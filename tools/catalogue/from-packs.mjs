@@ -53,7 +53,10 @@
  * in the `--packs` folder) names its catalogue id, the flag only the owner sets. Every other pack, a new one first of
  * all, is `unlisted`: in the index, installable by id, and in no listing. The flag is kept apart from the pack files so
  * that writing or publishing a pack can never list it. An id there that is no pack in the index, or whose latest file
- * says `unlisted: true`, stops the build by name. No file lists nothing. Use cases are not read against it. The
+ * says `unlisted: true`, stops the build by name. No file lists nothing. THE SAME FILE SAYS THE REST OF THE STORE'S
+ * TIERS (`usecases`, `examples`, `private` and `shelves`, read below): a starter from `packs/` is listed only when
+ * `usecases` names it once that key is there, a built-in starter always; an example setup and a shelf are carried onto
+ * the entry; a private add-on is unlisted and says `private`. The
  * index is not hashed, only the files are, so an entry published before these fields existed is given them here without
  * a new version, and a new version's `changes` becomes its `notes` through `publishTo`.
  *
@@ -83,6 +86,7 @@ import {
   fileChecksum,
   previewFile,
   publishTo,
+  SHELVES,
   readCatalogue,
   readCatalogueFile,
 } from '../../packages/declare/src/catalogue.ts';
@@ -222,9 +226,19 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
 /* EVERY ENTRY DESCRIBED FROM ITS LATEST FILE, the ones published before these fields existed included. A latest file
    that no longer reads through its door keeps the entry as it was, and the run says so rather than stopping the build
    over a version already published. */
-/* THE PACKS HE MARKED LISTED, read before any entry is described, and held to ids the index has. */
+/* THE PACKS HE MARKED LISTED, read before any entry is described, and held to ids the index has. AND THE REST OF HIS
+   LISTING, each optional: `usecases`, the starters from `packs/` the store lists (a built-in starter is always listed);
+   `examples`, the ones of those shown as example setups; `private`, the add-ons for one bank, country or person, never
+   listed and never updated without asking; and `shelves`, the store shelf each listed add-on stands on. */
 const listedPath = join(packsDir, LISTED_FILE);
 const marked = new Set();
+/** `null` while no `usecases` key is there: every starter from `packs/` is then listed, as before the key existed. */
+let markedUseCases = null;
+const examples = new Set();
+const privates = new Set();
+const shelfOf = new Map();
+const isIds = (list) => Array.isArray(list) && list.every((id) => typeof id === 'string' && id !== '');
+const hasEntry = (kind, id) => index.entries.some((e) => e.kind === kind && e.id === id);
 if (existsSync(listedPath)) {
   let doc;
   try {
@@ -232,13 +246,52 @@ if (existsSync(listedPath)) {
   } catch {
     fail(`packs/${LISTED_FILE} does not read as JSON.`);
   }
-  if (!Array.isArray(doc?.packs) || !doc.packs.every((id) => typeof id === 'string' && id !== '')) fail(`packs/${LISTED_FILE} says { "packs": [<catalogue id>, ...] }.`);
+  if (!isIds(doc?.packs)) fail(`packs/${LISTED_FILE} says { "packs": [<catalogue id>, ...] }.`);
   for (const id of doc.packs) {
     if (marked.has(id)) fail(`packs/${LISTED_FILE} names ${id} twice.`);
-    if (!index.entries.some((e) => e.kind === 'pack' && e.id === id)) fail(`packs/${LISTED_FILE} names ${id}, which is not a pack in the index.`);
+    if (!hasEntry('pack', id)) fail(`packs/${LISTED_FILE} names ${id}, which is not a pack in the index.`);
     marked.add(id);
   }
+  if (doc.usecases !== undefined) {
+    if (!isIds(doc.usecases)) fail(`packs/${LISTED_FILE} says "usecases": [<starter id>, ...].`);
+    markedUseCases = new Set();
+    for (const id of doc.usecases) {
+      if (markedUseCases.has(id)) fail(`packs/${LISTED_FILE} names the starter ${id} twice.`);
+      if (!hasEntry('usecase', id)) fail(`packs/${LISTED_FILE} names the starter ${id}, which is not a starter in the index.`);
+      markedUseCases.add(id);
+    }
+  }
+  if (doc.examples !== undefined) {
+    if (!isIds(doc.examples)) fail(`packs/${LISTED_FILE} says "examples": [<starter id>, ...].`);
+    for (const id of doc.examples) {
+      if (markedUseCases !== null && !markedUseCases.has(id)) fail(`packs/${LISTED_FILE} shows ${id} as an example setup, and does not list it under "usecases".`);
+      if (!hasEntry('usecase', id)) fail(`packs/${LISTED_FILE} shows ${id} as an example setup, which is not a starter in the index.`);
+      examples.add(id);
+    }
+  }
+  if (doc.private !== undefined) {
+    if (!isIds(doc.private)) fail(`packs/${LISTED_FILE} says "private": [<catalogue id>, ...].`);
+    for (const id of doc.private) {
+      if (marked.has(id)) fail(`packs/${LISTED_FILE} names ${id} as listed and as private. Take one of the two out.`);
+      if (!hasEntry('pack', id)) fail(`packs/${LISTED_FILE} names ${id} as private, which is not a pack in the index.`);
+      privates.add(id);
+    }
+  }
+  if (doc.shelves !== undefined) {
+    if (typeof doc.shelves !== 'object' || doc.shelves === null || Array.isArray(doc.shelves)) fail(`packs/${LISTED_FILE} says "shelves": { "<shelf>": [<catalogue id>, ...] }.`);
+    for (const [shelf, ids] of Object.entries(doc.shelves)) {
+      if (!SHELVES.includes(shelf)) fail(`packs/${LISTED_FILE} names the shelf ${shelf}, and the store's shelves are ${SHELVES.join(', ')}.`);
+      if (!isIds(ids)) fail(`packs/${LISTED_FILE} says "shelves": { "${shelf}": [<catalogue id>, ...] }.`);
+      for (const id of ids) {
+        if (shelfOf.has(id)) fail(`packs/${LISTED_FILE} puts ${id} on two shelves, ${shelfOf.get(id)} and ${shelf}.`);
+        if (!hasEntry('pack', id)) fail(`packs/${LISTED_FILE} puts ${id} on the ${shelf} shelf, which is not a pack in the index.`);
+        shelfOf.set(id, shelf);
+      }
+    }
+  }
 }
+/* The starters this build ships, listed whatever `usecases` says, since they are BrainDog's own. */
+const builtIn = new Set(USE_CASES.map((u) => u.usecase));
 
 const described = [];
 for (const entry of index.entries) {
@@ -250,16 +303,23 @@ for (const entry of index.entries) {
     described.push(entry);
     continue;
   }
-  const { categories: _c, publisher: _p, unlisted: _u, signals: _s, modules: _m, icon: _i, ...rest } = entry;
+  const { categories: _c, publisher: _p, unlisted: _u, signals: _s, modules: _m, icon: _i, shelf: _sh, example: _e, private: _pr, ...rest } = entry;
   const says = entry.kind === 'pack' && JSON.parse(text).unlisted === true;
   if (says && marked.has(entry.id)) fail(`packs/${LISTED_FILE} names ${entry.id}, whose latest file says unlisted: true. Take one of the two out.`);
-  const unlisted = entry.kind === 'pack' && (says || !marked.has(entry.id));
+  const own = entry.kind === 'pack' && privates.has(entry.id);
+  const unlisted =
+    entry.kind === 'pack' ? says || own || !marked.has(entry.id) : markedUseCases !== null && !builtIn.has(entry.id) && !markedUseCases.has(entry.id);
+  const tier = {
+    ...(own ? { private: true } : {}),
+    ...(entry.kind === 'usecase' && examples.has(entry.id) ? { example: true } : {}),
+    ...(entry.kind === 'pack' && shelfOf.has(entry.id) ? { shelf: shelfOf.get(entry.id) } : {}),
+  };
   /* A USE CASE PUBLISHED BEFORE ITS ENTRY SAID ITS WORDS is given them here, from the same latest file, as categories were. */
   const u = file.value.kind === 'usecase' ? file.value.shared.usecase : null;
   const heard = { ...(u && u.signals.length > 0 ? { signals: [...u.signals] } : {}), ...(u && u.modules.length > 0 ? { modules: [...u.modules] } : {}) };
   /* THE ICON IS THE ONE THE LATEST FILE NAMES (`icon` in the manifest), carried so Browse, Installed and the page draw it. */
   const iconSaid = file.value.kind === 'pack' ? file.value.file.doc.icon : undefined;
-  described.push({ ...rest, ...(typeof iconSaid === 'string' ? { icon: iconSaid } : {}), categories: categoriesOf(file.value, BRAINDOG_PUBLISHER.name), publisher: BRAINDOG_PUBLISHER, ...(unlisted ? { unlisted: true } : {}), ...heard });
+  described.push({ ...rest, ...(typeof iconSaid === 'string' ? { icon: iconSaid } : {}), categories: categoriesOf(file.value, BRAINDOG_PUBLISHER.name), publisher: BRAINDOG_PUBLISHER, ...(unlisted ? { unlisted: true } : {}), ...tier, ...heard });
 }
 index = { ...index, entries: described };
 

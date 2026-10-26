@@ -1,0 +1,395 @@
+{
+  "pack": "setup-sync",
+  "version": "1.0.4",
+  "icon": "refresh-cw",
+  "title": "Setup sync",
+  "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, locked on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
+  "changes": "Listed in the store, under Agents, beside Profiles. Nothing it keeps changed.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "profiles": "^1.0.0",
+      "people": ">=3.3.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "carry",
+      "name": "Carry",
+      "one": "thing to carry",
+      "icon": "briefcase",
+      "holds": "what each machine carries to the next, with where it lives on a Mac, on Windows and on Linux",
+      "title": "name",
+      "role": "carry",
+      "personal": true,
+      "state": "state",
+      "mobile": ["name", "kind", "state"],
+      "fields": [
+        { "id": "name", "label": "Name", "type": "text", "required": true, "max": 80, "search": true },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": ["files", "env", "patches", "sign_ins", "memory"],
+          "labels": { "files": "Files", "env": ".env files git ignores", "patches": "Work not yet pushed", "sign_ins": "Tool sign-ins", "memory": "Auto memory" },
+          "default": "files",
+          "required": true,
+          "index": true
+        },
+        { "id": "mac", "label": "On a Mac", "type": "text", "max": 512 },
+        { "id": "win", "label": "On Windows", "type": "text", "max": 512 },
+        { "id": "linux", "label": "On Linux", "type": "text", "max": 512 },
+        { "id": "leave_out", "label": "Leave out", "type": "list", "of": "text" },
+        { "id": "runs", "label": "Runs a program", "type": "bool" },
+        { "id": "whose", "label": "Belongs to", "type": "ref", "to": "people" },
+        { "id": "waits", "label": "Waits for a yes on", "type": "list", "of": "text" },
+        { "id": "note", "label": "Note", "type": "text", "max": 500 },
+        {
+          "id": "state",
+          "label": "Carried",
+          "type": "enum",
+          "values": ["on", "off"],
+          "labels": { "on": "On", "off": "Off" },
+          "default": "on",
+          "required": true,
+          "index": true
+        },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "register": "sync_bundles",
+      "name": "Bundles",
+      "one": "bundle",
+      "icon": "archive",
+      "holds": "what each machine locked and sent, written by that machine: when, what each thing held, and the locked files by hash",
+      "title": "host",
+      "personal": true,
+      "state": "state",
+      "done": ["older", "retired"],
+      "mobile": ["host", "at", "kept"],
+      "fields": [
+        { "id": "host", "label": "Machine", "type": "text", "required": true, "max": 120, "search": true, "index": true },
+        { "id": "ref", "label": "Bundle", "type": "text", "max": 120 },
+        { "id": "at", "label": "Sent", "type": "instant", "index": true },
+        { "id": "heard", "label": "Last checked", "type": "instant", "index": true },
+        { "id": "rows", "label": "What it sent", "type": "list", "of": "text" },
+        { "id": "files", "label": "Files", "type": "int" },
+        { "id": "size", "label": "Size", "type": "int" },
+        { "id": "sealed", "label": "Locked files", "type": "list", "of": "text" },
+        {
+          "id": "kept",
+          "label": "Result",
+          "type": "enum",
+          "values": ["whole", "partial"],
+          "labels": { "whole": "Everything", "partial": "Some of it" },
+          "default": "whole"
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": ["latest", "older", "retired"],
+          "labels": { "latest": "Latest", "older": "Older", "retired": "Machine retired" },
+          "default": "latest",
+          "required": true,
+          "index": true
+        }
+      ]
+    },
+    {
+      "register": "sync_drills",
+      "name": "Drills",
+      "one": "drill",
+      "icon": "shield-check",
+      "holds": "each restore drill: a bundle opened into a scratch folder on one machine, every file checked against its hash",
+      "title": "host",
+      "personal": true,
+      "state": "state",
+      "done": ["older"],
+      "mobile": ["host", "at", "grade"],
+      "fields": [
+        { "id": "host", "label": "Machine", "type": "text", "required": true, "max": 120, "search": true },
+        { "id": "ref", "label": "Bundle", "type": "text", "max": 120 },
+        { "id": "sent_by", "label": "Bundle from", "type": "text", "max": 120 },
+        { "id": "at", "label": "Ran", "type": "instant", "index": true },
+        {
+          "id": "grade",
+          "label": "Outcome",
+          "type": "enum",
+          "values": ["pass", "fail"],
+          "labels": { "pass": "Passed", "fail": "Failed" },
+          "required": true,
+          "index": true
+        },
+        { "id": "files", "label": "Files", "type": "int" },
+        { "id": "matched", "label": "Matched", "type": "int" },
+        { "id": "fails", "label": "What failed", "type": "list", "of": "text" },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": ["latest", "older"],
+          "labels": { "latest": "Latest", "older": "Older" },
+          "default": "latest",
+          "required": true,
+          "index": true
+        }
+      ]
+    },
+    {
+      "metric": "sync-quiet-machines",
+      "name": "Machines quiet for a week",
+      "source": "register.sync_bundles",
+      "where": "state is latest, heard before -7d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "rule": "sync-machine-quiet",
+      "name": "Ask about a machine that has sent nothing in seven days",
+      "register": "sync_bundles",
+      "when": "state is latest, heard before -7d",
+      "then": [
+        {
+          "suggest": {
+            "question": "{{host}} has not checked in its setup for seven days. Run braindog sync push there, or retire it if it is gone?",
+            "options": ["Push from it", "Retire it", "Leave it"]
+          }
+        }
+      ],
+      "once_per": ["entry", "heard"]
+    },
+    {
+      "rule": "sync-drill-due",
+      "name": "Ask for a restore drill when the last one is over thirty days old",
+      "register": "sync_drills",
+      "when": "state is latest, at before -30d",
+      "then": [
+        {
+          "suggest": {
+            "question": "The last restore drill ran over thirty days ago, on {{host}}. Run braindog sync drill to check a new machine could still be set up?",
+            "options": ["Run a drill", "Leave it"]
+          }
+        }
+      ],
+      "once_per": ["entry", "at"]
+    },
+    {
+      "page": "setup-sync",
+      "title": "Setup sync",
+      "nav": { "section": "Agents", "order": 51 },
+      "icon": "briefcase",
+      "requires": ["register.carry", "register.sync_bundles", "register.sync_drills"],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Each machine locks what it carries with your sync key before it leaves. BrainDog keeps only locked files it cannot open, and a new machine joins with your sync passphrase."
+        },
+        {
+          "kind": "stat",
+          "heading": "At a glance",
+          "icon": "gauge",
+          "span": 12,
+          "cells": [{ "metric": "sync-quiet-machines", "label": "Quiet for a week" }]
+        },
+        {
+          "kind": "table",
+          "heading": "Each machine's last bundle",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.sync_bundles",
+          "where": "state is latest",
+          "columns": [
+            { "field": "host", "label": "Machine", "width": "minmax(14ch,1fr)" },
+            { "field": "at", "label": "Sent", "width": "18ch" },
+            { "field": "heard", "label": "Last checked", "width": "18ch" },
+            { "field": "files", "label": "Files", "width": "8ch", "align": "end" },
+            { "field": "kept", "label": "Result", "width": "12ch" }
+          ],
+          "order": [{ "field": "host", "dir": "asc" }],
+          "limit": 50,
+          "empty": "No machine has sent anything yet. On each machine, run braindog sync join, then braindog sync push."
+        },
+        {
+          "kind": "cards",
+          "heading": "Waiting for a yes at a terminal",
+          "icon": "clock-alert",
+          "span": 12,
+          "source": "register.carry",
+          "where": "waits is set",
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "waits", "label": "Waits on", "as": "fact" },
+            { "field": "kind", "label": "Kind", "as": "fact" }
+          ],
+          "order": [{ "field": "name", "dir": "asc" }],
+          "empty": "Nothing waits for a yes. A program, tool sign-ins and somebody else's account are asked about at a terminal when braindog sync pull places them."
+        },
+        {
+          "kind": "cards",
+          "heading": "The last drill",
+          "icon": "shield-check",
+          "span": 12,
+          "source": "register.sync_drills",
+          "where": "state is latest",
+          "columns": [
+            { "field": "host", "as": "title" },
+            { "field": "grade", "label": "Outcome", "as": "fact" },
+            { "field": "sent_by", "label": "Bundle from", "as": "fact" },
+            { "field": "fails", "label": "What failed", "as": "fact" },
+            { "field": "at", "label": "Ran", "as": "when" }
+          ],
+          "empty": "No drill has run yet. braindog sync drill opens a bundle into a scratch folder, checks every file and removes the folder."
+        },
+        {
+          "kind": "table",
+          "heading": "What each machine carries",
+          "icon": "briefcase",
+          "span": 12,
+          "source": "register.carry",
+          "columns": [
+            { "field": "name", "label": "Name", "width": "minmax(14ch,1fr)" },
+            { "field": "kind", "label": "Kind", "width": "minmax(10ch,18ch)" },
+            { "field": "mac", "label": "On a Mac", "width": "minmax(12ch,1fr)" },
+            { "field": "win", "label": "On Windows", "width": "minmax(12ch,1fr)" },
+            { "field": "linux", "label": "On Linux", "width": "minmax(12ch,1fr)" },
+            { "field": "state", "label": "Carried", "width": "9ch" }
+          ],
+          "order": [{ "field": "name", "dir": "asc" }],
+          "limit": 50,
+          "empty": "Nothing to carry yet. Add what your machines should carry, with where it lives on each system."
+        },
+        {
+          "kind": "note",
+          "heading": "What the sync passphrase changes",
+          "icon": "lock",
+          "span": 12,
+          "body": "BrainDog can open what is locked: no, only your machines can. If you forget the passphrase, the machines that joined keep working, and one of them puts a new copy of the key back with braindog sync join."
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "heading": "If you lose the passphrase and every machine",
+          "icon": "circle-alert",
+          "span": 12,
+          "body": "Nothing locked can be opened again, by you or by anybody, and nobody can reset it. Keep the passphrase somewhere other than these machines."
+        },
+        {
+          "kind": "note",
+          "heading": "Tool sign-ins move, they are never shared",
+          "icon": "key",
+          "span": 12,
+          "body": "A tool sign-in lives on one machine at a time. Retire the old machine with braindog sync retire, and the next pull moves its sign-ins, so two machines never sign each other out. Your agent apps' own logins never leave the machine they were made on."
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "carry",
+      "fields": {
+        "name": "Tool sign-ins",
+        "kind": "sign_ins",
+        "mac": "keychain:ccenv-mcp-auth",
+        "win": "~/.ccenv/shared/mcp-auth.json",
+        "linux": "~/.ccenv/shared/mcp-auth.json",
+        "note": "The sign-ins your agent apps' tools share. They move to a new machine once the old one is retired, and never to an agent app's own login.",
+        "state": "on"
+      }
+    },
+    {
+      "register": "carry",
+      "fields": {
+        "name": ".env files",
+        "kind": "env",
+        "mac": "~/Developer",
+        "win": "~/Developer",
+        "linux": "~/Developer",
+        "note": "Each .env file git ignores in the repositories under this folder. Single keys belong in the vault.",
+        "state": "on"
+      }
+    },
+    {
+      "register": "carry",
+      "fields": {
+        "name": "npm settings",
+        "kind": "files",
+        "mac": "~/.npmrc",
+        "win": "~/.npmrc",
+        "linux": "~/.npmrc",
+        "state": "on"
+      }
+    },
+    {
+      "register": "carry",
+      "fields": {
+        "name": "Context folder",
+        "kind": "files",
+        "mac": "~/.claude/context",
+        "win": "~/.claude/context",
+        "linux": "~/.claude/context",
+        "leave_out": ["06-conversation-history"],
+        "state": "on"
+      }
+    },
+    {
+      "register": "carry",
+      "fields": {
+        "name": "Local programs",
+        "kind": "files",
+        "mac": "~/.local/bin",
+        "linux": "~/.local/bin",
+        "leave_out": ["claude"],
+        "runs": true,
+        "note": "No Windows place: these programs run in bash. claude itself is installed again, never carried.",
+        "state": "on"
+      }
+    },
+    {
+      "register": "carry",
+      "fields": {
+        "name": "ccenv shared files",
+        "kind": "files",
+        "mac": "~/.ccenv/shared",
+        "win": "~/.ccenv/shared",
+        "linux": "~/.ccenv/shared",
+        "leave_out": ["mcp-auth.json", ".mcp-auth.lock", "*.cache.json"],
+        "runs": true,
+        "state": "on"
+      }
+    },
+    {
+      "register": "carry",
+      "fields": {
+        "name": "Work not yet pushed",
+        "kind": "patches",
+        "mac": "~/Developer",
+        "win": "~/Developer",
+        "linux": "~/Developer",
+        "note": "Each repository's commits on no remote, its staged and unstaged changes and its new files, put back with braindog sync patches.",
+        "state": "on"
+      }
+    },
+    {
+      "register": "carry",
+      "fields": {
+        "name": "Auto memory",
+        "kind": "memory",
+        "mac": "~/.claude/projects",
+        "win": "~/.claude/projects",
+        "linux": "~/.claude/projects",
+        "note": "Auto memory waits on the owner's yes: it sits beside the session transcripts, which are never read.",
+        "state": "off"
+      }
+    }
+  ]
+}

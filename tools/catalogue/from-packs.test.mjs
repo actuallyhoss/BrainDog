@@ -210,3 +210,49 @@ test('THE STORE LISTS WHAT packs/listed.json NAMES, and nothing else', () => {
   const named = new Set(JSON.parse(readFileSync(join(ROOT, 'packs', 'listed.json'), 'utf8')).packs);
   for (const e of listedEntries(index.value).filter((x) => x.kind === 'pack')) assert.ok(named.has(e.id), `${e.id} is listed and packs/listed.json does not name it`);
 });
+
+test('THE STORE\'S TIERS: a starter from packs/ is listed once named, an example is marked, a private add-on is never listed, and each shelf is carried', () => {
+  const packs = packsFolder();
+  const to = scratch();
+  write(join(packs, 'listed.json'), { packs: [], usecases: [], private: ['shelf'], shelves: { 'money': ['shelf'] } });
+  const hidden = run(packs, to);
+  assert.equal(hidden.status, 0, hidden.stderr);
+  const entry = (kind, id) => indexOf(to).entries.find((e) => e.kind === kind && e.id === id);
+  assert.equal(entry('usecase', 'rent-book')?.unlisted, true, 'a starter from packs/ that usecases does not name is unlisted');
+  assert.ok(listedEntries(indexOf(to)).some((e) => e.kind === 'usecase' && e.id === 'founder'), 'a built-in starter is listed whatever usecases says');
+  assert.equal(entry('pack', 'shelf')?.private, true);
+  assert.equal(entry('pack', 'shelf')?.unlisted, true, 'a private add-on is unlisted too');
+  assert.equal(entry('pack', 'shelf')?.shelf, 'money');
+  assert.ok(!listedEntries(indexOf(to)).some((e) => e.id === 'shelf'));
+
+  write(join(packs, 'listed.json'), { packs: ['shelf'], usecases: ['rent-book'], examples: ['rent-book'], shelves: { 'reading': ['shelf'] } });
+  const shown = run(packs, to);
+  assert.equal(shown.status, 0, shown.stderr);
+  assert.equal(entry('usecase', 'rent-book')?.unlisted, undefined);
+  assert.equal(entry('usecase', 'rent-book')?.example, true);
+  assert.equal(entry('pack', 'shelf')?.private, undefined, 'a tier is worked out again on every run');
+  assert.equal(entry('pack', 'shelf')?.shelf, 'reading');
+
+  for (const [listed, said] of [
+    [{ packs: ['shelf'], private: ['shelf'] }, /names shelf as listed and as private/u],
+    [{ packs: [], usecases: [], examples: ['rent-book'] }, /shows rent-book as an example setup, and does not list it/u],
+    [{ packs: [], shelves: { garden: ['shelf'] } }, /names the shelf garden/u],
+    [{ packs: [], shelves: { 'money': ['shelf'], 'looks': ['shelf'] } }, /puts shelf on two shelves/u],
+  ]) {
+    write(join(packs, 'listed.json'), listed);
+    const out = run(packs, to);
+    assert.equal(out.status, 1, JSON.stringify(listed));
+    assert.match(out.stderr, said);
+  }
+});
+
+test('BRAINDOG\'S OWN LISTING: private and example tiers as the owner set them, and no listed add-on off a shelf', () => {
+  const index = readCatalogue(JSON.parse(readFileSync(join(ROOT, 'apps', 'web', 'static', 'catalogue', 'index.json'), 'utf8')));
+  assert.ok(index.ok);
+  const listed = listedEntries(index.value);
+  assert.ok(!listed.some((e) => e.private === true), 'a private add-on is listed');
+  for (const e of listed.filter((x) => x.kind === 'pack')) assert.ok(e.shelf !== undefined, `${e.id} is listed on no shelf`);
+  assert.deepEqual(listed.filter((e) => e.example === true).map((e) => e.id).sort(), ['landlord', 'photographer', 'retainer-hours']);
+  for (const id of ['studies', 'team-board', 'new-project']) assert.ok(!listed.some((e) => e.kind === 'usecase' && e.id === id), `${id} is a starter listed twice`);
+  for (const id of ['flow-check', 'rule-sheet', 'live-feed', 'mercury-company', 'feed-example', 'hello']) assert.ok(!listed.some((e) => e.id === id), `${id} is listed`);
+});

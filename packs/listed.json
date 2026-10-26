@@ -1,5 +1,5 @@
 {
-  "note": "The add-ons the store lists, by catalogue id. Only the owner adds one here (call 12 of the 22 Oct audit): a pack not named here installs by id and is in no listing. tools/catalogue/from-packs.mjs reads it.",
+  "note": "The store's listing, by catalogue id. Only the owner changes it (call 12 of the 22 Oct audit): a pack not named under packs installs by id and is in no listing. usecases are the starters from packs/ the store lists (the built-in starters always are), examples the ones shown as example setups, private the add-ons for one bank, country or person (never listed, never updated without asking), and shelves the store shelf each one stands on. tools/catalogue/from-packs.mjs reads it.",
   "packs": [
     "agent-notes",
     "card-alerts",
@@ -14,14 +14,27 @@
     "pad",
     "pad-second-opinion",
     "portfolio-bands",
+    "profiles",
     "project-brief",
     "reading-list",
     "roadmap",
+    "setup-sync",
     "slash-desk",
     "standup",
     "stripe",
     "task-tiers",
     "week-in-money",
     "worked-numbers"
-  ]
+  ],
+  "usecases": ["landlord", "photographer", "retainer-hours"],
+  "examples": ["landlord", "photographer", "retainer-hours"],
+  "private": ["bank-hsbc-eg"],
+  "shelves": {
+    "money": ["stripe", "mercury", "card-alerts", "money-watch", "count-cash", "holdings", "week-in-money"],
+    "planning": ["project-brief", "task-tiers", "portfolio-bands", "worked-numbers", "fixed-dates", "standup", "launch-desk", "roadmap"],
+    "helpers": ["agent-notes", "job-starter", "profiles", "setup-sync", "slash-desk"],
+    "reading": ["pad", "reading-list", "pad-second-opinion"],
+    "looks": ["harbour-look"],
+    "regions": ["bank-hsbc-eg"]
+  }
 }

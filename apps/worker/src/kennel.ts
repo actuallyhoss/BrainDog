@@ -197,8 +197,9 @@ export async function serveKennel(request: Request, deps: KennelDeps): Promise<R
     }
     switch (asked.ask) {
       case 'index': {
-        /* THE PUBLIC INDEX LEAVES OUT AN `unlisted` ENTRY, while its files still download by exact path, and
-           install by id keeps resolving against the bundled catalogue, which keeps it. */
+        /* THE PUBLIC INDEX LEAVES OUT AN `unlisted` ENTRY AND A `private` ONE (`listedEntries`), while its files still
+           download by exact path, and install by id or by link keeps resolving against the bundled catalogue, which
+           keeps it. */
         const merged = mergeIndexes(await bundledIndex(deps.assets, false), await readingIndex(deps.blobs));
         return answer(200, JSON.stringify({ ...merged, entries: listedEntries(merged) }), { head });
       }

@@ -159,6 +159,14 @@ export type CatalogueVersion = {
 export const CATEGORIES = ['ways-of-working', 'modules', 'templates', 'connectors', 'doors', 'automations', 'blocks', 'themes', 'made-by-braindog'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/**
+ * THE SHELF OF THE STORE AN ENTRY STANDS ON, by what it is for: money, projects and work, agents, notes and reading, looks,
+ * and banks and regions. BrainDog's own are placed by the owner's `packs/listed.json` (`shelves`); an entry with none is
+ * placed by the store from what it needs (`lib/market/shelves.ts` in the web app).
+ */
+export const SHELVES = ['money', 'planning', 'helpers', 'reading', 'looks', 'regions'] as const;
+export type Shelf = (typeof SHELVES)[number];
+
 /** Who published an entry, as the catalogue knows it: BrainDog itself, an author's signing key, or a person signed in. */
 export type Publisher = { kind: 'braindog' | 'key' | 'person'; id: string; name: string };
 
@@ -184,6 +192,15 @@ export type CatalogueEntry = {
    * installable by id and updated as any other, and left out of every listing.
    */
   unlisted?: true;
+  /**
+   * PRIVATE: an add-on for one bank, one country or one person (`packs/listed.json` `private`). Always unlisted as well,
+   * installable by id or link only, never suggested, and never updated without asking, whoever made it.
+   */
+  private?: true;
+  /** A starter shown on the store's "Example setups" shelf: a whole setup to copy from, for a trade BrainDog does not run itself. */
+  example?: true;
+  /** The store shelf it stands on (`SHELVES`). */
+  shelf?: Shelf;
   /** The icon its latest file names from the app's icon set, drawn on Browse, the installed list and its page; absent draws the generic one. */
   icon?: string;
   /**
@@ -230,7 +247,9 @@ export function readPreview(doc: unknown): Result<Preview> {
 /* AND AN ENTRY WITH NO VERSION LEFT TO INSTALL IS NOT LISTED (the scope of 24 October, E17): `feed-example` and
    `rates-open-er-api-com` had every version yanked and still stood in the store under their ids, offering nothing. A
    record that holds one still reads it by id, as an unlisted one is read. */
-export const listedEntries = (index: CatalogueIndex): CatalogueEntry[] => index.entries.filter((e) => e.unlisted !== true && e.versions.some((v) => v.yanked === undefined));
+/* A PRIVATE ENTRY IS NEVER LISTED, even one an older index wrote without `unlisted` beside it. */
+export const listedEntries = (index: CatalogueIndex): CatalogueEntry[] =>
+  index.entries.filter((e) => e.unlisted !== true && e.private !== true && e.versions.some((v) => v.yanked === undefined));
 
 /** The version an entry offers to install or update to: its newest that is not yanked, or `null` when every one is. */
 export const offeredVersion = (entry: Pick<CatalogueEntry, 'versions'>): CatalogueVersion | null => entry.versions.find((v) => v.yanked === undefined) ?? null;
@@ -570,11 +589,12 @@ const wordsRead = (x: unknown): string[] | null => (Array.isArray(x) && x.every(
 
 /**
  * An entry's marketplace fields kept only in their shapes: categories this version names, a publisher with its three
- * parts, `unlisted` only as `true`, and a use case's `signals` and `modules` only as lists of words, so a number there
+ * parts, `unlisted` and `private` only as `true` (a private entry is unlisted too), a use case's `example` only as `true`,
+ * a shelf only one of `SHELVES`, and a use case's `signals` and `modules` only as lists of words, so a number there
  * from a hand-edited index is dropped rather than heard.
  */
 const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): CatalogueEntry => {
-  const { categories, publisher, unlisted, signals, modules, icon, ...rest } = e;
+  const { categories, publisher, unlisted, signals, modules, icon, shelf, example, private: own, ...rest } = e;
   const named = Array.isArray(categories) ? CATEGORIES.filter((c) => categories.includes(c)) : null;
   const who: Publisher | null =
     isMap(publisher) && (publisher.kind === 'braindog' || publisher.kind === 'key' || publisher.kind === 'person') && typeof publisher.id === 'string' && typeof publisher.name === 'string'
@@ -586,7 +606,10 @@ const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): Ca
     latest: (versions[0] as CatalogueVersion).version,
     ...(named ? { categories: named } : {}),
     ...(who ? { publisher: who } : {}),
-    ...(unlisted === true ? { unlisted: true as const } : {}),
+    ...(unlisted === true || own === true ? { unlisted: true as const } : {}),
+    ...(own === true ? { private: true as const } : {}),
+    ...(example === true && e.kind === 'usecase' ? { example: true as const } : {}),
+    ...(typeof shelf === 'string' && (SHELVES as readonly string[]).includes(shelf) ? { shelf: shelf as Shelf } : {}),
     ...(typeof icon === 'string' && glyphFault(icon) === null ? { icon } : {}),
     ...(e.kind === 'usecase' && wordsRead(signals) ? { signals: wordsRead(signals) as string[] } : {}),
     ...(e.kind === 'usecase' && wordsRead(modules) ? { modules: wordsRead(modules) as string[] } : {}),

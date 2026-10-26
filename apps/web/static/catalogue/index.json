@@ -59,6 +59,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "helpers",
       "icon": "notebook-pen"
     },
     {
@@ -250,6 +251,8 @@
         "name": "BrainDog"
       },
       "unlisted": true,
+      "private": true,
+      "shelf": "regions",
       "icon": "piggy-bank"
     },
     {
@@ -366,6 +369,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "money",
       "icon": "credit-card"
     },
     {
@@ -671,6 +675,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "money",
       "icon": "hand-coins"
     },
     {
@@ -790,6 +795,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "calendar"
     },
     {
@@ -839,7 +845,11 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "The first version. Now draws its own icon."
+          "notes": "The first version. Now draws its own icon.",
+          "yanked": {
+            "reason": "A test bench for BrainDog's own checks, not an add-on to install",
+            "at": "2026-10-26T22:43:05.877Z"
+          }
         },
         {
           "version": "1.0.0",
@@ -878,7 +888,11 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "The first version."
+          "notes": "The first version.",
+          "yanked": {
+            "reason": "A test bench for BrainDog's own checks, not an add-on to install",
+            "at": "2026-10-26T22:43:05.877Z"
+          }
         }
       ],
       "categories": [
@@ -931,7 +945,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "shelf": "looks"
     },
     {
       "kind": "pack",
@@ -1197,6 +1212,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "money",
       "icon": "chart-pie"
     },
     {
@@ -1251,6 +1267,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "helpers",
       "icon": "list-todo"
     },
     {
@@ -1630,6 +1647,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "flag-triangle-right"
     },
     {
@@ -1663,7 +1681,11 @@
               }
             ]
           },
-          "notes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made. Now draws its own icon."
+          "notes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made. Now draws its own icon.",
+          "yanked": {
+            "reason": "An example that polls a made-up address. Set a poll up on a project's page, under Send numbers here",
+            "at": "2026-10-26T22:43:05.877Z"
+          }
         },
         {
           "version": "2.0.0",
@@ -1686,7 +1708,11 @@
               }
             ]
           },
-          "notes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made."
+          "notes": "The add-on is now live-feed, the one every feed is filled from. A number can be money, written as an amount and its currency. A number can be dated from the answer, a day or an instant, rather than when the answer arrived. A feed asked in whole days can say the time of day and the zone. An id too long for its poll is refused in a sentence rather than cut short, and past twenty numbers a second poll of the same address is made.",
+          "yanked": {
+            "reason": "An example that polls a made-up address. Set a poll up on a project's page, under Send numbers here",
+            "at": "2026-10-26T22:43:05.877Z"
+          }
         }
       ],
       "categories": [
@@ -1861,6 +1887,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "money",
       "icon": "piggy-bank"
     },
     {
@@ -2221,6 +2248,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "money",
       "icon": "money"
     },
     {
@@ -2439,6 +2467,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "reading",
       "icon": "edit"
     },
     {
@@ -2503,6 +2532,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "reading",
       "icon": "messages-square"
     },
     {
@@ -2748,6 +2778,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "chart-bar"
     },
     {
@@ -2758,8 +2789,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.2",
+      "latest": "1.2.3",
       "versions": [
+        {
+          "version": "1.2.3",
+          "checksum": "334c711c5687a4e709ea5924305ff1c8a4becab17a87f240868a2ce8b3dfd313",
+          "bytes": 12098,
+          "published_at": "2026-10-26T22:43:05.877Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Listed in the store, under Agents, beside Setup sync. Nothing in it changed."
+        },
         {
           "version": "1.2.2",
           "checksum": "85add9e8623742443fe67207a34007096eaac137a878bd3fbc599230d8646158",
@@ -2909,7 +2968,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true,
+      "shelf": "helpers",
       "icon": "people"
     },
     {
@@ -3100,6 +3159,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "clipboard-list"
     },
     {
@@ -3310,6 +3370,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "reading",
       "icon": "book-open"
     },
     {
@@ -3510,6 +3571,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "square-kanban"
     },
     {
@@ -3557,6 +3619,10 @@
             "calls_out": []
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+          "yanked": {
+            "reason": "A test sheet for BrainDog's own checks, not an add-on to install",
+            "at": "2026-10-26T22:43:05.877Z"
+          },
           "preview": true
         },
         {
@@ -3594,6 +3660,10 @@
             "calls_out": []
           },
           "notes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed.",
+          "yanked": {
+            "reason": "A test sheet for BrainDog's own checks, not an add-on to install",
+            "at": "2026-10-26T22:43:05.877Z"
+          },
           "preview": true
         },
         {
@@ -3631,6 +3701,10 @@
             "calls_out": []
           },
           "notes": "A project's page now reads that project's own next step, how many domains and repositories it holds and the day it aims for, and Values shows one day as it reads in two zones.",
+          "yanked": {
+            "reason": "A test sheet for BrainDog's own checks, not an add-on to install",
+            "at": "2026-10-26T22:43:05.877Z"
+          },
           "preview": true
         },
         {
@@ -3668,6 +3742,10 @@
             "calls_out": []
           },
           "notes": "The first version: Values, Blocks, Counts, Layout and ten short pages, in one section drawn as tabs.",
+          "yanked": {
+            "reason": "A test sheet for BrainDog's own checks, not an add-on to install",
+            "at": "2026-10-26T22:43:05.877Z"
+          },
           "preview": true
         }
       ],
@@ -3691,8 +3769,37 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.3",
+      "latest": "1.0.4",
       "versions": [
+        {
+          "version": "1.0.4",
+          "checksum": "fe4a4f07489863349f603377411c65513c9b3a576515f183ae252502ad277551",
+          "bytes": 15012,
+          "published_at": "2026-10-26T22:43:05.877Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "profiles",
+              "people"
+            ],
+            "lists": [
+              "Carry",
+              "Bundles",
+              "Drills"
+            ],
+            "pages": [
+              "Setup sync"
+            ],
+            "rules": [
+              "Ask about a machine that has sent nothing in seven days",
+              "Ask for a restore drill when the last one is over thirty days old"
+            ],
+            "examples": 8,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Listed in the store, under Agents, beside Profiles. Nothing it keeps changed."
+        },
         {
           "version": "1.0.3",
           "checksum": "a5e0059f46630007f3b510102bcea333e6d82baf873b05fcb0c2e1fa532a54ae",
@@ -3819,7 +3926,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true,
+      "shelf": "helpers",
       "icon": "refresh-cw"
     },
     {
@@ -3879,6 +3986,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "helpers",
       "icon": "slash"
     },
     {
@@ -3938,6 +4046,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "message-circle"
     },
     {
@@ -4131,6 +4240,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "money",
       "icon": "badge-dollar-sign"
     },
     {
@@ -4299,6 +4409,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "list-ordered"
     },
     {
@@ -4459,6 +4570,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "money",
       "icon": "calendar-range"
     },
     {
@@ -4529,6 +4641,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "shelf": "planning",
       "icon": "chart-line"
     },
     {
@@ -5057,6 +5170,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "example": true,
       "signals": [
         "landlord",
         "flats",
@@ -5125,6 +5239,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "unlisted": true,
       "signals": [
         "starting a project",
         "start a project",
@@ -5317,6 +5432,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "example": true,
       "signals": [
         "photographer",
         "photography",
@@ -5386,6 +5502,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "example": true,
       "signals": [
         "retainer",
         "retainers",
@@ -5643,6 +5760,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "unlisted": true,
       "signals": [
         "studies",
         "my courses",
@@ -6021,6 +6139,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
+      "unlisted": true,
       "signals": [
         "team task list",
         "task list for my team",

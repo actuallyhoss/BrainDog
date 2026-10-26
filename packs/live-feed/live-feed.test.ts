@@ -86,9 +86,12 @@ test('the file as it ships, with its marks taken off, is its own example filled,
 
 test('THE WITHDRAWN EXAMPLE SAYS WHERE A POLL IS SET UP NOW: the form on a project\'s page, not Settings', () => {
   const yanked = JSON.parse(readFileSync(new URL('./yanked.json', import.meta.url), 'utf8')) as Record<string, string>;
-  assert.deepEqual(Object.keys(yanked), ['feed-example']);
-  assert.match(yanked['feed-example']!, /project's page, under Send numbers here/u);
-  assert.doesNotMatch(yanked['feed-example']!, /Settings|\u2014/u);
+  /* AND LIVE FEED ITSELF IS WITHDRAWN, an example that polls a made-up address: dropped from the store, with the same pointer. */
+  assert.deepEqual(Object.keys(yanked), ['feed-example', 'live-feed']);
+  for (const id of ['feed-example', 'live-feed']) {
+    assert.match(yanked[id]!, /project's page, under Send numbers here/u);
+    assert.doesNotMatch(yanked[id]!, /Settings|\u2014/u);
+  }
 });
 
 test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {

@@ -298,3 +298,23 @@ test('a key asking for its own submissions is told waiting, then declined with t
   assert.equal((await serveKennel(post('submit', await signedSubmission(addon('1.0.1'), key)), deps)).status, 200);
   assert.deepEqual((await asked(key)).map((r) => [r.version, r.state]), [['1.0.1', 'waiting']]);
 });
+
+test('a private add-on of the bundled catalogue is never in the public index, and its file still downloads by its path', async () => {
+  const BANK: CatalogueEntry = { ...PAD, id: 'bank-x', title: 'A bank', private: true };
+  const files: Record<string, string> = {
+    '/app/catalogue/index.json': JSON.stringify({ ...BUNDLED, entries: [PAD, BANK] }),
+    '/app/catalogue/packs/bank-x/1.0.0.pack.json': '{"pack":"bank-x"}',
+  };
+  const own = {
+    fetch: async (request: Request): Promise<Response> => {
+      const text = files[new URL(request.url).pathname];
+      return text === undefined
+        ? new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } })
+        : new Response(text, { headers: { 'content-type': 'application/json' } });
+    },
+  };
+  const deps = { ...depsOf(bucket().blobs), assets: own };
+  const index = (await (await serveKennel(get('index.json'), deps)).json()) as CatalogueIndex;
+  assert.deepEqual(index.entries.map((e) => e.id), ['pad']);
+  assert.equal((await serveKennel(get('packs/bank-x/1.0.0.pack.json'), deps)).status, 200);
+});

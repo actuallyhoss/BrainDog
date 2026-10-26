@@ -1,11 +1,10 @@
 {
   "pack": "profiles",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "icon": "people",
   "title": "Profiles",
   "summary": "Each setup your agents run under: the app, the account it signs in as, how it is paid for and the projects it serves, with every machine it is on and whether each copy still matches. Kept for you alone, so nobody you share with sees it.",
-  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
-  "unlisted": true,
+  "changes": "Listed in the store, under Agents, beside Setup sync. Nothing in it changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
