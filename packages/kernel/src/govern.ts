@@ -3763,7 +3763,7 @@ function windowMs(window: string): number {
  * then will not install. The decision stands — somebody did answer — and the question comes back,
  * because a suggestion resolved with nothing behind it is the gate telling a lie.
  */
-export function reopen(deps: GovernDeps, id: string, why = 'What was accepted would not install.'): Result<null> {
+export function reopen(deps: GovernDeps, id: string, why = 'What was accepted would not install.', asked?: Record<string, unknown>): Result<null> {
   const row = deps.sql.one<{ status: string; resolved_as: string | null; body_kind: BodyKind }>(
     'SELECT status, resolved_as, body_kind FROM suggestion WHERE id = ?',
     id,
@@ -3821,6 +3821,9 @@ export function reopen(deps: GovernDeps, id: string, why = 'What was accepted wo
      WHERE id = ?`,
     id,
   );
+  /* AND IT MAY COME BACK ASKING WHAT IS TRUE NOW (`asked`): an add-on whose catalogue moved on since is asked again at the
+     version the catalogue holds, worked out by the caller as a new question would be, so a yes can land. */
+  if (asked !== undefined) deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(asked), id);
 
   /* AND IT SAYS SO, because the first law of this file is that a decision is a row and not a side
      effect. Without this a resolved row went back to open with nothing between the `resolve` event

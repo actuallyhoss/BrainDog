@@ -12912,8 +12912,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* AND IT LANDS BEFORE THE ANSWER IS TRUE. What will not apply reopens the question, with what was kept in its sentence. */
         const applied = await arrangement.apply(out.value.apply.kind, out.value.apply.body, actorOf(ctx));
         if (!applied.ok) {
-          kernel.reopen(out.value.suggestion, 'refusal' in applied ? applied.refusal.fix : undefined);
-          return tail(applied);
+          /* AN ADD-ON WHOSE CATALOGUE MOVED ON COMES BACK ASKING FOR THE VERSION IT HOLDS NOW (`askAgain`), so the next yes
+             installs it: "Propose it again" was a step only an agent could take. */
+          const refusal = 'refusal' in applied ? applied.refusal : undefined;
+          const again = refusal?.code === 'PLAN_STALE' ? await arrangement.askAgain(out.value.apply.kind, out.value.apply.body) : null;
+          kernel.reopen(out.value.suggestion, again?.said ?? refusal?.fix, again?.body);
+          return tail(again && refusal ? { ok: false as const, refusal: { ...refusal, fix: again.said } } : applied);
         }
         const { apply: _handed, ...decided } = out.value;
         /* KEPT ON THE DECISION, so what was applied is read back after a reload and by every other member. */

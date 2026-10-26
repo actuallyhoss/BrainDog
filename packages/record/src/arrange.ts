@@ -2235,5 +2235,30 @@ export function arranger(d: ArrangeDeps) {
     return ok(made.map((m) => m.spoken));
   }
 
-  return { overview, declaration, prepare, apply, setup };
+  /**
+   * An add-on's install asked again at the version the catalogue holds now, when its plan went stale because the
+   * catalogue moved on (`PLAN_STALE` in `apply`): the body `prepare` files for it today, and the sentence the question
+   * comes back with. `null` for anything else, or when it would not plan today, and the refusal then stands as it was.
+   *
+   * MEASURED ON THE LIVE RECORD: an install of Profiles was asked at 1.2.0, the catalogue moved to 1.2.1 before the yes,
+   * and the question came back saying "Propose it again", which an owner cannot do: an add-on the catalogue does not list
+   * is not in Browse. Asked again here, it waits at 1.2.1 with the plan that version makes, and the next yes installs it.
+   */
+  async function askAgain(kind: 'pack' | 'settings' | 'arrange', body: Body): Promise<{ body: Body; said: string } | null> {
+    if (kind !== 'pack' || typeof body.install !== 'string') return null;
+    const id = body.install;
+    const fresh = await prepare('pack', { install: id, ...(isMap(body.doc) ? { doc: body.doc } : {}) });
+    if (!fresh.ok) return null;
+    const versionIn = (b: Body): string | null => {
+      const step = (Array.isArray(b.plan) ? (b.plan as Body[]) : []).find((s) => s.pack === id);
+      return typeof step?.version === 'string' ? step.version : null;
+    };
+    const was = versionIn(body);
+    const now = versionIn(fresh.value);
+    if (now === null || now === was) return null;
+    const title = typeof fresh.value.title === 'string' && fresh.value.title.trim() !== '' ? fresh.value.title.trim() : titleOf(id);
+    return { body: fresh.value, said: `${title} is at ${now} in the catalogue now${was === null ? '' : `, where this asked for ${was}`}, so it asks for ${now}. Read it again, and accept to install it.` };
+  }
+
+  return { overview, declaration, prepare, apply, setup, askAgain };
 }

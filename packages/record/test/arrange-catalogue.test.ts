@@ -169,3 +169,23 @@ test('A FILE CHANGED AFTER THE QUESTION WAS FILED INSTALLS NOTHING, and a docume
   assert.equal(sent.code, 'VALUE_MALFORMED');
   assert.equal(sent.at, 'body.doc');
 });
+
+test('AN INSTALL WHOSE CATALOGUE MOVED ON IS ASKED AGAIN AT THE VERSION IT HOLDS NOW, and that yes installs it', async () => {
+  const key = await newAuthorKey('Halden');
+  const { a } = await recordOn(await catalogue([addon('1.0.0')], key));
+  const filed = value<Record<string, unknown>>(await a.prepare('pack', { install: 'ledgerline' }));
+
+  /* PUBLISHED AGAIN BEFORE THE YES: the install is refused as stale, and asked again at 1.1.0 rather than left to an agent. */
+  const moved = await recordOn(await catalogue([addon('1.0.0'), addon('1.1.0')], key));
+  assert.equal(refusal(await moved.a.apply('pack', filed, OWNER)).code, 'PLAN_STALE');
+  const asked = (await moved.a.askAgain('pack', filed))!;
+  assert.equal(asked.said, 'Ledgerline is at 1.1.0 in the catalogue now, where this asked for 1.0.0, so it asks for 1.1.0. Read it again, and accept to install it.');
+  assert.doesNotMatch(asked.said, /Propose|ledgerline/u);
+  const done = value<{ installed?: string[] }>(await moved.a.apply('pack', asked.body, OWNER));
+  assert.deepEqual(done.installed, ['ledgerline']);
+  assert.deepEqual(moved.k.packs().map((p) => [p.id, p.version]), [['ledgerline', '1.1.0']]);
+
+  /* A PLAN AT THE VERSION ON OFFER IS NOT ASKED AGAIN. */
+  const fresh = await recordOn(await catalogue([addon('1.0.0'), addon('1.1.0')], key));
+  assert.equal(await fresh.a.askAgain('pack', asked.body), null);
+});

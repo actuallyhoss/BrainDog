@@ -11287,7 +11287,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     },
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
-    reopen: (id: string, why?: string): Result<null> => transaction(() => reopen(governDeps(), id, why)),
+    reopen: (id: string, why?: string, asked?: Record<string, unknown>): Result<null> => transaction(() => reopen(governDeps(), id, why, asked)),
 
     /** Keep what an accepted arrangement did on its decision, so a reload and every other reader see it. */
     keepApplied: (decision: string, applied: Record<string, unknown>, actor: string): Result<null> =>
