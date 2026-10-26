@@ -703,6 +703,8 @@ export type QueueQuestion = {
   options: QueueOption[];
   about?: string;
   list?: string | null;
+  /** The list a rowset adds to or changes, which a question whose `about` names no row is on; absent on any other body. */
+  rows_on?: string;
   /** The person handed this question to decide (USE-A13), a person id; absent when nobody was handed it. */
   decider?: string | null;
   /**
@@ -780,7 +782,8 @@ export const ROWS_SAID_MOVES = 4;
 export type QueueCandidate = { at: string; name: string; seen: string[]; kept?: true };
 
 /** What a queue's `where:` reads of an open question: who asked, what kind and band it is, and what it is about. */
-export type OpenFacts = { who: string; kind: string; cost: Cost; about: string | null };
+/** `rows_on` is the list a rowset adds to or changes, which a question that names no row of its own is on (`list is`). */
+export type OpenFacts = { who: string; kind: string; cost: Cost; about: string | null; rows_on?: string | null };
 
 /**
  * How many days an open question waits before it is said to have waited too long: two weeks. The record counts them

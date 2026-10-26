@@ -92,6 +92,12 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A COUNT SAYS IT IS ONE (the pass of 27 October, UX46): a bare "2" before "Claude changed Priya Raman" read as a
+     stray figure, so a burst's count is "2×", how many times the line happened. */
+  .feed-count:not(:empty)::after {
+    content: '×';
+  }
+
   /* A face is round and a rule's mark is square, so the two are told apart by shape. */
   .feed-face {
     display: grid;

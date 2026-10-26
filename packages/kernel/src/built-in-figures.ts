@@ -1052,18 +1052,31 @@ const SPOKEN_ROW = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
  * How many open questions at `at` are about a row of `list`, or of any list with `null`. THE QUEUE'S RULE, NOT A
  * PATTERN OF ITS OWN: `about` is a spoken id and its list is the part before the `#` (`QueueQuestion.list`), so a word
  * such as `Box`, a body this record cannot parse, and an `about` that is not text are on no list.
+ *
+ * AND A QUESTION THAT ADDS OR CHANGES ROWS OF A LIST IS ON IT, where it names no row of its own (`ROWSET_LIST_SQL`, the pass
+ * of 27 October): "Add Priya to People?" and "Link Priya Raman to Lumen?" are rowsets on People with no `about`,
+ * and People's page said "no questions open" while both waited in Needs you.
  */
 function openOnList(sql: Sql, at: string, list: string | null): number {
-  const abouts = sql.all<{ about: string }>(
-    `SELECT about FROM (SELECT CASE WHEN json_valid(body) THEN CASE WHEN json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END END AS about
-       FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)) WHERE about LIKE '%#%'`,
+  const rows = sql.all<{ about: string | null; on_list: string | null }>(
+    `SELECT CASE WHEN json_valid(body) THEN CASE WHEN json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END END AS about,
+            ${ROWSET_LIST_SQL} AS on_list
+       FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)`,
     at,
   );
-  return abouts.filter((r) => {
-    const m = SPOKEN_ROW.exec(r.about);
-    return m !== null && (list === null || m[1] === list);
+  return rows.filter((r) => {
+    const m = r.about === null ? null : SPOKEN_ROW.exec(r.about);
+    const on = m !== null ? m[1]! : r.on_list;
+    return on !== null && on !== '' && (list === null || on === list);
   }).length;
 }
+
+/**
+ * THE LIST A ROWSET QUESTION ADDS TO OR CHANGES, as SQL over `suggestion`: its body's `register`, and `NULL` for any other
+ * body. What `openOnList` counts a question on where its `about` names no row, and what a queue's `list is` reads too.
+ */
+export const ROWSET_LIST_SQL =
+  "CASE WHEN body_kind = 'rowset' AND json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.register') = 'text' THEN json_extract(body, '$.register') END";
 
 /**
  * How many agents are working now, read off `workingRuns`, which every other reader of "working" reads too. Always now,

@@ -30,7 +30,7 @@ const unselfed = (where: unknown): unknown =>
 export function peopleBefore3(doc: Body): Body {
   const declarations = (doc.declarations as Body[])
     .map((d) => (typeof d.metric === 'string' && typeof d.where === 'string' && /\bself\b/u.test(d.where) ? withWhere(d, unselfed(d.where)) : d))
-    .filter((d) => d.register !== 'organisations' && d.page !== 'relation' && d.metric !== 'organisations-count' && !LATER_RULES.has(String(d.rule)))
+    .filter((d) => d.register !== 'organisations' && d.page !== 'relation' && d.metric !== 'organisations-count' && d.metric !== 'organisations-from-card-texts' && !LATER_RULES.has(String(d.rule)))
     .map((d) => {
       if (d.register === 'people')
         return {

@@ -130,6 +130,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   people: [
     {
+      version: '3.9.0',
+      notes:
+        'People counts a question that adds or changes somebody as a question about them. Each person is one line: what they are to you, the projects they are on and when you last spoke. Shops named on card texts are one line under Organisations instead of a list of half names.',
+    },
+    {
       version: '3.8.0',
       notes:
         'An organisation can be retired: it keeps its payments and is no longer listed on People. A shop met by a name a card text cut short is asked about once in Needs you, to fold it into the shop whose whole name it is, or retire it.',

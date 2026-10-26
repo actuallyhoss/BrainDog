@@ -60,14 +60,15 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
   const said = predicateOf(block.where, OPEN, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
-  const admits = (q: OpenFacts): boolean => evaluate(said.predicate, { ...q, list: listOf(q.about) }, OPEN);
+  /* A QUESTION'S LIST IS THE ROW IT NAMES, else the list its rowset adds to or changes (`on`). */
+  const admits = (q: OpenFacts): boolean => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about, list: listOf(q.about) ?? q.rows_on ?? null }, OPEN);
   /* THE FILTER GOES TO THE RECORD, which ranks every open question it admits and cuts after. Filtered here over the
      newest twenty, an expensive question asked a month ago never reached a page with a `where:`, nor its count. */
   const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING), said.predicate === undefined ? undefined : admits);
   /* AND AGAIN HERE, for a host that takes no filter: what it was handed is filtered as it always was. */
   const kept = read.questions
-    .map((q) => familyOf({ ...q, list: listOf(q.about) }))
-    .filter((q) => admits({ who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null }));
+    .map((q) => familyOf({ ...q, list: listOf(q.about) ?? q.rows_on ?? null }))
+    .filter((q) => admits({ who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, rows_on: q.rows_on ?? null }));
   /* THE RECORD'S OWN COUNT when it answered one, over everything the filter admitted. A host that answers none: with no
      predicate, every open question; with one, what this page could see, and it says so by being smaller. */
   const matched = read.matched ?? (said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length);
@@ -124,7 +125,7 @@ function laterBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: A
   const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
   const read = deps.laterQuestions(Math.max(limit, QUEUE_CEILING));
   const kept = read.questions
-    .map((q) => familyOf({ ...q, list: listOf(q.about) }))
+    .map((q) => familyOf({ ...q, list: listOf(q.about) ?? q.rows_on ?? null }))
     .filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, list: q.list }, OPEN));
   const matched = said.predicate === undefined && read.questions.length < read.later ? read.later : kept.length;
   return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched };

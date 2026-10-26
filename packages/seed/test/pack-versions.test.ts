@@ -2098,6 +2098,20 @@ const DECLARED: Record<string, Version> = {
       "`register.organisations` gains `retired_on` (Retired on), which its `org:` names as `retired`, and `page.people`'s Organisations and `metric.organisations-count` leave a retired one out (Y2) -> 4fb781bce8786ad1",
     ],
   },
+  /* PEOPLE IS ONE LINE A PERSON, WITH THE CARD-TEXT SHOPS APART (UX44, UX45). */
+  'people@3.9.0': {
+    holds: `
+      metric.organisations-count metric.organisations-from-card-texts metric.people-count metric.people-in-touch-12w
+      metric.people-in-touch-30d metric.people-in-touch-90d metric.people-quiet
+      page.activity page.calendar page.health page.people page.relation page.scripts page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '45015e6b8ce9d2d4',
+    history: [
+      "`metric.organisations-from-card-texts` counts the shops a card text named, which `metric.organisations-count` and `page.people`'s Organisations leave out, and a line under it says; and Everyone is one line a person (UX44, UX45) -> 45015e6b8ce9d2d4",
+    ],
+  },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
     holds: `

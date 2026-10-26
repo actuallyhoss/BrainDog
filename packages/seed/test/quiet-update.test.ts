@@ -863,10 +863,45 @@ const withoutLatePart = (doc: Body): Body =>
     (d) => d.metric !== 'installments-late',
   );
 /**
+ * PEOPLE 3.9.0 COMES OFF BEFORE IT (the pass of 27 October, UX44 and UX45): no figure for the shops a card text named nor
+ * the line that says them, organisations of every kind counted and listed, and Everyone's role and organisation.
+ */
+const withoutCardTexts39 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => d.metric !== 'organisations-from-card-texts')
+    .map((d) => {
+      const unkinded = (where: unknown) => (typeof where === 'string' ? where.replace(', kind is set', '') : where);
+      if (d.metric === 'organisations-count') return { ...d, where: unkinded(d.where) };
+      if (d.page === 'people' && Array.isArray(d.blocks))
+        return {
+          ...d,
+          blocks: (d.blocks as Body[])
+            .filter((b) => (b.when as Body | undefined)?.metric !== 'organisations-from-card-texts')
+            .map((b) =>
+              b.source === 'register.organisations' && b.kind === 'table'
+                ? { ...b, where: unkinded(b.where) }
+                : b.heading === 'Everyone'
+                  ? {
+                      ...b,
+                      columns: [
+                        { field: 'name', label: 'Name', as: 'who' },
+                        { field: 'role', label: 'Role', as: 'fact' },
+                        { field: 'org', label: 'With', as: 'fact' },
+                        { field: 'in_touch', label: 'Last spoke', as: 'when' },
+                      ],
+                    }
+                  : b,
+            ),
+        };
+      return d;
+    }),
+});
+/**
  * PEOPLE 3.8.0 COMES OFF FIRST (the audit of 25 October, Y2): no Retired on for an organisation, nor a `retired` part in
  * its `org:`, and its list and count read every organisation not folded into another.
  */
-const withoutRetired38 = (doc: Body): Body => ({
+const withoutRetired38 = (raw: Body): Body => ((doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[]).map((d) => {
     if (d.register === 'organisations' && Array.isArray(d.fields)) {
@@ -878,7 +913,7 @@ const withoutRetired38 = (doc: Body): Body => ({
       return { ...d, blocks: (d.blocks as Body[]).map((b) => (b.source === 'register.organisations' && b.kind === 'table' ? { ...b, where: 'merged_into is empty' } : b)) };
     return d;
   }),
-});
+}))(withoutCardTexts39(raw));
 /**
  * MONEY 3.22.0 COMES OFF FIRST (the audit of 25 October, Y1): no "Made one with" on Plans, no rule that moves a plan's
  * parts once it is made one with another, and the plans script as 3.21.0 released it, matching names letter for letter.

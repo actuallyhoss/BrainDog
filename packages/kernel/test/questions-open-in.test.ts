@@ -71,3 +71,24 @@ test('READ WITH NO LIST, IT COUNTS THE QUESTIONS ABOUT A ROW OF ANY LIST, and a 
   assert.equal(read('questions-open-in:people'), 1, 'one body it could not read stopped the count');
   sql.close();
 });
+
+/* THE PASS OF 27 OCTOBER (UX43): "Add Priya to People?" is a rowset on People that names no row of its own, and People's
+   line said no question was open while it waited in Needs you. A question that adds or changes a list's rows is on it. */
+test("A QUESTION THAT ADDS OR CHANGES A LIST'S ROWS IS ON THAT LIST, in the figure and in the queue alike", async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(k.propose({ question: 'Same potter?', body_kind: 'options', body: about('people#4') }, 'slash'));
+  const at = new Date(NOW).toISOString();
+  const rowset = (id: string, register: string, name: string) =>
+    sql.exec(
+      `INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES ('${id}', 'rowset', '${JSON.stringify({ register, rows: [{ fields: { name } }] })}', 'open', 'slash', '${at}')`,
+    );
+  rowset('SG900', 'people', 'Priya');
+  rowset('SG901', 'organisations', 'Apify');
+  const read = (list: string) => k.block({ kind: 'stat', cells: [{ metric: `questions-open-in:${list}` }] }).readings?.[0]?.reading?.value;
+  assert.equal(read('people'), 2, 'a rowset on People that names no row was not counted on People');
+  assert.equal(read('organisations'), 1);
+  assert.equal(read('tasks'), 0);
+  for (const list of ['people', 'organisations', 'tasks']) assert.equal(read(list), k.block(queueOn(list)).matched, list);
+  sql.close();
+});

@@ -440,7 +440,23 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'organisations-count',
     name: 'Organisations',
     source: 'register.organisations',
-    where: 'merged_into is empty, retired_on is empty',
+    /* AND NEVER A SHOP MET ON A CARD TEXT, SINCE People 3.9.0 (the pass of 27 October, UX45): a payee a bank text named is
+       met with no kind (`rule.meet-payees` gives none), so "Organisations 13" listed nine cut-off shop names beside the
+       four companies he deals with. Those are counted apart, below. */
+    where: 'merged_into is empty, retired_on is empty, kind is set',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* THE SHOPS A CARD TEXT NAMED, SINCE People 3.9.0: met by `rule.meet-payees` with no kind, so said as one line under
+     Organisations ("9 shops from card texts") and never as nine organisations. Giving one a kind lists it again. */
+  'organisations-from-card-texts': {
+    metric: 'organisations-from-card-texts',
+    name: 'Shops from card texts',
+    source: 'register.organisations',
+    where: 'merged_into is empty, retired_on is empty, kind is empty',
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -511,6 +527,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'people-quiet', is: 0 },
         /* NOT HOW MANY WERE IN TOUCH, SINCE People 3.4.0: In touch under it says that figure with its month as a line,
            and a page says a figure once. */
+        /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM (the pass of 27 October, UX43): "Add Priya to People?"
+           names no row of its own, and the line said no question was open while it waited in Needs you. The kernel
+           counts a rowset on People here now (`openOnList`), and Waiting on you lists it. */
         body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)',
       },
       {
@@ -601,10 +620,13 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         /* NAME, ROLE AND WHEN YOU LAST SPOKE, and not who they are with (money F13): a phone's line holds two values
            after the name, and "With" took the place of Last spoke there, so the one fact a person scans People for was
            dropped on a phone. Who they are with is on their own page, first line. */
+        /* ONE LINE A PERSON, SINCE People 3.9.0 (the pass of 27 October, UX44): their name, what they are to you in
+           the words written about them (the note's first line, under the name), the projects they are on as chips, and
+           when you last spoke. "Role · Other" stood under most of them as a field and its value. */
         columns: [
           { field: 'name', label: 'Name', as: 'who' },
-          { field: 'role', label: 'Role', as: 'fact' },
-          { field: 'org', label: 'With', as: 'fact' },
+          { field: 'note', label: 'Who they are', as: 'reply' },
+          { field: 'projects', label: 'Met in', as: 'fact' },
           { field: 'in_touch', label: 'Last spoke', as: 'when' },
         ],
         order: [
@@ -623,8 +645,8 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         icon: 'building',
         span: 6,
         source: 'register.organisations',
-        /* AND NEVER ONE RETIRED, SINCE People 3.8.0. */
-        where: 'merged_into is empty, retired_on is empty',
+        /* AND NEVER ONE RETIRED, SINCE People 3.8.0, NOR A SHOP A CARD TEXT NAMED, SINCE 3.9.0 (`organisations-count`). */
+        where: 'merged_into is empty, retired_on is empty, kind is set',
         when: { metric: 'organisations-count', gt: 0 },
         /* THE NAME AND WHAT KIND, in a third of the page: the website, which most shops have none of, is on the
            organisation's own page. */
@@ -633,6 +655,14 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
           { field: 'kind', label: 'Kind', width: '10ch' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
+      },
+      {
+        /* THE SHOPS CARD TEXTS NAMED, IN ONE LINE, SINCE People 3.9.0 (the pass of 27 October, UX45): how many and the
+           first few by name, and the list to look them over, where nine half names stood in Organisations. */
+        kind: 'note',
+        span: 6,
+        when: { metric: 'organisations-from-card-texts', gt: 0 },
+        body: '{{organisations-from-card-texts}} shop(s) from card texts, {{organisations-from-card-texts.names}}, kept apart from the organisations. [See them](/r/organisations).',
       },
       {
         /* WHAT AGENTS DID HERE, SINCE People 3.4.0 (PGS-C18): who an agent met, merged or wrote down, one group per run,

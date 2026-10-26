@@ -298,7 +298,7 @@ import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { clashes, foldPlan as sameFoldPlan, sameDoor, type FoldGroup, type SameGroup } from './same.ts';
-import { builtInFigure, openSteps, readOpenQuestions } from './built-in-figures.ts';
+import { ROWSET_LIST_SQL, builtInFigure, openSteps, readOpenQuestions } from './built-in-figures.ts';
 import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
@@ -7213,6 +7213,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       cost: (facts.money !== undefined && facts.records !== true) || movesMoney(r, kind, body) ? 'undo' : costOf(kind, body, costRows(sql)),
       options,
       ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
+      /* AND THE LIST A ROWSET ADDS TO OR CHANGES, which a question naming no row of its own is on (`list is people`). */
+      ...(kind === 'rowset' && typeof body.register === 'string' && body.register !== '' ? { rows_on: body.register } : {}),
       body_kind: kind,
       ...(does ? { does } : {}),
       ...(kind === 'pack' || kind === 'settings' || kind === 'arrange' ? { arranged: body } : {}),
@@ -7782,9 +7784,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          (`BAND_SQL` reads the declarations), and a queue with no `where:` once weighed every question twice, to order
          them and again to count the hard ones. */
       const lean = sql
-        .all<{ id: string; body_kind: string | null; opened_by: string | null; opened_at: string | null; cost: string; wait: string; about: string | null }>(
+        .all<{ id: string; body_kind: string | null; opened_by: string | null; opened_at: string | null; cost: string; wait: string; about: string | null; on_list: string | null }>(
           `SELECT id, body_kind, opened_by, opened_at, ${BAND_SQL} AS cost, ${WAIT_SQL} AS wait,
-             CASE WHEN json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END AS about
+             CASE WHEN json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END AS about,
+             ${ROWSET_LIST_SQL} AS on_list
            FROM suggestion WHERE ${OPEN}`,
           ...waitParams(nowMs),
           now,
@@ -7793,7 +7796,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           id: r.id,
           wait: r.wait,
           at: String(r.opened_at ?? ''),
-          facts: { who: String(r.opened_by ?? ''), kind: String(r.body_kind ?? ''), cost: r.cost as Cost, about: r.about !== null && r.about !== '' ? r.about : null },
+          facts: { who: String(r.opened_by ?? ''), kind: String(r.body_kind ?? ''), cost: r.cost as Cost, about: r.about !== null && r.about !== '' ? r.about : null, rows_on: r.on_list || null },
         }));
       /* AND ONLY THE QUESTIONS THE READER IS SHOWN (`PageSees`), asked before anything is counted, so every count is hers. */
       const hers = sees ? lean.filter((q) => sees.question('suggestion', q.id)) : lean;

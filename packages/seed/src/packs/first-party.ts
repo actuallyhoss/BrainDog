@@ -766,10 +766,14 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   a headline said from late work, dates, quiet numbers, questions and renewals, in place of the line read off health;
  *   Where they are and What each one earns go, the board saying both. Blocks taken away and one keyed, no id added or
  *   taken away, so a minor step.
+ * - people 3.9.0: each person on `page.people` is one line, what the note says
+ *   they are under the name, with the projects they are on and when you last spoke; and the shops a card text named are
+ *   one line under Organisations, counted by the new `metric.organisations-from-card-texts`, where they were listed as
+ *   organisations. A figure added and nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.30.0',
-  people: '3.8.0',
+  people: '3.9.0',
   'money-core': '3.27.0',
   estate: '2.5.0',
   work: '1.19.0',
