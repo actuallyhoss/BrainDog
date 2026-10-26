@@ -11,6 +11,7 @@ import { cardLayout, dayShort, sinceWords, trendOf } from 'braindog-render';
 import { briefFromNote } from '../record/brief.ts';
 import { actor } from '../record/names.ts';
 import { rowHref, rowScreen } from '../record/row-href.ts';
+import { keptOrder } from '../shell/project-order.ts';
 import { hueFor, slotOf } from '../ui/face.ts';
 
 import type { CardKpi } from './card-kpi.ts';
@@ -239,9 +240,16 @@ export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MO
     const lane = decl.state ? said(r.fields[decl.state]) : '';
     return name === '' || (OFF_DESK.has(lane) && !(parked && lane === 'parked')) ? [] : [{ r, name, lane }];
   });
-  /* A DRAFT COMES FIRST: it is the one thing on the desk waiting for a press. */
+  /* A DRAFT COMES FIRST: it is the one thing on the desk waiting for a press. THEN THE SIDEBAR'S ORDER, by this week,
+     where it has drawn this record (`project-order.ts`), so the projects stand in one order everywhere; a project it has
+     not drawn yet, and every project before it has drawn, by lane and then by number. */
   const drafty = (r: CardRow): number => (r.fields.draft === true ? 0 : 1);
-  if (!kept) live.sort((a, b) => drafty(a.r) - drafty(b.r) || (RANK[a.lane] ?? 2) - (RANK[b.lane] ?? 2) || a.r.seq - b.r.seq);
+  const order = kept ? [] : keptOrder();
+  const placed = (r: CardRow): number => {
+    const i = order.indexOf(`${decl.id}#${r.seq}`);
+    return i < 0 ? order.length : i;
+  };
+  if (!kept) live.sort((a, b) => drafty(a.r) - drafty(b.r) || placed(a.r) - placed(b.r) || (RANK[a.lane] ?? 2) - (RANK[b.lane] ?? 2) || a.r.seq - b.r.seq);
   const cards = live.slice(0, most).map(({ r, name, lane }): ProjectCard => {
     const f = r.fields;
     const about = said(f.about);

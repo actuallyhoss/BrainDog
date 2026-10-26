@@ -248,10 +248,16 @@ export const OVERVIEW = '/?overview';
 export const WORK = '/?work';
 
 /**
- * Where the reader is, for the rows to compare against: the address inside the record, with the Work screen as a place
- * of its own. `/?overview` and `/?classic` draw Today, so they count as Today.
+ * THE PHONE'S MENU, at a word in the query as Work is: the sidebar drawn as a page, every place, the projects and every
+ * list, for the tab bar's fifth tab. From 900px up the sidebar is on screen and the address draws Today.
  */
-export const placeOf = (path: string, search: URLSearchParams): string => (path === '/' && search.has('work') ? WORK : path);
+export const MENU = '/?menu';
+
+/**
+ * Where the reader is, for the rows to compare against: the address inside the record, with the Work screen and the
+ * phone's Menu as places of their own. `/?overview` and `/?classic` draw Today, so they count as Today.
+ */
+export const placeOf = (path: string, search: URLSearchParams): string => (path === '/' && search.has('work') ? WORK : path === '/' && search.has('menu') ? MENU : path);
 
 /** Whether `path`, read inside the record, is on this row: one of its addresses or one under it, or exactly `/` for Today. */
 export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): boolean {
