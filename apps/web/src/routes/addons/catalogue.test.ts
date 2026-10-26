@@ -248,7 +248,7 @@ test('updates on offer for what a record holds, with what changed, and a proposa
   assert.equal(missing.refused.length, 1);
 });
 
-test('browse is Add-ons, with a section for each kind it lists, and /packs names a catalogue entry by its title', async () => {
+test('browse is Add-ons, starters first, and /packs names a catalogue entry by its title', async () => {
   const { copy } = await import('../../lib/copy.ts');
   const { words: market } = await import('../../lib/market/words.ts');
   const { readFileSync } = await import('node:fs');
@@ -256,8 +256,8 @@ test('browse is Add-ons, with a section for each kind it lists, and /packs names
   /* ONE PLACE, ONE NAME (the UI pass of 20 October, agents F9): browse is the other half of Add-ons, and its sections
      name the kinds. */
   assert.equal(copy.packs, 'Add-ons');
-  /* THREE SECTIONS SINCE the screens scope of 24 October (E20), and never where a thing came from. */
-  assert.deepEqual(Object.values(market.sections), ['Starters', 'Add-ons', 'Looks']);
+  /* STARTERS FIRST, THEN SHELVES BY PURPOSE (the add-ons pass of 27 October), and never where a thing came from. */
+  assert.equal(market.store.starters, 'Starters');
   assert.doesNotMatch(JSON.stringify(market), /From others|"Doors"/u);
   assert.match(copy.browseAll, /starters/iu);
   assert.match(copy.browseAll, /add-ons/iu);

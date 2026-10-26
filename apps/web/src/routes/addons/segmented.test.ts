@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 const HERE = new URL('./', import.meta.url);
 
 /** The four files that draw a track (Add-ons' two halves moved to `AddonsTabs.svelte` on 20 October), each without its comments, so a comment quoting the old markup counts for nothing. */
-const PAGES = ['AddonsTabs.svelte', '[id]/Installed.svelte', '+page.svelte', 'share/+page.svelte'].map((name) => ({
+const PAGES = ['[id]/Installed.svelte', '+page.svelte', 'share/+page.svelte'].map((name) => ({
   name,
   text: readFileSync(new URL(name.replaceAll('[', '%5B').replaceAll(']', '%5D'), HERE), 'utf8')
     .replaceAll(/<!--[\s\S]*?-->/gu, '')

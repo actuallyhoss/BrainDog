@@ -1,33 +1,31 @@
 <!--
-  The store: everything a record can add, at `/addons`. The other half of Add-ons (`AddonsTabs.svelte`).
+  The store: everything a record can add, at `/addons`. What this record already holds is Settings › Add-ons.
 
-  ONE LISTING MODEL. The modules this build ships, its built-in use cases and every entry the Kennel answers are read into
-  `Listing`s by `listingsOf` (`$lib/market/listing.ts`), so they are searched, counted, filtered and sorted the same
-  way. A search reads the title, the summary, the id, the lists and pages it adds, who made it and its categories; the
-  chips keep one section; the sort is For you, Most installed or Newest.
+  ONE LISTING MODEL. The starters this build ships and every entry the catalogue lists are read into `Listing`s by
+  `listingsOf` (`$lib/market/listing.ts`), so they are searched and named the same way everywhere. Anything private,
+  unlisted or withdrawn is in no listing.
 
-  THREE SECTIONS, SINCE the screens scope of 24 October (E20): Ready-made setups, Add-ons and Looks, and the chips are
-  the same three with the same counts. A setup is a way of working, so each is a card, three across from 900px and one on
-  a phone, each as tall as what it holds, with no miniature: its grey bars read as a page still loading. An add-on, built
-  in or from outside, is a thing you hold, so it is a list of rows, as /packs lists what is installed. A chip that would
-  keep every listing is not drawn, and neither is a count that repeats the sentence.
+  IN THE ORDER A PERSON SHOPS (the add-ons pass of 27 October): one search over names, what each does and the lists it
+  brings; then "Suggested for you", at most three, each with its reason from this record's own signs and questions
+  (`$lib/market/suggest.ts`); then the starters, with the example setups behind one card; then every add-on on the shelf
+  of what it is for (`$lib/market/shelves.ts`), four to a shelf with Show all. BrainDog's own parts (Projects, People,
+  Work and Agents) are never offered, and a base add-on a starter turns on (Money, Services) only while it is off here.
 
-  NOTHING HERE INSTALLS. A card or a row opens the listing's own page, where the file is verified and the record's plan
-  is read before anything can be pressed. The record's packs are read only to say what is already in.
+  WHO MADE IT IS SAID ONCE A CARD: "By BrainDog" with a check, "Reviewed" for community work the operator listed, or its
+  author.
 
-  A HOST WITH NO KENNEL, OR A RECORD THAT DOES NOT ANSWER, still draws every built-in listing: neither is what browse is
-  about, and a signed-out visitor from the site's Install link is shown what there is before being asked to sign in.
-
-  ON A PHONE: the search the screen's width, then the filter with Sort at its end (agents F8).
+  NOTHING HERE INSTALLS. A card opens the add-on's own page, where its plan is read before anything can be pressed.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import type { CatalogueIndex } from '@braindog/declare/catalogue';
+  import type { CatalogueIndex, Shelf } from '@braindog/declare/catalogue';
+  import { MODULE_SHELVES, MODULES } from '@braindog/declare';
   import { useCase } from '@braindog/seed/usecases';
   import { firstPartyModules } from '@braindog/seed/packs/modules';
+  import { moduleName } from '@braindog/seed/usecases/names';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { read } from '$lib/data/record.ts';
@@ -38,72 +36,101 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
-  import type { IconName } from '$lib/ui/icons.ts';
-  import { isGlyph } from '$lib/ui/icons.ts';
-  import ListingCard from '$lib/market/ListingCard.svelte';
-  import ListingRow from '$lib/market/ListingRow.svelte';
-  import { categoryName, folds, sectionChips, sectionOf, SECTIONS, type Section } from '$lib/market/categories.ts';
+  import { isGlyph, type IconName } from '$lib/ui/icons.ts';
+  import { glyphOf, ownIcon } from '$lib/market/ListingCard.svelte';
+  import StoreCard from '$lib/market/StoreCard.svelte';
   import { readCounts } from '$lib/market/counts.ts';
-  import { actionOf, listingsOf, ordered, searchListings, type Listing, type Order } from '$lib/market/listing.ts';
+  import { actionOf, latestOf, listingHref, listingsOf, searchListings, verifiedOf, type Listing } from '$lib/market/listing.ts';
+  import { categoryName } from '$lib/market/categories.ts';
+  import { baseTurnedOn, SHELF_NAMES, SHELF_SLOTS, shelfOf, storeChips, storeOf } from '$lib/market/shelves.ts';
+  import { suggestionsOf, type SignRead } from '$lib/market/suggest.ts';
   import { words } from '$lib/market/words.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
-  import AddonsTabs from './AddonsTabs.svelte';
-  import { installedCount, words as packWords } from './words.ts';
-  import { glyphOf as placeGlyph } from './glyph.ts';
+  import { INSTALLED_AT } from './moved.ts';
   import { miniOf } from './mini.ts';
   import { readHostCatalogue } from './catalogue.ts';
+
+  const store = words.store;
 
   let kennel = $state.raw<CatalogueIndex | null>(null);
   let kennelRefused = $state<string | null>(null);
   let counts = $state.raw<Record<string, number> | null>(null);
   /** This record's packs, `null` until it answers or when it does not. */
   let states = $state.raw<PackState[] | null>(null);
+  /** The record's vital signs and its open questions, for what the store suggests; `null` until read, or refused. */
+  let signs = $state.raw<SignRead[] | null>(null);
+  let questions = $state.raw<string[] | null>(null);
 
   let query = $state(page.url.searchParams.get('q') ?? '');
-  let category = $state<Section | null>(null);
-  let order = $state<Order>('for-you');
+  /** The chip picked: the starters, one shelf, or everything. */
+  let picked = $state<'starters' | Shelf | null>(null);
+  /** The shelves opened past their first four, and whether the example setups are shown. */
+  let opened = $state<Partial<Record<Shelf, boolean>>>({});
+  let examplesOpen = $state(false);
 
   const listings = $derived(listingsOf({ kennel, counts }));
-  const searched = $derived(searchListings(listings, query, categoryName));
-  /* THE CHIPS ARE THE SECTIONS (E20), so each says the count its heading says. One section alone draws no chips: a filter
-     that keeps every listing says nothing. */
-  const chips = $derived(sectionChips(searched).filter((c) => c.count < searched.length));
-  /* A CHIP THAT A NEW SEARCH EMPTIED lets go, so the page never says nothing matches because of a chip no longer drawn. */
-  const picked = $derived(category !== null && chips.some((c) => c.section === category) ? category : null);
-  const inSection = (ls: readonly Listing[], s: Section | null): Listing[] => (s === null ? [...ls] : ls.filter((l) => sectionOf(l) === s));
-  /* WITH A SEARCH, THE BEST MATCH LEADS under For you; the other orders are what a person asked for, search or not. */
-  const shown = $derived(order === 'for-you' && query.trim() !== '' ? inSection(searched, picked) : ordered(inSection(searched, picked), order));
-  const ORDERS: readonly Order[] = ['for-you', 'installed', 'newest'];
+  const searching = $derived(query.trim() !== '');
+  const laid = $derived(storeOf(searchListings(listings, query, categoryName), states));
+  const chips = $derived(storeChips(laid, store.starters));
+  /* A CHIP A NEW SEARCH EMPTIED LETS GO, so the page never says nothing matches because of a chip no longer drawn. */
+  const chip = $derived(picked !== null && chips.some((c) => c.id === picked) ? picked : null);
+  const total = $derived(chips.reduce((n, c) => n + c.count, 0));
 
-  /* ON A PHONE EACH SECTION SHOWS FOUR, the rest a press away (audit C, X14): 41 entries in one column were about 6,000px.
-     A search or a chip shows them all. The fold is the phone's alone (the styles); wider, every card fits the grid. */
-  let opened = $state<Partial<Record<Section, boolean>>>({});
+  /** Four to a shelf until Show all, a search or a chip. */
+  const FOLDED_AT = 4;
+  const folded = (shelf: Shelf, n: number): boolean => n > FOLDED_AT && !searching && chip === null && opened[shelf] !== true;
 
-  /* HOW MANY THIS RECORD HOLDS ALREADY, in or turned off or behind an update, once it has answered: the number Installed
-     says (audit Z10), and not only the ones this catalogue lists. */
-  const held = $derived(installedCount(states));
+  /* ── what each card says ───────────────────────────────────────────────── */
 
-  /* A BUILT-IN USE CASE'S HOME IN MINIATURE, and the glyph it is known by. */
+  const modules = new Map(firstPartyModules().map((m) => [m.id, m]));
   const voiced = (u: NonNullable<ReturnType<typeof useCase>>) => (key: string): string | null =>
     (u.voice as Record<string, string | undefined>)[key] ?? (VOICE_LINES as Record<string, string | undefined>)[key] ?? null;
-  const miniFor = (l: Listing) => {
-    const u = l.kind === 'usecase' && l.source === 'bundled' ? useCase(l.id) : undefined;
-    return u ? miniOf(u, voiced(u)) : null;
-  };
   const asGlyph = (name: string | null | undefined): IconName | null => (name && isGlyph(name) ? name : null);
-  /* A USE CASE'S OWN GLYPH WHERE TWO WOULD WEAR ONE (UI pass of 21 October, P44): the guide took Personal's star from its
-     first list, and Solo founder took Small business's grid from its Home. */
+  /* A STARTER'S OWN GLYPH WHERE TWO WOULD WEAR ONE (UI pass of 21 October, P44). */
   const KNOWN_BY: Readonly<Record<string, IconName>> = { guide: 'check', founder: 'projects' };
 
-  /* A BUILT-IN WEARS THE GLYPH OF THE PLACE IT BRINGS, as its row on /packs does (`glyph.ts`). */
-  const modules = new Map(firstPartyModules().map((m) => [m.id, m]));
-  const rowGlyph = (l: Listing): IconName | null => {
-    if (l.kind !== 'module') return null;
-    const g = placeGlyph(modules.get(l.id)?.pages, page.data.nav ?? []);
-    return g === 'packs' ? null : g;
+  const iconOf = (l: Listing): IconName => {
+    const own = ownIcon(l) ?? (l.kind === 'module' ? asGlyph(modules.get(l.id)?.icon) : null);
+    if (own) return own;
+    if (l.kind === 'usecase') {
+      const u = l.source === 'bundled' ? useCase(l.id) : undefined;
+      return KNOWN_BY[l.id] ?? asGlyph(u ? miniOf(u, voiced(u)).glyph : null) ?? glyphOf(l);
+    }
+    return glyphOf(l);
   };
 
-  /* A STORE THAT DID NOT ANSWER SAYS SO, WITH TRY AGAIN (Y9): Browse had listed the built-ins alone and said nothing. */
+  /** Who made it, said once: BrainDog with a check, "Reviewed" for community work the operator listed, else its author. */
+  const ours = (l: Listing): boolean => verifiedOf(l) === 'braindog' || l.publisher?.kind === 'braindog';
+  const byOf = (l: Listing): string | null => (ours(l) ? null : latestOf(l)?.reviewed ? store.reviewed : store.community(l.publisher?.name ?? l.author));
+
+  /** The cue: Add, Added, Turn on or Update, and "Your starter" for a starter this record runs on. */
+  const cueOf = (l: Listing): { cue: string; held: boolean } => {
+    const a = states ? actionOf(l, states) : null;
+    if (a?.kind === 'installed') return { cue: l.kind === 'usecase' ? store.yourStarter : store.added, held: true };
+    if (a?.kind === 'turn-on') return { cue: store.turnOn, held: false };
+    if (a?.kind === 'update') return { cue: store.update, held: false };
+    return { cue: store.add, held: false };
+  };
+
+  /** A starter's second line: the add-ons it turns on, else the first lists it brings. */
+  const starterNote = (l: Listing): string | null => {
+    const on = baseTurnedOn(l, moduleName);
+    if (on.length > 0) return store.turnsOn(on);
+    const lists = (latestOf(l)?.reach.lists ?? []).slice(0, 2);
+    return lists.length > 0 ? store.adds(lists) : null;
+  };
+
+  /* ── what the record suggests ──────────────────────────────────────────── */
+
+  /* MONEY IS ON when a module standing on the money shelf is held and on: the rates it keeps are Money's. */
+  const moneyOn = $derived(
+    (states ?? []).some((s) => s.disabled_at === null && (MODULES as readonly string[]).includes(s.id) && MODULE_SHELVES[s.id as (typeof MODULES)[number]] === 'money'),
+  );
+  const suggested = $derived(searching || chip !== null ? [] : suggestionsOf({ signs, questions, listings, states, moneyOn, href: listingHref }));
+
+  /* ── reading ───────────────────────────────────────────────────────────── */
+
+  /* A STORE THAT DID NOT ANSWER SAYS SO, WITH TRY AGAIN (Y9). */
   let retry = $state(false);
   function readStore(): void {
     kennelRefused = null;
@@ -120,20 +147,38 @@
     readStore();
     void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
-      const chosen = await choose(createClient({ base: apiBase() }));
+      const client = createClient({ base: apiBase() });
+      const chosen = await choose(client);
       if (!chosen.first.ok) return false;
       states = chosen.first.value;
+      /* THE SIGNS AND THE OPEN QUESTIONS ARE ASKED AFTER, and a refusal of either is no suggestion, never an error here. */
+      void client
+        .call<{ signs?: unknown }>('signs')
+        .then((out) => (signs = out.ok && Array.isArray(out.value?.signs) ? (out.value.signs as SignRead[]) : null))
+        .catch(() => undefined);
+      void client
+        .governance({ register: 'suggestion', status: 'open', limit: 50 })
+        .then((out) => {
+          const rows = out.ok && Array.isArray(out.value) ? (out.value as { question?: unknown }[]) : [];
+          questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
+        })
+        .catch(() => undefined);
       return true;
     });
   });
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(packWords.tabs.browse, copy.packs)}</title></svelte:head>
+<svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
-<PageHead icon="packs" title={copy.packs} sentence={words.sentence(listings.length, held)}>
-  {#snippet below()}<AddonsTabs current="browse" />{/snippet}
+<PageHead icon="packs" title={copy.packs} sentence={store.sentence}>
+  {#snippet actions()}<Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>{/snippet}
 </PageHead>
+
+{#snippet card(l: Listing, hue: (typeof SHELF_SLOTS)[keyof typeof SHELF_SLOTS], note: string | null = null)}
+  {@const c = cueOf(l)}
+  <StoreCard title={l.title} line={l.summary} href={listingHref(l)} icon={iconOf(l)} {hue} ours={ours(l)} by={byOf(l)} cue={c.cue} held={c.held} {note} />
+{/snippet}
 
 <div class="page">
   <div class="tools">
@@ -141,26 +186,18 @@
       <Icon name="search" size="m" />
       <input class="find-input" type="search" bind:value={query} aria-label={words.searchLabel} placeholder={words.searchHint} autocomplete="off" enterkeyhint="search" />
     </div>
-    <div class="filter">
-      {#if chips.length > 0}
-        <Segmented full class="chips" role="group" aria-label={words.categoriesLabel}>
-          <button type="button" class="segment chip" aria-pressed={picked === null} data-on={picked === null ? '' : undefined} onclick={() => (category = null)}>
-            {words.all}<span class="n">{searched.length}</span>
+    {#if chips.length > 1}
+      <Segmented class="chips" role="group" aria-label={words.categoriesLabel}>
+        <button type="button" class="segment chip" aria-pressed={chip === null} data-on={chip === null ? '' : undefined} onclick={() => (picked = null)}>
+          {store.all}<span class="n">{total}</span>
+        </button>
+        {#each chips as c (c.id)}
+          <button type="button" class="segment chip" aria-pressed={chip === c.id} data-on={chip === c.id ? '' : undefined} onclick={() => (picked = chip === c.id ? null : c.id)}>
+            {c.name}<span class="n">{c.count}</span>
           </button>
-          {#each chips as c (c.section)}
-            <button type="button" class="segment chip" aria-pressed={picked === c.section} data-on={picked === c.section ? '' : undefined} onclick={() => (category = picked === c.section ? null : c.section)}>
-              {c.name}<span class="n">{c.count}</span>
-            </button>
-          {/each}
-        </Segmented>
-      {/if}
-      <label class="sort">
-        <span class="sort-word">{words.sortLabel}</span>
-        <select class="sort-select" bind:value={order} aria-label={words.orderLabel}>
-          {#each ORDERS as o (o)}<option value={o}>{words.orders[o]}</option>{/each}
-        </select>
-      </label>
-    </div>
+        {/each}
+      </Segmented>
+    {/if}
   </div>
 
   {#if kennelRefused}
@@ -169,38 +206,68 @@
     </Empty>
   {/if}
 
-  {#if shown.length === 0}
-    <Empty kind="no-results" title={words.nothingFound} body={words.nothingFoundBody} />
-  {:else}
-    {#each SECTIONS as section (section)}
-      {@const items = shown.filter((l) => sectionOf(l) === section)}
-      {#if items.length > 0}
-        {@const folded = folds(items.length, { searching: query.trim() !== '', picked: picked !== null, opened: opened[section] === true })}
-        <section class="part" aria-labelledby="browse-{section}" data-folded={folded ? '' : undefined}>
-          <h2 class="part-h" id="browse-{section}">{words.sections[section]}<span class="n num">{items.length}</span></h2>
-          {#if section === 'setups'}
-            <!-- NO MINIATURE (E20): grey bars under a heading read as a page still loading. The card is its glyph, its
-                 name, what it is for and the lists it brings. -->
-            <ul class="cards">
-              {#each items as l (l.key)}
-                {@const mini = miniFor(l)}
-                <ListingCard listing={l} action={states ? actionOf(l, states) : null} glyph={KNOWN_BY[l.id] ?? asGlyph(mini?.glyph)} />
-              {/each}
-            </ul>
-          {:else}
-            <ul class="rows">
-              {#each items as l (l.key)}
-                <ListingRow listing={l} action={states ? actionOf(l, states) : null} glyph={rowGlyph(l)} />
-              {/each}
-            </ul>
-          {/if}
-          {#if folded}
-            <div class="show-all"><Button weight="bare" onclick={() => (opened = { ...opened, [section]: true })}>{words.showAll(items.length)}</Button></div>
-          {/if}
-        </section>
-      {/if}
-    {/each}
+  {#if suggested.length > 0}
+    <section class="part" aria-labelledby="store-suggested">
+      <h2 class="part-h" id="store-suggested">{store.suggested}<span class="part-note">{store.suggestedNote}</span></h2>
+      <ul class="cards three">
+        {#each suggested as s (s.key)}
+          <StoreCard
+            title={s.title}
+            line={s.line}
+            href={s.href}
+            icon={s.listing ? iconOf(s.listing) : 'trending-up'}
+            hue={SHELF_SLOTS.money}
+            ours={s.listing ? ours(s.listing) : true}
+            by={s.listing ? byOf(s.listing) : null}
+            cue={s.cue}
+            why={s.why}
+          />
+        {/each}
+      </ul>
+    </section>
   {/if}
+
+  {#if total === 0}
+    <Empty kind="no-results" title={words.nothingFound} body={words.nothingFoundBody} />
+  {/if}
+
+  {#if (chip === null || chip === 'starters') && laid.starters.length + laid.examples.length > 0}
+    <section class="part" aria-labelledby="store-starters">
+      <h2 class="part-h" id="store-starters">{store.starters}<span class="part-note">{store.startersNote}</span></h2>
+      <ul class="cards">
+        {#each laid.starters as l (l.key)}{@render card(l, SHELF_SLOTS.starters, starterNote(l))}{/each}
+        {#if laid.examples.length > 0 && !searching && chip === null}
+          <li class="examples-card">
+            <h3 class="ex-name"><Icon name="grid" size="m" /><span>{store.examples}</span></h3>
+            <p class="ex-line">{store.examplesLine(laid.examples.map((l) => l.title))}</p>
+            <div class="ex-foot">
+              <Button size="sm" aria-expanded={examplesOpen} onclick={() => (examplesOpen = !examplesOpen)}>{examplesOpen ? store.hideExamples : store.seeExamples(laid.examples.length)}</Button>
+            </div>
+          </li>
+        {/if}
+        {#if examplesOpen || searching || chip === 'starters'}
+          {#each laid.examples as l (l.key)}{@render card(l, SHELF_SLOTS.starters, store.examples)}{/each}
+        {/if}
+      </ul>
+    </section>
+  {/if}
+
+  {#each laid.shelves as s (s.shelf)}
+    {#if chip === null || chip === s.shelf}
+      {@const fold = folded(s.shelf, s.items.length)}
+      <section class="part" aria-labelledby="store-{s.shelf}">
+        <h2 class="part-h" id="store-{s.shelf}">
+          {SHELF_NAMES[s.shelf]}<span class="n num">{s.items.length}</span>
+          {#if s.items.length > FOLDED_AT && !searching && chip === null}
+            <span class="part-more"><Button weight="bare" size="sm" onclick={() => (opened = { ...opened, [s.shelf]: !opened[s.shelf] })}>{opened[s.shelf] ? store.showFewer : store.showAll}</Button></span>
+          {/if}
+        </h2>
+        <ul class="cards">
+          {#each fold ? s.items.slice(0, FOLDED_AT) : s.items as l (l.key)}{@render card(l, SHELF_SLOTS[shelfOf(l)])}{/each}
+        </ul>
+      </section>
+    {/if}
+  {/each}
 </div>
 
 <style>
@@ -212,30 +279,27 @@
     min-inline-size: 0;
   }
 
-  /* SEARCH, THE FILTER AND SORT: one row from 900px, and on a phone the search its own line over the other two. */
+  /* THE SEARCH ACROSS THE PAGE, THE CHIPS UNDER IT. */
   .tools {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-3);
-  }
-
-  .filter {
-    display: flex;
-    flex: 1 1 auto;
-    align-items: center;
+    flex-direction: column;
     gap: var(--sp-3);
     min-inline-size: 0;
   }
 
-  /* THE SEARCH FIELD: the tile's fill on the board, the search glyph, `--ctl-h` tall and 44 under a thumb. Its focus is
-     the field's ring, on the wrapper. */
+  .tools > :global(.segmented) {
+    align-self: flex-start;
+    max-inline-size: 100%;
+    overflow-x: auto;
+  }
+
   .find {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     box-sizing: border-box;
-    inline-size: 20rem;
+    inline-size: 100%;
+    max-inline-size: 40rem;
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
     background: var(--tile);
@@ -290,36 +354,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* SORT, AT THE FILTER'S END: its word and the order chosen, the select's own chevron after it. */
-  .sort {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-inline-start: auto;
-    color: var(--ink-3);
-    font-size: var(--fs-ctl);
-  }
-
-  .sort-select {
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3) var(--sp-6);
-    background-color: var(--tile);
-    border: 0;
-    border-radius: var(--r-ctl);
-    box-shadow: inset 0 0 0 1px var(--switch-off);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-ctl);
-    font-weight: var(--fw-medium);
-  }
-
-  .sort-select:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  /* A SECTION ON THE BOARD: its name and count, then what it holds. */
   .part {
     display: flex;
     flex-direction: column;
@@ -338,32 +372,69 @@
     line-height: 24px;
   }
 
-  /* THE CARDS: one column on a phone, two from 640px and three from 900px, 12 apart, EACH AS TALL AS WHAT IT HOLDS. */
+  .part-note {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+  }
+
+  .part-more {
+    margin-inline-start: auto;
+  }
+
+  /* THE CARDS: one column on a phone, two from 640px, four from 1100px; the suggestions three. */
   .cards {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    align-items: start;
+    align-items: stretch;
     gap: var(--tile-gap);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* THE ROWS: one tile, the rows inside it. */
-  .rows {
+  /* THE EXAMPLE SETUPS: one card for the three, in the starters' grid. */
+  .examples-card {
     display: flex;
     flex-direction: column;
-    margin: 0;
-    padding: var(--sp-2);
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    padding: var(--sp-4);
     background: var(--tile);
     border-radius: var(--r-tile);
-    list-style: none;
+  }
+
+  .ex-name {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: 22px;
+  }
+
+  .ex-name :global(.icon) {
+    color: var(--ink-2);
+  }
+
+  .ex-line {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .ex-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-block-start: auto;
   }
 
   @media (pointer: coarse) {
     .find,
-    .find-input,
-    .sort-select {
+    .find-input {
       min-block-size: var(--tap);
     }
 
@@ -376,53 +447,6 @@
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
-
-    .find {
-      flex: 1 1 100%;
-      inline-size: auto;
-    }
-
-    /* THE CHIPS TAKE THE LINE AND SORT GOES UNDER THEM, at the start: beside them it left the strip a third of a phone,
-       and "Building blocks" was cut to "Bu" against the select. */
-    .filter {
-      flex: 1 1 100%;
-      flex-wrap: wrap;
-    }
-
-    .filter > :global(.segmented) {
-      flex: 1 1 100%;
-      min-inline-size: 0;
-    }
-
-    .sort {
-      margin-inline-start: 0;
-    }
-
-    /* ON A PHONE THE WORD "SORT" GOES, and the select says the order: room for the filter. */
-    .sort-word {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-  }
-
-  .show-all {
-    display: none;
-  }
-
-  /* FOLDED ON A PHONE: the first four of a section, and Show all under them. */
-  @media (width < 640px) {
-    .part[data-folded] .cards > :global(:nth-child(n + 5)),
-    .part[data-folded] .rows > :global(:nth-child(n + 5)) {
-      display: none;
-    }
-
-    .part[data-folded] .show-all {
-      display: flex;
-    }
   }
 
   @media (width >= 640px) {
@@ -431,24 +455,13 @@
     }
   }
 
-  @media (width >= 900px) {
+  @media (width >= 1100px) {
     .cards {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .cards.three {
       grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .find {
-      flex: none;
-    }
-
-    /* A LONE LAST CARD FILLS ITS ROW, and not a third of it beside two empty ones. */
-    .cards > :global(:last-child:nth-child(3n + 1)) {
-      grid-column: 1 / -1;
-    }
-  }
-
-  @media (width >= 640px) and (width < 900px) {
-    .cards > :global(:last-child:nth-child(2n + 1)) {
-      grid-column: 1 / -1;
     }
   }
 </style>

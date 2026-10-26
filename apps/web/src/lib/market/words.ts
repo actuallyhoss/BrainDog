@@ -7,16 +7,36 @@
 import type { Category } from '@braindog/declare/catalogue';
 
 export const words = {
-  searchLabel: 'Search add-ons',
-  searchHint: 'Search add-ons',
-  /* BROWSE IN THREE SECTIONS, SINCE the screens scope of 24 October (E20): the ready-made setups as cards, then every
-     add-on, built in or from outside, as rows, then the looks. "From others" and "Built in" said where a thing came
-     from, which is not what a person shops for. The chips are these sections, so a chip's count is its section's. */
-  sections: { setups: 'Starters', addons: 'Add-ons', looks: 'Looks' } as const,
-  /* THE SAME THREE AS CHIPS, a word each, so the four chips sit on one line of a phone (audit C, X14). */
-  chips: { setups: 'Starters', addons: 'Add-ons', looks: 'Looks' } as const,
-  showAll: (n: number): string => `Show all ${n}`,
-  sortLabel: 'Sort',
+  searchLabel: 'Search add-ons and starters',
+  /* THE WAY FROM THE STORE TO WHAT THIS RECORD HOLDS, Settings › Add-ons. */
+  yours: 'Your add-ons',
+  searchHint: 'Search add-ons and starters',
+  /* THE STORE (the add-ons pass of 27 October): starters first, then the shelves, and what the record suggests itself. */
+  store: {
+    sentence: 'Things you can add to your record. Each one shows you its plan before anything changes.',
+    suggested: 'Suggested for you',
+    suggestedNote: 'from your own record',
+    starters: 'Starters',
+    startersNote: 'a set of add-ons, pages and words to begin with',
+    examples: 'Example setups',
+    examplesLine: (names: readonly string[]): string =>
+      `${names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`}: whole setups to copy from, for trades BrainDog does not run itself.`,
+    seeExamples: (n: number): string => `See ${n}`,
+    hideExamples: 'Fewer',
+    yourStarter: 'Your starter',
+    turnsOn: (names: readonly string[]): string => `Turns on ${names.join(', ')}`,
+    adds: (names: readonly string[]): string => `Adds ${names.join(', ')}`,
+    byBrainDog: 'By BrainDog',
+    reviewed: 'Reviewed',
+    community: (name: string): string => `From ${name}`,
+    add: 'Add',
+    added: 'Added',
+    turnOn: 'Turn on',
+    update: 'Update',
+    showAll: 'Show all',
+    showFewer: 'Show fewer',
+    all: 'All',
+  },
   all: 'All',
   categoriesLabel: 'Categories',
   categories: {

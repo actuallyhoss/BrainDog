@@ -83,6 +83,29 @@ export const MODULES = ['portfolio', 'people', 'money-core', 'estate', 'work', '
 export type ModuleId = (typeof MODULES)[number];
 
 /**
+ * THE CORE: the parts of BrainDog itself, which every starter needs, agents read and write on every record, and other lists
+ * point at. Projects, People, Work and Agents. They are never offered as add-ons, have no off switch on a screen and
+ * update themselves. The rest of `MODULES` (Money and Services) are base add-ons a starter turns on, which a record may
+ * turn off.
+ */
+export const CORE = ['portfolio', 'people', 'work', 'agents'] as const satisfies readonly ModuleId[];
+/** Whether a pack id is one of the core parts (`CORE`). */
+export const isCore = (id: string): boolean => (CORE as readonly string[]).includes(id);
+
+/**
+ * THE STORE SHELF EACH MODULE'S NEIGHBOURS STAND ON (`SHELVES` in `catalogue.ts`): an add-on the catalogue places nowhere
+ * is shelved by the first module it needs, so one from outside that needs Money stands with Money's add-ons.
+ */
+export const MODULE_SHELVES: Readonly<Record<ModuleId, 'money' | 'planning' | 'helpers'>> = {
+  'money-core': 'money',
+  estate: 'money',
+  agents: 'helpers',
+  work: 'planning',
+  portfolio: 'planning',
+  people: 'planning',
+};
+
+/**
  * The lists each first-party module provides, by id, and the name a person knows it by. A shared use case may not declare
  * one of these unless it installs that module (`readShared`), because the record reads some of them as the module's own:
  * `boot` names members to whoever may read People. Held equal to the modules' manifests by `packages/seed`'s tests.

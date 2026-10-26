@@ -9,7 +9,6 @@ import { USE_CASES } from '@braindog/seed/usecases';
 import { isGlyph } from '../../lib/ui/icons.ts';
 import { copy } from '../../lib/copy.ts';
 import { words } from '../../lib/market/words.ts';
-import { FOLDED_MOST, folds, sectionChips } from '../../lib/market/categories.ts';
 import { miniOf, shapeOf } from './mini.ts';
 
 test('every use case draws one to four tiles, each named, with a glyph the app draws', () => {
@@ -44,27 +43,9 @@ test('a figure is a chart, a board is columns, and anything with rows is a list'
 
 test('ONE WORD FOR A STARTER EVERYWHERE, and the menu is never "Rail" (audit C of 25 October, X10)', () => {
   assert.equal(words.kinds.usecase, 'Starter');
-  assert.equal(words.sections.setups, 'Starters');
+  assert.equal(words.store.starters, 'Starters');
   assert.equal(words.categories['ways-of-working'], 'Starters');
   assert.equal(copy.browseAll, 'All starters and add-ons');
   assert.equal(copy.browseRail, 'Menu');
   for (const w of [copy.browseAll, copy.browseRail, copy.browseNoRail, words.kinds.usecase]) assert.doesNotMatch(w, /use case|rail/iu, w);
-});
-
-/* BROWSE FITS A PHONE (audit C of 25 October, X14): chips short enough for one line, and each section showing a few
-   with the rest a press away. */
-
-test('the chips say each section in a word, and the headings say it whole', () => {
-  const chips = sectionChips([{ kind: 'usecase', categories: [] }, { kind: 'pack', categories: [] }, { kind: 'pack', categories: ['themes'] }]);
-  assert.deepEqual(chips.map((c) => c.name), ['Starters', 'Add-ons', 'Looks']);
-});
-
-test('a section shows four until asked for all, and a search or a chip shows them all', () => {
-  assert.equal(FOLDED_MOST, 4);
-  assert.equal(folds(13, { searching: false, picked: false, opened: false }), true);
-  assert.equal(folds(4, { searching: false, picked: false, opened: false }), false);
-  assert.equal(folds(13, { searching: true, picked: false, opened: false }), false);
-  assert.equal(folds(13, { searching: false, picked: true, opened: false }), false);
-  assert.equal(folds(13, { searching: false, picked: false, opened: true }), false);
-  assert.equal(words.showAll(13), 'Show all 13');
 });

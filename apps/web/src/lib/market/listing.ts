@@ -14,7 +14,7 @@
  * drawn as a second card with the same link.
  */
 
-import type { CatalogueEntry, CatalogueIndex, CatalogueVersion, Category, Reach } from '@braindog/declare/catalogue';
+import type { CatalogueEntry, CatalogueIndex, CatalogueVersion, Category, Reach, Shelf } from '@braindog/declare/catalogue';
 import { MODULE_CHANGES } from '@braindog/seed/packs/changelog';
 import { firstPartyModules } from '@braindog/seed/packs/modules';
 import { USE_CASES } from '@braindog/seed/usecases';
@@ -45,6 +45,10 @@ export type Listing = {
   count: number | null;
   /** The icon the add-on's manifest names from the app's icon set; absent draws the generic one. */
   icon?: string;
+  /** The store shelf the catalogue puts it on (`packs/listed.json`); absent, the store works one out (`shelves.ts`). */
+  shelf?: Shelf;
+  /** A starter shown as an example setup, for a trade BrainDog does not run itself. */
+  example?: true;
 };
 
 /** What a listing's one primary button does on this record. */
@@ -195,6 +199,8 @@ function listingOfEntry(e: CatalogueEntry, count: number | null): Listing {
     versions: e.versions,
     count,
     ...(e.icon !== undefined ? { icon: e.icon } : {}),
+    ...(e.shelf !== undefined ? { shelf: e.shelf } : {}),
+    ...(e.example === true ? { example: true as const } : {}),
   };
 }
 

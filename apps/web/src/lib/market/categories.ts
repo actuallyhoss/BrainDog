@@ -8,7 +8,7 @@
 
 import type { Category } from '@braindog/declare/catalogue';
 
-import type { Listing, ListingKind } from './listing.ts';
+import type { Listing } from './listing.ts';
 import { LEADING } from './listing.ts';
 import { words } from './words.ts';
 
@@ -30,34 +30,6 @@ export function chipsOf(listings: readonly Listing[]): Chip[] {
   });
 }
 
-/** The three sections browse draws, in order (E20). */
-export const SECTIONS = ['setups', 'addons', 'looks'] as const;
-export type Section = (typeof SECTIONS)[number];
-
-/** A listing by the two keys a section is read from. */
-type Sorted = { kind: ListingKind; categories: readonly Category[] };
-
-/** Which section a listing is in: a use case is a ready-made setup, a theme is a look, and anything else an add-on. */
-export const sectionOf = (l: Sorted): Section =>
-  l.kind === 'usecase' ? 'setups' : l.categories.includes('themes') ? 'looks' : 'addons';
-
-export type SectionChip = { section: Section; name: string; count: number };
-
-/** A chip for each section that holds anything, with how many it holds: the same number its heading says. */
-export function sectionChips(listings: readonly Sorted[]): SectionChip[] {
-  return SECTIONS.flatMap((section) => {
-    const count = listings.filter((l) => sectionOf(l) === section).length;
-    return count === 0 ? [] : [{ section, name: words.chips[section], count }];
-  });
-}
-
 /** The listings in one category, or every one when none is picked. */
 export const inCategory = (listings: readonly Listing[], category: Category | null): Listing[] => (category === null ? [...listings] : listings.filter((l) => l.categories.includes(category)));
 
-
-/** How many of a section browse shows before "Show all", so a phone reads the store in about three screens. */
-export const FOLDED_MOST = 4;
-
-/** Whether a section is folded to its first few: not while searching or with a chip picked, nor once opened. */
-export const folds = (count: number, at: { searching: boolean; picked: boolean; opened: boolean }): boolean =>
-  count > FOLDED_MOST && !at.searching && !at.picked && !at.opened;

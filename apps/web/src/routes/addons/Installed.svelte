@@ -567,7 +567,7 @@
 
   /**
    * WHAT EACH INSTALLED ADD-ON HOLDS, SAID AS ITS OWN PAGE AND THE STORE SAY IT (E21): a built-in from its module, a use
-   * case or an add-on from outside from its listing, the one `ListingRow` reads, so the three screens never disagree.
+   * case or an add-on from outside from its listing, the one the store reads, so the screens never disagree.
    */
   const listed = $derived(listingsOf({ kennel, counts: null }));
   /* ITS OWN ICON, when its manifest names one the app draws: a built-in's, else the one its catalogue entry carries. */
