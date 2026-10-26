@@ -747,6 +747,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.26.0 (Needs you, 25 October): `script.book_from_account`'s nightly "File them" carries at most 200 changes,
  *   the most one option may carry, where it asked for 900 and every run over 200 entries in no book was refused and asked
  *   nothing. 3.25.0 is master's. One number changed, no id added or taken away, so a minor step.
+ * - money-core 3.27.0: In and out, by month reads its months ahead off the walk Cash ahead draws (`metric.in-ahead-by-month`,
+ *   `metric.out-ahead-by-month`), where bills due once and what repeats at its monthly share left every part of a plan
+ *   out of the month it falls due, and Cash ahead opens on twelve weeks, where ten stopped short of the largest part.
+ *   3.26.0 is master's. Two figures added and nothing taken away, so a minor step.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and
@@ -763,7 +767,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.29.0',
   people: '3.8.0',
-  'money-core': '3.26.0',
+  'money-core': '3.27.0',
   estate: '2.5.0',
   work: '1.19.0',
 };

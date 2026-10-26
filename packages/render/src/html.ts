@@ -26,7 +26,7 @@ import { kindSpec } from './kind-spec.ts';
 import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, barFigures, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, trendAhead, TREND_TODAY, type RunCell, type RunFace } from './cards.ts';
 import { FEED_DAY, FEED_EARLIER, feedBurst, feedCasedNodes, feedFold, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -399,6 +399,14 @@ function panel(b: Block, o: RenderOptions): string {
  * has fewer than two. `stat`'s trend cell and `sparkline` draw it; `Trend.svelte` is its twin.
  */
 function trendSvg(cls: string, label: string, value: string, o: RenderOptions): string {
+  /* A RUN AHEAD (`@day` first) is the walk from today: its line, today marked at its start and its lowest point marked,
+     and its two ends dated under it (`trendAhead`). `Trend.svelte` draws the same. */
+  const ahead = trendAhead(plain(inline(value, o)));
+  if (ahead) {
+    const run = trendOf(ahead.run)!;
+    const named = `${plain(inline(label, o)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${run.said.join(', ')}`;
+    return `<span class="${cls}-ahead"><svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(named)}"><path class="trend-line" d="${run.d}" vector-effect="non-scaling-stroke"></path><path class="trend-today" d="${ahead.today}" vector-effect="non-scaling-stroke"></path><path class="trend-low" d="${ahead.low}" vector-effect="non-scaling-stroke"></path></svg><span class="trend-days" aria-hidden="true"><span>${escape(TREND_TODAY)}</span><span>${escape(ahead.to)}</span></span></span>`;
+  }
   const t = trendOf(plain(inline(value, o)));
   if (!t) return '';
   const name = `${plain(inline(label, o)) || TREND}: ${t.said.join(', ')}`;
@@ -1702,10 +1710,19 @@ function forecast(b: Block, o: RenderOptions): string {
   const cutLine = under ? ` style="stroke:url(#${under})"` : '';
   const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${split}${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-today', plan.now.rule)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past, cutLine)}${path('forecast-walk', plan.walk, `${painted(FORECAST_PAINT.walk)}${cutLine}`)}${path('forecast-future', plan.future, cutLine)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true"><span class="forecast-now-word">${escape(FORECAST_NOW)}</span><span class="forecast-now-figure">${escape(plan.now.label)}</span></span>${axis}${
     plan.cross ? `<span class="forecast-pin"${plan.cross.near ? ' data-side="end"' : ''} style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
-  }</div>`;
+  }${plan.drops.map((d) => `<span class="forecast-drop num" style="--at:${d.at};--y:${d.y}" aria-hidden="true">${d.n}</span>`).join('')}</div>`;
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks
     .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
     .join('')}</ol>`;
+  /* EACH PART OF A PLAN THE LINE DROPS BY, numbered as its mark on the line is, with its day and amount (`drops`). */
+  const drops = plan.drops.length
+    ? `<ol class="forecast-drops">${plan.drops
+        .map(
+          (d) =>
+            `<li class="forecast-drop-item"><span class="forecast-drop-n num" aria-hidden="true">${d.n}</span><span class="forecast-drop-label">${escape(d.label)}</span><span class="forecast-drop-day">${escape(d.day)}</span><span class="forecast-drop-amount num">${escape(d.amount)}</span></li>`,
+        )
+        .join('')}</ol>`
+    : '';
   /* EVERYDAY SPENDING IS ONE LINE, not a row a week (`forecastEveryday`), and the bills are listed around it. */
   const everyday = forecastEveryday(model, shown);
   const row = (when: string, what: string, move: string, balance: string) =>
@@ -1717,7 +1734,7 @@ function forecast(b: Block, o: RenderOptions): string {
     .join('')}</tbody></table></details>`;
   const note = underNote(model, shown);
   const soon = note ? `<p class="forecast-soon">${escape(note)}</p>` : '';
-  return `<div class="prop forecast">${said}${chart}${ticks}${soon}${numbers}</div>`;
+  return `<div class="prop forecast">${said}${chart}${ticks}${drops}${soon}${numbers}</div>`;
 }
 
 /**

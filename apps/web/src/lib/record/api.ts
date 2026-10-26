@@ -1238,6 +1238,11 @@ export type Metric = {
   label: string;
   /** How the figure moved, one value a day, oldest first; `null` is a day nothing was recorded. */
   trend?: (number | null)[] | undefined;
+  /**
+   * Set when `trend` is the walk AHEAD from today rather than the days behind (`cells[].ahead`): the day it starts on,
+   * the walk's currency, and the lowest it reaches and the first day it does, in minor units.
+   */
+  ahead?: { from: string; currency: string; low: { day: string; value: number } } | undefined;
   value: string;
   note: string;
   tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;

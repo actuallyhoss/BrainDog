@@ -885,6 +885,35 @@ const withoutRetired38 = (doc: Body): Body => ({
  * MONEY 3.23.0 COMES OFF BEFORE ALL (the look of 25 October): the Lasts tile's two cells say what 3.22.0 released, "With
  * what is due" and "If nothing comes in".
  */
+/**
+ * MONEY 3.27.0 COMES OFF BEFORE ALL: no figures of what the walk moves in each month ahead, In and out, by month reads
+ * bills due once and what repeats at its monthly share again, and Cash ahead opens on ten weeks.
+ */
+const AHEAD_27 = new Set(['in-ahead-by-month', 'out-ahead-by-month']);
+const tenWeeks = (b: Body): Body => (b.kind === 'forecast' && b.horizon === 84 ? { ...b, horizon: 70, horizons: [70, 90, 180, 365, 730, 1825, 'last'] } : b);
+const withoutAhead27 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => !AHEAD_27.has(d.metric as string))
+    .map((d) =>
+      d.page === 'money' || d.page === 'money-book'
+        ? {
+            ...d,
+            blocks: (d.blocks as Body[]).map((b) =>
+              Array.isArray(b.series) && b.heading === 'In and out, by month'
+                ? {
+                    ...b,
+                    series: [
+                      { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
+                      { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
+                    ],
+                  }
+                : tenWeeks(b),
+            ),
+          }
+        : d,
+    ),
+});
 /** MONEY 3.24.0 COMES OFF FIRST (the look of 26 October, R4): the Accounts split read six accounts at most. */
 const withoutLimit24 = (doc: Body): Body =>
   withPage(doc, 'money', (now) => now.map((x) => (x.heading === 'Accounts' && x.limit === 12 ? { ...x, limit: 6 } : x)));
@@ -1064,7 +1093,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(raw)))))))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(withoutAhead27(raw))))))))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

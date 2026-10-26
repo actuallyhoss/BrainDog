@@ -21,7 +21,7 @@
 import { createClient, type ClientOptions } from '@braindog/client';
 import type { Bars, FxRead, MeasureSeries, Part, QueueQuestion, TargetIn } from '@braindog/kernel';
 import { COSTS, isBucket, isQuiet } from '@braindog/kernel/constants';
-import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, integer, slugWords, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
+import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, exponentOf, integer, slugWords, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { stopped } from '../shell/headline.ts';
@@ -67,6 +67,8 @@ import { liveOf } from '../ui/face.ts';
 import { sourceRows } from './source-rows.ts';
 import { scriptOf } from './scripts.ts';
 import { noteWithoutLeftovers } from './brief.ts';
+import { learnZone, recordToday } from './zone.ts';
+import { daySaid } from '../work/board.ts';
 import { pathOf } from '../ui/icons.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
@@ -206,7 +208,7 @@ type Answered = {
   fold?: unknown;
   icon?: string;
   columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string }; metric?: unknown; or?: unknown }[];
-  cells?: { metric: string; label?: unknown; trend?: unknown; note?: unknown }[];
+  cells?: { metric: string; label?: unknown; trend?: unknown; ahead?: unknown; note?: unknown }[];
   /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
      seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
      `heading`, `empty`, `body`, `target`, `authored`, and every `label` a column, cell or reading
@@ -864,10 +866,14 @@ export function tileOf(
   const door = decl && !empty && !unsaid ? hrefFor(decl) : null;
   /* THE LINE IS THE RECORD'S SERIES, and only numbers and gaps are drawn: anything else is not a day. */
   const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
+  /* A TREND AHEAD IS THE WALK FROM TODAY (`cells[].ahead`), and its note says the lowest it reaches and on which day. */
+  const ahead = trend ? aheadOf((cell as { ahead?: unknown }).ahead) : null;
+  const lowest = ahead ? copy.cashLowest(aboutMoney(ahead.low.value, ahead.currency), daySaid(ahead.low.day)) : '';
   return {
     id: cell.metric,
     label,
     ...(trend ? { trend } : {}),
+    ...(ahead ? { ahead } : {}),
     /* A CURRENCY CODE IS MONEY AND ANY OTHER UNIT IS A QUANTITY. Every unit went to `money`, so a
        sum of 150 kg drew `KG 1.50` and 12.5 hours drew `H 0.13`. */
     value: !r.unit
@@ -877,7 +883,7 @@ export function tileOf(
         : quantity(r.value, r.unit),
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
-    note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
+    note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), lowest, across].filter(Boolean).join(' · '),
     /* A MISSED TARGET IS AMBER, and red only on a tile its page declared `bad`: the day the cash runs out. */
     tone: met === null ? undefined : met ? 'good' : missed,
     ...(door ? { href: door } : {}),
@@ -895,6 +901,25 @@ export function tileOf(
 const text = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 const count = (v: unknown): number => (typeof v === 'number' ? v : 0);
 const STATES: readonly ActionRow['state'][] = ['pending', 'firing', 'paused', 'done'];
+
+/** A trend ahead as the record answers it (`readings[].ahead`), or `null` for one behind or one that is not whole. */
+function aheadOf(v: unknown): NonNullable<Metric['ahead']> | null {
+  if (v === null || typeof v !== 'object') return null;
+  const { from, currency, low } = v as { from?: unknown; currency?: unknown; low?: { day?: unknown; value?: unknown } | null };
+  if (typeof from !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(from) || typeof currency !== 'string' || !/^[A-Z]{3}$/u.test(currency)) return null;
+  if (!low || typeof low.day !== 'string' || typeof low.value !== 'number' || !Number.isFinite(low.value)) return null;
+  return { from, currency, low: { day: low.day, value: low.value } };
+}
+
+/** An amount ahead, said roughly, as a sentence about the future says one: three figures of whole units. */
+function aboutMoney(minor: number, currency: string): string {
+  const exp = exponentOf(currency);
+  const whole = Math.round(minor / 10 ** exp);
+  const size = Math.abs(whole);
+  const step = size >= 1000 ? 10 ** (Math.floor(Math.log10(size)) - 2) : 1;
+  const rounded = (whole < 0 ? -1 : 1) * Math.round(size / step) * step * 10 ** exp;
+  return moneyWhole(rounded, currency, homeCurrency())?.text ?? money(rounded, currency);
+}
 
 /** One row of an `actions` block, back in the shape the actions read gives "Runs on". */
 export function actionOf(fields: Record<string, unknown>): ActionRow {
@@ -1239,8 +1264,7 @@ function nextPart(cells: readonly { reading?: { value?: unknown; unit?: unknown;
     const part = typeof l === 'number' && typeof a === 'number' && l > a && typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit) ? moneyWhole(l - a, unit, homeCurrency()) : null;
     /* A PART WHOSE DAY HAS GONE IS LATE, in Today's words and the danger colour (the audit of 22 October, U4): "Next EGP
        467,915 on 13 Oct" stood in grey under a plan nine days after that day. Today is the reader's day at `now`. */
-    const wall = new Date(now);
-    const today = `${wall.getFullYear()}-${String(wall.getMonth() + 1).padStart(2, '0')}-${String(wall.getDate()).padStart(2, '0')}`;
+    const today = recordToday(now);
     if (iso < today) return `${part ? `${part.text} ` : ''}{{bad:${lateSaid(iso, today)}}}, due ${on}`;
     return part ? `Next ${part.text} on ${on}` : `Next on ${on}`;
   };
@@ -1431,6 +1455,7 @@ export function blockOf(
     metric: c.metric,
     label: str(c.label) ?? c.metric,
     ...(typeof c.trend === 'string' ? { trend: c.trend } : {}),
+    ...(typeof c.ahead === 'string' ? { ahead: c.ahead } : {}),
     ...(typeof c.note === 'string' ? { note: c.note } : {}),
   }));
 
@@ -1730,8 +1755,7 @@ export function blockOf(
      words again. */
   if (b.source === 'deadlines') {
     const spoken = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u;
-    const wall = new Date(now);
-    const today = `${wall.getFullYear()}-${String(wall.getMonth() + 1).padStart(2, '0')}-${String(wall.getDate()).padStart(2, '0')}`;
+    const today = recordToday(now);
     const entries = got.map((r) => entryOf('deadlines', r, refs));
     const rows: LiveBlock['rows'] = got.map((r) => {
       const at = typeof r.fields.row === 'string' ? spoken.exec(r.fields.row) : null;
@@ -1811,7 +1835,7 @@ export function blockOf(
         ...shell,
         walks: apart,
         walkNote: walksNote(typeof fx.home === 'string' ? fx.home : null, missing, apart.length),
-        ...walkTable(apart[0]!, kind === 'bridge' || kind === 'forecast' ? apart[0]!.steps.length : limit, new Date(now).toISOString().slice(0, 10), false),
+        ...walkTable(apart[0]!, kind === 'bridge' || kind === 'forecast' ? apart[0]!.steps.length : limit, recordToday(now), false),
       };
     }
     const walk = walkOf(walked);
@@ -1821,7 +1845,7 @@ export function blockOf(
           ...shell,
           walk,
           ...(past ? { past } : {}),
-          ...walkTable(walk, kind === 'bridge' || kind === 'forecast' ? walk.steps.length : limit, new Date(now).toISOString().slice(0, 10), false),
+          ...walkTable(walk, kind === 'bridge' || kind === 'forecast' ? walk.steps.length : limit, recordToday(now), false),
         }
       : cannot;
   }
@@ -2353,6 +2377,8 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       }
 
       const { blocks = [], read_at, look: arranged, ...bare } = out.value as AnsweredPage;
+      /* THE ZONE THE PAGE WAS READ IN IS THE RECORD'S, which every day drawn from it is counted in (`zone.ts`). */
+      learnZone((out.value as { zone?: unknown }).zone);
       /* HOW THE ENGINE ARRANGED IT, narrowed, and left off a page whose look this build cannot read. */
       const look = lookOf(arranged);
       const page: LivePageDecl = look ? { ...bare, look } : bare;

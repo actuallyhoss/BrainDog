@@ -179,6 +179,48 @@
     stroke: var(--red);
   }
 
+  /* A LINE AHEAD (the cash walk from today): the line, today's dot at its start, its lowest point marked, and its two
+     ends dated under it in the quiet size. It takes the trend's place in the cell, and its days add a line under it. */
+  .cell:has(> .cell-trend-ahead) {
+    grid-template-areas:
+      'label glyph trend'
+      'figure figure figure'
+      'note note note';
+    grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+  }
+
+  .cell-trend-ahead {
+    grid-area: trend;
+    display: grid;
+    inline-size: min(140px, 55cqi);
+    gap: 2px;
+  }
+
+  .cell-trend-ahead > .cell-trend {
+    inline-size: 100%;
+  }
+
+  .trend-today {
+    stroke: var(--chart-1);
+    stroke-width: 6px;
+    stroke-linecap: round;
+  }
+
+  .trend-low {
+    stroke: var(--ink);
+    stroke-width: 7px;
+    stroke-linecap: round;
+  }
+
+  .trend-days {
+    display: flex;
+    justify-content: space-between;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (a figure is
      read beside its heading, never shouted over it), and the others stay the size
      they are, so the lead reads as the answer and the rest as its detail. IT STEPS DOWN INSIDE ITS OWN CELL rather than

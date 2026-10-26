@@ -1,5 +1,5 @@
 /**
- * Cash ahead opens on the next ten weeks, on Money and on a book's page, with every longer length one press away
+ * Cash ahead opens on the next twelve weeks (ten until money-core 3.27.0), on Money and on a book's page, with every longer length one press away
  * (REC-B08, its windows).
  *
  * WHAT WAS WRONG. Money's Cash ahead opened on three months and a book's on a whole year, so the first thing a person
@@ -26,8 +26,8 @@ import { MONEY_PAGES } from '../src/modules/money.ts';
 import { MONEY_BOOK_PAGE } from '../src/modules/money/pages/book.ts';
 
 const OWNER = { actor: 'p_1' };
-/** Ten weeks, then every longer length the knob offers. */
-const WINDOWS = [70, 90, 180, 365, 730, 1825, 'last'];
+/** Twelve weeks (ten until money-core 3.27.0), then every longer length the knob offers. */
+const WINDOWS = [84, 180, 365, 730, 1825, 'last'];
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -86,36 +86,36 @@ function drawn(k: Kernel, slug: string): Ahead {
 test('BOTH PAGES DECLARE TEN WEEKS FIRST, every longer length after it, and a fitted axis', () => {
   for (const page of ['money', MONEY_BOOK_PAGE.page]) {
     const ahead = declared(page);
-    assert.equal(ahead.horizon, 70, `${page} opens on ten weeks`);
-    assert.deepEqual(ahead.horizons, WINDOWS, `${page}'s knob offers ten weeks and every longer length`);
+    assert.equal(ahead.horizon, 84, `${page} opens on twelve weeks`);
+    assert.deepEqual(ahead.horizons, WINDOWS, `${page}'s knob offers twelve weeks and every longer length`);
     assert.equal(ahead.axis, 'fit', `${page}'s axis fits the walk`);
   }
 });
 
-test('A FRESH RECORD INSTALLS THEM, and Money and a book both answer a walk that opens on 70 days', async () => {
+test('A FRESH RECORD INSTALLS THEM, and Money and a book both answer a walk that opens on 84 days', async () => {
   const k = await fresh();
-  /* WHAT THE RECORD HOLDS, not only what the seed says: the page as installed opens on ten weeks. */
+  /* WHAT THE RECORD HOLDS, not only what the seed says: the page as installed opens on twelve weeks. */
   for (const id of ['money', MONEY_BOOK_PAGE.page]) {
     const decl = k.declarations().find((d) => d.id === `page.${id}`);
     assert.ok(decl, `the record holds no ${id} page`);
     const ahead = (JSON.parse(decl.body) as { blocks: Ahead[] }).blocks.find((b) => b.kind === 'forecast' && b.heading === 'Cash ahead')!;
-    assert.deepEqual([ahead.horizon, ahead.horizons, ahead.axis], [70, WINDOWS, 'fit'], `${id} as installed`);
+    assert.deepEqual([ahead.horizon, ahead.horizons, ahead.axis], [84, WINDOWS, 'fit'], `${id} as installed`);
   }
 
   const found = (k.pages() as unknown as { slug: string; title: string; template: string | null }[]).find((p) => p.template === MONEY_BOOK_PAGE.page && p.title === 'Studio');
   assert.ok(found, 'Studio has a page of its own');
   for (const slug of ['money', found.slug]) {
     const ahead = drawn(k, slug);
-    assert.equal(ahead.walk?.horizon, 70, `${slug} opens on ten weeks`);
+    assert.equal(ahead.walk?.horizon, 84, `${slug} opens on twelve weeks`);
     /* THE LONGER LENGTHS STAY IN REACH: a load walks past the opening, and never past two years and a day unasked. */
     const reach = ahead.walk?.reach ?? 0;
-    assert.ok(reach > 70 && reach <= 731, `${slug}'s walk reaches ${reach} days`);
+    assert.ok(reach > 84 && reach <= 731, `${slug}'s walk reaches ${reach} days`);
   }
 });
 
-test('FIVE YEARS IS STILL ONE PRESS AWAY, and the walk still opens on ten weeks', async () => {
+test('FIVE YEARS IS STILL ONE PRESS AWAY, and the walk still opens on twelve weeks', async () => {
   const k = await fresh();
   const asked = drawn({ page: (slug: string) => k.page(slug, undefined, { walk: 1825 }) } as unknown as Kernel, 'money');
-  assert.equal(asked.walk?.horizon, 70, 'it still opens on ten weeks');
+  assert.equal(asked.walk?.horizon, 84, 'it still opens on twelve weeks');
   assert.ok((asked.walk?.reach ?? 0) >= 1825, `five years asked for walks ${String(asked.walk?.reach)} days`);
 });

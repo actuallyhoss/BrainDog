@@ -36,9 +36,12 @@ export const FORECAST: Record<string, unknown>[] = [
        can be read to its end (research audit 16, H1).
        TEN WEEKS FIRST, SINCE THE UNRELEASED money-core 3.17.0 (REC-B08): the span a person acts on, the next few pay
        days and the bills before them, with three months and every longer length still one press away. The walk is
-       unchanged, two years unasked, so opening shorter costs nothing and takes nothing off the knob. */
-    horizon: 70,
-    horizons: [70, 90, 180, 365, 730, 1825, 'last'],
+       unchanged, two years unasked, so opening shorter costs nothing and takes nothing off the knob.
+       TWELVE WEEKS FIRST, SINCE money-core 3.27.0: ten stopped a week short of the largest part of a plan, so the chart
+       never drew the drop the runway beside it ran out on, and Today's twelve weeks of the same walk ended in a drop this
+       chart did not have. Twelve weeks is Today's span too, so the two draw one picture. */
+    horizon: 84,
+    horizons: [84, 180, 365, 730, 1825, 'last'],
     /* THE VALUE AXIS FITS THE WALK (REC-B08), starting just under its lowest balance, so ten weeks of a balance far
        above nought still shows which way it moves. `fit` is what saying nothing draws today; said here so a change of
        the renderer's default does not flatten Money's chart. */

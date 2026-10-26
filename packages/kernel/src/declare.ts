@@ -591,8 +591,17 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id} is a figure over the walk, and its value is walk: ${WALKS.join(', ')}.`, 'value', [...WALKS]);
     if (v.within === undefined ? !walksToZero(v.walk) : typeof v.within !== 'string' || !windowMs(v.within))
       return bad('DECLARATION_INVALID', `${id} says how far ahead it adds up as within: 30d, 4w or 3m.`, 'value');
-    for (const key of ['where', 'group_by', 'bucket'] as const)
+    for (const key of ['where', 'group_by'] as const)
       if (body[key] !== undefined) return bad('DECLARATION_INVALID', `${id} walks its legs, and each leg says which rows it reads; a figure over the walk has no ${key}.`, key);
+    /* A WALK OF MONEY IN OR OUT MAY BE CUT INTO CALENDAR MONTHS (money-core 3.27.0), for the months ahead of a chart of
+       what moved; the days until zero and the day of it are one crossing, with nothing to cut. */
+    if (body.bucket !== undefined && (body.bucket !== 'month' || walksToZero(v.walk)))
+      return bad(
+        'DECLARATION_INVALID',
+        walksToZero(v.walk) ? `${id} is one crossing of zero, with no months to cut it into; leave bucket out.` : `${id} walks money in or out, which is cut by calendar month only: bucket: month.`,
+        'bucket',
+        walksToZero(v.walk) ? undefined : ['month'],
+      );
     const legs = body.legs;
     if (!Array.isArray(legs) || legs.length === 0 || legs.length > WALK_LEGS_MOST)
       return bad('DECLARATION_INVALID', `${id} names between 1 and ${WALK_LEGS_MOST} legs to walk.`, 'legs');
@@ -667,7 +676,8 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
   if (body.bucket !== undefined) {
     if (!(BUCKETS as readonly unknown[]).includes(body.bucket))
       return bad('DECLARATION_INVALID', `${String(body.bucket)} is not a bucket.`, 'bucket', BUCKETS as unknown as string[]);
-    if (body.group_by === undefined)
+    /* A WALK IS DATED BY ITS OWN STEPS, so it cuts by month with no field to group by (checked with the walk above). */
+    if (body.group_by === undefined && body.source !== WALK_SOURCE)
       return bad('DECLARATION_INVALID', `${id} buckets by ${String(body.bucket)} and groups by nothing.`, 'bucket');
   }
 

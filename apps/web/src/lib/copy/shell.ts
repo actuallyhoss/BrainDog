@@ -245,6 +245,8 @@ export const shell = {
   /* A WALK AHEAD THAT NEVER WENT UNDER: the last day it looked at, said where the day the money runs out would be. */
   lastsPast: (day: string) => `Lasts past ${day}`,
   figureConverted: (day: string) => `Converted at rates as of ${day}.`,
+  /** Under a cash figure whose line is the walk ahead: where it is lowest, said roughly, and on which day. */
+  cashLowest: (amount: string, day: string) => `Lowest ${amount} on ${day}`,
   /* A BAR'S OWN NOTE, beside the bar and not under the chart: what its money was kept in before it was said in home. */
   convertedFrom: (codes: string) => `converted from ${codes}`,
   /**

@@ -344,7 +344,8 @@ export type PageBlock = {
   field?: string;
   versions?: number;
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
-  cells?: readonly { metric: string; label: string; trend?: string; note?: string }[];
+  /** `ahead:` names a figure over the walk whose walk the trend draws ahead from today, in place of the days behind. */
+  cells?: readonly { metric: string; label: string; trend?: string; note?: string; ahead?: string }[];
   /** A `stat`'s: its first figure is the screen's one hero figure. */
   lead?: boolean;
   order?: readonly { field: string; dir: 'asc' | 'desc' }[];

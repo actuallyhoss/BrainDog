@@ -892,6 +892,14 @@ export type ForecastPlan = {
    */
   cross: { d: string; rule: string; at: string; day: string; near: boolean } | null;
   low: string;
+  /**
+   * EACH PART OF A PLAN GOING OUT INSIDE THE CHART, as a numbered drop (money-core 3.27.0): where its step sits on the
+   * line (shares across and down, as today's label is placed), its number, and what it is, its day and its amount, which
+   * a list under the chart says beside the same number. A part of a plan is the largest money a walk moves on a day, and
+   * a line that fell by most of the balance with nothing saying why read as a fault in the chart. At most `FORECAST_DROPS_MOST`,
+   * the soonest, so a plan of many parts over years does not cover the line in numbers.
+   */
+  drops: { n: number; at: string; y: string; label: string; day: string; amount: string }[];
   /** The month names under the chart; `edge` is the start's own month, set at the left edge rather than centred. */
   ticks: { at: string; label: string; edge?: true }[];
   /** The start and the end of the time axis, for the scrub. */
@@ -915,6 +923,9 @@ export type ForecastPlan = {
   foot: string;
   sentence: string;
 };
+
+/** The most parts of plans a chart numbers as drops: the soonest, so the line is never covered in numbers. */
+export const FORECAST_DROPS_MOST = 6;
 
 /** How many round steps the value axis is cut into at most, so at most one more name than this down its side. */
 const AXIS_MOST = 5;
@@ -1262,6 +1273,17 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
         }
       : null,
     low: `M${x(shown.lowest.day)} ${y(shown.lowest.balance)}h0`,
+    drops: shown.steps
+      .filter((s) => s.of !== undefined && s.of !== '' && s.delta < 0 && s.day > model.today && s.day <= end)
+      .slice(0, FORECAST_DROPS_MOST)
+      .map((s, i) => ({
+        n: i + 1,
+        at: at(daysBetween(start, s.day) / span),
+        y: String(Math.round(Number(y(s.balance)) * 100) / 10_000),
+        label: s.label,
+        day: shortDay(s.day, model.today),
+        amount: forecastFigure(model, s.delta, 'read'),
+      })),
     ticks,
     start,
     span,

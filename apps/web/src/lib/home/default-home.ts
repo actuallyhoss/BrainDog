@@ -39,6 +39,7 @@ import { words } from './words.ts';
 /* THE LIST A TASK IS KEPT IN, named once for every work screen (`lib/work/list.ts`), never again here. */
 import { TASKS } from '../work/list.ts';
 import { daysBetween, dueSaid } from '../work/board.ts';
+import { recordToday } from '../record/zone.ts';
 
 /** The headings a use case's voice may say its own way, with the house line each falls back to. */
 export type HomeVoice = {
@@ -563,8 +564,11 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       /* WHO IS WORKING, the record's runs at work by its one clock (`sessions.working`), only while one is (`runs-working`).
          The desk draws it as Working now, each run with how long it has been at it (`WorkingNow.svelte`, C27). */
       ...(holds.runs ? [workingTile(voice)] : []),
-      /* CASH AHEAD (today F5): the cash now over its twelve weeks, how long it lasts, and what comes in and goes out in
-         the next thirty days, read from the Money page's own figures, where that page is. */
+      /* CASH AHEAD (today F5): the cash now, how long it lasts, and what comes in and goes out in the next thirty days,
+         read from the Money page's own figures, where that page is. ITS LINE IS THE TWELVE WEEKS AHEAD, the walk the
+         runway counts (`ahead: runway-days`) and Money's Cash ahead draws over the same twelve weeks, with today, the
+         lowest point and both ends marked; it was the twelve weeks behind, under a tile called Cash ahead, and ended in
+         a drop Money's chart did not have. */
       ...(holds.money
         ? [
             {
@@ -574,7 +578,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
               heading: words.money,
               icon: 'wallet',
               cells: [
-                { metric: 'cash-now', label: words.cashNow, trend: '12w', note: words.lastsTo },
+                { metric: 'cash-now', label: words.cashNow, trend: '12w', ahead: 'runway-days', note: words.lastsTo },
                 { metric: 'arriving-30d', label: words.comingIn },
                 { metric: 'leaving-30d', label: words.goingOut },
               ],
@@ -698,11 +702,8 @@ const isTodo = (b: LiveBlock): boolean => b.kind === 'todo';
 /** Whether the block's rows are its entries one for one, which every reshaping here needs to keep them aligned. */
 const aligned = (b: LiveBlock): boolean => b.entries.length === b.rows.length;
 
-/** The reader's day at `now`, as `YYYY-MM-DD`, which a deadline's `day` is compared with. */
-const dayOf = (now: number): string => {
-  const d = new Date(now);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+/** The record's day at `now`, as `YYYY-MM-DD` (`zone.ts`), which a deadline's `day` is compared with. */
+const dayOf = (now: number): string => recordToday(now);
 
 const DAY = /^\d{4}-\d{2}-\d{2}/u;
 

@@ -69,6 +69,7 @@ const clockOf = (block: BlockResult): number => {
   return Number.isFinite(at) ? at : Date.now();
 };
 import { copy } from '../copy.ts';
+import { recordToday } from './zone.ts';
 import type { Entry } from './schema.ts';
 import { groupCards, meetsOf, mergedAway, seenWords, type CardRun, type GroupKey } from './people.ts';
 
@@ -472,7 +473,7 @@ function forecastRows(block: BlockResult): string[] {
   const currency = walk.currency ?? homeCurrency();
   const said = (minor: number) => (currency ? money(minor, currency) : String(minor));
   /* THE DAY THE BLOCK WAS READ, which is the record's clock on a live page and the sample's here. */
-  const today = block.stale_at.slice(0, 10);
+  const today = recordToday(clockOf(block));
   const axis = block.axis;
   return [
     `opening | ${today} | ${escapeCell(copy.bridgeStart)} | ${said(walk.from)}`,
@@ -588,10 +589,13 @@ export function bucketLabel(key: string, bucket: string): string {
  * WHOLE UNITS FOR MONEY, because the line's accessible name reads these numbers out, and `3385000` is
  * pence nobody says. The shape is the same at any scale. A trend of fewer than three readings draws no cell at all.
  */
-export function trendCell(trend: readonly (number | null)[] | undefined, money = false): string {
+export function trendCell(trend: readonly (number | null)[] | undefined, money = false, from?: string): string {
   /* A LINE FROM THREE SAVED NIGHTS AT LEAST, as Home's linesKept draws one: two points are a slope, not a line. */
   if (!trend || trend.filter((v) => v !== null).length < 3) return '';
-  return ` | ${trend.map((v) => (v === null ? '-' : String(money ? Math.round(v / 100) : v))).join(' ')}`;
+  /* A LINE AHEAD SAYS THE DAY IT STARTS ON FIRST, `@2026-10-27`, one point a day after it, which is what lets the
+     renderer mark today at its start, date its ends and mark its lowest point (`trendAhead` in `braindog-render`). */
+  const start = from && /^\d{4}-\d{2}-\d{2}$/u.test(from) ? `@${from} ` : '';
+  return ` | ${start}${trend.map((v) => (v === null ? '-' : String(money ? Math.round(v / 100) : v))).join(' ')}`;
 }
 
 /* AND A VALUE'S OWN LINE BREAKS ARE SPACES: a row is one line of the dialect, so a note of two paragraphs broke its row,
@@ -1061,7 +1065,7 @@ function charted(block: BlockResult): Split | null {
   /* A CASH WALK THE RECORD COULD NOT ADD UP, one walk a currency, each with its own table. A `table` over the walk is
      one table a currency too, each cut to `limit:` as the one walk's is, rather than the first currency's alone. */
   if (block.walks && block.walks.length > 0) {
-    const today = block.stale_at.slice(0, 10);
+    const today = recordToday(clockOf(block));
     const whole = block.kind === 'forecast' || block.kind === 'bridge';
     /* EACH WALK DRAWS ITS OWN REMEMBERED CASH, AND ONE SET OF KNOBS MOVES THEM ALL, under the last walk (`group`). */
     const walks = block.walks;
@@ -1122,7 +1126,7 @@ function charted(block: BlockResult): Split | null {
   const day = dayFieldOf(REGISTERS[register]?.fields ?? []);
   const dayOf = (e: BlockResult['matched'][number]): string => {
     const v = day ? e.fields[day] : null;
-    return typeof v === 'string' ? v.slice(0, 10) : new Date(clockOf(block)).toISOString().slice(0, 10);
+    return typeof v === 'string' ? v.slice(0, 10) : recordToday(clockOf(block));
   };
   if (home !== null) {
     const amounts = block.matched.flatMap((e) => {
@@ -1130,7 +1134,7 @@ function charted(block: BlockResult): Split | null {
       const c = currencyOf(v);
       return c === null ? [] : [{ currency: c, amount: (v as { amount: number }).amount, day: dayOf(e) }];
     });
-    const got = across(amounts, home, fx.rates, new Date(clockOf(block)).toISOString().slice(0, 10));
+    const got = across(amounts, home, fx.rates, recordToday(clockOf(block)));
     if (got.kind === 'converted') {
       const matched = block.matched.map((e) => {
         const v = e.fields[of];
@@ -1178,7 +1182,7 @@ function linkedCharted(block: BlockResult, of: string): Split | null {
   const fx = block.fx ?? fxNow();
   const home = fx.home;
   if (seen.size === 0 || (seen.size === 1 && (home === null || seen.has(home)))) return null;
-  const today = new Date(clockOf(block)).toISOString().slice(0, 10);
+  const today = recordToday(clockOf(block));
   if (home !== null) {
     const got = across(held.map((h) => ({ currency: h.currency, amount: h.amount, day: today })), home, fx.rates, today);
     if (got.kind === 'converted') {
@@ -1403,7 +1407,7 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
         )
       : block.metrics
     ? block.metrics.map(
-        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value))}${m.tone ? ` | ${m.tone}` : ''}`,
+        (m) => `${escapeCell(m.label)} | ${escapeCell(m.value)} | ${escapeCell(m.note)}${trendCell(m.trend, /^[A-Z]{3} /u.test(m.value) || m.ahead !== undefined, m.ahead?.from)}${m.tone ? ` | ${m.tone}` : ''}`,
       )
     : block.kind === 'stat' && (block.register || block.measures)
       ? tileRows(measuresFor(block))

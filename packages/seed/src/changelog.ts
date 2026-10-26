@@ -173,6 +173,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.27.0',
+      notes: 'The months ahead of In and out, by month are what Cash ahead walks, every part of a plan in the month it falls due, and Cash ahead opens on twelve weeks.',
+    },
+    {
       version: '3.26.0',
       notes: 'Entries in no book on an account that is in one are asked about two hundred at a time, and the rest the night after, where a record with more than two hundred was asked nothing.',
     },

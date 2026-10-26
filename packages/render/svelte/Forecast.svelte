@@ -372,6 +372,8 @@
         >{/each}
     </ol>
     {#if p.cross}<span class="forecast-pin" data-side={p.cross.near ? 'end' : undefined} style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}
+    <!-- EACH PART OF A PLAN THE LINE DROPS BY, numbered on the line and in the list under the chart (`drops`). -->
+    {#each p.drops as d (d.n)}<span class="forecast-drop num" style="--at:{d.at};--y:{d.y}" aria-hidden="true">{d.n}</span>{/each}
     {#if readout}
       <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
         <span class="forecast-readout-day">{readout.day}</span>
@@ -385,6 +387,15 @@
   <ol class="forecast-ticks" aria-hidden="true">
     {#each p.ticks as t}<li class="forecast-tick" data-edge={t.edge ? '' : undefined} style="--at:{t.at}">{t.label}</li>{/each}
   </ol>
+  {#if p.drops.length}
+    <ol class="forecast-drops">
+      {#each p.drops as d (d.n)}<li class="forecast-drop-item"
+          ><span class="forecast-drop-n num" aria-hidden="true">{d.n}</span><span class="forecast-drop-label">{d.label}</span><span class="forecast-drop-day">{d.day}</span><span
+            class="forecast-drop-amount num">{d.amount}</span
+          ></li
+        >{/each}
+    </ol>
+  {/if}
 {/snippet}
 
 <!-- EVERY MOVEMENT, the walk's numbers in a fold: under the chart, or inside Adjust where there is one. -->

@@ -1724,6 +1724,74 @@
     translate: calc(-1 * var(--sp-1)) calc(-100% - var(--sp-2));
   }
 
+  /* A PART OF A PLAN THE LINE DROPS BY: its number in a small ink disc just under the point it drops to, the same
+     number as its line in the list under the chart (`drops`, money-core 3.27.0). */
+  .forecast-drop {
+    --y: 0;
+    position: absolute;
+    inset-inline-start: calc(var(--at) * 100%);
+    inset-block-start: calc(var(--y) * 100%);
+    translate: -50% var(--sp-1);
+    display: grid;
+    place-items: center;
+    min-inline-size: 16px;
+    block-size: 16px;
+    padding-inline: 3px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--tile);
+    font-size: var(--fs-cap);
+    font-weight: 600;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .forecast-drops {
+    display: grid;
+    gap: var(--sp-1);
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-meta);
+  }
+
+  .forecast-drop-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: baseline;
+    gap: var(--sp-2);
+  }
+
+  .forecast-drop-n {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: 16px;
+    block-size: 16px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--tile);
+    font-size: var(--fs-cap);
+    font-weight: 600;
+  }
+
+  .forecast-drop-label {
+    overflow: hidden;
+    color: var(--ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .forecast-drop-day {
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+
+  .forecast-drop-amount {
+    color: var(--ink);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
   .forecast-readout[data-flip] {
     translate: calc(-100% - 2 * var(--sp-2)) 0;
   }

@@ -143,7 +143,7 @@ test('THE CHART READS SIX MONTHS BACK AND THREE AHEAD, and Cash ahead keeps its 
 
   /* MOVED HERE FROM `money.test.ts`: the cash walk offers five years and to the end, and counting is one control. */
   const ahead = BLOCKS[at('Cash ahead')]!;
-  assert.deepEqual(ahead.horizons, [70, 90, 180, 365, 730, 1825, 'last']);
+  assert.deepEqual(ahead.horizons, [84, 180, 365, 730, 1825, 'last']);
   assert.ok(!ahead.knobs!.includes('leave'), '`leave` is a second control over the streams `count` moves');
 });
 

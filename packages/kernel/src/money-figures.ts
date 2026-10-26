@@ -24,7 +24,7 @@ import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
-import { GROUP_CAP } from './buckets.ts';
+import { GROUP_CAP, bucketOf, shiftBucket } from './buckets.ts';
 import { fill } from './fill.ts';
 import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_ACTIVITY, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_MARKS, RECORD_PATHS, RECORD_PEOPLE, RECORD_PLACES, RECORD_SIGNS, RECORD_TIDY, RECORD_VITALS, RECORD_WORKED, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
@@ -823,10 +823,15 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
   /* SEVERAL CURRENCIES WITH NO WAY TO ADD THEM ARE ONE AMOUNT EACH, the walk run once per currency with its own
      movements unconverted (`only`). The days until zero are a date, and a date across two currencies is a day on which
      nothing happens, so that figure and the day itself have no value then. */
+  /* MONTH BY MONTH, SINCE money-core 3.27.0, for the months ahead of a chart of what moved (`series`'s `then`): the same
+     walk the forecast draws, its steps cut into the calendar months they fall in, so the bars ahead count every list the
+     walk does (a part of a plan among them) and cannot leave out what the walk and the runway count. */
+  const monthly = decl.bucket === 'month' && !toZero;
   const apart = walk.value.currency === null && walk.value.mixed.length > 0;
   if (apart) {
     if (toZero) return ok(empty(decl, 'the walk is in several currencies with no rate to add them', home.rates, today));
     const parts: Part[] = [];
+    const byMonth = new Map<string, Part[]>();
     let steps = 0;
     for (const currency of walk.value.mixed) {
       const one = runway(deps, 0, legs, horizon, currency);
@@ -835,12 +840,19 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
       if (bad) return { ok: false, refusal: bad };
       parts.push({ currency, amount: totalOf(one.value, walked.walk) ?? 0 });
       steps += one.value.steps.length;
+      if (monthly) for (const [key, amount] of monthsOf(one.value, walked.walk, today, horizon)) byMonth.set(key, [...(byMonth.get(key) ?? []), { currency, amount }]);
     }
     return ok({
       ...empty(decl, 'no comparison asked for', home.rates, today),
       rows: steps,
       held: steps,
       parts,
+      ...(monthly
+        ? {
+            current: bucketOf(today, 'month')!,
+            groups: [...byMonth].map(([key, p]): Group => ({ key, value: null, rows: 0, state: 'full', parts: p.filter((x) => x.amount !== 0).length > 0 ? p : [] })),
+          }
+        : {}),
       fx: { into: home.home, home: home.home, asOf: null, forward: false, stale: false, missing: walk.value.missing ?? [] },
     });
   }
@@ -887,7 +899,36 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
     ...(verdict.targetIn ? { targetIn: verdict.targetIn } : {}),
     ...(converted ? { fx: { into: home.home, home: home.home, asOf: converted.asOf, forward: converted.forward, stale: converted.stale, missing: [] } } : {}),
     ...(beyond ? { beyond } : {}),
+    ...(monthly
+      ? {
+          current: bucketOf(today, 'month')!,
+          groups: [...monthsOf(walk.value, walked.walk, today, horizon)].map(([key, value]): Group => ({ key, value, rows: walk.value.steps.filter((st) => st.day.startsWith(key)).length, state: 'full' })),
+        }
+      : {}),
   });
+}
+
+/**
+ * A walk's steps added up by the calendar month each falls in, as its kind adds them, from the month of today to the
+ * last month the walk sees whole, every month present: a month the walk looked at and nothing moved in is nought, which
+ * is what it counted, and never a gap. A MONTH THE WALK STOPS PART WAY THROUGH IS LEFT OUT, because its nought would
+ * say nothing moves in days nobody walked.
+ */
+function monthsOf(walk: Runway, kind: Walked['walk'], today: string, horizon: number): Map<string, number> {
+  const first = bucketOf(today, 'month')!;
+  const end = new Date(Date.parse(`${today}T00:00:00Z`) + horizon * DAY);
+  const whole = new Date(end.getTime() + DAY).getUTCDate() === 1;
+  const ending = bucketOf(end.toISOString().slice(0, 10), 'month')!;
+  const last = whole || ending === first ? ending : shiftBucket(ending, 'month', -1);
+  const out = new Map<string, number>();
+  for (let key = first; key <= last; key = shiftBucket(key, 'month', 1)) out.set(key, 0);
+  for (const step of walk.steps) {
+    const key = bucketOf(step.day, 'month');
+    if (key === null || !out.has(key)) continue;
+    const add = kind === 'in' ? Math.max(0, step.delta) : kind === 'out' ? Math.max(0, -step.delta) : step.delta;
+    out.set(key, out.get(key)! + add);
+  }
+  return out;
 }
 
 /** What a walk adds up to, as the figure asks for it. */

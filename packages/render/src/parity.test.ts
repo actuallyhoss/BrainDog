@@ -225,6 +225,8 @@ const SHAPES: Record<string, string> = {
   'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
   'a forecast with a past, stems, knobs and a crossing':
     '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',
+  'a forecast whose plans drop the line, each part numbered':
+    '```forecast\nopening | 2026-10-27 | Cash now | EGP 500,000.00\nstep | 2026-10-31 | Pay | EGP 120,000.00\nstep | 2027-01-05 | Car, part 4 of 12 | EGP −90,000.00\nof | Car |  | \nstep | 2027-01-13 | House, part 2 of 30 | EGP −300,000.00\nof | House |  | \nhorizon | 84 |  | \n```',
   'a forecast that goes under soon, with a late mark':
     '```forecast\nopening | 2026-09-17 | Cash now | £1,000.00\nstep | 2026-09-27 | Rent | −£2,000.00\nhorizon | 90 |  | \nknobs | late |  | \nlate | 12 |  | \nunder | 30 |  | \n```',
   'a forecast whose page headline says when it runs out':
@@ -251,6 +253,8 @@ const SHAPES: Record<string, string> = {
   'cards with a trend and no figure':
     '```cards\ntitle | trend: By week\nDrawn | 1 2 3\nTwice | 1,,2\nOnce | 7\nFlat | 0 0 4\nGap | [null,5,null]\nQuiet | \nWords | soon\n```',
   /* A STAT'S FIGURE IS A HEADLINE, with no `.00` (`headlineFigure`), in a currency with a symbol and one without. */
+  'a stat whose line is the walk ahead, today and its lowest point marked':
+    '```stat\nCash now | EGP 500,000.00 | Lowest EGP 7,000 on Wed 13 Jan | @2026-10-27 5000 4990 4800 6200 70 4100 4000 3900\nComing in, 30 days | EGP 250,000.00 | \n```',
   'a stat whose figures are headlines': '```stat\nCash now | GBP 33,850.00 | in 3 accounts · GBP 1,200.00 out\nIn Cairo | EGP 412,300.00 | \nSpent | GBP 12.50 | \nCame in | +EGP 850.00 | \n```',
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };

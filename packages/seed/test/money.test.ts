@@ -1353,13 +1353,13 @@ test('CASH AHEAD OPENS ON TEN WEEKS AND WALKS TO THE LONGEST LENGTH IT OFFERS, s
   assert.ok(out.ok, sayOf(out));
   const ahead = out.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number; steps?: { day: string }[] } } | undefined;
   assert.ok(ahead?.walk, 'Cash ahead drew no walk');
-  assert.equal(ahead.walk.horizon, 70);
+  assert.equal(ahead.walk.horizon, 84);
   /* AND A LOAD WALKS NO FURTHER THAN TWO YEARS AND A DAY, though the block offers five years and "to the end" again since
      money-core 3.10.0: those made every opening of Money walk twenty times the chart it opens on (3.9.0), and the kernel
      now walks them only when a reader asks (`WALK_UNASKED`, `walkReach`). How far short of that a load stops is the
      kernel's call, so this holds only the ends: past the opening, and never past two years and a day. */
   const reach = ahead.walk.reach ?? 0;
-  assert.ok(reach > 70 && reach <= 731, `the walk reaches ${reach} days`);
+  assert.ok(reach > 84 && reach <= 731, `the walk reaches ${reach} days`);
   const steps = ahead.walk.steps ?? [];
   assert.ok(steps.some((s) => s.day > day(90)), 'the walk stops at the length it opens on');
   assert.ok(steps.every((s) => s.day <= day(731)), 'a load walks five years');
@@ -1368,15 +1368,15 @@ test('CASH AHEAD OPENS ON TEN WEEKS AND WALKS TO THE LONGEST LENGTH IT OFFERS, s
   const asked = k.page('money', undefined, { walk: 1825 });
   assert.ok(asked.ok, sayOf(asked));
   const longer = asked.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number } } | undefined;
-  assert.equal(longer?.walk?.horizon, 70, 'it still opens on ten weeks');
+  assert.equal(longer?.walk?.horizon, 84, 'it still opens on twelve weeks');
   assert.ok((longer?.walk?.reach ?? 0) >= 1825, `five years asked for walks ${String(longer?.walk?.reach)} days`);
 });
 
 test("A BOOK'S CASH AHEAD OFFERS FIVE YEARS AND TO THE END as Money's own does, since money-core 3.10.0", () => {
   const book = MONEY_PAGES['money-book']!;
   const ahead = (book.blocks as { heading?: string; horizon?: unknown; horizons?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
-  assert.equal(ahead.horizon, 70);
-  assert.deepEqual(ahead.horizons, [70, 90, 180, 365, 730, 1825, 'last']);
+  assert.equal(ahead.horizon, 84);
+  assert.deepEqual(ahead.horizons, [84, 180, 365, 730, 1825, 'last']);
 });
 
 /**

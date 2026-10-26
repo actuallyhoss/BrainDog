@@ -123,8 +123,12 @@ export type PageBlock = {
    * words the bank wrote where nobody was matched to it. The entry carries both and the host falls back.
    */
   columns?: { field: string; or?: string; metric?: string; kpi?: 'headline'; label?: string; as?: string; edit?: boolean; sign?: { field: string; minus: string } }[];
-  /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
-  cells?: { metric: string; label?: string; trend?: string; note?: string }[];
+  /**
+   * A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. With `ahead:`
+   * naming a figure over the walk (`runway-days`), the trend is that walk's balance over the window AHEAD from today
+   * instead, from the figure the walk opens from and over its legs, so a tile draws the very walk Cash ahead draws.
+   */
+  cells?: { metric: string; label?: string; trend?: string; note?: string; ahead?: string }[];
   /**
    * A `stat`'s: its first figure is the screen's one hero figure. A `cards` block's: its first card is drawn two tracks
    * wide. A `note`'s: its body is the page's opening sentence, said with the plural and nought rules a figure's note has.
@@ -385,7 +389,19 @@ export type BlockResult = PageBlock & {
   wholeRead?: WholeRead;
   /** A `stat` block's figures, in the order its cells named them. */
   /** Each cell's figure, and the target the record holds for it, so a host says the record's target rather than its own build's. */
-  readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal; trend?: (number | null)[]; target?: MetricDecl['target'] }[];
+  readings?: {
+    metric: string;
+    label?: string;
+    reading: Reading | null;
+    refusal?: Refusal;
+    trend?: (number | null)[];
+    /**
+     * A trend AHEAD (`cells[].ahead`): `trend` is then the walk's balance at the end of each day from today, today first,
+     * in `currency`'s minor units, and `low` the lowest it reaches and the first day it does. Absent on a trend behind.
+     */
+    ahead?: { from: string; currency: string; low: { day: string; value: number } };
+    target?: MetricDecl['target'];
+  }[];
   /** A `forecast.runway` block's walk. */
   walk?: Runway;
   /**
@@ -2781,7 +2797,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.cells || (block.kind === 'stat' && !block.source?.startsWith('register.'))) {
     return {
       ...base,
-      readings: (block.cells ?? []).map(({ trend: window, ...cell }) => {
+      readings: (block.cells ?? []).map(({ trend: window, ahead: walkOf, ...cell }) => {
         const decl = deps.metric(cell.metric.split(':')[0] ?? '');
 
         if (!decl)
@@ -2801,7 +2817,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
         const at = cell.metric.indexOf(':');
         const param = at < 0 ? undefined : cell.metric.slice(at + 1);
         const read = deps.read(param === undefined ? decl : (fill(decl, null, param) as MetricDecl));
-        const moved = window === undefined ? {} : trendOf(deps, cell.metric, window);
+        const moved = window === undefined ? {} : walkOf !== undefined ? aheadOf(deps, walkOf, window) : trendOf(deps, cell.metric, window);
         const target = decl.target === undefined ? {} : { target: decl.target };
         if ('refusal' in moved) return { ...cell, ...target, reading: read.ok ? read.value : null, refusal: moved.refusal };
         if (read.ok) return { ...cell, ...target, reading: read.value, ...moved };
@@ -3803,6 +3819,49 @@ function trendOf(deps: PageDeps, metric: string, window: string): { trend?: (num
   const by = new Map(deps.points(metric, from, at(last)).map((p) => [p.at, p.value]));
   const trend = Array.from({ length: days }, (_, i) => by.get(at(last - (days - 1 - i) * DAY)) ?? null);
   return trend.some((v) => v !== null) ? { trend } : {};
+}
+
+/**
+ * A TREND AHEAD: the walk a figure over `forecast.runway` walks (its legs, from the figure its `opening` names), over the
+ * window from today, as the balance at the end of each day, today first. The same walk Cash ahead draws over the same
+ * legs, so a tile on Today and the chart on Money cannot draw two pictures of one future.
+ *
+ * NOTHING WHERE IT CANNOT BE ONE WALK: a figure that is not a walk, an opening with no value, or money in two currencies
+ * with no rate to add them, for the reason a walk never crosses two currencies. A window that is not one is refused, as
+ * a trend behind refuses it.
+ */
+function aheadOf(
+  deps: PageDeps,
+  walkId: string,
+  window: string,
+): { trend?: (number | null)[]; ahead?: { from: string; currency: string; low: { day: string; value: number } } } | { refusal: Refusal } {
+  const span = windowMs(window);
+  if (span === null) return { refusal: { code: 'DECLARATION_INVALID', fix: `trend: ${window} is not a window. Write 12w, 90d or 3m.`, at: 'trend' } };
+  const decl = deps.metric(walkId);
+  if (!decl || decl.source !== 'forecast.runway' || !Array.isArray(decl.legs) || typeof decl.opening?.metric !== 'string')
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `ahead: names a figure over the walk that opens from a figure of what is held, such as runway-days; ${walkId} is not one.`, at: 'ahead' } };
+  const opening = deps.metric(decl.opening.metric);
+  const held = opening ? deps.read(opening) : null;
+  if (!held?.ok || typeof held.value.value !== 'number') return {};
+  const DAY = 86_400_000;
+  const days = Math.max(1, Math.round(span / DAY));
+  const walk = deps.runway(held.value.value, decl.legs as Leg[], days);
+  if (!walk || walk.currency === null || (held.value.unit !== null && held.value.unit !== walk.currency)) return {};
+  const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
+  const at = (n: number): string => new Date(Date.parse(`${today}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+  const trend: number[] = [];
+  let balance = walk.from;
+  let low = { day: today, value: walk.from };
+  let i = 0;
+  for (let n = 0; n <= days; n++) {
+    const day = at(n);
+    while (i < walk.steps.length && walk.steps[i]!.day <= day) {
+      balance = walk.steps[i++]!.balance;
+      if (balance < low.value) low = { day, value: balance };
+    }
+    trend.push(balance);
+  }
+  return { trend, ahead: { from: today, currency: walk.currency, low } };
 }
 
 /* ── where a row applies ─────────────────────────────────────────────────── */
@@ -5016,6 +5075,8 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       /* THE FIRST COLON SEPARATES, as everywhere else: `project-owed:C:\Repos` is one project. */
       const at = cell.metric.indexOf(':');
       addFigure(at < 0 ? cell.metric : cell.metric.slice(0, at));
+      /* AND A TREND AHEAD READS THE WALK IT DRAWS: every list its legs walk and the figure it opens from. */
+      if (typeof (cell as { ahead?: unknown }).ahead === 'string') addFigure((cell as { ahead: string }).ahead);
     }
     /* A SERIES READS EVERY FIGURE IT LINES UP. */
     for (const line of block.series ?? [])

@@ -1844,6 +1844,17 @@
     margin-block: var(--sp-2) var(--sp-1);
   }
 
+  /* THE WALK AHEAD (Money's Cash ahead, the same twelve weeks): the line the tile's width, today and its lowest point
+     marked, and its two ends dated under it. */
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-trend-ahead) {
+    inline-size: 100%;
+    margin-block: var(--sp-2) var(--sp-1);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-trend-ahead > .cell-trend) {
+    margin-block: 0;
+  }
+
   .body[data-board] :global(.block-slot[data-key='cash'] .cell-note:empty) {
     display: none;
   }

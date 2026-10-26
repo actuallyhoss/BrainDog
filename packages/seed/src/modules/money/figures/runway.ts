@@ -125,4 +125,48 @@ export const RUNWAY_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
     snapshot: { grain: 'day', into: 'series.leaving-30d' },
   },
+
+  /**
+   * WHAT THE WALK BRINGS IN AND TAKES OUT, MONTH BY MONTH, SINCE money-core 3.27.0: the months ahead of In and out, by
+   * month (`pages/parts/history.ts`), read off the one walk Cash ahead draws and the runway counts (`CASH_LEGS`).
+   *
+   * THE MONTHS AHEAD READ TWO LISTS AND LEFT A THIRD OUT. They were bills due once (`out-due-by-month`) and what repeats
+   * at its monthly share (`every-month-out`), so a part of a plan, which is neither, was in no month ahead: two parts
+   * falling due in one month, most of the balance between them, drew that month with almost nothing going out, while the runway
+   * beside the chart ran out on the day the larger one fell due. Now every month ahead is the walk's own steps in it:
+   * bills, what repeats on the days it lands, every part of a plan, money on its way, subscriptions and everyday
+   * spending, exactly what the line on Cash ahead moves by.
+   *
+   * FAR ENOUGH FOR THE THIRD MONTH AFTER THIS ONE TO BE WHOLE from any day of this one. NOT REMEMBERED EACH NIGHT: what
+   * the walk says of a month ahead is tomorrow's walk to say again.
+   */
+  'in-ahead-by-month': {
+    metric: 'in-ahead-by-month',
+    name: 'Coming in, by month ahead',
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: CASH_LEGS,
+    value: { walk: 'in', within: '125d' },
+    bucket: 'month',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'out-ahead-by-month': {
+    metric: 'out-ahead-by-month',
+    name: 'Going out, by month ahead',
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: CASH_LEGS,
+    value: { walk: 'out', within: '125d' },
+    bucket: 'month',
+    format: MONEY,
+    /* NO TARGET A SUM OF PAYMENTS COULD MISS, as `out-due-by-month` says it: a ceiling is a sum in a currency a pack
+       cannot know. */
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
 };
