@@ -410,8 +410,9 @@
   const railOf = (r: string) => ((page.data.index?.registers ?? []) as { id: string; count: number; icon: IconName; guessed?: true }[]).find((x) => x.id === r);
   let changedAt = $state<Record<string, string>>({});
   const nowMs = $derived(recordNow());
+  /* NO `page.data.live` GUARD: the refused shell says `live: true` too, so it would witness nothing; a log that does not
+     answer live is passed over below. */
   $effect(() => {
-    if (!page.data.live) return;
     untrack(() => {
       void import('$lib/record/news-live.ts')
         .then((m) => m.readLog(apiBase(), null))
