@@ -37,6 +37,21 @@ export const words = {
     showFewer: 'Show fewer',
     all: 'All',
   },
+  /* ONE ADD-ON'S PAGE, AS THIS RECORD HOLDS IT (the add-ons pass of 27 October): what it reaches, always, even nothing;
+     its versions with the one on this record marked; and who made it, under what licence, and where it is offered. */
+  about: {
+    reaches: 'What it reaches',
+    reachesNothing: 'Nothing outside your record. It reads and writes only this record.',
+    madeBy: 'Made by',
+    author: 'Author',
+    listedAt: 'Offered',
+    tiers: { core: 'Part of BrainDog', store: 'In the store', unlisted: 'By its name only', link: 'By link only' },
+    onHere: 'On this record',
+    partOf: 'Part of BrainDog',
+    on: (version: string): string => `On · ${version}`,
+    off: (version: string): string => `Off · ${version}`,
+    updateTo: (version: string): string => `Update to ${version}`,
+  },
   all: 'All',
   categoriesLabel: 'Categories',
   categories: {

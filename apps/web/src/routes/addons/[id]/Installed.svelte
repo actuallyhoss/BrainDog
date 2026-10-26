@@ -77,9 +77,27 @@
   import { moduleName } from '@braindog/seed/usecases/names';
   import { SPEAKS } from '$lib/voice.ts';
   import { words as market } from '$lib/market/words.ts';
-  import { recordToday } from '$lib/record/zone.ts';
+  import { isCore } from '@braindog/declare';
+  import type { CatalogueIndex } from '@braindog/declare/catalogue';
+  import { readHostCatalogue, readShippedCatalogue } from '../catalogue.ts';
+  import About from './About.svelte';
+  import { foundListing, newerThan } from './found.ts';
 
-  const id = $derived(String(page.params.id));
+  /** The pack id the record holds it under, when the address names it otherwise (`founder` for `usecase-founder`). */
+  let { packId = null }: { packId?: string | null } = $props();
+  const id = $derived(packId ?? String(page.params.id));
+  /* BRAINDOG'S OWN PARTS HAVE NO OFF SWITCH (the add-ons pass of 27 October): Projects, People, Work and Agents are
+     BrainDog, not an add-on to choose, so their page says "Part of BrainDog" and draws no switch. */
+  const core = $derived(isCore(id));
+
+  /* WHAT THE STORE KNOWS OF IT, read as the store reads it (`found.ts`), so this page and the store never disagree on a
+     version, a host or a licence: the host's catalogue, then the one this build ships for a private add-on. */
+  let indexes = $state.raw<{ kennel: CatalogueIndex | null; shipped: CatalogueIndex | null } | null>(null);
+  void Promise.all([readHostCatalogue(fetch).then((got) => (got.ok ? got.index : null)), readShippedCatalogue(fetch)])
+    .then(([kennel, shipped]) => (indexes = { kennel, shipped }))
+    .catch(() => (indexes = { kennel: null, shipped: null }));
+  const found = $derived(indexes ? foundListing({ ...indexes, counts: null, id, kind: firstPartyModules().some((m) => m.id === id) ? 'module' : null }) : null);
+
   const pack = $derived(firstPartyModules().find((p) => p.id === id));
   /* A use case's pack by its use case, never `usecase-founder`. */
   const name = $derived(pack?.name ?? moduleName(id));
@@ -167,7 +185,7 @@
     const at = opened();
     const chosen = await openSettings(createClient({ base: apiBase() }), want);
     /* An answer for an add-on somebody has already navigated away from draws nothing. */
-    if (String(page.params.id) !== want) return closed(true, at);
+    if (id !== want) return closed(true, at);
     source = chosen.source;
     alone = chosen.alone;
     installed = null;
@@ -200,7 +218,7 @@
   async function readHolds(s: PackConfig, want: string) {
     const firstParty = firstPartyModules().some((m) => m.id === want);
     const declarations = await declarationsOf(want, s.version, firstParty).catch(() => null);
-    if (String(page.params.id) !== want) return;
+    if (id !== want) return;
     holds = declarations === null ? null : answersIn(declarations, Object.keys(s.config));
   }
 
@@ -212,13 +230,17 @@
    * not drawn until then, because a switch that guesses is a switch that lies.
    */
   let installed = $state<PackState | null>(null);
-  let turning = $state(false);
+  /** The version the store offers past the one held, and where its plan is read: the store's page, or the Updates card for one only this build ships. */
+  const newer = $derived(found && installed?.version ? newerThan(found.listing, installed.version) : null);
+  const updateAt = $derived(
+    found === null ? null : found.shippedOnly || found.tier === 'link' ? '/settings/addons' : `/addons/${encodeURIComponent(found.listing.id)}?kind=${found.listing.kind}&update`,
+  );  let turning = $state(false);
   /** The record's sentence when it refused the switch; the cascade that answers a dependent is offered on /packs. */
   let turnSaid = $state('');
 
   async function readHeld(s: Source, want: string) {
     const got = await s.packs();
-    if (got.ok && String(page.params.id) === want) {
+    if (got.ok && id === want) {
       installed = got.value.find((p) => p.id === want) ?? null;
       void readWaiting(got.value, want);
       void readPairs(installed?.registers ?? [], want);
@@ -236,7 +258,7 @@
     rates = [];
     if (!settings || !(HOME_CURRENCY_SETTING in settings.config)) return;
     const got = await readRates(createClient({ base: apiBase() }), registers);
-    if (String(page.params.id) === want) rates = got;
+    if (id === want) rates = got;
   }
   /* Worked out again when the home currency is saved, because a pair is read into it. */
   const pairs = $derived.by((): PairRead[] => {
@@ -255,9 +277,9 @@
     const version = packs.find((p) => p.id === want)?.version;
     if (!version || firstPartyModules().some((m) => m.id === want)) return;
     const text = await publishedText(kennelFetch, 'pack', want, version);
-    if (text === null || String(page.params.id) !== want) return;
+    if (text === null || id !== want) return;
     const waiting = await waitingIn(text, await heldNames(packs, REGISTERS));
-    if (String(page.params.id) !== want) return;
+    if (id !== want) return;
     const titles: Record<string, string> = Object.assign({}, ...firstPartyModules().map((m) => m.titles));
     for (const [id, list] of Object.entries(REGISTERS)) if (list?.name) titles[id] = list.name;
     waits = waitingLine(waiting, (hold) => holdName(hold, titles));
@@ -455,7 +477,7 @@
       kind={unknown ? 'no-results' : 'error'}
       glyph={unknown ? 'packs' : undefined}
       heading
-      title={unknown ? copy.packNotInstalled(String(page.params.id)) : refusal}
+      title={unknown ? copy.packNotInstalled(id) : refusal}
       body={unknown ? copy.packNotInstalledWhy : undefined}
     >
       {#snippet actions()}<Button href="/settings/addons">{copy.packs}</Button>{/snippet}
@@ -464,7 +486,8 @@
 {:else if from === 'ready' && settings}
   <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/settings/addons" title={name}>
     {#snippet actions()}
-      {#if installed}
+      {#if newer && updateAt}<Button weight="primary" size="sm" href={updateAt}>{market.about.updateTo(newer)}</Button>{/if}
+      {#if installed && !core}
         <!-- THE SWITCH WITH ITS WORD BESIDE IT, so it reads as the add-on's own on and off, not a setting of the page. -->
         <label class="head-switch">
           <span class="head-switch-word" aria-hidden="true">{installed.disabled_at === null ? turnWords.on : turnWords.off}</span>
@@ -491,7 +514,8 @@
      <Tile lead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} title={copy.useCaseFor} aria-label={copy.useCaseFor}>
       {#if pack?.blurb}<p class="summary">{pack.blurb}</p>{/if}
       <p class="about">
-        {#if settings.version}<span class="num">{market.versionOf(settings.version)}</span>{/if}
+        {#if installed?.version ?? settings.version}{@const v = (installed?.version ?? settings.version)!}<span class="num">{installed?.disabled_at ? market.about.off(v) : market.about.on(v)}</span>{/if}
+        {#if core}<span>{market.about.partOf}</span>{/if}
         {#if installed?.disabled_at}<span>{copy.packTurnedOff}</span>{/if}
       </p>
       {#if asking}
@@ -783,6 +807,9 @@
       </Tile>
      </div>
     {/if}
+    {#if found}
+      <div class="about-row"><About listing={found.listing} tier={found.tier} held={installed?.version ?? settings.version ?? null} /></div>
+    {/if}
    </div>
   </div>
 {/if}
@@ -840,6 +867,21 @@
     .wide-cell {
       grid-column: 1 / -1;
       grid-row: 2;
+    }
+  }
+
+  /* WHAT THE STORE KNOWS OF IT, under everything this record holds of it: three tiles across, one column on a phone. */
+  .tiles > .about-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-column: 1 / -1;
+    align-items: start;
+    gap: var(--tile-gap);
+  }
+
+  @media (width >= 900px) {
+    .tiles > .about-row {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
