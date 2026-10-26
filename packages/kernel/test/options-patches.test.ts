@@ -5,7 +5,7 @@
  * day, or the 29th?", but an option was words only: picking one wrote nothing, so the script had to run again to read
  * the answer and make the change itself, a second time, signed by itself. Now each option may carry `patches`, checked
  * as a rowset's updates are when it is filed, and the one picked is written at the press, as the person, in the
- * decision's batch, all of it or none.
+ * decision's batch: every entry still as it was asked, with the ones changed since left and counted.
  */
 
 import { test } from 'node:test';
@@ -44,9 +44,12 @@ const refusal = (out: { ok: boolean }) => {
 
 async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
-  const k = await openRecord(sql, fixedClock(NOW));
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
   value(await k.install([RECURRING]));
   for (const name of ['Rent', 'Phone']) value(k.create('recurring', { name }, { actor: 'p_owner' }));
+  /* AN HOUR ON, so an edit after the question is its own line in the log and not folded into the row's create. */
+  clock.advance(3_600_000);
   return { k, sql };
 }
 
@@ -99,17 +102,71 @@ test('THE OPTION NOT PICKED WRITES NOTHING', async () => {
   assert.deepEqual([day(sql, 1), day(sql, 2)], [{ day: null, version: 1 }, { day: null, version: 1 }]);
 });
 
-test('A STALE VERSION WRITES NONE: the entry is named, nothing is decided, and the question waits', async () => {
+test('AN ENTRY CHANGED SINCE IS LEFT AND COUNTED: the rest is written, and the decision says how many were left', async () => {
   const { k, sql } = await record();
   const filed = value<Filed>(k.propose(LAST_DAY(), 'S1'));
   value(k.update('recurring', 'recurring#2', { day_of_month: '30' }, { actor: 'p_owner' }));
-  const no = refusal(k.decide(filed.id, { decide: { option: 'last', reason: 'Yes.' } }, 'p_owner'));
-  assert.equal(no.code, 'VERSION_STALE');
-  assert.match(no.fix, /^"Phone" changed after this was asked, so none of this option was written\./u);
-  assert.doesNotMatch(no.fix, /recurring#|—/u);
-  assert.deepEqual(day(sql, 1), { day: null, version: 1 }, 'the fresh one is not written either');
-  assert.equal(sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', filed.id)!.status, 'open');
+  const out = value<{ status: string; wrote: string[]; skipped?: { count: number; said: string }; batch: string }>(k.decide(filed.id, { decide: { option: 'last', reason: 'Yes.' } }, 'p_owner'));
+  assert.equal(out.status, 'resolved');
+  assert.equal(out.wrote.length, 1);
+  assert.deepEqual(day(sql, 1), { day: 'last', version: 2 });
+  assert.deepEqual(day(sql, 2), { day: '30', version: 2 }, 'the one changed since keeps what it was changed to');
+  assert.equal(out.skipped?.count, 1);
+  assert.equal(out.skipped?.said, 'One was written. "Phone" was left as it is, because it changed after this was asked.');
+  assert.doesNotMatch(out.skipped!.said, /recurring#|—/u);
+  /* The line is in the question's history, in the decision's batch. */
+  assert.equal(sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND target = ? AND batch = ?", `suggestion:${filed.id}`, out.batch)?.note, out.skipped?.said);
+});
+
+test('EVERY ENTRY CHANGED SINCE: nothing is written, nothing is decided, and the question is closed in a plain line', async () => {
+  const { k, sql } = await record();
+  const filed = value<Filed>(k.propose(LAST_DAY(), 'S1'));
+  value(k.update('recurring', 'recurring#1', { day_of_month: '28' }, { actor: 'p_owner' }));
+  value(k.update('recurring', 'recurring#2', { day_of_month: '30' }, { actor: 'p_owner' }));
+  const out = value<{ status: string; decision: string | null; settled?: string }>(k.decide(filed.id, { decide: { option: 'last', reason: 'Yes.' } }, 'p_owner'));
+  assert.deepEqual({ status: out.status, decision: out.decision }, { status: 'resolved', decision: null });
+  assert.equal(out.settled, 'All 2 entries this changes changed after this was asked, so nothing was written and the question is closed.');
+  assert.deepEqual([day(sql, 1).day, day(sql, 2).day], ['28', '30']);
   assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM decision')!.n, 0);
+});
+
+test('AN ENTRY MOVED IN ANOTHER FIELD IS STILL AS ASKED: it is written onto the row as it is now', async () => {
+  const { k, sql } = await record();
+  const filed = value<Filed>(k.propose(LAST_DAY(), 'S1'));
+  value(k.update('recurring', 'recurring#2', { name: 'Phone and internet' }, { actor: 'p_owner' }));
+  const out = value<{ wrote: string[]; skipped?: unknown }>(k.decide(filed.id, { decide: { option: 'last', reason: 'Yes.' } }, 'p_owner'));
+  assert.equal(out.wrote.length, 2);
+  assert.equal(out.skipped, undefined);
+  assert.deepEqual(day(sql, 2), { day: 'last', version: 3 });
+});
+
+test('THE SAME ASKER ASKING AGAIN BRINGS THE OPEN QUESTION UP TO DATE, so a nightly ask never goes stale under its id', async () => {
+  const { k, sql } = await record();
+  const first = value<Filed>(k.propose(LAST_DAY(), 'script:last_day@v1'));
+  value(k.update('recurring', 'recurring#2', { name: 'Phone and internet' }, { actor: 'p_owner' }));
+  const again = value<Filed>(k.propose({ ...LAST_DAY([1, 2]), question: 'Rent and Phone and internet fall on the 29th. Move them to the last day?' }, 'script:last_day@v2'));
+  assert.deepEqual({ ...again }, { id: first.id, joined: true });
+  const body = JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', first.id)!.body) as { options: { patches?: { version: number }[] }[] };
+  assert.deepEqual(body.options[0]!.patches!.map((p) => p.version), [1, 2]);
+  const asked = sql.one<{ q: string }>("SELECT to_v AS q FROM event WHERE kind = 'suggest' AND target = ? ORDER BY rowid DESC LIMIT 1", `suggestion:${first.id}`)?.q;
+  assert.equal(asked, 'Rent and Phone and internet fall on the 29th. Move them to the last day?');
+  /* Asked the same again, nothing moves. */
+  const rows = sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event')!.n;
+  value(k.propose({ ...LAST_DAY([1, 2]), question: 'Rent and Phone and internet fall on the 29th. Move them to the last day?' }, 'script:last_day@v2'));
+  assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event')!.n, rows);
+});
+
+test('AN ENTRY A PICK LEFT IS ASKED AGAIN, and one it wrote is not', async () => {
+  const { k, sql } = await record();
+  const first = value<Filed>(k.propose(LAST_DAY(), 'S1'));
+  value(k.update('recurring', 'recurring#2', { day_of_month: '30' }, { actor: 'p_owner' }));
+  value(k.decide(first.id, { decide: { option: 'last', reason: 'Yes.' } }, 'p_owner'));
+  const ask = LAST_DAY();
+  const left = { ...ask, body: { ...ask.body, options: [{ ...ask.body.options[0], patches: [{ at: 'recurring#2', version: 2, patch: { day_of_month: 'last' } }] }, ask.body.options[1]] } };
+  const filed = value<Filed>(k.propose(left, 'S2'));
+  assert.equal(filed.answered, undefined);
+  assert.notEqual(filed.id, first.id);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open'")!.n, 1);
 });
 
 test('FILED TWICE GIVES ONE: the second run of the script joins the open question', async () => {

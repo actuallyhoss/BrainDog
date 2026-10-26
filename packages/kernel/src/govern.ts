@@ -695,11 +695,14 @@ function remembered(deps: GovernDeps, cause: string, kind: BodyKind, body: Recor
   const was = parse(q.body);
   if (q.body_kind !== kind || !was) return null;
   const before = reaches(deps, kind, was);
-  for (const r of reaches(deps, kind, body)) if (!before.has(r)) return null;
   const resolved = sql.one<{ ts: string; note: string | null; batch: string | null; actor: string }>(
     "SELECT ts, note, batch, actor FROM event WHERE kind = 'resolve' AND target = ? ORDER BY rowid DESC LIMIT 1",
     `suggestion:${q.id}`,
   );
+  /* AN ENTRY THE PICK LEFT IS NOT ANSWERED (`applyPatches`): it changed after it was asked and nothing was written to it,
+     so asking about it again is a new ask, not the same one. */
+  if (kind === 'options' && q.resolved_as === 'addressed' && resolved?.batch) for (const r of leftBy(deps, was, resolved.batch)) before.delete(r);
+  for (const r of reaches(deps, kind, body)) if (!before.has(r)) return null;
   /* A PERSON'S ANSWER ONLY. A rule closing its own ask when its run ended (`flow.ts`), Slash, or the asker itself said
      nothing about the question, and remembering that as a no would silence a fair ask. */
   if (!resolved || resolved.actor.startsWith('rule:') || resolved.actor === SLASH || resolved.actor === q.opened_by) return null;
@@ -737,6 +740,28 @@ function reaches(deps: GovernDeps, kind: string, body: Record<string, unknown>):
       if (lists?.ok) for (const [list, rows] of lists.value) for (const r of rows) entry(list, r);
     }
   if (arranging(kind as BodyKind)) for (const part of partsOf(body)) out.add(part.id);
+  return out;
+}
+
+/**
+ * The reach keys of the picked option's entries that its decision did not write: the pick is the option decided in
+ * `batch`, and an entry is written when an event of that batch names it.
+ */
+function leftBy(deps: GovernDeps, body: Record<string, unknown>, batch: string): string[] {
+  const answer = deps.sql.one<{ answer: string }>(
+    "SELECT d.answer AS answer FROM event e JOIN decision d ON e.target = 'decision:' || d.id WHERE e.kind = 'decide' AND e.batch = ? ORDER BY e.rowid DESC LIMIT 1",
+    batch,
+  )?.answer;
+  const picked = listOf(body.options).find((o) => isMap(o) && o.id === answer);
+  const lists = isMap(picked) && picked.patches !== undefined ? patchLists(picked.patches, 'patches') : null;
+  if (!lists?.ok) return [];
+  const out: string[] = [];
+  for (const [list, rows] of lists.value)
+    for (const r of rows) {
+      const id = typeof r.at === 'string' ? deps.row(list, r.at)?.id : undefined;
+      if (id !== undefined && deps.sql.one('SELECT 1 AS y FROM event WHERE batch = ? AND target = ? LIMIT 1', batch, `entry:${id}`) != null) continue;
+      out.push(canon([id ?? `${list}:${String(r.at)}`, r.patch ?? null]));
+    }
   return out;
 }
 
@@ -789,7 +814,17 @@ function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<st
         const wider = widenArrangement(deps, held, body, by, cause);
         if (wider !== null) return wider;
       }
-      if (!sameAgent(deps.sql, held.opened_by, by) && joinersOf(deps.sql, held.id).every((j) => !sameAgent(deps.sql, j, by)))
+      /* THE SAME ASKER'S OPTIONS ARE ASKED AS THEY ARE NOW. A script asking nightly under one cause joined the question it
+         first filed and left it as it was, so the entries it named at the versions of that night went stale one by one
+         and the question could only ever be refused. Its newer reading takes the old one's place, words and changes, and
+         the question keeps its id and its history. */
+      if (held.body_kind === 'options' && p.body_kind === 'options' && sameAsker(deps.sql, held.opened_by, by) && canon(parse(held.body)) !== canon(body)) {
+        const kind = stampOf(kindsOfProposal('options', body, recordReader(deps.sql, held.opened_by)));
+        deps.sql.exec('UPDATE suggestion SET body = ?, kind = ? WHERE id = ?', JSON.stringify(body), kind, held.id);
+        if (p.question.trim() !== questionOf(deps.sql, held.id)) event(deps, instant(deps.nowMs), by, 'suggest', `suggestion:${held.id}`, 'suggestion', p.question);
+        return ok({ id: held.id, joined: true });
+      }
+      if (!sameAsker(deps.sql, held.opened_by, by) && joinersOf(deps.sql, held.id).every((j) => !sameAgent(deps.sql, j, by)))
         event(deps, instant(deps.nowMs), by, 'note', `suggestion:${held.id}`, 'suggestion', JOINED, 'Asked the same thing too, and joined this question instead of asking again.');
       return ok({ id: held.id, joined: true });
     }
@@ -1073,6 +1108,12 @@ function sameAgent(sql: Sql, a: string, b: string): boolean {
   if (!RUN_ID.test(a) || !RUN_ID.test(b)) return false;
   const key = tokenOfRun(sql, a);
   return key !== null && tokenOfRun(sql, b) === key;
+}
+
+/** Whether two openers are one asker: one agent (`sameAgent`), or one script at any of its versions (`script:<id>@v2`). */
+function sameAsker(sql: Sql, a: string, b: string): boolean {
+  const script = (x: string): string | null => (x.startsWith('script:') ? x.replace(/@v\d+$/u, '') : null);
+  return sameAgent(sql, a, b) || (script(a) !== null && script(a) === script(b));
 }
 
 /** Whether `by` is the run that opened a question, or a later run of the same key. */
@@ -2763,33 +2804,59 @@ function unwritten(body: Record<string, unknown>): Refusal | null {
   return null;
 }
 
+/** What a pick's patches came to: the entries written, and the ones left because they changed since or are gone. */
+type Patched = { wrote: string[]; skipped: number; first: string | null };
+
 /**
- * The picked option's patches, written as the person deciding in the decision's batch: ALL OR NONE. Every entry is
- * found at the version it was read at before the first is written, so a stale one writes nothing at all and the
- * question stays open, with the entry's name in the refusal. The writes then compare-and-set again, as a rowset's do.
+ * The picked option's patches, written as the person deciding in the decision's batch: EACH ENTRY STILL AS IT WAS ASKED.
+ * An entry at the version it was read at is written; one that moved since is written onto the row as it is now when
+ * nothing the patch changes was written since (`moved`), as a rowset's row is; one whose changed fields were written to
+ * something else, or that is gone, is left as it is and counted in `skipped`, with the first one's name in `first`.
+ *
+ * IT WAS ALL OR NONE, MEASURED ON THE LIVE RECORD: "File them" carried two hundred entries, one of them was edited a day
+ * later, and every yes was refused with nothing written. The question could never be answered and stayed for ever. The
+ * writes still compare-and-set, as a rowset's do, and one that will not land refuses the whole pick.
  */
-function applyPatches(deps: GovernDeps, raw: unknown, actor: string, batch: string): Result<string[]> {
+function applyPatches(deps: GovernDeps, asked: string, raw: unknown, actor: string, batch: string): Result<Patched> {
   const lists = patchLists(raw, 'patches');
-  if (!lists.ok) return lists as Result<string[]>;
+  if (!lists.ok) return lists as Result<Patched>;
+  const out: Patched = { wrote: [], skipped: 0, first: null };
+  const skip = (fields: string | undefined): void => {
+    out.skipped += 1;
+    if (out.first !== null || fields === undefined) return;
+    const name = ['title', 'name', 'label', 'what'].map((k) => parse(fields)?.[k]).find((v): v is string => typeof v === 'string' && v.trim() !== '');
+    out.first = name?.trim() ?? null;
+  };
   for (const [list, rows] of lists.value)
     for (const r of rows) {
       const row = deps.row(list, String(r.at));
       const now = row && !row.deleted ? deps.sql.one<{ version: number; fields: string }>('SELECT version, fields FROM entry WHERE id = ?', row.id) : null;
-      if (!now) return no('VALUE_MALFORMED', 'An entry this option changes is gone, so none of it was written. It can be asked again with what is there now.', { at: 'option' });
-      if (now.version !== r.version) {
-        const name = ['title', 'name', 'label'].map((k) => parse(now.fields)?.[k]).find((v): v is string => typeof v === 'string' && v.trim() !== '');
-        const which = name === undefined ? 'An entry this option changes' : `"${name.trim()}"`;
-        return no('VERSION_STALE', `${which} changed after this was asked, so none of this option was written. It can be asked again with what it says now.`, { at: 'option' });
+      if (!now) {
+        skip(undefined);
+        continue;
       }
+      let version = Number(r.version);
+      if (now.version !== version) {
+        const met = moved(deps, asked, list, r);
+        if (met === null || !met.ok) {
+          skip(now.fields);
+          continue;
+        }
+        version = met.version;
+      }
+      const made = applyUpdate(deps, list, { ...r, version }, actor, batch);
+      if (!made.ok) return made as Result<Patched>;
+      out.wrote.push(made.value.id);
     }
-  const wrote: string[] = [];
-  for (const [list, rows] of lists.value)
-    for (const r of rows) {
-      const made = applyUpdate(deps, list, r, actor, batch);
-      if (!made.ok) return made as Result<string[]>;
-      wrote.push(made.value.id);
-    }
-  return ok(wrote);
+  return ok(out);
+}
+
+/** The line a pick that left some of its entries says, counted, so the owner knows what was not written and why. */
+function skippedSaid(p: Patched): string {
+  const n = p.skipped;
+  const which = n === 1 && p.first !== null ? `"${p.first}" was` : n === 1 ? 'One entry was' : `${n} entries were`;
+  const wrote = p.wrote.length === 1 ? 'One was written.' : `${p.wrote.length} were written.`;
+  return `${wrote} ${which} left as ${n === 1 ? 'it is' : 'they are'}, because ${n === 1 ? 'it' : 'they'} changed after this was asked.`;
 }
 
 /**
@@ -2873,7 +2940,6 @@ function moveFault(sql: Sql, list: string, id: string, named: string, patch: Rec
   if (missing !== undefined) return { code: 'REQUIRED_MISSING', fix: `${named} leaves ${from} only with ${missing} filled, so put ${missing} in the same patch.`, at: `${at}.${missing}` };
   return null;
 }
-
 
 /**
  * What one update row of a rowset meets when its row moved after the question was asked (`moved`):
@@ -3027,6 +3093,11 @@ export type Decided = {
    * (`moved`): nothing was written, and the question is closed as moot.
    */
   settled?: string;
+  /**
+   * The entries a picked option's patches left as they are, because they changed after it was asked or are gone, and the
+   * line that says so (`applyPatches`). The rest were written.
+   */
+  skipped?: { count: number; said: string };
   /** The open questions this one covered (`Proposal.covers`), closed as moot by its accept. */
   covered?: string[];
   /** A declaration an accepted `pattern` or `change` asks the caller to install. */
@@ -3507,12 +3578,24 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   /* AN OPTION THAT CHANGES ENTRIES (F61), such as a script asking which day a payment falls on: the one picked is
      written here, in the decision's batch and signed by the person deciding, all of it or none, so undoing the decision
      undoes what the pick wrote. The options not picked write nothing. */
+  /* ENTRIES THAT CHANGED SINCE ARE LEFT AND COUNTED (`applyPatches`), and the rest are written. A pick that finds every
+     entry changed writes nothing and closes the question as moot in a plain line, as a rowset's does: no yes could ever
+     make it true, and a question nobody can answer is one that waits for ever. */
+  let skipped: Decided['skipped'];
   if (row.body_kind === 'options') {
     const chosen = listOf(body.options).find((o) => isMap(o) && o.id === option);
     if (isMap(chosen) && chosen.patches !== undefined) {
-      const made = applyPatches(deps, chosen.patches, actor, batch);
+      const made = applyPatches(deps, id, chosen.patches, actor, batch);
       if (!made.ok) return made as Result<Decided>;
-      wrote.push(...made.value);
+      if (made.value.wrote.length === 0 && made.value.skipped > 0) {
+        const one = made.value.skipped === 1;
+        const line = `${one && made.value.first !== null ? `"${made.value.first}"` : one ? 'The entry this changes' : `All ${made.value.skipped} entries this changes`} changed after this was asked, so nothing was written and the question is closed.`;
+        deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", id);
+        event(deps, at, 'system', 'resolve', `suggestion:${id}`, 'suggestion', 'moot', line);
+        return ok({ decision: null, suggestion: id, status: 'resolved', wrote: [], settled: line });
+      }
+      wrote.push(...made.value.wrote);
+      if (made.value.skipped > 0) skipped = { count: made.value.skipped, said: skippedSaid(made.value) };
     }
   }
 
@@ -3544,6 +3627,8 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
        and the owner who took part of it would then hold the opener's withdraw. */
     event(deps, at, actor, 'note', `suggestion:${id}`, 'suggestion', `taken:${n}`, `${n === 1 ? 'One part of this was' : `${n} parts of this were`} accepted, and the rest still wait here.`, batch);
   } else event(deps, at, actor, 'resolve', `suggestion:${id}`, 'suggestion', 'addressed', reason, batch);
+  /* AND WHAT THE PICK LEFT, IN ITS BATCH, so the question's history says how many were not written and why. */
+  if (skipped) event(deps, at, 'system', 'note', `suggestion:${id}`, 'suggestion', `skipped:${skipped.count}`, skipped.said, batch);
 
   /* THE QUESTIONS IT COVERS GO WITH IT (scope D13): accepted whole, each one it named that still waits is closed as moot
      with a line saying which answer settled it (any answer but no), in this batch, so the decision's Undo asks them again. */
@@ -3563,6 +3648,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     status: taking ? 'open' : 'resolved',
     wrote,
     ...(covered.length === 0 ? {} : { covered }),
+    ...(skipped === undefined ? {} : { skipped }),
     ...(install === undefined ? {} : { install }),
     ...(expect === undefined ? {} : { expect }),
     ...(expects === undefined ? {} : { expects }),
