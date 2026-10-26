@@ -15,8 +15,8 @@ test('Browse and Installed say one count of the add-ons in this BrainDog (audit 
   assert.equal(typeof installedCount, 'function', 'the two tabs still count apart');
   assert.equal(installedCount!(Array.from({ length: 9 }, (_, n) => ({ id: `p${n}` }))), 9);
   assert.equal(installedCount!(null), null);
-  const browse = readFileSync(new URL('./browse/+page.svelte', import.meta.url), 'utf8');
-  const installed = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const browse = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const installed = readFileSync(new URL('./Installed.svelte', import.meta.url), 'utf8');
   assert.match(browse, /const held = \$derived\(installedCount\(states\)\);/u, 'Browse counts only the listings it holds');
   assert.match(installed, /words\.sentence\(installedCount\(states\) \?\? 0,/u);
 });

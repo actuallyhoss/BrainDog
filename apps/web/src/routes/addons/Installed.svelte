@@ -1,6 +1,6 @@
 <!--
-  Add-ons, Installed: what this record holds, any updates waiting at the top, and installing from a file or a link
-  behind the page's "⋯". Browse is the other half of the same place (`AddonsTabs.svelte`, `/packs/browse`).
+  Settings › Add-ons: what this record holds, any updates waiting at the top, and installing from a file or a link
+  behind the area's "⋯". The store is `/addons`.
 
   A pack declares CONTENT AND IDENTITY, never position or visibility. That is Chrome's line, stated most plainly of
   anyone: extension actions are unpinned by default, and `isOnToolbar` is exposed to the extension READ-ONLY. There is
@@ -11,7 +11,7 @@
   every line it calls out with. `04 §3`: "The diff is shown before it applies … this is the entire trust model." The
   owner in a browser approves it there; anybody else is refused by the record, and the same plan is filed on Decide.
 
-  BROWSING IS `/packs/browse`. This screen used to list what could still be installed under what was, with a guess at
+  BROWSING IS THE STORE, `/addons`. This screen used to list what could still be installed under what was, with a guess at
   what each would add; the plan now comes from the record, so it is read where the listing is.
 
   THE LOOK (the UI pass of 20 October, agents F8, F22): the name, the sentence saying how many are installed and how
@@ -32,7 +32,6 @@
      was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote, then a hand copy with
      stale versions. */
   import { firstPartyModules } from '@braindog/seed/packs/modules';
-  import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import * as pref from '$lib/pref.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -45,7 +44,6 @@
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { handsOf, holderFirst, inOrder, marked, orderWords } from '$lib/market/update-order.ts';
   import { words as market } from '$lib/market/words.ts';
-  import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -54,13 +52,13 @@
   import Menu from '$lib/ui/Menu.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import AddonsTabs from './AddonsTabs.svelte';
+  import { STORE_AT } from './moved.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
-  import { catalogueLines, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, readShippedCatalogue, trustForEntry, updatesFor, withheld } from './browse/catalogue.ts';
-  import { recordKeys } from './browse/known-keys.ts';
-  import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './browse/[id]/offer.ts';
+  import { catalogueLines, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, readShippedCatalogue, trustForEntry, updatesFor, withheld } from './catalogue.ts';
+  import { recordKeys } from './known-keys.ts';
+  import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './[id]/offer.ts';
   import { installedCount, words } from './words.ts';
   import { glyphOf } from './glyph.ts';
   import { readRemoved, wayBack, type Removed } from './removed.ts';
@@ -135,9 +133,9 @@
 
   /* ── install from a file or a link ─────────────────────────────────────── */
 
-  /* OPENED FROM THE "⋯", or by a link that still says `/packs?tab=from`; it sits over the list until Done. An old
+  /* OPENED FROM THE "⋯", or by a link that still says `/packs?tab=from` (it lands here with `?from`); it sits over the list until Done. An old
      `?tab=updates` lands on Installed, where the updates now lead. */
-  let from = $state(page.url.searchParams.get('tab') === 'from');
+  let from = $state(page.url.searchParams.has('from'));
 
   /* ── the plan sheet ────────────────────────────────────────────────────── */
 
@@ -627,20 +625,19 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
-
-<!-- NO COUNT BESIDE THE NAME (E21): the sentence under it says how many are installed, and once is enough. -->
-<PageHead icon="packs" title={copy.packs} sentence={live ? words.sentence(installedCount(states) ?? 0, updates ? updates.length : null) : undefined}>
-  {#snippet actions()}
-    <!-- THE PAGE'S "⋯", ALWAYS DRAWN: installing from a file or a link, and sharing this setup. -->
+<!-- SETTINGS › ADD-ONS DRAWS THE HEAD: this is the area's body. Its sentence, then the two things the page's "⋯" held,
+     installing from a file or a link and sharing your starter, and the way to the store. -->
+<div class="area-head">
+  {#if live}<p class="area-said">{words.sentence(installedCount(states) ?? 0, updates ? updates.length : null)}</p>{/if}
+  <div class="area-acts">
+    <Button size="sm" href={STORE_AT}>{words.browse}</Button>
     <Menu label={words.more} align="end">
-      {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="vh">{words.more}</span></span>{/snippet}
+      {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{words.more}</span></span>{/snippet}
       <button type="button" class="mi" role="menuitem" onclick={() => (from = true)}><Icon name="download" size="s" />{words.from}</button>
-      <a class="mi" role="menuitem" href={at('/packs/share')}><Icon name="share" size="s" />{copy.shareSetup}</a>
+      <a class="mi" role="menuitem" href={at('/addons/share')}><Icon name="share" size="s" />{copy.shareSetup}</a>
     </Menu>
-  {/snippet}
-  {#snippet below()}<AddonsTabs current="installed" />{/snippet}
-</PageHead>
+  </div>
+</div>
 
 <div class="page">
   <div class="board">
@@ -666,7 +663,7 @@
        that finds one. -->
   {#if states && installed.length === 0}
     <Empty kind="no-data-yet" glyph="packs" title={copy.noPacksYet} body={copy.packBlurb}>
-      {#snippet actions()}<Button href="/packs/browse">{words.browse}</Button>{/snippet}
+      {#snippet actions()}<Button href={STORE_AT}>{words.browse}</Button>{/snippet}
     </Empty>
   {/if}
 
@@ -685,7 +682,7 @@
           <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined}>
             <div class="line addon">
               <span class="line-mark"><IconWell name={iconFor(state.id) ?? glyphOf(byId.get(state.id)?.pages, page.data.nav ?? [])} size="l" /></span>
-              <a class="addon-main" href={at(`/packs/${state.id}`)}>
+              <a class="addon-main" href={at(`/addons/${state.id}`)}>
                 <span class="line-title addon-name">{name}</span>
                 <span class="line-detail addon-line">{lineOf(state)}</span>
                 {#if holdsOn(state.id)}<span class="addon-holds num">{holdsOn(state.id)}</span>{/if}
@@ -693,7 +690,7 @@
               <span class="line-verbs">
                 <Menu label={market.more(name)} align="end">
                   {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{market.more(name)}</span></span>{/snippet}
-                  <a class="mi" role="menuitem" href={at(`/packs/${state.id}`)}><Icon name="settings" size="s" />{packWords.settings}</a>
+                  <a class="mi" role="menuitem" href={at(`/addons/${state.id}`)}><Icon name="settings" size="s" />{packWords.settings}</a>
                   <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}><Icon name="eye" size="s" />{copy.installDiff}</button>
                   {#if pack}
                     <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, pack.name)}><Icon name="trash" size="s" />{copy.uninstall}</button>
@@ -808,7 +805,27 @@
     display: flex;
     flex-direction: column;
     gap: var(--tile-gap);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  /* THE AREA'S OWN LINE: what it holds, and the way to the store and the "⋯" at its end. */
+  .area-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-block-end: var(--tile-gap);
+  }
+
+  .area-said {
+    flex: 1 1 auto;
+    margin: 0;
+    color: var(--ink-2);
+  }
+
+  .area-acts {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
   /* THE BOARD: the page's tiles straight on the ground, 12 apart (`--tile-gap`), as on every other screen. */
@@ -956,10 +973,6 @@
 
   /* ON A PHONE a row's name is read at the phone's body size, as every row's first line is. */
   @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-
     .addon {
       min-block-size: 60px;
     }

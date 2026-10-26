@@ -55,7 +55,7 @@ import { heardLabels, relabelAll } from '../voice.ts';
 import { updatesOf } from '../../routes/decide/[id]/changes.ts';
 import { choicesOf, stateSaid } from '../../routes/r/[register]/[seq]/lead.ts';
 import { healthLabel } from '../record/api.ts';
-import { settingChoices } from '../../routes/packs/[id]/said.ts';
+import { settingChoices } from '../../routes/addons/[id]/said.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 /* THE LIST SCREEN IS ITS PAGE AND EVERY PART IT DRAWS THROUGH, read as one text so each count below is the screen's. */
@@ -65,7 +65,7 @@ const PAGE = ['+page.svelte', ...readdirSync(join(LIST, 'parts')).filter((f) => 
   .join('\n');
 const CARDS = readFileSync(join(here, 'RowCards.svelte'), 'utf8');
 const ROW_PAGE = readFileSync(join(here, '../../routes/r/[register]/[seq]/+page.svelte'), 'utf8');
-const PACK_PAGE = readFileSync(join(here, '../../routes/packs/[id]/+page.svelte'), 'utf8');
+const PACK_PAGE = readFileSync(join(here, '../../routes/addons/[id]/Installed.svelte'), 'utf8');
 
 const PERSONAL = useCase('personal')!.labels as Record<string, string>;
 after(() => {

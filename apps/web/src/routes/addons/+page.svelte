@@ -1,5 +1,5 @@
 <!--
-  Add-ons, Browse: everything a record can add, at `/packs/browse`. The other half of Add-ons (`AddonsTabs.svelte`).
+  The store: everything a record can add, at `/addons`. The other half of Add-ons (`AddonsTabs.svelte`).
 
   ONE LISTING MODEL. The modules this build ships, its built-in use cases and every entry the Kennel answers are read into
   `Listing`s by `listingsOf` (`$lib/market/listing.ts`), so they are searched, counted, filtered and sorted the same
@@ -46,10 +46,10 @@
   import { readCounts } from '$lib/market/counts.ts';
   import { actionOf, listingsOf, ordered, searchListings, type Listing, type Order } from '$lib/market/listing.ts';
   import { words } from '$lib/market/words.ts';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
-  import AddonsTabs from '../AddonsTabs.svelte';
-  import { installedCount, words as packWords } from '../words.ts';
-  import { glyphOf as placeGlyph } from '../glyph.ts';
+  import { drew } from '../../lib/ui/screen.svelte.ts';
+  import AddonsTabs from './AddonsTabs.svelte';
+  import { installedCount, words as packWords } from './words.ts';
+  import { glyphOf as placeGlyph } from './glyph.ts';
   import { miniOf } from './mini.ts';
   import { readHostCatalogue } from './catalogue.ts';
 

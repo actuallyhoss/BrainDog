@@ -271,7 +271,7 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide', aliases: ['questions', 'approve', 'approvals', 'pending'] },
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox', aliases: ['mail', 'messages', 'email', 'incoming'] },
   { id: 'c-keychain', title: copy.keychain, href: '/keychain', group: copy.destinations, icon: 'vault', aliases: ['vault', 'keys', 'secrets', 'passwords', 'tokens'] },
-  { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs', aliases: ['packs', 'extensions', 'plugins', 'install'] },
+  { id: 'c-packs', title: copy.packs, href: '/settings/addons', group: copy.destinations, icon: 'packs', aliases: ['packs', 'extensions', 'plugins', 'install', 'store'] },
   /* SLASH'S HISTORY, what it noticed, suggested and was asked: the old page, folded into the palette (batch 5d). The bare
      `/slash` opens the palette itself (`routes/slash/+page.ts`), so this row goes to the history. */
   { id: 'c-slash', title: 'Slash history', href: '/slash?history', group: copy.destinations, icon: 'slash', aliases: ['suggestions', 'noticed', 'asked'] },

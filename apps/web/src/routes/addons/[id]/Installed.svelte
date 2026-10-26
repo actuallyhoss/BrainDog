@@ -1,5 +1,5 @@
 <!--
-  One add-on's settings: `/packs/<id>`.
+  One add-on's settings: `/addons/<id>`.
 
   A FORM GENERATED FROM WHAT THE ADD-ON DECLARES, by the rule `06 §8` gives a register's create form,
   over the six types a setting can declare. A label is always visible, an error sits
@@ -458,11 +458,11 @@
       title={unknown ? copy.packNotInstalled(String(page.params.id)) : refusal}
       body={unknown ? copy.packNotInstalledWhy : undefined}
     >
-      {#snippet actions()}<Button href="/packs">{copy.packs}</Button>{/snippet}
+      {#snippet actions()}<Button href="/settings/addons">{copy.packs}</Button>{/snippet}
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/packs" title={name}>
+  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/settings/addons" title={name}>
     {#snippet actions()}
       {#if installed}
         <!-- THE SWITCH WITH ITS WORD BESIDE IT, so it reads as the add-on's own on and off, not a setting of the page. -->

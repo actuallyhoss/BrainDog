@@ -12,8 +12,8 @@
   let { current }: { current: 'installed' | 'browse' } = $props();
 
   const PLACES = [
-    { id: 'installed', href: '/packs', label: words.tabs.installed },
-    { id: 'browse', href: '/packs/browse', label: words.tabs.browse },
+    { id: 'installed', href: '/settings/addons', label: words.tabs.installed },
+    { id: 'browse', href: '/addons', label: words.tabs.browse },
   ] as const;
 </script>
 

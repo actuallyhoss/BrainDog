@@ -1,5 +1,5 @@
 <!--
-  The second mode of `/packs/share`: an add-on from what a person made (SHL-B09). The record offers its own things
+  The second mode of `/addons/share`: an add-on from what a person made (SHL-B09). The record offers its own things
   (`exportPack` with no `declarations`), the person ticks some and names the add-on, and the record writes the file and
   says what it would add, asked again once the ticks and the title rest. Download saves the file under its name.
 

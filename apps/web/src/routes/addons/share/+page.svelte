@@ -1,5 +1,5 @@
 <!--
-  Share this setup: `/packs/share`.
+  Share this setup: `/addons/share`.
 
   WHAT GOES IN THE FILE IS SAID BEFORE THE BUTTON, and none of the record's rows go in unless one is ticked here. The
   record writes the file (`exportUseCase`), reading it back through the door a stranger's file comes in by, so a row
@@ -33,7 +33,7 @@
   import { useCase } from '@braindog/seed/usecases';
   import { useCaseName } from '@braindog/seed/usecases/names';
   import { builtInFile, previewOf } from '@braindog/seed/usecases/share';
-  import { catalogueTitles, readShippedCatalogue } from '../browse/catalogue.ts';
+  import { catalogueTitles, readShippedCatalogue } from '../catalogue.ts';
   import { changeLines, changesSince, kennelFetch, publishedHref, publishedLink, publishedSaid, publishedText, publishWords, submitToKennel, type Submitted } from '$lib/market/publish.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -49,7 +49,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import '$lib/ui/forms.css';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
-  import Preview from '../browse/Preview.svelte';
+  import Preview from '../Preview.svelte';
   import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
   import { skillsOnce, words, type SkillOffer } from './share.ts';
   import { goto } from '$app/navigation';
@@ -325,7 +325,7 @@
 
 <svelte:head><title>{titleOf(copy.shareSetup)}</title></svelte:head>
 
-<PageHead icon="packs" kicker={copy.packs} back="/packs" title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : words.what} />
+<PageHead icon="packs" kicker={copy.packs} back="/settings/addons" title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : words.what} />
 
 <div class="page">
   <Segmented class="modes" role="group" aria-label={addonWords.modeGroup} full>

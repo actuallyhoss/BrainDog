@@ -133,7 +133,7 @@
   <Button disabled={checking} aria-busy={checking} onclick={() => checkInput?.click()}>{words.checkGo}</Button>
 {/snippet}
 {#snippet shareOne()}
-  <Button href="/packs/share">{copy.shareSetup}</Button>
+  <Button href="/addons/share">{copy.shareSetup}</Button>
 {/snippet}
 
 <Tile icon="download" class="section" data-surface="tile" title={copy.yourData}>

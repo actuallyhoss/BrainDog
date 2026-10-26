@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { catalogueLines, catalogueTitles, readShippedCatalogue, SHIPPED_INDEX_AT } from './browse/catalogue.ts';
+import { catalogueLines, catalogueTitles, readShippedCatalogue, SHIPPED_INDEX_AT } from './catalogue.ts';
 
 const shipped = readFileSync(new URL('../../../static/catalogue/index.json', import.meta.url), 'utf8');
 
@@ -37,7 +37,7 @@ test('a catalogue that cannot be read names nothing, and the page falls back as 
 });
 
 test('the Installed list describes an add-on by its catalogue line, and says it is drawn once the names have landed', () => {
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./Installed.svelte', import.meta.url), 'utf8');
   assert.match(page, /catalogueSays\.get\(state\.id\)/u, 'the line under a name does not read the catalogue');
   assert.match(page, /readShippedCatalogue\(fetch\)/u, 'no Kennel still names by id');
   assert.match(page, /await named;\s*return true;/u, 'the screen says it is drawn before the names land');

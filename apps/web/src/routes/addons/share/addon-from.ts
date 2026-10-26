@@ -97,7 +97,7 @@ const OTHER = { heading: 'Other things', one: '' };
 /** The query that opens this mode, so the Add-ons screen's offer links straight to it. */
 export const MODE_PARAM = 'mode';
 export const ADDON_MODE = 'addon';
-export const addonHref = `/packs/share?${MODE_PARAM}=${ADDON_MODE}`;
+export const addonHref = `/addons/share?${MODE_PARAM}=${ADDON_MODE}`;
 export type Mode = 'usecase' | 'addon';
 export const modeOf = (search: URLSearchParams): Mode => (search.get(MODE_PARAM) === ADDON_MODE ? 'addon' : 'usecase');
 

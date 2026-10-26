@@ -110,7 +110,7 @@ test('a plan names a list by the name the record gives it, and a pack by the cal
 const source = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 
 test('Needs you and Add-ons read what waits from one place', () => {
-  const addons = source('../packs/+page.svelte');
+  const addons = source('../addons/Installed.svelte');
   assert.match(addons, /import \{ declarationName, firstPartyUpdates \} from '\.\.\/decide\/improved\.ts';/u, 'Add-ons reads its own list of what waits again');
   const from = addons.indexOf('async function updatesOf(');
   const to = addons.indexOf("The record's plan for one update");

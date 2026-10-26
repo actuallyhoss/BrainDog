@@ -154,7 +154,7 @@ export const publishedLink = (s: Submitted): string => (s.state === 'listed' ? p
  * page's menu does not load the built-in use cases that file reads), else Browse.
  */
 export const publishedHref = (s: Submitted): string =>
-  s.state === 'listed' ? `/packs/browse/${encodeURIComponent(s.id)}${s.kind === 'pack' ? '?kind=pack' : ''}` : '/packs/browse';
+  s.state === 'listed' ? `/addons/${encodeURIComponent(s.id)}${s.kind === 'pack' ? '?kind=pack' : ''}` : '/addons';
 
 /* ── reading the Kennel ─────────────────────────────────────────────────── */
 

@@ -837,7 +837,7 @@
         -->
         <Empty kind={indexTell.kind} title={indexTell.title} body={indexTell.body}>
           {#snippet actions()}
-            {#if index.kind === 'absent'}<Button weight="primary" href="/packs">{tells.browse}</Button>{/if}
+            {#if index.kind === 'absent'}<Button weight="primary" href="/addons">{tells.browse}</Button>{/if}
           {/snippet}
         </Empty>
       {:else if from !== 'reading' && keys.length === 0}

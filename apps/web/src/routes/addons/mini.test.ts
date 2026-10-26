@@ -6,10 +6,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { USE_CASES } from '@braindog/seed/usecases';
-import { isGlyph } from '../../../lib/ui/icons.ts';
-import { copy } from '../../../lib/copy.ts';
-import { words } from '../../../lib/market/words.ts';
-import { FOLDED_MOST, folds, sectionChips } from '../../../lib/market/categories.ts';
+import { isGlyph } from '../../lib/ui/icons.ts';
+import { copy } from '../../lib/copy.ts';
+import { words } from '../../lib/market/words.ts';
+import { FOLDED_MOST, folds, sectionChips } from '../../lib/market/categories.ts';
 import { miniOf, shapeOf } from './mini.ts';
 
 test('every use case draws one to four tiles, each named, with a glyph the app draws', () => {

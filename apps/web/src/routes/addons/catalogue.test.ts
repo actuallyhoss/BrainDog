@@ -249,8 +249,8 @@ test('updates on offer for what a record holds, with what changed, and a proposa
 });
 
 test('browse is Add-ons, with a section for each kind it lists, and /packs names a catalogue entry by its title', async () => {
-  const { copy } = await import('../../../lib/copy.ts');
-  const { words: market } = await import('../../../lib/market/words.ts');
+  const { copy } = await import('../../lib/copy.ts');
+  const { words: market } = await import('../../lib/market/words.ts');
   const { readFileSync } = await import('node:fs');
   const at = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
   /* ONE PLACE, ONE NAME (the UI pass of 20 October, agents F9): browse is the other half of Add-ons, and its sections
@@ -262,8 +262,8 @@ test('browse is Add-ons, with a section for each kind it lists, and /packs names
   assert.match(copy.browseAll, /setups/iu);
   assert.match(copy.browseAll, /add-ons/iu);
   assert.match(at('./+page.svelte'), /title=\{copy\.packs\}/u);
-  assert.match(at('./[id]/+page.svelte'), /\{copy\.browseAll\}/u);
-  assert.doesNotMatch(at('./[id]/+page.svelte'), /copy\.useCase(s|All)\b/u);
+  assert.match(at('./[id]/Listing.svelte'), /\{copy\.browseAll\}/u);
+  assert.doesNotMatch(at('./[id]/Listing.svelte'), /copy\.useCase(s|All)\b/u);
 
   const key = await newAuthorKey('Halden');
   const { index } = await servedAddon(key);
@@ -272,12 +272,12 @@ test('browse is Add-ons, with a section for each kind it lists, and /packs names
   assert.equal(titles.get('bookshelf'), 'Bookshelf');
   assert.equal(titles.get('usecase-study'), 'Study');
   assert.equal((await catalogueTitles(null)).size, 0);
-  assert.match(at('../+page.svelte'), /catalogueNames\.get\(id\)/u);
+  assert.match(at('./Installed.svelte'), /catalogueNames\.get\(id\)/u);
 });
 
 test('a listing page installs through the plan sheet, and a Kennel entry is asked for in Needs you by somebody who may not install', async () => {
   const { readFileSync } = await import('node:fs');
-  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  const detail = readFileSync(new URL('./[id]/Listing.svelte', import.meta.url), 'utf8');
   const offer = readFileSync(new URL('./[id]/offer.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(detail, /InstallShared/u);
   assert.match(detail, /<PlanSheet/u);
@@ -333,7 +333,7 @@ test('a browser that kept an old key trusts and keeps the key it rotated to, and
   assert.match(offered.refused[0] ?? '', /which its author revoked, so it is not trusted/u);
 
   const { readFileSync } = await import('node:fs');
-  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  const detail = readFileSync(new URL('./[id]/Listing.svelte', import.meta.url), 'utf8');
   assert.match(detail, /trust\?\.kind === 'revoked'/u);
 });
 
@@ -361,7 +361,7 @@ test('a version arriving unsigned after signed ones is said loudly, cannot be as
   assert.match(offered.refused[0] ?? '', /is unsigned, and earlier versions were signed/u);
 
   const { readFileSync } = await import('node:fs');
-  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  const detail = readFileSync(new URL('./[id]/Listing.svelte', import.meta.url), 'utf8');
   assert.match(detail, /trust\?\.kind !== 'stripped'|trust\?\.kind === 'stripped'/u);
   assert.doesNotMatch(detail, /trustFor\(browserStore\(\), entry\.author/u);
 });
@@ -385,7 +385,7 @@ test('a file whose own id is not the entry it is listed under is not asked for',
  * resolve none of their ids. `tools/catalogue/from-packs.mjs` publishes each one into this folder through `publishTo`,
  * the door `braindog pack publish` uses, so a version is never rewritten under readers who hold it to its checksum.
  */
-const ROOT = new URL('../../../../../../', import.meta.url);
+const ROOT = new URL('../../../../../', import.meta.url);
 const TOOL = fileURLToPath(new URL('tools/catalogue/from-packs.mjs', ROOT));
 const SHIPPED = new URL('apps/web/static/catalogue/', ROOT);
 
@@ -579,7 +579,7 @@ test('the line under an add-on\'s name names its publisher, never a key, in one 
   assert.equal(withheld(null), false);
 
   const { readFileSync } = await import('node:fs');
-  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  const detail = readFileSync(new URL('./[id]/Listing.svelte', import.meta.url), 'utf8');
   assert.match(detail, /recordKeys\(/u);
   /* THROUGH `trustSaid`, which is `trustLine` but for BrainDog's own unsigned add-ons (X12). */
   assert.match(detail, /trustSaid\(/u);

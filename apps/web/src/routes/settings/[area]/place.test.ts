@@ -125,7 +125,7 @@ test('YOU, THIS BRAINDOG AND DATA (U-C9): six rows beside six, Data the whole wi
   assert.equal(rows[0]!.length, rows[1]!.length, 'the two columns side by side end together');
   assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 12]);
   const hrefs = SETTINGS_INDEX.blocks.flatMap((b) => (b.authored ?? []).map((r) => r.cells[1]));
-  for (const at of ['/keychain', '/packs', '/usage']) assert.ok(hrefs.includes(at), at);
+  for (const at of ['/keychain', '/settings/addons', '/usage']) assert.ok(hrefs.includes(at), at);
   assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');
   const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /param === 'look'\) void goto\(at\('\/design'\)/u, 'a link to the design book no longer lands');

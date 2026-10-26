@@ -23,12 +23,12 @@
 import type { createClient } from '@braindog/client';
 import type { CatalogueEntry, CatalogueIndex } from '@braindog/declare/catalogue';
 
-import type { Listing } from '../../../../lib/market/listing.ts';
-import { holderFirst, marked, type Waiting } from '../../../../lib/market/update-order.ts';
-import { words } from '../../../../lib/market/words.ts';
-import { packDocument, relabelDocument, type PackState } from '../../../../lib/record/packs.ts';
-import { afterInstall, installShared, keepVoice, planShared, speakingStates, switchTo, voiceQuestion, type SharedPlan } from '../../sharing.ts';
-import { firstPartyUpdates, inTurn, landed } from '../../../decide/improved.ts';
+import type { Listing } from '../../../lib/market/listing.ts';
+import { holderFirst, marked, type Waiting } from '../../../lib/market/update-order.ts';
+import { words } from '../../../lib/market/words.ts';
+import { packDocument, relabelDocument, type PackState } from '../../../lib/record/packs.ts';
+import { afterInstall, installShared, keepVoice, planShared, speakingStates, switchTo, voiceQuestion, type SharedPlan } from '../sharing.ts';
+import { firstPartyUpdates, inTurn, landed } from '../../decide/improved.ts';
 import { askForVersion, updatesFor } from '../catalogue.ts';
 
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal?: { code?: string; fix?: string } };

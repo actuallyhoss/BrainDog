@@ -56,7 +56,7 @@ export type Order = 'for-you' | 'installed' | 'newest';
 export const listingKey = (kind: ListingKind, id: string): Listing['key'] => `${kind}:${id}`;
 
 /** A detail page's address for a listing: the route keeps `?kind=`, whose default is `usecase` so old links still open. */
-export const listingHref = (l: Pick<Listing, 'kind' | 'id'>): string => `/packs/browse/${encodeURIComponent(l.id)}${l.kind === 'usecase' ? '' : `?kind=${l.kind}`}`;
+export const listingHref = (l: Pick<Listing, 'kind' | 'id'>): string => `/addons/${encodeURIComponent(l.id)}${l.kind === 'usecase' ? '' : `?kind=${l.kind}`}`;
 
 /* ── the two sums ───────────────────────────────────────────────────────── */
 

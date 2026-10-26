@@ -47,7 +47,7 @@ test('nothing a person reads here carries an em dash', () => {
 });
 
 /** The page without its comments, so a comment that quotes the old line counts for nothing. */
-const PAGE = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./Installed.svelte', import.meta.url), 'utf8')
   .replaceAll(/<!--[\s\S]*?-->/gu, '')
   .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 

@@ -99,7 +99,7 @@ test('THE SETTINGS PICKER IS ORDERED BY THE SAVED CURRENCY, so a pick does not m
 
   /* A SOURCE SCAN, BECAUSE NOTHING IN THIS APP RENDERS A ROUTE'S COMPONENT UNDER `node --test`. Comments blanked, as
      `at-sites.test.ts` blanks them, because a comment may say what the page used to draw. */
-  const source = readFileSync(fileURLToPath(new URL('../../routes/packs/[id]/+page.svelte', import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
+  const source = readFileSync(fileURLToPath(new URL('../../routes/addons/[id]/Installed.svelte', import.meta.url)), 'utf8').replace(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\//gu, '');
   const asked = [...source.matchAll(/currencyChoices\(([^)]*)\)/gu)].map((m) => m[1]);
   assert.equal(asked.length, 1, 'the settings screen asks for the choices in one place');
   assert.equal(/\bd\.text\b/u.test(asked[0]!), false, `the settings picker is ordered by its draft: currencyChoices(${asked[0]})`);

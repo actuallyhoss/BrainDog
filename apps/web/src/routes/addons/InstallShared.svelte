@@ -28,8 +28,8 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import type { PackState } from '$lib/record/packs.ts';
   import { hostedHere } from '../settings/billing.ts';
-  import { fileProposal } from './browse/catalogue.ts';
-  import { diffOf, install, notOwner, planFor, type OfferClient, type Planned } from './browse/[id]/offer.ts';
+  import { fileProposal } from './catalogue.ts';
+  import { diffOf, install, notOwner, planFor, type OfferClient, type Planned } from './[id]/offer.ts';
   import { afterInstall, installShared, keepVoice, readOnHost, relabelled, speakingStates, useCaseTitle, voiceQuestion } from './sharing.ts';
   import { words } from './words.ts';
 

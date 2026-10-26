@@ -35,7 +35,7 @@ import { hear, introduce, nameFromAddress, personRow, PEOPLE, type Heard } from 
 import { allLists } from '../../lib/start/lists.ts';
 import { entriesOf, newListDeclarations, ownList, type Export, type Mapping } from '../../lib/start/export.ts';
 import type { Proposal } from '../../lib/start/propose.ts';
-import { afterInstall, installShared, keepVoice, planShared, speakingStates } from '../packs/sharing.ts';
+import { afterInstall, installShared, keepVoice, planShared, speakingStates } from '../addons/sharing.ts';
 import { words } from './preview.ts';
 
 type Body = Record<string, unknown>;

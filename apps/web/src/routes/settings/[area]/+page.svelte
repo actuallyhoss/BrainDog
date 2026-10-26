@@ -512,6 +512,9 @@
       {#await import('./areas/Agents.svelte') then { default: Agents }}<Agents {shell} {area} />{/await}
     {:else if area === 'ingest'}
       <Ingest {shell} {area} />
+    {:else if area === 'addons'}
+      <!-- BY `import()`: the add-ons' list, its plan sheet and its readers are a chunk only somebody opening it waits for. -->
+      {#await import('./areas/Addons.svelte') then { default: Addons }}<Addons />{/await}
     {:else if area === 'notifications'}
       <Notifications {shell} {area} />
     {:else if area === 'words'}

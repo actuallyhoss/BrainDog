@@ -50,10 +50,10 @@ test('usage counts the record or says why not, and never the studio’s month', 
 
 test('the add-ons screens draw the record’s packs or its refusal, with no sample sentence', () => {
   for (const path of [
-    '../../routes/packs/+page.svelte',
-    '../../routes/packs/[id]/+page.svelte',
-    '../../routes/packs/share/+page.svelte',
-    '../../routes/packs/InstallShared.svelte',
+    '../../routes/addons/Installed.svelte',
+    '../../routes/addons/[id]/Installed.svelte',
+    '../../routes/addons/share/+page.svelte',
+    '../../routes/addons/InstallShared.svelte',
   ]) {
     const screen = code(path);
     assert.doesNotMatch(screen, /\.sample\b|notWritten|shareSampleNote|page\.data\.live|readAddress\(/u, path);

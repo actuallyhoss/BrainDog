@@ -8,10 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import type { SharedPlan } from '../../sharing.ts';
-import { sheetOf } from '../../../../lib/market/plan.ts';
+import type { SharedPlan } from '../sharing.ts';
+import { sheetOf } from '../../../lib/market/plan.ts';
 import { afterOthers, diffOf, firstPageOf, installInTurn, sheetWords, turnWords, waitsOf, type Offered, type Planned } from './offer.ts';
-import { words } from '../../../../lib/market/words.ts';
+import { words } from '../../../lib/market/words.ts';
 
 const planned = (diff: Record<string, unknown>, planHash = 'h'): Planned => ({ kind: 'pack', doc: {}, diff, planHash, approve: [] });
 
@@ -38,12 +38,12 @@ test('nothing waiting says nothing, and neither does a plan it cannot read', () 
 });
 
 test('the install card draws what waits under the plan, and what it sends once, on the plan\'s own lines, in words with no dash in them', () => {
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./Listing.svelte', import.meta.url), 'utf8');
   assert.match(page, /extra=\{waits\.length > 0 \? told : undefined\}/u);
   /* WHAT IT SENDS IS SAID ONCE, by the plan sheet's calls group (`$lib/market/plan.ts` writes each line with `doesOf`). */
   assert.doesNotMatch(page, /\{#each sends as line/u);
   assert.match(page, /\{#each waits as line \(line\)\}/u);
-  assert.match(readFileSync(new URL('../../../../lib/market/plan.ts', import.meta.url), 'utf8'), /doesOf\('install', \{ calls_out: \[/u);
+  assert.match(readFileSync(new URL('../../../lib/market/plan.ts', import.meta.url), 'utf8'), /doesOf\('install', \{ calls_out: \[/u);
   for (const word of Object.values(sheetWords)) assert.ok(!/[\u2013\u2014]/u.test(word), word);
 });
 
@@ -147,7 +147,7 @@ test('a run that took nothing in first names nobody, and the page says the old s
   });
   assert.deepEqual(went, ['pack']);
   assert.deepEqual(out, { ok: true, nav: null });
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./Listing.svelte', import.meta.url), 'utf8');
   assert.match(page, /out\.first \? turnWords\.installedAfter\(listing\.title, out\.first\) : copy\.shareInstalled\(listing\.title\)/);
 });
 
@@ -199,13 +199,13 @@ test('a refusal before any holder went in names none, and two that went in are b
   assert.equal(turnWords.stoppedAfter(['Personal'], 'No.'), 'Personal is installed. The next one stopped: No.');
 
   /* The page says it in a toast beside the refusal it already draws, on both refused branches. */
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./Listing.svelte', import.meta.url), 'utf8');
   assert.match(page, /if \(out\.first && out\.first\.length > 0\) toasts\.push\(turnWords\.stoppedAfter\(out\.first, out\.fix, out\.stopped\), \{ intent: 'warn' \}\)/);
   assert.equal(page.match(/\n\s+wentIn\(out\);/g)?.length, 2);
 });
 
 test('the listing hands its plan what else waits, so the wait is read where the update is pressed', () => {
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./Listing.svelte', import.meta.url), 'utf8');
   assert.match(page, /planFor\(client, listing, file, held, copy\.writeRaced, \(\) => waitingOf\(fetch, kennel, held\)\)/u);
 });
 

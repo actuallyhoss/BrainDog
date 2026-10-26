@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const src = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+const src = readFileSync(new URL('./Installed.svelte', import.meta.url), 'utf8');
 const css = src.slice(src.indexOf('<style>')).replace(/\/\*[\s\S]*?\*\//gu, '');
 const rule = (selector: string): string => new RegExp(`(?:^|\\n)  ${selector.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')} \\{([^}]*)\\}`, 'u').exec(css)?.[1] ?? '';
 

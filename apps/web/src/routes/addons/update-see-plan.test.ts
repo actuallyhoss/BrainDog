@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 
 import { sheetOf } from '../../lib/market/plan.ts';
 import { holderFirst } from '../../lib/market/update-order.ts';
-import { afterOthers, diffOf, installInTurn, turnWords, type Offered, type Planned } from './browse/[id]/offer.ts';
+import { afterOthers, diffOf, installInTurn, turnWords, type Offered, type Planned } from './[id]/offer.ts';
 import type { SharedPlan } from './sharing.ts';
 
 const personalFile = { usecase: 'personal', version: '2.4.0', pack: { pack: 'usecase-personal', hands: { 'metric.budgets-set': 'money-core' } } };
@@ -114,7 +114,7 @@ test('a holder from the Kennel is not taken along, so the row still names it as 
 });
 
 /** The page without its comments, so a comment that quotes the old line counts for nothing. */
-const PAGE = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./Installed.svelte', import.meta.url), 'utf8')
   .replaceAll(/<!--[\s\S]*?-->/gu, '')
   .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 const body = (name: string): string => {

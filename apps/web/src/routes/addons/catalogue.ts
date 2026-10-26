@@ -19,9 +19,9 @@
 
 import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, CatalogueVersion, Changes, KeyStatements, KnownKeys, Signature, Trust } from '@braindog/declare/catalogue';
 
-import { copy } from '../../../lib/copy.ts';
-import { KENNEL_AT } from '../../../lib/market/counts.ts';
-import type { PackState } from '../../../lib/record/packs.ts';
+import { copy } from '../../lib/copy.ts';
+import { KENNEL_AT } from '../../lib/market/counts.ts';
+import type { PackState } from '../../lib/record/packs.ts';
 import { localKeys, readLocal, type KeySource, type KeyStore } from './known-keys.ts';
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;

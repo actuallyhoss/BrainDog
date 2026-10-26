@@ -103,13 +103,15 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
          sharing address opens it too (`MOVED`). */
       area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and what you share'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
+      /* ADD-ONS IS AN AREA OF SETTINGS, with the rail beside it, as the store is the place to find more (`/addons`). It
+         was a row opening `/packs`, a page of its own with no Settings rail. */
+      area('/settings/addons', 'Add-ons', 'packs', 'What is added to this record, and its updates'),
     ],
     /* ONE HEALTH (audit 25 October, Y4): the record's vital signs, its Health page, with the count Today and the
        sentence above this index say. An area here called Health said "32 things went stale" while that page said 9. */
     outside: [
       /* ONE NAME FOR IT (audit 25 October, X24): the page is Keychain, and this row said Keys. */
-      { label: 'Keychain', href: '/keychain', icon: 'vault', line: 'The keys your agents are handed' },
-      { label: 'Add-ons', href: '/packs', icon: 'packs', line: 'What is installed, and what to add' },
+      { label: 'Keychain', href: '/keychain', icon: 'vault', line: 'The keys your agents are handed', before: 'addons' },
       { label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'What on this record needs a look' },
     ],
   },

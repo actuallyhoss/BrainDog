@@ -255,7 +255,7 @@ const ROUTES = new URL('../../routes/', import.meta.url);
 
 /** A handler allowed not to stand down, and the reason, which is the point of keeping the list. */
 const MODIFIED_ONLY: Record<string, string> = {
-  'packs/[id]/+page.svelte': 'acts only on Mod+Enter inside its own form, and the shell lets every modified chord through an open layer',
+  'addons/[id]/Installed.svelte': 'acts only on Mod+Enter inside its own form, and the shell lets every modified chord through an open layer',
 };
 
 test('EVERY ROUTE HANDLER THAT OWNS THE WINDOW ASKS WHETHER SOMETHING IS OVER THE PAGE', () => {

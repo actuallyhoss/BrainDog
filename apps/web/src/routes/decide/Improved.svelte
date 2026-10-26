@@ -22,7 +22,7 @@
   import Face from '$lib/ui/Face.svelte';
   import '$lib/decide/form.css';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { diffOf, install, planFor, type OfferClient, type Planned } from '../packs/browse/[id]/offer.ts';
+  import { diffOf, install, planFor, type OfferClient, type Planned } from '../addons/[id]/offer.ts';
   import { cardLines, cardNotes, inTurn, landed, ordered, readInOrder, type Improved } from './improved.ts';
   import { words } from './words.ts';
 
@@ -142,7 +142,7 @@
   {/if}
   {#if fix}<p class="improved-said" role="status">{fix}</p>{/if}
   {#if elsewhere}
-    <p class="improved-said" role="status">{words.improvedOnAddons} <a class="improved-link" href={at('/packs?tab=updates')}>{words.openAddons}</a></p>
+    <p class="improved-said" role="status">{words.improvedOnAddons} <a class="improved-link" href={at('/settings/addons')}>{words.openAddons}</a></p>
   {/if}
 </article>
 

@@ -1,5 +1,5 @@
 <!--
-  One listing on its own page, for every kind: `/packs/browse/<id>?kind=module|usecase|pack`, `usecase` when no kind is
+  One listing on its own page, for every kind: `/addons/<id>?kind=module|usecase|pack`, `usecase` when no kind is
   said so the links written before add-ons had pages still open.
 
   EVERYTHING HERE IS READ FROM THE THING ITSELF, never written for the page: the summary and who published it, a large
@@ -56,12 +56,12 @@
   import { readVersionPreview, type PreviewRead } from '$lib/market/preview.ts';
   import { words } from '$lib/market/words.ts';
   import { readyFor, readyWords, type Ready } from '$lib/market/update-ready.ts';
-  import { drew } from '../../../../lib/ui/screen.svelte.ts';
-  import { hostedHere } from '../../../settings/billing.ts';
-  import { listWords, moduleTitle, oneOf } from '../../sharing.ts';
+  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { hostedHere } from '../../settings/billing.ts';
+  import { listWords, moduleTitle, oneOf } from '../sharing.ts';
   import Preview from '../Preview.svelte';
   import { miniOf } from '../mini.ts';
-  import { glyphOf as placeGlyph } from '../../glyph.ts';
+  import { glyphOf as placeGlyph } from '../glyph.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { byBrainDog, callSaid, catalogueText, keepFirstKey, readHostCatalogue, signedLine, trustForEntry, trustSaid, trustThisKey } from '../catalogue.ts';
@@ -82,7 +82,7 @@
   let recordRefused = $state<string | null>(null);
 
   /* AN ADDRESS WITH NO `?kind=` IS READ AS A USE CASE FIRST, for the links written before add-ons had pages, and then as
-     whatever else goes by that id: `/packs/browse/reading-list` said "nothing here by that name" for an add-on the
+     whatever else goes by that id: `/addons/reading-list` said "nothing here by that name" for an add-on the
      catalogue lists. A kind that is said is kept to. AND AN ADD-ON THE CATALOGUE HOLDS UNLISTED IS SHOWN BY ITS ID
      (`unlistedListing`): it installs by id, and its address said there was nothing by that name. */
   const listing = $derived.by(() => {
@@ -449,7 +449,7 @@
 
 <!-- THE WAY BACK IS THE HEAD'S: a kicker at 1440 and the back link in the phone's bar, on the gutter like every detail
      page's, where a bare button above the lead sat off it. -->
-<PageHead icon={glyph} kicker={copy.packs} back="/packs/browse" title={listing?.title ?? copy.packs} />
+<PageHead icon={glyph} kicker={copy.packs} back="/addons" title={listing?.title ?? copy.packs} />
 
 <!-- ONE VERSION ON THE VERSIONS TILE: the newest, and each earlier one under the fold. -->
 {#snippet versionRow(v: CatalogueVersion)}
@@ -484,7 +484,7 @@
       </Empty>
     {:else if looked}
       <Empty kind="no-results" title={words.missing} body={words.missingBody}>
-        {#snippet actions()}<Button href="/packs/browse">{copy.browseAll}</Button>{/snippet}
+        {#snippet actions()}<Button href="/addons">{copy.browseAll}</Button>{/snippet}
       </Empty>
     {/if}
   {:else}

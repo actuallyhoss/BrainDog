@@ -472,7 +472,7 @@
       {#if addonIcons.length > 0}<span class="addons-icons" aria-hidden="true">{#each addonIcons as icon (icon)}<Icon name={icon} size="s" />{/each}</span>{/if}
       <span>{words.addonsOn(addonsOn, addons.length - addonsOn)}</span>
       <span class="addons-dot" aria-hidden="true">{' · '}</span>
-      <a class="addons-manage" href={at('/packs')}>{words.manage}</a>
+      <a class="addons-manage" href={at('/settings/addons')}>{words.manage}</a>
     </p>
   {/if}
 {/snippet}
