@@ -2240,9 +2240,10 @@ export function arranger(d: ArrangeDeps) {
    * catalogue moved on (`PLAN_STALE` in `apply`): the body `prepare` files for it today, and the sentence the question
    * comes back with. `null` for anything else, or when it would not plan today, and the refusal then stands as it was.
    *
-   * MEASURED ON THE LIVE RECORD: an install of Profiles was asked at 1.2.0, the catalogue moved to 1.2.1 before the yes,
-   * and the question came back saying "Propose it again", which an owner cannot do: an add-on the catalogue does not list
-   * is not in Browse. Asked again here, it waits at 1.2.1 with the plan that version makes, and the next yes installs it.
+   * MEASURED ON THE LIVE RECORD: an add-on's install was asked at one version, the catalogue moved a patch on before the
+   * yes, and the question came back saying "Propose it again", which an owner cannot do: an add-on the catalogue does not
+   * list is not in Browse. Asked again here, it waits at the newer version with the plan that version makes, and the next
+   * yes installs it.
    */
   async function askAgain(kind: 'pack' | 'settings' | 'arrange', body: Body): Promise<{ body: Body; said: string } | null> {
     if (kind !== 'pack' || typeof body.install !== 'string') return null;
