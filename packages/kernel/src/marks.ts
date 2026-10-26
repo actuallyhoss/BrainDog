@@ -46,7 +46,7 @@ export function isControlMark(name: unknown): boolean {
  * all the record asks.
  */
 export const MARK_GLYPHS = [
-  'home', 'decide', 'inbox', 'search', 'packs', 'vault', 'keychain', 'settings', 'plus', 'chevron', 'chevronDown', 'close',
+  'home', 'decide', 'inbox', 'search', 'packs', 'vault', 'settings', 'plus', 'chevron', 'chevronDown', 'close',
   'check', 'filter', 'copy', 'link', 'clock', 'alert', 'sun', 'moon', 'monitor', 'arrow', 'back', 'external', 'stop',
   'play', 'money', 'calendar', 'board', 'rows', 'obligation', 'service', 'thing', 'people', 'task', 'doc', 'tag',
   'bell', 'session', 'drag', 'arrowUp', 'arrowDown', 'grid', 'edit', 'trash', 'archive', 'eye', 'download', 'refresh',
@@ -78,7 +78,7 @@ export const MARK_GLYPHS = [
   'minimize-2', 'expand', 'shrink', 'music', 'video', 'camera', 'mic', 'headphones', 'book', 'book-open',
   'notebook-pen', 'graduation-cap', 'heart-pulse', 'stethoscope', 'car', 'plane', 'train-front', 'bike',
   'shopping-cart', 'shopping-bag', 'gift', 'ticket', 'utensils', 'coffee', 'dumbbell', 'leaf', 'sprout', 'tree-pine',
-  'invoice', 'card', 'message', 'help', 'alarm', 'loader', 'unlock', 'cake', 'shop', 'cube', 'site', 'website', 'web',
+  'invoice', 'card', 'message', 'help', 'alarm', 'loader', 'unlock', 'keychain', 'cake', 'shop', 'cube', 'site', 'website', 'web',
   'chart', 'graph', 'cart', 'bag', 'food', 'idea', 'robot', 'photo', 'film', 'app', 'computer', 'chat', 'email',
   'bank', 'school', 'health', 'plant', 'tree', 'train', 'office',
 ] as const;
