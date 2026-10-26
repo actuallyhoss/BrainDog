@@ -14,6 +14,10 @@
  * skill's name, which is what drafts a skill's next version at the daily look. Money, compare-and-set and the handoff's manners moved to the descriptions of
  * the tools they are about (`index.ts`), where a model reads them when it picks the tool.
  *
+ * THE SECOND RULE SAYS WHEN AN AGENT DECIDES (the owner's decision of 27 October): only when the person tells it to, and
+ * then with their words as `said`, which `instructions` takes with `answer` and `option`, and `create` and `update` take
+ * for a change that would have asked. The record holds the rest: his switch, what no word reaches, and the words kept.
+ *
  * AND ONE LINE SAYS WHOM TO MEET, because the record understands the people and organisations in the work only as well
  * as agents tell it about them: everyone worked with or told about, with an address or handle, since a
  * name alone is only noted. The opening's list of what a record holds paid for it.
@@ -27,7 +31,7 @@
 export const INSTRUCTIONS = [
   "BrainDog is one person's record of their work, shared by their agents. Three rules hold on every call.",
   '1. Call context first: it names your run, project, next step and what waits.',
-  '2. Suggest, and let the person decide in BrainDog. Never decide for them: ask with propose.',
+  '2. Suggest, and let the person decide in BrainDog: ask with propose. Decide only when they tell you to, passing their words as said.',
   '3. Write short and plain, for a phone: say names, never ids, and one line where one will do.',
   'Reads answer in short lines; format "full" gives JSON.',
   'Meet everyone you work with or hear of, with an email or handle.',

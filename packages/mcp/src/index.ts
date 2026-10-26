@@ -173,8 +173,8 @@ export type McpSurface<C> = {
   history(args: { register: string; seq: number }, ctx: C): Answer;
   governance(args: never, ctx: C): Answer;
   propose(args: never, ctx: C): Answer;
-  create(args: { register: string; fields: Args; note?: string; op_id?: string }, ctx: C): Answer;
-  update(args: { register: string; seq: number; patch: Args; version?: number; note?: string; op_id?: string }, ctx: C): Answer;
+  create(args: { register: string; fields: Args; note?: string; op_id?: string; said?: string }, ctx: C): Answer;
+  update(args: { register: string; seq: number; patch: Args; version?: number; note?: string; op_id?: string; said?: string }, ctx: C): Answer;
   pages(ctx: C): Answer<{ slug: string; title: string }[]>;
   page(args: { slug: string }, ctx: C): Answer;
   metric(args: { metric: string }, ctx: C): Answer;
@@ -494,14 +494,17 @@ export const TOOLS: readonly Tool[] = [
     title: 'Answer what you were told',
     /* WHAT HE TELLS AN AGENT FROM THE APP (plan §2, §6.1), the one new tool, paid for by folding `history` and `schema`.
        The three calls are the examples, because an agent copies an example before it reads a sentence. */
-    description: 'What the person told you: {} reads, {take:"IN4"} takes, {reply:"IN4",said,state} answers.',
-    /* AND `answer`, A QUESTION HIS ORDER NAMED (D8), given as he said: the line he sent says the call. */
+    /* AND AN SG HE TOLD YOU TO ANSWER, with `option` and his words in `said` (`wordAnswer`, the owner's decision of 27
+       October): the one example that says it, paid for out of the budget's last tokens. */
+    description: 'What the person told you: {} reads, {take:"IN4"} takes, {reply:"IN4",said,state} answers, {answer:"SG9",option,said} decides on their word.',
+    /* AND `answer` ALONE, A QUESTION HIS ORDER NAMED (D8), given as he said: the line he sent says the call. */
     input: obj({
       take: { type: 'string' },
       reply: { type: 'string' },
       said: { type: 'string' },
       state: { enum: ['done', 'needs_you', 'declined'] },
       answer: { type: 'string' },
+      option: { type: 'string' },
     }),
     /* WHAT A CLIENT SHOWED IT AND HOW, which the bridge says for its hooks; an agent reading with `{}` marks them itself. */
     quiet: ['seen', 'how'],
@@ -669,6 +672,9 @@ export const TOOLS: readonly Tool[] = [
         /* A WRITE THAT CAN BE SENT AGAIN (AGT-B05): the record replays a write by its operation id, so a call sent once
            more after a lost answer lands once. A bare type: what it is for is a client's to know, and costs no words. */
         op_id: { type: 'string' },
+        /* HIS WORDS, WHEN HE TOLD YOU TO (the owner's decision of 27 October): a write that would have asked lands, said
+           as his. What it is for is the instructions' second rule, so it is a bare type here and on `update`. */
+        said: { type: 'string' },
       },
       ['register', 'fields'],
     ),
@@ -690,6 +696,7 @@ export const TOOLS: readonly Tool[] = [
         version: int('The version you read.'),
         note: { type: 'string' },
         op_id: { type: 'string' },
+        said: { type: 'string' },
       },
       ['spoken', 'patch'],
     ),
@@ -2526,7 +2533,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     instructions: async (args, ctx, turn) => {
       if (!surface.instructionsMine) return { result: unbuilt('instructions', 'Call context: what you were told is its first line.') };
       const sent = Object.fromEntries(
-        (['take', 'reply', 'said', 'state', 'seen', 'how', 'answer'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
+        (['take', 'reply', 'said', 'state', 'seen', 'how', 'answer', 'option'] as const).flatMap((k) => (args[k] === undefined || args[k] === null ? [] : [[k, args[k]]])),
       );
       const out = await surface.instructionsMine(sent as never, ctx);
       /* THE KERNEL SAYS `id`, the instruction, and this tool calls it `take` or `reply`. */
@@ -2963,6 +2970,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           fields: (args.fields ?? {}) as Args,
           ...(args.note === undefined ? {} : { note: String(args.note) }),
           ...(args.op_id === undefined ? {} : { op_id: String(args.op_id) }),
+          ...(args.said === undefined || args.said === null ? {} : { said: String(args.said) }),
         },
         ctx,
       );
@@ -2996,6 +3004,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           ...(args.version === undefined ? {} : { version: Number(args.version) }),
           ...(args.note === undefined ? {} : { note: String(args.note) }),
           ...(args.op_id === undefined ? {} : { op_id: String(args.op_id) }),
+          ...(args.said === undefined || args.said === null ? {} : { said: String(args.said) }),
         },
         ctx,
       );
