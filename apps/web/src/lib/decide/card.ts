@@ -86,6 +86,12 @@ export const cardWords = {
   lapses: (day: string) => `Waits until ${day}`,
   /** The same once that day has come. */
   lapsesToday: 'Waits until today',
+  /** Past the two answers a row shows: the rest, on the question's own page. */
+  otherAnswers: (n: number) => (n === 1 ? '1 more answer' : `${n.toLocaleString('en-GB')} more answers`),
+  /** The info mark that opens the ladder's rule, and its name for a screen reader. */
+  whyAsks: 'Why it asks you',
+  /** Under a question cut at two lines. */
+  readAll: 'Read all',
 } as const;
 
 /** Who asked, as the by-line says it: the face and name, the app it ran in, the run, each only where it is a name. */
@@ -707,3 +713,39 @@ export function queueOf(q: Classic, about?: { kind?: string | undefined; by?: st
     options: two ? [] : q.options.map((o) => ({ key: o.key, label: o.title, because: o.body, recommended: o.recommended === true, ...(o.hard === true ? { hard: true as const } : {}) })),
   };
 }
+
+/* ── a card's answers, at most two and one quiet Later ───────────────────── */
+
+/** THE MOST ANSWERS A CARD'S ROW SHOWS AS BUTTONS: the suggested one and one other. The rest are on the question's page. */
+export const ANSWERS_MOST = 2;
+
+/** An answer that only puts the question off ("Later", "Not now", "Ask me later"), which the card draws as its quiet Later. */
+const LATER_SAID = /^(?:later|not now|ask me later|ask later|remind me later|maybe later)\.?$/iu;
+
+/**
+ * THE ROW OF ANSWERS A CARD DRAWS: at most two answers, the one the row fills first, and one quiet Later. An answer of
+ * the asker's own that only puts the question off is that Later, so a card never shows "Later" and "Ask me later"
+ * together. `more` is how many answers are left to the question's own page.
+ */
+export function answerRowOf<W extends { key: string; label: string }>(ways: readonly W[], primary: string | null): { shown: W[]; later: W | null; more: number } {
+  const later = ways.length > 2 ? (ways.find((w) => LATER_SAID.test(w.label.trim()) && w.key !== primary) ?? null) : null;
+  const rest = ways.filter((w) => w !== later);
+  const first = rest.find((w) => w.key === primary);
+  const ordered = first ? [first, ...rest.filter((w) => w !== first)] : rest;
+  return { shown: ordered.slice(0, ANSWERS_MOST), later, more: Math.max(0, ordered.length - ANSWERS_MOST) };
+}
+
+/**
+ * WHY AN ANSWER CAN'T BE UNDONE EASILY, said concretely beside the warning: money on entries already here, something
+ * turned off, entries removed, or an answer its asker marked hard. Read off what the card holds, never a guess.
+ */
+export function hardWhy(card: Pick<Card, 'moves' | 'filed' | 'ways'>, kinds: readonly string[] = []): string {
+  if (card.moves.length > 0 || kinds.some((k) => /(?:^|:)money(?::|$)/u.test(k))) return 'It changes amounts on entries already here, and Undo can’t put each one back in one press.';
+  if (card.filed === 'pack' || card.filed === 'settings') return 'It turns something off, and turning it back on is done by hand.';
+  if (kinds.some((k) => k.endsWith(':delete'))) return 'It removes entries, and bringing them back is done one at a time.';
+  if (card.ways.some((w) => w.hard)) return 'Whoever asked marked this answer as one that can’t be taken back in one press.';
+  return 'Undo can’t take it back in one press; each change would be put back by hand.';
+}
+
+/** THE LADDER'S LINE ("… ask until 10 of them have been kept as they were"), drawn behind an info mark and not as why. */
+export const ladderLine = (why: string): boolean => /\bask until \d+ of them have been kept\b/u.test(why);

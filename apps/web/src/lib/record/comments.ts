@@ -114,8 +114,17 @@ export async function readThread(base: string, on: string, clock: () => number =
   /* A READ THAT NEVER ANSWERS SETTLES AS UNREACHABLE, so the card never says Reading for good (audit P21). */
   let timer: ReturnType<typeof setTimeout> | undefined;
   const slow = new Promise<Failed>((done) => (timer = setTimeout(() => done({ ok: false, refusal: { code: 'UNREACHABLE', fix: '' } }), READ_MS)));
-  const out = (await Promise.race([createClient({ base }).comments(on), slow])) as { ok: true; value: Line[] } | Failed;
-  clearTimeout(timer);
+  /* AND A READ THAT THROWS SETTLES TOO (UX21): a client that fails before it answers left the thread at "Reading the
+     comments." for good, with no Retry. It is said as unreachable, with the way to try again. */
+  let out: { ok: true; value: Line[] } | Failed;
+  try {
+    out = (await Promise.race([Promise.resolve().then(() => createClient({ base }).comments(on)), slow])) as { ok: true; value: Line[] } | Failed;
+  } catch (e) {
+    out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : '' } };
+  } finally {
+    clearTimeout(timer);
+  }
+  if (out.ok && !Array.isArray(out.value)) return { from: 'live', lines: [], now: clock() };
   if (out.ok) return { from: 'live', lines: out.value, now: clock() };
   if (out.refusal === undefined || out.refusal.code === 'UNREACHABLE') return { from: 'unreachable', why: out.refusal?.fix ?? '' };
   return { from: 'refused', fix: out.refusal.fix };

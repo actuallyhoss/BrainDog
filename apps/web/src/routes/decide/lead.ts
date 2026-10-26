@@ -229,3 +229,39 @@ export function evidenceIn(body: unknown, now?: number): Evidence | null {
   const words = typeof said === 'string' ? citedWords(said, figures, now).trim() : '';
   return { value: v, max, said: words !== '' ? words : `${v.toLocaleString('en-GB')} of ${max.toLocaleString('en-GB')}` };
 }
+
+/* ── the lead tile and the compact queue under it (UX17) ─────────────── */
+
+/** The key the lead tile is placed by on the board (`+page.svelte`). */
+export const LEAD_KEY = 'decide-lead';
+
+/** A block of the drawn page, as far as the lead reads one. */
+type Drawn = { kind: string; key?: string | undefined; drawn: boolean; queue?: readonly { id: string }[] | undefined; total: number };
+
+/**
+ * DECIDE LEADS WITH ONE QUESTION (UX17, the Bento Decide board): the first question of the first group is drawn whole in
+ * a tile of its own across the board, with what it changes, its suggested answer and its numbered answers, and the rest
+ * are a compact queue under it, each its question, who asked and its answers.
+ *
+ * AT THE SAME INDEXES. The page's first block is its line, which the head already says (`decideDrawn` leaves it undrawn);
+ * the lead takes that place, so every block after it keeps its index. A kept page whose first block is no line keeps
+ * its cards as they were. `group` is the key of the group the lead came from, whose count is one less under it.
+ */
+export function leadOf<B extends Drawn>(blocks: readonly B[], order: readonly string[]): { blocks: B[]; group: string | null } {
+  const head = blocks[0];
+  if (!head || head.kind !== 'note' || head.drawn) return { blocks: [...blocks], group: null };
+  const at = order.map((key) => blocks.findIndex((b) => b.key === key && b.drawn && (b.queue?.length ?? 0) > 0)).find((i) => i >= 0);
+  if (at === undefined) return { blocks: [...blocks], group: null };
+  const from = blocks[at]!;
+  const [first, ...rest] = from.queue ?? [];
+  if (!first) return { blocks: [...blocks], group: null };
+  const out = blocks.map((b, n): B => {
+    if (n === 0) return { ...b, kind: 'queue', source: 'governance.open', key: LEAD_KEY, heading: undefined, lead: true, queue: [first], shown: 1, total: 1, drawn: true } as B;
+    if (b.kind !== 'queue' || typeof b.key !== 'string' || !order.includes(b.key)) return b;
+    /* THE QUEUE UNDER THE LEAD IS COMPACT: the question, who asked and its answers, and its own page for the rest. */
+    if (n !== at) return { ...b, compact: true } as B;
+    const counted = Math.max(0, ((b as { counted?: unknown }).counted as number | undefined ?? b.total) - 1);
+    return rest.length === 0 ? ({ ...b, queue: [], shown: 0, total: 0, counted, drawn: false } as B) : ({ ...b, queue: rest, shown: rest.length, total: rest.length, counted, compact: true } as B);
+  });
+  return { blocks: out, group: from.key ?? null };
+}

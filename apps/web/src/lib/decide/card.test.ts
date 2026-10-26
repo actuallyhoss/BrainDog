@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, keptWay, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, suggestsOf, wayTail } from './card.ts';
+import { answerRowOf, answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, keptWay, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, suggestsOf, wayTail } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
@@ -377,13 +377,15 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
 
 test('EVERY CARD STARTS WITH ITS SENTENCE: who asked is one line under the question, and the side is drawn only with something in it', () => {
   const card = src('./DecisionCard.svelte');
-  assert.match(card, /<div class="dc-main">\n(\s+<!--[^]*?-->\n)?\s+<h3 class="queue-question" dir="auto">/u, 'a card starts with who asked, not its sentence (U-A7)');
+  /* CUT AT TWO LINES UNTIL "READ ALL" (UX6), so the heading carries its clamp and its measure. */
+  assert.match(card, /<div class="dc-main">\n(\s+<!--[^]*?-->\n)?\s+<h3 class="queue-question" dir="auto" data-clamp=\{readAll \? undefined : ''\} bind:this=\{titleEl\}>/u, 'a card starts with who asked, not its sentence (U-A7)');
   assert.match(card, /\{#if !compact\}\n(\s+<!--[^]*?-->\n)?\s+<p class="queue-by">\n\s+<span class="dc-sr">\{cardWords\.askedBy\}<\/span>/u);
   const article = card.indexOf('<div class="dc-main">');
   assert.ok(card.indexOf('<h3 class="queue-question"', article) < card.indexOf('<p class="queue-by">', article), 'who asked leads the question');
   /* NAME AND APP, NEVER THE RUN'S TITLE CUT AT 24 CHARACTERS. */
   assert.match(card, /const from = \$derived\(\[card\.by\.app\]\.filter/u);
-  assert.match(card, /const side = \$derived\(!compact && \(card\.why !== '' \|\| changesAny\)\);/u);
+  /* THE LADDER'S RULE IS NO WHY (UX18): it waits behind an info mark, so it alone draws no side. */
+  assert.match(card, /const side = \$derived\(!compact && \(\(card\.why !== '' && !ladderLine\(card\.why\)\) \|\| changesAny\)\);/u);
   assert.match(card, /\{#if side\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-side">/u, 'a side is drawn for who asked alone');
   assert.match(card, /data-side=\{side \? '' : undefined\}/u);
   /* TWO COLUMNS ONLY FOR A CARD WITH A SIDE, and the parts are groups named once each, never sections. */
@@ -506,4 +508,21 @@ test('a kept press is the same answer saying the same thing, and never another o
   assert.equal(keptWay(ways, { key: 'accept', said: 'Chase it £4,800' }, said('£4,500')), null, 'the amount changed under the press');
   assert.equal(keptWay(ways.slice(1), { key: 'accept', said: 'Chase it £4,800' }, said('£4,800')), null, 'the answer was taken away');
   assert.equal(keptWay(ways, { key: 'reject', said: 'Chase it' }, said('£4,800')), null, 'a key alone is not the answer');
+});
+
+test('a card shows at most two answers, the suggested first, and one quiet later when the asker offered one', () => {
+  const ways = [
+    { key: 'a', label: 'Per seat' },
+    { key: 'b', label: 'Per product' },
+    { key: 'c', label: 'Ask me later' },
+    { key: 'd', label: 'Flat price' },
+  ];
+  const row = answerRowOf(ways, 'b');
+  assert.deepEqual(row.shown.map((w) => w.key), ['b', 'a']);
+  assert.equal(row.later?.key, 'c');
+  assert.equal(row.more, 1);
+  const two = answerRowOf(ways.slice(0, 2), null);
+  assert.deepEqual(two.shown.map((w) => w.key), ['a', 'b']);
+  assert.equal(two.later, null);
+  assert.equal(two.more, 0);
 });

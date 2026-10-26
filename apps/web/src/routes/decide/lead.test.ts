@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { ageDays, countSentence, evidenceIn, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
+import { ageDays, countSentence, evidenceIn, leadOf, LEAD_KEY, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
 
 const NOW = Date.parse('2026-09-29T09:40:00Z');
 /** When a question is late, as the record says it (`boot`'s `lateDays`): the web keeps no number of its own. */
@@ -141,4 +141,22 @@ test('the gate draws no sentence of counts under its title', () => {
   /* `sentence=""` says nothing and holds no line for one (VERIFY H4); any other sentence is trivia. */
   assert.doesNotMatch(gate, /gateSentence\(|<PageHead[^>]*\bsentence=(?!"")/u);
   assert.match(gate, /<p class="gate-by">/u, 'the tile no longer says who asked and when');
+});
+
+test('Decide leads with the first group\'s first question, and the rest are a compact queue under it', () => {
+  const blocks = [
+    { kind: 'note', drawn: false, total: 0 },
+    { kind: 'queue', key: 'decide-money', drawn: true, queue: [{ id: 'q1' }, { id: 'q2' }], total: 2 },
+    { kind: 'queue', key: 'decide-quick', drawn: true, queue: [{ id: 'q3' }], total: 1 },
+  ];
+  const { blocks: out, group } = leadOf(blocks, ['decide-money', 'decide-quick']);
+  assert.equal(group, 'decide-money');
+  assert.equal(out.length, 3);
+  assert.equal(out[0]!.key, LEAD_KEY);
+  assert.deepEqual(out[0]!.queue, [{ id: 'q1' }]);
+  assert.deepEqual(out[1]!.queue, [{ id: 'q2' }]);
+  assert.equal((out[2] as { compact?: boolean }).compact, true);
+  /* A page whose first block is drawn keeps its cards as they were. */
+  const kept = leadOf([{ ...blocks[0]!, drawn: true }, blocks[1]!], ['decide-money']);
+  assert.equal(kept.group, null);
 });

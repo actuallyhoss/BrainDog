@@ -77,7 +77,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, cardOf, cardWords, hardSaid, inlineOf, keptWay, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
+  import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, leave, pointerOff, settle } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
@@ -180,6 +180,31 @@
   /** What the filled answer does, in its own words, where it says: the line under a row of buttons. */
   const hardLine = $derived(hardSaid(card, primary));
   const primaryDoes = $derived(card.ways.find((w) => w.key === primary)?.because.trim() ?? '');
+  /* AT MOST TWO ANSWERS AND ONE QUIET LATER (`answerRowOf`): the asker's own "Later" is that Later, never beside ours. */
+  const answerRow = $derived(answerRowOf(card.ways, primary));
+  /* "CAN'T BE UNDONE EASILY" SAYS WHY, in words of what the answer does (`hardWhy`), never the bare warning. */
+  const hardReason = $derived(hardLine ? hardWhy(card, Array.isArray(question.kinds) ? question.kinds : []) : '');
+  /* THE LADDER'S RULE ("Changes like this ask until …") IS NOT WHY THIS QUESTION MATTERS: it waits behind an info mark. */
+  const ladder = $derived(ladderLine(card.why));
+  let ladderOpen = $state(false);
+  /* THE QUESTION IS AT MOST TWO LINES, and "Read all" opens the rest where it was cut. */
+  let readAll = $state(false);
+  let clamped = $state(false);
+  let titleEl = $state<HTMLElement | null>(null);
+  $effect(() => {
+    const el = titleEl;
+    if (!el || readAll || typeof ResizeObserver !== 'function') return;
+    /* COUNTED IN LINES OF THE QUESTION'S OWN WORDS, not the heading's height: a pressable title grows its 44px hit box
+       below a single line, which a height read as a third line. */
+    const measure = () => {
+      const own = el.querySelector('[data-own]');
+      clamped = own ? new Set([...own.getClientRects()].map((r) => Math.round(r.top))).size > 2 : false;
+    };
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    return () => seen.disconnect();
+  });
   /* A READER WHO MAY NOT ANSWER reads a question of options as its answers in words; the record's two say nothing. */
   /* THE WORDS A LONG LIST REPEATS ARE SAID ONCE OVER IT (`fold.ts`). */
   const visualOfWay = (way: Way) => optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: recordNow(), home: grounded?.home ?? null });
@@ -204,6 +229,8 @@
   const optId = (key: string): string => idOf?.(key) ?? `${uid}-opt-${key}`;
   /* THE WHOLE CHANGE, ONE LINK AWAY, where it is worth a look and the host has no other door to the question. */
   const seeWhole = $derived(card.seeWhole && whole && !link);
+  /* AND NOT WHERE THE CARD ALREADY SHOWS THE WHOLE CHANGE: its lines are drawn, none left out and none past the third. */
+  const seeLink = $derived(seeWhole && !(card.lines.length > 0 && card.more === 0 && card.does === ''));
   /* WHETHER THE SIDE SAYS WHAT IT CHANGES: a line of what accepting does, money, or a change from what to what. The
      heading is drawn only over such a line; the link to the whole change alone is drawn alone. */
   /* THE MONEY AN ANSWER MOVES IS THE LINE OVER THE BUTTONS (the scope of 24 October, E10), and the button says Accept:
@@ -211,9 +238,9 @@
      answer, there are no buttons to stand over, and the side says it under what it changes as before. */
   const moneyAbove = $derived(drawn && card.money !== '' && (!card.merge || compact));
   const changesSaid = $derived(saysChanges(moneyAbove ? { ...card, money: '' } : card));
-  const changesAny = $derived(changesSaid || seeWhole);
+  const changesAny = $derived(changesSaid || seeLink);
   /* THE SIDE IS DRAWN ONLY WITH SOMETHING IN IT: why it is asked, or what it changes. Who asked is the line over the question. */
-  const side = $derived(!compact && (card.why !== '' || changesAny));
+  const side = $derived(!compact && ((card.why !== '' && !ladderLine(card.why)) || changesAny));
 
   /**
    * WHERE THE CARD IS. `open` offers the options; `asking` has one chosen and the reason line open under it, for a record
@@ -619,7 +646,8 @@
 <!-- THE ANSWERS AS A ROW OF BUTTONS, one press each: the suggested one, or else the first, filled with the accent. On a
      money row the filled one names the amount ("Chase £4,800"). -->
 {#snippet inlineButtons(amount: string | null)}
-  {#each card.ways as way, i (way.key)}
+  {#each answerRow.shown as way (way.key)}
+    {@const i = card.ways.indexOf(way)}
     <button
       type="button"
       class="queue-act dc-btn"
@@ -635,15 +663,24 @@
       onclick={() => press(way)}
       >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
         ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span></span
-      >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
+      >{#if way.recommended}<span class={lead && !compact ? 'dc-rec-in' : 'dc-sr'}>{queueWords.suggestedSaid}</span>{/if}</button
     >
   {/each}
 {/snippet}
 
 <!-- ASK ME LATER (today F11): a quiet clock and its words at the row's end, opening the question's own page at the step
      that puts it off. The clock alone floated under the answers on every card and said nothing until it was pressed. -->
-{#snippet later()}
-  {#if notNow && kept}
+{#snippet later(inlined = false)}
+  {#if inlined && answerRow.later}
+    <!-- THE ASKER'S OWN LATER IS THE CARD'S ONE QUIET LATER: an answer like any other, drawn bare. -->
+    {@const way = answerRow.later}
+    <button type="button" class="queue-act dc-btn dc-later" data-weight="bare" id={optId(way.key)} aria-disabled={kept ? 'true' : undefined} onclick={() => press(way)}
+      ><Icon name="clock" size="s" /><span class="dc-later-words" dir="auto">{way.label}</span></button
+    >
+  {:else if inlined && answerRow.more > 0 && drawn}
+    <!-- MORE ANSWERS THAN A ROW HOLDS: the rest, and putting it off, are chosen on the question's own page. -->
+    <a class="dc-btn dc-later" data-weight="bare" href={at(card.href)}><span class="dc-later-words">{cardWords.otherAnswers(answerRow.more)}</span></a>
+  {:else if notNow && kept}
     <button type="button" class="dc-btn dc-later" data-weight="bare" aria-disabled="true" aria-label={queueWords.notNow}><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></button>
   {:else if notNow}
     <a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)} aria-label={queueWords.notNow} title={queueWords.notNow}><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></a>
@@ -685,7 +722,7 @@
     {#if drawn}
       <div class="dc-actions dr-actions" data-inline>
         {@render inlineButtons(row.amount)}
-        {@render later()}
+        {@render later(true)}
       </div>
     {/if}
     {#if fix || bulkFix}<p class="qa-fix dr-fix" role="status">{fix || bulkFix}</p>{/if}
@@ -725,11 +762,15 @@
     <div class="dc-main">
       <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
            is kept on it, unseen, for the keys and the ranking. -->
-      <h3 class="queue-question" dir="auto">
+      <h3 class="queue-question" dir="auto" data-clamp={readAll ? undefined : ''} bind:this={titleEl}>
         {#if link || compact}<a class="dc-open tap" href={at(card.href)}><span data-own>{card.question}</span></a>{:else}<span data-own>{card.question}</span>{/if}{#if card.joined}{' '}<span
             class="qa-joined num">{queueWords.joined(card.joined)}</span
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
       </h3>
+      <!-- A QUESTION LONGER THAN TWO LINES IS CUT THERE, and read whole on a press. -->
+      {#if clamped && !readAll}<button type="button" class="dc-read tap" onclick={() => (readAll = true)}>{cardWords.readAll}</button>{/if}
+      <!-- COMPACT, WHO ASKED AND HOW LONG IT HAS WAITED ARE ONE QUIET LINE (UX17): the kind of thing, who, and when. -->
+      {#if compact}<p class="dc-meta" dir="auto">{[card.by.name, ...from, card.when].filter((s) => s !== '').join(' · ')}</p>{/if}
       {#if !compact}
         <!-- WHO ASKED AND WHEN, one quiet line UNDER the question at every width, so every card starts with its sentence
              (the audit of 22 October, U-A7): the face and name, and the app it ran in where it has a name. "Asked by" is said to a screen reader, where the eye reads
@@ -741,13 +782,17 @@
           {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
           <span class="queue-when">{card.when}</span>
           {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
+          {#if ladder}<button type="button" class="dc-info" aria-expanded={ladderOpen} aria-controls="{uid}-ladder" title={cardWords.whyAsks} onclick={() => (ladderOpen = !ladderOpen)}
+              ><Icon name="info" size="s" /><span class="dc-sr">{cardWords.whyAsks}</span></button
+            >{/if}
         </p>
+        {#if ladder && ladderOpen}<p class="qa-later dc-ladder" id="{uid}-ladder" dir="auto">{card.why}</p>{/if}
       {/if}
       {#if decidesLine}<p class="qa-later" dir="auto">{decidesLine}</p>{/if}
       {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
       <!-- HOW LONG IT WAITS (ENG-B14): under why, in the side, where whoever asked wrote one; here, under the question,
            where nobody did. -->
-      {#if !compact && !card.why && card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
+      {#if !compact && (!card.why || ladder) && card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
       <!-- WHAT THE QUESTION HOLDS TO LOOK AT, a still or a quiet card under it, opened full width on a press. -->
       <VisualStrip on={question.id} {compact} />
       {#if card.merge && !compact}
@@ -835,12 +880,12 @@
               onclick={commit}>{pressSaid(card, queueWords.decide, card.ways.find((w) => w.key === selected))}</button
             >
           {/if}
-          {@render later()}
+          {@render later(inline)}
         </div>
         <!-- WHAT THE FILLED ANSWER DOES, one line under the row (U-A9), where its answers each carry one: "File them" says
              what filing does before the press, as its rectangle did. -->
         <!-- THE CARE A HARD ANSWER ASKS FOR, A LINE UNDER THE ROW (audit Z28): on the button it wrapped to two lines at 390. -->
-        {#if inline && hardLine}<p class="dc-hard" id="{uid}-hard" dir="auto">{hardLine}</p>{/if}
+        {#if inline && hardLine}<p class="dc-hard" id="{uid}-hard" dir="auto"><span class="dc-hard-word">{hardLine}.</span> {hardReason}</p>{/if}
         {#if inline && !compact && primaryDoes}<p class="dc-does" dir="auto">{primaryDoes}</p>{/if}
       {/if}
       {#if phase === 'asking' && chosen}
@@ -862,7 +907,7 @@
            follows the question and what it changes comes under the buttons. -->
       <div class="dc-side">
         <!-- WHY: under the question on a narrow card, beside it on a wide one, before what it moves. -->
-        {#if card.why}
+        {#if card.why && !ladder}
           <div class="dc-part dc-part-why" role="group" aria-labelledby="{uid}-why-h">
             <h4 class="dc-h" id="{uid}-why-h">{cardWords.why}</h4>
             <p class="queue-why" dir="auto">{card.why}</p>
@@ -893,9 +938,9 @@
                 {#if card.more > 0}<li class="dc-more">{cardWords.more(card.more)}</li>{/if}
               </ul>
             {/if}
-            {#if seeWhole}<a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>{/if}
+            {#if seeLink}<a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>{/if}
           </div>
-        {:else if seeWhole}
+        {:else if seeLink}
           <!-- NOTHING TO SAY UNDER THE HEADING, so no heading: the link to the whole change stands on its own. -->
           <div class="dc-part dc-part-changes"><a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a></div>
         {/if}
@@ -930,7 +975,7 @@
 
   /* A part let go of hands its order to its own children, which are the grid's items now: why, written after the form,
      is read before the form's answers. */
-  .dc-main > :not(.queue-by, .queue-question) {
+  .dc-main > :not(.queue-by, .queue-question, .dc-read, .dc-meta) {
     order: 1;
   }
 
@@ -1093,6 +1138,78 @@
     .dc-main > .dc-does {
       margin-block-start: calc(var(--sp-1) * -1);
     }
+  }
+
+  /* A QUESTION IS AT MOST TWO LINES UNTIL "READ ALL" (UX6): the rest is cut at a word with an ellipsis. */
+  .dc-main > .queue-question[data-clamp] {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  /* "READ ALL", a quiet ink link right under the cut question. */
+  .dc-read {
+    justify-self: start;
+    margin-block-start: calc(var(--sp-2) * -1);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 30%, transparent);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  /* THE INFO MARK AT THE END OF WHO ASKED: the ladder's rule waits behind it, quiet until pressed. */
+  .dc-info {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    margin-inline-start: calc(var(--sp-1) * -1);
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: none;
+    color: var(--ink-3);
+    cursor: pointer;
+  }
+
+  .dc-info:hover,
+  .dc-info[aria-expanded='true'] {
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .dc-info,
+    .dc-read {
+      min-inline-size: var(--tap);
+      min-block-size: var(--tap);
+    }
+  }
+
+  .dc-meta {
+    margin: calc(var(--sp-1) * -1) 0 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  /* ON THE LEAD THE SUGGESTION IS SAID ON ITS BUTTON, "Accept, suggested", in the button's own ink. */
+  .dc-rec-in {
+    font-weight: 400;
+    opacity: 0.85;
+  }
+
+  .dc-hard-word {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
   }
 
   /* THE CARE A HARD ANSWER ASKS FOR, quiet, under the row of answers (audit Z28). */
@@ -1277,11 +1394,11 @@
     background: none;
     border: 0;
     font: inherit;
-    color: var(--red);
+    color: var(--ink);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--red) 40%, transparent);
+    text-decoration-color: color-mix(in srgb, var(--ink) 35%, transparent);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
     cursor: pointer;

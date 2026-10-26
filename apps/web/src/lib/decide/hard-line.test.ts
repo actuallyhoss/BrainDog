@@ -37,5 +37,7 @@ test('a hard answer says its care as a line under the row, and its button says i
   const source = readFileSync(new URL('./DecisionCard.svelte', import.meta.url), 'utf8');
   const row = source.slice(source.indexOf('{#snippet inlineButtons('), source.indexOf('{/snippet}', source.indexOf('{#snippet inlineButtons(')));
   assert.doesNotMatch(row, /\{wayTail\(card, way, primary\)\}/u, 'the care is still said inside the button');
-  assert.match(source, /<p class="dc-hard" id="\{uid\}-hard" dir="auto">\{hardLine\}<\/p>/u);
+  /* AND SAYS WHY, in words of what the answer does (UX18): never the bare warning. */
+  assert.match(source, /<p class="dc-hard" id="\{uid\}-hard" dir="auto"><span class="dc-hard-word">\{hardLine\}\.<\/span> \{hardReason\}<\/p>/u);
+  assert.ok(card.hardWhy(card.cardOf(ask({ cost: 'undo', money: [{ amount: 1298, currency: 'GBP' }] }), { now })).startsWith('It changes amounts'));
 });

@@ -66,7 +66,7 @@
   import { decideSpots } from './kept-decide.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live as poll } from '$lib/data/live.svelte.ts';
-  import { blocksMineFirst, boardOf, callsRead, dayWord, decideDrawn, GROUP_WORDS, mineFirst, readCalls, readDecide, WORDS, type Call, type Column, type DecideBody } from './views.ts';
+  import { blocksMineFirst, boardOf, callsRead, dayWord, decideDrawn, GROUP_KEY, GROUP_WORDS, mineFirst, readCalls, readDecide, WORDS, type Call, type Column, type DecideBody } from './views.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Handled from '$lib/home/Handled.svelte';
   import { loadHandled, ownCount, toldHandled, withTold, type Handled as HandledFound } from '$lib/home/handled.ts';
@@ -75,6 +75,7 @@
   import { toldNeedOf } from '$lib/record/told-live.ts';
   import { words } from './words.ts';
   import { waitsNow } from '$lib/home/waits.svelte.ts';
+  import { leadOf } from './lead.ts';
 
   let { data } = $props();
 
@@ -374,7 +375,9 @@
     const queue = live?.page.blocks.find((b) => b.kind === 'queue' && b.source === 'governance.open')?.queue;
     return queue ? mineFirst(queue, shell.me?.person ?? null).heading : null;
   });
-  const drawn = $derived<Opened | null>(got && got.from === 'live' && shaped ? { ...got, page: { page: got.page.page, blocks: shaped.blocks } } : got);
+  /* ONE LEAD TILE ACROSS THE BOARD, THE REST A COMPACT QUEUE UNDER IT (UX17): the first group's first question, whole. */
+  const led = $derived(shaped ? leadOf(shaped.blocks, shaped.first === 'quick' ? [GROUP_KEY.quick, GROUP_KEY.money] : [GROUP_KEY.money, GROUP_KEY.quick]) : null);
+  const drawn = $derived<Opened | null>(got && got.from === 'live' && led ? { ...got, page: { page: got.page.page, blocks: led.blocks } } : got);
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
   const cleared = $derived(shaped !== null && !shaped.drawsAny);
   /* THE HEAD'S LINE IS THE RECORD'S, and there is none with no question waiting: the head is then the page's name, and
@@ -391,7 +394,11 @@
 
   /* HOW MANY EACH COLUMN HOLDS, as the phone's switch says it: the questions, as the head's sentence counts them (audit Z3), and the lines BrainDog handled. */
   const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
-  const counts = $derived<Record<Column, number>>({ money: shaped?.groups.money ?? 0, quick: shaped?.groups.quick ?? 0, handled: handledCount });
+  const counts = $derived<Record<Column, number>>({
+    money: Math.max(0, (shaped?.groups.money ?? 0) - (led?.group === GROUP_KEY.money ? 1 : 0)),
+    quick: Math.max(0, (shaped?.groups.quick ?? 0) - (led?.group === GROUP_KEY.quick ? 1 : 0)),
+    handled: handledCount,
+  });
   /* WHERE EACH SITS ON A WIDE BOARD (`boardOf`): a third each, or a half, or the row, for those that hold something. */
   const board = $derived(boardOf({ money: counts.money > 0, quick: counts.quick > 0, handled: counts.handled > 0 }, shaped?.first));
   const columns = $derived((shaped?.first === 'quick' ? (['quick', 'money', 'handled'] as const) : (['money', 'quick', 'handled'] as const)).filter((c) => counts[c] > 0));
@@ -488,6 +495,7 @@
         data-board={columns.length > 0 ? '' : undefined}
         data-switch={columns.length > 1 ? '' : undefined}
         data-showing={showing ?? undefined}
+        data-led={led?.group ? '' : undefined}
         style:--col-money={board.money ?? 'auto'}
         style:--col-quick={board.quick ?? 'auto'}
         style:--col-handled={board.handled ?? '1 / -1'}
@@ -592,6 +600,24 @@
       grid-column: var(--col-handled);
       align-self: start;
     }
+
+    /* THE LEAD TILE IS THE BOARD'S FIRST ROW, ACROSS IT (UX17), and the groups and Handled are the row under it. */
+    .body[data-board] :global(.page:not([data-narrow]) .block-slot[data-key='decide-lead']) {
+      grid-row: 1;
+      grid-column: 1 / -1;
+    }
+
+    .body[data-board][data-led] :global(.page:not([data-narrow]) .block-slot[data-key='decide-money']),
+    .body[data-board][data-led] :global(.page:not([data-narrow]) .block-slot[data-key='decide-quick']),
+    .body[data-board][data-led] :global(.page:not([data-narrow]) > .page-strip[data-opens]) {
+      grid-row: 2;
+    }
+  }
+
+  /* THE LEAD IS ONE TILE, and the cards under it keep their tiles: they are a compact queue, each the question, who
+     asked and its answers. */
+  .body :global(.block-slot[data-key='decide-lead']) {
+    padding: 0;
   }
 
   /* THE PHONE'S SWITCH: one column at a time, the others out of the way until they are chosen. On a wide board the

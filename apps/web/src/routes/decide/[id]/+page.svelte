@@ -232,6 +232,43 @@
      address under this record. Until that answers, and for a reader the record will not show the entry to, the option
      reads by its name. */
   const offered = $derived(about?.kind === 'options' ? about.body.options : undefined);
+
+  /* A CHANGE OF MANY ROWS SHOWS A FEW OF THEM (UX21): "File them" over 200 entries named none, so the press was taken on
+     trust. The first five rows an answer's changes name, by their own titles, read once the page is drawn, and how many
+     more there are. A row the reader may not see, or that is gone, is left out of the sample, not guessed at. */
+  const SAMPLE_MOST = 5;
+  let samples = $state.raw<ReadonlyMap<string, { names: string[]; more: number }>>(new Map());
+  $effect(() => {
+    const opts = offered;
+    if (!Array.isArray(opts)) return;
+    let here = true;
+    void (async () => {
+      const client = createClient({ base: apiBase() });
+      const out = new Map<string, { names: string[]; more: number }>();
+      for (const o of opts as unknown[]) {
+        if (o === null || typeof o !== 'object') continue;
+        const { id, patches } = o as { id?: unknown; patches?: unknown };
+        if (typeof id !== 'string' || !Array.isArray(patches) || patches.length < 2) continue;
+        const ats = patches.map((p) => (p !== null && typeof p === 'object' ? (p as { at?: unknown }).at : null)).filter((a): a is string => typeof a === 'string' && /^[a-z][a-z0-9_-]*#[1-9]\d*$/u.test(a));
+        const names = await Promise.all(
+          ats.slice(0, SAMPLE_MOST).map(async (spoken) => {
+            const [list = '', seq = '0'] = spoken.split('#');
+            const got = await client.get(list, Number(seq)).catch(() => null);
+            const fields = got?.ok ? ((got.value as { fields?: Record<string, unknown> }).fields ?? {}) : null;
+            const field = REGISTERS[list]?.title;
+            const name = fields && field ? fields[field] : null;
+            return typeof name === 'string' && name.trim() !== '' ? name.trim() : null;
+          }),
+        );
+        const kept = names.filter((n): n is string => n !== null);
+        if (kept.length > 0) out.set(id, { names: kept, more: patches.length - kept.length });
+      }
+      if (here) samples = out;
+    })();
+    return () => {
+      here = false;
+    };
+  });
   let optionFile = $state.raw<FileAt | undefined>(undefined);
   const visuals = $derived(visualsOf(offered, optionFile));
 
@@ -951,7 +988,8 @@
 <!-- NOT NOW, THE THIRD VERB, kept beside the answers: a queue with only yes and no is a queue that gets rubber-stamped.
      It opens the step that asks why not yet and until when. -->
 {#snippet later()}
-  {#if !deferring}
+  <!-- NEVER BESIDE AN ANSWER OF THE ASKER'S OWN THAT ONLY PUTS IT OFF (UX18): one Later, not "Later" and "Later". -->
+  {#if !deferring && !(question?.options ?? []).some((o) => /^(?:later|not now|ask me later|not yet)\.?$/iu.test(o.title.trim()))}
     <!-- A CLOCK AND ITS WORDS, as on every card (VERIFY H8): "Ask me later", 44 under a thumb. The clock alone floated
          under the answers and said nothing to anybody who had not pressed it. -->
     <button type="button" class="dc-btn dc-later" data-weight="bare" disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} aria-label={queueWords.notNow} title={queueWords.notNow} onclick={defer}
@@ -1096,14 +1134,14 @@
                 id="opt-{option.key}"
                 data-answer={option.key}
                 data-suggested={marked ? '' : undefined}
-                data-weight={option.key === 'accept' ? 'primary' : undefined}
+                data-weight={marked || (suggestedKey === undefined && option.key === 'accept') ? 'primary' : undefined}
                 data-on={asked === option.key ? '' : undefined}
                 aria-pressed={asked === null ? undefined : asked === option.key}
                 disabled={!answerable || holding !== null}
                 aria-describedby={answerable ? undefined : 'cannot-decide'}
                 onclick={() => choose(option.key)}
               >
-                {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : hardOption(option.key) ? queueWords.hard(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}
+                {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : hardOption(option.key) ? queueWords.hard(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="gate-sug">, {gate.suggested.toLowerCase()}</span>{/if}
               </button>
             {/snippet}
 
@@ -1166,6 +1204,13 @@
                         <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
                       {/if}
                       <OptionVisual visual={drawn} />
+                      {#if samples.has(option.key)}
+                        {@const sample = samples.get(option.key)!}
+                        <ul class="dc-sample" aria-label={gate.sample}>
+                          {#each sample.names as name, i (i)}<li dir="auto">{name}</li>{/each}
+                          {#if sample.more > 0}<li class="dc-sample-more">{gate.sampleMore(sample.more)}</li>{/if}
+                        </ul>
+                      {/if}
                       <div class="dc-option-foot">
                         {#if confirming === option.key}
                           <!-- THE CONFIRM STAYS IN THE CARD, never a dialog over the page: what cannot be undone, then the
@@ -2069,6 +2114,34 @@
   .dc-option[data-bare] > .dc-option-foot > .dc-btn {
     min-block-size: var(--tap);
     font-size: var(--fs-body);
+  }
+
+  /* A FEW OF THE ROWS AN ANSWER CHANGES, a quiet list in the card, each one line. */
+  .dc-sample {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .dc-sample > li {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dc-sample > .dc-sample-more {
+    color: var(--ink-3);
+  }
+
+  /* THE SUGGESTED ANSWER SAYS SO ON ITS OWN BUTTON (UX21), "Accept, suggested", and is the one red primary. */
+  .gate-sug {
+    font-weight: 400;
+    opacity: 0.85;
   }
 
   .dc-option > .dc-rec {

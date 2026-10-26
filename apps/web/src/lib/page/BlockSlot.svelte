@@ -816,10 +816,12 @@
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <!-- COMPACT, AT MOST THREE (`queue-answer.ts` `compactOf`): the question and its answers, and the rest a count on Decide. -->
   <!-- A COMPACT QUEUE THAT SAYS HOW MANY IT SHOWS (`most`, Today's Needs you on a phone) shows that many. -->
-  {@const asked = compact ? compactOf(block.queue, block.total, typeof block.most === 'number' ? block.most : undefined) : { shown: block.queue, more: block.total - block.queue.length }}
+  <!-- A QUEUE COMPACT BY ITS OWN SAY (`compact: true`, Decide's queue under its lead) opens its rest in place, as a whole one does. -->
+  {@const inPlace = (block as { compact?: unknown }).compact === true}
+  {@const asked = compact && !inPlace ? compactOf(block.queue, block.total, typeof block.most === 'number' ? block.most : undefined) : { shown: block.queue, more: block.total - block.queue.length }}
   {@const every = compact ? asked.shown.map((q): QueueEntry => ({ kind: 'one', q })) : alikeOf(asked.shown)}
   <!-- A QUEUE THAT SAYS HOW MANY IT SHOWS (`most`, Needs you's groups) shows that many cards and opens the rest in place. -->
-  {@const most = !compact && typeof block.most === 'number' && !open && every.length > block.most ? block.most : null}
+  {@const most = (!compact || inPlace) && typeof block.most === 'number' && !open && every.length > block.most ? block.most : null}
   {@const entries = most === null ? every : every.slice(0, most)}
   <div class="queue" data-compact={compact ? '' : undefined}>
     <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->

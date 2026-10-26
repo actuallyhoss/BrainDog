@@ -381,7 +381,7 @@ export function ladder(deps: LadderDeps) {
     /* AND SO DOES A RUN MARKING DONE THE TASK IN ITS OWN HAND (`ownDone`), at Do and tell, counted towards nothing. */
     if (op === 'update' && ownDone(c, shape, kinds, selfId)) return { write: true, rung: 'tell', kinds: [] };
     const rung = rungFor(c.token, c.scope, kinds);
-    if (rung === 'ask') return { write: false, kinds, why: `Changes like this ask until ${OFFER_AFTER} of them have been kept as they were.` };
+    if (rung === 'ask') return { write: false, kinds, why: `An agent's changes of this kind ask until ${OFFER_AFTER} of them have been kept as they were, so this one waits for you.` };
     return { write: true, rung, kinds };
   };
 
