@@ -2,7 +2,7 @@
   Settings > Backups: the copies this record keeps, the key that opens them, and going back to one.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   /* Lane F: backups and putting a copy back. */
@@ -380,19 +380,19 @@
       <StateRow icon="download" title={words.exports} line={facts ? exportLine(facts, Date.now()) : undefined} action={anOwner ? exportNow : undefined} />
       {#if exportsShown.length > 0}
         <ul class="ledger ledger-glyph exports">
-          {#each exportsShown as at (at)}
+          {#each exportsShown as when (when)}
             <li>
               <div class="line">
                 <span class="seq"><Icon name="download" size="s" /></span>
                 <span class="line-main">
-                  <span class="line-title">{copyDay(at.slice(0, 10))}</span>
-                  <span class="line-detail">{relative(at, Date.now())}</span>
+                  <span class="line-title">{copyDay(when.slice(0, 10))}</span>
+                  <span class="line-detail">{relative(when, Date.now())}</span>
                 </span>
               </div>
             </li>
           {/each}
         </ul>
-        <p class="every-export"><a href="/audit?kind=export">{words.everyExport}</a></p>
+        <p class="every-export"><a href={at('/audit?kind=export')}>{words.everyExport}</a></p>
       {/if}
       {@render drillLineOf()}
     </div>
