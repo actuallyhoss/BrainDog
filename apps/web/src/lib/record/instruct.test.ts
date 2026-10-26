@@ -12,11 +12,15 @@ import {
   answersSaid,
   agoSaid,
   composerOf,
-  deskSplit,
   doingSaid,
   instructArgs,
   leadsOf,
-  onDeskOf,
+  openNow,
+  lastSaid,
+  machineNamed,
+  quietSaid,
+  runTitle,
+  folderSaid,
   presenceOf,
   runsOf,
   sendingOf,
@@ -294,24 +298,39 @@ test('HOW A RUN STANDS, AND WHICH RUNS ARE AT WORK: working now, then the ones q
   assert.equal(standsSaid(run({ state: 'waiting', quiet_s: 40 * 60 })), 'Quiet for 40 min');
   assert.equal(standsSaid(run({ state: 'waiting' })), 'Waiting on you');
   assert.equal(standsSaid(run({ stopped: 'pause' })), 'Paused by you');
-  const quiet = run({ run: 'S4', state: 'waiting', quiet_s: 2 * 3600 });
-  const silent = run({ run: 'S5', state: 'waiting', quiet_s: 42 * 3600 });
-  const unsaid = run({ run: 'S6', state: 'waiting' });
-  assert.deepEqual(onDeskOf([...ROWS, quiet, silent, unsaid]).map((r) => r.run), ['S1', 'S2', 'S4']);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z6 (`agents-390-light.png`): "Nobody working right now." over a list called At work holding
-   three quiet runs. The quiet ones are their own part, so nothing quiet stands among the runs at work. */
-test('THREE QUIET RUNS ARE OPEN AND QUIET, NONE AT WORK, and a working one is the only one at work', () => {
-  const tidy = run({ run: 'S904', state: 'waiting', quiet_s: 19 * 60 });
-  const bot = run({ run: 'S900', state: 'waiting', quiet_s: 75 * 60 });
-  const unsaid = run({ run: 'S901', state: 'waiting', quiet_s: 80 * 60 });
-  const quiet = deskSplit([tidy, bot, unsaid]);
-  assert.deepEqual(quiet.working, []);
-  assert.deepEqual(quiet.quiet.map((r) => r.run), ['S904', 'S900', 'S901']);
-  const one = deskSplit([{ ...tidy, state: 'working' }, bot, unsaid]);
-  assert.deepEqual(one.working.map((r) => r.run), ['S904']);
-  assert.deepEqual(one.quiet.map((r) => r.run), ['S900', 'S901']);
+/* THE PASS OF 27 OCTOBER (UX1, UX38): three rows of "Claude / Claude Code run" on Today and "Has not said what it is
+   doing" four times on Agents, "On MacBook Pro and Sam" for a Windows PC silent nine hours, and the screenshot run
+   itself counted at work. A run is named by its app and where it works, says the last thing it did, and is counted
+   only once it wrote, asked or said what it does. */
+test('A RUN IS ITS APP AND WHERE IT WORKS, and says the last thing it did', () => {
+  const dev = run({ project: null, repo: null, branch: null, doing: 'Claude Code run', app: 'Claude Code', cwd: '/Users/teo/Developer' });
+  assert.equal(runTitle(dev, null), 'Claude Code in the Developer folder');
+  assert.equal(runTitle({ ...dev, app: null }, 'Encore'), 'Claude in Encore');
+  assert.equal(runTitle({ ...dev, cwd: 'D:\\' }, null), 'Claude Code in D:\\');
+  assert.equal(folderSaid('C:\\Users\\teo\\work'), 'the work folder');
+  assert.equal(lastSaid({ ...dev, asked: 'Mark Wave 0: nav, the Agents page redo and the record overload fix done, and close the three tasks it took over?', wrote: 1 }), 'Asked you: “Mark Wave 0: nav, the Agents page redo and the record overload fix done, and…”');
+  assert.equal(lastSaid({ ...dev, wrote: 3 }), 'Wrote 3 changes');
+  assert.equal(lastSaid({ ...dev, wrote: 0 }), 'Nothing written yet');
+  assert.equal(lastSaid({ ...dev, doing: 'Fixing the hero', wrote: 3 }), 'Fixing the hero');
+});
+
+test('WHO IS OPEN NOW: the runs that did something, the ones that wrote nothing folded, quiet machines and looks apart', () => {
+  const asks = run({ run: 'S10', doing: 'Claude Code run', repo: null, branch: null, wrote: 1, asked: 'Mark Wave 0 done?' });
+  const idle = run({ run: 'S11', doing: 'Claude run', repo: null, branch: null, wrote: 0 });
+  const waits = run({ run: 'S12', state: 'waiting', quiet_s: 20 * 60, wrote: 4 });
+  const pc = run({ run: 'S13', machine: 'Sam', cwd: 'D:\\', state: 'waiting', heard_s: 9 * 3600, quiet_s: 9 * 3600, wrote: 0 });
+  const pc2 = run({ run: 'S14', machine: 'Sam', cwd: 'D:\\', state: 'waiting', heard_s: 10 * 3600, quiet_s: 10 * 3600, wrote: 0 });
+  const look = run({ run: 'S15', wrote: 0, looks: true });
+  const old = run({ run: 'S16', state: 'waiting', quiet_s: 30 * 60 });
+  const o = openNow([waits, asks, idle, pc, pc2, look, old, HELPER]);
+  assert.deepEqual(o.shown.map((r) => r.run), ['S10', 'S12', 'S16'], 'at work first; a host that counts no writes says it wrote');
+  assert.deepEqual(o.idle.map((r) => r.run), ['S11']);
+  assert.deepEqual(o.looks.map((r) => r.run), ['S15']);
+  assert.deepEqual(o.quiet.map((q) => [q.said, q.runs.map((r) => r.run)]), [['Windows PC', ['S13', 'S14']]]);
+  assert.deepEqual(quietSaid(o.quiet[0]!), { what: '2 Claude sessions on D:\\', said: 'Nothing written · silent for 9 h' });
+  assert.equal(machineNamed('Maras-MacBook-Pro.local', [pc]), 'MacBook Pro', 'a Mac keeps its own kind');
 });
 
 /* ── an order that names questions (D8) ─────────────────────────────────── */

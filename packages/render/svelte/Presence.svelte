@@ -103,7 +103,13 @@
       <li class="pres-row" data-live={r.live} data-stopped={r.stopped ?? undefined} style={hue(r.agent)}>
         {@render face(r, m)}
         <div class="pres-body">
-          {#if r.stands !== undefined}
+          {#if r.stands !== undefined && r.last}
+            <!-- ITS NAME LEADS THE ROW AND THE LAST THING IT DID IS UNDER IT, where the host says both. -->
+            <p class="pres-head" title={r.name}>
+              {#if r.href}<a class="pres-what" href={r.href}>{r.name}</a>{:else}<span class="pres-what">{r.name}</span>{/if}{#if r.helpers}<span class="pres-helpers">{r.helpers}</span>{/if}
+            </p>
+            <p class="pres-last" title={r.last}>{r.last}</p>
+          {:else if r.stands !== undefined}
             <!-- WHAT IT IS DOING LEADS THE ROW, the agent said by its mark and to a screen reader by name, never twice. -->
             <p class="pres-head" title={r.doing ?? r.name}>
               <span class="pres-who">{r.name}: </span>{#if r.href}<a class="pres-what" href={r.href}>{r.doing ?? r.name}</a>{:else}<span class="pres-what">{r.doing ?? r.name}</span>{/if}{#if r.helpers}<span class="pres-helpers">{r.helpers}</span>{/if}

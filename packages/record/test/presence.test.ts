@@ -190,3 +190,17 @@ test('A SESSION LEFT OPEN AND SILENT FOR HOURS that calls again is at it from th
   assert.equal(row.for_s, 10 * 60, `for ${String(row.for_s)} s, counted from when it opened five hours ago`);
   sql.close();
 });
+
+test('A ROW SAYS WHERE IT IS AND WHAT IT DID: its app, its folder, how much it wrote and the question it asked', async () => {
+  const { api, sql } = await record();
+  const ctx = agent('c-asks', { cwd: '/Users/teo/Developer', client: 'claude-code' });
+  const run = await opened(api, ctx);
+  const other = await opened(api, agent('c-quiet', { cwd: 'D:\\work' }));
+  value(await api.propose({ question: 'Add this task?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ fields: { what: 'Proposed' } }] } } as never, ctx));
+  const by = new Map(value<PresenceRow[]>(await api.presence({}, owner)).map((r) => [r.run, r]));
+  const asks = by.get(run)!;
+  assert.deepEqual([asks.app, asks.cwd, asks.asked, asks.looks], ['Claude Code', '/Users/teo/Developer', 'Add this task?', false]);
+  assert.equal(typeof asks.wrote, 'number');
+  assert.deepEqual([by.get(other)?.app, by.get(other)?.cwd, by.get(other)?.asked], [null, 'D:\\work', null]);
+  sql.close();
+});

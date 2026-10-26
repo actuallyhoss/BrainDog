@@ -370,6 +370,18 @@
     white-space: nowrap;
   }
 
+  /* THE LAST THING IT DID, under its name: the meta size in the second ink, one line cut with an ellipsis. */
+  .pres-last {
+    margin: 0;
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   a.pres-what:hover {
     text-decoration: underline;
     text-underline-offset: 3px;

@@ -301,4 +301,9 @@ export type PresenceView = {
   time?: string;
   /** How it stands, for a row drawn on one line: "Working now", "Quiet for 40 min". */
   stands?: string;
+  /**
+   * The last thing it did, for a row drawn on one line, under its name: "Asked you: “Mark Wave 0 done?”", "Wrote 3
+   * changes". Given, the row is headed by its name ("Claude Code in Kiln") and says this under it.
+   */
+  last?: string | null;
 };

@@ -74,8 +74,8 @@
   );
   const shown = $derived(all ? folded : folded.slice(0, SHOWN));
 
-  /** A sentence's first clause, without its full stop: "Refused 2h ago" of "Refused 2h ago. The script did not finish." */
-  const firstOf = (said: string): string => (said.split(/(?<=\.)\s/u)[0] ?? said).replace(/\.$/u, '');
+  /** How a line ended, from its sentence where it carries no word of its own: "Refused" of "Refused 2h ago." */
+  const firstWord = (said: string): string => said.split(/\s/u)[0]?.replace(/[.,]$/u, '') ?? said;
 </script>
 
 {#if drew !== true}
@@ -92,15 +92,12 @@
           <span class="runs-mark">{#if line.agent}<AgentMark kind={agentKindOf(line.agent)} size="s" />{:else}<Icon name={kindIcon(line.kind)} size="s" />{/if}</span>
           {#if line.path}<a class="runs-name" href={at(line.path)} title={line.name}>{line.name}</a>{:else}<span class="runs-name" title={line.name}>{line.name}</span>{/if}
           <span class="runs-end">
-            {#if n > 1}<span class="runs-proj num">{n} times</span>{/if}
+            <!-- ONE FORMAT FOR EVERY ROW (the pass of 27 October, UX40): how many times as a chip where it ran more
+                 than once, its project as a chip, then how it ended and when, in two words. -->
+            {#if (line.times ?? 1) + n - 1 > 1}<span class="runs-proj num">{((line.times ?? 1) + n - 1).toLocaleString('en')} times</span>{/if}
             {#if project}<span class="runs-proj">{project}</span>{/if}
-            {#if line.outcome}
-              <span class="runs-said">{line.outcome}</span>
-              <span class="runs-when num">{since(line.at, recordNow())}</span>
-            {:else}
-              <!-- HOW IT ENDED AND WHEN, its first sentence; what the run said after it is on the run's own screen and in the hover. -->
-              <span class="runs-said" title={line.said}>{firstOf(line.said)}</span>
-            {/if}
+            <span class="runs-said" title={line.said}>{line.outcome ?? firstWord(line.said)}</span>
+            <span class="runs-when num">{since(line.at, recordNow())}</span>
           </span>
         </li>
       {/each}

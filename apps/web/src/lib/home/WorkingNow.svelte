@@ -3,8 +3,11 @@
 
   FROM `boot`'S ANSWER AT THE FIRST PAINT, so the count is the rail's and the header's and the tile stands at once. THEN
   FROM `presence` (agents and MCP plan §4.4, §7.2), read once it has drawn, again when the record moves, when a stop or a
-  tell is sent (`told`), and every fifteen seconds, since "for 32 min" is a clock: what each run says it is doing, for
-  how long, what he told it that it holds, and whether he paused or stopped it. A read that fails keeps what is drawn.
+  tell is sent (`told`), and every fifteen seconds, since "heard 3 min ago" is a clock: as the Agents page says the same
+  runs (`openNow`, the pass of 27 October), each run that did something by its app and where it works, the last thing it
+  did ("Asked you: …", "Wrote 3 changes") and when it was last heard; what he told it that it holds, and whether he
+  paused or stopped it. Under them one line each for the runs open with nothing written, the machines quiet for an hour,
+  and the read-only looks, none of them counted. A read that fails keeps what is drawn.
 
   TELL, PAUSE AND STOP ARE ONE PRESS AWAY for the owner: the row's end opens the run's sheet (`RunSheet.svelte`), which
   is the Agents page's own run row and composer scoped to that run, so nothing here words a stop a second time.
@@ -17,13 +20,13 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { apiBase } from '$lib/at.ts';
-  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
-  import type { LiveRun, Thread } from '$lib/record/instruct.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import type { LiveRun, Project, Thread } from '$lib/record/instruct.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
   import AgentFace from '$lib/ui/AgentFace.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import { WORKING_MOST, liveRows, type WorkingRow } from './desk.ts';
+  import { WORKING_MOST, type WorkingRow } from './desk.ts';
   import { afterFirst } from '$lib/data/first-drawn.ts';
 
   let { rows }: { rows: readonly WorkingRow[] } = $props();
@@ -40,16 +43,23 @@
   /* HIS ALONE: only a person signed in as the owner tells, pauses or stops a run. */
   const owner = $derived((page.data as unknown as Partial<Shell> | undefined)?.me?.owner === true);
 
-  /* WHAT `presence` LAST SAID, and the clock its "for 32 min" is read against. `null` until it has answered. */
-  let live = $state.raw<{ rows: LiveRun[]; threads: Thread[]; at: number } | null>(null);
+  /* WHAT `presence` LAST SAID, worded (`desk-live.ts`): the rows, and the lines for the runs left out of them. `null`
+     until it has answered. */
+  let live = $state.raw<{ rows: WorkingRow[]; folds: string[] } | null>(null);
+  /* THE PROJECTS RUNS HOLD BY HANDLE, by name, read once a run names one `boot` did not draw. */
+  let projects = new Map<string, Project>();
 
   async function read(): Promise<void> {
     try {
-      const m = await import('$lib/record/instruct.ts');
+      const [m, d] = await Promise.all([import('$lib/record/instruct.ts'), import('./desk-live.ts')]);
       const io = m.control(apiBase());
       const [p, t] = await Promise.all([io.presence(), owner ? io.threads(20) : Promise.resolve(null)]);
       if (!p.ok) return;
-      live = { rows: p.value, threads: t?.ok ? t.value : (live?.threads ?? []), at: recordNow() };
+      const threads: Thread[] = t?.ok ? t.value : [];
+      const known = new Set(rows.map((r) => r.run));
+      if (p.value.some((r: LiveRun) => r.project !== null && !known.has(r.run) && !projects.has(r.project))) projects = await io.projects(p.value);
+      const named = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
+      live = { rows: d.liveRows(rows, p.value, threads, named), folds: d.liveFolds(p.value) };
     } catch {
       /* What is drawn stands. */
     }
@@ -70,8 +80,9 @@
 
   listen(read, () => sheetOpen);
 
-  const drawn = $derived(live ? liveRows(rows, live.rows, live.threads, live.at) : rows);
+  const drawn = $derived(live ? live.rows : rows);
   const shown = $derived(drawn.slice(0, WORKING_MOST));
+  const folds = $derived(live?.folds ?? []);
 
   /* THE RUN WHOSE SHEET IS OPEN, and the sheet itself, fetched on the first press. */
   let sheet = $state<{ run: string; title: string } | null>(null);
@@ -92,7 +103,7 @@
   });
 </script>
 
-{#if drawn.length > 0}
+{#if drawn.length > 0 || folds.length > 0}
   <Tile icon="session" tone="live" title={words.title} count={drawn.length} href="/p/agents" hrefLabel={words.open} data-working>
     <ol class="runs">
       {#each shown as r (r.key)}
@@ -114,6 +125,7 @@
       {/each}
     </ol>
     {#if drawn.length > shown.length}<p class="r-more">{words.more(drawn.length - shown.length)}</p>{/if}
+    {#each folds as f (f)}<p class="r-more">{f}</p>{/each}
   </Tile>
 {/if}
 

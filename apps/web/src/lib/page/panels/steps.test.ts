@@ -5,7 +5,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { stepsOf } from './steps.ts';
+import { stepSaid, stepsOf } from './steps.ts';
+
+test('A STEP IS SAID IN PLAIN WORDS: no name it was addressed to, and a key by what it opens', () => {
+  assert.equal(
+    stepSaid('Sam: answer 2 questions, and set up the Mercury add-on with the sealed mercury-secret key, then accept it.'),
+    'Answer 2 questions, and set up the Mercury add-on with the Mercury key, then accept it.',
+  );
+  assert.equal(stepSaid('Wire the pulse endpoint: two calls'), 'Wire the pulse endpoint: two calls');
+  assert.equal(stepSaid('Note: Kiln ships Friday'), 'Note: Kiln ships Friday', 'a capital after the colon is not an address');
+});
 
 const row = (run: string, next: string, mark = 'next', at = '2026-09-03T11:00:00Z') => ({ fields: { run, agent: 'Codex', next, left_at: at, mark } });
 

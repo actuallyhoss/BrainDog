@@ -16,7 +16,7 @@ import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 import { listFor } from '../agent-lists.ts';
 import { readSight } from '../sight.ts';
-import { verifiedBy, type RunToken } from '../run-verified.ts';
+import { appOfRun, verifiedBy, type RunToken } from '../run-verified.ts';
 import { OWN_RUN, stopLine, toldOf, toldTo, type Told } from './instructions.ts';
 
 /** One run's use of a key or a tool: the run by its spoken id, its agent and machine, when it last used it, and how often. */
@@ -146,6 +146,16 @@ export type PresenceRow = {
   reach: 'hooks' | 'next_call';
   /** Its key proves the app it says it is (`run-verified.ts`): a checked client document, or a key made for that app. */
   verified: boolean;
+  /** The app its client says it is, by name ("Claude Code", `appOfRun`), or `null` where it names no client. */
+  app: string | null;
+  /** The folder it opened in, as its agent said it, so a run with no project is still somewhere ("the Developer folder"). */
+  cwd: string | null;
+  /** How many writes it has made, or `null` on a run from before the record counted them. */
+  wrote: number | null;
+  /** The newest question it asked that still waits on him, in its words, or `null`. */
+  asked: string | null;
+  /** Its key reads and nothing more, so it can write nothing: a look, never a run at work. */
+  looks: boolean;
 };
 
 /** What `presence` takes: one project or one repository. */
@@ -424,7 +434,22 @@ export function methods(deps: RecordDeps) {
       };
       /* THE KEYS THE RUNS SPOKE WITH, read once, so each row can say whether its key proves its app (H19). */
       const keys = new Map<string, RunToken>();
-      for (const t of kernel.listTokens()) for (const k of [t, ...(t.children ?? [])]) keys.set(k.id, { label: k.label, ...(k.client ? { client: k.client } : {}) });
+      const readOnly = new Set<string>();
+      for (const t of kernel.listTokens())
+        for (const k of [t, ...(t.children ?? [])]) {
+          keys.set(k.id, { label: k.label, ...(k.client ? { client: k.client } : {}) });
+          if (t.scope === 'read') readOnly.add(k.id);
+        }
+      /* THE NEWEST QUESTION EACH RUN ASKED THAT STILL WAITS, by the run that signed it (`opened_by`, its spoken name), said
+         only to a caller who reads the record whole, as the questions themselves are. */
+      const asked = new Map<string, string>();
+      const open = whole(ctx) ? kernel.openSuggestions() : null;
+      if (open?.ok)
+        for (const s of [...open.value].sort((a, b) => String(a.opened_at ?? '').localeCompare(String(b.opened_at ?? '')))) {
+          const by = typeof s.opened_by === 'string' ? s.opened_by : '';
+          const said = /^S[1-9][0-9]*$/u.test(by) ? kernel.question(String(s.id)) : null;
+          if (said) asked.set(by, said);
+        }
       const out: PresenceRow[] = rows
         .filter((r) => (projectSaid === null || of(r.fields, 'project') === projectSaid) && (repoSaid === null || of(r.fields, 'repo') === repoSaid))
         .map((r) => {
@@ -455,6 +480,11 @@ export function methods(deps: RecordDeps) {
             quiet_s: of(f, 'last_seen') === null ? null : secs(of(f, 'last_seen')),
             reach: agent === 'claude' && profile.enforce.hooks ? 'hooks' : 'next_call',
             verified: verifiedBy(f, keys.get(of(f, 'token_id') ?? '') ?? null),
+            app: of(f, 'client') === null ? null : appOfRun(f),
+            cwd: of(f, 'cwd'),
+            wrote: typeof f.wrote === 'number' ? f.wrote : null,
+            asked: asked.get(spoken(r)) ?? null,
+            looks: readOnly.has(of(f, 'token_id') ?? ''),
           };
         });
       return ok(out);

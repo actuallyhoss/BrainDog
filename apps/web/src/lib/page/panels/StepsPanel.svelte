@@ -24,7 +24,7 @@
   import { fill, told } from '$lib/record/instruct.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { listen } from '../listen.svelte.ts';
-  import { stepsOf, type Step } from './steps.ts';
+  import { stepSaid, stepsOf, type Step } from './steps.ts';
   import { readQuestionWords, refsParts } from './run-talk.ts';
 
   let { owner = false }: { owner?: boolean } = $props();
@@ -116,7 +116,7 @@
     <ol class="steps-list">
       {#each shown as s (s.key)}
         <li class="step" data-earlier={s.earlier ? '' : undefined}>
-          <p class="step-next">{#each refsParts(s.next, questions) as part}{#if part.href}<a class="step-ref" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}</p>
+          <p class="step-next">{#each refsParts(stepSaid(s.next), questions) as part}{#if part.href}<a class="step-ref" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}</p>
           <p class="step-meta">
             {#if s.project}<span class="step-proj">{s.project}</span>{/if}<span>{words.left(s.agent || words.someone, since(s.at, recordNow()), s.runs.length)}</span>
           </p>

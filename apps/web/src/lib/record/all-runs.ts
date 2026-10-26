@@ -44,7 +44,7 @@ export const runsWords = {
   agentStopped: (when: string) => `stopped ${when}`,
   agentName: 'An agent',
   /* HOW AN AGENT RUN STANDS, WITHOUT WHEN, for a row that says when in a column of its own (the Agents page's Recent runs). */
-  outcome: { working: 'At work', left: 'Left a step', ended: 'Finished', stopped: 'Stopped', open: 'Open' },
+  outcome: { working: 'At work', left: 'Left a step', ended: 'Finished', stopped: 'Stopped', open: 'Last heard' },
   /** A run that said nothing of what it did, where it worked. */
   agentIn: (who: string, repo: string) => `${who} in ${repo}`,
   /** A run that said nothing of what it did: its agent's run. */
@@ -217,7 +217,7 @@ export function jobLines(rows: readonly { id: string; title: string | null; kind
   return rows.map((j) => {
     const at = startedAt(j);
     const s = statusOf(j.status, j.lost, j.cancel);
-    return { key: `j:${j.id}`, kind: 'job', name: runName(j), at, said: runsWords.jobSaid(s.word, since(at, now)), bad: s.tone === 'bad', path: `/jobs/${encodeURIComponent(j.id)}` };
+    return { key: `j:${j.id}`, kind: 'job', name: runName(j), at, said: runsWords.jobSaid(s.word, since(at, now)), bad: s.tone === 'bad', path: `/jobs/${encodeURIComponent(j.id)}`, outcome: s.word };
   });
 }
 

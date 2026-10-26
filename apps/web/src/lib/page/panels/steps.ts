@@ -40,3 +40,26 @@ export function stepsOf(block: unknown): Step[] {
   });
   return [...out.values()];
 }
+
+/** A key's label as a person says it: "mercury-secret" is "Mercury", its kind of secret left out. */
+function keyNamed(label: string): string {
+  const parts = label.split(/[-_]+/u).filter((w) => w !== '');
+  const kept = parts.filter((w) => !/^(?:secret|token|key|api|apikey|pat)$/iu.test(w));
+  const name = (kept.length > 0 ? kept : parts).join(' ');
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
+ * A STEP IN PLAIN WORDS (the pass of 27 October, UX39), as Up next prints it: a step one run left for him opens with
+ * his name ("Sam: answer 2 questions"), which on his own screen is noise, and names a key as the keychain stores it
+ * ("the sealed mercury-secret key"). The name is dropped and the key said by what it opens ("the Mercury key"). The
+ * step's own words stay what Take hands on and what Drop is keyed by.
+ */
+export function stepSaid(next: string): string {
+  let said = next.trim();
+  const addressed = /^[A-Z][\p{L}'-]{1,30}:\s+(?=\p{Ll})/u.exec(said);
+  if (addressed) said = said.slice(addressed[0].length);
+  said = said.replace(/\b(?:the\s+)?(?:sealed\s+)?([a-z0-9]+(?:[-_][a-z0-9]+)+)\s+key\b/gu, (_m, label: string) => `the ${keyNamed(label)} key`);
+  said = said.replace(/\bthe sealed\s+(\S+)\s+key\b/giu, 'the $1 key');
+  return said.charAt(0).toUpperCase() + said.slice(1);
+}

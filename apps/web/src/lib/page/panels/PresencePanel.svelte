@@ -6,14 +6,14 @@
   writes. Tell aims the composer above (`aim`); a stop, a pause or a resume is an instruction the record applies at once,
   and the other panel is told to read again (`told`).
 
-  ON THE AGENTS PAGE, ONE LINE A RUN (the Agents page of 23 October): what the run is doing in plain words leads the row
-  (`doingSaid`, never "Claude run" or the agent's name twice), then its project as a chip, how long it has run and how
-  it stands (`standsSaid`: working now, or quiet for 40 min). The runs at work come first, then, under Quiet, the
-  ones waiting on him that called inside three hours (`deskSplit`); a run quiet longer is left to Recent runs, so a
-  session open and silent for two days is not at work. THE QUIET ONES ARE A PART OF THEIR OWN SINCE THE AUDIT OF 25
-  OCTOBER (Z6): drawn among the runs at work, three quiet runs sat under "Nobody working right now." Tell, Pause and Stop are behind one More press, which a mouse finds on hover; what each
-  reaches is said in the ask before it is sent. The machines they are on are one quiet line at the foot, and under two
-  or more machines each heads its own runs. With nothing at work the tile says so in one line.
+  ON THE AGENTS PAGE, ONE LINE A RUN (the pass of 27 October, `openNow`): each run is named by its app and where it
+  works ("Claude Code in Encore", "Claude in the Developer folder"), with the last thing it did under it ("Asked you: …",
+  "Wrote 3 changes"), how many changes it wrote and when it was last heard. Only those runs are counted. The ones open
+  with nothing written fold into one line ("2 open, nothing written") that opens onto them; each machine silent over an
+  hour is one quiet row ("Windows PC, 3 Claude sessions on D:\"); a run whose key only reads is never counted and is
+  said once at the foot. Tell, Pause and Stop are behind one More press, which a mouse finds on hover; what each reaches
+  is said in the ask before it is sent. The machines the runs are on are one quiet line at the foot. With nothing open
+  the tile says so in one line.
 
   READ BY ANYONE WHO READS THE RUNS (`level: read`); the presses are drawn for the owner alone, since only a person
   signed in as the owner can instruct.
@@ -31,23 +31,24 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import { listen } from '../listen.svelte.ts';
-  import { machineSaid } from '$lib/record/machine-name.ts';
   import {
     NO_PLACES,
     aim,
-    atWorkOf,
-    byMachine,
+    changesSaid,
     control,
-    doingSaid,
-    deskSplit,
+    heardSaid,
+    idleSaid,
+    isAtWork,
+    lastSaid,
+    looksSaid,
+    openNow,
     presenceOf,
+    quietSaid,
+    runTitle,
     scopedLeads,
-    spanSaid,
     standsSaid,
     told,
-    waitingOf,
     type LiveRun,
-    type Places,
     type Project,
     type Thread,
   } from '$lib/record/instruct.ts';
@@ -69,8 +70,6 @@
   } = $props();
 
   const words = {
-    machine: (name: string | null, among: readonly string[]) => (name ? machineSaid(name, among) : 'A machine not named'),
-    atWork: (n: number) => `${n.toLocaleString('en')} here`,
     menu: (name: string) => `Tell, pause or stop ${name}`,
     tell: 'Tell it something',
     pause: 'Pause',
@@ -78,16 +77,13 @@
     resume: 'Resume',
     open: 'Open its page',
     none: 'No agent has a run open.',
-    working: 'Working now',
     quiet: 'Quiet',
     on: (said: string) => `On ${said}`,
-    idle: (names: string) => `nothing open on ${names}`,
   } as const;
 
   const io = control(apiBase());
   let rows = $state.raw<LiveRun[]>([]);
   let threads = $state.raw<Thread[]>([]);
-  let places = $state.raw<Places>(NO_PLACES);
   let projects = $state.raw<Map<string, Project>>(new Map());
   let pressing = $state.raw<Set<string>>(new Set());
   let read = $state(false);
@@ -100,10 +96,7 @@
   async function load(): Promise<void> {
     const [p, t] = await Promise.all([io.presence(), owner ? io.threads(20, run ?? undefined) : Promise.resolve({ ok: false as const, fix: '' })]);
     if (p.ok) rows = p.value;
-    if (t.ok) {
-      threads = t.value;
-      places = ('places' in t ? t.places : undefined) ?? NO_PLACES;
-    }
+    if (t.ok) threads = t.value;
     /* THE ROWS DRAW ONCE PRESENCE IS READ; their projects' names follow, a read of their own. */
     read = true;
     if (projects.size === 0 || rows.some((r) => r.project !== null && !projects.has(r.project))) projects = await io.projects(rows);
@@ -128,40 +121,42 @@
     return { ...v, href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
   };
 
-  /* THE ONE-LINE ROW: what it is doing, how long it has run, and how it stands. */
-  const lineOf = (r: LiveRun): PresenceView => ({ ...viewOf(r), doing: doingSaid(r), time: `Open ${spanSaid(r.for_s * 1000)}`, stands: standsSaid(r) });
-
-  /* WHO IS AT WORK, AND WHO WAITS ON HIM BUT CALLED LATELY: the rail's count first, never the runs merely open. */
-  const split = $derived(line ? deskSplit(rows) : { working: [], quiet: [] });
-  const desk = $derived([...split.working, ...split.quiet]);
-  const quietRuns = $derived(new Set(split.quiet.map((r) => r.run)));
-  /* A PART IS HEADED WHERE QUIET RUNS ARE DRAWN, so a run open and quiet never reads as one at work. */
-  const headed = $derived(split.quiet.length > 0);
-  /* A MACHINE IS SAID AS A PERSON SAYS IT (`machineSaid`), its own name kept for the hover. */
-  const machineNames = $derived([...new Set(rows.map((r) => r.machine).filter((m): m is string => m !== null))]);
-  const groups = $derived(
-    byMachine(desk).map((g) => ({
-      ...g,
-      said: words.machine(g.machine, machineNames),
-      parts: [
-        { key: 'working', head: words.working, views: g.rows.filter((r) => !quietRuns.has(r.run)).map(lineOf) },
-        { key: 'quiet', head: words.quiet, views: g.rows.filter((r) => quietRuns.has(r.run)).map(lineOf) },
-      ].filter((p) => p.views.length > 0),
-    })),
-  );
-  /* THE MACHINES IN ONE QUIET LINE, where one machine holds them all: "On MacBook Pro, as work". */
-  const foot = $derived.by((): string | null => {
-    if (!line || groups.length > 1) return null;
-    const m = machinesOf(atWorkOf(rows), waitingOf(rows), places);
-    const open = m.lines.filter((l) => !l.quiet || l.said !== 'Nothing open').map((l) => `${l.name}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
-    const idle = m.lines.filter((l) => l.said === 'Nothing open').map((l) => l.name);
-    const parts = [open.length > 0 ? words.on(open.join(' and ')) : null, idle.length > 0 ? words.idle(idle.join(' and ')) : null].filter((x): x is string => x !== null);
-    return parts.length === 0 ? null : `${parts.join('; ')}.`;
+  /* THE ONE-LINE ROW (the pass of 27 October): who and where ("Claude Code in Encore"), the last thing it did under it,
+     how many changes it wrote, and when it was last heard; never "Working now" again on every row. */
+  const projectOf = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
+  const lineOf = (r: LiveRun): PresenceView => ({
+    ...viewOf(r),
+    project: null,
+    name: runTitle(r, projectOf(r)),
+    last: lastSaid(r),
+    doing: null,
+    time: typeof r.wrote === 'number' && r.wrote > 0 ? changesSaid(r.wrote) : '',
+    stands: r.stopped ? standsSaid(r) : heardSaid(r),
   });
-  const views = $derived(line ? [] : scopedLeads(rows, { run, project }).map(viewOf));
-  const drawn = $derived(line ? desk.length : views.length);
 
-  $effect(() => oncount?.(line ? atWorkOf(rows).length : views.length));
+  /* WHO IS OPEN NOW (`openNow`): the runs that did something, then the ones that wrote nothing folded into a line, then
+     each machine silent over an hour as one quiet row; a run whose key only reads is never counted. */
+  const open = $derived(line ? openNow(rows) : { shown: [], idle: [], quiet: [], looks: [] });
+  const shownViews = $derived(open.shown.map(lineOf));
+  const idleViews = $derived(open.idle.map(lineOf));
+  /* THE MACHINES THE RUNS DRAWN ARE ON, in one quiet line: "On MacBook Pro, as work". */
+  const foot = $derived.by((): string | null => {
+    if (!line) return null;
+    const drawnRuns = [...open.shown, ...open.idle];
+    const m = machinesOf(drawnRuns.filter(isAtWork), drawnRuns.filter((r) => !isAtWork(r)), NO_PLACES);
+    const on = m.lines.map((l) => `${l.name}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
+    return on.length === 0 ? null : `${words.on(on.join(' and '))}.`;
+  });
+  const quietRows = $derived(
+    open.quiet.map((q) => {
+      const said = quietSaid(q);
+      return { key: q.machine ?? '', name: q.said, title: q.machine !== null && q.machine !== q.said ? q.machine : undefined, runs: q.runs.length, what: said.what, said: said.said };
+    }),
+  );
+  const views = $derived(line ? [] : scopedLeads(rows, { run, project }).map(viewOf));
+  const drawn = $derived(line ? open.shown.length + open.idle.length + open.quiet.length : views.length);
+
+  $effect(() => oncount?.(line ? open.shown.length : views.length));
 
   async function hold(run: string, kind: 'stop' | 'pause' | 'resume', why: string): Promise<void> {
     pressing = new Set([...pressing, run]);
@@ -212,18 +207,31 @@
     <p class="at-work-none">{words.none}</p>
   {:else}
     <div class="at-work">
-      {#each groups as g (g.machine ?? '')}
-        <section class="machine" aria-label={g.said}>
-          {#if groups.length > 1}
-            <h3 class="machine-head"><Icon name="monitor" size="s" /><span class="machine-name" title={g.machine ?? undefined}>{g.said}</span><span class="machine-n num">{words.atWork(g.rows.length)}</span></h3>
-          {/if}
-          {#each g.parts as p (p.key)}
-            {#if headed}<svelte:element this={groups.length > 1 ? 'h4' : 'h3'} class="part-head" data-part={p.key}>{p.head}<span class="machine-n num">{p.views.length.toLocaleString('en')}</span></svelte:element>{/if}
-            {@render list(`${g.machine ?? ''}:${p.key}`, p.views)}
+      {#if shownViews.length > 0}{@render list('shown', shownViews)}{/if}
+      {#if idleViews.length > 0}
+        <!-- OPEN AND NOTHING WRITTEN, ONE LINE: the runs are a press away, each with its presses. -->
+        <details class="fold">
+          <summary class="fold-head">{idleSaid(idleViews.length)}</summary>
+          {@render list('idle', idleViews)}
+        </details>
+      {/if}
+      {#if quietRows.length > 0}
+        <h3 class="part-head">{words.quiet}<span class="machine-n num">{quietRows.reduce((n, q) => n + q.runs, 0).toLocaleString('en')}</span></h3>
+        <ul class="quiet">
+          {#each quietRows as q (q.key)}
+            <li class="quiet-row">
+              <span class="quiet-face" aria-hidden="true"><Icon name="monitor" size="s" /></span>
+              <span class="quiet-body">
+                <span class="quiet-head"><b class="quiet-name" title={q.title}>{q.name}</b> <span class="quiet-what">{q.what}</span></span>
+                <span class="quiet-said">{q.said}</span>
+              </span>
+            </li>
           {/each}
-        </section>
-      {/each}
-      {#if foot}<p class="at-work-foot">{foot}</p>{/if}
+        </ul>
+      {/if}
+      {#if foot || open.looks.length > 0}
+        <p class="at-work-foot">{[foot, open.looks.length > 0 ? looksSaid(open.looks.length) : null].filter((x) => x !== null).join(' ')}</p>
+      {/if}
     </div>
   {/if}
   {#if menuView && menuRun}
@@ -261,50 +269,96 @@
     container-type: inline-size;
   }
 
-  .machine {
-    display: grid;
-    min-inline-size: 0;
-  }
-
-  /* A MACHINE'S NAME OVER ITS RUNS, quiet: the meta size in the second ink, how many at its end. */
-  .machine-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0 0 var(--sp-1);
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
-    line-height: 18px;
-  }
-
-  /* WORKING NOW AND QUIET, each over its runs, quieter than a machine's name. */
+  /* QUIET, over the machines silent for an hour: the meta size in the third ink, how many runs at its end. */
   .part-head {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    margin: var(--sp-2) 0 0;
+    margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 18px;
-  }
-
-  .part-head:first-of-type {
-    margin-block-start: 0;
-  }
-
-  .machine-name {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .machine-n {
     margin-inline-start: auto;
     color: var(--ink-3);
     font-weight: var(--fw-regular, 400);
+  }
+
+  /* OPEN AND NOTHING WRITTEN: one quiet line that opens onto the runs. */
+  .fold {
+    min-inline-size: 0;
+  }
+
+  .fold-head {
+    display: flex;
+    align-items: center;
+    min-block-size: 32px;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    cursor: pointer;
+  }
+
+  .fold-head:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* ONE ROW A QUIET MACHINE: its glyph, its name and what is open on it, and what they did and how long it is silent. */
+  .quiet {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .quiet-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: start;
+    gap: 0 var(--sp-3);
+    padding-block: var(--sp-1);
+  }
+
+  .quiet-row + .quiet-row {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .quiet-face {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    color: var(--ink-3);
+  }
+
+  .quiet-body {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .quiet-head {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .quiet-name {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .quiet-said {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .at-work-none,

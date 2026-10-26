@@ -7,7 +7,8 @@ import { test } from 'node:test';
 
 import type { Working } from '../record/boot-live.ts';
 import type { LiveRun, Thread } from '../record/instruct.ts';
-import { LIVE_WORDS, forSaid, liveRows, workingRows } from './desk.ts';
+import { LIVE_WORDS, forSaid, workingRows } from './desk.ts';
+import { liveFolds, liveRows } from './desk-live.ts';
 
 const NOW = Date.parse('2026-10-19T10:00:00Z');
 const run = (over: Partial<Working> = {}): Working => ({
@@ -80,30 +81,35 @@ const presence = (over: Partial<LiveRun> = {}): LiveRun => ({
 
 const thread = (id: string, said: string) => ({ id, said }) as unknown as Thread;
 
-test('presence speaks over boot’s rows: what it is doing, for how long, and what he told it that it holds', () => {
+test('presence speaks over boot’s rows: the app, where, the last thing it did, when heard, and what it holds', () => {
   const drawn = workingRows([run()], new Map([['Larkspur', 210]]), NOW);
-  const [r] = liveRows(drawn, [presence({ instruction: 'IN4' })], [thread('IN4', 'Merge wave 1,\n then stop')], NOW);
+  const [r] = liveRows(drawn, [presence({ instruction: 'IN4', app: 'Claude Code', wrote: 3 })], [thread('IN4', 'Merge wave 1,\n then stop')]);
   assert.equal(r?.run, 'S82');
-  assert.equal(r?.agent, 'Claude');
+  assert.equal(r?.agent, 'Claude Code');
   assert.equal(r?.project, 'Larkspur', 'the project by the name and colour Today draws its card in');
   assert.equal(r?.slot, 'sky');
   assert.equal(r?.doing, 'Merging wave 1');
-  assert.equal(r?.began, 'for 10 min');
+  assert.equal(r?.began, 'heard just now');
   assert.equal(r?.holds, 'Merge wave 1, then stop');
   assert.equal(r?.word, null);
 });
 
+test('a run is named by where it opened, says what it asked or wrote, and the runs left out are lines', () => {
+  const asks = presence({ run: 'S1', project: null, doing: 'Claude Code run', app: 'Claude Code', cwd: '/Users/teo/Developer', wrote: 1, asked: 'Mark Wave 0 done?' });
+  const idle = presence({ run: 'S2', project: null, doing: 'Claude run', cwd: '/Users/teo/Developer', wrote: 0 });
+  const pc = presence({ run: 'S3', project: null, doing: 'Claude run', machine: 'Sam', cwd: 'D:\\work', wrote: 0, state: 'waiting', heard_s: 9 * 3600, quiet_s: 9 * 3600 });
+  const look = presence({ run: 'S4', project: null, doing: 'Claude run', wrote: 0, looks: true });
+  const rows = liveRows(workingRows([], new Map(), NOW), [asks, idle, pc, look], []);
+  assert.deepEqual(rows.map((x) => [x.agent, x.project, x.doing]), [['Claude Code', 'the Developer folder', 'Asked you: “Mark Wave 0 done?”']]);
+  assert.deepEqual(liveFolds([asks, idle, pc, look]), ['1 open, nothing written', 'Windows PC: 1 Claude session in the work folder, quiet', 'Not counted: one read-only look.']);
+});
+
 test('a paused or stopped run says so in the time’s place, a helper is no row, and a run gone is gone', () => {
   const drawn = workingRows([run()], new Map(), NOW);
-  const rows = liveRows(
-    drawn,
-    [presence({ stopped: 'pause' }), presence({ run: 'S83', parent: 'S82' }), presence({ run: 'S84', state: 'gone' }), presence({ run: 'S85', state: 'waiting' })],
-    [],
-    NOW,
-  );
-  assert.deepEqual(rows.map((x) => x.run), ['S82'], 'a waiting run boot does not count is not working');
+  const rows = liveRows(drawn, [presence({ stopped: 'pause' }), presence({ run: 'S83', parent: 'S82' }), presence({ run: 'S84', state: 'gone' })], []);
+  assert.deepEqual(rows.map((x) => x.run), ['S82']);
   assert.equal(rows[0]?.word, LIVE_WORDS.pause);
   assert.equal(rows[0]?.held, 'pause');
   assert.equal(rows[0]?.live, 'quiet');
-  assert.equal(liveRows(drawn, [presence({ state: 'waiting' })], [], NOW)[0]?.word, LIVE_WORDS.waiting, 'one boot counts says it waits');
+  assert.equal(liveRows(drawn, [presence({ state: 'waiting' })], [])[0]?.word, 'heard just now', 'a run waiting on him says when it was heard');
 });

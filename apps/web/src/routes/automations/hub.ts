@@ -647,13 +647,18 @@ export type RunLine = {
   agent?: string;
   /** An agent run's project by its handle (`things#21`), which the Agents page says by name. */
   project?: string;
-  /** How an agent run ended or stands, without when: "finished", "left a step". */
+  /** How it ended or stands, without when: "Ran", "Refused", "Finished", "Left a step". The row says when beside it. */
   outcome?: string;
+  /** How many times a line standing for a count ran, said once beside the outcome rather than inside a sentence. */
+  times?: number;
   /** Whether the agent run is at work now, which the Agents page lists under At work and not again. */
   live?: boolean;
 };
 
 const BAD = new Set(['failed', 'refused']);
+
+/** How a run ended, in one word and without when, for a row that says when beside it: "Ran", "Refused", "Held". */
+const outcomeOf = (state: string): string => ((Object.hasOwn(hubWords.ended, state) ? hubWords.ended[state] : undefined) ?? hubWords.ended.done!)('').split(' ')[0]!.replace(/[.,]$/u, '');
 
 /** A run's ending and its own sentence after it, when it said one. */
 function saidOf(outcome: string, at: string, say: string | null, now: number): string {
@@ -685,26 +690,26 @@ export function runLines(
     const own = runs.get(a.id);
     if (own && own.length > 0) {
       for (const r of own) {
-        out.push({ key: `a:${r.id}`, kind: 'automation', name: a.name, at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now), bad: BAD.has(r.state), path });
+        out.push({ key: `a:${r.id}`, kind: 'automation', name: a.name, at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now), bad: BAD.has(r.state), path, outcome: outcomeOf(r.state) });
       }
     } else if (a.last) {
-      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: a.name, at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now), bad: BAD.has(a.last.state), path });
+      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: a.name, at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now), bad: BAD.has(a.last.state), path, outcome: outcomeOf(a.last.state) });
     } else {
       /* A RULE THE RECORD COUNTS AND KEEPS NO RUN OF STILL RAN (agents F2): "Ran 17 times, last on 3 Sep" on its row
          beside "Nothing has run yet" here was two answers to one question. Its last firing is its line, with the count. */
       const c = a as Counted;
       if (typeof c.fired === 'number' && c.fired > 0 && typeof c.last_at === 'string' && Number.isFinite(Date.parse(c.last_at)))
-        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: a.name, at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path, counted: true });
+        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: a.name, at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path, counted: true, outcome: outcomeOf('done'), times: c.fired });
     }
   }
   for (const s of actions) {
     if (!s.last) continue;
-    out.push({ key: `s:${s.ingest}`, kind: 'scheduled', name: humanize(s.ingest), at: s.last.at, said: saidOf(s.last.outcome, s.last.at, s.last.note || null, now), bad: BAD.has(s.last.outcome), path: null });
+    out.push({ key: `s:${s.ingest}`, kind: 'scheduled', name: humanize(s.ingest), at: s.last.at, said: saidOf(s.last.outcome, s.last.at, s.last.note || null, now), bad: BAD.has(s.last.outcome), path: null, outcome: outcomeOf(s.last.outcome) });
   }
   for (const s of scripts) {
     const path = `/scripts/${encodeURIComponent(s.script)}`;
     for (const r of s.recent) {
-      out.push({ key: `c:${r.id}`, kind: 'script', name: s.title, at: r.at, said: saidOf(r.outcome, r.at, r.say || null, now), bad: BAD.has(r.outcome), path });
+      out.push({ key: `c:${r.id}`, kind: 'script', name: s.title, at: r.at, said: saidOf(r.outcome, r.at, r.say || null, now), bad: BAD.has(r.outcome), path, outcome: outcomeOf(r.outcome) });
     }
   }
   return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));

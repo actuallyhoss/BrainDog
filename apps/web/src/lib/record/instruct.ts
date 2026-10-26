@@ -59,6 +59,15 @@ export type LiveRun = {
   reach: 'hooks' | 'next_call';
   /** Its key proves the app it says it is (H19); absent from a host older than 24 October. */
   verified?: boolean;
+  /**
+   * The app its client says it is ("Claude Code"), the folder it opened in, how many writes it made, the question it
+   * asked that still waits, and whether its key only reads; each absent from a host older than 27 October.
+   */
+  app?: string | null;
+  cwd?: string | null;
+  wrote?: number | null;
+  asked?: string | null;
+  looks?: boolean;
 };
 
 export type SeenHow = 'start' | 'prompt' | 'tool' | 'channel' | 'job' | 'asked';
@@ -248,30 +257,6 @@ export function waitingOf(rows: readonly LiveRun[]): LiveRun[] {
   return rows.filter((r) => r.state === 'waiting' && (r.parent === null || !open.has(r.parent)));
 }
 
-/** A run waiting on him this long is no longer at work in any sense: the Agents page lists it under Recent runs instead. */
-export const QUIET_DROP_S = 3 * 3600;
-
-/**
- * THE RUNS THE AGENTS PAGE LISTS UNDER At work: the ones at work, then the ones waiting on him that called inside the
- * last three hours (`QUIET_DROP_S`), each a lead run. A run quiet longer, or one whose quiet the host does not say, is
- * left to Recent runs, so a session open and silent for two days is not "at work".
- */
-export function onDeskOf(rows: readonly LiveRun[]): LiveRun[] {
-  const waiting = waitingOf(rows).filter((r) => typeof r.quiet_s === 'number' && r.quiet_s <= QUIET_DROP_S);
-  return [...atWorkOf(rows), ...waiting];
-}
-
-/**
- * THE SAME RUNS IN TWO PARTS, as the Agents page draws them (the audit of 25 October, Z6): the ones working now, which
- * the page's line counts, and the ones open and quiet. Three quiet runs drawn as one list under At work read as three
- * at work beside "Nobody working right now."
- */
-export function deskSplit(rows: readonly LiveRun[]): { working: LiveRun[]; quiet: LiveRun[] } {
-  const working = atWorkOf(rows);
-  const at = new Set(working.map((r) => r.run));
-  return { working, quiet: onDeskOf(rows).filter((r) => !at.has(r.run)) };
-}
-
 const escaped = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
 /**
@@ -308,6 +293,131 @@ export function byMachine(rows: readonly LiveRun[]): { machine: string | null; r
     .map(([machine, rs]) => ({ machine, rows: rs }))
     .sort((a, b) => b.rows.length - a.rows.length || (a.machine ?? '\uffff').localeCompare(b.machine ?? '\uffff'));
 }
+
+/* ── who is open now, said as a person reads it ─────────────────────────── */
+
+/** A run silent this long is quiet: no longer at work in any sense, and folded with the others on its machine. */
+export const SILENT_S = 3600;
+
+/** Whether a folder is a Windows one: a drive letter, or a backslash where a path would put a slash. */
+export const isWindowsPath = (cwd: string | null | undefined): boolean => typeof cwd === 'string' && (/^[A-Za-z]:(?:[\\/]|$)/u.test(cwd) || cwd.includes('\\'));
+
+/**
+ * THE FOLDER A RUN OPENED IN, AS A PERSON SAYS IT: its last part ("the Developer folder"), or the drive on a Windows root
+ * ("D:\"). `null` with no folder.
+ */
+export function folderSaid(cwd: string | null | undefined): string | null {
+  const parts = (cwd ?? '')
+    .trim()
+    .split(/[\\/]+/u)
+    .filter((p) => p !== '');
+  const last = parts.at(-1);
+  if (last === undefined) return null;
+  if (/^[A-Za-z]:$/u.test(last)) return `${last}\\`;
+  return `the ${last} folder`;
+}
+
+/** The app a run is ("Claude Code"), else its agent's name ("Claude"), else "An agent". */
+export const appSaid = (r: Pick<LiveRun, 'app' | 'agent'>): string => r.app?.trim() || agentNamed(r.agent) || controlWords.aRun;
+
+/**
+ * A RUN BY NAME: its app and where it works, the project's name where it has one, else its repository, else the folder
+ * it opened in. "Claude Code in Encore", "Claude in the Developer folder". Never "Claude run".
+ */
+export function runTitle(r: Pick<LiveRun, 'app' | 'agent' | 'repo' | 'cwd'>, project: string | null): string {
+  const who = appSaid(r);
+  const where = project ?? r.repo ?? folderSaid(r.cwd);
+  return where ? `${who} in ${where}` : who;
+}
+
+/** Words cut to a line: the first eighty characters, at a word, with an ellipsis where it was cut. */
+function cutSaid(said: string, most = 80): string {
+  const one = said.replace(/\s+/gu, ' ').trim();
+  if (one.length <= most) return one;
+  const cut = one.slice(0, most);
+  const at = cut.lastIndexOf(' ');
+  return `${(at > most / 2 ? cut.slice(0, at) : cut).replace(/[\s,;:.]+$/u, '')}…`;
+}
+
+/** How many changes, as a count: "1 change", "3 changes". */
+export const changesSaid = (n: number): string => plural(n, 'change');
+
+/**
+ * THE LAST THING A RUN DID, in a few words: the question it asked that waits on him, else what it says it is doing,
+ * else how many changes it wrote, else that it has written nothing yet.
+ */
+export function lastSaid(r: Pick<LiveRun, 'asked' | 'wrote' | 'doing' | 'agent' | 'name'>): string {
+  if (r.asked?.trim()) return `Asked you: “${cutSaid(r.asked)}”`;
+  const doing = doingSaid({ ...r, repo: null, branch: null });
+  if (doing !== controlWords.saidNothing) return doing;
+  if (typeof r.wrote === 'number' && r.wrote > 0) return `Wrote ${changesSaid(r.wrote)}`;
+  return 'Nothing written yet';
+}
+
+/** When a run was last heard from: "heard just now", "heard 3 min ago". */
+export const heardSaid = (r: Pick<LiveRun, 'heard_s'>): string => `heard ${agoSaid(r.heard_s)}`;
+
+/** How long a run has been silent: the time since its last call, or since it was last heard where that is longer. */
+const silenceOf = (r: Pick<LiveRun, 'quiet_s' | 'heard_s'>): number => Math.max(r.heard_s, typeof r.quiet_s === 'number' ? r.quiet_s : 0);
+
+/** Whether a run is quiet: nothing heard for an hour, or, while it is not at work, no call for an hour. */
+export const isSilent = (r: LiveRun): boolean => r.heard_s > SILENT_S || (!isAtWork(r) && silenceOf(r) > SILENT_S);
+
+/** Whether a run has written nothing, asked nothing and said nothing of what it does. A host that does not count says it wrote. */
+export const wroteNothing = (r: LiveRun): boolean => r.wrote === 0 && !r.asked?.trim() && doingSaid({ ...r, repo: null, branch: null }) === controlWords.saidNothing;
+
+/** The runs silent over an hour on one machine, one row: its name as a person says it, and the runs. */
+export type QuietMachine = { machine: string | null; said: string; runs: LiveRun[] };
+
+/**
+ * WHO IS OPEN NOW, IN FOUR PARTS (the pass of 27 October), each lead run in exactly one:
+ *
+ *   - `shown`: the runs that wrote, asked or said what they do, heard inside the hour, the ones at work first. These are
+ *     what "Working now" and "Open now" count.
+ *   - `idle`: open, heard lately, and nothing written, folded into one line ("2 open, nothing written").
+ *   - `quiet`: silent over an hour, one row a machine ("Windows PC: 3 Claude sessions on D:\, silent for 9 h").
+ *   - `looks`: runs whose key only reads, which can write nothing and are never counted.
+ */
+export function openNow(rows: readonly LiveRun[]): { shown: LiveRun[]; idle: LiveRun[]; quiet: QuietMachine[]; looks: LiveRun[] } {
+  const leads = leadsOf(rows);
+  const looks = leads.filter((r) => r.looks === true);
+  const left = leads.filter((r) => r.looks !== true);
+  const heard = left.filter((r) => !isSilent(r));
+  const idle = heard.filter(wroteNothing);
+  const shown = heard.filter((r) => !wroteNothing(r)).sort((a, b) => Number(isAtWork(b)) - Number(isAtWork(a)) || a.heard_s - b.heard_s);
+  const hosts = [...new Set(rows.map((r) => r.machine).filter((m): m is string => m !== null))];
+  const quiet = byMachine(left.filter(isSilent)).map((g) => ({ machine: g.machine, said: machineNamed(g.machine, rows, hosts), runs: g.rows }));
+  return { shown, idle, quiet, looks };
+}
+
+const KIND_SAID = /\b(?:Windows|Mac|MacBook|iMac|Linux|Ubuntu|Debian|Fedora|Arch|NixOS|Mint|Pop!_OS|Raspberry)\b/u;
+
+/**
+ * A MACHINE AS A PERSON SAYS IT, from its name and the folders its runs opened in: a host named after its owner ("Sam")
+ * whose runs open on D:\ is the Windows PC, not "Sam", which `machineSaid` reads from the name alone.
+ */
+export function machineNamed(host: string | null, rows: readonly Pick<LiveRun, 'machine' | 'cwd'>[], among: readonly string[] = []): string {
+  if (host === null) return 'A machine not named';
+  const said = machineSaid(host, among);
+  if (KIND_SAID.test(said) || !rows.some((r) => r.machine === host && isWindowsPath(r.cwd))) return said;
+  const twin = among.some((o) => o !== host && !KIND_SAID.test(machineSaid(o, among)) && rows.some((r) => r.machine === o && isWindowsPath(r.cwd)));
+  return twin ? `${said}'s Windows PC` : 'Windows PC';
+}
+
+/** A quiet machine's two lines: "3 Claude sessions on D:\" and "Nothing written · silent for 9 h". */
+export function quietSaid(q: QuietMachine): { what: string; said: string } {
+  const apps = [...new Set(q.runs.map((r) => appSaid(r)))];
+  const folders = [...new Set(q.runs.map((r) => folderSaid(r.cwd)).filter((f): f is string => f !== null))];
+  const where = folders.length === 1 ? (/^[A-Za-z]:\\$/u.test(folders[0]!) ? ` on ${folders[0]!}` : ` in ${folders[0]!}`) : '';
+  const what = `${plural(q.runs.length, `${apps.length === 1 ? apps[0]! : 'agent'} session`)}${where}`;
+  const wrote = q.runs.reduce((n, r) => n + (typeof r.wrote === 'number' ? r.wrote : 0), 0);
+  const did = q.runs.some((r) => !!r.asked?.trim()) ? 'Asked you something' : wrote > 0 ? `Wrote ${changesSaid(wrote)}` : 'Nothing written';
+  return { what, said: `${did} · silent for ${spanSaid(Math.min(...q.runs.map(silenceOf)) * 1000)}` };
+}
+
+/** The lines for the runs left out of the count: "2 open, nothing written", "Not counted: one read-only look." */
+export const idleSaid = (n: number): string => `${n.toLocaleString('en')} open, nothing written`;
+export const looksSaid = (n: number): string => `Not counted: ${n === 1 ? 'one read-only look' : `${n.toLocaleString('en')} read-only looks`}.`;
 
 /** A list of names as a person says it: "Codex", "Codex and Cursor", "Codex, Cursor and Gemini". */
 const andList = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
