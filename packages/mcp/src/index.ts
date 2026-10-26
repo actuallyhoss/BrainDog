@@ -633,11 +633,13 @@ export const TOOLS: readonly Tool[] = [
            `record/test/change-drawn.test.ts` holds `from_version` to being said.
            AND IT IS SHORTER BY A THIRD, TO PAY FOR THE TITLES. A rowset's `register` was taught and the tool reads it
            off every row's `at` (`rowset` below), an option's three keys were a sentence where a shape says them, and
-           `braindog:arrangement` is named by `braindog:grammar/proposals` itself. */
+           `braindog:arrangement` is named by `braindog:grammar/proposals` itself.
+           AN OPTION'S `patches` ARE SAID, since an option that says a change and carries none is refused (`govern.ts`
+           `unwritten`): an agent never told of them asked "Close all six" in words, and the pick closed nothing. */
         body: {
           type: 'object',
           description:
-            'options: {"options":[{id,label,because}]}, two or more. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or a whole declaration with its from_version. Others, automations too: braindog:grammar/proposals.',
+            'options: {"options":[{id,label,because,patches}]}, two or more; patches are rowset rows, on an option that changes them. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or a whole declaration with its from_version. Others, automations too: braindog:grammar/proposals.',
         },
         cause: str('A short key, so it is asked once.'),
         again: str('What changed since they answered.'),
