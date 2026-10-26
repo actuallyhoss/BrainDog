@@ -252,6 +252,7 @@ const LINE_LEG = (({ on, every, ends, days, weekend }) => ({ on, every, ends, da
  * says so in the payment's note, where it has none, and in the run. Payments already in the record are not matched:
  * REC-B11 step 7 is not built. "IT WENT THROUGH" IS `settle` TOLD (`told`), a person's answer: "Next" moves one cycle
  * on and nothing else, and not at all on a line no longer past its day, which its payment moved since it was asked.
+ * `settle` IS BOUND BY NAME: the Worker's bundle renamed it (`settle3`), and the body below, text, called `settle`.
  */
 export const SETTLE_LINE_SCRIPT = {
   script: 'settle_matched_line',
@@ -263,7 +264,7 @@ export const SETTLE_LINE_SCRIPT = {
   reads: ['obligations', 'installments', 'recurring', 'transactions'],
   writes: ['recurring', 'transactions'],
   source: `${matchPayment.toString()}
-${settle.toString()}
+const settle = ${settle.toString()};
 const find = ${matchRun.toString()};
 const LEG = ${JSON.stringify(LINE_LEG)};
 export default async function run(ctx) {

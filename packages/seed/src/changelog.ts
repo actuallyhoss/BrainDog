@@ -173,6 +173,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.25.0',
+      notes: 'A payment that paid a repeating line moves the line on to its next day again, where the step stopped with an error.',
+    },
+    {
       version: '3.24.0',
       notes: 'Accounts lists every account the first line counts, where it stopped at six and the line said seven.',
     },

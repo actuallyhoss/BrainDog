@@ -741,6 +741,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   3.22.0 is on production. Words only, no id added or taken away, so a minor step.
  * - money-core 3.24.0 (the look of 26 October, R4): the Accounts split's limit is twelve, where six cut a seventh account off
  *   a tile beside a line that said "7 accounts". 3.23.0 is master's. One number changed, no id added or taken away, so a minor step.
+ * - money-core 3.25.0: `script.settle_matched_line` binds `settle` by name in its own text, where the Worker's bundle had
+ *   renamed the function it took and every run that found its repeating line threw "settle is not defined". 3.24.0 is
+ *   master's. One script's text changed, no id added or taken away, so a minor step.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and
@@ -757,7 +760,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.29.0',
   people: '3.8.0',
-  'money-core': '3.24.0',
+  'money-core': '3.25.0',
   estate: '2.5.0',
   work: '1.19.0',
 };
