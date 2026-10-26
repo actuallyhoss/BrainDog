@@ -7520,6 +7520,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }
       return structuredClone(got);
     },
+    /* WITH NO CURRENCY TO ADD UP IN, so each currency is its own amount: the reader's own rows, as `read` reads them. */
+    readApart: (decl) => evaluateMetric(sql, decl, { ...here, fx: () => ({ home: null, rates: [] }) }),
     list: (q) => {
       /* AND THE ORDER GOES THROUGH. It was dropped here, silently, which is the one place a
          forwarded query can be wrong without anybody seeing it: the block asked, `list` could
@@ -9943,6 +9945,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           }
           return structuredClone(got);
         },
+        readApart: (decl) => evaluateMetric(sql, decl, { ...ctx, fx: () => ({ home: null, rates: [] }) }),
         /* THE RECORD'S OWN SIGNS ARE READ OVER THE BUILT-IN ONES THE FIGURES READ, never a second read of them. */
         ...(signs ? { signs: () => structuredClone((every ??= everySign(structuredClone(ctx.signs!() as VitalSign[])))) } : {}),
         /* AND THE LOG A FEED IS DRAWN FROM, by how many lines it asks: every feed asks the same, and every look its seen. */

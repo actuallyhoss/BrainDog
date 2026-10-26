@@ -307,7 +307,16 @@ export type Halves = { of: number | null; per: number | null; perRows: number };
  * `stale` WHEN THAT OLDEST RATE IS OLDER THAN `RATE_STALE_DAYS`. A rate with no maximum age was the expensive kind
  * of silence: a poll that quietly stopped went on converting at the old rate and the figure never changed tone.
  */
-export type FxRead = { into: string | null; home: string | null; asOf: string | null; forward: boolean; stale: boolean; missing: string[] };
+export type FxRead = {
+  into: string | null;
+  home: string | null;
+  asOf: string | null;
+  forward: boolean;
+  stale: boolean;
+  missing: string[];
+  /** The rates of `asOf` the figure was converted with, one a currency, so a page can say "$1 = EGP 50.50" beside it. */
+  pairs?: { from: string; rate: number }[];
+};
 
 /** Named factor tables: a table's name, then each `by` value's factor. */
 export type Lookups = Record<string, Record<string, number>>;
@@ -974,7 +983,7 @@ export type AcrossSaid = Pick<Reading, 'value' | 'unit' | 'parts' | 'fx' | 'atLe
  */
 export function acrossSaid(said: Added, amounts: readonly Amount[], into: string | null, home: string | null, whole = true): AcrossSaid {
   if (said.kind === 'one') return { value: said.amount, unit: said.currency };
-  const dated = said.kind === 'parts' ? null : { into, home, asOf: said.asOf || null, forward: said.forward, stale: said.stale };
+  const dated = said.kind === 'parts' ? null : { into, home, asOf: said.asOf || null, forward: said.forward, stale: said.stale, ...(said.pairs ? { pairs: said.pairs } : {}) };
   if (said.kind === 'converted') return { value: said.amount, unit: said.currency, fx: { ...dated!, asOf: said.asOf, missing: [] } };
   if (isAtLeast(said)) {
     const left = said.left.filter((p) => p.amount !== 0);

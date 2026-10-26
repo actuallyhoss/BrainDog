@@ -751,8 +751,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `metric.out-ahead-by-month`), where bills due once and what repeats at its monthly share left every part of a plan
  *   out of the month it falls due, and Cash ahead opens on twelve weeks, where ten stopped short of the largest part.
  *   Lasts is one figure, the days it lasts with nothing coming in, with a sentence of the day that ends on and what falls
- *   due then, where "Lasts past" a year away stood beside it unexplained. 3.26.0 is master's. Two figures added and
- *   nothing taken away, so a minor step.
+ *   due then, where "Lasts past" a year away stood beside it unexplained. The first line says Cash now in each currency
+ *   apart and about what that comes to at the rate's day, where dollars were blended in at a month-old rate unsaid, and
+ *   counts the accounts the Accounts tile lists. 3.26.0 is master's. Two figures added and nothing taken away, so a
+ *   minor step.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and

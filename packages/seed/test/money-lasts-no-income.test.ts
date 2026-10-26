@@ -123,7 +123,7 @@ test('MONEY\'S LASTS TILE SAYS IT, and the one line drawn says what there is and
   /* AND THE PART THAT IS LATE AFTER IT, since money-core 3.18.0, a sentence the app leaves out while none is. */
   assert.equal(
     leads[0]!.body,
-    'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.',
+    "Cash is {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.",
   );
   assert.equal(leads[0]!.values?.['lasts-no-income'], undefined, 'the line says it again');
   /* ONE FIGURE SINCE money-core 3.27.0, with the day it ends on in the sentence under it: the line says it lasts the year

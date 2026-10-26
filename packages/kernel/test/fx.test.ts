@@ -63,6 +63,8 @@ test('ACROSS: one currency is one amount, every rate converts, and with nothing 
     asOf: '2026-09-01',
     forward: false,
     stale: true,
+    /* AND THE RATES OF THAT OLDEST DAY, one a currency, so a page can say "$1 = EGP 48" beside the figure. */
+    pairs: [{ from: 'USD', rate: 48 }],
   });
   /* ONE MISSING RATE AND NOTHING ADDED UP IN: no amount is in dollars and none reaches them, so there is no total to
      be at least anything, and the answer is one amount a currency with the pair named. */
@@ -95,6 +97,7 @@ test('A SUM WITH ONE RATE MISSING CONVERTS WHAT IT CAN AND LISTS THE REST, and i
     asOf: '2026-09-01',
     forward: false,
     stale: true,
+    pairs: [{ from: 'USD', rate: 48 }],
     left: [{ currency: 'AED', amount: 120_000 }],
     missing: ['AED'],
   });
@@ -109,6 +112,7 @@ test('A SUM WITH ONE RATE MISSING CONVERTS WHAT IT CAN AND LISTS THE REST, and i
     asOf: '2026-09-01',
     forward: true,
     stale: false,
+    pairs: [{ from: 'USD', rate: 48 }],
     left: [{ currency: 'AED', amount: 120_000 }, { currency: 'GBP', amount: 100 }],
     missing: ['AED', 'GBP'],
   });
@@ -152,7 +156,7 @@ test('A SUM WITH ONE RATE MISSING CONVERTS WHAT IT CAN AND LISTS THE REST, and i
 
   /* NOTHING MISSING IS CONVERTED, exactly as before. */
   const whole = across(amounts.slice(0, 2), 'EGP', RATES, '2026-09-17');
-  assert.deepEqual(whole, { kind: 'converted', currency: 'EGP', amount: 5_000_000 + 16_320_000, asOf: '2026-09-01', forward: false, stale: true });
+  assert.deepEqual(whole, { kind: 'converted', currency: 'EGP', amount: 5_000_000 + 16_320_000, asOf: '2026-09-01', forward: false, stale: true, pairs: [{ from: 'USD', rate: 48 }] });
   assert.equal(isAtLeast(whole), false);
 });
 
@@ -285,7 +289,7 @@ test('A FOUNDER’S CASH IN EGP AND USD: parts with no home currency, parts nami
   assert.equal(converted.value, 5_200_000 + 16_320_000 + 502_500);
   assert.equal(converted.unit, 'EGP');
   assert.equal(converted.parts, undefined);
-  assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-01', forward: false, stale: true, missing: [] });
+  assert.deepEqual(converted.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-01', forward: false, stale: true, pairs: [{ from: 'USD', rate: 48 }], missing: [] });
   assert.equal(converted.met, null, 'the target is in sterling, the figure it declares, so a figure in pounds has no verdict');
 
   /* THE OTHER WAY ROUND, the same rows read in dollars through the inverse. */
@@ -410,7 +414,7 @@ test('AN AVERAGE, A LEAST AND A MOST ACROSS CURRENCIES are each currency’s own
   assert.equal(avg.value, (5_200_000 + 16_320_000 + 502_500) / 3);
   assert.equal(avg.unit, 'EGP');
   assert.equal(avg.parts, undefined);
-  assert.deepEqual(avg.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-01', forward: false, stale: true, missing: [] });
+  assert.deepEqual(avg.fx, { into: 'EGP', home: 'EGP', asOf: '2026-09-01', forward: false, stale: true, pairs: [{ from: 'USD', rate: 48 }], missing: [] });
   assert.equal(of({ min: 'balance' }).value, 502_500);
   assert.equal(of({ max: 'balance' }).value, 16_320_000);
   sql.close();
@@ -621,6 +625,8 @@ test('A FIGURE IS AS STALE AS THE OLDEST RATE UNDER IT, and it says so rather th
      dollar half really is as of today, and saying so about the figure was false about the pound. */
   assert.deepEqual(across(amounts, 'GBP', stale, '2026-09-20'), {
     kind: 'converted', currency: 'GBP', amount: 87_900, asOf: '2026-07-14', forward: false, stale: true,
+    /* THE OLDEST DAY'S RATE ALONE: the dollar's is today's and says nothing of how old the figure is. */
+    pairs: [{ from: 'EGP', rate: 0.016 }],
   });
 
   /* A WEEK IS NOT STALE AND EIGHT DAYS IS. The boundary is asserted from both sides, because a

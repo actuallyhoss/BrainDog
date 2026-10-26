@@ -738,7 +738,18 @@ test('A HOME CURRENCY THE ROWS DO NOT HOLD IS STILL THE ONE THEY ARE ADDED UP IN
   assert.equal(out.unit, 'GBP', 'the currency chosen on the settings is not the one the figure came back in');
   /* 5,818,554 piastres at 0.0155 is 90,188 pence, and 340,000 cents at 0.74 is 251,600. */
   assert.equal(out.value, 90_188 + 251_600);
-  assert.deepEqual(out.fx, { into: 'GBP', home: 'GBP', asOf: day(0), forward: false, stale: false, missing: [] });
+  assert.deepEqual(out.fx, {
+    into: 'GBP',
+    home: 'GBP',
+    asOf: day(0),
+    forward: false,
+    stale: false,
+    pairs: [
+      { from: 'EGP', rate: 0.0155 },
+      { from: 'USD', rate: 0.74 },
+    ],
+    missing: [],
+  });
   /* AND THE TARGET COMES WITH IT: it is in the declared currency, so it is converted at the latest rate. */
   assert.equal(out.targetIn?.currency, 'GBP');
   assert.equal(out.met, false, 'a ceiling of E£60,000.00 is £930.00, and the figure is £3,417.88');

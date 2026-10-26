@@ -891,6 +891,11 @@ export type PageDeps = {
   metric: (id: string) => MetricDecl | null;
   /** One reading. It is a callback rather than SQL because this layer runs queries it did not write. */
   read: (decl: MetricDecl) => Result<Reading>;
+  /**
+   * A money figure read with no currency to add up in, so each currency is its own amount (`<figure>.apart`). A host
+   * that does not take it says no figure apart, and the sentence drops the clause.
+   */
+  readApart?: (decl: MetricDecl) => Result<Reading>;
   list: (q: {
     register: string;
     where?: Predicate | undefined;
@@ -5133,8 +5138,8 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const owned = two && beside ? moduleFigure(beside, two.head, two.tail) : null;
       if (owned) addFigure(owned.metric);
       const isList = (id: string): boolean => LIST_ID.test(id) && (owned === null || (beside?.lists?.() ?? []).some((l) => l.id === id));
-      if ('change' in said || 'rowsOf' in said || 'crossingOf' in said) {
-        const head = 'change' in said ? said.change : 'rowsOf' in said ? said.rowsOf : said.crossingOf;
+      if ('change' in said || 'rowsOf' in said || 'crossingOf' in said || 'convertedOf' in said) {
+        const head = 'change' in said ? said.change : 'rowsOf' in said ? said.rowsOf : 'crossingOf' in said ? said.crossingOf : said.convertedOf;
         const isFigure = (metric?.(head) ?? builtInFigure(head)) !== null;
         if (isFigure) addFigure(head);
         /* A LIST OF THAT NAME IS NAMED TOO when the record has one, since a state it holds is read first (`twoOf`). */
@@ -5254,6 +5259,7 @@ function pathOf(
   | { change: string; words?: true }
   | { rowsOf: string; part: RowPart; field?: string }
   | { crossingOf: string; part: CrossingPart }
+  | { convertedOf: string; part: ConvertedPart }
   | { register: string; seq: number; field: string }
   | { register: string; seq: number; field: string; then: string }
   | { register: string; count: true }
@@ -5296,6 +5302,9 @@ function pathOf(
   /* `<figure>.on`, `.because` AND `.because_amount` ARE WHERE A WALK TO ZERO GOES UNDER (`crossingValue`): its day, what
      falls due that day and its money, so a sentence says why the money runs out on the day it does. */
   if ((CROSSING_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { crossingOf: head, part: tail as CrossingPart };
+  /* `<figure>.apart`, `.converted` AND `.rate_on` ARE A MONEY FIGURE IN EACH OF ITS CURRENCIES, THE ONE AMOUNT THEY ARE
+     CONVERTED INTO AND THE DAY OF THE RATES, so a line keeps pounds and dollars apart and says the sum as roughly that. */
+  if ((CONVERTED_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { convertedOf: head, part: tail as ConvertedPart };
   const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(head);
   if (row) return { register: row[1]!, seq: Number(row[2]), field: tail };
   /* A MODULE'S ID MAY HOLD A DASH where a list's may not, so `money-core.cash-now` is two words to ask the order about. */
@@ -5394,6 +5403,7 @@ function twoOf(said: PathSaid): Two | null {
   if ('change' in said) return { head: said.change, tail: 'words' in said ? 'moved' : 'change' };
   if ('rowsOf' in said) return { head: said.rowsOf, tail: said.field === undefined ? said.part : `first_${said.field}` };
   if ('crossingOf' in said) return { head: said.crossingOf, tail: said.part };
+  if ('convertedOf' in said) return { head: said.convertedOf, tail: said.part };
   if ('count' in said && 'register' in said) return { head: said.register, tail: 'count' };
   if ('state' in said) return { head: said.register, tail: said.state };
   return null;
@@ -5460,14 +5470,21 @@ const PATH_ORDER: readonly PathRule[] = [
     /* A FIGURE'S PART, when a figure has the name: how far it moved, or the rows it counts. */
     as: 'figure',
     reads: (deps, said) => {
-      const decl = 'change' in said ? deps.metric(said.change) : 'rowsOf' in said ? deps.metric(said.rowsOf) : 'crossingOf' in said ? deps.metric(said.crossingOf) : null;
+      const decl =
+        'change' in said ? deps.metric(said.change)
+        : 'rowsOf' in said ? deps.metric(said.rowsOf)
+        : 'crossingOf' in said ? deps.metric(said.crossingOf)
+        : 'convertedOf' in said ? deps.metric(said.convertedOf)
+        : null;
       if (!decl) return null;
       if ('crossingOf' in said) return { value: crossingValue(deps, decl, said.part) };
+      if ('convertedOf' in said) return { value: convertedValue(deps, decl, said.part) };
       return { value: 'rowsOf' in said ? rowsValue(deps, decl, said.part, said.field) : changeOf(deps, decl, 'words' in said) };
     },
     names: (deps, said) => {
       if ('change' in said) return figureNamed(deps, said.change);
       /* A CROSSING IS NAMED BY A FIGURE THAT WALKS TO ZERO, and by no other: `cash-now.on` is the author's slip. */
+      if ('convertedOf' in said) return figureNamed(deps, said.convertedOf);
       if ('crossingOf' in said) {
         const decl = deps.metric(said.crossingOf);
         return decl !== null && decl.source === WALK_SOURCE && walksToZero((decl.value as { walk?: unknown } | undefined)?.walk);
@@ -5717,6 +5734,42 @@ function stepSpec(deps: PageDeps, said: { register: string; field: string; then:
 /** What a sentence may say about the rows a figure counts: the first one's name, a few names, how many besides, and since when. */
 const ROW_PARTS = ['first', 'names', 'more', 'since'] as const;
 type RowPart = (typeof ROW_PARTS)[number];
+
+/** The parts of a money figure a sentence may name: each currency apart, the sum converted, the rates' day, its parts held. */
+const CONVERTED_PARTS = ['apart', 'converted', 'rate_on', 'groups'] as const;
+type ConvertedPart = (typeof CONVERTED_PARTS)[number];
+
+/**
+ * `{{cash-now.apart}}`: a money figure in each currency it holds, never converted, then `{{cash-now.converted}}` the one
+ * amount those come to in the home currency, to whole units, and `{{cash-now.rate_on}}` the day of the rates it took.
+ *
+ * - `apart` IS ALWAYS SAID, one amount where there is one currency, so a line can open on it on any record.
+ * - `converted` AND `rate_on` ARE SAID ONLY WHERE THE FIGURE WAS CONVERTED FROM ANOTHER CURRENCY, so a record that keeps
+ *   one currency, or one with no rate, has neither, and a sentence drops the clause and reads as it always did.
+ * - `converted` IS ROUNDED TO WHOLE UNITS because a sum at one day's rate is about that much, never to the penny.
+ */
+function convertedValue(deps: PageDeps, decl: MetricDecl, part: ConvertedPart): Json | undefined {
+  if (!mayRead(deps, decl)) return undefined;
+  /* `groups` IS HOW MANY OF A GROUPED FIGURE'S PARTS HOLD ANY MONEY, the ones a split of it lists: "across 6 accounts"
+     beside a tile of six, where the count of every account said seven over one at nought the tile leaves out. */
+  if (part === 'groups') {
+    const read = deps.read(decl);
+    if (!read.ok || !read.value.groups) return undefined;
+    return read.value.groups.filter((g) => (g.value !== null && g.value !== 0) || (g.parts ?? []).some((p) => p.amount !== 0)).length;
+  }
+  if (part === 'apart') {
+    const apart = deps.readApart?.(decl);
+    if (!apart?.ok) return undefined;
+    const parts = apart.value.parts;
+    if (parts && parts.length > 0) return parts.map((p) => ({ amount: p.amount, currency: p.currency }));
+    return apart.value.value !== null && apart.value.unit !== null ? { amount: apart.value.value, currency: apart.value.unit } : undefined;
+  }
+  const read = deps.read(decl);
+  if (!read.ok || read.value.value === null || read.value.unit === null || !read.value.fx?.asOf) return undefined;
+  if (part === 'rate_on') return read.value.fx.asOf;
+  const unit = 10 ** exponentOf(read.value.unit);
+  return { amount: Math.round(read.value.value / unit) * unit, currency: read.value.unit };
+}
 
 /** The parts of a walk to zero a sentence may name: the day it goes under, what falls due then, and that money. */
 const CROSSING_PARTS = ['on', 'because', 'because_amount'] as const;

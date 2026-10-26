@@ -889,10 +889,12 @@ const withoutRetired38 = (doc: Body): Body => ({
  */
 /**
  * MONEY 3.27.0 COMES OFF BEFORE ALL: no figures of what the walk moves in each month ahead, In and out, by month reads
- * bills due once and what repeats at its monthly share again, Cash ahead opens on ten weeks, and Lasts draws its two
- * figures again with no sentence under them.
+ * bills due once and what repeats at its monthly share again, Cash ahead opens on ten weeks, Lasts draws its two
+ * figures again with no sentence under them, and the first line says one Cash now.
  */
 const AHEAD_27 = new Set(['in-ahead-by-month', 'out-ahead-by-month']);
+/* And the first line said one Cash now, over every account counted as cash. */
+const CASH_APART_27 = "{{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s)";
 const tenWeeks = (b: Body): Body => (b.kind === 'forecast' && b.horizon === 84 ? { ...b, horizon: 70, horizons: [70, 90, 180, 365, 730, 1825, 'last'] } : b);
 const withoutAhead27 = (doc: Body): Body => ({
   ...doc,
@@ -911,7 +913,9 @@ const withoutAhead27 = (doc: Body): Body => ({
                       { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
                     ],
                   }
-                : b.heading === 'Lasts' && b.kind === 'stat'
+                : b.lead === true && typeof b.body === 'string'
+                  ? { ...b, body: b.body.replace(CASH_APART_27, '{{cash-now}} across {{cash-accounts}} account(s)') }
+                  : b.heading === 'Lasts' && b.kind === 'stat'
                   ? { ...b, cells: [{ metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' }, { metric: 'lasts-no-income', label: 'If nothing more comes in' }] }
                   : tenWeeks(b),
             ),

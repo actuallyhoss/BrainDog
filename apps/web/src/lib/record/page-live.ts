@@ -107,8 +107,13 @@ export const footWords = {
    * second copy to a person who needed the first mended. `unread`: the actions could not be read, so nothing is offered,
    * because a link chosen at a guess is the fault this fixes.
    */
-  ratesStale: (day: string, way: RatesWay): string => {
-    const said = `Figures on this page are converted at rates as of ${day}, which are out of date.`;
+  ratesStale: (day: string, way: RatesWay, age: number, pairs = ''): string => {
+    /* THE RATE ITSELF AND HOW OLD IT IS, SINCE THE LOOK OF 27 OCTOBER: "$1 = EGP 50.50, the rate from 28 Sep 2026, is 30
+       days old". A record that sends no rate beside its figures is said the day and the age alone. */
+    const old = age === 1 ? '1 day old' : `${age} days old`;
+    const said = pairs
+      ? `${pairs}, the rate${pairs.includes(' and ') ? 's' : ''} from ${day}, ${pairs.includes(' and ') ? 'are' : 'is'} ${old}, so figures on this page converted at ${pairs.includes(' and ') ? 'them' : 'it'} are out of date.`
+      : `Figures on this page are converted at rates as of ${day}, ${old}, which are out of date.`;
     if (way === 'none') return `${said} [Keep rates current](${RATES_PRESET})`;
     return way === 'held' ? `${said} [Open the action that fetches them](${RATES_HELD})` : said;
   },
@@ -792,6 +797,25 @@ function backsOf(r: Reading): { backs?: string[] } {
   return held.length ? { backs: held } : {};
 }
 
+/**
+ * A TILE'S FIGURES SAY THE DAY OF THEIR RATES ONCE, under the last that was converted at them: Today's money tile said
+ * "Converted at rates as of 28 Sep 2026." under each of its three figures. A sentence about a rate that is missing is
+ * the figure's own, and stays under it.
+ */
+function onceATile(metrics: Metric[]): Metric[] {
+  const RATED = /(?:^| · )(Converted at rates as of [^·]*?\.)$/u;
+  const last = new Map<string, number>();
+  metrics.forEach((m, i) => {
+    const said = RATED.exec(m.note ?? '')?.[1];
+    if (said) last.set(said, i);
+  });
+  return metrics.map((m, i) => {
+    const said = RATED.exec(m.note ?? '')?.[1];
+    if (!said || last.get(said) === i) return m;
+    return { ...m, note: (m.note ?? '').slice(0, -said.length).replace(/ · $/u, '') };
+  });
+}
+
 /** A figure converted at rates that are out of date: the one thing a page says at its foot and not under the figure. */
 const staleRead = (r: Reading | null | undefined): r is Reading & { fx: FxRead & { asOf: string } } => !!r && !r.parts && !!r.fx?.stale && typeof r.fx.asOf === 'string';
 
@@ -816,7 +840,10 @@ export function tileOf(
   const label = str(cell.label) ?? decl?.name ?? cell.metric;
   const r = cell.reading;
   /* A FIGURE IN SEVERAL CURRENCIES IS EACH AMOUNT IN ITS OWN, never a blank, and says why it is not one number. */
-  const across = !r ? null : stale === 'foot' && staleRead(r) ? fxNote({ ...r, fx: { ...r.fx, stale: false } }) : fxNote(r);
+  /* ON A PAGE, RATES OUT OF DATE ARE THE FOOT'S TO SAY, WITH THE RATE AND ITS AGE (`footed`), so a tile converted at them
+     says nothing of them: "Converted at rates as of 28 Sep 2026." stood under three tiles and over a foot that said it
+     again. A tile converted at current rates still says their day, once a tile (`onceATile`). */
+  const across = !r ? null : stale === 'foot' && staleRead(r) ? null : fxNote(r);
   const said = (fallback: string) =>
     typeof cell.note === 'string'
       ? noteOf(cell.note, (id) => {
@@ -1601,7 +1628,7 @@ export function blockOf(
     return { ...shell, authored: tracks, shown: tracks.length, total: plans.length + (typeof past === 'number' && past > 0 ? past : 0) };
   }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
-  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : b.tone === 'info' ? 'info' : 'warn', 'foot')) };
+  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: onceATile((readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : b.tone === 'info' ? 'info' : 'warn', 'foot'))) };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read, EACH BY ITS NAME: a part keyed by a ref is the row
      it points at, read from the walk `pageReader` made of that list, and never the ULID the key is. */
   if (typeof source === 'string' && source.startsWith('metric.')) {
@@ -2106,8 +2133,9 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
     /* BY THE FIGURE'S OWN NAME, a parameter taken off (`cash-as-of:hsbc` is `cash-as-of`), so a figure read for one
        group of a grouped day figure is a day too: "3 Sep", never 20,699. */
     const figure = path.includes(':') ? path.slice(0, path.indexOf(':')) : path;
-    /* `<figure>.on` IS THE DAY A WALK GOES UNDER (`pages.ts` `crossingValue`), said as any day figure is. */
-    const dayFigure = (Object.hasOwn(METRICS, figure) && METRICS[figure]?.format === 'day') || path.endsWith('.on');
+    /* `<figure>.on` IS THE DAY A WALK GOES UNDER (`pages.ts` `crossingValue`), and `.rate_on` the day of the rates a sum
+       was converted at (`convertedValue`), each said as any day figure is. */
+    const dayFigure = (Object.hasOwn(METRICS, figure) && METRICS[figure]?.format === 'day') || path.endsWith('.on') || path.endsWith('.rate_on');
     /* A DAY FIGURE THE RECORD ANSWERED AS ITS ISO DAY (`pages.ts` `valueAt`) is said as the same figure is said from its
        count of days, so "the last part on 1 Jun" and never "on 2027-06-01". */
     if (dayFigure && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v) && !Number.isNaN(Date.parse(v))) return format('day', Date.parse(v) / 86_400_000);
@@ -2117,14 +2145,19 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
       return Number.isInteger(v) ? integer(v) : String(v);
     }
     if (typeof v === 'boolean') return v ? 'yes' : 'no';
-    /* A FIGURE IN SEVERAL CURRENCIES, one amount a currency, written as a tile writes its parts. */
+    /* A FIGURE IN SEVERAL CURRENCIES, one amount a currency, written as a tile writes its parts. `<figure>.apart` IS A
+       LINE'S, so its amounts are said as a sentence says them: "EGP 40,000.00 and $10,000.50". */
     if (Array.isArray(v)) {
       const parts = v.filter((p): p is { amount: number; currency: string } => isObject(p) && typeof p.amount === 'number' && typeof p.currency === 'string');
-      return parts.length && parts.length === v.length ? partsText(parts) : null;
+      if (!parts.length || parts.length !== v.length) return null;
+      if (!path.endsWith('.apart')) return partsText(parts);
+      const said = parts.map((p) => money(Math.round(p.amount), p.currency));
+      return said.length === 1 ? said[0]! : `${said.slice(0, -1).join(', ')} and ${said.at(-1)}`;
     }
     if (v !== null && typeof v === 'object') {
       const { amount, currency } = v as { amount?: unknown; currency?: unknown };
-      if (typeof amount === 'number' && typeof currency === 'string') return money(amount, currency);
+      /* `<figure>.converted` IS ABOUT THAT MUCH, in whole units (`convertedValue`), so it is said with no pennies. */
+      if (typeof amount === 'number' && typeof currency === 'string') return path.endsWith('.converted') ? money(amount, currency).replace(/\.0+$/u, '') : money(amount, currency);
     }
     return null;
   };
@@ -2235,7 +2268,9 @@ export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: n
   const oldest = oldestStale(answered, drawn);
   if (oldest === null) return drawn;
   const way: RatesWay = actions === null ? 'unread' : ratesActionOf(actions) ? 'held' : 'none';
-  const foot = { kind: 'note', key: 'rates-out-of-date', span: 12, body: footWords.ratesStale(fmtDay(oldest), way), rows: [], matched: 0, refusals: [] };
+  const age = Math.max(0, Math.round((Date.parse(`${recordToday(now)}T00:00:00Z`) - Date.parse(`${oldest}T00:00:00Z`)) / 86_400_000));
+  /* AMBER, as anything out of date is: a week is when a rate is, the day `fx.ts` marks a figure stale. */
+  const foot = { kind: 'note', key: 'rates-out-of-date', span: 12, tone: 'warn', body: footWords.ratesStale(fmtDay(oldest), way, age, pairsSaid(answered, drawn, oldest)), rows: [], matched: 0, refusals: [] };
   return [...drawn, { ...blockOf(foot as unknown as Answered, new Map(), now), synthetic: true }];
 }
 
@@ -2270,6 +2305,37 @@ function staleSaid(b: Answered): string[] {
     const said = Object.hasOwn(b.values!, path) && isObject(fx) && fx.stale === true && typeof fx.asOf === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(fx.asOf);
     return said ? [(fx as { asOf: string }).asOf] : [];
   });
+}
+
+/**
+ * The rates the oldest day's figures were converted at, as a person reads them: "$1 = EGP 50.50", one a currency and
+ * "and" between them, or `''` where the record sent none (`FxRead.pairs`). A rate under one is said the other way round,
+ * "£1 = EGP 64.52", so it is never a fraction of a penny.
+ */
+function pairsSaid(answered: readonly Answered[], drawn: readonly LiveBlock[], day: string): string {
+  const seen = new Map<string, string>();
+  const take = (fx: unknown): void => {
+    if (!isObject(fx) || fx.asOf !== day || typeof fx.into !== 'string' || !Array.isArray(fx.pairs)) return;
+    for (const p of fx.pairs as unknown[]) {
+      if (!isObject(p) || typeof p.from !== 'string' || typeof p.rate !== 'number' || !(p.rate > 0) || seen.has(p.from)) continue;
+      seen.set(p.from, rateSaid(p.from, fx.into, p.rate));
+    }
+  };
+  answered.forEach((b, i) => {
+    const d = drawn[i];
+    if (!d || d.drawn === false || d.cannot !== undefined) return;
+    for (const c of b.readings ?? []) take(c.reading?.fx);
+    if (isObject(b.values_fx)) for (const fx of Object.values(b.values_fx)) take(fx);
+  });
+  const said = [...seen.values()];
+  return said.length <= 1 ? (said[0] ?? '') : `${said.slice(0, -1).join(', ')} and ${said.at(-1)}`;
+}
+
+/** One rate as a person reads it: one of a currency in the other, `$1 = EGP 50.50`, the larger way round. */
+function rateSaid(from: string, into: string, rate: number): string {
+  const [one, other, by] = rate >= 1 ? [from, into, rate] : [into, from, 1 / rate];
+  const whole = (currency: string): string => money(10 ** exponentOf(currency), currency).replace(/\.0+$/u, '');
+  return `${whole(one)} = ${money(Math.round(by * 10 ** exponentOf(other)), other)}`;
 }
 
 /**

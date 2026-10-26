@@ -947,8 +947,10 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* AND HOW FAR CASH MOVED ON A MONTH AGO, since the sample holds its nights from the moment it is made (`cashPoints`). */
   /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the UI pass
      of 20 October (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on', 'cash-accounts', 'cash-now', 'cash-now.moved']);
-  assert.equal(lead.values?.['cash-accounts'], reading(k, 'cash-accounts'));
+  /* EACH CURRENCY APART, AND THE ACCOUNTS THE ACCOUNTS TILE LISTS, SINCE money-core 3.27.0: the sample keeps one
+     currency, so nothing is said converted, and every account it counts as cash holds money. */
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on', 'cash-by-account.groups', 'cash-now.apart', 'cash-now.moved']);
+  assert.equal(lead.values?.['cash-by-account.groups'], reading(k, 'cash-accounts'));
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
@@ -958,8 +960,8 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
      that clause and keeps the rest. */
   const [money, late] = lead.body?.split(/(?<=\.)\s+/u) ?? [];
   assert.deepEqual(
-    money?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9.-]+)\}\}/gu)].map((m) => m[1])),
-    [['cash-now', 'cash-accounts'], ['cash-now.moved']],
+    money?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9._-]+)\}\}/gu)].map((m) => m[1])),
+    [['cash-now.apart'], ['cash-now.converted', 'cash-now.rate_on'], ['cash-by-account.groups'], ['cash-now.moved']],
   );
   /* AND THE PART THAT IS LATE, A SENTENCE OF ITS OWN SINCE money-core 3.18.0, which the sample has none of: its figures
      hold no value here, so the app leaves the sentence out whole (`leadOf`). */
@@ -1331,7 +1333,7 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
     /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines of Heads up carry no heading either. */
     return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean; body?: string }[] }).blocks
       .filter((b) => b.drawn !== false)
-      .map((b) => (b.lead === true ? (b.body?.startsWith('Cash is {{cash-now}}') ? undefined : 'kept in') : (b.heading ?? '')));
+      .map((b) => (b.lead === true ? (b.body?.startsWith('Cash is {{cash-now.apart}}') ? undefined : 'kept in') : (b.heading ?? '')));
   };
   assert.ok(drawn().includes(undefined) && !drawn().includes('What you have, by book'));
   made('Home');

@@ -27,6 +27,12 @@ export type Rate = { currency: string; base: string; rate: number; as_of: string
 /** One amount a figure adds up: minor units in its currency, and the day it is about, when the row has one. */
 export type Amount = { currency: string; amount: number; day: string | null };
 
+/**
+ * One rate a figure was converted with, as a person reads it: one of `from` is `rate` of the currency it was converted
+ * into. Only the rates of the oldest day used are said (`asOf`), since that is the day a figure is only as current as.
+ */
+export type RateSaid = { from: string; rate: number };
+
 /** One currency's part of a figure that is not added up. */
 export type Part = { currency: string; amount: number };
 
@@ -49,7 +55,7 @@ export type Across =
    * `forward` when a rate AFTER an amount's day stood in; `stale` when the oldest is older than
    * `RATE_STALE_DAYS` before the figure's day.
    */
-  | { kind: 'converted'; currency: string; amount: number; asOf: string; forward: boolean; stale: boolean }
+  | { kind: 'converted'; currency: string; amount: number; asOf: string; forward: boolean; stale: boolean; pairs?: RateSaid[] }
   /**
    * A sum that converted what it could: `amount` is the least the whole can be, in `currency`.
    *
@@ -57,7 +63,7 @@ export type Across =
    * currencies' codes. `asOf`, `forward` and `stale` are `converted`'s, over the rates that were used; `asOf` is empty
    * when the only amounts added were already in `currency`.
    */
-  | { kind: 'atleast'; currency: string; amount: number; asOf: string; forward: boolean; stale: boolean; left: Part[]; missing: string[] }
+  | { kind: 'atleast'; currency: string; amount: number; asOf: string; forward: boolean; stale: boolean; pairs?: RateSaid[]; left: Part[]; missing: string[] }
   /** Not added up: one part per currency, largest code order, and each pair with no rate as `EGP to USD`. */
   | { kind: 'parts'; parts: Part[]; missing: string[] };
 
@@ -191,6 +197,8 @@ export function across(amounts: readonly Amount[], into: string | null, rates: r
      which is what `one` and `parts` already mean. */
   let asOf = '';
   let forward = false;
+  /* EACH CURRENCY'S RATE ON THE DAY IT WAS FIRST NEEDED, so the oldest day's rates can be said beside the figure. */
+  const used = new Map<string, { rate: number; as_of: string }>();
   if (into !== null && convert)
     for (const a of amounts) {
       if (a.currency === into) {
@@ -204,11 +212,14 @@ export function across(amounts: readonly Amount[], into: string | null, rates: r
         continue;
       }
       converted.push(convertMinor(a.amount, a.currency, into, r.rate));
+      const held = used.get(a.currency);
+      if (!held || r.as_of < held.as_of) used.set(a.currency, { rate: r.rate, as_of: r.as_of });
       if (asOf === '' || r.as_of < asOf) asOf = r.as_of;
       forward ||= r.forward;
     }
   if (into !== null && convert) {
-    const dated = { currency: into, amount: reduceOf(kind, converted) ?? 0, asOf, forward, stale: asOf !== '' && rateIsStale(asOf, today.slice(0, 10)) };
+    const pairs = [...used].filter(([, r]) => r.as_of === asOf).map(([from, r]) => ({ from, rate: r.rate })).sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+    const dated = { currency: into, amount: reduceOf(kind, converted) ?? 0, asOf, forward, stale: asOf !== '' && rateIsStale(asOf, today.slice(0, 10)), ...(pairs.length ? { pairs } : {}) };
     if (missing.size === 0) return { kind: 'converted', ...dated };
     /* CONVERT WHAT IT CAN, LIST WHAT IT CANNOT. Only a sum, only when something was added, and only when nothing left
        out is under nought: then the total can only be more than this, and it is safe to say at least. */

@@ -9,6 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import './fixtures/fill.ts';
+import { money } from 'braindog-render';
+
 import { copy } from '../copy.ts';
 import { ratesPreset } from './action-draft.ts';
 import { REGISTERS } from './api.ts';
@@ -43,17 +45,45 @@ test('out of date rates are said once, at the foot, with the way to keep them cu
   const foot = blocks[2]!;
   assert.equal(foot.kind, 'note');
   assert.equal(foot.drawn, true);
-  assert.equal(foot.body, footWords.ratesStale('28 Sep 2026', 'none'), 'the oldest day is the one named');
+  assert.equal(foot.body, footWords.ratesStale('28 Sep 2026', 'none', 15), 'the oldest day is the one named');
   assert.match(foot.body ?? '', /out of date/u);
   assert.match(foot.body ?? '', /\[Keep rates current\]\(\/automations\?new=action&preset=rates\)/u);
   assert.doesNotMatch(foot.body ?? '', /—/u);
   const notes = blocks.slice(0, 2).flatMap((b) => (b.metrics ?? []).map((m) => m.note));
   assert.equal(notes.length, 3);
+  /* AND THE FOOT IS WHERE THEY ARE SAID, SINCE THE LOOK OF 27 OCTOBER: a tile converted at them says nothing of them, where
+     each of three tiles said its day over a foot that said it again. The foot is amber and says how old they are. */
   for (const note of notes) {
     assert.doesNotMatch(note ?? '', /out of date/u);
     assert.notEqual(note, STALE);
-    assert.match(note ?? '', /(^| · )Converted at rates as of (28|30) Sep 2026\.$/u, 'a tile still says which day its rates are from');
+    assert.doesNotMatch(note ?? '', /Converted at rates/u);
   }
+  assert.equal(foot.tone, 'warn');
+  assert.match(foot.body ?? '', /15 days old/u);
+});
+
+test('the foot says the rate itself where the record sends it, one a currency, and the larger way round', () => {
+  const pairs = [{ from: 'USD', rate: 50.5 }];
+  /* ONE OF A CURRENCY IS WRITTEN AS EVERY AMOUNT IS, with no pennies: `$1` or `USD 1` as the record's home says it. */
+  const unit = (currency: string): string => money(100, currency).replace(/\.0+$/u, '');
+  const one = page(tiles(reading({ fx: fx({ pairs }) })))[1]!;
+  assert.equal(one.body, footWords.ratesStale('28 Sep 2026', 'none', 15, `${unit('USD')} = ${money(5050, 'EGP')}`));
+  assert.ok(
+    (one.body ?? '').startsWith(`${unit('USD')} = ${money(5050, 'EGP')}, the rate from 28 Sep 2026, is 15 days old, so figures on this page converted at it are out of date. [Keep rates current]`),
+    one.body,
+  );
+  const two = page(tiles(reading({ fx: fx({ into: 'GBP', home: 'GBP', pairs: [{ from: 'EGP', rate: 0.0155 }, { from: 'USD', rate: 0.74 }] }) })))[1]!;
+  assert.ok(
+    (two.body ?? '').startsWith(`${unit('GBP')} = ${money(6452, 'EGP')} and ${unit('GBP')} = ${money(135, 'USD')}, the rates from 28 Sep 2026, are 15 days old, so figures on this page converted at them are out of date.`),
+    two.body,
+  );
+});
+
+test('a tile converted at current rates says their day once, under the last figure that was', () => {
+  const current = fx({ stale: false });
+  const [block] = page(tiles(reading({ fx: current }), reading({ fx: current }), reading()));
+  const notes = (block!.metrics ?? []).map((m) => m.note ?? '');
+  assert.deepEqual(notes.map((n) => /Converted at rates as of 28 Sep 2026\.$/u.test(n)), [false, true, false]);
 });
 
 test('a page with no out of date rate gains nothing', () => {
@@ -77,7 +107,7 @@ test('a tile with a missing rate keeps its own sentence, and is not what the foo
   const both = page(tiles(missing, reading({ fx: fx() })));
   assert.equal(both.length, 2);
   assert.equal(both[0]!.metrics![0]!.note, copy.figureNoRate('USD to EGP'));
-  assert.equal(both[1]!.body, footWords.ratesStale('28 Sep 2026', 'none'));
+  assert.equal(both[1]!.body, footWords.ratesStale('28 Sep 2026', 'none', 15));
 });
 
 test('a tile drawn off a page, with no foot under it, still says its rates are out of date', () => {
@@ -115,7 +145,7 @@ test('a record that holds a rates action is sent to it, and is not offered a sec
   assert.equal(ratesPreset({ currencies: ['GBP', 'EUR', 'JPY'], home: 'USD' })!.filled!.ingest, RATES);
 
   const body = pageWith([{ ingest: 'site-stats' }, { ingest: RATES }], tiles(reading({ fx: fx() })))[1]!.body ?? '';
-  assert.equal(body, footWords.ratesStale('28 Sep 2026', 'held'));
+  assert.equal(body, footWords.ratesStale('28 Sep 2026', 'held', 15));
   assert.doesNotMatch(body, /Keep rates current|preset=rates|new=action/u);
   assert.match(body, /\]\(\/automations\?tab=scheduled\)$/u, 'where the action is listed, with its state and its way back on');
   assert.doesNotMatch(body, new RegExp(RATES, 'u'), 'and its filing name is not read out');
@@ -124,7 +154,7 @@ test('a record that holds a rates action is sent to it, and is not offered a sec
 
 test('where the actions could not be read, the foot says its sentence and offers nothing', () => {
   const foot = pageWith(null, tiles(reading({ fx: fx() })))[1]!;
-  assert.equal(foot.body, footWords.ratesStale('28 Sep 2026', 'unread'));
+  assert.equal(foot.body, footWords.ratesStale('28 Sep 2026', 'unread', 15));
   assert.doesNotMatch(foot.body ?? '', /\]\(/u);
   assert.match(foot.body ?? '', /out of date\.$/u);
   assert.equal(foot.synthetic, true);
@@ -150,7 +180,7 @@ test('a bar and a split over a figure converted at out of date rates ask for the
     assert.equal(out.length, 2, kind);
     assert.ok(out[0]!.parts, 'drawn as its parts, and no tile');
     assert.equal(out[0]!.metrics, undefined);
-    assert.equal(out[1]!.body, footWords.ratesStale('28 Sep 2026', 'none'));
+    assert.equal(out[1]!.body, footWords.ratesStale('28 Sep 2026', 'none', 15));
     assert.equal(out[1]!.synthetic, true);
 
     assert.equal(page(charted(kind, reading({ fx: fx({ stale: false }), groups: GROUPS }))).length, 1, 'current rates ask nothing');
@@ -162,7 +192,7 @@ test('a note whose figure was converted at out of date rates asks for the foot',
   const out = page(note({ overdue: fx() }));
   assert.equal(out.length, 2);
   assert.equal(out[0]!.kind, 'note');
-  assert.equal(out[1]!.body, footWords.ratesStale('28 Sep 2026', 'none'));
+  assert.equal(out[1]!.body, footWords.ratesStale('28 Sep 2026', 'none', 15));
 
   assert.equal(page(note(undefined)).length, 1, 'a record that says nothing of the rates asks nothing');
   assert.equal(page(note({ overdue: fx({ stale: false }) })).length, 1);
@@ -181,7 +211,7 @@ test('the foot names the oldest day across tiles, bars and notes, and is said on
     note({ overdue: fx({ asOf: '2026-09-20' }) }),
   );
   assert.equal(out.length, 4);
-  assert.equal(out[3]!.body, footWords.ratesStale('11 Sep 2026', 'none'));
+  assert.equal(out[3]!.body, footWords.ratesStale('11 Sep 2026', 'none', 32));
 });
 
 /* AN ACTION SOMEBODY DRAFTED BY HAND IS A RATES ACTION BY WHAT IT DOES: it writes the list the preset writes. Found by
@@ -197,7 +227,7 @@ test('a rates action drafted by hand under a name of its own is known by the lis
   assert.equal(ratesActionOf([mine, { ingest: RATES }])?.ingest, RATES);
 
   const body = pageWith([mine], tiles(reading({ fx: fx() })))[1]!.body ?? '';
-  assert.equal(body, footWords.ratesStale('28 Sep 2026', 'held'));
+  assert.equal(body, footWords.ratesStale('28 Sep 2026', 'held', 15));
   assert.doesNotMatch(body, /Keep rates current|rates_by_hand/u);
 });
 
@@ -229,18 +259,18 @@ test('the reader looks for a rates action when rates are out of date, and only t
   const none = host(stale, json(200, { ok: true, value: [] }));
   const offered = await read(none.io);
   assert.equal(none.sent.filter((m) => m === 'actions').length, 1);
-  assert.equal(offered.at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'none'));
+  assert.equal(offered.at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'none', 15));
   assert.equal(offered.at(-1)!.synthetic, true);
 
   const held = host(stale, json(200, { ok: true, value: [{ ingest: RATES, channel: 'poll', state: 'paused' }] }));
-  assert.equal((await read(held.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'held'));
+  assert.equal((await read(held.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'held', 15));
 
   const refused = host(stale, json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'This key cannot read that.' } }));
-  assert.equal((await read(refused.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'unread'));
+  assert.equal((await read(refused.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'unread', 15));
 
   /* A BAR ALONE IS ENOUGH TO ASK, and an action drafted by hand answers it. */
   const byHand = host([charted('bar', reading({ fx: fx(), groups: GROUPS }))], json(200, { ok: true, value: [{ ingest: 'rates_by_hand', writes: ratesPreset({ currencies: ['USD', 'EGP'], home: 'EGP' })!.filled!.register, channel: 'poll', state: 'pending' }] }));
-  assert.equal((await read(byHand.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'held'));
+  assert.equal((await read(byHand.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'held', 15));
   assert.equal(byHand.sent.filter((m) => m === 'actions').length, 1);
 
   const current = host([tiles(reading({ fx: fx({ stale: false }) }))], json(200, { ok: true, value: [] }));
@@ -273,7 +303,7 @@ test('a bar and a split over a list holding pounds and dollars ask for the foot 
     const out = page(held(kind, '2026-09-13'));
     assert.equal(out.length, 2, kind);
     assert.equal(out[0]!.parts, undefined, 'over the list itself, and no figure');
-    assert.equal(out[1]!.body, footWords.ratesStale('13 Sep 2026', 'none'));
+    assert.equal(out[1]!.body, footWords.ratesStale('13 Sep 2026', 'none', 30));
     assert.equal(out[1]!.synthetic, true);
     /* The bar is drawn as it was: converted into pounds, with the day of its rates under it. */
     const said = JSON.stringify(toSegments(out[0]!));
@@ -294,7 +324,7 @@ test('the same bar with rates a day old, or all in the home currency, asks for n
 test('two bars over lists say the foot once, with the oldest day, and a bar that is not drawn asks nothing', () => {
   const out = page(held('bar', '2026-09-13'), held('split', '2026-08-30'), tiles(reading({ fx: fx() })));
   assert.equal(out.length, 4);
-  assert.equal(out[3]!.body, footWords.ratesStale('30 Aug 2026', 'none'));
+  assert.equal(out[3]!.body, footWords.ratesStale('30 Aug 2026', 'none', 44));
   assert.equal(out.filter((b) => b.synthetic).length, 1);
 
   const answered = [held('bar', '2026-09-13')];
@@ -305,7 +335,7 @@ test('two bars over lists say the foot once, with the oldest day, and a bar that
 
 test('the reader looks for a rates action for a bar over a list too', async () => {
   const stale = host([held('bar', '2026-09-13')], json(200, { ok: true, value: [{ ingest: RATES, channel: 'poll', state: 'pending' }] }));
-  assert.equal((await read(stale.io)).at(-1)!.body, footWords.ratesStale('13 Sep 2026', 'held'));
+  assert.equal((await read(stale.io)).at(-1)!.body, footWords.ratesStale('13 Sep 2026', 'held', 30));
   assert.equal(stale.sent.filter((m) => m === 'actions').length, 1);
 
   const current = host([held('bar', '2026-10-12')], json(200, { ok: true, value: [] }));

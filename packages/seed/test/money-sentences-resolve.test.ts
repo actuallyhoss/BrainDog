@@ -33,6 +33,8 @@ const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct'
 const FIGURE_PARTS = new Set(['change', 'moved', 'first', 'names', 'more', 'since']);
 /** What `<figure>.<part>` may ask of a walk to zero: where it goes under (`crossingValue`), since money-core 3.27.0. */
 const CROSSING_PARTS = new Set(['on', 'because', 'because_amount']);
+/** And of a money figure, its currencies apart, the sum converted and the rates' day (`convertedValue`), since 3.27.0. */
+const CONVERTED_PARTS = new Set(['apart', 'converted', 'rate_on', 'groups']);
 /** Where on a page the record fills a name from the figures: the places `pathsOf` reads. */
 const SAID = [/\.blocks\[\d+\]\.(?:heading|body|empty)$/, /\.blocks\[\d+\]\.says\[\d+\]\.body$/, /\.cells\[\d+\]\.note$/, /\.columns\[\d+\]\.label$/, /\.authored\[\d+\]\.cells\[\d+\]$/];
 
@@ -62,6 +64,7 @@ export function unresolved(doc: { declarations: Decl[] }): string[] {
     if (parts.length !== 2) return false;
     const [head, tail] = parts as [string, string];
     if (FIGURE_PARTS.has(tail) && isFigure(head)) return true;
+    if (CONVERTED_PARTS.has(tail)) return doc.declarations.some((d) => d.metric === head && typeof d.format === 'string' && d.format.startsWith('money'));
     if (CROSSING_PARTS.has(tail)) {
       const walked = doc.declarations.find((d) => d.metric === head);
       const walk = (walked?.value as { walk?: unknown } | undefined)?.walk;

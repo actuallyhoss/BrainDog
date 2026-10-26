@@ -192,17 +192,18 @@ test('MONEY WITH TWO BOOKS OPENS ON HOW MUCH THERE IS AND WHERE IT IS KEPT, and 
   account('Everyday', own, 'GBP');
   /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE LASTS THE YEAR, and since money-core 3.17.0 the line says so
      (`HEADLINE_LASTS`): one lead still, the line of what there is stepping aside for it. */
-  assert.deepEqual(leads().map((b) => b.body), [`Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.${LATE}`]);
+  assert.deepEqual(leads().map((b) => b.body), [`Cash is {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.${LATE}`]);
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
-  assert.deepEqual(two.map((b) => b.body), [`You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE}`], 'one lead');
+  assert.deepEqual(two.map((b) => b.body), [`You have {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s) in {{books-held}} books.${LATE}`], 'one lead');
   /* NO CARD SAYS WHAT IS TO PAY ON IT: the sum reads nought and its day reads nothing, so the card's sentence goes whole. */
   assert.deepEqual(two[0]!.values, {
     'books-held': 2,
     'card-to-pay': 0,
-    'cash-accounts': 2,
-    'cash-now': [
+    /* EACH CURRENCY APART, SINCE money-core 3.27.0, and with no home currency nothing converted to say beside them. */
+    'cash-by-account.groups': 2,
+    'cash-now.apart': [
       { amount: 250_000, currency: 'GBP' },
       { amount: 250_000, currency: 'USD' },
     ],

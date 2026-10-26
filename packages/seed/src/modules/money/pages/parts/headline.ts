@@ -1,7 +1,20 @@
 /** Money's first line: what the money is doing, in one sentence. */
 
 const ONE_BOOK = { metric: 'books-held', lt: 2 };
-const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.moved}} on a month ago.';
+/**
+ * EACH CURRENCY APART, THEN ABOUT WHAT THEY COME TO, SINCE money-core 3.27.0: the line said one amount in the home
+ * currency, a dollar balance blended in at a rate a month old with nothing saying so. Now it is the money in each currency
+ * it is kept in (`cash-now.apart`), and only where some was converted, about what that comes to and the day of the rate
+ * (`cash-now.converted`, `cash-now.rate_on`), a clause that goes on a record kept in one currency.
+ */
+const CASH_SAID = "{{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate";
+/**
+ * AND THE ACCOUNTS THE MONEY IS IN, SINCE money-core 3.27.0: the accounts Cash now cuts into that hold money
+ * (`cash-by-account.groups`), the ones the Accounts tile lists. The count of every cash account said seven beside a
+ * tile of six, which leaves one at nought out of its legend.
+ */
+const ACCOUNTS_SAID = '{{cash-by-account.groups}} account(s)';
+const WHAT_THERE_IS = `Cash is ${CASH_SAID}, across ${ACCOUNTS_SAID}, {{cash-now.moved}} on a month ago.`;
 
 /**
  * AND A PART THAT IS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4: "Money's first line says how much he
@@ -56,7 +69,7 @@ export const HEADLINE: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { metric: 'books-held', gte: 2 },
-    body: `You have {{cash-now}} across {{cash-accounts}} account(s) in {{books-held}} books.${LATE_PART}${CARD_OWES}`,
+    body: `You have ${CASH_SAID}, across ${ACCOUNTS_SAID} in {{books-held}} books.${LATE_PART}${CARD_OWES}`,
   },
   /* NO "WHAT YOU HAVE" TILE BESIDE THE LINE, SINCE money-core 3.4.0. It said Cash now, the accounts and how long it
      lasts, which are the three figures the line above says, so a person read them twice before reading anything
