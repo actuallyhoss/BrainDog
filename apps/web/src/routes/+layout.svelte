@@ -46,6 +46,7 @@
   import { callsOut, leaving, quiet, settled } from '$lib/ui/screen.svelte.ts';
   import { onCallsOut } from '@braindog/client';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { inField, notTheShells } from '$lib/a11y/typed.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
   import TopBar from '$lib/ui/TopBar.svelte';
   import { assets } from '$app/paths';
@@ -1066,6 +1067,12 @@
   const leadIn = () => import('$lib/a11y/goto.ts').then((m) => (lead = m));
   const railRows = () => [...rail.places, ...rail.rest].map((i) => ({ href: i.href, name: i.label }));
 
+  /** When a key was last typed in a field, in event time: read before any screen's own handler can move the focus. */
+  let typedAt = Number.NEGATIVE_INFINITY;
+  function ontyped(e: KeyboardEvent) {
+    if (!e.metaKey && !e.ctrlKey && inField(e.target)) typedAt = e.timeStamp;
+  }
+
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
 
@@ -1115,6 +1122,10 @@
       return;
     }
     if (typing()) return;
+    /* NOR WHILE THE HANDS ARE STILL TYPING (`typed.ts`): a key begun in a field, one mid-composition, or one pressed just
+       after a key typed in a box that went away under it, as the palette's does on its way to a question. Its `?` opened
+       the keys sheet over the question it had just opened. */
+    if (notTheShells(e, typedAt)) return;
 
     /* AND THE SWITCH. Every chord above this line still works with character keys off; nothing below
        it does, which is the whole of what `Character keys: Off` promises. */
@@ -1182,7 +1193,7 @@
   }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} onkeydowncapture={ontyped} />
 <svelte:document onpointerover={(e) => readAhead(e, 60)} ontouchstart={(e) => readAhead(e, 0)} onfocusin={(e) => readAhead(e, 0)} />
 
 <a class="skip" href="#main">Skip to content</a>
