@@ -1041,37 +1041,6 @@ export const PORTFOLIO_RULES: Record<string, SeedRule> = {
 /** What was finished on a project in the last seven days, and how that moved over four weeks: At a glance's last figure. */
 const PROJECT_DONE_CELL = { metric: 'project-done-7d:{{name}}', label: 'Done this week', trend: '4w' } as const;
 
-/* THE TILES UNDER THE OVERVIEW'S TWO HEADINGS, each written once and drawn under whichever heading is: the open one
-   while the list is short and the folded one when it is long (`PORTFOLIO_PAGES.portfolio`). */
-
-/* WHAT EACH ONE EARNS, because the question a person asks of a portfolio after "what needs me" is "which of
-   these is carrying the others". A total says the studio earned GBP 22,600 and hides that one project is 81 per
-   cent of it. Two columns, so each part is the name against the money and nothing else.
-
-   ONE TRACK CUT INTO PARTS, SINCE portfolio 1.6.0, where it was a bar a project: the question is a share of one
-   whole, and a split says "81 per cent" by its length where bars side by side only say which is longest. The
-   rows, the order, the empty line and the heading are the bar's.
-
-   NO EARNING TILE BESIDE IT, SINCE portfolio 1.8.0. Its year was the sum of this split, said a second time; what each
-   project earns is read off the split, and the year before is on each project's row. */
-const EARNS = {
-  kind: 'split',
-  heading: 'What each one earns',
-  icon: 'coins',
-  span: 12,
-  source: 'register.things',
-  where: `${LIVE}, revenue is set`,
-  /* EACH PART IN ITS PROJECT'S COLOUR, SINCE the UI pass of 20 October (VERIFY H11): the third column is the stored hue,
-     which the split snaps to the slot the project's card and well wear, where Kiln was drawn in ink and Marlow & Co in
-     Kiln's blue. It is a colour, so it says no word of its own. */
-  columns: [{ field: 'name' }, { field: 'revenue' }, { field: 'hue' }],
-  order: [{ field: 'revenue', dir: 'desc' }],
-  limit: 8,
-  /* ONLY WHILE TWO OR MORE EARN, SINCE the UI pass of 20 October (proj F5): a split of one part says nothing a card
-     does not. Drawn alone, the whole width, in each project's own colour. */
-  when: { metric: 'projects-earning-said', gt: 1 },
-};
-
 /* NO LINE COUNTING HOW MANY SAY WHAT THEY EARNED, SINCE portfolio 1.18.0: "3 of 3 projects in play say what they earned in a
    year" in a grey box beside the split, which the split says by being drawn. */
 
@@ -1142,35 +1111,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         when: { all: [{ metric: 'projects-live', is: 0 }, { metric: 'projects-parked', gt: 0 }] },
         body: 'No project is in play. Add one, or set a parked one building.',
       },
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'projects-need-you', gt: 0 },
-        /* THE PROJECTS BY NAME, SINCE portfolio 1.12.0 (the visual review of October 2nd), where the line counted them
-           ("3 projects in play, 2 at risk or off track"): which need a push and which are on track, from what each one's
-           health says (`.names`), so the verb agrees with how many it names. A record with nothing on track says the
-           first half alone. */
-        /* AND FIRST, THE QUESTIONS ABOUT PROJECTS, SINCE portfolio 1.17.0 (PGS-C18): "2 questions for you, Kiln needs a
-           push". The line said all was well while Decide's badge counted calls about these same projects.
-           `questions-open-in:things` counts what Waiting on you below draws, and at nought the clause goes. */
-        body: '{{questions-open-in:things}} question(s) for you, {{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track',
-      },
-      {
-        /* SAID OF THE PROJECTS IN PLAY, SINCE portfolio 1.13.0, so with none in play the clause has no figure left and the
-           first note speaks instead: "Every project in play is on track" was true of an empty list. */
-        kind: 'note',
-        lead: true,
-        span: 12,
-        /* AND ONLY WHILE ONE IS IN PLAY, SINCE portfolio 1.27.0 (audit C of 25 October): "Nothing needs a push." stood
-           under the line saying none is in play, a second line outside any card on a new record's Projects. */
-        when: { all: [{ metric: 'projects-need-you', is: 0 }, { metric: 'projects-live', gt: 0 }] },
-        /* A PUSH AND NOT YOU, AND THE QUESTIONS SECOND, SINCE portfolio 1.17.0: "Nothing needs you" read false beside two
-           questions waiting, and first they would put "Nothing" mid-line, since the writer never mends a capital.
-           AND NO COUNT OF THE PROJECTS IN PLAY, inside the same 1.17.0 (PGS-C17): the strip under the line says it, with
-           how it moved, and a figure is said once on a page. */
-        body: 'Nothing needs a push, {{questions-open-in:things}} question(s) for you',
-      },
+      /* NO LINE SAID FROM HOW THE PROJECTS ARE GOING, SINCE portfolio 1.30.0: "Nothing needs a push" read only each
+         project's health, which a record may never set, so it was false beside two late projects. The board below leads
+         with a fact instead (`key: board`): what is late, what is due this week, whose numbers went quiet, what waits and
+         what renews, naming the projects. The two lines for a record with no project stay above. */
       {
         /* ONE BOX TO ADD A PROJECT WHILE NONE IS IN PLAY, SINCE portfolio 1.27.0 (audit C of 25 October): the page said
            "Add one" with nothing to press. Under the line, as Work's box is under its own, and a project added here is
@@ -1184,18 +1128,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       },
       /* NO IN PLAY AND EARNING STRIP, SINCE portfolio 1.18.0: a full-width tile saying "In play 3, Earning 2", which the line
          above already says. */
-      {
-        /* WHERE THEY ARE, BY LANE, SINCE portfolio 1.17.0 (PGS-C17): every project in Building, Earning, Parked or
-           Finished as one track, the figure `projects-by-lane` declared since 1.6.0 and drawn by nothing since 1.11.0.
-           Past four in play, as How they are going is: three projects are three cards and say it themselves. */
-        kind: 'split',
-        heading: 'Where they are',
-        icon: 'thing',
-        span: 12,
-        key: 'where-they-are',
-        source: 'metric.projects-by-lane',
-        when: { metric: 'projects-live', gt: 4 },
-      },
+      /* NO WHERE THEY ARE, SINCE portfolio 1.30.0: a bar of lanes said 45% are building and nothing to act on. The
+         board's date line says how many are in play, parked and finished. */
       /* NO RIGHT NOW TILE, SINCE portfolio 1.10.0. It held In play and what aims to land within thirty days in a third of
          the row, beside two splits a third its height, so the row ended at three heights. In play is the line's now;
          what aims within thirty days is Coming up, folded under Earnings, agents and dates; and what an agent holds is
@@ -1228,11 +1162,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         heading: 'In play',
         icon: 'rocket',
         span: 12,
+        /* THE BOARD, SINCE portfolio 1.30.0: the app draws this block as the Projects board (`ProjectsBoard.svelte`), its
+           headline, what the earning ones bring in a month, this week's four counts, one list in three groups and the
+           parked and finished as a strip. Read by its key; a host that does not know it draws the cards. */
+        key: 'board',
         source: 'register.things',
-        /* THE PARKED TOO, SINCE the UI pass of 20 October (proj F5): the app draws this block's heading as a lane bar, In
-           play, Earning, Building and Parked, and Parked shows its cards in the same grid, where a one-row table under
-           Parked and finished said it. A finished project is not here. */
-        where: 'lane is not retired',
+        /* EVERY PROJECT, THE FINISHED TOO, SINCE portfolio 1.30.0: the board counts them on its date line and folds them
+           into its last strip. The cards a host draws in its place leave the finished out themselves. */
         /* EACH CARD WEARS THE PROJECT'S OWN MARK IN ITS OWN HUE, SINCE portfolio 1.6.0, the identity the list declares
            (`identity: { mark, accent }`), and says what the project is under its name (`about`, drawn as the quieter
            line under a title). Neither is a fact, so the three facts below are unchanged.
@@ -1280,7 +1216,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         limit: 100,
         /* DRAWN ONLY WHILE ONE IS IN PLAY OR PARKED, SINCE portfolio 1.13.0 and the UI pass of 20 October: its empty line,
            the one thing to do on a page with no project, is the line's now, and a parked one is a lane of these cards. */
-        when: { any: [{ metric: 'projects-live', gt: 0 }, { metric: 'projects-parked', gt: 0 }] },
+        when: { any: [{ metric: 'projects-live', gt: 0 }, { metric: 'projects-parked', gt: 0 }, { metric: 'projects-retired', gt: 0 }] },
       },
       {
         /* WHAT A RULE OR AN AGENT ASKED ABOUT A PROJECT, SINCE portfolio 1.17.0 (PGS-C18), answered here, three at a time,
@@ -1299,10 +1235,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tiles: true,
         when: { metric: 'questions-open-in:things', gt: 0 },
       },
-      /* WHAT EACH ONE EARNS, ALONE, SINCE the UI pass of 20 October (proj F5): the heading Earnings, agents and dates, what
-         agents hold, what is coming up and the parked and finished went. Every card says its agent, how far along it is
-         and the day it aims for, and Parked is a lane of the cards. */
-      EARNS,
+      /* NO WHAT EACH ONE EARNS, SINCE portfolio 1.30.0: the board's Earning, a month says it beside its headline, a
+         month at a time and with each project's own warning, where this split said the year each one typed. */
     ],
   },
 

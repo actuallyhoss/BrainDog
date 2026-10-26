@@ -114,10 +114,14 @@ const answered = (k: Kernel, page: string): Drawn[] => {
   return out.value!.blocks;
 };
 
-/** The page's sentence, by the web's rule (`leadIndex` in apps/web): the first block drawn, when it is a lead note. */
+/**
+ * The page's sentence, by the web's rule (`leadIndex` in apps/web): the first block drawn, when it is a lead note. OR THE
+ * PROJECTS BOARD, SINCE portfolio 1.30.0: its headline is the page's sentence, said from the late work, the dates, the
+ * quiet numbers, the questions and the renewals by project, which no one figure reads (`ProjectsBoard.svelte`).
+ */
 const sentenceOf = (blocks: readonly Drawn[]): Drawn | undefined => {
   const first = blocks.find((b) => b.drawn !== false);
-  return first && PARTS.lead!(first, '') ? first : undefined;
+  return first && (PARTS.lead!(first, '') || (first.kind === 'cards' && (first as { key?: unknown }).key === 'board')) ? first : undefined;
 };
 
 test('EACH MODULE PAGE DECLARES THE FIVE PARTS: its line, one queue over its own list, figures, agents at work, the list', () => {
@@ -224,6 +228,8 @@ test('ON A RECORD AT WORK EVERY PAGE DRAWS ALL FIVE: one sentence, its queue, it
     assert.ok(sentenceOf(blocks), `${slug} opens on no sentence`);
     for (const [part, is] of Object.entries(PARTS)) {
       if (part === 'figures' && NO_FIGURES_TILE.has(slug)) continue;
+      /* THE BOARD IS PROJECTS' LEAD, held by `sentenceOf` above. */
+      if (part === 'lead' && sentenceOf(blocks)?.kind === 'cards') continue;
       assert.ok(shown.some((b) => is(b, list)), `${slug} draws no ${part}`);
     }
     assert.equal(shown.find((b) => b.kind === 'queue')?.queue?.length, 1, `${slug}'s queue draws its one question`);

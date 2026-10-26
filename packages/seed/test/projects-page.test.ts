@@ -85,29 +85,28 @@ const headed = (blocks: Drawn[], heading: string): Drawn => {
 
 const drawn = (b: Drawn): boolean => b.drawn !== false;
 
-test('FIVE IN PLAY OVER THREE LANES DRAW WHERE THEY ARE, each lane in words with its own count', async () => {
+test('THE BOARD HOLDS EVERY PROJECT, the finished too, and no bar of lanes is drawn over it', async () => {
   const { k } = await fresh();
   for (const [name, lane] of SIX) add(k, name, lane);
-  const split = headed(projects(k), 'Where they are');
-  assert.ok(drawn(split), 'Where they are is not drawn over five projects in play');
-  assert.equal(split.kind, 'split');
-  const groups = split.readings?.[0]?.reading?.groups ?? [];
-  assert.deepEqual(
-    groups.map((g) => [g.label, g.value]),
-    [
-      ['Building', 3],
-      ['Earning', 2],
-      ['Parked', 1],
-    ],
-  );
+  add(k, 'Kestrel', 'retired');
+  const page = projects(k);
+  /* SINCE portfolio 1.30.0 the board's date line says how many are in play, parked and finished, where a split said it. */
+  assert.equal(page.filter((b) => b.heading === 'Where they are').length, 0, 'the bar of lanes is drawn again');
+  const board = page.filter((b) => (b as { key?: unknown }).key === 'board');
+  assert.equal(board.length, 1, `${board.length} blocks are the board`);
+  assert.ok(drawn(board[0]!), 'the board is not drawn over five projects in play');
+  assert.equal(board[0]!.kind, 'cards');
+  const names = ((board[0]!.rows ?? []) as unknown as { fields: Record<string, unknown> }[]).map((r) => String(r.fields.name)).sort();
+  assert.deepEqual(names, ['Bindery', 'Harbour', 'Kestrel', 'Lantern', 'Orchard', 'Quill', 'Saltmarsh']);
 });
 
-test('THREE PROJECTS DRAW NO SPLIT: three cards say it themselves', async () => {
+test('THREE PROJECTS ARE THE BOARD, and a record with only finished ones still draws it', async () => {
   const { k } = await fresh();
   for (const [name, lane] of SIX.slice(2, 5)) add(k, name, lane);
-  const page = projects(k);
-  assert.equal(drawn(headed(page, 'Where they are')), false, 'Where they are is drawn over three projects');
-  assert.ok(drawn(headed(page, 'In play')), 'the cards are not drawn');
+  assert.ok(drawn(headed(projects(k), 'In play')), 'the board is not drawn');
+  const done = await fresh();
+  add(done.k, 'Kestrel', 'retired');
+  assert.ok(drawn(headed(projects(done.k), 'In play')), 'the board is not drawn over a finished project');
 });
 
 test('WITH NO HEALTH SET THERE IS NO HEALTH SPLIT, and the first project that says how it is going draws it', async () => {
@@ -153,6 +152,6 @@ test('SIX TILES AT MOST BEFORE THE FOLD, drawn on a record with every one of the
     return !boxed && b.lead !== true;
   });
   assert.ok(above.length <= 6, `${above.length} tiles before the fold: ${above.map((b) => b.heading ?? b.kind).join(', ')}`);
-  for (const heading of ['Where they are', 'How they are going', 'In play'])
+  for (const heading of ['How they are going', 'In play'])
     assert.ok(above.some((b) => b.heading === heading), `${heading} is not before the fold`);
 });

@@ -152,8 +152,11 @@ test('PROJECTS SAYS NO COUNT OF THOSE IN PLAY THAT SAY WHAT THEY EARNED, since t
   /* CUT IN BATCH 6: "3 of 3 projects in play say what they earned in a year" sat in a grey box beside the split, and the figure
      stays declared for the split's own gate. */
   assert.equal(earnsLine(opened(k, 'portfolio')).length, 0, 'the line is declared again');
-  const split = (opened(k, 'portfolio').blocks as Drawn[]).filter((b) => b.heading === 'What each one earns' && b.drawn !== false);
-  assert.equal(split.length, 1, 'the split is drawn once');
+  /* AND SINCE portfolio 1.30.0 NO SPLIT EITHER: the board's Earning, a month says what each brings in, beside its headline. */
+  const split = (opened(k, 'portfolio').blocks as Drawn[]).filter((b) => b.heading === 'What each one earns');
+  assert.equal(split.length, 0, 'the split of the year each typed is declared again');
+  const board = (opened(k, 'portfolio').blocks as (Drawn & { key?: unknown })[]).filter((b) => b.key === 'board' && b.drawn !== false);
+  assert.equal(board.length, 1, 'the board is drawn once');
 });
 
 test('WITH NONE SAYING, THE LINE GOES WITH THE SPLIT: neither is drawn', async () => {

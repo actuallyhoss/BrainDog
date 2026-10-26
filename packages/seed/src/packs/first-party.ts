@@ -762,9 +762,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   are counts the projects Projects draws, Finished left out. Words and one filter moved, no id added or taken away, so a minor step.
  * - portfolio 1.29.0 (the agents' reads): a project's mark, hue and draft flag are declared `hidden_from_agents`, so the short
  *   answers an agent reads leave them out; `format: full` and the app keep them. Three fields flagged, no id added or taken away, so a minor step.
+ * - portfolio 1.30.0 (the Projects board): `page.portfolio` leads with the board its cards block is drawn as (`key: board`),
+ *   a headline said from late work, dates, quiet numbers, questions and renewals, in place of the line read off health;
+ *   Where they are and What each one earns go, the board saying both. Blocks taken away and one keyed, no id added or
+ *   taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.29.0',
+  portfolio: '1.30.0',
   people: '3.8.0',
   'money-core': '3.27.0',
   estate: '2.5.0',

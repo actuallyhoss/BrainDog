@@ -310,10 +310,11 @@ test('A NEW SHOP\'S PROJECTS HAS NO LINE AND ONE BOX TO ADD A PROJECT, and a pro
     parked.map((b) => b.body ?? b.heading),
     ['No project is in play. Add one, or set a parked one building.', 'Add a project'],
   );
-  /* ONE IN PLAY: one line, and no box. */
+  /* ONE IN PLAY: the board leads, SINCE portfolio 1.30.0, its headline the page's line, and no box. */
   value(k.create('things', { name: 'Kiln room', lane: 'building' }, { actor: 'p_owner' }));
-  const live = value<{ blocks: (Drawn & { lead?: boolean })[] }>(k.page('portfolio')).blocks.filter((b) => b.drawn !== false);
-  assert.equal(live.filter((b) => b.kind === 'note' && b.lead === true).length, 1);
+  const live = value<{ blocks: (Drawn & { lead?: boolean; key?: unknown })[] }>(k.page('portfolio')).blocks.filter((b) => b.drawn !== false);
+  assert.equal(live.filter((b) => b.kind === 'note' && b.lead === true).length, 0, 'a line is said over the board');
+  assert.equal(live[0]?.key, 'board', 'the page does not open on its board');
   assert.ok(!live.some((b) => b.kind === 'capture'), 'the Add box stays once a project is in play');
   sql.close();
 });

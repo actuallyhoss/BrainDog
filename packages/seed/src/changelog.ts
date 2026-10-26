@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.30.0',
+      notes: 'Projects opens on what is true today: which projects are late, what falls due this week, whose numbers went quiet and what renews, by name, with what the earning ones bring in a month beside it. One list follows, earning first, then what is moving, then what is quiet, and the parked and finished fold into a strip.',
+    },
+    {
       version: '1.29.0',
       notes: "A project's mark, hue and whether it is kept yet are the list's own bookkeeping, so an agent's short answers about a project no longer say them. The app and the full read still hold them.",
     },

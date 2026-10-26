@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.29.0",
+  "version": "1.30.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "A project's mark, hue and whether it is kept yet are the list's own bookkeeping, so an agent's short answers about a project no longer say them. The app and the full read still hold them.",
+  "changes": "Projects opens on what is true today: which projects are late, what falls due this week, whose numbers went quiet and what renews, by name, with what the earning ones bring in a month beside it. One list follows, earning first, then what is moving, then what is quiet, and the parked and finished fold into a strip.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -227,35 +227,12 @@
           "body": "No project is in play. Add one, or set a parked one building."
         },
         {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "projects-need-you", "gt": 0 },
-          "body": "{{questions-open-in:things}} question(s) for you, {{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track"
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "all": [ { "metric": "projects-need-you", "is": 0 }, { "metric": "projects-live", "gt": 0 } ] },
-          "body": "Nothing needs a push, {{questions-open-in:things}} question(s) for you"
-        },
-        {
           "kind": "capture",
           "heading": "Add a project",
           "icon": "plus",
           "span": 12,
           "register": "things",
           "when": { "metric": "projects-live", "is": 0 }
-        },
-        {
-          "kind": "split",
-          "heading": "Where they are",
-          "icon": "thing",
-          "span": 12,
-          "key": "where-they-are",
-          "source": "metric.projects-by-lane",
-          "when": { "metric": "projects-live", "gt": 4 }
         },
         {
           "kind": "split",
@@ -272,8 +249,8 @@
           "heading": "In play",
           "icon": "rocket",
           "span": 12,
+          "key": "board",
           "source": "register.things",
-          "where": "lane is not retired",
           "columns": [
             { "field": "name", "as": "title" },
             { "field": "mark", "as": "mark" },
@@ -289,7 +266,7 @@
           ],
           "order": [ { "field": "name", "dir": "asc" } ],
           "limit": 100,
-          "when": { "any": [ { "metric": "projects-live", "gt": 0 }, { "metric": "projects-parked", "gt": 0 } ] }
+          "when": { "any": [ { "metric": "projects-live", "gt": 0 }, { "metric": "projects-parked", "gt": 0 }, { "metric": "projects-retired", "gt": 0 } ] }
         },
         {
           "kind": "queue",
@@ -301,18 +278,6 @@
           "limit": 3,
           "tiles": true,
           "when": { "metric": "questions-open-in:things", "gt": 0 }
-        },
-        {
-          "kind": "split",
-          "heading": "What each one earns",
-          "icon": "coins",
-          "span": 12,
-          "source": "register.things",
-          "where": "lane is building or earning, revenue is set",
-          "columns": [ { "field": "name" }, { "field": "revenue" }, { "field": "hue" } ],
-          "order": [ { "field": "revenue", "dir": "desc" } ],
-          "limit": 8,
-          "when": { "metric": "projects-earning-said", "gt": 1 }
         }
       ]
     },

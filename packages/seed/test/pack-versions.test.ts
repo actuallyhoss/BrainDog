@@ -2157,6 +2157,25 @@ const DECLARED: Record<string, Version> = {
   /* AUDIT C OF 25 OCTOBER (X7): 1.26.0 IS MASTER'S, so a version of its own. A block added, no id added. */
   /* THE LOOK OF 25 OCTOBER (P7, P11): 1.27.0 IS MASTER'S, so a version of its own. Words on Numbers and one filter on a figure, no id added. */
   /* A PROJECT'S MARK, HUE AND NOT-KEPT-YET ARE THE LIST'S OWN BOOKKEEPING: 1.28.0 IS MASTER'S, so a version of its own. Three fields flagged, no id added. */
+  /* THE PROJECTS BOARD: 1.30.0, blocks taken away and one keyed, no id added. */
+  'portfolio@1.30.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health
+      metric.projects-by-lane metric.projects-earning metric.projects-earning-before metric.projects-earning-change
+      metric.projects-earning-said metric.projects-lane-earning metric.projects-live metric.projects-looked-up
+      metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.all-numbers page.portfolio
+      register.datapoints register.kpis register.stages register.things
+      rule.kind-offers-kpis rule.project-past-aim
+      script.kind_drafts script.kpi_backfill
+    `,
+    declares: '182444007550fda9',
+    history: [
+      "Portfolio 1.30.0 (the Projects board): `page.portfolio` keys its cards block `board`, which the app draws as the board, and drops the lines read off health, Where they are and What each one earns; no id added or taken away -> 182444007550fda9",
+    ],
+  },
   'portfolio@1.29.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

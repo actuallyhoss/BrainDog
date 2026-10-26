@@ -255,9 +255,9 @@ test('THE FILE IS ITS OWN: four lists, two pages, twenty-five figures over them,
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
   /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
-     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers, 1.25.0 since Numbers has a page of its own, 1.26.0 since the card's when reads the runs too, 1.27.0 since a page with nothing in play opens on a box to add one, 1.28.0 since Numbers opens on a plain line and Where they are leaves Finished out. */
+     the module is at and nothing a record already holds is changed in place. 1.19.0 since the key numbers, 1.20.0 since the cards draw the key number they lead with, 1.21.0 since the cards draw every project in play or parked, 1.22.0 since the key-numbers backfill ships, 1.23.0 since a project keeps its stages and its plan's shape, 1.24.0 since a project's kind offers its key numbers, 1.25.0 since Numbers has a page of its own, 1.26.0 since the card's when reads the runs too, 1.27.0 since a page with nothing in play opens on a box to add one, 1.28.0 since Numbers opens on a plain line and Where they are leaves Finished out, 1.29.0 since agents' short reads leave out the bookkeeping fields, 1.30.0 since Projects is drawn as its board. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.29.0');
+  assert.equal(doc.version, '1.30.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -459,16 +459,18 @@ test('PROJECTS ASKS ITS OWN QUESTIONS: a queue of the questions about projects, 
     { heading: queue.heading, where: queue.where, when: queue.when, limit: queue.limit, tiles: queue.tiles },
     { heading: 'Waiting on you', where: 'list is things', when: { metric: 'questions-open-in:things', gt: 0 }, limit: 3, tiles: true },
   );
+  /* SINCE 1.30.0 THE BOARD SAYS THEM (`key: board`), by project, in its headline; no line said from figures is left. */
   const lines = projectsPage().filter((b) => b.lead && typeof b.body === 'string' && b.body.includes('{{'));
-  assert.equal(lines.length, 2);
-  for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:things\}\} question\(s\) for you/u);
+  assert.equal(lines.length, 0, 'a line said from figures is declared over the board');
+  assert.equal(projectsPage().filter((b) => (b as { key?: unknown }).key === 'board').length, 1, 'Projects declares no board');
 });
 
 /* FIVE SINCE 1.18.0: the In play and earning strip is gone, so Where they are leads, over How they are going, and the page is at
    the most a page shows before its fold (`calm-pages.test.ts`). */
 /* AND NO OPEN TILE SINCE the UI pass of 20 October (proj F5): What each one earns stands alone under the questions. */
-test('FIVE TILES BEFORE THE FOLD AT 1440, the lanes first, the questions under In play and what each earns last', () => {
-  assert.deepEqual(beforeTheFold(projectsPage()), ['Where they are', 'How they are going', 'In play', 'Waiting on you', 'What each one earns']);
+/* AND THREE SINCE 1.30.0: the board is In play and says where they are and what each earns itself. */
+test('THREE TILES BEFORE THE FOLD AT 1440, how they are going, the board, and the questions under it', () => {
+  assert.deepEqual(beforeTheFold(projectsPage()), ['How they are going', 'In play', 'Waiting on you']);
 });
 
 test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT PROJECTS: nothing at nought, two at two, and not the one about a task', async () => {
@@ -498,18 +500,15 @@ test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT PROJECTS: noth
   const waiting = (): Drawn => page().find((b) => b.kind === 'queue' && b.heading === 'Waiting on you')!;
 
   assert.equal(waiting().drawn, false, 'the queue drew with nothing asked');
-  /* BOTH IN PLAY (`building`, the first a project can say), so a line is drawn, and it says no question at nought. */
-  const quiet = line();
-  assert.ok(quiet !== null && quiet !== '', 'Projects drew no line');
-  assert.doesNotMatch(quiet, /question/u, 'the line said nought');
+  /* BOTH IN PLAY (`building`, the first a project can say): SINCE 1.30.0 the board leads, and no line said from figures is drawn. */
+  assert.equal(line(), null, 'a line is drawn over the board');
 
   ask('Ship the Kiln beta?', spoken(kiln));
   ask('Park Atlas for a month?', spoken(atlas));
   ask('Move the glazing to Friday?', spoken(task));
   assert.notEqual(waiting().drawn, false);
   assert.equal(waiting().matched, 2, 'the queue kept a question about a task');
-  /* THE CLAUSE LEADS THE LINE THAT NAMES WHAT NEEDS A PUSH, and follows the one that says nothing does. */
-  const two = line()!;
-  assert.ok(two === `2 questions for you, ${quiet}` || two === `${quiet}, 2 questions for you`, two);
+  /* THE BOARD SAYS THEM BY PROJECT (`projects-board.ts`), so still no line is drawn. */
+  assert.equal(line(), null, 'a line is drawn over the board');
   close();
 });

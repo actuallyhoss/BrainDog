@@ -60,9 +60,13 @@ test('THE PORTFOLIO OVERVIEW DRAWS WHAT THE PROJECTS EARN, in a block over the r
      columns over the same rows, drawn as parts of one whole. */
   /* DECLARED ONCE, ALONE, SINCE the UI pass of 20 October (proj F5): the open and folded headings over it went with what
      agents hold, what is coming up and the parked and finished, which every card now says. */
-  const tracks = draws('split');
-  assert.equal(tracks.length, 1, 'no track on the Overview puts one project’s money against another’s, so the page says a total and nothing under it');
-  assert.equal(draws('cards').length, 1, 'the In play cards do not say what a project earns, so the money on the page is a total nobody can attribute');
+  /* AND SINCE portfolio 1.30.0 THE BOARD SAYS IT (`key: board`): what each earning project brings in a month, one line
+     each with its share of the whole, from the money linked to it, else its monthly key number, else its year in
+     twelve. No split is declared beside it. */
+  assert.equal(draws('split').length, 0, 'a split says again what the board says');
+  const board = blocks.filter((b) => b.kind === 'cards' && (b as { key?: unknown }).key === 'board');
+  assert.equal(board.length, 1, 'no board on the Overview says what each project earns');
+  assert.equal(draws('cards').length, 1, 'the board does not read what a project earns, so the money on the page is a total nobody can attribute');
 
   /* EVERY ONE OF THEM STILL READS PROJECTS ALONE. The pack needs nothing (`first-party.test.ts` holds
      `portfolio` to `requires: []`), so a money block sourced from the ledger would be a page the
@@ -214,11 +218,11 @@ test('AND A PROJECT THAT STATED LAST YEAR AND NOTHING THIS YEAR DOES NOT PRINT A
    portfolio 1.8.0, and what each one earns is drawn only while a project has said what it earns, which is the same
    guard on the block that is left: a record nobody told draws no money at all, rather than nought. */
 test('WHAT EACH ONE EARNS IS DRAWN ONLY WHILE A PROJECT SAYS IT, so a total of nothing cannot be read as a year', () => {
-  const earns = blocksOf('portfolio').find((b) => b.kind === 'split' && (b.columns ?? []).some((c) => c.field === 'revenue')) as (Block & { when?: unknown }) | undefined;
-  assert.ok(earns, 'no block on the Overview draws what each project earns');
-  /* AND ONLY WHILE TWO OR MORE SAY IT, SINCE the UI pass of 20 October (proj F5): a split of one part says nothing. */
-  assert.deepEqual(earns.when, { metric: 'projects-earning-said', gt: 1 }, 'the split draws over projects that said nothing about what they earn');
-  assert.ok(METRICS['projects-earning-said'], 'projects-earning-said is not declared, so the split is drawn on a figure the record cannot answer');
+  /* SINCE portfolio 1.30.0 THE BOARD SAYS IT, and over a project that said nothing it says no money is linked rather than
+     nought (`projects-board.ts` in apps/web). No split of the year is declared, so none can draw a total of nothing. */
+  const earns = blocksOf('portfolio').find((b) => b.kind === 'split' && (b.columns ?? []).some((c) => c.field === 'revenue'));
+  assert.equal(earns, undefined, 'a split of the year each project typed is declared again');
+  assert.ok(METRICS['projects-earning-said'], 'projects-earning-said is not declared, so a page asking how many said cannot be answered');
 });
 
 test('and that count is of the projects that stated a figure, never of the projects in play', async () => {

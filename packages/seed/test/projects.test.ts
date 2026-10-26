@@ -94,15 +94,13 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   /* IN PLAY IS THE LINE'S, SINCE portfolio 1.10.0, beside what needs you, and what aims within thirty days is a figure
      the fold's Coming up is drawn under. */
   /* AND SINCE portfolio 1.12.0 THE LINE NAMES THEM, which need a push and which are on track, from the rows. */
-  const line = overview.blocks.find((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false) as { values?: Record<string, unknown> };
-  /* NEWEST MADE FIRST, the order a list that declares none reads in (PGS-B06): the sample's projects in reverse. */
-  const named = (ok: (t: (typeof THINGS)[number]) => boolean) => THINGS.filter((t) => inPlay(t) && ok(t)).map((t) => String(t.name)).reverse();
-  const and = (list: string[]) => (list.length < 2 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
-  assert.deepEqual(line.values, {
-    'questions-open-in:things': 0,
-    'projects-need-you.names': and(named((t) => t.health === 'at_risk' || t.health === 'off_track')),
-    'projects-on-track.names': and(named((t) => t.health === 'on_track')),
-  });
+  /* SINCE portfolio 1.30.0 NO LINE IS SAID FROM HEALTH over projects in play: the board leads with what is late, due,
+     quiet, asked and renewing, by name, and a line read off health alone said "Nothing needs a push" over late work. */
+  assert.deepEqual(
+    overview.blocks.filter((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false).map((b) => (b as { body?: string }).body),
+    [],
+    'a line is said over the board',
+  );
   assert.equal(figure(k, 'projects-live'), THINGS.filter(inPlay).length);
   assert.equal(
     figure(k, 'projects-aim-30d'),
@@ -186,12 +184,8 @@ test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and the parked are
   assert.equal(leads[0]!.drawn, false, 'a record with parked projects says it has none');
   assert.equal(leads[1]!.drawn !== false, true, 'a page with nothing in play does not say so');
   assert.equal(leads[1]!.body, 'No project is in play. Add one, or set a parked one building.');
-  /* THE ONE SAYING NOTHING NEEDS YOU IS SAID OF THE PROJECTS IN PLAY ALONE, and SINCE portfolio 1.27.0 (audit C, X7) it
-     draws only while one is in play: "Nothing needs a push." stood as a second line under this one. It still comes
-     after the line with no figure: the nightly line is written for the first line a page draws (`leadBlockOf` in
-     `packages/record/src/headlines.ts`), and asked of "across 0 projects" the model's line would be drawn over this one
-     saying the same. */
-  assert.equal(leads[3]!.body, 'Nothing needs a push, {{questions-open-in:things}} question(s) for you', 'the quiet line is not the one that leaves In play to the strip');
+  /* THE LINES SAID FROM HEALTH ARE GONE, SINCE portfolio 1.30.0: the board says what is late, due and quiet. */
+  assert.equal(leads.length, 2, 'the page declares a line said from health again');
   assert.deepEqual(
     leads.filter((b) => b.drawn !== false).map((b) => b.body),
     ['No project is in play. Add one, or set a parked one building.'],
@@ -204,11 +198,16 @@ test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and the parked are
   assert.equal(parkedOf(overview).length, THINGS.length);
   assert.ok(!overview.blocks.some((b) => b.heading === 'Parked and finished'), 'Parked and finished is drawn again');
 
-  /* A FINISHED PROJECT IS ON NO CARD. */
+  /* A FINISHED PROJECT IS A ROW OF THE BOARD, SINCE portfolio 1.30.0, which counts it on its date line and folds it into
+     its last strip; it is never parked. */
   assert.ok(k.create('things', { name: 'Fathom', lane: 'retired' } as never, { actor: 'p_1' }).ok);
   const longer = opened(k, 'portfolio');
   assert.equal(parkedOf(longer).length, THINGS.length);
-  assert.ok(!names(block(longer, 'In play').rows).includes('Fathom'), 'a finished project is drawn as a card');
+  assert.deepEqual(
+    block(longer, 'In play').rows.filter((r) => r.fields.name === 'Fathom').map((r) => r.fields.lane),
+    ['retired'],
+    'the board does not hold the finished project',
+  );
 });
 
 /**
@@ -224,9 +223,8 @@ test('PROJECTS IS THE CARDS AND WHAT EACH EARNS, with no heading over them and n
   for (const b of short.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
   assert.deepEqual(short.blocks.filter((b) => gone.includes(String(b.heading))).map((b) => b.heading), [], 'a tile the cards say is declared again');
   assert.ok(!short.blocks.some((b) => b.drawn !== false && (b as { fold?: unknown }).fold === true), 'Projects ends on a folded heading');
-  const earns = block(short, 'What each one earns') as PageResult['blocks'][number] & { span?: number };
-  assert.equal(earns.drawn !== false, true);
-  assert.deepEqual(names(earns.rows).sort(), THINGS.filter((t) => inPlay(t) && t.revenue !== undefined && t.revenue !== null).map((t) => String(t.name)).sort());
+  /* WHAT EACH ONE EARNS IS THE BOARD'S, SINCE portfolio 1.30.0, a month at a time beside its headline. */
+  assert.ok(!short.blocks.some((b) => b.heading === 'What each one earns'), 'the split of the year each one typed is declared again');
 
   /* PAST FOUR, STILL NOTHING FOLDS: the cards are the page however many there are. */
   for (const name of ['Fathom', 'Quire']) assert.ok(k.create('things', { name, lane: 'building', aim: TODAY } as never, { actor: 'p_1' }).ok);
@@ -241,7 +239,6 @@ test('PROJECTS IS THE CARDS AND WHAT EACH EARNS, with no heading over them and n
   for (const n of THINGS.keys()) assert.ok(bare.update('things', `things#${n + 1}`, { lane: 'building', revenue: null, agent: null, aim: null } as never, { actor: 'p_1' }).ok);
   const ends = opened(bare, 'portfolio');
   assert.equal(block(ends, 'In play').rows.length, THINGS.length);
-  assert.equal(block(ends, 'What each one earns').drawn, false, 'a split of nothing is drawn');
   const said = (ends.blocks as (PageResult['blocks'][number] & { body?: string })[]).filter((b) => typeof b.body === 'string' && b.body.includes('say what they earned'));
   assert.deepEqual(said, [], 'the page declares the line again');
 });
@@ -307,22 +304,21 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS HOW THE PROJECTS IN PLAY AR
      THE FIRST, SINCE portfolio 1.27.0 (audit C, X7), is the record with no project at all, and the second, since 1.13.0,
      the page with nothing in play; the sample is neither. */
   const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
-  assert.equal(leads.length, 4, 'the Overview declares its four opening sentences');
-  assert.deepEqual(leads.map((b) => b.drawn !== false), [false, false, true, false], 'one sentence and not two, or none');
-  assert.match(String((leads[2] as { body?: string }).body), /^\{\{questions-open-in:things\}\} question\(s\) for you, \{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
+  /* SINCE portfolio 1.30.0 THE TWO LINES SAID FROM HEALTH ARE GONE, and the board leads (`key: board`). */
+  assert.equal(leads.length, 2, 'the Overview declares its two opening sentences for a record with nothing in play');
+  assert.deepEqual(leads.map((b) => b.drawn !== false), [false, false], 'a line is drawn over projects in play');
+  assert.equal((block(overview, 'In play') as { key?: unknown }).key, 'board', 'the cards are not the board');
 
   /* EVERY PROJECT IN PLAY IS A PART OF HOW THEY ARE GOING, and Where they are, which said the line again, is gone
      (portfolio 1.11.0). */
-  assert.equal(block(overview, 'Where they are').drawn, false, 'Where they are is drawn over three projects in play');
+  assert.ok(!overview.blocks.some((b) => b.heading === 'Where they are'), 'Where they are is declared again');
   const read = k.metric(PROJECT_METRICS['projects-by-health'] as never);
   assert.ok(read.ok, sayOf(read));
   const health = read.value.groups ?? [];
   assert.equal(health.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'a project in play is in no part');
 
-  /* WHAT EACH ONE EARNS IS ONE TRACK, over the rows the Earning tile adds up. */
-  const earns = overview.blocks.find((b) => b.heading === 'What each one earns')!;
-  assert.equal(earns.kind, 'split');
-  assert.deepEqual(earns.refusals, []);
+  /* WHAT EACH ONE EARNS IS THE BOARD'S, SINCE portfolio 1.30.0. */
+  assert.ok(!overview.blocks.some((b) => b.heading === 'What each one earns'), 'What each one earns is declared again');
 
   /* A CARD CARRIES THE PROJECT'S LINE, MARK AND HUE, read off the project's own row. */
   const cards = block(overview, 'In play');
@@ -344,15 +340,15 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
   /* SINCE portfolio 1.11.0 the row is one track of how they are going, the whole width: Where they are said the line
      again beside it. */
   const row = blocks.filter((b) => ['Where they are', 'How they are going'].includes(String(b.heading)));
-  assert.deepEqual(row.map((b) => [b.heading, b.span]), [['Where they are', 12], ['How they are going', 12]], 'a split is not one whole tile');
+  /* AND SINCE portfolio 1.30.0 WHERE THEY ARE IS GONE: the board's date line counts the lanes. */
+  assert.deepEqual(row.map((b) => [b.heading, b.span]), [['How they are going', 12]], 'a split is not one whole tile');
   /* ONLY PAST FOUR IN PLAY, SINCE portfolio 1.12.0: three projects drew three equal thirds, which the line and the cards
      already say. */
-  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ metric: 'projects-live', gt: 4 }), 'the lanes draw over a few projects');
-  assert.equal(JSON.stringify(row[1]!.when), JSON.stringify({ all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] }), 'the track draws over a few projects, or over none that says');
+  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] }), 'the track draws over a few projects, or over none that says');
   /* NO STRIP UNDER THE LINE SINCE BATCH 6: "In play 3, Earning 2" was a whole row for what the line says. */
   assert.ok(!blocks.some((b) => b.heading === 'In play and earning'), 'the strip is drawn again');
   /* THE ADD A PROJECT BOX COMES BEFORE THEM, SINCE portfolio 1.27.0 (audit C, X7), drawn only while none is in play. */
-  assert.equal(blocks.find((b) => !b.lead && b.kind !== 'capture')?.heading, 'Where they are', 'the lanes are not the first under the line');
+  assert.equal(blocks.find((b) => !b.lead && b.kind !== 'capture')?.heading, 'How they are going', 'the track is not the first under the line');
 
   const k = await seeded();
   const going = () => opened(k, 'portfolio').blocks.find((b) => b.heading === 'How they are going')!;
