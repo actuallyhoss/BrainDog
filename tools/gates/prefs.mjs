@@ -699,8 +699,11 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * the person's digest, and Today's activity is a screen; it drew muted notes all the same, and the excuse is what kept
    * anybody from looking (`loop/research-audit-11-13.md`). Whether a muted note leaves Today is the record's to test, where
    * the activity block is built: `packages/record/test/activity-muted.test.ts`.
+   *
+   * `agents.answer_on_word` DRAWS NOTHING: it decides whether an agent's answer on the owner's word is taken, and the
+   * record tests that, a refusal naming the switch when it is off: `packages/record/test/on-word.test.ts`.
    */
-  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot', 'packs.known_keys']);
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot', 'packs.known_keys', 'agents.answer_on_word']);
   const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
   const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
   const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);
