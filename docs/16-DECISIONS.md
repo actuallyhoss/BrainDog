@@ -1424,6 +1424,21 @@ person with `pressedIn`, which `admin` and `vault` refuse, so it never installs 
 the decision keeps the app it was pressed in. A model calling `answer` without a grant is refused
 and told to show the card ([12-SECURITY](12-SECURITY.md) §5.1, [44-SPEC-MCP](44-SPEC-MCP.md) §15.12).
 
+**Amended 27 October 2026: on the person's word, the owner's decision.** "Make it so decisions can be closed out by
+agents if I tell them so." An agent the owner tells, in the conversation, to answer a question or make a change sends
+his words, quoted, as `said`: `instructions {answer, option, said}` answers a waiting question, and `create` or
+`update` with `said` writes a change the ladder would have filed as a question. The record runs `decide` as the owner
+with `onWord` set, keeps his words and the run on the decision (a `note`, `field` `answered_on_word`, "Answered by S12
+on Teodor's word: ..."), and Undo takes it back as any of his answers; a write keeps his words in its note and counts
+towards no rung. Only an owner's key that may write, while **Agents may answer when you tell them** is on (Settings ›
+Agents, `agents.answer_on_word`, on until he turns it off), from a run that has not read outside text. His word may
+accept what installs (an add-on, an arrangement, an automation), which `decide` allows `onWord` alone; it never reaches
+a key (a list of keys, or an automation that calls out with one), an amount of money set on what is already there, or
+anything else `admin` and `vault` keep, which refuse `onWord`: erasing, deleting the record, the keychain, billing,
+tokens and sharing stay a browser session's. A token still never calls `decide` itself; the record cannot tell his
+words from words an agent made up, so the switch, the words kept and Undo are the controls
+([44-SPEC-MCP](44-SPEC-MCP.md) §15.14, [12-SECURITY](12-SECURITY.md) §5.2).
+
 **Rejected:** an `admin` scope, off by default. A scope that exists can be minted, leaked and
 replayed; a group no token can reach cannot.
 

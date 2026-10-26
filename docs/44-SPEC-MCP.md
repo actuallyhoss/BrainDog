@@ -1188,6 +1188,7 @@ only a person writes it: `instruct` refuses a token, so no agent instructs anoth
 | `{}` | What waits for this run, as lines, or "Nothing new for you". Marks them seen, by `asked`. |
 | `{take: "IN4"}` | Takes it, or says who has it. |
 | `{reply: "IN4", said, state}` | `state` is `done`, `needs_you` or `declined`. Answers with the receipts. Only the run that took it may reply. |
+| `{answer: "SG9", option, said}` | Answers a waiting question the person told this agent to answer, `said` their words quoted (§15.14). `answer` alone answers one an order of his names. |
 
 `seen` and `how` are taken and not listed. The bridge and the hooks use them to say what a client showed.
 
@@ -1394,6 +1395,45 @@ runs are already seen: the Profiles add-on's lists stay personal.
   turns the profile's name into a folder of its own (48 §5.13). A runner that says neither takes only jobs placed
   nowhere, as before.
 - **The `instructions` tool is unchanged.** An agent reads, takes and replies; only a person aims an instruction.
+
+### 15.14 · Answering on the person's word
+
+Built on 27 October 2026, the owner's decision: "make it so decisions can be closed out by agents if I tell them so"
+([ADR-060](16-DECISIONS.md), amended). The second rule of the instructions says it: "Suggest, and let the person decide
+in BrainDog: ask with propose. Decide only when they tell you to, passing their words as said."
+
+| Call | What it does |
+|---|---|
+| `instructions {answer: "SG9", option, said}` | Answers the question as the owner's own `decide`, run with `onWord` set to the run. `option` is one of the question's own answers (a choice's ids; `accept`, `reject`, `merge`, `apart` for a set of rows; `accept` or `reject` for anything that installs), and "yes", "approve", "no" and "decline" are read as the yes and no it takes. The answer says "Answered SG9 with accept, on Teodor's word. Undo is in BrainDog." |
+| `create {..., said}`, `update {..., said}` | A write the ladder would have filed as a question ("Changes like this ask until 10 of them have been kept as they were") is written instead, its note `On Teodor's word: "<said>"` (after the agent's own note when it sent one). It counts towards no rung. A write the rung lets through ignores `said`; one his settings row asks about still asks. |
+
+**What is kept.** The decision's reason is `Teodor told S12: "<said>"`, and a `note` on `decision:<id>`, `field`
+`answered_on_word`, the run in `to_v`, says `Answered by S12 on Teodor's word: "<said>"` in History and Activity
+(`kernel.keepWordAnswer`). Undo in BrainDog takes the decision back as any of his.
+
+**Who may.** A key whose person owns the record, whose scope and settings row let it write, from a run that has not
+read outside text (the ladder's `untrusted`), while **Agents may answer when you tell them** is on (Settings › Agents,
+the owner's `agents.answer_on_word`; on until he turns it off, and set only by an owner in a browser).
+
+**What no word reaches**, refused `FORBIDDEN` at `said` or `answer` with the reason: a key (a list of keys, or a question
+whose automation calls out with one, `Egress.key`), and an amount of money set on what is already there (adding an entry
+with an amount is filing it, and passes). Declining changes nothing, so a no is always answerable. `admin` and `vault`
+refuse `onWord`, so erasing, deleting the record, the keychain, tokens, sharing and billing stay a browser session's;
+`decide` lets `onWord` alone past its install door, for an add-on, an arrangement, a setting or an automation.
+
+| Code | At | When |
+|---|---|---|
+| `REQUIRED_MISSING` | `said` | `said` is empty or only spaces |
+| `REQUIRED_MISSING` | `option` | `answer` and `said` with no `option` |
+| `ENUM_VALUE_UNKNOWN` | `option` | An answer the question does not take |
+| `FORBIDDEN` | `said` | The switch is off (the refusal names **Agents may answer when you tell them** and Settings > Agents), the key is not the owner's, it may only suggest, or the run read outside text |
+| `FORBIDDEN` | `said`, `answer` | It is about keys, or it changes an amount of money |
+| `OUT_OF_BOUNDS` | `answer` | No question by that name the caller may see |
+| `TRANSITION_ILLEGAL` | `answer` | Already answered |
+
+The record cannot tell the person's words from words an agent made up. The switch, the words kept on every answer, the
+outside-text rule and Undo are the controls; the record's own tests are `packages/record/test/on-word.test.ts` and the
+door's `packages/mcp/test/on-word.test.ts`.
 
 ---
 

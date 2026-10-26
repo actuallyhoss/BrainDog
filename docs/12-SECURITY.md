@@ -199,6 +199,25 @@ answer, which is what both apps specify. A person who connects an app at another
 BrainDog. If an app were found to show `_meta` to its model, the remedy is to take its address off the list in
 `packages/record/src/methods/chat-answer.ts` (`appOf`).
 
+### 5.2 · An answer on the person's word
+
+The owner decided on 27 October 2026 that an agent he tells to may close out a decision ([ADR-060](16-DECISIONS.md),
+amended). An agent passes his words, quoted, as `said`: `instructions {answer, option, said}` answers a waiting
+question, and `create` or `update` with `said` writes a change the ladder would have asked about
+([44-SPEC-MCP](44-SPEC-MCP.md) §15.14). Unlike a press on the card, nothing proves the words are his: the agent says
+they are. So the controls are about who may, what may never, and what is kept.
+
+| Control | Kind |
+|---|---|
+| **Agents may answer when you tell them** (Settings › Agents, `agents.answer_on_word`) is on until the owner turns it off, and only an owner in a browser sets it. Off, every such call is refused, naming the switch | enforced in the record |
+| Only a key whose person owns the record, and whose scope and settings row let it write. A run that read text from outside the record (the ladder's `untrusted`) asks for the rest of it, his word or not, because that text could carry words he never said | enforced in the record |
+| `said` must hold words. An empty one is refused at `said` | enforced in the record |
+| No word reaches a key (a list of keys, or an automation that calls out with one) or an amount of money set on what is already there | enforced in the record |
+| The answer runs the record's own `decide` as the owner with `onWord` set. `admin` and `vault` refuse `onWord`, so erasing, deleting the record, the keychain, tokens, sharing and billing stay a browser session's. `decide` lets `onWord` alone accept what installs | enforced in the record |
+| A token still never calls `decide` itself | architectural |
+| Each answer keeps his words and the run: the decision's reason, and a `note` on it, `field` `answered_on_word`, "Answered by S12 on Teodor's word: ..." in History and Activity. A write keeps them in its note | audit |
+| Undo in BrainDog takes the answer back as any of his | recovery |
+
 ---
 
 ## 6 · The credential Keychain
