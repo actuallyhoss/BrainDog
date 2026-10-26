@@ -212,6 +212,20 @@ test('the sentence\'s sum is the sum of what the money cards say, in their curre
   assert.match(shaped.sentence.text, /^3 need you: 2 about money, EGP\s2,229,681 and \$9,074\s?USD in all, and 1 quick one\.$/u);
 });
 
+/* A GOAL AND A CHARGE TO CHECK NAME AN AMOUNT AND MOVE NONE: the total is only what accepting would move. */
+test('the sentence\'s sum leaves out a goal and a charge to check, which name an amount and move none', () => {
+  const tidy = { ...question('m1'), money: [{ amount: 7409216, currency: 'EGP' }, { amount: 907401, currency: 'USD' }] } as QueueQuestion;
+  const goal = { ...question('m2'), question: 'Track the shop\'s monthly revenue, aiming for USD 1,500.00 by Sep 2027?' };
+  const charge = { ...question('m3'), question: 'A charge of EGP 1,750.00 at a shop came twice. Was the second one yours?' };
+  const qs = [tidy, goal, charge, question('q1')];
+  const shaped = decideDrawn([noteBlock(), queueBlock(qs, 4), queueBlock(qs, 4)], CLOCK);
+  assert.match(shaped.sentence.text, /^4 need you: 3 about money, EGP\s74,092 and \$9,074\s?USD from 1 of them, and 1 quick one\.$/u);
+  assert.doesNotMatch(shaped.sentence.text, /1,500|1,750/u);
+  /* WHERE EVERY ONE MOVES MONEY, THE SUM IS SAID "IN ALL", AS BEFORE. */
+  const alone = decideDrawn([noteBlock(), queueBlock([tidy, question('q1')], 2), queueBlock([tidy, question('q1')], 2)], CLOCK);
+  assert.match(alone.sentence.text, /^2 need you: 1 about money, EGP\s74,092 and \$9,074\s?USD in all, and 1 quick one\.$/u);
+});
+
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);
 
 test('the head says how many need you, then the two groups in digits (today F12, U-A7): about money and what they come to, then the quick ones', () => {

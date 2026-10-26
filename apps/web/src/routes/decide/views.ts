@@ -32,6 +32,7 @@ import { emptyHidden, says } from '../../lib/page/home.ts';
 import { alikeOf } from '../../lib/page/alike.ts';
 import { copy } from '../../lib/copy.ts';
 import { movesOf as cardMoves } from '../../lib/decide/card.ts';
+import { moneyRowOf } from '../../lib/decide/money-row.ts';
 import { ageDays, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
 import { othersLine, WORDS as DECIDER_WORDS, type Decided } from './[id]/decider.ts';
@@ -320,14 +321,18 @@ function shortDay(iso: string): string {
 }
 
 /**
- * THE AMOUNTS A MONEY QUESTION'S CARD SAYS, one a currency, in minor units, or `null`. What accepting writes is read as
- * the card reads it (`card.ts` `movesOf`, every value and not the first), so "in all" is the sum of what the cards say
- * (audit Z4: "EGP 930,191 in all" over cards of EGP 74,092.16 and $9,074.01, and EGP 2,155,589). A question that writes
- * none is read off its sentence ("GBP 4,800.00").
+ * THE AMOUNTS ACCEPTING A MONEY QUESTION WOULD MOVE, one a currency, in minor units, or `null` where it moves none.
+ * What accepting writes is read as the card reads it (`card.ts` `movesOf`, every value and not the first), so "in all"
+ * is the sum of what the cards say (audit Z4: "EGP 930,191 in all" over cards of EGP 74,092.16 and $9,074.01, and EGP
+ * 2,155,589). A question that writes none is read off its sentence ("GBP 4,800.00") ONLY WHERE THE SENTENCE IS MONEY
+ * THAT FELL DUE (`moneyRowOf`), the bill or invoice its answer settles or chases. Any other amount a sentence names is
+ * not money an answer moves: a revenue goal ("aiming for $1,500") and a charge somebody is asked to check were added to
+ * the total as though accepting them paid something.
  */
 function amountsIn(q: QueueQuestion): { minor: number; currency: string }[] | null {
   const moves = cardMoves((q as unknown as { money?: unknown }).money);
   if (moves.length > 0) return moves.map((m) => ({ minor: Math.abs(m.amount), currency: m.currency }));
+  if (moneyRowOf(q.question) === null) return null;
   const m = /\b([A-Z]{3})\s?([\d,]+(?:\.(\d+))?)\b/u.exec(q.question);
   if (!m) return null;
   const exp = exponentOf(m[1]!);
@@ -352,14 +357,17 @@ export function groupSentence(money: readonly QueueQuestion[], quick: readonly Q
   const needs = `${total.toLocaleString('en-GB')} ${total === 1 ? 'needs' : 'need'} you${folded}`;
   let sum = '';
   if (money.length > 0) {
-    const amounts = money.map(amountsIn);
+    /* ONLY WHAT AN ACCEPT WOULD MOVE IS ADDED (`amountsIn`), per currency and never across. Where some of the questions
+       about money move none, the sum says how many it is from, so it is never read as all of them. */
+    const amounts = money.map(amountsIn).filter((a): a is { minor: number; currency: string }[] => a !== null && a.length > 0);
     const sums = new Map<string, number>();
-    if (amounts.every((a) => a !== null)) for (const a of amounts.flat()) sums.set(a!.currency, (sums.get(a!.currency) ?? 0) + a!.minor);
+    for (const a of amounts.flat()) sums.set(a.currency, (sums.get(a.currency) ?? 0) + a.minor);
     const said = [...sums.entries()].map(([currency, minor]) => {
       const exp = exponentOf(currency);
       return writeAmount({ minor: Math.round(minor / 10 ** exp) * 10 ** exp, currency }, homeCurrency(), 'read')?.text ?? '';
     });
-    if (said.length > 0 && said.every((x) => x !== '')) sum = `, ${said.join(' and ')} in all`;
+    const from = amounts.length < money.length ? ` from ${amounts.length.toLocaleString('en-GB')} of them` : ' in all';
+    if (said.length > 0 && said.every((x) => x !== '')) sum = `, ${said.join(' and ')}${from}`;
   }
   if (quickCount <= 0) return { text: `${needs}, ${money.length === 1 ? 'about money' : 'all about money'}${sum}.`, needs };
   const quickSaid = `${quickCount.toLocaleString('en-GB')} quick ${quickCount === 1 ? 'one' : 'ones'}`;
