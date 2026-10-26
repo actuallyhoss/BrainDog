@@ -43,7 +43,7 @@ test('A NEWER FIRST-PARTY MODULE THAT LOSES NOTHING GOES IN ON THE TICK, said in
   await api.slashTick();
   assert.equal(held(api, 'portfolio'), FIRST_PARTY_VERSIONS.portfolio);
   const kept = api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[]; day: string };
-  assert.deepEqual(kept.steps, [`Portfolio was updated to ${FIRST_PARTY_VERSIONS.portfolio}.`]);
+  assert.deepEqual(kept.steps, [`Projects was updated to ${FIRST_PARTY_VERSIONS.portfolio}.`]);
   assert.equal(kept.day, '2026-10-06');
   /* ONCE A DAY WHILE THE BUILD IS THE SAME: the same day's tick does not plan again, the next day's does. */
   api.kernel.setPref('braindog:updates', 'first-party', { ...kept, steps: ['kept'] });
