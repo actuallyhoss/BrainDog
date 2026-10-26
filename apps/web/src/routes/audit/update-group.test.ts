@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import type { AuditEvent, EventKind } from '../../lib/record/schema.ts';
-import { awaySaid, burstsOf, byWhoOf, historyWords, keyOf, passOf, runFolds, type ByWho, type Passed } from './lines.ts';
+import { awaySaid, burstsOf, byWhoOf, historyWords, keyOf, passOf, type ByWho, type Passed } from './lines.ts';
 
 const NO_NAMES: ReadonlyMap<string, string> = new Map();
 const at = (m: number): string => new Date(2026, 9, 9, 3, m).toISOString();
@@ -62,11 +62,6 @@ test('a pass of six steps reads as one line that opens to its six steps', () => 
   );
   assert.equal(new Set(pass.steps.map((s) => s.key)).size, 6, 'each step is keyed once');
   assert.ok(pass.steps.every((s) => s.key.startsWith(`${keyOf(line.e)}/`)), 'a step is keyed under its pass');
-  /* A PASS IS NO RUN'S WORK: it is never folded under an agent, nor an agent's line under it. */
-  assert.deepEqual(
-    runFolds(told).map((f) => f.rest.length),
-    [0, 0, 0],
-  );
 });
 
 /**
@@ -90,10 +85,6 @@ test("a person's own edit in the same minute as a pass is never folded into it",
     'and what the pass opens to is what the record wrote',
   );
   assert.ok(!steps.some((s) => s.e === mine || s.e === theirs));
-  assert.deepEqual(
-    runFolds(told).map((f) => f.rest.length),
-    [0, 0, 0],
-  );
 });
 
 test('a line that is no pass, or a pass with nothing under it, is drawn as it always was', () => {

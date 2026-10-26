@@ -237,6 +237,11 @@ export const saidKind = (name: string): ActorKind | undefined => SAID.get(name.t
 export function actor(by: string, me: string | null = null, names: ReadonlyMap<string, string> = new Map(), run_by: RunBy | null = null): Actor {
   const who = by.trim();
   if (who === 'you' || (me !== null && me !== '' && who === me)) return { name: copy.feedYou, kind: 'you' };
+  /* A RULE THE CALLER HOLDS THE TITLE OF IS SAID BY IT, keyed `rule:<id>` whichever way the rule signs (`rule.reply` in
+     the sample), before any person is looked up, since no person is keyed like a rule. */
+  const ruled = /^rule[.:](.+)$/u.exec(who)?.[1];
+  const titled = ruled === undefined ? undefined : names.get(`rule:${ruled}`)?.trim();
+  if (ruled !== undefined && titled) return said(titled, 'rule');
   const named = names.get(who);
   if (named !== undefined && named.trim() !== '') return { name: named, kind: 'person' };
   /* AN ADDRESS IS NEVER A NAME, in whatever shape it came (`jo@kiln.example`, `Jo <jo@kiln.example>`, `@jo`): a `who`

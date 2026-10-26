@@ -28,8 +28,6 @@ import {
   dayOf,
   dayWord,
   fold,
-  foldKeys,
-  foldOpen,
   dayGroups,
   hourGroups,
   HOURS,
@@ -40,8 +38,9 @@ import {
   lanesSaid,
   LIVE_MS,
   reaches,
-  RUN_FOLD_MIN,
-  runFolds,
+  partOf,
+  ranSaid,
+  rolledRuns,
   settledOf,
   settledWords,
   tallyOf,
@@ -174,10 +173,10 @@ test('what changed counts who and what, and says the biggest share', () => {
     { group: 'rule', count: 1 },
     { group: 'you', count: 2 },
   ]);
-  assert.deepEqual(t.kinds[0], { kind: 'create', count: 3, agents: 2 });
-  const word = (k: EventKind) => ({ create: 'Created', edit: 'Changed', state: 'Moved' })[k as 'create'] ?? k;
-  const said = t.kinds.map((k) => ({ word: word(k.kind), count: k.count, agents: k.agents }));
-  assert.equal(tallySaid(said, t.total), 'Created is the biggest share: 3 of 5, and agents made 2 of them.');
+  assert.deepEqual(t.parts[0], { part: 'Other changes', count: 5, agents: 2 }, 'a line on no list is another change');
+  const said = t.parts.map((k) => ({ word: k.part, count: k.count, agents: k.agents }));
+  assert.equal(tallySaid(said, t.total), 'Other changes is all of it: 5, and agents made 2 of them.');
+  assert.equal(tallySaid([{ word: 'Created', count: 3, agents: 2 }, { word: 'Changed', count: 2, agents: 0 }], 5), 'Created is the biggest share: 3 of 5, and agents made 2 of them.');
   assert.equal(tallySaid([{ word: 'Created', count: 2, agents: 2 }], 2), 'Created is all of it: 2, all of them by agents.');
   assert.equal(
     tallySaid([{ word: 'Created', count: 2, agents: 0 }, { word: 'Changed', count: 2, agents: 0 }], 4),
@@ -335,56 +334,51 @@ test('the words about what is hidden name the person’s own things, in plain wo
   assert.equal(historyWords.everything, 'Everything');
   assert.match(historyWords.hidden(14), /^14 entries are BrainDog's own bookkeeping: /u);
   assert.match(historyWords.hidden(1), /^One entry is /u);
-  assert.equal(historyWords.more(9), '+9 more');
-  for (const line of [historyWords.hidden(1), historyWords.hidden(14), historyWords.onlyBooks, historyWords.more(9), historyWords.showThem(2)]) {
+  assert.equal(historyWords.showMore, 'Show more');
+  for (const line of [historyWords.hidden(1), historyWords.hidden(14), historyWords.onlyBooks, historyWords.showMore, historyWords.showThem(2), historyWords.hiddenWhere]) {
     assert.doesNotMatch(line, /\u2014|—/u, `an em dash in "${line}"`);
     assert.doesNotMatch(line, /\b(rows?|lists?|registers?|sessions?|events?)\b/iu, `a system word in "${line}"`);
   }
 });
 
-/* ── a run's work, folded ───────────────────────────────────────────────── */
+/* ── a rule's runs, one line a day (the pass of 27 October, UX64) ──────── */
 
-test('one run’s lines next to each other fold under its newest as "+N more", and nobody else’s do', () => {
-  const run = [1, 2, 3, 4, 5].map((n) => one(ev(iso(29, 9, 30 - n), 'S42', 'edit', `payouts#${n}`)));
-  const you = one(ev(iso(29, 9, 20), 'you', 'edit', 'tasks#1'));
-  const other = [1, 2, 3].map((n) => one(ev(iso(29, 9, 10 - n), 'S43', 'edit', `tasks#${n}`)));
-  const again = [1, 2].map((n) => one(ev(iso(29, 8, 50 - n), 'S42', 'edit', `payouts#${n}`)));
-  const folds = runFolds([...run, you, ...other, ...again]);
-
+test('a rule’s quiet runs on one day are one line saying how many times, and a failed run stays its own', () => {
+  const ran = (h: number, by: string, note = 'rule.meet-payees ran.') => one({ ...ev(iso(29, h), by, 'pull', 'declaration:rule.meet-payees'), note });
+  const lines = rolledRuns([
+    ran(9, 'rule:meet-payees'),
+    ran(8, 'rule:meet-payees'),
+    ran(7, 'rule:meet-payees', 'Meet payees did not finish.'),
+    ran(6, 'rule:meet-payees'),
+    ran(5, 'rule:entry-takes-book'),
+    one(ev(iso(29, 4), 'you', 'edit', 'tasks#1')),
+  ]);
   assert.deepEqual(
-    folds.map((f) => [f.head.e.by, f.rest.length]),
+    lines.map((t) => [t.e.by, t.count, t.note]),
     [
-      ['S42', 4],
-      ['you', 0],
-      ['S43', 2],
-      /* TWO LINES OF A RUN ARE DRAWN AS THEY ARE: folding them saves nothing. */
-      ['S42', 0],
-      ['S42', 0],
+      ['rule:meet-payees', 3, '3 times'],
+      ['rule:meet-payees', 1, 'Meet payees did not finish.'],
+      ['rule:entry-takes-book', 1, ''],
+      ['you', 1, ''],
     ],
   );
-  assert.equal(RUN_FOLD_MIN, 3);
-  assert.equal(folds[0]!.head, run[0], 'the fold is not headed by the run’s newest line');
-  assert.deepEqual(folds[0]!.rest, run.slice(1), 'the folded lines are not the rest, in their order');
-  assert.equal(new Set(folds.map((f) => f.key)).size, folds.length, 'two folds share a key');
-
-  /* A PERSON'S LINES NEXT TO EACH OTHER ARE NEVER FOLDED: only a run's work is one thing. */
-  const yours = [1, 2, 3, 4].map((n) => one(ev(iso(29, 9, 10 - n), 'you', 'edit', `tasks#${n}`)));
-  assert.ok(runFolds(yours).every((f) => f.rest.length === 0));
-  assert.deepEqual(runFolds([]), []);
+  assert.equal(lines[0]!.from, iso(29, 6), 'the line spans from its first run');
 });
 
-test('a fold somebody opened stays open when the run writes its next line on top of it', () => {
-  const run = [1, 2, 3, 4].map((n) => one(ev(iso(29, 9, 30 - n), 'S42', 'edit', `payouts#${n}`)));
-  const [opened] = runFolds(run);
-  assert.ok(opened && opened.rest.length === 3);
-  const kept = new Set(foldKeys(opened));
-  assert.equal(foldOpen(opened, kept), true);
+test('a run’s note says no id and not its title again', () => {
+  assert.equal(ranSaid('settle_matched_line did not finish, so it wrote nothing; its log says why.', 'Settle a matched line', 'settle_matched_line'), 'Did not finish, so it wrote nothing; its log says why.');
+  assert.equal(ranSaid('“File what an account holds in the account’s book” ran and wrote one line.', 'File what an account holds in the account’s book', 'book_from_account'), 'Wrote one line.');
+  assert.equal(ranSaid('rule.meet-payees ran.', 'Meet payees', 'meet-payees'), '');
+});
 
-  /* THE RUN WRITES AGAIN: the fold's newest line, and so its key, is the new one. */
-  const [after] = runFolds([one(ev(iso(29, 9, 30), 'S42', 'edit', 'payouts#9')), ...run]);
-  assert.ok(after && after.key !== opened.key, 'this test no longer moves the fold’s key');
-  assert.equal(foldOpen(after, kept), true, 'the fold shut under the reader when the run wrote again');
-  assert.equal(foldOpen(after, new Set()), false, 'a fold nobody opened is open');
+test('what changed is counted in a person’s words: the list a row is in, questions, exports and runs', () => {
+  const name = (l: string) => ({ ledger: 'Ledger', people: 'People' })[l as 'ledger'] ?? l;
+  assert.equal(partOf(ev(iso(29, 9), 'you', 'edit', 'ledger#4'), name), 'Ledger');
+  assert.equal(partOf(ev(iso(29, 9), 'S4', 'suggest', 'suggestion:SG1'), name), 'Questions asked');
+  assert.equal(partOf(ev(iso(29, 9), 'you', 'decide', 'decision:D1'), name), 'Questions answered');
+  assert.equal(partOf(ev(iso(29, 9), 'you', 'export'), name), 'Exports');
+  assert.equal(partOf({ ...ev(iso(29, 9), 'rule:meet-payees', 'pull'), note: 'rule.meet-payees ran.' }, name), 'Rule and script runs');
+  assert.equal(partOf({ ...ev(iso(29, 9), 'script:a_b@v1', 'pull'), note: 'a_b did not finish' }, name), 'Runs that failed');
 });
 
 test('a list is said by the name the page hands over, so Activity and the rail call it one thing', () => {
@@ -407,7 +401,7 @@ test('September is Sep down the whole screen, and the dot between two parts of a
   const markup = page.slice(page.indexOf('{#snippet entry('), page.indexOf('<PageHead'));
   assert.doesNotMatch(markup, />\s+·/u, 'an element opens on white space and a dot');
   assert.match(markup, /<span class="note" title=\{note\} data-own>\{' · '\}\{note\}<\/span>/u);
-  assert.match(markup, /<span class="where-inline"\s*>\{' · '\}\{thing\.list\}<\/span/u);
+  assert.match(markup, /<span class="where-chip">\{thing\.list\}<\/span>/u, 'where it happened is a chip of its own');
 });
 
 /* WHO A RUN IS (history-run-by-web-68): a line a run signed carries run_by, and the screen says the app it ran in. */

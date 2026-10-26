@@ -86,9 +86,15 @@ export const historyWords = {
   hidden: (n: number): string =>
     `${n === 1 ? 'One entry is' : `${count(n)} entries are`} BrainDog's own bookkeeping: agent runs starting and stopping, their working folders, and when a tool was last seen.`,
   showThem: (n: number): string => (n === 1 ? 'Show it' : 'Show them'),
+  /* THE FOOT SAYS WHERE THEY ARE rather than being a second press beside Show more. */
+  hiddenWhere: 'Everything, above, shows them.',
   onlyBooks: 'Nothing changed, apart from BrainDog keeping its own books.',
-  /* A RUN'S WORK, FOLDED UNDER ITS NEWEST LINE. */
-  more: (n: number): string => `+${count(n)} more`,
+  /* THE ONE PRESS AT THE STREAM'S FOOT, for more of what was read and then for older lines. */
+  showMore: 'Show more',
+  /* A RULE OR A SCRIPT THAT RAN, said by what it is beside its title, which the line already says. */
+  aRule: 'A rule',
+  aScript: 'A script',
+  ran: 'Ran',
   /* WHAT BRAINDOG DID ON ITS OWN, said apart from the agents in the sentence under the title (`awaySaid`). */
   itself: 'BrainDog itself',
   /* ONE PASS OF BRAINDOG'S OWN UPDATE, said as one line that opens to what it did (`passOf`). */
@@ -444,6 +450,9 @@ export const scriptWords = (note: string): string =>
     .replace(/\bscript:([a-z][a-z0-9_-]*)@v\d+/gu, (_m, slug: string) => `the ${humanize(slug)} script`)
     /* A rule's id is a mechanism: "rule.meet-payees ran." is "Meet payees ran." */
     .replace(/\brule[.:]([a-z][a-z0-9_-]*)/gu, (_m, slug: string) => humanize(slug))
+    /* AND ANY OTHER NAME IN snake_case IS A MECHANISM'S (the pass of 27 October, UX64): "settle_matched_line did not
+       finish" is "Settle matched line did not finish", never the id. A caller holding the thing's title says that first. */
+    .replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gu, (slug, at: number) => (at === 0 ? humanize(slug) : humanize(slug).toLowerCase()))
     .replace(/\s*·\s*$/u, '')
     .trim();
 
@@ -598,42 +607,65 @@ export function burstsOf(events: readonly AuditEvent[], nameOf: (list: string) =
   return out;
 }
 
-/* ── one run's work, folded ────────────────────────────────────────────── */
+/* ── a rule or a script that ran ───────────────────────────────────────── */
 
-/** Fewer lines than this by one run, side by side, are drawn as they are: folding two lines saves nothing. */
-export const RUN_FOLD_MIN = 3;
-
-/** One run's lines next to each other, drawn as its newest and folded under it as "+9 more"; a line alone has no rest. */
-export type RunFold = { key: string; head: Told; rest: Told[] };
-
-/**
- * A RUN'S WORK IS ONE THING TO READ. An agent that fixes a payout writes a line a field, so one stretch of its work was
- * a column of lines with the same face down the stream; the newest says who and what, and the rest wait one press away.
- * Only lines of one run next to each other fold, in the order they were drawn, so nothing moves out of its place in
- * time, and a person's lines, a rule's and Slash's are never folded under anybody.
- */
-export function runFolds(told: readonly Told[]): RunFold[] {
-  const runs: Told[][] = [];
-  for (const t of told) {
-    const run = runOf(t.e.by);
-    const last = runs.at(-1);
-    if (run !== null && last && runOf(last[0]!.e.by) === run) last.push(t);
-    else runs.push([t]);
-  }
-  return runs.flatMap((lines): RunFold[] =>
-    lines.length >= RUN_FOLD_MIN ? [{ key: lines[0]!.key, head: lines[0]!, rest: lines.slice(1) }] : lines.map((t) => ({ key: t.key, head: t, rest: [] })),
-  );
+/** A rule's or a script's run, from who signed a `pull` line: which it is, its id, and its own page. `null` for any other line. */
+export function ranOf(e: Pick<AuditEvent, 'kind' | 'by'>): { kind: 'rule' | 'script'; id: string; href: string } | null {
+  if (e.kind !== 'pull') return null;
+  const rule = /^rule[.:](.+)$/u.exec(e.by)?.[1];
+  if (rule !== undefined) return { kind: 'rule', id: rule, href: `/automations/${encodeURIComponent(rule)}` };
+  const script = /^script:([^@]+)@v\d+$/u.exec(e.by)?.[1];
+  if (script !== undefined) return { kind: 'script', id: script, href: `/scripts/${encodeURIComponent(script)}` };
+  return null;
 }
 
-/** Every line a fold holds, which is what a press on "+9 more" keeps as opened. */
-export const foldKeys = (f: RunFold): string[] => [f.head.key, ...f.rest.map((t) => t.key)];
+/** A run that did not go through, by the words its line says it in. */
+const FAILED = /\b(?:did not finish|failed|refused|could not|was held)\b/iu;
+
+/** Whether a line is a run that did not go through: what "What changed" counts apart, and never rolled into one. */
+export const ranBadly = (e: Pick<AuditEvent, 'kind' | 'by' | 'note'>): boolean => ranOf(e) !== null && FAILED.test(e.note);
 
 /**
- * WHETHER A FOLD SOMEBODY OPENED IS STILL OPEN: by any line it held when it was opened, and not by its newest. A run
- * still at work puts its next line on top of the fold, which is then the fold's newest and its key, and a fold kept by
- * that key shut under the reader the moment the run wrote again.
+ * WHAT A RUN'S NOTE SAYS ONCE ITS TITLE LEADS THE LINE: "“File what an account holds” ran and wrote one line." is
+ * "Wrote one line.", "settle_matched_line did not finish, so it wrote nothing" is "Did not finish, so it wrote nothing",
+ * and "Meet payees ran." is nothing at all, since "Ran Meet payees" already says it.
  */
-export const foldOpen = (f: RunFold, opened: ReadonlySet<string>): boolean => foldKeys(f).some((k) => opened.has(k));
+export function ranSaid(note: string, title: string, id: string): string {
+  const esc = (x: string): string => x.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  let rest = scriptWords(note.trim()).replace(new RegExp(`\\b${esc(id)}\\b`, 'gu'), title);
+  for (const lead of [`“${title}” `, `"${title}" `, `${title} `, `${humanize(id)} `]) if (rest.startsWith(lead)) rest = rest.slice(lead.length);
+  rest = rest.replace(/^ran(?: and |\.?$)/u, '').trim();
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+/**
+ * ONE LINE A RULE A DAY (the pass of 27 October, UX64). A filing rule runs on every payment that arrives and writes a
+ * "ran" line each time, so a day of Activity was forty "Fetched · A rule: Meet payees · Meet payees ran." The runs of
+ * one rule on one day that went through are its newest line, saying how many times; a run that failed stays a line of
+ * its own, since that one needs him.
+ */
+export function rolledRuns(told: readonly Told[]): Told[] {
+  const out: Told[] = [];
+  const held = new Map<string, Told>();
+  for (const t of told) {
+    if (ranOf(t.e)?.kind !== 'rule' || ranBadly(t.e)) {
+      out.push(t);
+      continue;
+    }
+    const k = `${t.e.by}\u0001${dayOf(t.e.at)}`;
+    const had = held.get(k);
+    if (had) {
+      had.count += t.count;
+      had.from = t.from;
+      had.note = historyWords.times(had.count);
+      continue;
+    }
+    const line: Told = { ...t, note: t.count > 1 ? historyWords.times(t.count) : '' };
+    held.set(k, line);
+    out.push(line);
+  }
+  return out;
+}
 
 /**
  * THE LOG NEWEST FIRST BY WHEN, THEN BY ITS PLACE IN THE LOG (money F11). The record sends it by version, and a line
@@ -855,25 +887,99 @@ export type Tally = {
   total: number;
   /** Who made the changes, in `GROUPS` order, the empty groups left out. */
   groups: { group: Group; count: number }[];
-  /** Each kind of change, the most first; a tie keeps the order the kinds were first met in, newest first. */
-  kinds: { kind: EventKind; count: number; agents: number }[];
+  /** What changed, in a person's words, the most first; a tie keeps the order they were first met in, newest first. */
+  parts: { part: string; count: number; agents: number }[];
 };
 
-export function tallyOf(events: readonly AuditEvent[], me: string | null, names: ReadonlyMap<string, string>): Tally {
+/** The parts "What changed" says that are not a list's name. */
+export const partWords = {
+  asked: 'Questions asked',
+  answered: 'Questions answered',
+  predicted: 'Predictions',
+  exported: 'Exports',
+  imported: 'Imports',
+  ran: 'Rule and script runs',
+  failed: 'Runs that failed',
+  arrived: 'Mail and messages in',
+  keys: 'Keys',
+  sharing: 'Sharing',
+  pages: 'Add-ons and pages',
+  upkeep: 'Record upkeep',
+  other: 'Other changes',
+} as const;
+
+/**
+ * WHAT A LINE CHANGED, IN A PERSON'S WORDS (the pass of 27 October, UX66): a change to a row is its list ("Ledger",
+ * "People"), a question asked or answered is that, an export is an export, a rule's run is a run and a failed one is
+ * counted apart. "What changed" was split by the log's own verbs, "Fetched 41", and said "Fetched is the biggest share".
+ */
+export function partOf(e: Pick<AuditEvent, 'kind' | 'by' | 'target' | 'note'>, nameOf: (list: string) => string = listName): string {
+  switch (e.kind) {
+    case 'suggest':
+    case 'propose':
+      return partWords.asked;
+    case 'decide':
+    case 'resolve':
+    case 'supersede':
+      return partWords.answered;
+    case 'predict':
+    case 'score':
+      return partWords.predicted;
+    case 'export':
+      return partWords.exported;
+    case 'import':
+      return partWords.imported;
+    case 'pull':
+      return FAILED.test(e.note) ? partWords.failed : partWords.ran;
+    case 'arrive':
+    case 'match':
+    case 'extract':
+      return partWords.arrived;
+    case 'grant.add':
+    case 'grant.read':
+    case 'grant.rotate':
+    case 'grant.revoke':
+    case 'grant.bind':
+      return partWords.keys;
+    case 'access.grant':
+    case 'access.revoke':
+    case 'share.open':
+    case 'share.close':
+      return partWords.sharing;
+    case 'install':
+    case 'uninstall':
+    case 'upgrade':
+    case 'declare':
+    case 'retire':
+      return partWords.pages;
+    case 'erase':
+    case 'migrate':
+    case 'restore.pitr':
+    case 'purge':
+      return partWords.upkeep;
+    default: {
+      const list = listOf(e.target);
+      return list === null ? partWords.other : nameOf(list);
+    }
+  }
+}
+
+export function tallyOf(events: readonly AuditEvent[], me: string | null, names: ReadonlyMap<string, string>, nameOf: (list: string) => string = listName): Tally {
   const groups = new Map<Group, number>();
-  const kinds = new Map<EventKind, { kind: EventKind; count: number; agents: number }>();
+  const parts = new Map<string, { part: string; count: number; agents: number }>();
   for (const e of events) {
     const group = groupOf(actor(e.by, me, names, e.run_by ?? null).kind);
     groups.set(group, (groups.get(group) ?? 0) + 1);
-    const k = kinds.get(e.kind) ?? { kind: e.kind, count: 0, agents: 0 };
+    const part = partOf(e, nameOf);
+    const k = parts.get(part) ?? { part, count: 0, agents: 0 };
     k.count++;
     if (group === 'agent') k.agents++;
-    kinds.set(e.kind, k);
+    parts.set(part, k);
   }
   return {
     total: events.length,
     groups: GROUPS.flatMap((group) => (groups.has(group) ? [{ group, count: groups.get(group)! }] : [])),
-    kinds: [...kinds.values()].sort((a, b) => b.count - a.count),
+    parts: [...parts.values()].sort((a, b) => b.count - a.count),
   };
 }
 

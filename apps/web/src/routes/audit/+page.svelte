@@ -75,8 +75,6 @@
     dayOf,
     dayWord,
     fold,
-    foldKeys,
-    foldOpen,
     historyWords,
     HOURS,
     isAgent,
@@ -88,14 +86,16 @@
     lanesOf,
     lanesSaid,
     listOf,
+    partOf,
     passOf,
-    runFolds,
+    ranOf,
+    ranSaid,
+    rolledRuns,
     settledOf,
     tallyOf,
     tallySaid,
     thingOf,
     type ByWho,
-    type RunFold,
     type Told,
   } from './lines.ts';
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
@@ -169,14 +169,16 @@
        their mail. `copy.ts` renamed the word off the inbox's own button for the same reason. */
     extract: { word: 'Read an email', icon: 'inbox' },
     propose: { word: 'Proposed', icon: 'decide' },
-    pull: { word: 'Fetched', icon: 'refresh' },
+    /* `Ran` AND IT WAS `Fetched` (the pass of 27 October, UX64): a rule or a script that ran is what a person reads. */
+    pull: { word: 'Ran', icon: 'refresh' },
     /* Access */
     'access.grant': { word: 'Gave access', icon: 'people' },
     'access.revoke': { word: 'Took access away', icon: 'people' },
     'share.open': { word: 'Opened a link', icon: 'link' },
     'share.close': { word: 'Closed a link', icon: 'link' },
     /* Lifecycle */
-    export: { word: 'Backed up', icon: 'archive' },
+    /* `Exported` AND IT WAS `Backed up`: these lines are his own exports, and Settings › Backups lists them as that. */
+    export: { word: 'Exported', icon: 'archive' },
     import: { word: 'Imported', icon: 'download' },
     erase: { word: 'Erased', icon: 'trash' },
     migrate: { word: 'Migrated', icon: 'refresh' },
@@ -221,7 +223,28 @@
    * "Someone on this record" branch, which is the honest reading of a record that does not know.
    */
   const me = $derived(route.data.me.person);
-  const names = $derived<ReadonlyMap<string, string>>(new Map(Object.entries(route.data.names ?? {})));
+  /* THE TITLES OF THE RULES AND SCRIPTS IN THE LOG, read once (`titlesOf`), so a line signed `rule:meet-payees` or
+     `script:settle_matched_line@v4` is said by the name the Automations page gives it, never its id. */
+  let titles = $state.raw<ReadonlyMap<string, string>>(new Map());
+  const names = $derived<ReadonlyMap<string, string>>(new Map<string, string>([...(Object.entries(route.data.names ?? {}) as [string, string][]), ...titles]));
+  /* THE READER'S OWN FACE IS THEIR OWN FIRST LETTER, never the "Y" of "You" (UX67). */
+  const myName = $derived((route.data.me as { name?: string }).name ?? null);
+  $effect(() => {
+    if (!route.data.live) return;
+    void titlesOf(apiBase()).then((t) => (titles = t));
+  });
+  async function titlesOf(base: string): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    try {
+      const [{ createClient }, { rowsOf }, { readScripts }] = await Promise.all([import('@braindog/client'), import('$lib/flow/source.ts'), import('$lib/record/scripts.ts')]);
+      const [rules, scripts] = await Promise.all([createClient({ base }).call<unknown>('automations'), readScripts(base)]);
+      if (rules.ok) for (const r of rowsOf(rules.value)) out.set(`rule:${r.id}`, r.name);
+      if (scripts.ok) for (const sc of scripts.value) if (sc.title.trim() !== '') out.set(`script:${sc.script}`, sc.title.trim());
+    } catch {
+      /* The ids in words stand. */
+    }
+    return out;
+  }
 
   /**
    * THE LOG AS THE RECORD SENDS IT, AND ITS OWN BOOKS WITH IT WHILE EVERYTHING IS ON. The record leaves the sweep that
@@ -466,28 +489,19 @@
      the product. `13 §4.3`'s cap, and the line that admits it. */
   /* A PHONE-LENGTH FIRST SCREEN: the newest 30 lines, then "Show more" adds 30 of the same page. */
   let wanted = $state(30);
-  const shown = $derived(matched.slice(0, Math.min(wanted, DOM_CAP)));
-  /* A BURST IS ONE LINE (`burstsOf`), folded from what is drawn, so the cap above still counts lines of the log and
-     the cap line under the list still says how many of them there are. */
-  const told = $derived(burstsOf(shown, listSaid));
+  /* A BURST IS ONE LINE (`burstsOf`), and a rule's quiet runs on one day are one line (`rolledRuns`), folded from
+     everything that matched, so a line drawn and a line counted are the same line. */
+  const lines = $derived(rolledRuns(burstsOf(matched, listSaid)));
+  const told = $derived(lines.slice(0, Math.min(wanted, DOM_CAP)));
+  /* ONE PRESS FOR MORE (UX65): more of what was read, then the older page under it. */
+  const moreRead = $derived(told.length < lines.length && wanted < DOM_CAP);
+  const moreOlder = $derived(!moreRead && route.data.live && live !== null && live.cursor !== null);
+  function showMore(): void {
+    if (moreRead) wanted += 30;
+    else void loadOlder().then(() => (wanted += 30));
+  }
   /* AND THE LINES SIT ONE TILE A DAY, each hour a subhead inside it (`dayGroups`). */
   const bands = $derived(dayGroups(told, clock));
-
-  /**
-   * A RUN'S WORK IS ITS NEWEST LINE AND "+9 MORE" (`runFolds`), opened in place by a press. Open stays open: a fold that
-   * shut again under the reader would take the line they were reading. The first line it opens takes the focus, so a
-   * keyboard carries on from where the button was.
-   *
-   * KEPT OPEN BY EVERY LINE IT OPENED, not by its newest (`foldOpen`), so a run still at work writing its next line on
-   * top does not shut it.
-   */
-  let unfolded = $state<ReadonlySet<string>>(new Set());
-  async function unfold(f: RunFold) {
-    unfolded = new Set([...unfolded, ...foldKeys(f)]);
-    await tick();
-    const first = f.rest[0]?.key;
-    if (first !== undefined) document.querySelector<HTMLElement>(`[data-unfolded="${CSS.escape(first)}"]`)?.focus();
-  }
 
   /**
    * ONE PASS OF BRAINDOG'S OWN UPDATE IS ONE LINE, AND WHAT IT DID IS CLOSED AT FIRST (`passOf`, SHL-A21). A press opens
@@ -514,17 +528,17 @@
    * rest of the log is.
    */
   const lanes = $derived(lanesOf(kept, clock, me, names));
-  const tally = $derived(tallyOf(matched, me, names));
+  const tally = $derived(tallyOf(matched, me, names, listSaid));
   /* THE SAME COUNT OVER EVERYTHING READ, whatever the chips narrow, for the line under the title (`awaySaid`). */
-  const whole = $derived(tallyOf(kept, me, names));
+  const whole = $derived(tallyOf(kept, me, names, listSaid));
   /* The line under the title, below `whole`, which it reads. */
   const lead = $derived(
     unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho, { total: whole.total, agents: whole.groups.find((g) => g.group === 'agent')?.count ?? 0 }) : undefined,
   );
   const busy = $derived(busyOf(kept, clock));
   const topKinds = $derived(
-    tally.kinds.slice(0, 5).map((k) => ({
-      label: kindOf(k.kind).word,
+    tally.parts.slice(0, 5).map((k) => ({
+      label: k.part,
       value: k.count,
       /* EVERY BAR IN THE SECOND INK (money F11): the kinds are counts side by side, and an accent's tint or one bar in
          black made one kind read as the thing to look at. */
@@ -540,7 +554,7 @@
   });
   const tallyReading = $derived(
     tallySaid(
-      tally.kinds.map((k) => ({ word: kindOf(k.kind).word, count: k.count, agents: k.agents })),
+      tally.parts.map((k) => ({ word: k.part, count: k.count, agents: k.agents })),
       tally.total,
     ),
   );
@@ -668,20 +682,23 @@
   </Sheet>
 {/snippet}
 
-{#snippet entry(t: Told, first?: string)}
+{#snippet entry(t: Told)}
   {@const e = t.e}
   {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
+  <!-- A RULE OR A SCRIPT THAT RAN LEADS WITH ITS TITLE ("Ran Meet payees"), and says what it is beside its face. -->
+  {@const ran = ranOf(e)}
+  {@const ranTitle = ran === null ? null : (names.get(`${ran.kind}:${ran.id}`) ?? actorSaid(e.by, null, new Map()).name.replace(/^A rule: /u, '').replace(/ script$/u, ''))}
   <!-- ONE PASS OF BRAINDOG'S OWN UPDATE (`passOf`) says the record's sentence as its whole line, and names nothing of its own. -->
   {@const pass = passOf(e)}
   {@const settled = pass === null ? settledOf(e, me, names) : null}
   {@const declared = pass === null && e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
-  {@const thing = pass !== null ? null : (t.many ?? (declared === null && e.target ? thingFor(e.target) : null))}
+  {@const thing = pass !== null ? null : ran !== null && ranTitle !== null ? { text: ranTitle, href: ran.href, list: null } : (t.many ?? (declared === null && e.target ? thingFor(e.target) : null))}
   <!-- THE LINE AS ONE SENTENCE (`lineSaid`): no second verb where the title already says what was done, a question in
        quotation marks, and a note that does not say the title again, its days said as a person says them. -->
   {@const said = lineSaid(
-    e.kind === 'pull' && by.kind === 'automation' ? 'Ran a script' : kindOf(e.kind).word,
+    kindOf(e.kind).word,
     thing?.text ?? null,
-    declared === null && pass === null ? t.note : '',
+    declared === null && pass === null ? (ran !== null && ranTitle !== null && t.count === 1 ? ranSaid(t.note, ranTitle, ran.id) : t.note) : '',
     t.many === null && /^(?:suggestion|decision|prediction):/u.test(e.target ?? ''),
     clock,
   )}
@@ -689,10 +706,7 @@
   <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE, and every other well is neutral: "Created"
        wore the green of done on a hundred lines at once (money F11). Nothing here is red: a log is history, not need. -->
   {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : undefined}
-  <!-- THE FIRST LINE A FOLD OPENS takes the focus from "+9 more", which is gone once pressed; `-1`, so it is never a stop
-       of its own in the tab order. It wears the ring every focused thing wears, as the page's row cursor does. -->
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <li data-arrived={fresh.has(keyOf(e)) ? '' : undefined} data-unfolded={first} tabindex={first === undefined ? undefined : -1}>
+  <li data-arrived={fresh.has(keyOf(e)) ? '' : undefined}>
     <div class="line line-tall act">
       <IconWell name={kindOf(e.kind).icon} size="l" {tone} />
       <span class="line-main">
@@ -712,12 +726,12 @@
           >{/if}
         <span class="line-detail">
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
-          <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
+          <span class="who"><Face name={by.you && myName ? myName : by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{settled ?? by.name}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
-                >{' · '}{thing.list}</span
-              >{/if}</span
+            >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : by.name)}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}</span
           >
+          <!-- WHERE IT HAPPENED AS A CHIP at the line's end (UX64): the list a row is in, as the rail names it. -->
+          {#if thing?.list}<span class="where-chip">{thing.list}</span>{/if}
         </span>
       </span>
       <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
@@ -840,19 +854,7 @@
               <div class="hour-band">
               <h3 class="hour num">{band.title}</h3>
               <ul class="ledger">
-                <!-- ONE RUN'S WORK IS ITS NEWEST LINE, and the rest of it one press away in the same place (`runFolds`). -->
-                {#each runFolds(band.lines) as f (f.key)}
-                  {@render entry(f.head)}
-                  {#if f.rest.length > 0}
-                    {#if foldOpen(f, unfolded)}
-                      {#each f.rest as t, i (t.key)}{@render entry(t, i === 0 ? t.key : undefined)}{/each}
-                    {:else}
-                      <li class="fold-row">
-                        <button type="button" class="fold tap" aria-expanded="false" onclick={() => void unfold(f)}>{historyWords.more(f.rest.length)}</button>
-                      </li>
-                    {/if}
-                  {/if}
-                {/each}
+                {#each band.lines as t (t.key)}{@render entry(t)}{/each}
               </ul>
               </div>
             {/each}
@@ -862,24 +864,17 @@
       {#if bands.length === 1 && tiles && phone}{@render sideTiles()}{/if}
 
       <!-- WHAT THE STREAM LEAVES OUT, said once at its foot, and the press that shows it: the same switch as the toolbar's. -->
-      {#if hiddenNow > 0 && matched.length > 0}
-        <p class="foot hidden-line">
-          {historyWords.hidden(hiddenNow)}
-          <button type="button" class="show-all tap" onclick={() => setParam('everything', '1')}>{historyWords.showThem(hiddenNow)}</button>
-        </p>
-      {/if}
-
-      {#if shown.length < matched.length && wanted < DOM_CAP}
+      {#if moreRead || moreOlder}
         <div class="older">
-          <Button weight="quiet" onclick={() => (wanted += 30)}>Show more ({matched.length - shown.length} left)</Button>
+          <Button weight="quiet" onclick={showMore} disabled={older}>{historyWords.showMore}</Button>
         </div>
       {:else}
-        <CapLine shown={shown.length} total={matched.length} />
+        <CapLine shown={told.length} total={lines.length} />
       {/if}
-      {#if route.data.live && live && live.cursor !== null}
-        <div class="older">
-          <Button weight="quiet" onclick={loadOlder} disabled={older}>{copy.olderEntries}</Button>
-        </div>
+
+      <!-- WHAT THE STREAM LEAVES OUT, said once at its foot: the toolbar's Everything shows it, so it is no second press. -->
+      {#if hiddenNow > 0 && matched.length > 0}
+        <p class="foot hidden-line">{historyWords.hidden(hiddenNow)} {historyWords.hiddenWhere}</p>
       {/if}
       {#if olderFix}<p class="foot">{olderFix}</p>{/if}
     </div>
@@ -1022,18 +1017,6 @@
   }
 
   /* SAID AS A LINK IN THE SENTENCE, because it is part of it; a button, because it changes the view and goes nowhere. */
-  .show-all {
-    position: relative;
-    padding: 0;
-    background: none;
-    border: 0;
-    color: var(--ink);
-    font: inherit;
-    text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
 
   /* ── the toolbar ─────────────────────────────────────────────────────── */
 
@@ -1233,7 +1216,21 @@
     white-space: nowrap;
   }
 
-  /* THE LIST IS SAID IN THE LINE ITSELF, after who and what, and not as a lone chip at the far edge. */
+  /* WHERE IT HAPPENED, AS A QUIET CHIP right after who and what (the pass of 27 October, UX64), as Recent runs and Up
+     next say a project: the list a row is in, never a lone chip at the far edge. */
+  .where-chip {
+    flex: none;
+    max-inline-size: 12em;
+    overflow: hidden;
+    padding: 0 var(--sp-2);
+    border-radius: var(--r-round);
+    background: var(--tile-2);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   /* A TIME IN A FEED IS GEIST AT 13 WITH TABULAR FIGURES, in the quiet ink: the figures line up down the tile without a
      typewriter face beside the words. */
