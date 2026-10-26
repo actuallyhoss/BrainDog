@@ -9,6 +9,7 @@
  * PURE, AND NODE LOADS IT.
  */
 
+import { article } from '../copy/english.ts';
 import { nextSplit } from './next-split.ts';
 import { ago, dayChip, daysBetween, endedAs, trailOf } from '../home/projects-board.ts';
 
@@ -58,6 +59,8 @@ export type FactsIn = {
   format: (minor: number, currency: string) => string;
   /** Where the feed of numbers is set up, and where all its work opens. */
   hrefs: { feed: string; work: string | null };
+  /** What one of its work and many of it are called mid-sentence, from the work list's own declaration ("job", "jobs"). */
+  called: { one: string; many: string };
 };
 
 /* ── small words ───────────────────────────────────────────────────────── */
@@ -68,6 +71,7 @@ const day10 = (s: string | null | undefined): string | null => (typeof s === 'st
 /** "28 Sep", with its year when it is not this one. */
 export const daySaid = (day: string, today: string): string => `${Number(day.slice(8, 10))} ${SHORT[Number(day.slice(5, 7)) - 1]}${day.slice(0, 4) === today.slice(0, 4) ? '' : ` ${day.slice(0, 4)}`}`;
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+const upper = (s: string): string => `${s.slice(0, 1).toUpperCase()}${s.slice(1)}`;
 const lateSaid = (days: number): string => (days === 1 ? 'a day late' : `${days} days late`);
 const quoted = (t: string): string => `“${t.length > 60 ? `${t.slice(0, 57).trimEnd()}…` : t}”`;
 const fold = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/gu, ' ').trim();
@@ -159,7 +163,7 @@ function movedOf(m: Measure, format: FactsIn['format'], today: string): string {
  * first. Each says its newest value, how it moved, its line from its readings, and how old it is, stale past twice how
  * often it arrives. When every one is stale the feed has stopped, and a banner says so once.
  */
-export function numbersOf(f: Pick<FactsIn, 'name' | 'kpis' | 'readings' | 'today' | 'format'>, most = 4): Numbers {
+export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'format'> & { kpis: readonly FactKpi[] }, most = 4): Numbers {
   const measures: Measure[] = [];
   const seen = new Set<string>();
   for (const k of f.kpis) {
@@ -421,7 +425,7 @@ export function datesOf(f: FactsIn, most = 6): DateLine[] {
 
 export type RunsOnLine = { name: string; sub: string; right: string; tone: 'warn' | 'good' | 'plain'; href: string | null };
 
-export function runsOnOf(f: Pick<FactsIn, 'services' | 'today' | 'format'>, numbers: Numbers): RunsOnLine[] {
+export function runsOnOf(f: Pick<FactsIn, 'today' | 'format'> & { services: readonly FactService[] }, numbers: Numbers): RunsOnLine[] {
   const lines: RunsOnLine[] = f.services
     .filter(live)
     .sort((a, b) => (a.renews ?? '9999').localeCompare(b.renews ?? '9999'))
@@ -489,8 +493,8 @@ export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine
   for (const [d, titles] of added) {
     const text =
       titles.length === 1
-        ? `A task was added: ${titles[0]}.`
-        : `${plural(titles.length, 'task', 'tasks')} were added: ${titles.slice(0, 2).join(', ')}${titles.length > 2 ? ` and ${titles.length - 2} more` : ''}.`;
+        ? `${upper(article(f.called.one))} ${f.called.one} was added: ${titles[0]}.`
+        : `${plural(titles.length, f.called.one, f.called.many)} were added: ${titles.slice(0, 2).join(', ')}${titles.length > 2 ? ` and ${titles.length - 2} more` : ''}.`;
     out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain' });
   }
   for (const r of f.runs.slice(0, 6)) {

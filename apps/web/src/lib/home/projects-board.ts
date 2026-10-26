@@ -105,6 +105,8 @@ export type BoardInput = {
   home: string | null;
   /** Where the late work, the questions and the numbers' setup open. */
   hrefs: { late: string | null; asks: string; feed: string; numbers: string };
+  /** What one of the work and many of it are called mid-sentence, from the work list's own declaration ("job", "jobs"). */
+  called: { one: string; many: string };
 };
 
 export type Chip = { tone: 'late' | 'warn' | 'plain'; text: string } | null;
@@ -149,6 +151,8 @@ const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eig
 /** A small count in words, as a sentence says it ("three projects"); a large one in figures. */
 export const counted = (n: number): string => (n >= 0 && n < WORDS.length ? WORDS[n]! : n.toLocaleString('en-GB'));
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+/** How many questions wait, as a chip says it: "1 question", "3 questions". */
+const questionsSaid = (n: number): string => (n === 1 ? '1 question' : `${n.toLocaleString('en-GB')} questions`);
 /** "A", "A and B", "A, B and C", or "A, B and 2 more". */
 export function names(list: readonly string[], most = 3): string {
   const all = [...new Set(list)];
@@ -343,7 +347,7 @@ function chipOf(f: Facts, today: string): Chip {
   if (f.due.length > 0) return { tone: 'plain', text: f.due[0]!.day === today ? 'today' : dayChip(f.due[0]!.day) };
   if (f.quiet) return { tone: 'warn', text: `numbers ${f.quietDays} days old` };
   if (f.renews.length > 0) return { tone: 'warn', text: `renews in ${plural(Math.max(0, daysBetween(today, f.renews[0]!.day)), 'day', 'days')}` };
-  if (f.asks.length > 0) return { tone: 'plain', text: plural(f.asks.length, 'question', 'questions') };
+  if (f.asks.length > 0) return { tone: 'plain', text: questionsSaid(f.asks.length) };
   return null;
 }
 
@@ -550,7 +554,7 @@ export function boardOf(input: BoardInput): Board {
   const lateCount = lateLines.length;
   const lateTile: WeekTile = {
     count: lateCount,
-    said: lateCount === 0 ? 'nothing late' : `${lateCount === 1 ? 'task' : 'tasks'}, ${lateDays.length > 0 && Math.max(...lateDays) === Math.min(...lateDays) ? `${plural(lateDays[0]!, 'day', 'days')} over` : `up to ${plural(Math.max(...lateDays), 'day', 'days')} over`}`,
+    said: lateCount === 0 ? 'nothing late' : `${lateCount === 1 ? input.called.one : input.called.many}, ${lateDays.length > 0 && Math.max(...lateDays) === Math.min(...lateDays) ? `${plural(lateDays[0]!, 'day', 'days')} over` : `up to ${plural(Math.max(...lateDays), 'day', 'days')} over`}`,
     lines: lateLines.slice(0, 4),
     more: Math.max(0, lateLines.length - 4),
   };
@@ -582,7 +586,7 @@ export function boardOf(input: BoardInput): Board {
       .map((f) => {
         const r = f.renews[0];
         const t = f.due[0] ?? null;
-        const due = r ? `${r.name} renews ${dayChip(r.day).slice(4)}` : f.late.length > 0 ? lateWords(f.lateDays) : t ? `due ${dayChip(t.day)}` : f.asks.length > 0 ? plural(f.asks.length, 'question', 'questions') : null;
+        const due = r ? `${r.name} renews ${dayChip(r.day).slice(4)}` : f.late.length > 0 ? lateWords(f.lateDays) : t ? `due ${dayChip(t.day)}` : f.asks.length > 0 ? questionsSaid(f.asks.length) : null;
         return { name: f.p.name, mark: f.p.mark, hue: f.p.hue, href: f.p.href, due };
       })
       .sort((a, b) => Number(b.due !== null) - Number(a.due !== null) || a.name.localeCompare(b.name)),

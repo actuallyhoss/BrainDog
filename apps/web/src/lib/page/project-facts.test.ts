@@ -47,6 +47,7 @@ const base = (more: Partial<FactsIn> = {}): FactsIn => ({
   today: TODAY,
   format: fmt,
   hrefs: { feed: '/feed', work: '/r/tasks?lantern' },
+  called: { one: 'task', many: 'tasks' },
   ...more,
 });
 

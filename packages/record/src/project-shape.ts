@@ -176,8 +176,10 @@ export async function shapeAnswerOf(asks: ShapeAsks, register: string, seq: numb
   const services = await linked(SHAPE_LINKED.services, { limit: SHAPE_LINKED_READ });
   const readings = await linked(SHAPE_LINKED.readings, { limit: SHAPE_READINGS_READ, order: [{ field: 'at', dir: 'desc' }] });
   const recurring = await linked(SHAPE_LINKED.recurring, { limit: SHAPE_LINKED_READ });
-  /* WHAT WAS DECIDED ABOUT IT, the body a `governance.decided` block over this row asks, drawn by the same method. */
-  const asked = { page: 'decided', title: 'Decided', blocks: [{ kind: 'table', source: 'governance.decided', where: `about is ${spoken}`, columns: [{ field: 'question' }, { field: 'answer_label' }, { field: 'answer' }, { field: 'at' }], limit: SHAPE_DECIDED_READ }] };
+  /* WHAT WAS DECIDED ABOUT IT, the body a `governance.decided` block over this row asks, drawn by the same method. It
+     names no columns: the source answers every field a decision has, whatever the kernel calls them, and a page keeps
+     every field of a row it sends. */
+  const asked = { page: 'decided', title: 'Decided', blocks: [{ kind: 'table', source: 'governance.decided', where: `about is ${spoken}`, limit: SHAPE_DECIDED_READ }] };
   const said = valueOf(await asking(asks.previewPage, { body: asked }, ctx)) as { blocks?: { rows?: unknown }[] } | null;
   const decided = Array.isArray(said?.blocks?.[0]?.rows) ? (said.blocks[0].rows as unknown[]) : null;
   return { register, seq, row, history, links, work, runs, kpis, figures, services, readings, recurring, decided };

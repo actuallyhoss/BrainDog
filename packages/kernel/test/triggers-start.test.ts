@@ -104,12 +104,12 @@ test('A METRIC TRIGGER STARTS ONE RUN WHEN ITS FIGURE CHANGES SIDE, and its firs
 test('A DECIDED TRIGGER STARTS ONE RUN FOR THE ANSWER IT NAMES, reading the row the question is about', async () => {
   const { k, sql } = await record(
     rule({ rule: 'ask', register: 'obligations', once_per: ['entry'], then: [{ suggest: { question: 'Chase {{what}}?', options: ['Chase it', 'Leave it'] } }] }),
-    rule({ rule: 'chase', on: { decided: { about: 'rule.ask', option: 'Chase it' } }, steps: [{ notify: { say: 'Chasing it.' } }] }),
+    rule({ rule: 'chase', name: 'Chase the obligation', on: { decided: { about: 'rule.ask', option: 'Chase it' } }, steps: [{ notify: { say: 'Chasing it.' } }] }),
   );
-  const open = (): { id: string; body: { about?: string; options: { id: string; label: string }[] } } => {
+  const open = (): { id: string; body: { about?: string; options: { id: string; label: string; because: string }[] } } => {
     const s = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE status = 'open' AND opened_by = 'rule:ask' ORDER BY rowid DESC");
     assert.ok(s, 'the rule put no question in front of anybody');
-    return { id: s.id, body: JSON.parse(s.body) as { about?: string; options: { id: string; label: string }[] } };
+    return { id: s.id, body: JSON.parse(s.body) as { about?: string; options: { id: string; label: string; because: string }[] } };
   };
   const pick = (s: ReturnType<typeof open>, label: string): string => {
     const found = s.body.options.find((o) => o.label === label);
@@ -121,6 +121,8 @@ test('A DECIDED TRIGGER STARTS ONE RUN FOR THE ANSWER IT NAMES, reading the row 
   const first = open();
   /* THE QUESTION NAMES ITS ROW, which Decide shows and the run reads. */
   assert.equal(first.body.about, `obligations#${rent.seq}`);
+  /* EACH ANSWER SAYS WHAT IT STARTS, by the name of the automation installed on it, and one nothing acts on says nothing. */
+  assert.deepEqual(first.body.options.map((o) => o.because), ['Chase the obligation', '']);
   value(k.decide(first.id, { decide: { option: pick(first, 'Chase it'), reason: 'It is late.' } }, 'p_1'));
 
   const [chased, ...more] = runs(sql, 'chase');

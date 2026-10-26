@@ -212,6 +212,7 @@ import {
   pruneRuns,
   retryRun as retryFlowRun,
   startRun,
+  startedBy,
   type FlowDeps,
 } from './flow.ts';
 import { trialTrigger, tryRun, type Tried, type TryOptions, type TrySample } from './flow-try.ts';
@@ -8373,19 +8374,23 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     generate: (register, patch, actor, batch, stamp) =>
       write(register, null, patch, { actor, batch, cascade: false, stamp }),
     /* `about` IS THE ROW THE RULE ASKED ABOUT, on the body, where Decide's queue and a `decided` rule's run read it. */
-    suggest: (question, options, actor, about) =>
-      openSuggestion(governDeps(), actor, {
+    suggest: (question, options, actor, about) => {
+      /* A RULE'S OPTION SAYS WHAT ANSWERING IT STARTS: the names of the automations installed on that answer
+         (`startedBy`), since a rule declares no reason of its own. "a rule put this in front of you" sat under every one
+         of them once and said how the question arrived, not why to pick the option. Where nothing acts on an answer,
+         `because` stays an empty string rather than going, since `govern.ts` refuses an option without one, and Decide
+         draws no line for it. */
+      const starts = actor.startsWith('rule:') ? startedBy(installedFlows(sql), `rule.${actor.slice('rule:'.length)}`) : () => '';
+      return openSuggestion(governDeps(), actor, {
         question,
         body_kind: 'options',
         body: {
           ...(about === undefined ? {} : { about }),
-          /* A RULE'S OPTION CARRIES NO REASON, because a rule declares none. "a rule put this in front of you" sat under
-             every one of them and said how the question arrived, not why to pick the option. `because` stays an empty
-             string rather than going, since `govern.ts` refuses an option without one, and Decide draws no line for it. */
-          options: options.map((label, i) => ({ id: `o${i + 1}`, label, because: '' })),
+          options: options.map((label, i) => ({ id: `o${i + 1}`, label, because: starts({ id: `o${i + 1}`, label }) })),
           requires_reason: true,
         },
-      }),
+      });
+    },
     note: (entry, actor, text, batch) =>
       void appendEvent({ kind: 'note', target: entry.id, register: entry.register, actor, note: text, at: instant(clock.now()), batch }),
     stateOf: (register) => registers.get(register)?.state ?? null,

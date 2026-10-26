@@ -278,6 +278,15 @@ export const oneOf = (name: string): string | null => {
  */
 export const singularOf = (name: string): string => oneOf(name) ?? inSentence(name.trim());
 
+/**
+ * WHAT ONE ROW OF A LIST AND MANY OF THEM ARE CALLED MID-SENTENCE, from its declaration: its `one` and its `name`
+ * ("job", "jobs" on a record that calls its tasks jobs). With no list, the house word for one of the work.
+ */
+export const calledOf = (decl: { name: string; one: string } | undefined): { one: string; many: string } =>
+  decl
+    ? { one: decl.one.trim() !== '' ? inSentence(decl.one.trim()) : singularOf(decl.name), many: inSentence(decl.name.trim()) }
+    : { one: homeWords.task, many: `${homeWords.task}s` };
+
 /** A list's name: the record's label for it, or the name its declaration gives. */
 export const listNamed = (labels: Labels, list: string, declared: string): string => labels[list] ?? declared;
 

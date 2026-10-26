@@ -35,7 +35,7 @@ import { blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/pr
 import { HEALTH, daySaid, figureOf, hueOf } from '$lib/home/project-cards.ts';
 import { cardKpiOf } from '$lib/home/card-kpi.ts';
 import { pathOf, trendOf } from '$lib/record/visuals.ts';
-import { valueSaid } from '$lib/voice.ts';
+import { calledOf, valueSaid } from '$lib/voice.ts';
 import { money as moneyOf, monthShort } from 'braindog-render';
 import { moneyShown, partsLaid, type PartsHave } from './project-parts.ts';
 import { rowHref } from '$lib/record/row-href.ts';
@@ -364,6 +364,7 @@ export class ShapeHold {
       today: localDay(read.now),
       format: this.said,
       hrefs: { feed: FEED_SETUP, work: this.workHref },
+      called: calledOf(this.workDecl),
     };
   });
   numbers = $derived(this.facts ? numbersOf(this.facts) : null);

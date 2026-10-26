@@ -21,6 +21,7 @@ import { REGISTERS } from '../record/held.ts';
 import { handFor } from '../record/hand.ts';
 import { symbolText } from '../record/money.ts';
 import { learn } from '../record/remote.ts';
+import { calledOf } from '../voice.ts';
 import { rowHref } from '../record/row-href.ts';
 import { registerHref } from '../record/where.ts';
 import { viaOf } from '../../routes/r/[register]/[seq]/figures.ts';
@@ -246,6 +247,7 @@ export async function readBoard(base: string, list: string, entries: readonly Ro
       feed: '/automations?new=door&preset=numbers',
       numbers: '/p/all-numbers',
     },
+    called: calledOf(work ? REGISTERS[work] : undefined),
   };
   return boardOf(input);
 }

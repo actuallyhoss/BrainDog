@@ -202,44 +202,23 @@ export type Way = { key: string; label: string; because: string; recommended: bo
  * `file` IS THE PAGE'S WAY TO A FILE IT HOLDS: with it an option that is a picture carries its address, and without it
  * the option reads by its name (`visualOf`).
  */
-export function waysOf(q: Pick<QueueQuestion, 'options'> & { who?: string | undefined }, file?: FileAt): Way[] {
+export function waysOf(q: Pick<QueueQuestion, 'options'>, file?: FileAt): Way[] {
   if (q.options.length === 0)
     return [
       { key: 'accept', label: copy.acceptIt, because: '', recommended: false, shows: null, hard: false },
       { key: 'reject', label: copy.rejectIt, because: '', recommended: false, shows: null, hard: false },
     ];
-  const rule = typeof q.who === 'string' && Object.hasOwn(RULE_SAYS, q.who) ? RULE_SAYS[q.who]! : null;
-  return q.options.map((o, i) => {
-    const label = spoken(saidOf(o.label)) || queueWords.nth(i + 1);
-    const own = spoken(saidOf(o.because));
-    return {
-      key: o.key,
-      label,
-      /* A RULE'S ANSWER SAYS WHAT IT CHANGES: the record files a rule's options with no reason, and the answer that
-         marks a bill paid read as if it changed nothing. Said only where the rule's own answer is the one named. */
-      because: own !== '' ? own : (rule?.[o.label.trim()] ?? ''),
-      recommended: o.recommended,
-      shows: visualOf(o.shows, file),
-      hard: o.hard === true,
-    };
-  });
+  /* A RULE'S ANSWER SAYS WHAT IT CHANGES, in its own reason: the record files each of a rule's options with the names
+     of the automations that act on that answer (`startedBy` in the kernel's `flow.ts`), so it is read as any reason is. */
+  return q.options.map((o, i) => ({
+    key: o.key,
+    label: spoken(saidOf(o.label)) || queueWords.nth(i + 1),
+    because: spoken(saidOf(o.because)),
+    recommended: o.recommended,
+    shows: visualOf(o.shows, file),
+    hard: o.hard === true,
+  }));
 }
-
-/**
- * WHAT A FIRST-PARTY RULE'S ANSWERS DO, by who asked and the answer's words, as the record's automations carry them out
- * (money-core's `recurring-went-through`, `recurring-stopped` and `invoice-chased`). Words, not ids: a rule's options
- * carry their words and places only.
- */
-const RULE_SAYS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'rule:recurring-missed': {
-    'It went through': 'Marks its bill paid and moves it on to its next day.',
-    'It stopped': 'Ends the repeat, so it is no longer counted ahead.',
-  },
-  'rule:invoice-late': {
-    'Chase it': 'Marks it chased and drafts a message for you to send.',
-    'Not yet': 'Nothing changes for now.',
-  },
-};
 
 /** A question's own words, and why it is asked, as the card draws them: citations as words, money in the record's currency. */
 export const saidOf = (text: string): string => moneyInText(citedWords(text));

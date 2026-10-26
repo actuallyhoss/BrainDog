@@ -1282,6 +1282,26 @@ export function onDecided(
   }
 }
 
+/**
+ * WHAT ONE ANSWER TO A QUESTION STARTS, by the names of the automations whose `decided` trigger names that question's
+ * declaration (`about`) and that answer, by its id or its words, as `onDecided` matches them. It is the reason a rule's
+ * option carries, since a rule declares none of its own and the automation that acts on the answer says what it does.
+ * One that admits any question or any answer is left out: it says nothing about this answer. A switched-off one starts
+ * nothing, so it is not said. Empty where nothing acts on the answer.
+ */
+export function startedBy(rules: readonly Installed[], about: string): (option: { id: string; label: string }) => string {
+  const on = rules.filter((r) => triggerOf(r.body) === 'decided' && r.body.enabled !== false && (r.body.on as Extract<Trigger, { decided: unknown }>).decided?.about === about);
+  return (o) =>
+    on
+      .filter((r) => {
+        const option = (r.body.on as Extract<Trigger, { decided: unknown }>).decided?.option;
+        return option !== undefined && (option === o.id || option === o.label);
+      })
+      .map((r) => (typeof r.body.name === 'string' ? r.body.name.trim() : ''))
+      .filter((name) => name !== '')
+      .join(' and ');
+}
+
 /** How many rows one run-path rule about a relative day has read each hour, as `rulesAboutTime` reads an inline one. */
 export const SWEPT_ROWS = 1000;
 

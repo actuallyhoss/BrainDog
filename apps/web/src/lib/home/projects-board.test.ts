@@ -56,6 +56,7 @@ const base = (more: Partial<BoardInput> = {}): BoardInput => ({
   format: (m) => usd(m),
   home: 'USD',
   hrefs: { late: '/r/tasks?late', asks: '/decide', feed: '/numbers/setup', numbers: '/p/all-numbers' },
+  called: { one: 'task', many: 'tasks' },
   ...more,
 });
 
