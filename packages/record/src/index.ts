@@ -43,7 +43,7 @@ import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, railRoom, raiseFault, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
-import { mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
@@ -633,6 +633,18 @@ export type CallContext = {
   ordered?: string | undefined;
 
   /**
+   * The run a question is answered through, on his word, when a run answers one he told it to in the conversation and
+   * sent his words as `said` (`methods/instructions.ts`, `answer` with `option` and `said`): `principal` is then the
+   * owner whose key the run holds, at the level they hold now.
+   *
+   * SET ONLY BY `instructionsMine`, AFTER `wordOf` HAS SAID HIS SWITCH IS ON AND `wordFault` THAT THE QUESTION NEITHER
+   * GRANTS A KEY NOR SETS AN AMOUNT, and for one `decide` and nothing else. `decide` lets it accept what installs (an
+   * add-on, an arrangement, an automation), which is what he asked for; `admin` and `keychain` refuse it everywhere else,
+   * so his word never erases, deletes the record, shares a key or touches billing.
+   */
+  onWord?: string | undefined;
+
+  /**
    * When this caller last proved who they are, in epoch milliseconds: a passkey, a link or the server key.
    *
    * SET ONLY BY A HOST, AND ONLY FROM A SESSION ROW'S `authed_at`, which rotation never moves. The keychain
@@ -1113,8 +1125,11 @@ export const PREF_KEYS = [
   'packs.known_keys',
   'shelf.kept',
   'agents.answer_in_chat',
+  'agents.answer_on_word',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
+/** "Agents may answer when you tell them": the owner's own switch, on unless it is `false` (`wordOf`). */
+export const ON_WORD_PREF = 'agents.answer_on_word' satisfies PrefKey;
 /**
  * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail (`side`), a
  * bar across the top or one menu, and `rail` is the side rail as builds before the top bar led wrote it, unasked; `pen.dismissed` is the ids of what the pen offered and the person turned down
@@ -1140,6 +1155,11 @@ export type PrefKey = (typeof PREF_KEYS)[number];
  * `agents.answer_in_chat` IS "ANSWER FROM INSIDE CHAT APPS" in Settings > Agents: `true` lets a press on the decision card
  * inside Claude or ChatGPT answer the question (`methods/chat-answer.ts`). Absent or `false` is off, and the card's
  * buttons open BrainDog. Only an owner in a browser sets it, so no agent turns it on for itself.
+ *
+ * `agents.answer_on_word` IS "AGENTS MAY ANSWER WHEN YOU TELL THEM" in Settings > Agents (the owner's decision of 27
+ * October): absent or `true`, an agent he tells to answer a question or make a change does it, sending his words as
+ * `said` (`wordOf`); `false` and every such call is refused, naming the switch. On until he turns it off, and only an
+ * owner in a browser sets it, so no agent turns it back on for itself.
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -1162,6 +1182,8 @@ export type Prefs = {
   'packs.known_keys'?: Record<string, string[]>;
   /** Whether a press on the decision card inside a chat app answers the question. Absent is off. */
   'agents.answer_in_chat'?: boolean;
+  /** Whether an agent he tells to answer or change something does it on his word. Absent is on. */
+  'agents.answer_on_word'?: boolean;
   /** The person's shelf: drawn components they kept, each a name and a block declaration (`shelfFault`). */
   'shelf.kept'?: { id: string; name: string; block: Record<string, unknown> }[];
 };
@@ -2880,9 +2902,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     at: 'principal',
   };
 
+  /** What `admin` and `keychain` say to an answer given on his word: his word answers the question and nothing more. */
+  const onWordNot: Refusal = {
+    code: 'NEEDS_BROWSER_SESSION',
+    fix: 'An agent answers on your word and does nothing more. Open this one in BrainDog.',
+    at: 'principal',
+  };
+
   const keychain = (ctx: CallContext): Refusal | null => {
     if (ctx.pressedIn !== undefined) return pressedNot;
     if (ctx.ordered !== undefined) return orderedNot;
+    if (ctx.onWord !== undefined) return onWordNot;
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
@@ -2918,6 +2948,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* A PRESS IN A CHAT ANSWERS A QUESTION AND REACHES NOTHING AN OWNER DOES IN A BROWSER (`pressedIn`). */
     if (ctx.pressedIn !== undefined) return pressedNot;
     if (ctx.ordered !== undefined) return orderedNot;
+    if (ctx.onWord !== undefined) return onWordNot;
     if (ctx.operation !== undefined) {
       if (method === undefined || ctx.operation !== method || ctx.principal.kind !== 'person') return allows(ctx, 'owner', listName);
       const { operation: _spent, ...approver } = ctx;
@@ -6697,7 +6728,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * caller is no agent, or the write is to its own run. An app that changed under the grant, or a burst of writes, takes
    * it back to Ask first, so this write already asks.
    */
-  const laddered = (ctx: CallContext, register: string, op: 'create' | 'update', patch: unknown, self: Entry | null): { caller: Caller; gate: Gate } | null => {
+  const laddered = (ctx: CallContext, register: string, op: 'create' | 'update', patch: unknown, self: Entry | null): { caller: Caller; gate: Gate; held?: true } | null => {
     if (register === SESSION) return null;
     const said = patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? (patch as Record<string, unknown>) : {};
     /* HIS SETTINGS FIRST, which only narrow (plan §5.1): a write his row does not let through is asked whatever rung the
@@ -6707,12 +6738,83 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (caller === null) {
       if (asks === null || ctx.principal.kind !== 'token') return null;
       const p = ctx.principal;
-      return { caller: { token: p.id, scope: p.scope, person: p.person, run: null, app: null }, gate: { write: false, why: asks, kinds: [] } };
+      return { caller: { token: p.id, scope: p.scope, person: p.person, run: null, app: null }, gate: { write: false, why: asks, kinds: [] }, held: true };
     }
     trust.clientChanged(caller, SESSION);
     trust.anomaly(caller.token, caller.run);
     const gate = trust.gate(caller, register, op, said, self?.id ?? null);
-    return { caller, gate: asks !== null && gate.write ? { write: false, why: asks, kinds: gate.kinds } : gate };
+    return { caller, gate: asks !== null && gate.write ? { write: false, why: asks, kinds: gate.kinds } : gate, ...(asks === null ? {} : { held: true as const }) };
+  };
+
+  /**
+   * ON HIS WORD (the owner's decision of 27 October): "make it so decisions can be closed out by agents if I tell them
+   * so". An agent he tells, in the conversation, to answer a question or make a change it would otherwise ask about
+   * sends his words as `said`, quoted, and the record acts as he said: a question answered as his own decision
+   * (`instructionsMine`'s `answer`), a write landed where it would have been filed (`create`, `update`). Each keeps his
+   * words and the run that carried them, and Undo takes it back as any of his.
+   *
+   * WHO MAY, AND WHEN. A token whose person owns the record, whose key and settings let it write, while his switch
+   * "Agents may answer when you tell them" is on (`ON_WORD_PREF`, on unless he turns it off), and whose run has not read
+   * text from outside the record: a run that did (`trust.untrusted`) could be carrying words nobody said, so it asks for
+   * the rest of it, his word or not. `said` is his words, never empty.
+   */
+  const wordOf = (ctx: CallContext, said: unknown): Result<{ by: string; byName: string; said: string }> => {
+    if (ctx.principal.kind !== 'token') return no('FORBIDDEN', 'said is the words a person told an agent. A person answers in BrainDog.', { at: 'said' });
+    const words = typeof said === 'string' ? said.replace(/\s+/gu, ' ').trim() : '';
+    if (words === '') return no('REQUIRED_MISSING', 'said is what the person told you, in their own words, and it is empty. Without them, ask with propose.', { at: 'said' });
+    if (words.length > SAID_MOST) return no('OUT_OF_BOUNDS', `said is at most ${String(SAID_MOST)} characters: quote the words that told you.`, { at: 'said' });
+    const by = ctx.principal.person;
+    if (kernel.access(by)?.level !== 'owner') return no('FORBIDDEN', 'Only the owner answers on their word, and this key is not theirs. Ask with propose.', { at: 'said' });
+    if (kernel.prefsOf(by)[ON_WORD_PREF] === false)
+      return no('FORBIDDEN', '"Agents may answer when you tell them" is off in Settings > Agents, so ask with propose and they answer in BrainDog.', { at: 'said' });
+    if (effectiveOf(ctx)?.may !== 'write') return no('FORBIDDEN', 'This agent may only suggest, by its key or its settings, so it asks even on their word. Ask with propose.', { at: 'said' });
+    const caller = callerOf(ctx);
+    const from = caller === null ? null : trust.untrusted(caller);
+    if (from !== null) return no('FORBIDDEN', `This run read ${from}, so it asks for the rest of it, even on their word. Ask with propose.`, { at: 'said' });
+    return ok({ by, byName: personNamed(sql, by), said: words });
+  };
+
+  /**
+   * What no word reaches, of what a write or a question would do, or `null` when his word may do it all: a key (a list
+   * of keys, or an automation that calls out with one), and an amount of money set on what is already there. Adding an
+   * entry with an amount is filing it, as the kernel's own line on the floor says (`kindsOfProposal`'s money `add`).
+   * Erasing, deleting the record and billing are no write or question an agent reaches: `admin` refuses `onWord`.
+   */
+  const beyondWord = (kinds: readonly { floor: string | null; verb: string }[], body?: unknown): string | null => {
+    if (kinds.some((k) => k.floor === 'keys') || callsWithKey(body))
+      return 'It is about keys, and a key is granted or opened only by the owner in BrainDog, even on their word. Ask with propose.';
+    if (kinds.some((k) => k.floor === 'money' && k.verb !== 'add'))
+      return 'It changes an amount of money, which only the owner does in BrainDog, even on their word. Ask with propose.';
+    return null;
+  };
+
+  /** Whether a question's body sends a key out: an automation's line naming one (`Egress.key`), anywhere in it. */
+  const callsWithKey = (body: unknown, depth = 0): boolean => {
+    if (depth > 8 || body === null || typeof body !== 'object') return false;
+    if (Array.isArray(body)) return body.some((x) => callsWithKey(x, depth + 1));
+    const o = body as Record<string, unknown>;
+    if (typeof o.channel === 'string' && ((typeof o.key === 'string' && o.key !== '') || (typeof o.key_line === 'string' && o.key_line !== ''))) return true;
+    return Object.values(o).some((x) => callsWithKey(x, depth + 1));
+  };
+
+  /** Why his word may not answer one open question, or `null`: what it would do, read as the ladder reads it. */
+  const wordFault = (row: Record<string, unknown>): string | null =>
+    beyondWord(kindsOfProposal(String(row.body_kind ?? ''), row.body, recordReader(sql, String(row.opened_by ?? ''))), row.body);
+
+  /**
+   * A write the ladder would have asked about, landed on his word instead: `null` when it is not one (no `said`, a
+   * person's own write, a write the rung lets through, or one his settings ask), else the note it is written with, or
+   * the refusal. His settings row still asks (`held`): it is what he set this agent to, and a word in a chat lifts none
+   * of it, as an instruction lifts none of it (§10.3).
+   */
+  const onWordWrite = (ctx: CallContext, said: unknown, rung: { gate: Gate; held?: true } | null, note: string | undefined): Result<string> | null => {
+    if (said === undefined || said === null || rung === null || rung.gate.write || rung.held === true) return null;
+    const word = wordOf(ctx, said);
+    if (!word.ok) return word as Result<never>;
+    const beyond = beyondWord(rung.gate.kinds);
+    if (beyond !== null) return no('FORBIDDEN', beyond, { at: 'said' });
+    const line = `On ${word.value.byName}'s word: "${word.value.said}"`;
+    return ok(typeof note === 'string' && note.trim() !== '' ? `${note.trim()} (${line})` : line);
   };
 
   /**
@@ -9646,7 +9748,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -10540,7 +10642,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * permission, because the risk is different: a wrong new row is visible and a wrong edit to an
      * old one is not.
      */
-    async create(args: { register: string; fields: Patch; note?: string; op_id?: string }, ctx: CallContext): Promise<Result<Entry | Asked>> {
+    async create(args: { register: string; fields: Patch; note?: string; op_id?: string; said?: string }, ctx: CallContext): Promise<Result<Entry | Asked>> {
       const missing = named(args);
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'append', args.register);
@@ -10564,14 +10666,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          run read text from outside the record, the row is filed on Decide instead, and the answer says so in one line. */
       args = { ...args, fields: huedOf(args.register, args.fields) };
       const rung = laddered(ctx, args.register, 'create', args.fields, null);
-      if (rung && !rung.gate.write) {
+      /* AND ON HIS WORD IT LANDS WHERE IT WOULD HAVE ASKED (`onWordWrite`), his words in its note, counted towards no rung. */
+      const word = onWordWrite(ctx, args.said, rung, args.note);
+      if (word !== null && !word.ok) return word as Result<never>;
+      const note = word === null ? args.note : word.value;
+      if (rung && !rung.gate.write && word === null) {
         const refused = wouldRefuse((w) => offRegister(args.register, kernel.create(args.register, args.fields, { ...writerOf(ctx), reads: refsSeen(ctx), within, ...w })));
         if (refused) return refused;
         return tail(askInstead(ctx, args.register, { ...(args.fields as Record<string, unknown>) }, null, rung.gate.why, rung.gate.outside === true));
       }
       return tail(
         keptOnLadder(
-          rung,
+          word === null ? rung : null,
           ownRowsAsked(
             args.register,
             args.fields,
@@ -10581,7 +10687,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ...writerOf(ctx),
                 reads: refsSeen(ctx),
                 within,
-                ...(args.note === undefined ? {} : { note: args.note }),
+                ...(note === undefined ? {} : { note }),
                 ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
                 /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
                    without its own id the record has no way to know the second is the first. */
@@ -10670,7 +10776,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     async update(
-      args: { register: string; seq: number; patch: Patch; version?: number; note?: string; op_id?: string },
+      args: { register: string; seq: number; patch: Patch; version?: number; note?: string; op_id?: string; said?: string },
       ctx: CallContext,
     ): Promise<Result<Entry | Asked>> {
       const missing = named(args, true);
@@ -10701,7 +10807,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       /* AT THE RUNG IT HAS EARNED, as `create` (`ladder.ts`). A row that is not there is left to the write's own refusal. */
       const rung = self === null || noteOnly ? null : laddered(ctx, args.register, 'update', args.patch, self);
-      if (rung && self && !rung.gate.write) {
+      /* AND ON HIS WORD IT LANDS WHERE IT WOULD HAVE ASKED (`onWordWrite`), as `create`. */
+      const word = self === null ? null : onWordWrite(ctx, args.said, rung, args.note);
+      if (word !== null && !word.ok) return word as Result<never>;
+      const note = word === null ? args.note : word.value;
+      if (rung && self && !rung.gate.write && word === null) {
         const refused = wouldRefuse((w) =>
           offRegister(
             args.register,
@@ -10719,7 +10829,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       /* THE ROW IT ANSWERS IS HER VIEW OF IT: a field hidden from her is not in it, though she moved the row on. */
       const written = keptOnLadder(
-        rung,
+        word === null ? rung : null,
         ownRowsAsked(
           args.register,
           args.patch,
@@ -10730,7 +10840,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               reads: refsSeen(ctx),
               within,
               ...(args.version === undefined ? {} : { version: args.version }),
-              ...(args.note === undefined ? {} : { note: args.note }),
+              ...(note === undefined ? {} : { note }),
               ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
               ...(args.op_id === undefined ? {} : { opId: args.op_id }),
             }),
@@ -12013,9 +12123,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           });
         /* NEWEST LAST AND THE OLDEST LET GO, as `pen.dismissed` is, so the switch that mutes one more never stops working. */
         kept = [...new Set(value)].slice(-MUTED_MOST);
-      } else if (key === 'agents.answer_in_chat') {
-        /* THE OWNER'S, IN A BROWSER: it lets a press in a chat app answer questions, so it is held to `admin`'s door. */
-        const owner = admin(ctx, 'let a chat app answer questions');
+      } else if (key === 'agents.answer_in_chat' || key === ON_WORD_PREF) {
+        /* THE OWNER'S, IN A BROWSER: each lets somebody other than him answer questions, so each is held to `admin`'s door. */
+        const owner = admin(ctx, key === ON_WORD_PREF ? 'let agents answer on your word' : 'let a chat app answer questions');
         if (owner) return { ok: false as const, refusal: owner };
         if (value !== null && typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
         kept = value as boolean | null;
@@ -12808,10 +12918,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          hourly purge row re-armed within the hour; on one without an identity row, nothing did. */
       /* ACCEPTING AN ARRANGEMENT IS INSTALLING, so it is held to the install's own door: an owner, and never a token
          (ADR-060). A member who may decide other questions may not change what this record is by accepting one. */
+      /* AN ANSWER ON HIS WORD MAY ACCEPT WHAT INSTALLS (`onWord`, the owner's decision of 27 October): he told the run to,
+         and `instructionsMine` has already held it to an owner whose switch is on and to a question that grants no key.
+         Every other door `admin` keeps stays shut to it. */
       if (args.decide?.option === 'accept') {
         const asked = kernel.governanceRow('suggestion', String(args.id));
         const kind = asked?.body_kind;
-        if (kind === 'pack' || kind === 'settings' || kind === 'arrange') {
+        if ((kind === 'pack' || kind === 'settings' || kind === 'arrange') && ctx.onWord === undefined) {
           const owner = admin(ctx, 'accept a change to what this record is');
           if (owner) return { ok: false as const, refusal: owner };
         }
@@ -12823,7 +12936,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            other three kinds once rules were held (`test/accept-unattended.test.ts`). Held to every one and not only one
            that asks or calls out, as ADR-060 states it; a narrower door is a decision for the owner, not for this
            line. */
-        if (runsUnattended(kind, asked?.body)) {
+        if (runsUnattended(kind, asked?.body) && ctx.onWord === undefined) {
           const owner = admin(ctx, 'accept a change to what runs while nobody is looking');
           if (owner) return { ok: false as const, refusal: owner };
         }

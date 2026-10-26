@@ -216,6 +216,14 @@ export type RecordDeps = {
    * outside the app (`chat-answer.ts`), with the context it built from a spent card grant. Absent, that press is refused.
    */
   decideAs?: ((args: { id: string; decide: { option: string; reason: string } }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
+  /**
+   * Whether a token may act on its owner's word now, and as whom, his words cleaned (`wordOf` in `index.ts`): his switch,
+   * his ownership, the key's reach and a run untouched by outside text. `instructions.ts` answers a question with it.
+   * Absent, nothing is answered on a word.
+   */
+  wordOf?: ((ctx: CallContext, said: unknown) => Result<{ by: string; byName: string; said: string }>) | undefined;
+  /** Why his word may not answer one question (a key, an amount on what is there), or `null` (`wordFault` in `index.ts`). */
+  wordFault?: ((row: Record<string, unknown>) => string | null) | undefined;
   /** The record's own `metric`, every check it makes, which `metrics` answers each figure with. Absent, `metrics` is refused. */
   metricAs?: ((args: { metric: string }, ctx: CallContext) => Promise<Result<unknown>>) | undefined;
   /** Where this host keeps sealed bytes (`sealed.ts`). Absent, the four sealed methods keep and hand back none. */

@@ -165,6 +165,9 @@ export const ANSWERED_FIELD = 'answered';
 /** The line on a decision made on his order (`field`), the instruction in `to_v`. */
 export const ORDERED_FIELD = 'answered_on';
 
+/** The line on a decision a run made on his word, said to it in the conversation (`field`), the run in `to_v`. */
+export const ON_WORD_FIELD = 'answered_on_word';
+
 /** What stops a run: a stop or a pause he sent it (or its parent), by instruction. `null` from `stopOf` when none. */
 export type Stop = { kind: 'stop' | 'pause'; id: string; said: string };
 
@@ -844,6 +847,28 @@ export function keepOrderAnswer(
     ORDERED_FIELD,
     k.instruction.id,
     `Answered by ${k.run} on ${k.byName}'s order (${k.instruction.id}).`,
+    k.batch ?? null,
+  );
+}
+
+/**
+ * A question a run answered on his word, his own words quoted (`instructionsMine`'s `answer` with `said`): the decision
+ * says which run gave it and what he told it, signed by him, in the decision's batch. The record has already answered
+ * the question as him; this keeps the line History and Activity say it by.
+ */
+export function keepWordAnswer(
+  d: Pick<InstructionDeps, 'sql' | 'now' | 'mint'>,
+  k: { run: string; decision: string; by: string; byName: string; said: string; batch?: string | undefined },
+): void {
+  d.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note, batch) VALUES (?, ?, ?, 'note', ?, 'decision', ?, ?, ?, ?)",
+    d.mint(),
+    iso(d.now),
+    k.by,
+    `decision:${k.decision}`,
+    ON_WORD_FIELD,
+    k.run,
+    `Answered by ${k.run} on ${k.byName}'s word: "${k.said}"`,
     k.batch ?? null,
   );
 }

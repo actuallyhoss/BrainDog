@@ -315,6 +315,7 @@ import {
   instructionFor as instructionsFor,
   instructionOf,
   keepOrderAnswer,
+  keepWordAnswer,
   replyInstruction as replyToInstruction,
   runOf as instructedRun,
   seenBy as instructionSeenBy,
@@ -491,6 +492,7 @@ export {
   REPLY_STATES,
   ANSWERS_MOST,
   ORDERED_FIELD,
+  ON_WORD_FIELD,
   SAID_MOST,
   SEAT_NAME,
   SEEN_HOW,
@@ -12804,6 +12806,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     keepOrderAnswer: (k: { instruction: Instr; question: string; run: string; decision: string; by: string; byName: string; batch?: string | undefined }): void =>
       transaction(() => keepOrderAnswer({ sql, now: clock.now(), mint }, k)),
+    /** A question a run answered on his word (`said`): the decision said as given on it, by him, with his words. */
+    keepWordAnswer: (k: { run: string; decision: string; by: string; byName: string; said: string; batch?: string | undefined }): void =>
+      transaction(() => keepWordAnswer({ sql, now: clock.now(), mint }, k)),
     /**
      * The bridge says run `runId`'s session is open: `pulseRun(runId, at, seat)`, `at` in milliseconds and the record's
      * clock when left out. Moves `pulse_at` in place, no version and no event; answers whether it moved (`presence.ts`).

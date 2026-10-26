@@ -219,8 +219,11 @@ const INSTRUCT_TAKES = ['said', 'kind', 'when', 'to', 'to_run', 'to_agent', 'pro
 /** What `instructionList` takes. */
 const LIST_TAKES = ['state', 'project', 'task', 'run', 'limit', 'cursor'] as const;
 
-/** What `instructionsMine` takes: nothing (what is pending), `take`, `reply` with `said` and `state`, `seen`, or `answer`. */
-const MINE_TAKES = ['take', 'reply', 'said', 'state', 'seen', 'how', 'answer'] as const;
+/**
+ * What `instructionsMine` takes: nothing (what is pending), `take`, `reply` with `said` and `state`, `seen`, or `answer`,
+ * alone for a question his order named, or with `option` and `said` for one he told the run to answer (`wordAnswer`).
+ */
+const MINE_TAKES = ['take', 'reply', 'said', 'state', 'seen', 'how', 'answer', 'option'] as const;
 
 /** The words he may say a yes or a no in, each group one answer, its question's own id found among them (D8). */
 const SAME_ANSWER: readonly (readonly string[])[] = [
@@ -270,7 +273,7 @@ export type Mine = {
   /** The one it took or answered in this call, as it now stands, with its receipts after a reply. */
   instruction?: Told;
   receipts?: Receipts | null;
-  /** The question it answered on his order in this call (`answer`), and the line it says. */
+  /** The question it answered on his order or his word in this call (`answer`), and the line it says. */
   answered?: { question: string; option: string; decision: string | null; said: string };
 };
 
@@ -453,7 +456,8 @@ export function methods(deps: RecordDeps) {
     const id = spokenAs(given) ?? given;
     const held = instructionsTakenBy(sql, run).filter((i) => i.state === 'working' && i.answers.some((x) => x.question === id));
     const i = held.at(-1);
-    if (i === undefined) return no('LEVEL_REQUIRED', `No order you hold names ${given}. Only he answers it, in BrainDog.`, { at: 'answer' });
+    if (i === undefined)
+      return no('LEVEL_REQUIRED', `No order you hold names ${given}. Only he answers it, in BrainDog, unless he told you to: then send option and said, his words.`, { at: 'answer' });
     const named = i.answers.find((x) => x.question === id)!;
     if (i.answered.includes(id)) return no('TRANSITION_ILLEGAL', `You already answered ${given} on ${i.id}.`, { at: 'answer' });
     /* HIS ORDER, UNDER HIS OWN KEY: a run on somebody else's key never answers as him, whatever it took. */
@@ -482,6 +486,48 @@ export function methods(deps: RecordDeps) {
         answered: { question: given, option: named.option, decision, said: `Answered ${given} with ${named.option}, on ${byName}'s order (${i.id}).` },
       }),
     );
+  };
+
+  /**
+   * A run answers a question he told it to answer, in the conversation, his words sent as `said` (the owner's decision
+   * of 27 October; `wordOf` and `wordFault` in `index.ts` say who may and what no word reaches). The answer is his own
+   * `decide`, made as him and said as given on his word (`onWord`), so Undo takes it back as any decision. Unlike an
+   * order the run names the answer, so the question takes any of its own answers, an install's among them, and the
+   * decision keeps his words and the run that carried them.
+   */
+  const wordAnswer = async (run: string, given: string, option: unknown, said: unknown, ctx: CallContext): Promise<Result<Mine>> => {
+    if (deps.wordOf === undefined || deps.wordFault === undefined || deps.decideAs === undefined)
+      return no('NOT_IN_THIS_BUILD', 'Answering on their word is not in this build. Ask with propose.', { at: 'said' });
+    const word = deps.wordOf(ctx, said);
+    if (!word.ok) return word as Result<never>;
+    const id = spokenAs(given) ?? given;
+    const row = kernel.governanceRow('suggestion', id);
+    /* A QUESTION HE IS NOT SHOWN IS ONE THAT IS NOT THERE, as `decide` answers it. */
+    if (row === null || sightOf(ctx, `suggestion:${id}`) === null) return no('OUT_OF_BOUNDS', `There is no question called ${given}.`, { at: 'answer' });
+    if (row.status !== 'open') return no('TRANSITION_ILLEGAL', `${given} is already answered.`, { at: 'answer' });
+    const kind = String(row.body_kind ?? '');
+    const takes = PRESSABLE.has(kind) ? answersTaken(row) : ['accept', 'reject'];
+    const asked = typeof option === 'string' ? option.trim() : '';
+    if (asked === '') return no('REQUIRED_MISSING', `Which answer did they give? Send option, one of ${takes.join(', ')}.`, { at: 'option', allowed: takes });
+    /* HIS WORD AS HE SAYS IT, as an order's: "approve" or "yes" is the yes this question takes, "decline" or "no" its no. */
+    const same = SAME_ANSWER.find((g) => g.includes(asked.toLowerCase()));
+    const chosen = takes.includes(asked) ? asked : (same?.find((w) => takes.includes(w)) ?? asked);
+    if (!takes.includes(chosen)) return no('ENUM_VALUE_UNKNOWN', `${given} is answered with one of ${takes.join(', ')}.`, { at: 'option', allowed: takes });
+    /* WHAT THE ANSWER WOULD DO, AND NOTHING ELSE: a no to a set of rows or an install changes nothing, and of a choice only
+       the option picked is read, so a key named by another option never holds this one back. */
+    const body = typeof row.body === 'object' && row.body !== null ? (row.body as Record<string, unknown>) : {};
+    const options = Array.isArray(body.options) ? body.options : [];
+    const weighed = kind === 'options' ? { ...row, body: { ...body, options: options.filter((o) => typeof o === 'object' && o !== null && (o as { id?: unknown }).id === chosen) } } : row;
+    const fault = kind !== 'options' && (chosen === 'reject' || chosen === 'apart') ? null : deps.wordFault(weighed);
+    if (fault !== null) return no('FORBIDDEN', fault, { at: 'answer' });
+    const { by, byName, said: words } = word.value;
+    const as: CallContext = { principal: { kind: 'person', id: by, level: 'owner' }, registers: '*', credentialed: true, onWord: run };
+    const out = await deps.decideAs({ id, decide: { option: chosen, reason: `${byName} told ${run}: "${words}"` } }, as);
+    if (!out.ok) return out as Result<never>;
+    const decided = (typeof out.value === 'object' && out.value !== null ? out.value : {}) as { decision?: unknown; batch?: unknown };
+    const decision = typeof decided.decision === 'string' ? decided.decision : null;
+    if (decision !== null) kernel.keepWordAnswer({ run, decision, by, byName, said: words, batch: typeof decided.batch === 'string' ? decided.batch : undefined });
+    return ok(mineOf(run, ctx, { answered: { question: given, option: chosen, decision, said: `Answered ${given} with ${chosen}, on ${byName}'s word. Undo is in BrainDog.` } }));
   };
 
   /** What a run is answered with: its stamp, what is pending, what stops it, and the lines in his voice. */
@@ -682,8 +728,11 @@ export function methods(deps: RecordDeps) {
       if (asked.length > 1) return no('VALUE_MALFORMED', `Send one of take, reply, seen or answer in a call, not ${asked.join(' and ')}.`, { at: asked[1]! });
       for (const key of ['take', 'reply', 'said', 'answer'] as const)
         if (a[key] !== undefined && a[key] !== null && typeof a[key] !== 'string') return no('VALUE_MALFORMED', `${key} is text${key === 'said' ? '' : key === 'answer' ? ', as SG243' : ', as IN4'}.`, { at: key });
-      if ((a.said !== undefined || a.state !== undefined) && a.reply === undefined)
-        return no('VALUE_MALFORMED', 'said and state go with reply, the instruction they answer.', { at: a.said !== undefined ? 'said' : 'state' });
+      if (a.state !== undefined && a.reply === undefined) return no('VALUE_MALFORMED', 'state goes with reply, the instruction it answers.', { at: 'state' });
+      if (a.said !== undefined && a.reply === undefined && a.answer === undefined)
+        return no('VALUE_MALFORMED', 'said goes with reply, the instruction it answers, or with answer and option: the words the person told you it in.', { at: 'said' });
+      if (a.option !== undefined && (a.answer === undefined || typeof a.option !== 'string'))
+        return no('VALUE_MALFORMED', 'option is text, and goes with answer and said: the answer the person gave, in their words.', { at: 'option' });
       if (a.state !== undefined && !(REPLY_STATES as readonly unknown[]).includes(a.state))
         return no('ENUM_VALUE_UNKNOWN', `state is one of ${REPLY_STATES.join(', ')}.`, { at: 'state', allowed: REPLY_STATES });
       if (a.how !== undefined && !(SEEN_HOW as readonly unknown[]).includes(a.how))
@@ -694,7 +743,8 @@ export function methods(deps: RecordDeps) {
 
       const run = runOfCaller(ctx, 'opened: instructions');
       if (!run.ok) return tail(run as Result<never>);
-      /* A QUESTION HIS ORDER NAMED, answered as he said (D8). */
+      /* A QUESTION HE TOLD IT TO ANSWER, his words sent with it (`wordAnswer`); else one his order named, as he said (D8). */
+      if (typeof a.answer === 'string' && (a.said !== undefined || a.option !== undefined)) return tail(await wordAnswer(run.value, a.answer.trim(), a.option, a.said, ctx));
       if (typeof a.answer === 'string') return tail(await orderAnswer(run.value, a.answer.trim(), ctx));
       if (typeof a.take === 'string') {
         /* ONLY ONE IT IS HANDED (`toldTo`): an agent that may not read his instructions guessed `IN4` and took it whole. The
