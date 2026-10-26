@@ -391,3 +391,16 @@ test('RECONNECT FROM THE NAVIGATION STATE answers what the address answered, and
   ];
   for (const state of not) assert.equal(reconnectFrom(state, [row]), null, JSON.stringify(state) ?? 'undefined');
 });
+
+/* THE PASS OF 27 OCTOBER (UX62): a key is a Keys row not retired, said once, and the retired are counted beside it. */
+test('a key is a row of the Keys list that is not retired, and the retired are counted apart', () => {
+  const rows = [
+    { id: 'a', fields: { label: 'A', state: 'live' } },
+    { id: 'b', fields: { label: 'B', state: 'retired' } },
+    { id: 'c', fields: { label: 'C' }, state: 'retired' },
+    { id: 'd', fields: { label: 'D', state: 'unverified' } },
+  ];
+  assert.deepEqual(rows.filter(keychain.isKey).map((r) => r.id), ['a', 'd']);
+  assert.equal(keychain.retiredOf(rows), 2);
+  assert.equal(keychain.keysOf(rows, [], new Map()).length + keychain.retiredOf(rows), rows.length, 'the two counts do not add up to the list');
+});

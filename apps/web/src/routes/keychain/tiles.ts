@@ -75,7 +75,7 @@ export type Sentence = { text: string; needs: string | undefined };
  * `asking` is counted only for a reader who may see the machines: a reader refused them passes `seesMachines: false`
  * and the clause is not drawn, because a count they were refused is not theirs to read in a sentence either.
  */
-export function sentenceOf(o: { keys: readonly KeyRow[]; listed: boolean; counts: boolean; asking: number; seesMachines: boolean }): Sentence | null {
+export function sentenceOf(o: { keys: readonly KeyRow[]; listed: boolean; counts: boolean; asking: number; seesMachines: boolean; retired?: number }): Sentence | null {
   const parts: string[] = [];
   if (o.listed && o.keys.length > 0) {
     /* "6 keys. 2 have no value yet.": the keys with a value nowhere are the ones to see to, counted as Agents counts
@@ -85,6 +85,10 @@ export function sentenceOf(o: { keys: readonly KeyRow[]; listed: boolean; counts
     parts.push(o.counts && sealed.length > 0 ? `${keysSaid(o.keys.length)}, ${total === 0 ? 'none opened yet' : keychain.opened(total)}.` : `${keysSaid(o.keys.length)}.`);
     const none = o.keys.filter(missing).length;
     if (none > 0) parts.push(`${none === 1 ? '1 has' : `${none} have`} no value yet.`);
+    /* THE RETIRED ONES ARE COUNTED BESIDE THEM (UX62): Search's Keys counts every row, so "83 keys" here and "176" there
+       read as two records. */
+    const retired = o.retired ?? 0;
+    if (retired > 0) parts.push(`${retired === 1 ? '1 more is' : `${retired} more are`} retired and not listed here.`);
   }
   let needs: string | undefined;
   if (o.seesMachines && o.asking > 0) {

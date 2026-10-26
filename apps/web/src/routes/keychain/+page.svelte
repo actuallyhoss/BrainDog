@@ -39,7 +39,7 @@
   import { copy } from '$lib/copy.ts';
   import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
   import {
-    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, lockOf, namesOf, readAll, reconnectFrom, reconnectOf, reprove, revoke, runPath,
+    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, retiredOf, lockOf, namesOf, readAll, reconnectFrom, reconnectOf, reprove, revoke, runPath,
     scopeName, wantsPassphrase, withPassphrase, words, RECONNECT_STATE,
     type GrantState, type KeyRow, type Lock, type ProjectMark, type UsedByRun,
   } from '$lib/record/keychain.ts';
@@ -58,7 +58,7 @@
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
-  import { countSaid, machinesTellOf, mayAct, saidOf, tellOf, words as tells, type Said } from './said.ts';
+  import { countSaid, machinesTellOf, mayAct, plainOr, saidOf, tellOf, words as tells, type Said } from './said.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
@@ -82,6 +82,8 @@
   let from = $state<'reading' | 'live'>('reading');
   let machines = $state<DeviceRow[]>([]);
   let keys = $state<KeyRow[]>([]);
+  /** How many of the Keys list's rows are retired, said beside the count so it adds up to the list's (`isKey`). */
+  let retired = $state(0);
   /* WHAT THE ADDRESS ASKED FOR (`?q=`, a service's page links here with its name), and the keys grouped by project and
      then by who they are with (`groupsOf`), the asked-for ones alone while it asks. */
   const asked = $derived(page.url.searchParams.get('q')?.trim() || null);
@@ -144,7 +146,8 @@
    * which is a screen still reading and not a refusal; that sentence there would have told an owner their record
    * was the demo.
    */
-  const cannot = (): string | null => (devices.kind !== 'held' ? devices.fix : index.kind !== 'held' ? index.fix : null);
+  const cannot = (): string | null =>
+    devices.kind !== 'held' ? plainOr(devices.fix, tells.actHow) : index.kind !== 'held' ? plainOr(index.fix, tells.keysHow) : null;
   function refuse() {
     const line = cannot();
     if (line) toasts.push(line, { intent: 'warn' });
@@ -160,7 +163,7 @@
    */
   const sentence = $derived(
     from === 'live'
-      ? sentenceOf({ keys, listed: index.kind === 'held', counts, asking: waiting.length, seesMachines: devices.kind === 'held' })
+      ? sentenceOf({ keys, listed: index.kind === 'held', counts, asking: waiting.length, seesMachines: devices.kind === 'held', retired })
       : null,
   );
   /** "Opens by key": the one figure on this screen, or nothing where no count came back. */
@@ -214,6 +217,7 @@
          points at one this screen cannot name, which is this screen saying where the record said nothing. */
       names = projects.rows.length > 0 ? namesOf(projects.rows) : new Map();
       keys = keysOf(credentials.rows, grants.ok ? (grants.value as GrantState[]) : [], names);
+      retired = retiredOf(credentials.rows);
       cameFrom = cameFromOf(credentials.rows);
       moreKeys = credentials.more && credentials.rows.length > 0;
       forConnectors = connectorGrants(grants.ok ? grants.value : []);
@@ -369,6 +373,7 @@
     /* A read refused before its first key leaves the keys as they were drawn, as one refused page always did. */
     if (credentials.refused === null || credentials.rows.length > 0) {
       keys = keysOf(credentials.rows, grants.ok ? (grants.value as GrantState[]) : [], names);
+      retired = retiredOf(credentials.rows);
       cameFrom = cameFromOf(credentials.rows);
       moreKeys = credentials.more;
     }

@@ -44,9 +44,15 @@ export const words = {
   noListHow: 'Keys arrive with the Agents add-on. Install it on Add-ons and this section fills itself.',
   browse: 'Browse add-ons',
   /** The Keys section when the record refused the read rather than lacking the list. */
-  notYours: 'The record did not hand over the Keys index.',
+  notYours: 'Your keys could not be listed here.',
   /** The machines half, when the record refused to list them. */
-  machinesNotYours: 'The record did not hand over the machines.',
+  machinesNotYours: 'Only the owner sees the machines that may open keys.',
+  /* IN PLAIN WORDS WHERE THE RECORD'S OWN WERE ITS INSIDES (the pass of 27 October, UX63): "listDevices, in ADMIN, was
+     not sent" and "a token cannot reach the vault" were drawn as they came. Each says what to do instead. */
+  keysHow: 'Sign in again, then open the Keychain.',
+  machinesHow: 'Sign in as the owner to see them and approve a new one.',
+  countsHow: 'How often each key was opened shows once you sign in again.',
+  actHow: 'Only the owner, signed in, can change keys here.',
   /**
    * A COUNT NOBODY GAVE US IS NOT DRAWN AS ZERO. `listGrants` is KEYCHAIN, so a reader is refused it, and
    * `keysOf` then has no grant to join a row to: "never opened" would be this screen's guess printed
@@ -64,6 +70,15 @@ export const words = {
   noAnswer: 'The record answered something this screen could not read. Try again.',
 } as const;
 
+/**
+ * WHETHER A SENTENCE SPEAKS THE RECORD'S INSIDES rather than to a person: a method's name (`listDevices`), a group or
+ * code in capitals (`ADMIN`, `READ+`), or a token, which he never holds in the app.
+ */
+const INSIDES = /\b[a-z]+[A-Z][A-Za-z]*\b|\b[A-Z]{3,}\+?(?![a-z])|\btokens?\b/u;
+
+/** The record's own sentence where it is plain, else `how`: what to do, in this screen's words. */
+export const plainOr = (fix: string, how: string): string => (fix.trim() === '' || INSIDES.test(fix) ? how : fix);
+
 /** The one refusal code that means the record holds no such list, rather than refusing the reader. */
 const ABSENT = 'REGISTER_UNKNOWN';
 
@@ -75,7 +90,7 @@ export function saidOf(out: Wire<unknown>): Said {
 }
 
 /** What the sealed line says where no count came back: the record's own sentence, never this screen's guess at it. */
-export const countSaid = (counted: Said): string => (counted.kind === 'held' ? '' : counted.fix);
+export const countSaid = (counted: Said): string => (counted.kind === 'held' ? '' : plainOr(counted.fix, words.countsHow));
 
 /** What a section draws instead of its rows, or `null` when the record answered and the rows speak for themselves. */
 export type Tell = { kind: 'no-data-yet' | 'no-permission'; title: string; body: string };
@@ -92,13 +107,13 @@ export function tellOf(said: Said): Tell | null {
   if (said.kind === 'held') return null;
   return said.kind === 'absent'
     ? { kind: 'no-data-yet', title: words.noList, body: `${said.fix} ${words.noListHow}` }
-    : { kind: 'no-permission', title: words.notYours, body: said.fix };
+    : { kind: 'no-permission', title: words.notYours, body: plainOr(said.fix, words.keysHow) };
 }
 
 /** The machines half's own sentence, which is the record's, or `null` when it answered. */
 export function machinesTellOf(said: Said): Tell | null {
   if (said.kind === 'held') return null;
-  return { kind: 'no-permission', title: words.machinesNotYours, body: said.fix };
+  return { kind: 'no-permission', title: words.machinesNotYours, body: plainOr(said.fix, words.machinesHow) };
 }
 
 /**

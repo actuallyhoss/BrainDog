@@ -377,6 +377,16 @@ function expiresOf(field: unknown, grant: GrantState | undefined): { expires?: s
  * hands a browser with the grant. Only a row whose value is sealed here carries them, so a revoked grant's row, whose
  * bytes are gone, does not go on describing them.
  */
+/**
+ * WHAT A KEY IS, SAID ONCE (the pass of 27 October, UX62): a row of the Keys list that is not retired. The Keychain lists
+ * and counts these; the Keys list itself, and Search's "every entry, finished ones too", count the retired as well, so
+ * the Keychain says how many are retired beside its own count and the two add up.
+ */
+export const isKey = (r: { fields: Record<string, unknown>; state?: string | null }): boolean => (r.state ?? r.fields.state) !== 'retired';
+
+/** How many of the Keys list's rows are retired, and so not keys on the Keychain. */
+export const retiredOf = (rows: readonly { fields: Record<string, unknown>; state?: string | null }[]): number => rows.filter((r) => !isKey(r)).length;
+
 export function keysOf(
   rows: readonly { id: string; seq?: number | null; fields: Record<string, unknown>; state?: string | null }[],
   grants: readonly GrantState[],
@@ -385,7 +395,7 @@ export function keysOf(
 ): KeyRow[] {
   const byId = new Map(grants.map((g) => [g.id, g]));
   return rows
-    .filter((r) => (r.state ?? r.fields.state) !== 'retired')
+    .filter(isKey)
     .map((r): KeyRow => {
       const value = r.fields[field];
       const grant = typeof value === 'string' ? byId.get(value) : undefined;
