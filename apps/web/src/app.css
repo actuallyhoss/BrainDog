@@ -35,6 +35,14 @@
     overflow: hidden;
   }
 
+  /* A LINK IN THE RECORD IS INK WITH A QUIET UNDERLINE (UX81). Red is kept for what needs him, the one primary action
+     and what is late, each of which says so on its own class; an ordinary link ("See what it changes", "1 more",
+     "Show all") read as one more alarm. The shared base keeps red for the marketing site's documents. */
+  a {
+    color: var(--ink);
+    text-decoration-color: color-mix(in srgb, var(--ink) 35%, transparent);
+  }
+
   /* THE BOARD UNDER EVERYTHING (frame F2): `html` and `body` are one colour, so overscroll and the frame before `body`
      has a size show the page and not a darker grey. */
   html {

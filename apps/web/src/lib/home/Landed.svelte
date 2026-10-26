@@ -255,7 +255,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--red);
+    color: var(--ink);
     font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: none;

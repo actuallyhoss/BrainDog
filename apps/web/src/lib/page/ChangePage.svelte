@@ -358,7 +358,7 @@
   .change-show {
     margin-inline-start: auto;
     padding-inline-start: var(--sp-3);
-    color: var(--red);
+    color: var(--ink);
   }
 
   .change-vh {

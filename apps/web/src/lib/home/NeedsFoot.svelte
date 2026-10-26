@@ -86,7 +86,7 @@
             <a class="nf-line nf-told" href={at('/p/agents')} data-told>
               <Icon name="session" size="s" /><span class="nf-words"
                 ><span class="nf-what" dir="auto">{t.line}</span>{#if t.reply}<span class="nf-reply" dir="auto">{t.reply}</span>{/if}</span
-              ><span class="nf-go">{words.answer}</span>
+              ><span class="nf-go" data-needs>{words.answer}</span>
             </a>
           </li>
         {/each}
@@ -248,15 +248,21 @@
     line-height: 18px;
   }
 
+  .nf-go[data-needs],
+  .nf-shared[data-needs] .nf-go {
+    color: var(--red);
+  }
+
   .nf-count {
     margin-inline-start: var(--sp-2);
     color: var(--red);
     font-weight: 600;
   }
 
+  /* THE WORD AT A LINE'S END IS A LINK IN INK (UX81); red only where it answers something that needs him. */
   .nf-go {
     flex: none;
-    color: var(--red);
+    color: var(--ink);
     font-weight: 500;
   }
 
