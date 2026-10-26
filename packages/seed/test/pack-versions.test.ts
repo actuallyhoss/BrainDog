@@ -1967,11 +1967,12 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'ef720f5f29513147',
+    declares: 'f622b9b3dad561d4',
     history: [
       "Money 3.27.0: `page.money`'s In and out, by month reads its months ahead off `metric.in-ahead-by-month` and `metric.out-ahead-by-month`, the walk Cash ahead draws, and Cash ahead on `page.money` and `page.money-book` opens on twelve weeks -> 74076d8938aa73b8",
       "Money 3.27.0: Lasts on `page.money` is how long `metric.lasts-no-income` lasts with a sentence of the day it ends on and what falls due then, and the day `metric.runs-out-on` names only while there is one -> b8350a22f5adb3fc",
       "Money 3.27.0: `page.money`'s first line says Cash now in each currency apart and about what that comes to at the day's rate, over the accounts `metric.cash-by-account` lists -> ef720f5f29513147",
+      "Money 3.27.0: Every month on `page.money` says `metric.leaving-30d`, what goes out in the next thirty days as Today says it, beside the two repeating figures -> f622b9b3dad561d4",
     ],
   },
   'work@1.17.0': {

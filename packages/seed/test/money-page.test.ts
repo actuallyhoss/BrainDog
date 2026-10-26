@@ -107,9 +107,12 @@ test('MONEY HOLDS EVERY MONTH AFTER INSTALMENTS, inside Coming and going, and no
   const block = BLOCKS[every]!;
   assert.equal(block, EVERY_MONTH[0], 'Money places a copy of Every month');
   assert.equal(block.kind, 'stat');
+  /* WHAT REPEATS SAYS IT REPEATS, AND GOING OUT IS TODAY'S OWN FIGURE, since money-core 3.27.0: the walk's thirty days,
+     every part of a plan in it, where the one called Going out here left them out. */
   assert.deepEqual(block.cells, [
-    { metric: 'every-month-in', label: 'Coming in' },
-    { metric: 'every-month-out', label: 'Going out' },
+    { metric: 'every-month-in', label: 'Repeats, coming in' },
+    { metric: 'every-month-out', label: 'Repeats, going out' },
+    { metric: 'leaving-30d', label: 'Going out, 30 days', note: 'Bills, what repeats and parts of plans' },
   ]);
   assert.deepEqual(block.when, { metric: 'every-month-out', gt: 0 });
 
@@ -181,7 +184,8 @@ test('ON THE SAMPLE, EVERY MONTH READS ITS TWO CELLS FROM THE TWO FIGURES, and n
   const ins = reading(k, 'every-month-in');
   const outs = reading(k, 'every-month-out');
   assert.ok(typeof ins === 'number' && typeof outs === 'number' && outs > 0, `nothing to hold the cells to: ${String(ins)}, ${String(outs)}`);
-  assert.deepEqual(said, { 'every-month-in': ins, 'every-month-out': outs });
+  /* AND WHAT GOES OUT IN THE NEXT THIRTY DAYS, the walk's figure Today says too, since money-core 3.27.0. */
+  assert.deepEqual(said, { 'every-month-in': ins, 'every-month-out': outs, 'leaving-30d': reading(k, 'leaving-30d') });
 });
 
 test('ON THE SAMPLE, THE COSTS BY CATEGORY ARE DRAWN, and their parts add up to Going out in one currency', async () => {
@@ -227,6 +231,6 @@ test('A RECORD WITH ONE ACCOUNT SHUTS COMING AND GOING UNTIL SOMETHING REPEATS, 
   assert.notEqual(box(blocks).drawn, false, 'Coming and going is shut with something repeating');
   assert.notEqual(every(blocks).drawn, false, 'Every month is not drawn with a cost repeating');
   const said = Object.fromEntries((every(blocks).readings ?? []).map((r) => [r.metric, r.reading?.value ?? null]));
-  assert.deepEqual(said, { 'every-month-in': reading(k, 'every-month-in'), 'every-month-out': reading(k, 'every-month-out') });
+  assert.deepEqual(said, { 'every-month-in': reading(k, 'every-month-in'), 'every-month-out': reading(k, 'every-month-out'), 'leaving-30d': 4_500 });
   assert.deepEqual([said['every-month-in'], said['every-month-out']], [100_000, 4_500]);
 });

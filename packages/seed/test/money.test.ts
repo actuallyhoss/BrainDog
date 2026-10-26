@@ -496,8 +496,14 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
   /* THE COUNTS ARE ASSERTED BECAUSE A SWEEP THAT FINDS NOTHING PASSES EVERY LOOP BELOW IT: the walk's two tiles on
      `/p/money`, and the same two on each of the founder's Overview and Dashboard, which since founder 1.7.0 lead with
      the money there is and no longer with who owes whom. */
-  /* NONE ON `/p/money` SINCE money-core 3.3.0: the thirty days are the bridge's there, beside the calendar of them. */
-  assert.equal(cells.filter((c) => c.where === 'money-core /money').length, 0, 'the Money page says the thirty days twice again');
+  /* ONE ON `/p/money` SINCE money-core 3.27.0, what goes out in the next thirty days under Every month, in the walk's
+     own words, as Today's money tile says it: none from 3.3.0, when the bridge said the thirty days there, and the
+     bridge has been off Money since. */
+  assert.deepEqual(
+    cells.filter((c) => c.where === 'money-core /money').map((c) => [c.metric, c.label]),
+    [['leaving-30d', 'Going out, 30 days']],
+    'the Money page says the thirty days twice again',
+  );
   /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0, which drew the walk's two under the cash
      Home's line had just said: the money is Home's and Money's, and the Dashboard is the numbers. */
   assert.equal(cells.filter((c) => c.where.startsWith('founder ')).length, 0, "the founder's Dashboard says Home's money again");

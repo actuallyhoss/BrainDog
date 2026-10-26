@@ -890,7 +890,8 @@ const withoutRetired38 = (doc: Body): Body => ({
 /**
  * MONEY 3.27.0 COMES OFF BEFORE ALL: no figures of what the walk moves in each month ahead, In and out, by month reads
  * bills due once and what repeats at its monthly share again, Cash ahead opens on ten weeks, Lasts draws its two
- * figures again with no sentence under them, and the first line says one Cash now.
+ * figures again with no sentence under them, the first line says one Cash now, and Every month is its two repeating
+ * figures alone.
  */
 const AHEAD_27 = new Set(['in-ahead-by-month', 'out-ahead-by-month']);
 /* And the first line said one Cash now, over every account counted as cash. */
@@ -915,6 +916,8 @@ const withoutAhead27 = (doc: Body): Body => ({
                   }
                 : b.lead === true && typeof b.body === 'string'
                   ? { ...b, body: b.body.replace(CASH_APART_27, '{{cash-now}} across {{cash-accounts}} account(s)') }
+                  : b.heading === 'Every month' && b.kind === 'stat'
+                  ? { ...b, cells: [{ metric: 'every-month-in', label: 'Coming in' }, { metric: 'every-month-out', label: 'Going out' }] }
                   : b.heading === 'Lasts' && b.kind === 'stat'
                   ? { ...b, cells: [{ metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' }, { metric: 'lasts-no-income', label: 'If nothing more comes in' }] }
                   : tenWeeks(b),

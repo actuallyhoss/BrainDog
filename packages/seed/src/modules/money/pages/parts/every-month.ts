@@ -10,6 +10,11 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
        NO DIFFERENCE BETWEEN THE TWO YET: a third cell would need a figure that is one less the other (`sum_of`,
        REC-B06 job 2), and a host that took one from the other here would be a second way of doing sums.
 
+       AND WHAT GOES OUT IN THE NEXT THIRTY DAYS BESIDE THEM, SINCE money-core 3.27.0: the walk's own figure
+       (`leaving-30d`), the one Today's money tile says under the same name, so every part of a plan falling due is in
+       it. Two figures called Going out stood a page apart, this tile's leaving every plan out, and read as two answers
+       to one question; the repeating two now say they are what repeats.
+
        ONLY WHILE SOMETHING GOES OUT EVERY MONTH. A page condition is one figure or all of several, never either of
        two, so a record whose only repeating line is money coming in reads it on the chart and not here. */
     kind: 'stat',
@@ -17,8 +22,9 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
     icon: 'refresh',
     span: 12,
     cells: [
-      { metric: 'every-month-in', label: 'Coming in' },
-      { metric: 'every-month-out', label: 'Going out' },
+      { metric: 'every-month-in', label: 'Repeats, coming in' },
+      { metric: 'every-month-out', label: 'Repeats, going out' },
+      { metric: 'leaving-30d', label: 'Going out, 30 days', note: 'Bills, what repeats and parts of plans' },
     ],
     when: { metric: 'every-month-out', gt: 0 },
   },
