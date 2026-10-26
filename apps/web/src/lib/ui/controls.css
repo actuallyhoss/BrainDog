@@ -793,6 +793,7 @@
 
   /* A DISABLED BUTTON KEEPS AN EDGE, so on a tile it reads as a control that cannot act and not as plain text. */
   .btn:disabled {
-    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    outline: 1px solid var(--rule-strong);
+    outline-offset: -1px;
   }
 }
