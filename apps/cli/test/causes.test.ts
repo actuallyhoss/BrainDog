@@ -159,7 +159,7 @@ test('AN OLDER RECORD that ignores cause files each question as before, and the 
   const m = h.machine('desk');
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
-  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.1\.0\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
+  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.1\.1\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
 });
 
 /* ── pack install ──────────────────────────────────────────────────────── */
@@ -169,7 +169,7 @@ test('PACK INSTALL ASKS ONCE: the pack is its cause, and asking again prints "Al
   const m = h.machine('studio');
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[0]?.args.cause, 'install#project-brief');
-  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.1\.0\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
+  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.1\.1\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
 
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[1]?.args.cause, 'install#project-brief');
