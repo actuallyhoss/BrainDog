@@ -282,6 +282,15 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
         return [{ ...b, cells: (b.cells as { metric?: string }[]).map((c) => (c.metric === 'project-worked:{{name}}' ? { ...c, metric: 'project-last-worked:{{name}}' } : c)) }];
       return [b];
     });
+  /* AND THE PLAN AND WHERE NUMBERS ARE SENT, MOVED SINCE founder 3.7.0: the plan under More about, and Send numbers here
+     folded last, laid back here where 2.6.0 drew them, just over More about. */
+  const inPlace = (blocks: Block[]): Block[] => {
+    const plan = blocks.filter((b) => b.kind === 'roadmap');
+    const send = blocks.filter((b) => b.heading === 'Send numbers here').map(({ fold: _fold, ...rest }) => rest as Block);
+    const rest = blocks.filter((b) => b.kind !== 'roadmap' && b.heading !== 'Send numbers here');
+    const at = rest.findIndex((b) => b.heading === 'More about {{name}}');
+    return [...rest.slice(0, at), ...plan, ...send, ...rest.slice(at)];
+  };
   /* AND THE DASHBOARD'S TWO CHARTS SINCE founder 3.4.0 (Z20): the one headed with its age taken out, and the other's
      gate on the age. */
   const dashboardBefore = (blocks: Block[]): Block[] =>
@@ -300,13 +309,15 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
     .filter((d) => d.metric !== 'datapoints-age')
     .map((d) =>
       d.page === 'project'
-        ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: asBefore(d.blocks as Block[]) }
+        ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: inPlace(asBefore(d.blocks as Block[])) }
         : d.page === 'dashboard'
           ? { ...d, blocks: dashboardBefore(d.blocks as Block[]) }
           : d,
     );
-  /* THE TWO BLOCKS THAT WENT FOR THE SHAPE (founder 3.3.0): Handed back or blocked, and Money by month. */
-  const WENT = new Set(['Handed back or blocked', 'Money by month']);
+  /* THE TWO BLOCKS THAT WENT FOR THE SHAPE (founder 3.3.0): Handed back or blocked, and Money by month. And the three
+     that went for its parts (founder 3.7.0): the Numbers lines for the numbers part, What changed for what happened, and
+     Where it was seen for the agents part, each saying the same thing a second time. */
+  const WENT = new Set(['Handed back or blocked', 'Money by month', 'Numbers, 30 days', 'What changed', 'Where it was seen']);
   const was26 = frozen.pack.declarations
     .filter((d) => d.register !== 'datapoints')
     .map((d) => ((d as Page).page === 'project' ? { ...d, blocks: ((d as Page).blocks as Block[]).filter((b) => !WENT.has(String(b.heading))) } : d));

@@ -163,15 +163,6 @@ const SILENT = {
   compare: 'none',
 };
 
-/**
- * A project template's blocks with `added` put in before its boxed section, More about it (work 1.15.0), so what a use
- * case adds to the page stands on the board and is not taken into that tile, which holds every block after it up to
- * the next section. At the end where the template has no box.
- */
-const beforeMore = (blocks: readonly Record<string, unknown>[], ...added: Record<string, unknown>[]): Record<string, unknown>[] => {
-  const at = blocks.findIndex((b) => b.kind === 'section' && b.box === true);
-  return at < 0 ? [...blocks, ...added] : [...blocks.slice(0, at), ...added, ...blocks.slice(at)];
-};
 
 /**
  * WHERE A BUTTON ON A DECLARED PAGE OPENS THE NEW-ACTION SHEET. A path of this
@@ -506,8 +497,14 @@ export const FOUNDER = {
 
      3.6.0, AUDIT C OF 25 OCTOBER (X7): Projects, which this use case brings, opens a record with no project in play on
      a box to add one under one line (portfolio 1.27.0). Nothing of its own changed, and 3.5.0 is master's, so a minor
-     step of its own. */
-  version: '3.6.0',
+     step of its own.
+
+     3.7.0, THE PROJECT PAGE OF 27 OCTOBER: the project page it embeds draws the project's own parts in three blocks, the
+     hero beside its lane's tile, its numbers beside its work, then its dates, who is on it, what it runs on, the agents,
+     what was decided and what happened; the plan and Key numbers move under More about, What changed goes for those
+     parts, the Numbers lines and Where it was seen go from the project page, and Send numbers here is folded last.
+     Projects 1.30.0 leads with its board. No id added or taken away, so a minor step. */
+  version: '3.7.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -800,17 +797,14 @@ export const FOUNDER = {
         /* THE NUMBERS AND WHERE THEY ARE SENT BEFORE THE TEMPLATE'S MORE ABOUT TILE, SINCE founder 2.1.0: a box holds
            every block after it up to the next section, so under it the numbers would be a part of that tile and not the
            project's own figures, and the key would sit under the tile, a screen away from the numbers it sends. */
+        /* SINCE 3.7.0 (the project page of 27 October) THE NUMBERS ARE THE PAGE'S NUMBERS PART, with their lines, how
+           they moved and how old they are, and a banner once the feed stops, so the lines block that drew them went; and
+           What happened says in words where it was seen, so Where it was seen went from this page (People's and an
+           organisation's keep it). WHERE THE NUMBERS ARE SENT IS SETUP, folded last: the Numbers feed's row under Runs on
+           and renewals says whether it is quiet, and the key and the help are one press under it. */
         blocks: [
-          ...beforeMore(
-            withNumbersThisWeek(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
-            numbers('thing is {{name}}', undefined, 'Numbers'),
-            /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: More about
-               the project draws the scheduled actions alone (`BlockSlot.svelte`). */
-            { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },
-          ),
-          /* AFTER THE MORE ABOUT TILE, SINCE 2.6.0 (`WHERE_SEEN`): a section ends the box before it, so the tile keeps
-             what it held. */
-          WHERE_SEEN,
+          ...withNumbersThisWeek(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
+          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting', fold: true },
         ],
       },
     ],

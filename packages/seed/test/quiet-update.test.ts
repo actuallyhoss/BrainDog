@@ -1531,8 +1531,26 @@ const MONEY_BY_MONTH: Body = {
  * blocks, More about not declared folded, Handed back or blocked and Money by month back at their places, and What
  * changed and the agents' cards half a row each.
  */
+/** What changed, as the project page declared it until founder 3.7.0 and team 2.28.0. */
+const WHAT_CHANGED: Body = { kind: 'feed', heading: 'What changed', icon: 'activity', span: 12, source: 'activity', where: 'target is {{spoken}}', first: 3 };
+
+/**
+ * THE PROJECT PAGE AS IT WAS BEFORE founder 3.7.0 AND team 2.28.0 (the project page of 27 October): Key numbers and the
+ * plan over More about, not under it, and What changed before the agents' cards, which What happened says in words now.
+ */
+const partsBefore = (doc: Body): Body =>
+  withPage(doc, 'project', (now) => {
+    const moved = [...now.filter((b) => b.kind === 'kpis'), ...now.filter((b) => b.kind === 'roadmap')];
+    const rest = now.filter((b) => b.kind !== 'kpis' && b.kind !== 'roadmap');
+    return rest.flatMap((b): Body[] => {
+      if (b.kind === 'section' && b.box === true && b.heading === 'More about {{name}}') return [...moved, b];
+      if (b.kind === 'cards' && b.heading === 'Agents') return [WHAT_CHANGED, b];
+      return [b];
+    });
+  });
+
 const shapeBefore = (doc: Body, id: string): Body =>
-  withPage(doc, 'project', (now) =>
+  withPage(partsBefore(doc), 'project', (now) =>
     now.flatMap((b): Body[] => {
       if (b.kind === 'project') return [];
       if (b.kind === 'section' && b.box === true && b.fold === true) return [(({ fold: _fold, ...section }) => section)(b)];

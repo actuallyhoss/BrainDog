@@ -243,13 +243,15 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     /* THE PROJECT'S SHAPE FIRST, SINCE founder 3.3.0 (C28, C29): the hero with Path and Money, then Work and Who is on
        it with Runs on and the agents on it, two blocks the app draws from its read of the project. */
     'Overview',
-    'Work, people and agents',
+    /* AND SINCE founder 3.7.0 (the project page of 27 October) THREE BLOCKS OF ITS PARTS: the hero beside its lane's
+       tile, its numbers beside its work, and its dates, who is on it, what it runs on, the agents, what was decided and
+       what happened, laid in rows as they fit. */
+    'Numbers and work',
+    'Dates, people, agents and what happened',
     /* THE OPENING SENTENCE, which carries no heading: one note since portfolio 1.23.0, its second sentence said
        while nothing is handed back. The figures beside it sit in the rail. */
     undefined,
     'Waiting on you',
-    /* ITS KEY NUMBERS, SINCE founder 3.0.0 (the KPI plan of 21 October, K3-C): the whole width under the questions. */
-    'Key numbers',
     /* THE RAIL'S COLUMN SINCE portfolio 1.10.0: the figures, where it stands and what is handed back, one above the
        other beside the chart. */
     'At a glance',
@@ -264,13 +266,11 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
        week in founder 2.3.0, a chart of ones and twos: what was finished this week is At a glance's last figure. A
        LINE A MEASURE, SINCE founder 1.16.0, and where to send them, before the More about tile, which would otherwise
        hold them. */
-    'The plan',
-    /* HEADED NUMBERS SINCE founder 3.4.0 (Z20 of 25 October): "30 days" stood over a month-old import, and the page is at
-       its ceiling of blocks, so there is no second chart to say the age. */
-    'Numbers',
-    'Send numbers here',
+    /* SINCE founder 3.7.0 THE PLAN AND THE KEY NUMBERS ARE UNDER MORE ABOUT, one press away: the tile beside the hero
+       draws the dated path and the Numbers part the numbers. The Numbers lines and What changed went for those parts. */
     'More about Harbour app',
-    'What changed',
+    'The plan',
+    'Key numbers',
     'Agents',
     /* NO MONEY BY MONTH SINCE founder 3.3.0: the Money tile's bars say it. */
     'Notes',
@@ -282,7 +282,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Tools and servers',
     'Skills',
     'And from everywhere',
-    'Where it was seen',
+    /* WHERE ITS NUMBERS ARE SENT, FOLDED LAST SINCE founder 3.7.0, the Numbers feed's row under Runs on saying whether it is quiet. */
+    'Send numbers here',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');
@@ -294,9 +295,10 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   /* FOUND BY HEADING, since the template's blocks move with each version and a place in the list says nothing. */
   const headed = (heading: string) => blocks.find((b) => b.heading === heading)!;
   assert.equal((headed('Notes') as unknown as { document?: boolean }).document, true);
-  /* ONE READING IS STILL ITS LATEST: the record answers it on the block, a line or not. */
-  const numbers = headed('Numbers') as Drawn & { latest?: { measure: string; value: number }[] };
-  assert.equal(numbers.matched, 1, 'the one number the project reported');
-  assert.deepEqual(numbers.measures ?? [], [], 'a measure read once is drawn as a line of one dot');
-  assert.deepEqual(numbers.latest?.map((l) => [l.measure, l.value]), [['Installs', 7]], 'the number the project reported is not its latest reading');
+  /* THE ONE READING IS COUNTED THIS WEEK, where nobody has said where it stands, and the Numbers part draws it beside the
+     work (the record answers it with the page's shape, `project-shape.ts`). */
+  const stands = blocks.find((b) => b.heading === 'Where it stands' && (b as { key?: unknown }).key === 'stands-figures') as Drawn & { readings?: { label?: string; reading: { value: unknown } | null }[] };
+  assert.equal(stands.readings?.find((r) => r.label === 'Numbers this week')?.reading?.value, 1, 'the one number the project reported this week');
+  const rows = blocks.filter((b) => b.kind === 'project').map((b) => (b as unknown as { parts: string[] }).parts);
+  assert.deepEqual(rows, [['hero', 'side'], ['numbers', 'what-is-open'], ['dates', 'who-is-on-it', 'runs-on', 'agents-here', 'decisions', 'happened']]);
 });

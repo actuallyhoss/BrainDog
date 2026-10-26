@@ -27,6 +27,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   ],
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
+    { version: '3.7.0', notes: "A project page leads with what is true of the project, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane: what it brings in, its dated path, or what it costs to keep. Its numbers have lines and say their age, and its dates, what it runs on and renews, its agents and what happened sit under them. Projects opens on what needs you and one sorted list." },
     { version: '3.6.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
     {
       version: '3.5.0',
@@ -69,6 +70,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.28.0', notes: "A product's page leads with what is true of it, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane, and its numbers, dates, what it runs on, its agents and what happened sit under it. Projects opens on what needs you and one sorted list." },
     { version: '2.27.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
     {
       version: '2.26.0',

@@ -245,8 +245,13 @@ export const TEAM = {
 
      2.27.0, AUDIT C OF 25 OCTOBER (X7): Projects, which this use case brings, opens a record with no project in play on
      a box to add one under one line (portfolio 1.27.0). Nothing of its own changed, and 2.26.0 is master's, so a minor
-     step of its own. */
-  version: '2.27.0',
+     step of its own.
+
+     2.28.0, THE PROJECT PAGE OF 27 OCTOBER: the project page it embeds draws the project's own parts in three blocks,
+     the hero beside its lane's tile, its numbers beside its work, then its dates, who is on it, what it runs on, the
+     agents, what was decided and what happened; the plan and Key numbers move under More about, and What changed goes
+     for those parts. Projects 1.30.0 leads with its board. No id added or taken away, so a minor step. */
+  version: '2.28.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

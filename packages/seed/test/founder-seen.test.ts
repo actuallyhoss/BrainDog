@@ -81,12 +81,16 @@ function pageOf(k: Kernel, template: string, name: string): Drawn[] {
   return value<{ blocks: Drawn[] }>(k.page(found.slug)).blocks;
 }
 
-test('THE PROJECT PAGE ENDS WITH WHERE IT WAS SEEN, and People’s pages for an organisation and a person are laid it last', () => {
+/* SINCE founder 3.7.0 (the project page of 27 October) A PROJECT'S PAGE SAYS WHERE IT WAS SEEN AS WHAT HAPPENED, in words
+   and with the edits to its own row folded (`project` part `happened`), so the section is no longer laid on it; it ends
+   with where its numbers are sent, folded. People's pages keep the section. */
+test('THE PROJECT PAGE ENDS WITH WHERE ITS NUMBERS ARE SENT, folded, and People’s pages for an organisation and a person are laid Where it was seen last', () => {
   const pack = useCase('founder')!.pack!;
   const project = (pack.declarations as { page?: string; blocks?: Record<string, unknown>[] }[]).find((d) => d.page === 'project');
   assert.ok(project?.blocks, 'the founder declares the project page');
-  assert.deepEqual(project.blocks.at(-1), SEEN, 'the last block of the project page');
-  assert.equal(project.blocks.filter((b) => b.panel === 'seen').length, 1, 'said once');
+  assert.deepEqual(project.blocks.at(-1), { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting', fold: true }, 'the last block of the project page');
+  assert.equal(project.blocks.filter((b) => b.panel === 'seen').length, 0, 'Where it was seen is laid on the project page again');
+  assert.ok(project.blocks.some((b) => b.kind === 'project' && Array.isArray(b.parts) && (b.parts as string[]).includes('happened')), 'the project page says no What happened');
 
   const adds = (pack as { adds?: { page: string; after?: string; block: Record<string, unknown> }[] }).adds ?? [];
   for (const page of ['page.relation', 'page.someone']) {
@@ -105,8 +109,8 @@ test('ON A FRESH FOUNDER RECORD a project’s, an organisation’s and a person�
     const blocks = pageOf(k, template, name);
     const last = blocks.at(-1)!;
     assert.equal(last.kind, 'section', `${template} ends with ${last.heading ?? last.kind}`);
-    assert.equal(last.heading, 'Where it was seen', template);
-    assert.equal(last.panel, 'seen', `${template} hands the panel back`);
+    assert.equal(last.heading, template === 'project' ? 'Send numbers here' : 'Where it was seen', template);
+    assert.equal(last.panel, template === 'project' ? 'reporting' : 'seen', `${template} hands the panel back`);
     assert.deepEqual(last.refusals ?? [], [], `${template} refused the panel on a page per row`);
     if (template !== 'project') assert.equal(last.added, 'usecase-founder', `${template} is laid it by the founder`);
     const astray = blocks.filter((b) => (b.refusals ?? []).some((r) => r.at === 'panel'));

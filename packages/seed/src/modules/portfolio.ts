@@ -1371,8 +1371,16 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          TWO BLOCKS AND NOT A PART A BLOCK, since a page holds 24 blocks and shows six tiles before it folds, and a
          founder's project page held 24 already. So two blocks the page drew only where the shape was not went for them:
          Handed back or blocked (the Work tile's With you) and Money by month (the Money tile's bars). */
-      { kind: 'project', parts: ['hero', 'path', 'money'], heading: 'Overview', icon: 'eye', span: 12 },
-      { kind: 'project', parts: ['what-is-open', 'who-is-on-it', 'runs-on', 'agents-here'], heading: 'Work, people and agents', icon: 'task', span: 12 },
+      /* THREE BLOCKS, LANE BY LANE, SINCE founder 3.7.0 and team 2.28.0 (the project page of 27 October): the hero, whose
+         headline is a fact and whose next step is drawn once as a checklist, beside its lane's tile (what it brings in
+         while it earns, its dated path while it is built, what it costs to keep while parked); its numbers with their
+         lines and ages beside its work; and the rest of its picture in one block, laid in rows as they fit (`rowLaid`,
+         `project-parts.ts`): its dates beside who is on it and what it runs on and renews, the agents' sessions, with
+         the box to tell them at the foot, beside what was decided, and what happened, in words. Three and not a block a
+         row, so the page keeps the room under the ceiling of 24 that a use case adds to. */
+      { kind: 'project', parts: ['hero', 'side'], heading: 'Overview', icon: 'eye', span: 12 },
+      { kind: 'project', parts: ['numbers', 'what-is-open'], heading: 'Numbers and work', icon: 'chart-line', span: 12 },
+      { kind: 'project', parts: ['dates', 'who-is-on-it', 'runs-on', 'agents-here', 'decisions', 'happened'], heading: 'Dates, people, agents and what happened', icon: 'calendar', span: 12 },
       /* THE OPENING SENTENCE, SAID FROM THE PROJECT'S FIGURES. A sentence cannot print a figure named for one project
          (`{{project-open:Kiln}}` is not a path the page reads), so each sentence is drawn on its figure's `when:`
          instead, as the launch desk's are.
@@ -1415,20 +1423,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* ONE TILE A QUESTION, SINCE portfolio 1.6.0, led by what its recommended answer shows, the ways to answer under
            it: a decision about a project is read as its options, not as a line in a list. */
         tiles: true,
-      },
-      {
-        /* ITS KEY NUMBERS, SINCE founder 3.0.0 and team 2.21.0 (the KPI plan of 21 October, 2.8): the one it leads with
-           large with its chart, the rest as small tiles, each its value, its line from three points, its target and
-           whether it is late, from the project's own rows of Key numbers (`kpis`, the kernel's `sources/kpis.ts`). The
-           whole width under the questions, before the plan. A number is pressed to change it, and the app adds one at
-           the foot and lists what was suggested and not kept yet under it. */
-        kind: 'kpis',
-        heading: 'Key numbers',
-        icon: 'chart-line',
-        span: 12,
-        key: 'kpis',
-        source: 'kpis',
-        for: 'project',
       },
       {
         kind: 'stat',
@@ -1538,30 +1532,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: '{{name}} has no stages yet.',
       },
       {
-        /* ITS PLAN ON A TIME AXIS, AND ITS DATES ONCE, SINCE portfolio 1.8.0: a calendar of the month above it drew the
-           same tasks on the same days a second time, so it went.
-
-           ITS PLAN ON A TIME AXIS: each task in play with a day, as a window as long as its effort ending on that day, or a
-           line on the day where it has no effort. Drawn only when the project has such a task (`project-dated`), so a
-           project nobody has planned in days says nothing about a plan rather than showing an empty axis. */
-        kind: 'roadmap',
-        heading: 'The plan',
-        icon: 'milestone',
-        span: 12,
-        source: 'register.tasks',
-        where: 'thing is {{name}}, by is set, state is not done or dropped',
-        columns: [
-          { field: 'what', label: 'What' },
-          { field: 'by', label: 'Due' },
-          { field: 'effort', label: 'Effort' },
-        ],
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 50,
-        /* AND NOT WHILE ITS PLAN IS KEPT AS ITS ROAD ALONE, SINCE portfolio 1.23.0 (`drawn_as`). */
-        when: { all: [{ metric: 'project-dated:{{name}}', gt: 0 }, { metric: 'project-plan-path:{{name}}', is: 0 }] },
-        empty: 'No task on {{name}} has a day yet.',
-      },
-      {
         /* EVERYTHING ELSE ABOUT IT, AS ONE TILE, SINCE work 1.15.0 (the design review's fix 9). From
            1.8.0 who worked on it and its notes, its money, and what it runs on were three sections folded shut, each a
            tile 56px tall holding only its name and a Show button, which read as unfinished. Now they are one boxed tile
@@ -1583,19 +1553,49 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         fold: true,
       },
       {
-        /* WHAT CHANGED ON THE PROJECT, from the record's own log, newest first: who said how it is going, what is next and
-           how far along, a person or an agent or a rule. `{{spoken}}` is this project's row, which is what an edit of it
-           names as its target. THREE, SINCE work 1.15.0, and the project's own history holds the rest. THE TILE'S WIDTH
-           SINCE founder 3.3.0 and team 2.25.0, and so are the agents' cards: with Money by month gone, the rules' look
-           ordered a half between two whole rows, a hole beside it, and the project's page drew both whole already. */
-        kind: 'feed',
-        heading: 'What changed',
-        icon: 'activity',
+        /* ITS PLAN ON A TIME AXIS, AND ITS DATES ONCE, SINCE portfolio 1.8.0: a calendar of the month above it drew the
+           same tasks on the same days a second time, so it went.
+
+           ITS PLAN ON A TIME AXIS: each task in play with a day, as a window as long as its effort ending on that day, or a
+           line on the day where it has no effort. Drawn only when the project has such a task (`project-dated`), so a
+           project nobody has planned in days says nothing about a plan rather than showing an empty axis.
+           UNDER MORE ABOUT, SINCE founder 3.7.0 and team 2.28.0: the tile beside the hero draws a project's dated path while
+           it is built, so the axis is one press away, where the app already drew it as Plan by date. */
+        kind: 'roadmap',
+        heading: 'The plan',
+        icon: 'milestone',
         span: 12,
-        source: 'activity',
-        where: 'target is {{spoken}}',
-        first: 3,
+        source: 'register.tasks',
+        where: 'thing is {{name}}, by is set, state is not done or dropped',
+        columns: [
+          { field: 'what', label: 'What' },
+          { field: 'by', label: 'Due' },
+          { field: 'effort', label: 'Effort' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 50,
+        /* AND NOT WHILE ITS PLAN IS KEPT AS ITS ROAD ALONE, SINCE portfolio 1.23.0 (`drawn_as`). */
+        when: { all: [{ metric: 'project-dated:{{name}}', gt: 0 }, { metric: 'project-plan-path:{{name}}', is: 0 }] },
+        empty: 'No task on {{name}} has a day yet.',
       },
+      {
+        /* ITS KEY NUMBERS, SINCE founder 3.0.0 and team 2.21.0 (the KPI plan of 21 October, 2.8): the one it leads with
+           large with its chart, the rest as small tiles, each its value, its line from three points, its target and
+           whether it is late, from the project's own rows of Key numbers (`kpis`, the kernel's `sources/kpis.ts`). The
+           whole width under the questions, before the plan. A number is pressed to change it, and the app adds one at
+           the foot and lists what was suggested and not kept yet under it.
+           UNDER MORE ABOUT, SINCE founder 3.7.0 and team 2.28.0: the Numbers part beside the work draws them with their
+           lines and ages, so here they are kept to be changed, one press away. */
+        kind: 'kpis',
+        heading: 'Key numbers',
+        icon: 'chart-line',
+        span: 12,
+        key: 'kpis',
+        source: 'kpis',
+        for: 'project',
+      },
+      /* NO WHAT CHANGED, SINCE founder 3.7.0 and team 2.28.0: What happened says the changes in words, with the edits to
+         the project's own row folded into one line a day. */
       {
         /* CARDS, because an agent working on the project is a face and a sentence, not a row in a log. The last three
            runs, beside what changed.
@@ -1604,7 +1604,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            and each helper it started were a card apiece, and so was a run that opened and wrote nothing; and each was
            titled by `doing`, which on a run nobody named is the record's own name for it. A project's page listed six
            cards with one title. A CARD IS THE AGENT AND WHAT IT SAID, as on Agents: `doing_said` is the column the
-           record works out over the list of runs, empty where the name is the record's own or reads as a path. */
+           record works out over the list of runs, empty where the name is the record's own or reads as a path.
+           KEPT FOR A HOST THAT DOES NOT DRAW THE AGENTS' PART: the app draws the sessions there, with how each ended. */
         kind: 'cards',
         heading: 'Agents',
         icon: 'bot',
