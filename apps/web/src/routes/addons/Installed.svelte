@@ -56,7 +56,7 @@
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
-  import { catalogueLines, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, readShippedCatalogue, trustForEntry, updatesFor, withheld } from './catalogue.ts';
+  import { catalogueLines, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, readShippedCatalogue, trustForEntry, updatesFor, indexForUpdates, withheld } from './catalogue.ts';
   import { recordKeys } from './known-keys.ts';
   import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './[id]/offer.ts';
   import { installedCount, words } from './words.ts';
@@ -306,6 +306,8 @@
   };
 
   let kennel = $state.raw<CatalogueIndex | null>(null);
+  /** The catalogue this build ships, read once: it names what the Kennel leaves out, and finds its updates. */
+  const shippedIndex: Promise<CatalogueIndex | null> = readShippedCatalogue(fetch);
   let looked = $state(false);
   let updates = $state.raw<Update[] | null>(null);
   /** The Kennel's own sentence for each later version that did not verify, said quietly and never offered. */
@@ -329,7 +331,8 @@
   async function updatesOf(held: readonly PackState[], index: CatalogueIndex | null): Promise<Update[]> {
     const bundled = firstPartyUpdates(held).map((u): Update => ({ key: u.key, kind: u.kind, id: u.id, title: u.title, from: u.from, to: u.to, source: 'bundled', file: u.file, entry: null, trust: null }));
     if (!index) return bundled;
-    const out = await updatesFor(fetch, index, held);
+    /* AN ADD-ON HELD UNLISTED OR PRIVATE is looked for too, from the catalogue this build ships (`indexForUpdates`). */
+    const out = await updatesFor(fetch, await indexForUpdates(index, await shippedIndex, held), held);
     unverified = out.refused;
     const fromKennel = await Promise.all(
       out.updates.map(async (u: CatalogueUpdate): Promise<Update> => ({
@@ -601,7 +604,7 @@
         kennel = got.ok ? got.index : null;
         looked = true;
         /* THE SHIPPED CATALOGUE UNDER THE KENNEL'S: it holds every pack in `packs/`, unlisted ones too, so an installed add-on the Kennel does not list is still named. */
-        const indexes = [await readShippedCatalogue(fetch), got.ok ? got.index : null];
+        const indexes = [await shippedIndex, got.ok ? got.index : null];
         const maps = await Promise.all(indexes.map(async (i) => [await catalogueTitles(i), await catalogueLines(i)] as const));
         catalogueNames = new Map(maps.flatMap(([n]) => [...n]));
         catalogueSays = new Map(maps.flatMap(([, l]) => [...l]));

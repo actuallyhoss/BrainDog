@@ -29,7 +29,7 @@ import { words } from '../../../lib/market/words.ts';
 import { packDocument, relabelDocument, type PackState } from '../../../lib/record/packs.ts';
 import { afterInstall, installShared, keepVoice, planShared, speakingStates, switchTo, voiceQuestion, type SharedPlan } from '../sharing.ts';
 import { firstPartyUpdates, inTurn, landed } from '../../decide/improved.ts';
-import { askForVersion, updatesFor } from '../catalogue.ts';
+import { askForVersion, indexForUpdates, readShippedCatalogue, updatesFor } from '../catalogue.ts';
 
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal?: { code?: string; fix?: string } };
 
@@ -186,7 +186,7 @@ export async function waitingOf(fetcher: typeof fetch, index: CatalogueIndex | n
   const bundled = firstPartyUpdates(states).map((u): Offered => ({ key: u.key, kind: u.kind, id: u.id, title: u.title, source: 'bundled', file: u.file }));
   if (!index) return bundled;
   try {
-    const out = await updatesFor(fetcher, index, states);
+    const out = await updatesFor(fetcher, await indexForUpdates(index, await readShippedCatalogue(fetcher), states), states);
     const far = out.updates.map((u): Offered => ({ key: `${u.entry.kind}:${u.entry.id}`, kind: u.entry.kind, id: u.entry.id, title: u.entry.title, source: 'kennel', file: { doc: u.file.kind === 'pack' ? u.file.file.doc : null, text: u.text } }));
     const taken = new Set(far.map((u) => u.key));
     return [...bundled.filter((u) => !taken.has(u.key)), ...far];

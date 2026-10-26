@@ -369,6 +369,21 @@ export const fetchReader =
     }
   };
 
+/**
+ * THE INDEX UPDATES ARE LOOKED FOR IN: the Kennel's public one, with every entry the catalogue this build ships holds for
+ * an add-on this record has installed and the public index leaves out. An add-on held unlisted or private (installed by
+ * its link, never listed) is missing from the public index, so its later versions never reached the Updates card while
+ * the record's own check, which reads the whole index, said one had arrived. Its files are served all the same.
+ */
+export async function indexForUpdates(index: CatalogueIndex, shipped: CatalogueIndex | null, states: readonly PackState[]): Promise<CatalogueIndex> {
+  if (!shipped) return index;
+  const { installedIdOf } = await import('@braindog/declare/catalogue');
+  const held = new Set(states.map((s) => s.id));
+  const have = new Set(index.entries.map((e) => `${e.kind}:${e.id}`));
+  const missing = shipped.entries.filter((e) => !have.has(`${e.kind}:${e.id}`) && held.has(installedIdOf(e)));
+  return missing.length === 0 ? index : { ...index, entries: [...index.entries, ...missing] };
+}
+
 /** Every later version of what this record holds, verified and read, and the sentences for any that were not. */
 export async function updatesFor(fetcher: Fetcher, index: CatalogueIndex, states: readonly PackState[]): Promise<{ updates: CatalogueUpdate[]; refused: string[] }> {
   const { catalogueUpdates } = await import('@braindog/declare/catalogue');
