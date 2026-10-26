@@ -32,7 +32,7 @@ test('an arrangement reads as one story, in the order a person asks it', () => {
   assert.deepEqual(why?.part === 'why' && why.lines[1], { text: 'Two courses start on Monday.', at: 'courses#2' });
   assert.deepEqual(needs?.part === 'needs' && needs.keys, [{ label: 'Timetable feed', opens: 'calendar.example', scheduled: true, held: null }]);
   assert.deepEqual(starts?.part === 'starts' && starts.feeds, [{ host: 'calendar.example', detail: 'every hour', every: 'every hour', keys: ['Timetable feed'], to: {} }]);
-  assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Portfolio, then Student', 'Turns off Money']);
+  assert.deepEqual(packs?.part === 'packs' && packs.lines, ['Installs Projects, then Student', 'Turns off Money']);
   assert.ok(appears?.part === 'appears');
   assert.equal(appears.examples, 6);
   /* The changed page first, then pages, then lists, then the rest. */
@@ -118,7 +118,7 @@ test('a line that is not a CALLS OUT line is kept whole', () => {
 
 test('what was applied is said plainly, with what is new in the sidebar', () => {
   assert.deepEqual(appliedLines({ installed: ['portfolio', 'usecase-student'], pages: ['page.home-student'], settings: ['usecase-student'] }, STUDENT, ['Studies']), [
-    'Installed Portfolio and Student',
+    'Installed Projects and Student',
     'Put in place the page Today',
     'Changed the words and settings of Student',
     'New in the sidebar: Studies',
@@ -130,7 +130,7 @@ test('a partial apply says what was done, what was not, and why it stopped', () 
   const fix = 'usecase-student now calls out something this proposal did not show: CALLS OUT x. Propose it again. Already applied, and kept: portfolio.';
   assert.deepEqual(partialOf('arrange', STUDENT, fix), {
     why: 'usecase-student now calls out something this proposal did not show: CALLS OUT x. Propose it again.',
-    done: ['Portfolio'],
+    done: ['Projects'],
     left: ['Student', 'Money', 'the page Today', 'the words and settings of Student'],
   });
   assert.equal(partialOf('arrange', STUDENT, 'Nothing landed.'), null);

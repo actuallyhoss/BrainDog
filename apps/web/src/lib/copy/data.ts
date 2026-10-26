@@ -11,10 +11,10 @@
 
 export const data = {
   /** A use case's pack going in or out, in the feed: "Added the Student use case". */
-  useCaseEvent: (verb: string, name: string) => `${verb} the ${name} use case`,
+  useCaseEvent: (verb: string, name: string) => `${verb} the ${name} starter`,
   /** A pack's settings saved, said as what changed: which use case speaks, or that the settings did. */
   useCaseSpeaks: (name: string) => `${name} speaks for this BrainDog now`,
-  useCaseBeside: (name: string) => `${name} added beside the use case that speaks`,
+  useCaseBeside: (name: string) => `${name} added beside the starter that speaks`,
   useCaseAddedBeside: (name: string, speaker: string) => `${name} added beside ${speaker}`,
   settingsChanged: (name: string) => `Changed the settings of ${name}`,
   /** A record setting itself up, said as one line of the feed: "Set up Personal with 40 example items". */
@@ -38,7 +38,7 @@ export const data = {
     return why ? `${why}: ${joined}${tail}` : `${joined.charAt(0).toUpperCase()}${joined.slice(1)} at once${tail}`;
   },
   feedYou: 'You',
-  feedUseCase: (name: string) => `the ${name} use case`,
+  feedUseCase: (name: string) => `the ${name} starter`,
   feedPack: (id: string) => `the ${id} add-on`,
   /* MONEY IN MORE THAN ONE CURRENCY, said under the figure rather than left blank: why it is one amount per currency,
      and once it is added up, as of which day's rates. */

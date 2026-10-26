@@ -770,7 +770,7 @@ test('a live feed names its reader as You, anybody else without an id, a pack or
       ['', 'Asked: Raise the Kiln retainer'],
       ['', 'TALLYARD categorised'],
       ['', 'The balance of Tax reserve was last set 9 days ago.'],
-      ['BrainDog', 'installed the Team board use case'],
+      ['BrainDog', 'installed the Team board starter'],
       ['BrainDog', 'installed the polish-log add-on'],
     ],
   );

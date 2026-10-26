@@ -58,10 +58,10 @@ export const packs = {
 
   /* USE CASES, SHARED AND INSTALLED. A use case is a file like an add-on, planned and
      approved the same way, so these sentences say what it arranges and never how the screen works. */
-  browseAll: 'All setups and add-ons',
+  browseAll: 'All starters and add-ons',
   chooseFile: 'Choose a file',
   shareAddressNotOne: 'That is not a web address. Paste the whole https address of the file.',
-  shareAddressHttps: 'A use case is read only from an https address.',
+  shareAddressHttps: 'A starter is read only from an https address.',
   shareConflict: (name: string, pack: string) => `${name} is already held by ${pack}, so this cannot be installed beside it.`,
   shareStale: 'Something changed since the plan was read, so it has been read again. Look it over, then install.',
   /** A page drawn once for every row of a list, whose title is the row's own. */
@@ -78,7 +78,7 @@ export const packs = {
   browseHome: 'Home',
   browseLists: 'Lists',
   browseNoRail: 'Nothing added to the menu',
-  shareNoUseCase: 'No setup is on here, so the file carries the add-ons that are on and the pages you placed.',
+  shareNoUseCase: 'No starter is on here, so the file carries the add-ons that are on and the pages you placed.',
   shareTitle: 'Title',
   shareVersion: 'Version',
   shareSummary: 'What it is for',

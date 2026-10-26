@@ -61,7 +61,7 @@ export const words = {
   /* WHAT AN UPDATE'S ROW SAYS: the versions it moves between are in its tooltip, for whoever wants them. */
   updateAvailable: 'Update available',
   /* INSTALL FROM. */
-  fromBlurb: 'A use case or an add-on somebody shared: a file, an https address, a file in a GitHub repository, or its text pasted in.',
+  fromBlurb: 'A starter or an add-on somebody shared: a file, an https address, a file in a GitHub repository, or its text pasted in.',
   address: 'An https address, or a file in a GitHub repository',
   addressHint: 'BrainDog reads it, so a site that blocks browsers still works.',
   read: 'Read it',

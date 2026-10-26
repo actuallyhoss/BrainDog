@@ -114,9 +114,10 @@ const saidWithCode = (r: Result<unknown>): string => (refused(r) ? oneLine(`${r.
 const ID = /^[a-z][a-z0-9-]{0,62}$/u;
 const VERSION = /^\d{1,6}\.\d{1,6}\.\d{1,6}$/u;
 
-const NOUN: Record<EntryKind, { a: string; the: string; suffix: string }> = {
-  usecase: { a: 'a use case', the: 'use case', suffix: '.usecase.json' },
-  pack: { a: 'an add-on', the: 'add-on', suffix: '.pack.json' },
+/* `command` IS THE NAME A PERSON TYPES: `starter` and `addon`, whose old names `usecase` and `pack` still work. */
+const NOUN: Record<EntryKind, { a: string; the: string; suffix: string; command: string }> = {
+  usecase: { a: 'a starter', the: 'starter', suffix: '.usecase.json', command: 'starter' },
+  pack: { a: 'an add-on', the: 'add-on', suffix: '.pack.json', command: 'addon' },
 };
 
 /* ── new ────────────────────────────────────────────────────────────────── */
@@ -316,7 +317,7 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
 
 /** `usecase new <id> [--yaml]`: one `.usecase.json` (or `.usecase.yaml`) file that already reads through `readShared`. */
 async function createUseCase(args: string[], io: AgentIo): Promise<number> {
-  const cmd = 'braindog usecase new';
+  const cmd = 'braindog starter new';
   let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined; yaml?: boolean | undefined };
   let positionals: string[];
   try {
@@ -356,7 +357,7 @@ async function createUseCase(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   writeFileSync(file, values.yaml ? `${yamlOf(doc)}\n` : text);
-  io.out(`${title} 1.0.0 written to ${file}: one list and a page over it. Check it with braindog usecase check, and see it with braindog usecase preview.`);
+  io.out(`${title} 1.0.0 written to ${file}: one list and a page over it. Check it with braindog starter check, and see it with braindog starter preview.`);
   return 0;
 }
 
@@ -830,7 +831,7 @@ async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<nu
   }
   const shape = await readCatalogueFile(source.text);
   if (shape.ok && shape.value.kind !== kind) {
-    io.say(`${file} is ${NOUN[shape.value.kind].a}, not ${NOUN[kind].a}. Publish it with braindog ${shape.value.kind} publish.`);
+    io.say(`${file} is ${NOUN[shape.value.kind].a}, not ${NOUN[kind].a}. Publish it with braindog ${NOUN[shape.value.kind].command} publish.`);
     return 1;
   }
   let signer: AuthorKey | undefined;
@@ -971,7 +972,7 @@ async function readFileAs(given: string, io: AgentIo, kind: EntryKind): Promise<
     return 1;
   }
   if (read.value.kind !== kind) {
-    io.say(`${given} is ${NOUN[read.value.kind].a}, not ${NOUN[kind].a}. Use braindog ${read.value.kind} for it.`);
+    io.say(`${given} is ${NOUN[read.value.kind].a}, not ${NOUN[kind].a}. Use braindog ${NOUN[read.value.kind].command} for it.`);
     return 1;
   }
   return { text: source.text, file: read.value, dir: source.dir };
@@ -1098,7 +1099,7 @@ export async function installFromCatalogue(
     const pack = kind === 'usecase' && at.index.entries.some((e) => e.id === bare && e.kind === 'pack');
     io.say(
       pack
-        ? `${bare} is an add-on, not a use case. Ask for it with propose, body_kind pack and {"install":"${bare}"}, and it installs when the owner says yes.`
+        ? `${bare} is an add-on, not a starter. Ask for it with propose, body_kind pack and {"install":"${bare}"}, and it installs when the owner says yes.`
         : `There is no ${NOUN[kind].the} called ${bare} in this catalogue.${ids.length ? ` It has: ${ids.join(', ')}.` : ''}`,
     );
     return 1;
@@ -1267,7 +1268,7 @@ async function preview(args: string[], io: AgentIo, kind: EntryKind = 'usecase')
     return 1;
   }
   /* THE FILE'S TITLE IS ITS AUTHOR'S, and `preview` reads a file from an address as readily as `check` does. */
-  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/packs/browse/${read.id}?from=catalogue and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
+  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/app/addons/${read.id}?kind=${kind} and press Review the plan. Stop with Ctrl+C; the scratch record is removed.`);
   const code = await run(['serve'], true);
   rmSync(scratch, { recursive: true, force: true });
   return code;

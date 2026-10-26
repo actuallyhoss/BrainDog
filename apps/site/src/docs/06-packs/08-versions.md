@@ -20,7 +20,7 @@ Anything else | the third, a patch | 1.4.2 to 1.4.3
 ```
 ~~~
 
-A patch covers a changed page, rule, script, title or word. Publishing checks the bump against what actually changed, so a version that takes something away without being a major is refused, and so is a version that is not later than the one before it. `braindog pack diff <earlier> <later>` says what moved between two files and the least bump that needs.
+A patch covers a changed page, rule, script, title or word. Publishing checks the bump against what actually changed, so a version that takes something away without being a major is refused, and so is a version that is not later than the one before it. `braindog addon diff <earlier> <later>` says what moved between two files and the least bump that needs.
 
 ## Saying which versions you need
 
@@ -41,4 +41,4 @@ Some changes a record refuses as an ordinary upgrade, each with its reason:
 
 ## Taking a version back
 
-A version published by mistake is yanked, not deleted: `braindog pack yank <id> <version> --reason <why>`. It is never offered again, and a record that holds it is told why. The number is used up; the fix goes out as the next version.
+A version published by mistake is yanked, not deleted: `braindog addon yank <id> <version> --reason <why>`. It is never offered again, and a record that holds it is told why. The number is used up; the fix goes out as the next version.

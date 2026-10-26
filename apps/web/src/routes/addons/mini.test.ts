@@ -42,11 +42,11 @@ test('a figure is a chart, a board is columns, and anything with rows is a list'
   assert.equal(shapeOf(undefined), 'list');
 });
 
-test('ONE WORD FOR A SETUP EVERYWHERE, and the menu is never "Rail" (audit C of 25 October, X10)', () => {
-  assert.equal(words.kinds.usecase, 'Ready-made setup');
-  assert.equal(words.sections.setups, 'Ready-made setups');
-  assert.equal(words.categories['ways-of-working'], 'Ready-made setups');
-  assert.equal(copy.browseAll, 'All setups and add-ons');
+test('ONE WORD FOR A STARTER EVERYWHERE, and the menu is never "Rail" (audit C of 25 October, X10)', () => {
+  assert.equal(words.kinds.usecase, 'Starter');
+  assert.equal(words.sections.setups, 'Starters');
+  assert.equal(words.categories['ways-of-working'], 'Starters');
+  assert.equal(copy.browseAll, 'All starters and add-ons');
   assert.equal(copy.browseRail, 'Menu');
   for (const w of [copy.browseAll, copy.browseRail, copy.browseNoRail, words.kinds.usecase]) assert.doesNotMatch(w, /use case|rail/iu, w);
 });
@@ -56,7 +56,7 @@ test('ONE WORD FOR A SETUP EVERYWHERE, and the menu is never "Rail" (audit C of 
 
 test('the chips say each section in a word, and the headings say it whole', () => {
   const chips = sectionChips([{ kind: 'usecase', categories: [] }, { kind: 'pack', categories: [] }, { kind: 'pack', categories: ['themes'] }]);
-  assert.deepEqual(chips.map((c) => c.name), ['Setups', 'Add-ons', 'Looks']);
+  assert.deepEqual(chips.map((c) => c.name), ['Starters', 'Add-ons', 'Looks']);
 });
 
 test('a section shows four until asked for all, and a search or a chip shows them all', () => {

@@ -1,13 +1,13 @@
 # Publishing and review
 
-The Kennel is the public catalogue every BrainDog reads packs and use cases from. Anybody can submit to it from the command line, and a person looks at what a stranger submits before any record is offered it.
+The Kennel is the public catalogue every BrainDog reads packs and starters from. Anybody can submit to it from the command line, and a person looks at what a stranger submits before any record is offered it.
 
 ## Submitting a version
 
 ```code | In a terminal
-braindog pack check reading-list
-braindog pack test reading-list
-braindog pack publish reading-list/reading-list.pack.json --kennel
+braindog addon check reading-list
+braindog addon test reading-list
+braindog addon publish reading-list/reading-list.pack.json --kennel
 ```
 
 `publish --kennel` sends the file to the Kennel at `https://brain.dog/api/kennel/v1/`, or to the one named after `--kennel`, and says whether the version is listed now or waits for review. A later version is published the same way, with its `changes` line saying what moved.
@@ -26,10 +26,10 @@ The name inside the file is only what readers see; the publisher is the key or t
 ## Author keys
 
 ```code | In a terminal
-braindog pack key ~/keys/me.key --author "Your name"
+braindog addon key ~/keys/me.key --author "Your name"
 ```
 
-This makes an author key in a file you choose. Keep it outside any repository, and keep it private: it signs what you publish. When a key has to change, `braindog pack key rotate <old key> <new key> --to <folder>` names the new key as the old one's successor, signed by the old key, so readers who trusted one trust the other. `braindog pack key revoke <key> --to <folder> --reason <why>` marks a key as untrusted, and the versions it signed are then said as untrusted and not offered.
+This makes an author key in a file you choose. Keep it outside any repository, and keep it private: it signs what you publish. When a key has to change, `braindog addon key rotate <old key> <new key> --to <folder>` names the new key as the old one's successor, signed by the old key, so readers who trusted one trust the other. `braindog addon key revoke <key> --to <folder> --reason <why>` marks a key as untrusted, and the versions it signed are then said as untrusted and not offered.
 
 ## Review
 
@@ -60,7 +60,7 @@ The preview a listing carries is the record's drawing of the pack's pages, never
 ## Yanking
 
 ```code | In a terminal
-braindog pack yank reading-list 1.2.0 --reason "The due dates were read a day early."
+braindog addon yank reading-list 1.2.0 --reason "The due dates were read a day early."
 ```
 
 A yanked version is never offered again, and a record that holds it is told why. Its number is used up, so the fix goes out as the next version.

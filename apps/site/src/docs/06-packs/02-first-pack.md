@@ -7,11 +7,11 @@ You need the `braindog` command line, which [the SDK](/docs/packs/sdk) says how 
 ## Start it
 
 ```code | In a terminal
-braindog pack new reading-list --title "Reading list" --author "Your name"
+braindog addon new reading-list --title "Reading list" --author "Your name"
 ```
 
 ```code | What it prints
-Reading list 1.0.0 written to /home/you/reading-list: reading-list.pack.json with one list, a page over it and two example rows, reading-list.test.json and a README. Check it with braindog pack check reading-list, and test it with braindog pack test reading-list.
+Reading list 1.0.0 written to /home/you/reading-list: reading-list.pack.json with one list, a page over it and two example rows, reading-list.test.json and a README. Check it with braindog addon check reading-list, and test it with braindog addon test reading-list.
 ```
 
 The folder holds three files. `reading-list.pack.json` is the add-on itself: one list called Items, a page that shows what is still open, and two example rows. `reading-list.test.json` is its test, and `README.md` says in five lines how to check, test and publish it. Add `--yaml` to write `reading-list.pack.yaml` instead; a record reads both the same way.
@@ -30,7 +30,7 @@ A list that carries example rows needs a `tags` field, because that is where eac
 ## Check it
 
 ```code | In a terminal
-braindog pack check reading-list
+braindog addon check reading-list
 ```
 
 ```code | What it prints
@@ -57,7 +57,7 @@ Every refusal a pack can meet is on [one page](/docs/packs/refusals), with its s
 ## Test it
 
 ```code | In a terminal
-braindog pack test reading-list
+braindog addon test reading-list
 ```
 
 ```code | What it prints
@@ -78,11 +78,11 @@ Some of what the test expects did not hold, as said above.
 ## Look at it
 
 ```code | In a terminal
-braindog pack preview reading-list
+braindog addon preview reading-list
 ```
 
 ```code | What it prints
-Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/packs/browse/reading-list?from=catalogue and press Review the plan. Stop with Ctrl+C; the scratch record is removed.
+Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/app/addons/reading-list?kind=pack and press Review the plan. Stop with Ctrl+C; the scratch record is removed.
 ```
 
 `preview` starts a whole BrainDog on your machine with nothing in it but your add-on in its catalogue. Open the address, review the plan, install it, and use its page the way somebody who installs it will. `--port <n>` chooses another port. Starting the scratch record takes a little while the first time.
@@ -92,7 +92,7 @@ Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/
 When it is ready for other people, send it to the Kennel, the public catalogue every BrainDog reads:
 
 ```code | In a terminal
-braindog pack publish reading-list/reading-list.pack.json --kennel
+braindog addon publish reading-list/reading-list.pack.json --kennel
 ```
 
 ```code | What it prints
@@ -108,7 +108,7 @@ The Kennel needs to know who publishes this: sign it with --sign <key file>, or 
 Once the Kennel's operator trusts you as a publisher, what you submit is listed straight away instead:
 
 ```code | What it prints for a trusted publisher
-Reading list 1.0.0 is listed on the Kennel at https://brain.dog. Anyone can find it with braindog pack search and install it by its id.
+Reading list 1.0.0 is listed on the Kennel at https://brain.dog. Anyone can find it with braindog addon search and install it by its id.
 ```
 
 [Publishing and review](/docs/packs/publishing) has the rest: author keys, what review looks at, and taking a version back.

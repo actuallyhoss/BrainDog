@@ -4,7 +4,7 @@ A pack is one file, `<id>.pack.json` or `<id>.pack.yaml`: a manifest saying what
 
 ## A whole pack
 
-This is the smallest useful pack, a list of things to do and a page of what is still open. It is the shape `braindog pack new` starts every pack in, shortened here by its `author` and `license` lines.
+This is the smallest useful pack, a list of things to do and a page of what is still open. It is the shape `braindog addon new` starts every pack in, shortened here by its `author` and `license` lines.
 
 ```code | hello.pack.json
 {
@@ -102,4 +102,4 @@ packs/hello
 ```
 ~~~
 
-`hello.test.json` is the test `braindog pack test` runs, described in [the SDK](/docs/packs/sdk). The packs in BrainDog's own repository each carry a `.test.ts` too, which installs the file exactly as it ships in a fresh record.
+`hello.test.json` is the test `braindog addon test` runs, described in [the SDK](/docs/packs/sdk). The packs in BrainDog's own repository each carry a `.test.ts` too, which installs the file exactly as it ships in a fresh record.

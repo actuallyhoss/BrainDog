@@ -122,7 +122,7 @@ test("an export's note is said as a sentence, not in the kernel's words", () => 
 test("a pack's settings saved are said as what they did, never as \"Edit\"", () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'edit', note: null, target_kind: 'pack', ...over })] as never, null)[0]?.text;
   assert.equal(at({ target: 'pack:usecase-personal', from: { speaks: false }, to: { speaks: true } }), 'Personal speaks for this BrainDog now');
-  assert.equal(at({ target: 'pack:usecase-personal', to: { speaks: false } }), 'Personal added beside the use case that speaks');
+  assert.equal(at({ target: 'pack:usecase-personal', to: { speaks: false } }), 'Personal added beside the starter that speaks');
   assert.equal(at({ target: 'pack:usecase-personal', to: { label_goals: 'Aims' } }), 'Changed the settings of Personal');
 });
 
@@ -133,13 +133,13 @@ test('a use case added beside another says so, and "speaks" is said only when th
   /* Newest first, as the log sends them. Personal went in beside Student, which spoke unwritten. */
   assert.deepEqual(texts([voice('personal', null, false, 'A'), voice('student', null, true, 'A'), installed('personal'), installed('student')]), [
     'Personal added beside Student',
-    'Added the Personal use case',
-    'Added the Student use case',
+    'Added the Personal starter',
+    'Added the Student starter',
   ]);
   /* A third beside a voice already written down names the one that spoke before. */
   assert.deepEqual(texts([voice('team', null, false, 'B'), installed('team'), voice('personal', null, false, 'A'), voice('student', null, true, 'A')]), [
     'Team board added beside Student',
-    'Added the Team board use case',
+    'Added the Team board starter',
     'Personal added beside Student',
   ]);
   /* A real switch: the one that spoke is set not to. */
@@ -147,8 +147,8 @@ test('a use case added beside another says so, and "speaks" is said only when th
   /* Switched to on arrival, when the one before had never been written down. */
   assert.deepEqual(texts([voice('team', null, true, 'A'), voice('student', null, false, 'A'), installed('team'), installed('student')]), [
     'Team board speaks for this BrainDog now',
-    'Added the Team board use case',
-    'Added the Student use case',
+    'Added the Team board starter',
+    'Added the Student starter',
   ]);
 
   /* TWO WRITES, NOTHING LOGGED BETWEEN THEM, ARE TWO CHANGES. A switch to Student, then Team board added beside it: read by
@@ -156,7 +156,7 @@ test('a use case added beside another says so, and "speaks" is said only when th
   const twoWrites = [voice('team', null, false, 'B'), voice('student', false, true, 'A'), voice('personal', true, false, 'A')];
   assert.deepEqual(texts(twoWrites), ['Team board added beside Student', 'Student speaks for this BrainDog now']);
   /* The lines of one write are read together wherever they sit, and a line with no batch is read alone. */
-  assert.deepEqual(texts([voice('personal', null, false, 'A'), installed('personal'), voice('student', null, true, 'A')]), ['Personal added beside Student', 'Added the Personal use case']);
+  assert.deepEqual(texts([voice('personal', null, false, 'A'), installed('personal'), voice('student', null, true, 'A')]), ['Personal added beside Student', 'Added the Personal starter']);
   assert.deepEqual(texts([voice('personal', null, false), voice('student', null, true)]), ['Personal added beside Student']);
 });
 
@@ -242,10 +242,10 @@ test('a pack install names the list it brought, not the bare verb', () => {
   assert.equal(at({ kind: 'install', target: 'pack:estate' }), 'Added the Services list');
   assert.equal(at({ kind: 'uninstall', target: 'pack:estate' }), 'Removed the Services list');
   assert.equal(at({ kind: 'install', target: 'pack:nobody-knows' }), 'Added the nobody-knows add-on');
-  assert.equal(at({ kind: 'install', target: 'pack:usecase-student' }), 'Added the Student use case');
-  assert.equal(at({ kind: 'install', target: 'pack:usecase-team' }), 'Added the Team board use case');
-  assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-book-club' }), 'Removed the Book club use case');
-  assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-new-project' }), 'Removed the New project use case');
+  assert.equal(at({ kind: 'install', target: 'pack:usecase-student' }), 'Added the Student starter');
+  assert.equal(at({ kind: 'install', target: 'pack:usecase-team' }), 'Added the Team board starter');
+  assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-book-club' }), 'Removed the Book club starter');
+  assert.equal(at({ kind: 'uninstall', target: 'pack:usecase-new-project' }), 'Removed the New project starter');
 });
 
 /**

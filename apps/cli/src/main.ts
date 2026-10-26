@@ -327,25 +327,25 @@ const fullUsage = () =>
     '  Read a .dog file and set it as the page. An owner in the app only: a token is refused, this CLI included.',
     'braindog page check <file>',
     '  Validate a .dog file against the authoring grammar, locally. Nothing is sent.',
-    'braindog usecase list [--host <host>]',
-    '  Say the use cases on this BrainDog, the one speaking, and the ones on offer. A read.',
-    'braindog usecase export [--out <file>] [--title <title>] [--version <x.y.z>] [--example <list>:<n>,<n>] [--host <host>]',
-    "  Save this BrainDog's arrangement as a use-case file: its modules, lists, pages, voice and labels, and only the rows named.",
-    'braindog usecase check <file>',
-    '  Read a use-case file the way a record will, locally: its size, any credential, its shape and its block kinds. Nothing is sent.',
-    'braindog usecase install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>]',
-    '  Ask the owner to install a use case on offer, a shared one, or one from a catalogue held to its checksum: files a proposal and prints its link on Decide. Nothing is installed until they accept it.',
-    'braindog usecase new <id> [--title <title>] [--author <name>] [--out <file>] [--yaml]',
-    '  Write a starting use-case file, one list and a page over it, that already reads the way a record will read it.',
-    'braindog usecase diff <earlier file> <later file>',
-    '  Say what moved between two versions of a use case, and the least version bump that needs. Nothing is sent.',
-    'braindog usecase publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
+    'braindog starter list [--host <host>]',
+    '  Say the starters on this BrainDog, the one speaking, and the ones on offer. A read.',
+    'braindog starter export [--out <file>] [--title <title>] [--version <x.y.z>] [--example <list>:<n>,<n>] [--host <host>]',
+    "  Save this BrainDog's arrangement as a starter file: its add-ons, lists, pages, voice and labels, and only the rows named.",
+    'braindog starter check <file>',
+    '  Read a starter file the way a record will, locally: its size, any credential, its shape and its block kinds. Nothing is sent.',
+    'braindog starter install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>]',
+    '  Ask the owner to install a starter on offer, a shared one, or one from a catalogue held to its checksum: files a proposal and prints its link on Decide. Nothing is installed until they accept it.',
+    'braindog starter new <id> [--title <title>] [--author <name>] [--out <file>] [--yaml]',
+    '  Write a first starter file, one list and a page over it, that already reads the way a record will read it.',
+    'braindog starter diff <earlier file> <later file>',
+    '  Say what moved between two versions of a starter, and the least version bump that needs. Nothing is sent.',
+    'braindog starter publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
     '  Add a version to a catalogue folder, or submit it to the Kennel: never one already there, never an earlier one, and a major when it takes something away.',
-    'braindog usecase yank <id> <version> --reason <why> [--kennel host] [--sign <key file>]',
+    'braindog starter yank <id> <version> --reason <why> [--kennel host] [--sign <key file>]',
     '  Take a version back on the Kennel. It is never offered again, and a record holding it is told why.',
-    'braindog usecase search [words] [--from <folder|address> | --kennel [host]]',
+    'braindog starter search [words] [--from <folder|address> | --kennel [host]]',
     '  List what a catalogue holds, the Kennel when no --from is named, with what each can reach and call out to. Nothing is sent to a record.',
-    'braindog usecase preview <file> [--port <n>]',
+    'braindog starter preview <file> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the file in its catalogue, to install and look at. Removed when it stops.',
     'braindog addon new <id> [--title <title>] [--author <name>] [--out <folder>] [--yaml] [--from-page <file.dog>]',
     '  Write a starting add-on folder: its .pack.json (or .pack.yaml), a first page over a first list with two example rows, its test and a README.',
@@ -356,7 +356,7 @@ const fullUsage = () =>
     'braindog addon preview <file|dir> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the add-on in its catalogue, and print its page. Removed when it stops.',
     'braindog addon diff|search|install|yank <...>',
-    '  The same as for a use case: diff <a> <b>, search [words] [--from <catalogue> | --kennel [host]], install <id|file> [--from <catalogue>], yank <id> <version> --reason <why>.',
+    '  The same as for a starter: diff <a> <b>, search [words] [--from <catalogue> | --kennel [host]], install <id|file> [--from <catalogue>], yank <id> <version> --reason <why>.',
     'braindog addon install <file> --force | braindog addon uninstall <id> [--force]',
     '  --force on addon install or addon uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.',
     'braindog addon publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
@@ -518,7 +518,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['export / import / verify', 'Back up, restore or check a .brainl file'],
     ['page pull|push|check', 'Fetch, set or validate a page as a .dog file'],
     ['attach <file.html> --on <thing>', 'Put a page on a task, project or decision'],
-    ['usecase <verb>', 'Export, check, install or publish a use case'],
+    ['starter <verb>', 'Export, check, install or publish a starter'],
     ['automations <verb>', 'List, show, run or cancel automations'],
     ['actions run <name>', 'Run a scheduled action now'],
     ['scripts resume <id>', 'Start a paused script again'],
@@ -1210,10 +1210,11 @@ function install(args: string[]): void {
  */
 const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'attach', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'tidy', 'private-terms', 'doctor', 'env', 'sync', 'actions']);
 
-/* `pack` IS THE OLD NAME OF `addon`, kept working: both are the one handler, with the same subcommands. */
+/* `pack` IS THE OLD NAME OF `addon`, AND `usecase` OF `starter`, kept working: each pair is the one handler, with the same
+   subcommands. */
 const [named, ...rest] = process.argv.slice(2);
-const command = named === 'addon' ? 'pack' : named;
-const helpName = (c: string): string => (c === 'pack' ? 'addon' : c);
+const command = named === 'addon' ? 'pack' : named === 'starter' ? 'usecase' : named;
+const helpName = (c: string): string => (c === 'pack' ? 'addon' : c === 'usecase' ? 'starter' : c);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
    so no command's own `parseArgs` has to know a global exists. */
 const cut = takeJson(rest);

@@ -257,9 +257,9 @@ test('browse is Add-ons, with a section for each kind it lists, and /packs names
      name the kinds. */
   assert.equal(copy.packs, 'Add-ons');
   /* THREE SECTIONS SINCE the screens scope of 24 October (E20), and never where a thing came from. */
-  assert.deepEqual(Object.values(market.sections), ['Ready-made setups', 'Add-ons', 'Looks']);
+  assert.deepEqual(Object.values(market.sections), ['Starters', 'Add-ons', 'Looks']);
   assert.doesNotMatch(JSON.stringify(market), /From others|"Doors"/u);
-  assert.match(copy.browseAll, /setups/iu);
+  assert.match(copy.browseAll, /starters/iu);
   assert.match(copy.browseAll, /add-ons/iu);
   assert.match(at('./+page.svelte'), /title=\{copy\.packs\}/u);
   assert.match(at('./[id]/Listing.svelte'), /\{copy\.browseAll\}/u);

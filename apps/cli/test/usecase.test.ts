@@ -112,7 +112,7 @@ test('usecase check: reads a good file, and refuses a credential in one, sending
   const h = await setup(t);
   writeFileSync(join(h.dir, 'good.usecase.json'), JSON.stringify(DOC));
   assert.equal(await usecase(['check', 'good.usecase.json'], h.io), 0);
-  assert.match(h.out[0] ?? '', /Study 1\.0\.1 reads as a use case: 1 lists, 0 pages/);
+  assert.match(h.out[0] ?? '', /Study 1\.0\.1 reads as a starter: 1 lists, 0 pages/);
   writeFileSync(join(h.dir, 'bad.usecase.json'), JSON.stringify({ ...DOC, summary: `Uses ${['xoxb', '1234567890', 'abcdefghij'].join('-')}` }));
   assert.equal(await usecase(['check', 'bad.usecase.json'], h.io), 1);
   assert.match(h.said.at(-1) ?? '', /looks like a credential/);
@@ -180,14 +180,14 @@ test('usecase install: an address is read to 300 KB and ten seconds at most, as 
   for (const path of ['/said', '/streamed']) {
     const read = await readSource(`${at}${path}`, io);
     assert.equal(read.ok, false, path);
-    assert.match(read.ok ? '' : read.fix, /larger than a shared use case may be/, path);
+    assert.match(read.ok ? '' : read.fix, /larger than a shared starter may be/, path);
   }
   const slow = await readSource(`${at}/silent`, io, 50);
   assert.match(slow.ok ? '' : slow.fix, /took longer than/);
 
   writeFileSync(join(dir, 'big.usecase.json'), big);
   const onDisk = await readSource('big.usecase.json', io);
-  assert.match(onDisk.ok ? '' : onDisk.fix, /larger than a shared use case may be/);
+  assert.match(onDisk.ok ? '' : onDisk.fix, /larger than a shared starter may be/);
 });
 
 test('usecase list: says the use cases on, the one speaking, and those on offer, from one read', async (t) => {
@@ -197,8 +197,8 @@ test('usecase list: says the use cases on, the one speaking, and those on offer,
   assert.deepEqual(h.out, [
     'On this BrainDog:',
     '  personal  Personal (1.2.0, speaking)',
-    '  team  Team (1.0.0)',
-    'On offer, installed with braindog usecase install <id>:',
+    '  team  Team board (1.0.0)',
+    'On offer, installed with braindog starter install <id>:',
     '  student  Student. Courses, deadlines and grades. Builds on portfolio.',
   ]);
   assert.equal(await usecase(['list', '--nope'], h.io), 1);
@@ -213,13 +213,13 @@ test('usecase install <id>: files a pack proposal for a use case on offer, as an
 
   /* BY ITS PACK ID TOO, and one on at an older version is asked as its update. */
   assert.equal(await usecase(['install', 'usecase-team'], h.io), 0, h.said.join('\n'));
-  assert.deepEqual(proposed()[1]?.args, { question: 'Update Team from 1.0.0 to 1.1.0?', body_kind: 'pack', body: { install: 'usecase-team' }, cause: 'install#usecase-team' });
+  assert.deepEqual(proposed()[1]?.args, { question: 'Update Team board from 1.0.0 to 1.1.0?', body_kind: 'pack', body: { install: 'usecase-team' }, cause: 'install#usecase-team' });
 
   /* ONE ALREADY ON, ONE NOT OFFERED, AND A MODULE ARE REFUSED, AND NOTHING IS PROPOSED. */
   assert.equal(await usecase(['install', 'personal'], h.io), 1);
   assert.equal(h.said.at(-1), 'Personal is already on this BrainDog. On offer: student.');
   assert.equal(await usecase(['install', 'reading-club'], h.io), 1);
-  assert.equal(h.said.at(-1), 'There is no use case called reading-club on offer here. On offer: student.');
+  assert.equal(h.said.at(-1), 'There is no starter called reading-club on offer here. On offer: student.');
   assert.equal(await usecase(['install', 'portfolio'], h.io), 1);
   assert.equal(proposed().length, 2, 'a use case not on offer was proposed');
 });

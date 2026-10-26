@@ -18,11 +18,11 @@ Pull the page you made into a file, then start an add-on from it:
 
 ```code | In a terminal
 braindog page pull bills
-braindog pack new bills-kit --from-page bills.dog
-braindog pack check bills-kit
+braindog addon new bills-kit --from-page bills.dog
+braindog addon check bills-kit
 ```
 
-`pack new` writes the same folder it always does, with the add-on file made from your page in place of the blank one. The test file and the README are the ones a blank add-on starts with, so change the test to rows of your own list before you run `braindog pack test`.
+`pack new` writes the same folder it always does, with the add-on file made from your page in place of the blank one. The test file and the README are the ones a blank add-on starts with, so change the test to rows of your own list before you run `braindog addon test`.
 
 A page file holds the page and not what it reads. So the command line makes each list the page reads from what the page shows of it: the columns, the order and the filters. Read those fields before you publish, because a page does not name every field a list holds.
 
@@ -42,6 +42,6 @@ Headings, labels and what an automation says are kept as you wrote them. Read th
 
 ## Before you publish
 
-- Run `braindog pack check` and `braindog pack test`, as [your first pack](/docs/packs/first-pack) does.
+- Run `braindog addon check` and `braindog addon test`, as [your first pack](/docs/packs/first-pack) does.
 - Give the add-on a summary in your own words. Both ways start it as a line for you to replace.
 - [Settings](/docs/packs/settings) says how a setting reads on the page of whoever installs it.

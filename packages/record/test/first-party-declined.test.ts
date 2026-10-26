@@ -87,7 +87,7 @@ test('A CARRY THAT THROWS AFTER AN UPDATE WENT IN IS SAID, AND THE NIGHT GOES ON
   await api.slashTick();
   assert.equal(held(api), FIRST_PARTY_VERSIONS.portfolio);
   const steps = (api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] }).steps;
-  assert.deepEqual(steps, [`Portfolio was updated to ${FIRST_PARTY_VERSIONS.portfolio}.`, 'Portfolio was updated, and moving what it kept from before stopped partway.']);
+  assert.deepEqual(steps, [`Projects was updated to ${FIRST_PARTY_VERSIONS.portfolio}.`, 'Projects was updated, and moving what it kept from before stopped partway.']);
   sql.close();
 });
 

@@ -64,7 +64,7 @@ test('new writes a starting file that checks, and never writes over one', async 
   const h = await setup(t);
   assert.equal(await usecase(['new', 'reading-club', '--author', 'Halden'], h.io), 0, h.said.join('\n'));
   assert.equal(await usecase(['check', 'reading-club-1.0.0.usecase.json'], h.io), 0, h.said.join('\n'));
-  assert.ok(h.out.some((l) => /Reading club 1\.0\.0 reads as a use case: 1 lists, 1 pages/u.test(l)));
+  assert.ok(h.out.some((l) => /Reading club 1\.0\.0 reads as a starter: 1 lists, 1 pages/u.test(l)));
   assert.ok(h.out.some((l) => /Calls out to: nothing/u.test(l)));
   assert.equal(await usecase(['new', 'reading-club'], h.io), 1);
   assert.equal(await usecase(['new', 'Bad Id'], h.io), 1);
@@ -372,7 +372,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
   const before = h.seen.length;
   assert.equal(await pack(['install', 'club-1.0.0.usecase.json'], h.io), 1);
-  assert.match(h.said.at(-1) ?? '', /is a use case, not an add-on/u);
+  assert.match(h.said.at(-1) ?? '', /is a starter, not an add-on/u);
   assert.equal(h.seen.length, before);
 });
 

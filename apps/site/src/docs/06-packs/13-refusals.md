@@ -1,8 +1,8 @@
 # Every refusal
 
-A pack that cannot install is refused with one sentence saying what is wrong and what to do, and a code in capitals naming the kind of fault. `braindog pack check` says the same sentence a record would, so you meet each of these on your own machine first. This page lists them by where you meet them, each with its sentence.
+A pack that cannot install is refused with one sentence saying what is wrong and what to do, and a code in capitals naming the kind of fault. `braindog addon check` says the same sentence a record would, so you meet each of these on your own machine first. This page lists them by where you meet them, each with its sentence.
 
-Sentences in a code block are copied from what `braindog pack check` printed. The rest are written the way the code writes them, with the parts that change in angle brackets. The codes themselves are kept in `packages/ports/src/index.ts`, and the pack family is the list headed "Pack and declaration" there.
+Sentences in a code block are copied from what `braindog addon check` printed. The rest are written the way the code writes them, with the parts that change in angle brackets. The codes themselves are kept in `packages/ports/src/index.ts`, and the pack family is the list headed "Pack and declaration" there.
 
 ## Reading the file
 
@@ -32,7 +32,7 @@ reading-list needs primitives 9 and this record renders 1. Update BrainDog, or a
 ```
 
 - **`PACK_OVER_CAP`**, a file past the size an add-on may be: "This file is <n> KB, and an add-on is at most <n> KB. Ship fewer example rows, or split it."
-- **`PACK_MALFORMED`**, a file that is not an add-on at all: "This is not an add-on file: it has no pack in it." A use case gets "This is a use-case file, not an add-on. Publish it as a use case."
+- **`PACK_MALFORMED`**, a file that is not an add-on at all: "This is not an add-on file: it has no pack in it." A starter gets "This is a use-case file, not an add-on. Publish it as a use case."
 
 ## What it needs installed first
 

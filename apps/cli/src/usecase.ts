@@ -31,6 +31,7 @@ import { parseArgs } from 'node:util';
 import { readShared, SHARED_SUFFIX } from '@braindog/declare';
 import { reachOf } from '@braindog/declare/catalogue';
 import { refused, type Result } from '@braindog/ports';
+import { moduleName } from '@braindog/seed/usecases/names';
 
 import { installFromCatalogue, loadSource, reachLines, sdkVerb } from './catalogue.ts';
 import { oneLine, printable } from './clip.ts';
@@ -39,7 +40,7 @@ import { untilAccepted } from './links.ts';
 import { causeOf, connect, fixOf, joinedSaid, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
-  'braindog usecase takes new <id>, check <file>, diff <a> <b>, publish <file> --to <folder> [--sign <key file>], key <file> --author <name>, search [words] --from <catalogue>, preview <file> [--port <n>], list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>].';
+  'braindog starter takes new <id>, check <file>, diff <a> <b>, publish <file> --to <folder> [--sign <key file>], key <file> --author <name>, search [words] --from <catalogue>, preview <file> [--port <n>], list [--host <host>], export [--out <file>] [--title <title>] [--version <x.y.z> | --minor] [--example <list>:<n>,<n>] [--signal <word>] [--skill <n>], or install <id|file|url> [--from <catalogue>] [--version <x.y.z>] [--host <host>].';
 
 /**
  * A refusal's sentence with its code after it, or the plain sentence for an answer that carries none, as one clean line:
@@ -133,7 +134,7 @@ async function exportFile(args: string[], io: AgentIo): Promise<number> {
   }
   const got = answer.value as { file?: unknown; doc?: unknown };
   if (typeof got.file !== 'string' || typeof got.doc !== 'object' || got.doc === null) {
-    io.say('The record answered in a shape this build does not recognise as a use case.');
+    io.say('The record answered in a shape this build does not recognise as a starter.');
     return 1;
   }
   const file = resolve(io.cwd, values.out ?? got.file);
@@ -148,12 +149,12 @@ async function check(args: string[], io: AgentIo): Promise<number> {
   try {
     ({ positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: {} }));
   } catch {
-    io.say('braindog usecase check takes one file, and nothing else.');
+    io.say('braindog starter check takes one file, and nothing else.');
     return 1;
   }
   const [file, ...more] = positionals;
   if (!file || more.length > 0) {
-    io.say('braindog usecase check takes one file, as in braindog usecase check student-1.0.1.usecase.json.');
+    io.say('braindog starter check takes one file, as in braindog starter check student-1.0.1.usecase.json.');
     return 1;
   }
   /* READ AS PUBLISH, PREVIEW, DIFF, SEARCH AND YANK ALREADY DO, through `catalogue.ts`'s `loadSource`, so a
@@ -174,7 +175,7 @@ async function check(args: string[], io: AgentIo): Promise<number> {
   const lists = shared.value.pack?.declarations.filter((d) => d.kind === 'register').length ?? 0;
   const pages = shared.value.pack?.declarations.filter((d) => d.kind === 'page').length ?? 0;
   const needs = u.modules.length === 0 ? 'no module first' : `${u.modules.join(', ')} first`;
-  io.out(`${u.title} ${u.version} reads as a use case: ${lists} lists, ${pages} pages and ${shared.value.pack?.seeds.length ?? 0} example rows, needing ${needs}. Nothing was sent.`);
+  io.out(`${u.title} ${u.version} reads as a starter: ${lists} lists, ${pages} pages and ${shared.value.pack?.seeds.length ?? 0} example rows, needing ${needs}. Nothing was sent.`);
   io.out(`  By ${u.author}, ${u.license}.`);
   for (const line of reachLines(reachOf(shared.value))) io.out(line);
   return 0;
@@ -197,7 +198,7 @@ export const USECASE_READ_MOST_BYTES = 300 * 1024;
 /** How long reading one from an address may take, the body included, as on the hosts (`PUBLIC_TIMEOUT_MS`). */
 export const USECASE_READ_TIMEOUT_MS = 10_000;
 
-const TOO_LARGE = (where: string) => `The file at ${where} is larger than a shared use case may be, so it was not read.`;
+const TOO_LARGE = (where: string) => `The file at ${where} is larger than a shared starter may be, so it was not read.`;
 
 /** The text of a use-case file, from a path or an address, or the sentence saying why it could not be read. */
 export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE_READ_TIMEOUT_MS): Promise<{ ok: true; text: string } | { ok: false; fix: string }> {
@@ -211,7 +212,7 @@ export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE
     }
   }
   const url = addressOf(given);
-  if (url === null) return { ok: false, fix: `${given} is not an https address. A use case is read from https, or from http on this machine.` };
+  if (url === null) return { ok: false, fix: `${given} is not an https address. A starter is read from https, or from http on this machine.` };
   const signal = AbortSignal.timeout(timeoutMs);
   try {
     const got = await fetch(url, { redirect: 'error', signal });
@@ -256,11 +257,11 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
   }
   const [given, ...more] = positionals;
   if (!given || more.length > 0) {
-    io.say('braindog usecase install takes one file or address, as in braindog usecase install reading-club-1.0.0.usecase.json.');
+    io.say('braindog starter install takes one file or address, as in braindog starter install reading-club-1.0.0.usecase.json.');
     return 1;
   }
   /* FROM A CATALOGUE BY ID, held to the checksum the index gives, then asked for as a file. */
-  if (values.from !== undefined) return ID.test(given) ? installFromCatalogue(given, values.from, values.version, values.host, io, 'usecase', false, false, values['trust-key'] === true) : (io.say('--from names a catalogue to install a use case from by its id, as in braindog usecase install study --from ./catalogue.'), 1);
+  if (values.from !== undefined) return ID.test(given) ? installFromCatalogue(given, values.from, values.version, values.host, io, 'usecase', false, false, values['trust-key'] === true) : (io.say('--from names a catalogue to install a starter from by its id, as in braindog starter install study --from ./catalogue.'), 1);
   if (values.version !== undefined) {
     io.say('--version picks a version from a catalogue, so it goes with --from.');
     return 1;
@@ -323,11 +324,11 @@ type Arrangement = { packs: { id: string; version?: string; off?: boolean }[]; o
 const isArrangement = (v: unknown): v is Arrangement =>
   typeof v === 'object' && v !== null && Array.isArray((v as Arrangement).packs) && Array.isArray((v as Arrangement).offer);
 
-/** A use case not on offer here said by its id in words: `usecase-reading-club` as "Reading club". */
-const idWords = (id: string): string => {
-  const bare = id.slice(USE_CASE.length).replace(/-/gu, ' ');
-  return bare.charAt(0).toUpperCase() + bare.slice(1);
-};
+/**
+ * A starter by the name the app gives it: `usecase-founder` as "Solo founder", one name everywhere, and one this build
+ * does not ship by its id in words: `usecase-reading-club` as "Reading club".
+ */
+const idWords = (id: string): string => moduleName(id);
 
 /** The arrangement, or the exit code after saying why it could not be read. */
 async function arrangementOf(host: string | undefined, io: AgentIo): Promise<{ at: Connected; value: Arrangement } | number> {
@@ -349,7 +350,7 @@ async function list(args: string[], io: AgentIo): Promise<number> {
   try {
     ({ values } = parseArgs({ args, strict: true, options: { host: { type: 'string' } } }));
   } catch {
-    io.say('braindog usecase list takes --host <host>, and nothing else.');
+    io.say('braindog starter list takes --host <host>, and nothing else.');
     return 1;
   }
   const read = await arrangementOf(values.host, io);
@@ -358,7 +359,7 @@ async function list(args: string[], io: AgentIo): Promise<number> {
   const { packs, offer, voice } = printable(read.value);
   const on = packs.filter((p) => p.id.startsWith(USE_CASE));
   const offered = offer.filter((o) => o.id.startsWith(USE_CASE) || typeof o.usecase === 'string');
-  if (on.length === 0) io.out('No use case is set up on this BrainDog yet.');
+  if (on.length === 0) io.out('No starter is set up on this BrainDog yet.');
   else {
     io.out('On this BrainDog:');
     for (const p of on) {
@@ -366,9 +367,9 @@ async function list(args: string[], io: AgentIo): Promise<number> {
       io.out(`  ${p.id.slice(USE_CASE.length)}  ${idWords(p.id)}${notes.length ? ` (${notes.join(', ')})` : ''}`);
     }
   }
-  if (offered.length === 0) io.out('No other use case is on offer here.');
+  if (offered.length === 0) io.out('No other starter is on offer here.');
   else {
-    io.out('On offer, installed with braindog usecase install <id>:');
+    io.out('On offer, installed with braindog starter install <id>:');
     for (const o of offered) {
       const summary = o.summary ? ` ${o.summary.replace(/\.?$/u, '.')}` : '';
       const needs = o.modules?.length ? ` Builds on ${o.modules.join(', ')}.` : '';
@@ -390,8 +391,8 @@ async function installOffered(given: string, host: string | undefined, io: Agent
   if (offered === undefined && update === undefined) {
     const held = value.packs.find((p) => p.id === id);
     const ids = value.offer.filter((o) => o.id.startsWith(USE_CASE)).map((o) => o.id.slice(USE_CASE.length));
-    const others = ids.length === 0 ? 'No other use case is on offer here.' : `On offer: ${ids.join(', ')}.`;
-    io.say(held ? `${idWords(id)} is already on this BrainDog. ${others}` : `There is no use case called ${id.slice(USE_CASE.length)} on offer here. ${others}`);
+    const others = ids.length === 0 ? 'No other starter is on offer here.' : `On offer: ${ids.join(', ')}.`;
+    io.say(held ? `${idWords(id)} is already on this BrainDog. ${others}` : `There is no starter called ${id.slice(USE_CASE.length)} on offer here. ${others}`);
     return 1;
   }
   const title = oneLine(offered?.usecase ?? idWords(id));

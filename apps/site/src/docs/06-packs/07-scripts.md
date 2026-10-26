@@ -82,7 +82,7 @@ A pack reaches outside the record in three ways, and all three are printed in th
 - **An `ingest` on a schedule**: `pull` fetches something you own, `poll` fetches an address and acts only when the answer changed, and `call` posts to an address.
 - **A rule's `call` step**, which posts to an address when the rule runs.
 
-```code | braindog pack check on the first-party Stripe pack
+```code | braindog addon check on the first-party Stripe pack
 Stripe 1.3.0 reads as an add-on: 0 lists, 0 pages and 0 example rows. Nothing was sent.
   By BrainDog, Apache-2.0.
   Installs first: money-core

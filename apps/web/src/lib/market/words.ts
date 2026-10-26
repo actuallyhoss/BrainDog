@@ -12,16 +12,16 @@ export const words = {
   /* BROWSE IN THREE SECTIONS, SINCE the screens scope of 24 October (E20): the ready-made setups as cards, then every
      add-on, built in or from outside, as rows, then the looks. "From others" and "Built in" said where a thing came
      from, which is not what a person shops for. The chips are these sections, so a chip's count is its section's. */
-  sections: { setups: 'Ready-made setups', addons: 'Add-ons', looks: 'Looks' } as const,
+  sections: { setups: 'Starters', addons: 'Add-ons', looks: 'Looks' } as const,
   /* THE SAME THREE AS CHIPS, a word each, so the four chips sit on one line of a phone (audit C, X14). */
-  chips: { setups: 'Setups', addons: 'Add-ons', looks: 'Looks' } as const,
+  chips: { setups: 'Starters', addons: 'Add-ons', looks: 'Looks' } as const,
   showAll: (n: number): string => `Show all ${n}`,
   sortLabel: 'Sort',
   all: 'All',
   categoriesLabel: 'Categories',
   categories: {
     'made-by-braindog': 'Made by BrainDog',
-    'ways-of-working': 'Ready-made setups',
+    'ways-of-working': 'Starters',
     modules: 'Built in',
     templates: 'Templates',
     connectors: 'Connectors',
@@ -32,7 +32,7 @@ export const words = {
   } satisfies Record<Category, string>,
   orderLabel: 'Order',
   orders: { 'for-you': 'For you', installed: 'Most used', newest: 'Newest' },
-  kinds: { module: 'Built in', usecase: 'Ready-made setup', pack: 'Add-on' },
+  kinds: { module: 'Part of BrainDog', usecase: 'Starter', pack: 'Add-on' },
   nothingFound: 'Nothing matches that search',
   nothingFoundBody: 'Try fewer words, or pick All.',
   installs: (n: number): string => `On ${n}+ BrainDogs`,

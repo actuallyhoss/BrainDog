@@ -222,7 +222,7 @@ export const shell = {
      teach people to ignore warnings. Adds, Examples and What you wrote went with the Agents
      offer's tile (audit C of 25 October, X16), which names what it adds and says the rest as lines. */
   diffConflicts: 'Conflicts',
-  shareSetup: 'Share this setup',
+  shareSetup: 'Share your starter',
   /* THE FLAT NAV'S OWN ROW (`flatNav` in `lib/nav.ts`): the screen every record opens on. */
   today: 'Today',
   /* The search button at the head of the rail, which says its two keys where the pointer rests on it. */

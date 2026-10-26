@@ -4,7 +4,7 @@ Home is the page your record opens on. It answers four questions without a filte
 
 ## What Home shows
 
-Home is drawn from your use case's own Home where it has one, and from the house Home otherwise. Either way it holds the same kinds of thing:
+Home is drawn from your starter's own Home where it has one, and from the house Home otherwise. Either way it holds the same kinds of thing:
 
 - **What needs you**: questions waiting in Needs you, bills falling due, anything a rule raised. Answer a question or tick a row where it is drawn, without leaving Home.
 - **Right now**: the few figures that matter most, such as cash now or open work.

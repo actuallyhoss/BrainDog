@@ -212,7 +212,7 @@ test('USECASE INSTALL ASKS ONCE: a file, a use case on offer and an update each 
   /* AN UPDATE, the third place that asks. */
   assert.equal(await usecase(['install', 'team'], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[3]?.args.cause, 'install#usecase-team');
-  assert.equal(m.out.at(-1), `Asked the owner to update Team from 1.0.0 to 1.1.0. Nothing is installed until they accept it. Open Decide in the app.`);
+  assert.equal(m.out.at(-1), `Asked the owner to update Team board from 1.0.0 to 1.1.0. Nothing is installed until they accept it. Open Decide in the app.`);
   assert.equal(await usecase(['install', 'team'], m.io), 0, m.said.join('\n'));
   assert.equal(m.out.at(-1), `Already waiting as SG2. Nothing is installed until they accept it. Open Decide in the app.`);
 });

@@ -82,4 +82,4 @@ A page with `for` is a template. The record makes one page for each row of the l
 
 ## Checking a page
 
-`braindog pack check` installs the page in a scratch record and reads every block once, so a key a kind does not read, a list the page does not require, or a kind nobody declares is said with its code before anybody installs it. `braindog pack preview` draws it, which is the way to see how it reads at a phone's width as well as a desk's.
+`braindog addon check` installs the page in a scratch record and reads every block once, so a key a kind does not read, a list the page does not require, or a kind nobody declares is said with its code before anybody installs it. `braindog addon preview` draws it, which is the way to see how it reads at a phone's width as well as a desk's.

@@ -12,7 +12,7 @@
 
 export const words = {
   /* THE PAGE'S SENTENCE (agents F27): what the file is, in the words a person uses for it, and what stays out. */
-  what: 'A file of this setup: your add-ons, pages, nav order and the names you gave things. Nothing you wrote goes in unless you pick it below.',
+  what: 'A file of your starter: your add-ons, pages, nav order and the names you gave things. Nothing you wrote goes in unless you pick it below.',
   /* TWO STEPS, SINCE the screens scope of 24 October (E22): name the file, then pick what goes in and send it. */
   about: '1. Name the file',
   send: '2. Pick what goes in, then send it',

@@ -101,7 +101,7 @@
     wayLine: (things: string) => `How ${things} are set up, with your pages, figures and rules, and nothing you wrote in them.`,
     rowsTitle: 'What you wrote',
     rowsLine: (things: string) => `Everything you have written in ${things}, without the pages around it.`,
-    setupTitle: 'A setup somebody else can install',
+    setupTitle: 'A starter somebody else can install',
     setupLine: 'Published as an add-on, with what you wrote left out.',
     /** What the record keeps, when it keeps nothing it can name yet. */
     yourThings: 'your things',

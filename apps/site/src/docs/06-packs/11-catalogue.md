@@ -7,18 +7,18 @@ A catalogue is where a record finds packs: an index of what is on offer, each ve
 ```comparison | Where packs come from
 Source | What it is | How a record reaches it
 The host's own catalogue | the packs BrainDog ships, bundled with the app | Browse, in the app
-The Kennel | the public catalogue anybody can publish to | Browse, and braindog pack search
-A catalogue folder | a folder you publish to yourself | braindog pack install with --from
-A file | one pack file on your machine | braindog pack install with its path
+The Kennel | the public catalogue anybody can publish to | Browse, and braindog addon search
+A catalogue folder | a folder you publish to yourself | braindog addon install with --from
+A file | one pack file on your machine | braindog addon install with its path
 ```
 
 ~~~code | As written
 ```comparison | Where packs come from
 Source | What it is | How a record reaches it
 The host's own catalogue | the packs BrainDog ships, bundled with the app | Browse, in the app
-The Kennel | the public catalogue anybody can publish to | Browse, and braindog pack search
-A catalogue folder | a folder you publish to yourself | braindog pack install with --from
-A file | one pack file on your machine | braindog pack install with its path
+The Kennel | the public catalogue anybody can publish to | Browse, and braindog addon search
+A catalogue folder | a folder you publish to yourself | braindog addon install with --from
+A file | one pack file on your machine | braindog addon install with its path
 ```
 ~~~
 
@@ -31,9 +31,9 @@ In the app, Browse lists what the catalogue offers, each with its title, summary
 From the command line:
 
 ```code | In a terminal
-braindog pack install reading-list
-braindog pack install ./reading-list/reading-list.pack.json
-braindog pack install reading-list --from https://example.com/catalogue/
+braindog addon install reading-list
+braindog addon install ./reading-list/reading-list.pack.json
+braindog addon install reading-list --from https://example.com/catalogue/
 ```
 
 Each files a proposal for the owner rather than installing, and prints where to answer it in Needs you. An agent with a key installs the same way, so no agent can add lists or pages to a record without its owner saying yes.
@@ -43,7 +43,7 @@ A record holds the version it installed to that file's checksum, and a catalogue
 ## A catalogue of your own
 
 ```code | In a terminal
-braindog pack publish reading-list/reading-list.pack.json --to ./catalogue
+braindog addon publish reading-list/reading-list.pack.json --to ./catalogue
 ```
 
 `--to <folder>` adds a version to a catalogue folder: an `index.json` and each version's file under `packs/<id>/`. It is held to the same rules as the Kennel: never a version already there, never an earlier one, and a major for anything taken away. Serve the folder from any address, and a record installs from it with `--from`. The Kennel is laid out the same way, which is why one reader serves both.
