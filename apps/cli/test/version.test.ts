@@ -74,6 +74,10 @@ test('IT IS NO LONGER LISTED AS UNBUILT, and neither is run', async (t) => {
   const unbuilt = out.stdout.split('\n').find((l) => l.startsWith('Not built yet:')) ?? '';
   assert.equal(unbuilt.includes('--version'), false, unbuilt);
   assert.equal(unbuilt.includes('run'), false, unbuilt);
-  assert.ok(out.stdout.includes('braindog --version'), 'the usage does not name it');
-  assert.ok(out.stdout.includes('braindog run <label'), 'the usage does not name run');
+  /* THE HELP IS GROUPED, one short line a command; the long line is the command's own --help. */
+  assert.match(out.stdout, /^  --version +\S/m, 'the usage does not name it');
+  assert.match(out.stdout, /^  keys exec\|run <label> +\S/m, 'the usage does not name run');
+  const run = await ran(['run', '--help'], nowhere(t));
+  assert.equal(run.code, 0, run.stderr);
+  assert.ok(run.stdout.includes('braindog run <label'), "run's own help does not name it");
 });

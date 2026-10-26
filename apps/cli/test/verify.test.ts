@@ -320,6 +320,9 @@ test('A --key THAT IS NEITHER A KEY NOR AN ADDRESS IS REFUSED BEFORE THE FILE IS
 });
 
 test('THE USAGE LINE NAMES verify', async (t) => {
-  const out = await ran(['help'], scratch(t));
+  /* THE HELP IS GROUPED, so it names verify in a short row, and verify's own --help gives its whole line. */
+  const help = await ran(['help'], scratch(t));
+  assert.match(help.stdout, /^  export \/ import \/ verify +\S/m);
+  const out = await ran(['verify', '--help'], scratch(t));
   assert.match(out.stdout, /^braindog verify <file> \[--key <pubkey\|url>\]$/m);
 });

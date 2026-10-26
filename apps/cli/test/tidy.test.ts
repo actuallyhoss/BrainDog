@@ -235,9 +235,12 @@ test('BRAINDOG TIDY, AS A PERSON RUNS IT: the word is wired, --json prints one d
   assert.match(wrong.stderr, /^braindog tidy takes/u);
   assert.equal(h.seen.length, sent, 'an unknown flag sends nothing');
 
+  /* THE HELP IS GROUPED: tidy has its short row there, and its own --help gives the whole line. */
   const help = await run(h.base, ['help']);
+  assert.match(help.stdout, /^  tidy +\S/mu);
+  const own = await run(h.base, ['tidy', '--help']);
   /* `--ask` joins this line when main.ts names it (blocked for batch 89's file), so either form passes. */
-  assert.match(help.stdout, /^braindog tidy (\[--ask\] )?\[--json\] \[--host <host>\]$/mu);
+  assert.match(own.stdout, /^braindog tidy (\[--ask\] )?\[--json\] \[--host <host>\]$/mu);
 });
 
 /**
