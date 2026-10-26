@@ -8,8 +8,8 @@
   /* Lane F: backups and putting a copy back. */
   import { backUpNow, downloadSnapshot, readSnapshots, restoreSnapshot } from '$lib/record/settings-write.ts';
   import { readBoot, rereadBoot } from '$lib/record/boot-live.ts';
-  import { copiesOf, copyLine, drillLine, readDrill, type CopyFacts, type DrillFacts } from './copies.ts';
-  import type { Snapshot as KeptCopy } from '@braindog/client';
+  import { copiesOf, copyLine, drillLine, exportLine, readDrill, readExports, type CopyFacts, type DrillFacts } from './copies.ts';
+  import type { Cursor, Snapshot as KeptCopy } from '@braindog/client';
   /* Bytes as a person reads them: `braindog-render`'s, and it is imported rather than written here
      because it was written here, as `(bytes / 1e6).toFixed(1)`, and printed **"0.2 MB"** for all four
      snapshots of a ninety-three-row record. Four distinct copies, four identical strings, on the one
@@ -37,15 +37,20 @@
    */
   const words = {
     /* THE REWRITES OF THE UI PASS OF 20 OCTOBER (agents F27): what a person can do, not what a deployment lacks. */
-    notHereYet: 'No backups here yet',
-    exportInstead: 'Download a copy instead; it works anywhere.',
     keyOutside: 'Kept outside BrainDog',
     askForIt: 'Going back to a copy',
     /* NEEDS YOU, AS THE BAR CALLS IT (audit 25 October, X20): the page said Decide, a name nothing else on screen uses. */
     missedLine: 'Run it now from Needs you, or let tonight try again.',
-    /* UNDER A NIGHT THAT DID NOT RUN, the export is the way to a copy, said without "No backups here yet" again. */
-    copyAnyway: 'Download a copy',
     answer: 'Answer it',
+    /* THE NIGHT'S COPY AND HIS EXPORTS, AS ROWS (the pass of 27 October, UX68): a host whose copies a browser cannot list
+       still copies the record each night, and the exports he took are his backups too. "No backups here yet" stood
+       over both. */
+    nightly: 'Copied every night',
+    nightlyLate: 'The nightly copy is late',
+    noNightly: 'No nightly copies here yet',
+    exports: 'Your exports',
+    exportNow: 'Export now',
+    everyExport: 'Every export in Activity',
   };
 
   /* THE OWNER QUESTION IS SHARED with every area that has an owner's control (`settings-state.svelte.ts`).
@@ -181,6 +186,24 @@
     if (out?.ok && Array.isArray(out.value?.faults)) nightFaults = out.value.faults;
   }
 
+  /**
+   * THE EXPORTS HE TOOK, from the newest pages of the log (`readExports`): the instants, newest first, five drawn.
+   * `null` is a log that could not be read, and then the row says the one line `boot` gave it.
+   */
+  let exportsAt = $state.raw<string[] | null>(null);
+  const exportsShown = $derived((exportsAt ?? []).slice(0, 5));
+  $effect(() => {
+    untrack(() => void readExportsNow());
+  });
+
+  async function readExportsNow() {
+    const client = createClient({ base: apiBase() });
+    exportsAt = await readExports(async (cursor) => {
+      const out = await client.recentHistory({ limit: 200, ...(cursor === null ? {} : { cursor: cursor as Cursor }) });
+      return out.ok ? { events: out.value.events, cursor: out.value.cursor } : null;
+    });
+  }
+
   async function readMissed() {
     const out = await createClient({ base: apiBase() })
       .governance({ status: 'open' })
@@ -251,8 +274,8 @@
 
 <!-- WHERE THIS HOST KEEPS NO COPY A PERSON CAN REACH, THE ONE THING THEY CAN TAKE IS AN EXPORT, and it
      is the owner's, as the export itself is. -->
-{#snippet exportInstead()}
-  <Button href="/settings/export">{copy.export}</Button>
+{#snippet exportNow()}
+  <Button href="/settings/export">{words.exportNow}</Button>
 {/snippet}
 
 <!--
@@ -343,10 +366,35 @@
            host that keeps no copies is a promise the next row takes back. -->
       <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
       {@render missedRow()}
+      <!-- THE NIGHT'S COPY FIRST, as `boot` says it (the pass of 27 October, UX68): its age and size, late past 26 hours.
+           A host that sends no such fact, or a record never copied, keeps the row that says there is none. -->
+      {#if lastCopy && facts?.last_copy_at}
+        <div role="status">
+          <StateRow icon="archive" tone={lastCopy.late ? 'warn' : undefined} title={lastCopy.late ? words.nightlyLate : words.nightly} line={lastCopy.text} />
+        </div>
+      {:else if !failedNight && !missed}
+        <!-- A NIGHT THAT DID NOT RUN IS SAID ABOVE, so this row is drawn only where nothing was said of the nights. -->
+        <div role="status"><StateRow icon="archive" title={words.noNightly} /></div>
+      {/if}
+      <!-- AND THE EXPORTS HE TOOK, the newest five by day, with the one press that takes another. -->
+      <StateRow icon="download" title={words.exports} line={facts ? exportLine(facts, Date.now()) : undefined} action={anOwner ? exportNow : undefined} />
+      {#if exportsShown.length > 0}
+        <ul class="ledger ledger-glyph exports">
+          {#each exportsShown as at (at)}
+            <li>
+              <div class="line">
+                <span class="seq"><Icon name="download" size="s" /></span>
+                <span class="line-main">
+                  <span class="line-title">{copyDay(at.slice(0, 10))}</span>
+                  <span class="line-detail">{relative(at, Date.now())}</span>
+                </span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+        <p class="every-export"><a href="/audit?kind=export">{words.everyExport}</a></p>
+      {/if}
       {@render drillLineOf()}
-      <div role="status">
-        <StateRow icon="archive" title={failedNight || missed ? words.copyAnyway : words.notHereYet} line={words.exportInstead} action={anOwner ? exportInstead : undefined} />
-      </div>
     </div>
   </Tile>
 {:else if copiesFrom === 'reading'}
@@ -533,6 +581,16 @@
   }
 
   /* THE NIGHT'S COPY, the first line in the tile over the copies, at body size. */
+  /* THE EXPORTS' LIST SITS UNDER ITS ROW, and the way to every one of them under that, in the quiet meta line. */
+  .every-export {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--fs-meta);
+  }
+
+  .every-export a {
+    color: var(--ink-2);
+  }
+
   .last-copy {
     display: flex;
     flex-wrap: wrap;

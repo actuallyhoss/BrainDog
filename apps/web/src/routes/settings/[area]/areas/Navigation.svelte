@@ -193,7 +193,9 @@
   THE HOLDING PEN. Every offer, whatever its kind, is one row: what it is, one sentence of why, and three presses, "Show
   it", "Keep it" and "Not this one". Nothing in it is ever applied without the second (`19 §3`).
 -->
-<Tile icon="inbox" title={words.offers} count={waitingCount}>
+<!-- NO COUNT OVER NOTHING (the pass of 27 October, UX70): "Suggestions 0" sat over "Nothing waiting". The number is the
+     sidebar's own (`penCount`), so where one is drawn the two agree. -->
+<Tile icon="inbox" title={words.offers} count={waitingCount || undefined}>
   <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />
   {#if !navPrefs.suggest}
     <!-- NOT `no-data-yet`, WHICH WOULD BE A LIE ABOUT THE RECORD. `19 §6` separates the empty states precisely so that

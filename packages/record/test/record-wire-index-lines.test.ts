@@ -49,8 +49,8 @@ test('44 1c THE PREVIEW HOLDS THE INBOX: a key the inbox does not reach reads th
   const page = { page: 'look', title: 'Look', blocks: [{ kind: 'table', source: 'signs', where: 'sign is arrivals-filed' }] };
   const said = async (ctx: CallContext) =>
     (value<{ blocks: { rows?: { fields: Record<string, unknown> }[] }[] }>(await api.previewPage({ body: page }, ctx)).blocks[0]?.rows ?? [])[0]?.fields.said;
-  assert.equal(await said(token()), 'Messages wait to be filed.');
-  assert.notEqual(await said(token(['inbox'])), 'Messages wait to be filed.');
+  assert.equal(await said(token()), 'Messages came in that are not filed yet.');
+  assert.notEqual(await said(token(['inbox'])), 'Messages came in that are not filed yet.');
   sql.close();
 });
 

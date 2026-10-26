@@ -27,7 +27,10 @@ test('the walk of every page and note is asked last, after the six quick parts',
 test('the screen is drawn only once a part has answered, and says nothing to tidy while the walk reads on', () => {
   assert.match(health, /let first: number \| null = opened\(\);/u, 'the screen claims it is drawn on the shell alone');
   assert.match(health, /closed\(true, first\);/u);
-  assert.match(health, /\{#if !heard && !quick\}/u, 'the reading line stays up until the walk ends');
+  /* AND NEVER PAST EIGHT SECONDS (the pass of 27 October, UX69): the quick parts still out, it says the record is slow. */
+  assert.match(health, /\{#if !heard && !quick && !late\}/u, 'the reading line stays up until the walk ends');
+  assert.match(health, /\{:else if !any && !heard && !quick\}\s*<Empty kind="error" title=\{words\.slow\} body=\{words\.lateBody\} \/>/u, 'a late read stays on Reading');
+  assert.match(health, /late = true;\s*\}, 8_000\)/u);
   assert.match(health, /\{:else if !any && !heard\}\s*<!--[^>]*-->\s*<Empty kind="cleared" title=\{words\.clear\} body=\{words\.clearBodyUnchecked\} \/>/u);
   assert.match(health, /words\.readingPages/u);
 });

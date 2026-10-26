@@ -72,7 +72,7 @@ test('44 #1 THE BLOCK VERB: a one-block preview for a key the inbox does not rea
   clock.advance(2 * DAY);
   const signs = { kind: 'table', source: 'signs', where: 'sign is arrivals-filed' } as unknown as PageBlock;
   const said = (inbox?: boolean) => k.block(signs, inbox === undefined ? {} : { inbox }).rows[0]?.fields.said;
-  assert.equal(said(false), 'Messages wait to be filed.');
+  assert.equal(said(false), 'Messages came in that are not filed yet.');
   assert.notEqual(said(), said(false), 'the owner read the quiet words');
   sql.close();
 });

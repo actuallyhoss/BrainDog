@@ -46,7 +46,7 @@ const TABLE: PageBlock = { kind: 'table', source: 'signs', columns: [{ field: 'n
 test('A READER HELD FROM THE INBOX reads the red sign in the kernel words, never the message', () => {
   const read = readBlock(depsFor(false), TABLE);
   assert.deepEqual(read.refusals, []);
-  assert.equal(read.rows[0]!.fields.said, 'Messages wait to be filed.');
+  assert.equal(read.rows[0]!.fields.said, 'Messages came in that are not filed yet.');
   assert.ok(!JSON.stringify(read).includes('Lena'));
   /* A sign QUIET does not name keeps its own sentence. */
   assert.equal(read.rows[1]!.fields.said, 'The oldest question has waited 3 days.');

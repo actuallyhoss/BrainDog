@@ -39,6 +39,7 @@
     slow: 'The record is slow to answer',
     slowBody: 'Nothing was found to tidy yet, and the rest did not answer in time. Open this page again in a moment.',
     clearBodyUnchecked: 'Nothing has gone stale, and nothing else waits to be tidied.',
+    lateBody: 'Nothing was found to tidy yet, and the rest is still being read.',
   } as const;
 
   type StalePart = typeof import('$lib/home/Stale.svelte').default;
@@ -65,6 +66,12 @@
 
   /** Whether the reads took longer than anyone waits: said in plain words, never left on Reading. */
   let slow = $state(false);
+  /**
+   * WHETHER THE QUICK PARTS ARE LATE (the pass of 27 October, UX69): eight seconds and some still out. "Reading the record
+   * for anything to tidy." stood alone for as long as the slowest of them took on his record, so past eight seconds it
+   * says what it has, that the record is slow, and reads on under it.
+   */
+  let late = $state(false);
 
   const any = $derived(Boolean(stale || matched || faults || learned || named || hues || imported));
 
@@ -82,6 +89,9 @@
       quick = true;
       heard = true;
     }, 20_000);
+    const lateAfter = setTimeout(() => {
+      if (here && !quick) late = true;
+    }, 8_000);
     /* A TAB BEING LEFT ASKS NOTHING MORE: WebKit refuses every call begun once a navigation starts and prints each as an
        error, and a failed part walks on to the next. `beforeunload` is the last event before that. */
     const leaving = new AbortController();
@@ -164,6 +174,7 @@
     })();
     return () => {
       clearTimeout(giveUp);
+      clearTimeout(lateAfter);
       here = false;
       removeEventListener('beforeunload', leave);
     };
@@ -184,8 +195,10 @@
   {#if named}<named.Part found={named.found} />{/if}
   {#if hues}<hues.Part found={hues.found} />{/if}
   {#if imported}<imported.Part found={imported.found} />{/if}
-  {#if !heard && !quick}
+  {#if !heard && !quick && !late}
     <p class="health-reading" role="status">{words.reading}</p>
+  {:else if !any && !heard && !quick}
+    <Empty kind="error" title={words.slow} body={words.lateBody} />
   {:else if !any && !heard}
     <!-- THE QUICK PARTS FOUND NOTHING, and the walk of pages and notes is still out: the calm line vouches only for them. -->
     <Empty kind="cleared" title={words.clear} body={words.clearBodyUnchecked} />
@@ -196,6 +209,8 @@
   {/if}
   {#if quick && !heard}
     <p class="health-reading" role="status">{words.readingPages}</p>
+  {:else if late && any && !heard}
+    <p class="health-reading" role="status">{words.reading}</p>
   {/if}
   <!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
        about, a dry look first and then Do it. Tidying the record, so it is here and not in the sharing screen. -->

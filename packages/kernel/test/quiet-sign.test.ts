@@ -54,7 +54,7 @@ test('THE QUIET SENTENCES SAY THE NUMBER AND NOTHING THAT WAS SENT', () => {
   assert.equal(quietSign(sign('arrivals-filed', { value: 1 })).said, '1 message waits to be filed, not yet too long.');
   assert.equal(quietSign(sign('arrivals-filed', { value: 3 })).said, '3 messages wait to be filed, not yet too long.');
   assert.equal(quietSign(sign('arrivals-filed', { value: 0 })).said, 'No message waits to be filed.');
-  assert.equal(quietSign(sign('arrivals-filed', { state: 'red' })).said, 'Messages wait to be filed.');
+  assert.equal(quietSign(sign('arrivals-filed', { state: 'red' })).said, 'Messages came in that are not filed yet.');
   assert.equal(quietSign(sign('questions-by-cause', { value: 1 })).said, '1 open question, no two with the same cause.');
   assert.equal(quietSign(sign('questions-by-cause', { value: 4 })).said, '4 open questions, no two with the same cause.');
   assert.equal(quietSign(sign('questions-by-cause', { value: 0 })).said, 'No question is waiting.');

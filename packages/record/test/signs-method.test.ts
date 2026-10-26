@@ -141,7 +141,7 @@ test('THE INBOX’S WORDS GO ONLY TO A CALLER WHO MAY READ THE INBOX: an owner a
       assert.doesNotMatch(s.said, /—/u);
       assert.ok(s.said.length > 0, `${s.sign} said nothing`);
     }
-    assert.equal(signs.find((s) => s.sign === 'arrivals-filed')!.said, 'Messages wait to be filed.');
+    assert.equal(signs.find((s) => s.sign === 'arrivals-filed')!.said, 'Messages came in that are not filed yet.');
     assert.equal(signs.find((s) => s.sign === 'questions-by-cause')!.said, 'Open questions pile up on one cause, or carry none.');
   }
   sql.close();

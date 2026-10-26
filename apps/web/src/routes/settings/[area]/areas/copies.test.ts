@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DRILL_DUE_MS, LATE_MS, ago, copiesOf, copyLine, drillLine, drillOf, exportLine, readDrill } from './copies.ts';
+import { DRILL_DUE_MS, LATE_MS, ago, copiesOf, copyLine, drillLine, drillOf, exportLine, exportsIn, readDrill, readExports } from './copies.ts';
 
 const NOW = Date.parse('2026-10-09T12:00:00Z');
 const back = (ms: number) => new Date(NOW - ms).toISOString();
@@ -170,4 +170,25 @@ test('no drill line carries an em dash, an id or a path', () => {
 
 test('a drill reported a moment ago reads "just now", as the operator sees it after the first report', () => {
   assert.equal(drillLine({ at: back(30_000), pass: true, records: 3 }, NOW).text, "This BrainDog's last restore test: passed just now");
+});
+
+/* THE PASS OF 27 OCTOBER (UX68): Backups said "No backups here yet" while Activity counted four exports he took. */
+test('the exports he took are listed newest first, and the night’s own dump is never one', async () => {
+  const events = [
+    { kind: 'export', actor: 'p_1', note: 'sections registers', ts: '2026-10-02T10:00:00Z' },
+    { kind: 'export', actor: 'system', note: 'sections registers', ts: '2026-10-03T03:17:00Z' },
+    { kind: 'export', actor: 'system', note: 'snapshot 2026-10-03 2048 bytes', ts: '2026-10-03T03:17:00Z' },
+    { kind: 'create', actor: 'p_1', note: 'sections', ts: '2026-10-04T10:00:00Z' },
+    { kind: 'export', actor: 'p_1', note: 'sections registers', ts: '2026-10-05T09:00:00Z' },
+  ];
+  assert.deepEqual(exportsIn(events), ['2026-10-05T09:00:00Z', '2026-10-02T10:00:00Z']);
+  /* TWO PAGES AT MOST, and a log that cannot be read lists nothing it was not told. */
+  let asked = 0;
+  const paged = await readExports(async (cursor) => {
+    asked++;
+    return cursor === null ? { events: events.slice(0, 2), cursor: 'c1' } : { events: events.slice(2), cursor: 'c2' };
+  });
+  assert.equal(asked, 2);
+  assert.deepEqual(paged, ['2026-10-05T09:00:00Z', '2026-10-02T10:00:00Z']);
+  assert.equal(await readExports(async () => null), null);
 });

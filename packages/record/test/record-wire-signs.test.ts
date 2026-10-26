@@ -62,7 +62,7 @@ test('A SIGNS BLOCK ON A PAGE IS QUIET FOR A KEY THE INBOX DOES NOT REACH, and s
   assert.match(own, /Most say/u, 'the owner reads the sign as it was filed');
   const read = JSON.stringify(value(await api.page({ slug: 'health' }, agent)));
   assert.doesNotMatch(read, /1234|Most say|Digits/u);
-  assert.match(read, /Messages wait to be filed\./u);
+  assert.match(read, /Messages came in that are not filed yet\./u);
   /* A KEY GIVEN THE INBOX READS IT AS THE OWNER DOES. */
   const reached: CallContext = { ...agent, principal: { ...agent.principal, reach: ['inbox'] } as CallContext['principal'] };
   assert.match(JSON.stringify(value(await api.page({ slug: 'health' }, reached))), /Most say/u);

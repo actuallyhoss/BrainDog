@@ -73,6 +73,45 @@ export function exportLine(facts: CopyFacts, now: number): string {
 }
 
 /**
+ * THE EXPORTS SOMEBODY TOOK, AS THE LOG KEEPS THEM (the pass of 27 October, UX68): every export writes one `export`
+ * event whose note begins `sections` (`packages/kernel/src/copies.ts`), and the night's own dump is one too, written as
+ * `system`, which is the nightly copy and never an export. Backups said "No backups here yet" over a log whose Activity
+ * counted four of his exports, so it lists them, newest first, the instants alone.
+ */
+export function exportsIn(events: readonly { kind?: unknown; actor?: unknown; note?: unknown; ts?: unknown }[]): string[] {
+  const out: string[] = [];
+  for (const e of events) {
+    if (e.kind !== 'export' || e.actor === 'system' || typeof e.note !== 'string' || !e.note.startsWith('sections')) continue;
+    const at = instant(e.ts);
+    if (at !== null) out.push(at);
+  }
+  return out.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+}
+
+/** How many pages of the log Backups reads for exports: a recent export is found, an old one is said by the line. */
+export const EXPORT_PAGES = 2;
+
+/** The page reader `readExports` asks, `recentHistory`'s shape: one page and the cursor below it. */
+export type LogPager = (cursor: unknown) => Promise<{ events: readonly Record<string, unknown>[]; cursor: unknown } | null>;
+
+/**
+ * The exports in the newest `EXPORT_PAGES` pages of the log, or `null` where the log could not be read, so the screen
+ * says the one line it has from `boot` and lists nothing it was not told.
+ */
+export async function readExports(page: LogPager): Promise<string[] | null> {
+  const seen: Record<string, unknown>[] = [];
+  let cursor: unknown = null;
+  for (let i = 0; i < EXPORT_PAGES; i++) {
+    const out = await page(cursor).catch(() => null);
+    if (out === null) return i === 0 ? null : exportsIn(seen);
+    seen.push(...out.events);
+    if (out.cursor === null || out.cursor === undefined) break;
+    cursor = out.cursor;
+  }
+  return exportsIn(seen);
+}
+
+/**
  * THIS HOST'S LAST RESTORE TEST (LCH-C04 job 4), from `GET /account/drill`: `{ at, pass, record_copies, directory_only }`, or `{ at: null }`
  * before the first. A FACT ABOUT THE HOST AND NOT THE RECORD (the scope's critic): only the operator holds the key that
  * opens the copies, so every record on the host reads the same line, and nothing here is drawn for one record alone.
