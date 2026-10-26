@@ -4298,6 +4298,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* A NO IS KEPT FOR ANY PACK ASKED ABOUT HERE (`propose` above, `firstPartyAnswered`), so the agents pack and a use
            case are asked about as the five are, and not left waiting for the person to update them by hand. */
         remembers: () => true,
+        /* BRAINDOG'S OWN ADD-ONS THE CATALOGUE HOLDS NEWER, verified as Slash's offers are, each under the key that signed
+           the version installed (or a successor it named): an unsigned one after a signed one, or a key changed without
+           a statement, waits for the person. Never a module or use case the night already keeps, and never one declined. */
+        addons: async () => {
+          if (!deps.catalogueOffers) return [];
+          const offers = await deps.catalogueOffers(kernel.packStates().map((p) => ({ id: p.id, version: p.version ?? '0.0.0', on: p.disabled_at === null })));
+          return offers.flatMap((o) => {
+            const doc = (o.body as { doc?: unknown }).doc;
+            const sameKey = o.installedSignedBy === null || o.signedBy === o.installedSignedBy || o.rotated;
+            if (o.firstParty !== true || !sameKey || shippedVersion(o.id) !== undefined || declined[o.id] === o.to) return [];
+            return doc !== null && typeof doc === 'object' && !Array.isArray(doc) ? [{ id: o.id, title: o.title, from: o.from, to: o.to, doc: doc as Record<string, unknown> }] : [];
+          });
+        },
         nameOf: (id) => {
           const body = kernel.declarations().find((d) => d.id === id)?.body as { name?: unknown; title?: unknown } | undefined;
           return typeof body?.name === 'string' ? body.name : typeof body?.title === 'string' ? body.title : null;
@@ -4309,7 +4322,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* WHERE THE PASS ENDS: before who the record's own person is is looked for, so that line is said as its own and never
        inside an update it had no part in. */
     const to = kernel.newestEvent();
-    const name = (id: string): string => moduleName(id);
+    const titled = new Map(steps.flatMap((st) => (st.title === undefined ? [] : [[st.pack, st.title] as const])));
+    const name = (id: string): string => titled.get(id) ?? moduleName(id);
     const listed = (lose: readonly string[] | undefined): string =>
       lose === undefined || lose.length === 0 ? 'change what you made' : lose.length === 1 ? lose[0]! : `${lose.slice(0, -1).join(', ')} and ${lose.at(-1)!}`;
     const said = steps.map((st) =>

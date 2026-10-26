@@ -35,6 +35,13 @@
  * Money is, so they take the same road: Agents once the five are in, since it reads Projects, then each use case the
  * record holds, since a use case's pages read the modules under it. Their documents are built here (`documentOf`),
  * because the port lends a document for the five only.
+ *
+ * AND BRAINDOG'S OWN ADD-ONS FROM THE CATALOGUE, LAST (the add-ons pass of 27 October). An add-on BrainDog publishes and
+ * lists (Profiles, Setup sync, Pad and the rest) is BrainDog's own as much as a module is, so a newer version reaches a
+ * record that holds it on the same terms, with one more: it goes in only when it reaches nothing new as well as losing
+ * nothing (`reachesNew`: no service, key or approval it did not have, no script it did not run). Otherwise it is never
+ * asked about here: it waits on the Updates card in Add-ons, where its plan says what changes. A community add-on and a
+ * private one are not lent at all, so each always asks.
  */
 
 import type { Diff } from '@braindog/declare';
@@ -80,13 +87,21 @@ export type QuietPort = {
    * question that comes back every night after a no is worse than an update that waits.
    */
   remembers?(id: string): boolean | Promise<boolean>;
+  /**
+   * BrainDog's own add-ons from the catalogue with a newer version than the record holds, each verified and read, with
+   * its document. Only first-party ones: a community or private add-on is never lent, so it always asks. Absent, none.
+   */
+  addons?(): readonly QuietAddon[] | Promise<readonly QuietAddon[]>;
 };
+
+/** One of BrainDog's own add-ons the catalogue holds newer: its pack id, its name, the versions, and its document. */
+export type QuietAddon = { id: string; title: string; from: string; to: string; doc: Body };
 
 /**
  * What happened to one module: `updated` went in, `asked` filed its question, `waiting` already has one open, and
  * `refused` could not be planned, installed or asked, with the record's sentence in `why`.
  */
-export type QuietStep = { pack: string; from: string; to: string; did: 'updated' | 'asked' | 'waiting' | 'refused'; lose?: string[]; why?: string };
+export type QuietStep = { pack: string; from: string; to: string; did: 'updated' | 'asked' | 'waiting' | 'refused'; lose?: string[]; why?: string; title?: string };
 
 /** A declaration's id in words, when nothing names it: `page.money-book` is "Money book". */
 const spelled = (id: string): string => {
@@ -120,6 +135,16 @@ export function losses(diff: Diff, nameOf: (id: string) => string = spelled, too
   if (broken.length > 0) out.push(`stop ${namesSaid(broken.map((p) => moduleName(p.id)))} working`);
   if (diff.approve.length > 0 || diff.calls_out.some((c) => c.change !== 'same')) out.push('reach a service outside BrainDog');
   return out;
+}
+
+/**
+ * WHAT AN ADD-ON'S UPDATE WOULD NEWLY REACH, one phrase each like `losses`, or nothing. A service outside, a key or an
+ * approval is already a loss (`losses`); a script the record does not run yet is new code running unasked, so an add-on's
+ * update that brings one waits for the person too.
+ */
+export function reachesNew(diff: Diff): string[] {
+  const fresh = diff.scripts.filter((s) => s.changed === null);
+  return fresh.length > 0 ? [`run ${namesSaid(fresh.map((s) => s.title))}, which it did not run before`] : [];
 }
 
 /**
@@ -284,6 +309,29 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     const step = await attempt(id);
     const at = out.findIndex((s) => s.pack === id);
     if (step && at >= 0) out[at] = step;
+  }
+
+  /* BRAINDOG'S OWN ADD-ONS, after the modules and use cases they stand on: in when the plan loses nothing and reaches
+     nothing new, else said and left for the Updates card. Never asked about here, and never a community or private one. */
+  for (const a of (await port.addons?.()) ?? []) {
+    const held = await heldOf(a.id);
+    if (!held || held.version !== a.from || compareVersions(a.from, a.to) >= 0) continue;
+    const step = { pack: a.id, title: a.title, from: a.from, to: a.to };
+    const doc = without(a.doc);
+    const planned = await port.plan(doc);
+    if (!planned.ok) {
+      out.push({ ...step, did: 'refused', why: fixOf(planned) });
+      continue;
+    }
+    const diff = planned.value;
+    const lose = [...losses(diff, nameOf, tookOff), ...reachesNew(diff)];
+    const blocked = unready(diff);
+    if (blocked !== null || lose.length > 0) {
+      out.push({ ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked ?? `Updating it would ${lostSaid(lose)}, so it waits for you in Add-ons.` });
+      continue;
+    }
+    const put = await port.install(doc, diff.planHash);
+    out.push(put.ok ? { ...step, did: 'updated' } : { ...step, did: 'refused', why: fixOf(put) });
   }
 
   for (const id of FIRST_PARTY) {

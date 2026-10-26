@@ -76,3 +76,14 @@ test('when the installed version is gone from the catalogue, the question says w
   const q = catalogueDrafts(await offersFromCatalogue(reader(index, files))(held))[0]!.question;
   assert.match(q, /This catalogue no longer holds 1\.0\.0, so what it adds, takes away or newly calls out to is not known here/u);
 });
+
+test('an add-on BrainDog publishes is first-party, and the same one held private or by anybody else is not', async () => {
+  const { index, files } = await catalogue([{ text: addon('1.0.0', [BOOKS]) }, { text: addon('1.1.0', [BOOKS, LOANS]) }]);
+  const as = async (entry: Record<string, unknown>) => {
+    const changed = { ...index, entries: index.entries.map((e) => ({ ...e, ...entry })) } as CatalogueIndex;
+    return (await offersFromCatalogue(reader(changed, files))(held))[0]?.firstParty;
+  };
+  assert.equal(await as({ publisher: { kind: 'braindog', id: 'braindog', name: 'BrainDog' } }), true);
+  assert.equal(await as({ publisher: { kind: 'braindog', id: 'braindog', name: 'BrainDog' }, private: true, unlisted: true }), false);
+  assert.equal(await as({}), false);
+});

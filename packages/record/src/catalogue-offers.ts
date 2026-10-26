@@ -68,6 +68,7 @@ export function offersFromCatalogue(read: CatalogueReader): (held: readonly { id
         hostsAdded: u.changes?.hosts.added ?? [],
         removed: (u.changes?.removed ?? []).map((r) => r.title),
         changesKnown: u.changes !== null,
+        firstParty: u.file.kind === 'pack' && u.entry.publisher?.kind === 'braindog' && u.entry.private !== true,
       });
     }
     return offers;
