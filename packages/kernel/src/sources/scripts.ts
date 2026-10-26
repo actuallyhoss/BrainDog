@@ -75,7 +75,7 @@ function scriptEntry(s: ScriptRow, at: string): Entry {
  * `signs` block refuses it, and a page that wants the paused ones asks for them with `where: status is paused`.
  */
 function scriptsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
-  const { predicateOf } = kit;
+  const { predicateOf, typesOf } = kit;
   if (!deps.scripts) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its scripts onto a page yet.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'scripts come in the order the record lists them, so it takes no order:. Use where: status is paused for the paused ones.', at: 'order' }) };
@@ -90,7 +90,9 @@ function scriptsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
     .map((s) => scriptEntry(s, at))
     .filter((r) => evaluate(said.predicate, r.fields, SCRIPTS));
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  return { ...base, rows: kept.slice(0, limit), matched: kept.length };
+  /* AND EACH FIELD'S TYPE, as every computed source answers it (`typesOf`): no list declares `last_at`, so without it the
+     page printed a script's last run as `2026-10-26T19:02:27.656Z` under "Where it stands" and not as how long ago. */
+  return { ...base, rows: kept.slice(0, limit), matched: kept.length, types: typesOf(SCRIPTS) };
 }
 
 export const scripts: Source = {
