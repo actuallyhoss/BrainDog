@@ -29,6 +29,7 @@ import type { Fetch } from './row-live.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue } from './where.ts';
 import { singularOf } from '../voice.ts';
+import { recordToday } from './zone.ts';
 
 export type Wrote =
   | { ok: true; entry: Entry }
@@ -303,7 +304,7 @@ function emptiest(register: string, f: { id: string; type: string; values?: read
     case 'enum':
       return typeof f.default === 'string' && f.values?.includes(f.default) ? f.default : f.values?.[0];
     case 'day':
-      return new Date(now).toISOString().slice(0, 10);
+      return recordToday(now);
     case 'instant':
       return new Date(now).toISOString();
     case 'money': {

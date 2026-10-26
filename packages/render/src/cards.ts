@@ -207,6 +207,49 @@ export function trendOf(value: string): { d: string; end: string; said: string[]
   return { d, end, said: numbers.map((n, i) => (n === null ? NO_VALUE : tokens[i]!)), bars };
 }
 
+const AHEAD = /^@(\d{4}-\d{2}-\d{2})\s+/u;
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** What a stat cell says under a line ahead, at its left end: the line starts today. */
+export const TREND_TODAY = 'Today';
+
+/**
+ * A RUN AHEAD: a trend cell that starts `@2026-10-27`, one point a day from that day, which is the cash walk from today
+ * (the host's `cells[].ahead`). Drawn as the run is, and with three things a run behind does not need: a mark on today
+ * at its start, a mark on its lowest point, and its two ends dated under it. `null` for a run behind, or one too short
+ * to be a line.
+ *
+ * THE MARKS SIT ON THE LINE `trendOf` DRAWS, worked out by its own scale, so a dot is never off the stroke it names.
+ */
+export function trendAhead(value: string): { run: string; from: string; to: string; today: string; low: string; lowDay: string } | null {
+  const m = AHEAD.exec(value.trim());
+  if (!m) return null;
+  const from = m[1]!;
+  const start = Date.parse(`${from}T00:00:00Z`);
+  if (!Number.isFinite(start)) return null;
+  const run = value.trim().slice(m[0].length);
+  if (trendOf(run) === null) return null;
+  const tokens = runTokens(run);
+  const numbers = tokens.map((t) => {
+    const n = t === '' ? Number.NaN : Number(t.replace(/−/gu, '-').replace(/,(?=\d{3}(?!\d))/gu, ''));
+    return Number.isFinite(n) ? n : null;
+  });
+  const known = numbers.filter((n): n is number => n !== null);
+  const lo = Math.min(...known);
+  const hi = Math.max(...known);
+  const last = tokens.length - 1;
+  const x = (i: number) => (last === 0 ? 500 : (i / last) * 1000);
+  const y = (n: number) => (hi === lo ? 50 : 90 - ((n - lo) / (hi - lo)) * 80);
+  const dot = (i: number): string => `M${at(x(i))} ${at(y(numbers[i]!))}h0`;
+  const first = numbers.findIndex((n) => n !== null);
+  const lowest = numbers.findIndex((n) => n === lo);
+  const said = (i: number): string => {
+    const d = new Date(start + i * 86_400_000);
+    return `${d.getUTCDate()} ${SHORT_MONTHS[d.getUTCMonth()]}`;
+  };
+  return { run, from, to: said(last), today: dot(first), low: dot(lowest), lowDay: said(lowest) };
+}
+
 /**
  * A card's trend, or `null` when it is not drawn.
  *

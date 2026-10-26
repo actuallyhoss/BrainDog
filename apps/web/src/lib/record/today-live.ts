@@ -23,6 +23,7 @@ import { REGISTERS } from './held.ts';
 import { moneyInText } from './money.ts';
 import { TASKS } from '../work/list.ts';
 import { singularOf } from '../voice.ts';
+import { recordMidnight, recordToday } from './zone.ts';
 
 /**
  * A task that needs you: past its day, handed back to be checked, due today, or marked urgent.
@@ -162,10 +163,9 @@ const carried = (where: string): unknown => ({ toJSON: () => where });
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && typeof (v as Row).id === 'string';
 
-/** The reader's own day, `YYYY-MM-DD`, in their zone: a task due today is due on the day on their wall. */
+/** The record's own day, `YYYY-MM-DD`, in its zone (`zone.ts`): a task due today is due on the day on its wall. */
 export function dayOf(now: number): string {
-  const d = new Date(now);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return recordToday(now);
 }
 
 /** An amount the record holds, `{ amount, currency }`, as a screen writes it. */
@@ -592,11 +592,9 @@ async function walkFor(client: Client, key: string, b: Boot): Promise<readonly u
   return blocks;
 }
 
-/** The reader's midnight before `now`, on their own clock. */
+/** The record's midnight before `now`, on its own clock (`zone.ts`). */
 export function midnightOf(now: number): number {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  return recordMidnight(now);
 }
 
 async function moneyFor(client: Client, held: ReadonlySet<string>, books: number, today: string): Promise<Today['money']> {

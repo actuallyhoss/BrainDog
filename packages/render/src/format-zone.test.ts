@@ -9,7 +9,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatTyped, inWords, money, MISSING, readerZone, relative, since } from './format.ts';
+import { dayIn, formatTyped, inWords, money, MISSING, readerZone, relative, since, timeIn } from './format.ts';
+
+test('ONE DAY OF AN INSTANT: around midnight in a +03:00 zone the day is the zone\'s, not the UTC one', () => {
+  const before = Date.parse('2026-10-26T20:59:00Z'); // 23:59 on 26 October in Cairo
+  const after = Date.parse('2026-10-26T21:30:00Z'); // 00:30 on 27 October in Cairo, still the 26th in UTC
+  assert.equal(dayIn(before, 'Africa/Cairo'), '2026-10-26');
+  assert.equal(dayIn(after, 'Africa/Cairo'), '2026-10-27');
+  assert.equal(dayIn(after, 'UTC'), '2026-10-26', 'the same moment in UTC is the day before');
+  assert.equal(dayIn(after, 'Europe/Istanbul'), '2026-10-27', 'any +03:00 zone turns at its own midnight');
+  assert.equal(dayIn(after), '2026-10-26', 'with no window and no zone named, the day is counted in UTC');
+  assert.equal(dayIn(after, 'Not/A_Zone'), '2026-10-26', 'a zone Intl does not know is UTC and never throws');
+  assert.equal(dayIn(Number.NaN, 'Africa/Cairo'), '', 'an instant that is not one has no day');
+});
+
+test('ONE CLOCK OF AN INSTANT: the wall time in the zone, on twenty-four hours', () => {
+  assert.equal(timeIn(Date.parse('2026-10-26T21:30:00Z'), 'Africa/Cairo'), '00:30');
+  assert.equal(timeIn(Date.parse('2026-10-27T16:10:00Z'), 'Africa/Cairo'), '19:10');
+  assert.equal(timeIn(Date.parse('2026-10-27T16:10:00Z'), 'UTC'), '16:10');
+  assert.equal(timeIn(Date.parse('2026-10-27T16:10:00Z'), 'Not/A_Zone'), '16:10');
+});
 
 const at = (iso: string): number => Date.parse(iso);
 

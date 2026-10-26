@@ -19,6 +19,7 @@
  */
 
 import type { FieldDecl, Fields, RegisterDecl } from '../record/schema.ts';
+import { recordToday } from '../record/zone.ts';
 
 /** What a record's tasks list can do, read from its declaration. Every part is `null` when the list lacks it. */
 export type Shape = {
@@ -255,11 +256,8 @@ export function matches(t: { seq: number; fields: Fields }, s: Shape, needle: st
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
-/** The reader's own day, `YYYY-MM-DD`, on their wall clock. */
-export const dayOf = (now: number): string => {
-  const d = new Date(now);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
+/** The record's own day, `YYYY-MM-DD`, on its wall clock (`zone.ts`), the one "today" every screen says. */
+export const dayOf = (now: number): string => recordToday(now);
 
 /** A day `n` days after `day`, by the calendar and not by 24-hour steps, so a clock change moves nothing. */
 export function addDays(day: string, n: number): string {

@@ -99,6 +99,8 @@ export type Boot = {
    */
   currency?: string | null;
   money?: string[];
+  /** The record's own time zone, which "today" is counted in. Absent from a host older than the field. */
+  zone?: string;
   /** Who is asking: the person behind the call, their name, and what they hold on the record. */
   me?: {
     kind: 'person' | 'token' | 'system';

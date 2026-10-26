@@ -77,6 +77,7 @@
   import { moduleName } from '@braindog/seed/usecases/names';
   import { SPEAKS } from '$lib/voice.ts';
   import { words as market } from '$lib/market/words.ts';
+  import { recordToday } from '$lib/record/zone.ts';
 
   const id = $derived(String(page.params.id));
   const pack = $derived(firstPartyModules().find((p) => p.id === id));
@@ -240,7 +241,7 @@
   /* Worked out again when the home currency is saved, because a pair is read into it. */
   const pairs = $derived.by((): PairRead[] => {
     const home = settings?.values[HOME_CURRENCY_SETTING];
-    return pairsOf(rates, new Date().toISOString().slice(0, 10), typeof home === 'string' && home !== '' ? home : null);
+    return pairsOf(rates, recordToday(), typeof home === 'string' && home !== '' ? home : null);
   });
 
   /**

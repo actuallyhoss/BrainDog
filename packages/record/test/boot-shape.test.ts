@@ -71,6 +71,16 @@ test('BOOT CARRIES ITS SHAPE, WHAT WAITS, WHO IS WORKING, THE VOICE AND SLASH, b
   sql.close();
 });
 
+test('BOOT SAYS THE RECORD\'S ZONE, which every today a screen says is counted in, and UTC where it names none', async () => {
+  const bare = await record();
+  assert.equal(value<Boot>(await bare.api.boot(owner)).zone, 'UTC');
+  bare.sql.close();
+  const { api, sql } = await record();
+  api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAZ', slug: 'zoned', name: 'Zoned', tz: 'Africa/Cairo', locale: 'en', owner: { id: 'p_owner' } });
+  assert.equal(value<Boot>(await api.boot(owner)).zone, 'Africa/Cairo');
+  sql.close();
+});
+
 test('SLASH IS OFF WHERE THE BUILD DID NOT SAY A MODEL IS HERE', async () => {
   const { api, sql } = await record();
   assert.equal(value<Boot>(await api.boot(owner)).slash, false);

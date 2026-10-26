@@ -28,6 +28,7 @@ import { MODULE_ORDER, signalsIn } from '@braindog/seed/usecases';
 import { exponentOf } from 'braindog-render';
 
 import { firstRun } from './first-run.ts';
+import { recordToday } from './record/zone.ts';
 
 /** A pack's id: one of the six modules, or any other pack in the catalogue. */
 export type PackId = string;
@@ -222,7 +223,7 @@ const overlaps = (a: Span, b: Span): boolean => a.at < b.at + b.text.length && b
  * What a sentence says about a business. `today` is an ISO day, for a date given as "on the 1st". `offers` are the packs
  * whose signals are listened for: the bundled modules unless the caller hands in more of the catalogue.
  */
-export function shape(sentence: string, today: string = new Date().toISOString().slice(0, 10), offers: readonly Offer[] = BUNDLED): Shape {
+export function shape(sentence: string, today: string = recordToday(), offers: readonly Offer[] = BUNDLED): Shape {
   const said = oneLine(sentence);
   if (!said) return nothing('empty');
   if (foreign(said)) return nothing('language');

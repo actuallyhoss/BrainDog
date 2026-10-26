@@ -101,6 +101,7 @@
   import Face from '$lib/ui/Face.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { recordToday } from '../../../lib/record/zone.ts';
 
   /**
    * WHERE THE QUESTION CAME FROM, as `/decide` decides it: the record through `governance`, or the
@@ -574,7 +575,7 @@
     fix = '';
     /* Seeded a fortnight out — 21 A5, seeds not blanks. A date picker opened on nothing makes the
        person do arithmetic before they can say the thing they already know. */
-    wake = new Date(now + 14 * 86_400_000).toISOString().slice(0, 10);
+    wake = recordToday(now + 14 * 86_400_000);
     queueMicrotask(() => parkField?.focus());
   }
 

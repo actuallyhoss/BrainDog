@@ -69,6 +69,7 @@
   import { asksConfirm, sheetApi, type Got, type Group, type Here, type Preview } from './sheet-api.ts';
   import { chipsFor } from './templates.ts';
   import { SHARED_EVENT } from './sharing.ts';
+  import { recordToday } from '../record/zone.ts';
 
   let {
     open = $bindable(false),
@@ -531,7 +532,7 @@
                   id="{uid}-day"
                   class="field-input"
                   type="date"
-                  min={new Date(now + 86_400_000).toISOString().slice(0, 10)}
+                  min={recordToday(now + 86_400_000)}
                   value={s.until.day}
                   oninput={(e) => (s = { ...s, until: { kind: 'day', day: e.currentTarget.value } })}
                 />

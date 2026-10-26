@@ -26,6 +26,7 @@ import { arrangedBody, schemaOf, setBody, type Added, type Arranged, type Placed
 import { pagesReader, type BlockBody, type Fetch, type PageBody } from '../record/pages-live.ts';
 import { homeSlugOf } from '../voice.ts';
 import { FIGURES_TRACE, whereWords } from './slash.ts';
+import { recordToday } from '../record/zone.ts';
 
 /** Kept here rather than in `copy.ts`, so this module owns its words, as `bind-write.ts` does. */
 export const words = {
@@ -94,7 +95,7 @@ export function pinnable(r: Reading | null, asked: string, prose?: string | null
 /** The block a pin adds, as the record will store it. `now` is the moment of the press; the note is dated by it. */
 export function pinBlock(p: Exclude<Pin, { kind: 'refused' }>, now: number, decl?: ListDecl | null): Added {
   if (p.kind === 'rows') return boundBlock(p.register, p.predicate, 'table', p.heading, decl);
-  return { kind: 'note', span: 12, heading: words.pinnedOn(day(new Date(now).toISOString().slice(0, 10))), body: `${p.text} {inferred}` };
+  return { kind: 'note', span: 12, heading: words.pinnedOn(day(recordToday(now))), body: `${p.text} {inferred}` };
 }
 
 /** A page an answer can go on, with what the page already requires, so the write knows whether to add the list. */

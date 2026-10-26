@@ -35,6 +35,7 @@
   import Icon from './Icon.svelte';
   import Segmented from './Segmented.svelte';
   import { fileOf, isFile } from '../record/field-draft.ts';
+  import { recordToday } from '../record/zone.ts';
 
   /**
    * `problems` IS BOUND OUT rather than pulled in.
@@ -121,7 +122,7 @@
 
   /** Four weeks out, from today. It was four weeks from the sample's 3 September 2026, which is 1 October whatever the
       day: six days out on the 25th, and a due date in the past from October on. */
-  const soon = new Date(Date.now() + 28 * 86_400_000).toISOString().slice(0, 10);
+  const soon = recordToday(Date.now() + 28 * 86_400_000);
 
   /**
    * `secret` never appears. Not disabled, not greyed — absent, with the reason said once.

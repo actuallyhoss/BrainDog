@@ -23,6 +23,7 @@ import { since } from 'braindog-render';
 
 import { moneyInText } from './money.ts';
 import { recordNow } from './boot-live.ts';
+import { recordTime, recordToday } from './zone.ts';
 import { humanize, listName } from './names.ts';
 import { often } from './actions.ts';
 
@@ -250,7 +251,6 @@ export function startsBy(s: Pick<ScriptRow, 'runs'>): string {
 /** The word a run that is already due is said by, in place of a time. */
 const DUE = 'due';
 
-const two = (n: number): string => String(n).padStart(2, '0');
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
@@ -261,11 +261,13 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export function nextSaid(iso: string, now: number = recordNow()): string {
   const at = Date.parse(iso);
   if (!Number.isFinite(at) || at <= now) return DUE;
-  const d = new Date(at);
-  const day = (t: Date): number => Date.UTC(t.getFullYear(), t.getMonth(), t.getDate());
-  const days = Math.round((day(d) - day(new Date(now))) / 86_400_000);
-  const time = `${two(d.getHours())}:${two(d.getMinutes())}`;
-  return days === 0 ? `today at ${time}` : days === 1 ? `tomorrow at ${time}` : `${d.getDate()} ${MONTHS[d.getMonth()]!} at ${time}`;
+  /* THE DAY AND THE TIME ARE THE RECORD'S, IN ITS ZONE (`zone.ts`), as every other "today" is: they were the browser's
+     hours and its wall, so a reader whose browser kept another zone than the record read a run at the wrong hour, and
+     "today" for one already behind the record's midnight. */
+  const day = recordToday(at);
+  const days = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${recordToday(now)}T00:00:00Z`)) / 86_400_000);
+  const time = recordTime(at);
+  return days === 0 ? `today at ${time}` : days === 1 ? `tomorrow at ${time}` : `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]!} at ${time}`;
 }
 
 /** What starts a script and where it stands, as the list's one meta line: "Runs every day · Not run yet". */

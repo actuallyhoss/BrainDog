@@ -40,7 +40,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, railRoom, raiseFault, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
+import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
@@ -1282,6 +1282,12 @@ export type Boot = {
    */
   currency: string | null;
   money: string[];
+  /**
+   * The record's own time zone, `Africa/Cairo`, which every "today" and "late" a screen says is counted in (UTC where it
+   * names none or one the runtime cannot read). A page's answer carried it, and `boot` did not, so a screen that drew no
+   * page counted its day in the browser's zone or in Greenwich.
+   */
+  zone: string;
   /** Who is asking: the person behind the call, the name they gave, and what they hold on the record. */
   me: {
     kind: 'person' | 'token' | 'system';
@@ -1464,8 +1470,8 @@ export type Boot = {
   copies?: CopyFacts;
 };
 
-/** The shape `boot` answers in: 2 since `waits`, `lateDays`, `working`, `voice` and `slash` joined it; 3 since `copies`; 4 since `looks`. */
-export const BOOT_SHAPE = 4;
+/** The shape `boot` answers in: 2 since `waits`, `lateDays`, `working`, `voice` and `slash` joined it; 3 since `copies`; 4 since `looks`; 5 since `zone`. */
+export const BOOT_SHAPE = 5;
 
 /** The most working runs `boot` sends. The rail says how many, so past this it says the ceiling. */
 export const WORKING_MOST = 50;
@@ -4584,7 +4590,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const orgs = orgsList();
     if (orgs === null) return [];
     const { merged_into: into, retired } = orgs.fields;
-    const today = new Date(clock.now()).toISOString().slice(0, 10);
+    const today = localDays(readableZone(kernel.identity()?.tz))(clock.now());
     const rows = one.shops.flatMap(({ organisation, into: whole }) => {
       const at = kernel.nameOf(organisation.id);
       if (whole !== null && into !== undefined) return [{ at, version: organisation.version, patch: { [into]: kernel.nameOf(whole.id) } }];
@@ -4814,8 +4820,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { filed, dropped };
   };
 
-  /** The UTC day as `slashTick` names it, which every headline is written and read against. */
-  const slashDay = (): string => new Date(clock.now()).toISOString().slice(0, 10);
+  /**
+   * THE RECORD'S OWN DAY, in its zone, as `slashTick` names it, which every headline is written and read against, and
+   * which what is pressing is late or due today by. It was the day in Greenwich, so from midnight to three in Cairo a
+   * line said a task due yesterday was due "today" while Today called it a day late.
+   */
+  const slashDay = (): string => localDays(readableZone(kernel.identity()?.tz))(clock.now());
 
   /** The lists a page's blocks read, by their `source: register.<id>`. */
   const listsRead = (blocks: readonly unknown[]): Set<string> =>
@@ -8796,7 +8806,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return kept;
   };
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'zone' | 'me' | 'pages' | 'pagesByRow' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -8865,6 +8875,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
+      zone: readableZone(identity?.tz),
       me: {
         /* A RUNNER NEVER BOOTS, since `scoped` refuses it before this is read, so `Boot.me.kind` keeps its three and a
            principal that is neither a person nor a token reads as the record's own, with no level. */
@@ -11060,7 +11071,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async slashTick(): Promise<{ ran: false; why: 'off' | 'today' | 'unopened' } | { ran: true; by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] }> {
       if (kernel.refused()) return { ran: false, why: 'unopened' };
-      const today = new Date(clock.now()).toISOString().slice(0, 10);
+      const today = slashDay();
       /* BRAINDOG'S OWN MODULES FIRST, ONCE A DEPLOY AND ONCE A DAY, whether Slash is on or not (`firstPartyTick`). A check
          that breaks outside its own try (a module of this build that will not load) never costs the day its look. */
       const updates = await firstPartyTick(today).catch(() => ["The check for BrainDog's own updates could not run, and runs again on the next tick."]);

@@ -109,10 +109,10 @@ test('THE CLIENT’S HANDOFF TAKES A STEP AND DROPS ONE, each a call of its own,
   sql.close();
 });
 
-test('BOOT CARRIES THE COPIES to an owner, none before the first night, and shape 4', async () => {
+test('BOOT CARRIES THE COPIES to an owner, none before the first night, and shape 5', async () => {
   const { sql, as, agent } = await wired();
   const boot: Boot = ok(await as(owner).boot());
-  assert.equal(boot.shape, 4);
+  assert.equal(boot.shape, 5);
   const copies: BootCopies | undefined = boot.copies;
   assert.deepEqual(copies, { last_copy_at: null, last_copy_bytes: null, last_export_at: null });
   /* A KEY IS NO BROWSER, and is not told. */

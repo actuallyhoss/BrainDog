@@ -17,12 +17,13 @@
  */
 
 import type { Sentence } from './today-tiles.ts';
+import { recordToday } from '../record/zone.ts';
 
 /** The line under Home's title: its words, the phrase in them drawn red (`''` for none), and who said it. */
 export type HomeLine = Sentence & { by: 'slash' | 'rules' };
 
-/** The record's day at `now`, as it dates a line it keeps (`toISOString`, the day Slash's daily look runs on). */
-export const recordDay = (now: number): string => new Date(now).toISOString().slice(0, 10);
+/** The record's day at `now`, in its zone, as it dates a line it keeps (the day Slash's daily look runs on). */
+export const recordDay = (now: number): string => recordToday(now);
 
 /**
  * The model's line as the record sent it, when it is fresh: a kept line (`{ text, day, basis }`) written on the record's

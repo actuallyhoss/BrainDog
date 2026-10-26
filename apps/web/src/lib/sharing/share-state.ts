@@ -21,6 +21,7 @@ import { shareSentenceOf, type Share, type ShareCaps, type ShareHide, type Share
 
 import { copy } from '../copy.ts';
 import { deletesOf, rowsOf, rungOf, templateOf, type Fills, type Offers } from './templates.ts';
+import { recordToday } from '../record/zone.ts';
 
 const DAY_MS = 86_400_000;
 /** How long a share with somebody not on the record lasts unless somebody says otherwise (§6, default 2). */
@@ -82,7 +83,7 @@ export type SheetState = {
 };
 
 /** A day `days` from `now`, as a date field holds it. */
-export const dayAhead = (now: number, days: number): string => new Date(now + days * DAY_MS).toISOString().slice(0, 10);
+export const dayAhead = (now: number, days: number): string => recordToday(now + days * DAY_MS);
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
 export const isEmail = (s: string): boolean => EMAIL.test(s.trim());
@@ -269,7 +270,7 @@ export function ready(s: SheetState, subject: Subject, now?: number): boolean {
   if (s.with === null) return false;
   if (s.with.kind === 'email' && !isEmail(s.with.email)) return false;
   if (s.until.kind === 'day' && !/^\d{4}-\d{2}-\d{2}$/u.test(s.until.day)) return false;
-  if (s.until.kind === 'day' && now !== undefined && s.until.day <= new Date(now).toISOString().slice(0, 10)) return false;
+  if (s.until.kind === 'day' && now !== undefined && s.until.day <= recordToday(now)) return false;
   const t = templateOf(s.template);
   if (t) return rowsOf(t, fillsOf(s, subject)) !== null;
   return targetOf(subject, s.what) !== null;

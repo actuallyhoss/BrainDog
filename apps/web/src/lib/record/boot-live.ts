@@ -25,6 +25,7 @@ import { asPartOf, useCaseName } from '@braindog/seed/usecases/names';
 
 import { hueOf, iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
 import { homeOf, learnHome, learnMoney } from './api.ts';
+import { forgetZone, learnZone } from './zone.ts';
 import { currencyOf } from './money.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { learnRowPages } from './row-href.ts';
@@ -940,6 +941,10 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
   /* EVERY CURRENCY THE RECORD'S MONEY IS IN, kept beside the home one (`learnHome` below), so the rates preset quotes
      them all; a shell over a refusal holds none, so the last record's are forgotten. */
   learnMoney(drawn ? (drawn.money ?? implied?.held ?? []) : []);
+  /* AND THE RECORD'S ZONE, which every "today" a screen says is counted in (`zone.ts`); a host that sends none leaves the
+     reader's own, and a shell over another record forgets the last one's first. */
+  forgetZone();
+  learnZone(b.zone);
   /* AND THE PAGES A TEMPLATE MADE FOR A ROW, so a `ref:` opens the row's own page where it has one (`row-href.ts`). */
   /* AND THE RUNS' PAGES, WHICH AN OLDER `boot` SENDS BY THEIR ADDRESS ALONE (`rowPages`), and a newer one opens by the
      row (`pagesByRow`). */

@@ -595,6 +595,40 @@ export function readerZone(zone?: string): string {
   return 'UTC';
 }
 
+/**
+ * THE ONE DAY AN INSTANT FALLS ON, `YYYY-MM-DD`, in a zone: the record's where the caller holds it, else the reader's
+ * (`readerZone`). Every "today" a screen draws is this of its clock, never `toISOString().slice(0, 10)`, which is the
+ * day in Greenwich: from midnight to two or three in Cairo it named yesterday, so a task due on the 26th read "today"
+ * on Work while Today called it a day late. A zone `Intl` does not know is UTC, as `relative` reads it. `''` for an
+ * instant that is not one.
+ */
+export function dayIn(ms: number, zone?: string): string {
+  if (!Number.isFinite(ms)) return '';
+  const parts = calendarIn(readerZone(zone)).formatToParts(ms);
+  const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year').padStart(4, '0')}-${part('month').padStart(2, '0')}-${part('day').padStart(2, '0')}`;
+}
+
+const CLOCKS = new Map<string, Intl.DateTimeFormat>();
+
+/** The wall clock an instant shows in a zone, `HH:MM` on twenty-four hours, read as `dayIn` reads its day. */
+export function timeIn(ms: number, zone?: string): string {
+  if (!Number.isFinite(ms)) return '';
+  const z = readerZone(zone);
+  let found = CLOCKS.get(z);
+  if (found === undefined) {
+    try {
+      found = new Intl.DateTimeFormat('en-GB-u-nu-latn', { timeZone: z, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    } catch {
+      found = new Intl.DateTimeFormat('en-GB-u-nu-latn', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    }
+    CLOCKS.set(z, found);
+  }
+  const parts = found.formatToParts(ms);
+  const part = (type: Intl.DateTimeFormatPartTypes): string => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${part('hour').padStart(2, '0')}:${part('minute').padStart(2, '0')}`;
+}
+
 const dayIndex = (ms: number, zone: string): number => {
   /* `formatToParts` throws on an invalid time where `Math.floor` gave NaN; a formatter never throws. */
   if (!Number.isFinite(ms)) return Number.NaN;

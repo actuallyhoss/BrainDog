@@ -34,6 +34,7 @@ import { nameWords } from '../record/names.ts';
 import { acceptKey, amountSaid, declineKey, labelOf, twoWords } from '../../routes/decide/press.ts';
 import { arrangedOf, isArranging } from '../../routes/decide/[id]/arranged.ts';
 import { spoken } from './spoken.ts';
+import { recordToday } from '../record/zone.ts';
 
 /* SAID FROM HERE TOO, where every screen that draws a card already reads its words. */
 export { spoken };
@@ -441,10 +442,9 @@ export function realDay(v: unknown): string | null {
   return !Number.isNaN(at) && new Date(at).toISOString().slice(0, 10) === v ? v : null;
 }
 
-/** The reader's own day, as `YYYY-MM-DD`: the day a card is read on is the one on the reader's wall. */
+/** The record's own day, as `YYYY-MM-DD` (`zone.ts`): the day a card is read on is the one on the record's wall. */
 export function todayOf(now: number): string {
-  const d = new Date(now);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return recordToday(now);
 }
 
 /**

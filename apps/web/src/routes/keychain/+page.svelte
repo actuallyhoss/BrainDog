@@ -72,6 +72,7 @@
   import { createIdle, lockAfterOf, LOCK_AFTER_MINUTES, type Idle } from '$lib/record/keychain-idle.ts';
   /* TYPES ONLY: the note's code and its component are a dynamic import (`scopeNote`), never in this screen's own chunk. */
   import type { Call, ScopeProposal } from './scope-note.ts';
+  import { recordToday } from '$lib/record/zone.ts';
 
   /**
    * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
@@ -922,7 +923,7 @@
                   <span class="line-detail key-dates">
                     {#if changedSaid(k, readAt)}<span class="key-changed">{changedSaid(k, readAt)}</span>{/if}
                     {#if changedSaid(k, readAt) && expiresSaid(k, readAt)}<span class="sep" aria-hidden="true">{' · '}</span>{/if}
-                    {#if expiresSaid(k, readAt)}<span class="key-expires" class:key-warn={k.expires && k.expires < new Date(readAt).toISOString().slice(0, 10)}>{expiresSaid(k, readAt)}</span>{/if}
+                    {#if expiresSaid(k, readAt)}<span class="key-expires" class:key-warn={k.expires && k.expires < recordToday(readAt)}>{expiresSaid(k, readAt)}</span>{/if}
                   </span>
                 {/if}
               </span>
