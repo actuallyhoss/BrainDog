@@ -95,12 +95,12 @@ type Api = Awaited<ReturnType<typeof createRecordApi>> & {
  * The studio: Kiln and Tallow live, Fernway finished. A tool and a key three Kiln runs used, a tool placed in
  * Tallow that needs a key, a key used in both projects, a key with no evidence, and a key left in Fernway.
  */
-async function studio() {
+async function studio(keys = KEYS) {
   const sql = openSqlite();
   const clock = fixedClock(NOW - 5 * DAY);
   const api = (await createRecordApi({ sql, clock })) as Api;
   value(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }));
-  value(await api.kernel.install([PROJECTS, KEYS, TOOLS] as never));
+  value(await api.kernel.install([PROJECTS, keys, TOOLS] as never));
   sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_claude', 'p_1', 'h_t_claude', 'write', 'Claude Code', '2026-09-01T00:00:00.000Z')");
   const make = async (register: string, fields: Record<string, unknown>) => value<Entry>(await api.create({ register, fields: fields as never }, owner));
   const kiln = await make('things', { name: 'Kiln', repos: [KILN] });
@@ -277,4 +277,29 @@ test('WHAT IS LEFT IN A FINISHED PROJECT IS ASKED IN THREE ANSWERS, and each ans
     assert.equal(placeOf(s, s.old), place, option);
     s.sql.close();
   }
+});
+
+test('A LIST THAT CLOSES ONLY WITH A REASON IS CLOSED AS IT DECLARES: its own finished state, and the reason filled', async () => {
+  const keys = reg({
+    ...(KEYS.body as unknown as Record<string, unknown>),
+    done: ['superseded', 'reverted'],
+    fields: [
+      ...(KEYS.body as unknown as { fields: Record<string, unknown>[] }).fields.filter((f) => f.id !== 'state'),
+      {
+        id: 'state',
+        type: 'enum',
+        values: ['live', 'superseded', 'reverted'],
+        default: 'live',
+        transitions: { live: { to: ['superseded', 'reverted'], requires: ['why'] }, superseded: { to: ['live'] }, reverted: { to: ['live'] } },
+      },
+      { id: 'why', type: 'text' },
+    ],
+  });
+  const s = await studio(keys);
+  const left = value<ScopesAsked>(await s.api.proposeScopes({ register: 'keys' }, owner)).asked.find((a) => !a.said.startsWith('Move'))!;
+  value(await s.api.decide({ id: left.question, decide: { option: 'retire', reason: 'As it says.' } }, owner));
+  const fields = s.api.kernel.get(s.old.id)?.fields;
+  assert.equal(fields?.state, 'superseded');
+  assert.equal(fields?.why, 'Nothing live works in the project it is in any more.');
+  s.sql.close();
 });

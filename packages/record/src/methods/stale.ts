@@ -404,6 +404,21 @@ const scopeFieldIn = (decl: Decl): Field | undefined => decl.fields.find((f) => 
 const finishedIn = (decl: Decl, row: Entry): boolean =>
   decl.state !== undefined && (decl.done ?? []).length > 0 && (decl.done ?? []).includes(String(row.fields[decl.state] ?? row.state ?? ''));
 
+/**
+ * The patch that closes one row as its list declares it, or `null` when its list has no way to a finished state from
+ * where the row is: the first of the list's finished states its state field lets the row move to, and each field that
+ * move needs filled and the row lacks, filled with `because`.
+ */
+const closeOf = (decl: Decl, row: Entry, because: string): Record<string, Json> | null => {
+  if (decl.state === undefined || (decl.done ?? []).length === 0) return null;
+  const from = String(row.fields[decl.state] ?? row.state ?? '');
+  const move = decl.fields.find((f) => f.id === decl.state)?.transitions?.[from];
+  const to = (decl.done ?? []).find((d) => d !== from && (move === undefined || move.to.includes(d)));
+  if (to === undefined) return null;
+  const needs = (move?.requires ?? []).filter((f) => row.fields[f] === undefined || row.fields[f] === null);
+  return { [decl.state]: to, ...Object.fromEntries(needs.map((f) => [f, because])) };
+};
+
 /** A list as a sentence names its rows, from its own declaration: "Keys", and "key" (its `one`, or its name less an s). */
 const namesOf = (decl: Decl): ScopeListName => {
   const { one, many } = wordsOf(decl);
@@ -626,21 +641,26 @@ function declinedIn(deps: RecordDeps, list: string, field: Field): Set<string> {
 const CHOOSE: Extract<BodyKind, keyof { options: unknown }> = BODY_KINDS[0];
 
 /**
- * The question for one list's things left in a finished project: three answers, two of which write. "Retire them" sets
- * each to the list's retired state (or its last finished one), "Keep them for every project" clears where they apply,
- * which widens them and so is only ever his answer, and "Leave them" writes nothing. A list with no finished state has
- * no "Retire them", and is asked the other two.
+ * The question for one list's things left in a finished project: three answers, two of which write. "Retire them" moves
+ * each to a finished state its list lets it move to from where it is, with what that move needs filled, both as the list
+ * declares them; "Keep them for every project" clears where they apply, which widens them and so is only ever his
+ * answer, and "Leave them" writes nothing. A list with no finished state has no "Retire them", and is asked the other two.
+ *
+ * THE STATE IS THE LIST'S OWN. It was the one whose name held "retir", or the last finished one, with nothing else in
+ * the patch: Learnings close as `superseded` or `reverted` and only with a why, so the yes could never land. Each row is
+ * moved by its own state's way out, and a row with none is left out of the move.
  */
 function strandedAsk(nameOf: (id: string) => string, g: Gathered, left: readonly ScopeRow[], names: ScopeListName) {
   const [retire, keep, leave] = strandedAnswers(left.length);
   const them = left.length === 1 ? 'it' : 'them';
-  const done = g.decl.done ?? [];
-  const retired = g.decl.state === undefined ? undefined : (done.find((v) => /retir/iu.test(v)) ?? done[done.length - 1]);
+  const because = `Nothing live works in the project ${them === 'it' ? 'it is' : 'they are'} in any more.`;
   const at = (r: ScopeRow) => ({ at: nameOf(r.id), version: g.rows.get(r.id)!.version });
+  const closing = left.flatMap((r) => {
+    const patch = closeOf(g.decl, g.rows.get(r.id)!, because);
+    return patch === null ? [] : [{ ...at(r), patch }];
+  });
   const options = [
-    ...(retired === undefined || g.decl.state === undefined
-      ? []
-      : [{ id: 'retire', label: retire, because: `Nothing live works in the project ${them === 'it' ? 'it is' : 'they are'} in any more.`, patches: left.map((r) => ({ ...at(r), patch: { [g.decl.state!]: retired } })) }]),
+    ...(closing.length === 0 ? [] : [{ id: 'retire', label: retire, because, patches: closing }]),
     { id: 'every', label: keep, because: `${them === 'it' ? 'It is' : 'They are'} still needed, so every project's sessions are handed ${them}.`, patches: left.map((r) => ({ ...at(r), patch: { [g.field.id]: null } })) },
     { id: 'leave', label: leave, because: `Nothing changes, and ${them === 'it' ? 'it stays' : 'they stay'} with the finished project.` },
   ];

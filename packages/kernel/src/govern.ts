@@ -2804,9 +2804,45 @@ function checkUpdates(deps: GovernDeps, register: string, rows: readonly Record<
     const extra = Object.keys(r).find((key) => !UPDATE_KEYS.includes(key));
     if (extra !== undefined)
       return { code: 'FIELD_UNKNOWN', fix: 'A row that updates carries at, version and patch, and register when it is in another list, and nothing beside them.', at: `${where}.${extra}` };
+    const wrong = moveFault(deps.sql, list, row.id, String(r.at), patch as Record<string, unknown>, `${where}.patch`);
+    if (wrong) return wrong;
   }
   return null;
 }
+
+/**
+ * Whether a patch's move of state is one its list makes, asked as the write path will ask it at the press: a state the
+ * list holds, a way it declares from where the row is now, and what that way needs filled.
+ *
+ * ASKED WHEN IT IS FILED, IN THE LIST'S OWN WORDS. A proposal to move a lesson to `retired` was filed and could never
+ * apply, since learnings close as `superseded` or `reverted`, each with a why; the owner pressed yes and was refused. The
+ * refusal names the states the list moves to from there, its finished ones and what they need, read off the list.
+ */
+function moveFault(sql: Sql, list: string, id: string, named: string, patch: Record<string, unknown>, at: string): Refusal | null {
+  const decl = parse(sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', `register.${list}`)?.body ?? '');
+  const state = typeof decl?.state === 'string' ? decl.state : null;
+  if (decl === null || state === null || !Object.hasOwn(patch, state) || typeof patch[state] !== 'string') return null;
+  const to = patch[state] as string;
+  const field = listOf(decl.fields).find((f): f is Record<string, unknown> => isMap(f) && f.id === state);
+  const held = parse(sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', id)?.fields ?? '') ?? {};
+  const from = typeof held[state] === 'string' ? (held[state] as string) : '';
+  if (to === from) return null;
+  const values = textsOf(field?.values);
+  const move = isMap(field?.transitions) && isMap(field.transitions[from]) ? field.transitions[from] : null;
+  const ways = move ? textsOf(move.to) : values;
+  const needs = move ? textsOf(move.requires) : [];
+  const or = (xs: readonly string[]) => new Intl.ListFormat('en-GB', { type: 'disjunction' }).format(xs);
+  const and = (xs: readonly string[]) => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(xs);
+  const finished = textsOf(decl.done).filter((d) => ways.includes(d));
+  const goes = `${from === '' ? `${named} moves` : `From ${from}, ${named} moves`} to ${ways.length === 0 ? 'no other state' : or(ways)}${needs.length === 0 ? '' : `, with ${and(needs)} filled`}.${finished.length === 0 ? '' : ` To close it, use ${or(finished)}.`}`;
+  if (values.length > 0 && !values.includes(to))
+    return { code: 'ENUM_VALUE_UNKNOWN', fix: `${list} has no state called ${to}. ${goes}`, at: `${at}.${state}`, allowed: ways };
+  if (move && !ways.includes(to)) return { code: 'TRANSITION_ILLEGAL', fix: `${named} cannot go from ${from} to ${to}. ${goes}`, at: `${at}.${state}`, allowed: ways };
+  const missing = needs.find((need) => patch[need] === undefined && held[need] === undefined);
+  if (missing !== undefined) return { code: 'REQUIRED_MISSING', fix: `${named} leaves ${from} only with ${missing} filled, so put ${missing} in the same patch.`, at: `${at}.${missing}` };
+  return null;
+}
+
 
 /**
  * What one update row of a rowset meets when its row moved after the question was asked (`moved`):
