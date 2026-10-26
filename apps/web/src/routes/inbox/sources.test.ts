@@ -70,7 +70,7 @@ test('an inbox nothing has ever reached is one fact, told by the record\'s own t
 test('the page draws that inbox as one tile, in place of the two tiles and the empty state under them', () => {
   const src = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8').replace(/<!--[\s\S]*?-->/gu, '');
   const markup = src.slice(src.indexOf('<div class="page">'), src.indexOf('{#snippet settledSeries()}'));
-  const never = markup.indexOf('{:else if never}');
+  const never = markup.indexOf('{:else if !refused && never}');
   const board = markup.indexOf('<div class="inbox">');
   assert.ok(never > 0 && board > never, 'the one tile is not chosen before the board');
   const one = markup.slice(never, markup.indexOf('{:else}', never));
@@ -81,7 +81,7 @@ test('the page draws that inbox as one tile, in place of the two tiles and the e
   /* AND THE ONE STEP TO AN ADDRESS, where it is a command to copy (X25). */
   assert.match(one, /\{#if quiet\.command\}<CodeLine text=\{quiet\.command\}/u, 'the self-host command is not drawn to copy');
   /* IT WAITS FOR THE TALLY, so the cleared inbox is never drawn first and swapped a moment later. */
-  assert.match(markup, /\{:else if INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if never\}/u);
+  assert.match(markup, /\{:else if !refused && INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if !refused && never\}/u);
   assert.match(src, /const never = \$derived\(patterns\.length === 0 && nothingEver\(tally, ways, INBOX\.length\)\);/u);
 });
 

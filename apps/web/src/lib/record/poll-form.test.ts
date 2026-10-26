@@ -29,7 +29,7 @@ test('THE FORM FILES THE LIVE FEED ADD-ON WITH ONE POLL OF THE ADDRESS, a map a 
   const p = pollProposal(DRAFT, ORG);
   assert.equal(p.body_kind, 'pack');
   assert.equal(p.body.install, 'feed-northwind-labs-ltd-stats');
-  assert.equal((p.body.doc as { version?: unknown }).version, '2.0.0');
+  assert.equal((p.body.doc as { version?: unknown }).version, '2.0.1');
   assert.deepEqual((p.body.doc as { requires: { packs: unknown } }).requires.packs, {});
   const decls = declsOf(p);
   assert.equal(decls.length, 1);

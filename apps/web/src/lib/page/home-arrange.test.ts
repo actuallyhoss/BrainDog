@@ -216,8 +216,9 @@ test('a read that does not answer one block for each the body declares is not ar
 test('Put back retires the page the first Done installed, and says a refusal in its own words', async () => {
   const { io, sent } = host(() => json(200, { ok: true, value: [] }));
   assert.deepEqual(await unkeep(BASE, 'home', io as never), { ok: true });
-  assert.equal(sent[0]?.path, '/api/retireDeclaration');
-  assert.deepEqual(sent[0]?.body, { id: 'page.home' });
+  /* THE PAGE IS READ FIRST, for a look a said change kept with it; this one kept none, so only the page is retired. */
+  assert.deepEqual(sent.map((s) => s.path), ['/api/page', '/api/retireDeclaration']);
+  assert.deepEqual(sent[1]?.body, { id: 'page.home' });
 
   const fix = 'Only an owner can change what this record declares.';
   const refused = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } }));

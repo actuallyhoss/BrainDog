@@ -72,7 +72,8 @@ test('the suggested option leads and the others keep their order', () => {
 test('the card draws a picture only for an option with a kind, after its own picture', async () => {
   const { readFileSync } = await import('node:fs');
   const card = readFileSync(new URL('./DecisionCard.svelte', import.meta.url), 'utf8');
-  assert.match(card, /\{#if !way\.shows\}<OptionVisual/u);
+  /* AFTER ITS OWN PICTURE, and not when the picture would only repeat the option's name or the question's figure. */
+  assert.match(card, /\{#if !way\.shows\}\{@const v = visualOfWay\(way\)\}\{#if [^\n]*\}<OptionVisual visual=\{v\} \/>\{\/if\}\{\/if\}/u);
   const one = readFileSync(new URL('./OptionVisual.svelte', import.meta.url), 'utf8');
   assert.doesNotMatch(one, /\{:else\}/u, 'an option with no kind drew a placeholder');
 });
