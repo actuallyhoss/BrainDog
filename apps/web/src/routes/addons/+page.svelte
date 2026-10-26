@@ -63,7 +63,7 @@
 
   let query = $state(page.url.searchParams.get('q') ?? '');
   /** The chip picked: the starters, one shelf, or everything. */
-  let picked = $state<'starters' | Shelf | null>(null);
+  let picked = $state<'starters' | Shelf | null>(page.url.searchParams.get('chip') === 'starters' ? 'starters' : null);
   /** The shelves opened past their first four, and whether the example setups are shown. */
   let opened = $state<Partial<Record<Shelf, boolean>>>({});
   let examplesOpen = $state(false);
@@ -86,7 +86,7 @@
   const voiced = (u: NonNullable<ReturnType<typeof useCase>>) => (key: string): string | null =>
     (u.voice as Record<string, string | undefined>)[key] ?? (VOICE_LINES as Record<string, string | undefined>)[key] ?? null;
   const asGlyph = (name: string | null | undefined): IconName | null => (name && isGlyph(name) ? name : null);
-  /* A STARTER'S OWN GLYPH WHERE TWO WOULD WEAR ONE (UI pass of 21 October, P44). */
+  /* A STARTER'S OWN GLYPH WHERE TWO WOULD WEAR ONE, so no two starters wear the same one. */
   const KNOWN_BY: Readonly<Record<string, IconName>> = { guide: 'check', founder: 'projects' };
 
   const iconOf = (l: Listing): IconName => {
@@ -130,7 +130,7 @@
 
   /* ── reading ───────────────────────────────────────────────────────────── */
 
-  /* A STORE THAT DID NOT ANSWER SAYS SO, WITH TRY AGAIN (Y9). */
+  /* A STORE THAT DID NOT ANSWER SAYS SO, WITH TRY AGAIN, and never as a store with nothing in it. */
   let retry = $state(false);
   function readStore(): void {
     kennelRefused = null;

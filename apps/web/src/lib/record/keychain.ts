@@ -89,8 +89,9 @@ export const words = {
   ],
   /* The pack offered after "Connect an agent". */
   notNow: 'Not now',
-  offerTitle: 'Add the Agents add-on?',
-  packInstalled: 'The agents add-on is installed.',
+  /* AGENTS IS PART OF BRAINDOG, never an add-on to choose: a record that lacks it is offered it as turning it on. */
+  offerTitle: 'Turn on Agents?',
+  packInstalled: 'Agents is on.',
   seeds: (n: number) => `${n} example ${n === 1 ? 'row' : 'rows'}, marked example, clearable in one action`,
   touches: 'Nothing you wrote is touched',
   /* THE OFFER'S FIGURES, FOLDED: forty engineer-worded names were a wall under Settings › Agents (audit C, X16). */

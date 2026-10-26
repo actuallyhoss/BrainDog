@@ -44,6 +44,8 @@
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { handsOf, holderFirst, inOrder, marked, orderWords } from '$lib/market/update-order.ts';
   import { words as market } from '$lib/market/words.ts';
+  import { isCore, speakingPack } from '@braindog/declare';
+  import { baseTurnedOn } from '$lib/market/shelves.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -578,6 +580,17 @@
     const named = byId.get(id)?.icon ?? catalogueIcons.get(id);
     return named !== undefined && isGlyph(named) ? named : null;
   };
+  /* THE STARTER THIS RECORD RUNS ON is one tile, never an add-on row, and BrainDog's own parts are one folded line. */
+  const starterId = $derived(speakingPack(installed));
+  const starter = $derived(starterId === null ? null : (listed.find((l) => l.installedId === starterId) ?? null));
+  const coreHeld = $derived(installed.filter((s) => isCore(s.id)));
+  const addons = $derived(installed.filter((s) => !isCore(s.id) && s.id !== starterId));
+  /** Why an update waits, in one line: what its version says it changes, or that one is there. */
+  const reasonOf = (u: { id: string; kind: ListingKind; to: string; entry: CatalogueEntry | null }): string => {
+    const l = listed.find((x) => x.installedId === u.id || (x.kind === u.kind && x.id === u.id));
+    const notes = (l?.versions ?? u.entry?.versions ?? []).find((v) => v.version === u.to)?.notes;
+    return notes && notes.trim() !== '' ? notes : words.updateAvailable;
+  };
   const holdsOn = (id: string): string => {
     const m = byId.get(id);
     if (m) return describe(moduleHolds(m));
@@ -633,7 +646,6 @@
 <div class="area-head">
   {#if live}<p class="area-said">{words.sentence(installedCount(states) ?? 0, updates ? updates.length : null)}</p>{/if}
   <div class="area-acts">
-    <Button size="sm" href={STORE_AT}>{words.browse}</Button>
     <Menu label={words.more} align="end">
       {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{words.more}</span></span>{/snippet}
       <button type="button" class="mi" role="menuitem" onclick={() => (from = true)}><Icon name="download" size="s" />{words.from}</button>
@@ -670,12 +682,26 @@
     </Empty>
   {/if}
 
-  {#if installed.length > 0}
+  {#if starter && starterId}
+    {@const on = baseTurnedOn(starter, moduleName)}
+    <!-- YOUR STARTER, ONE TILE: what it is, what it turned on, and the two things to do with it. -->
+    <Tile icon={iconFor(starterId) ?? 'projects'} title={words.yourStarter(starter.title)} count={installed.find((x) => x.id === starterId)?.version ?? undefined}>
+      {#snippet actions()}
+        <Button size="sm" href={`${STORE_AT}?chip=starters`}>{words.changeStarter}</Button>
+        <Button size="sm" weight="bare" href="/addons/share">{words.shareStarter}</Button>
+      {/snippet}
+      <p class="starter-line">{starter.summary}</p>
+      {#if on.length > 0}<p class="aside">{words.starterTurnedOn(on)}</p>{/if}
+    </Tile>
+  {/if}
+
+  {#if addons.length > 0}
     <!-- ONE ROW PER ADD-ON: its well, its name, its line and what it holds, its "…" holding Settings, What this adds and
          Uninstall, destructive last, and its switch. In one tile, a hairline between rows. -->
-    <Tile icon="packs" title={words.installedTitle}>
+    <Tile icon="packs" title={words.yoursTitle} count={addons.length}>
+      {#snippet actions()}<Button size="sm" href={STORE_AT}>{words.findAddons}</Button>{/snippet}
       <ul class="ledger addons">
-        {#each installed as state (state.id)}
+        {#each addons as state (state.id)}
           {@const pack = byId.get(state.id)}
           {@const off = state.disabled_at !== null}
           {@const block = blocks[state.id]}
@@ -695,22 +721,14 @@
                   {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{market.more(name)}</span></span>{/snippet}
                   <a class="mi" role="menuitem" href={at(`/addons/${state.id}`)}><Icon name="settings" size="s" />{packWords.settings}</a>
                   <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}><Icon name="eye" size="s" />{copy.installDiff}</button>
+                  <!-- ON AND OFF IN THE "⋯", never a bare switch on the row: what stops it is said under the row. -->
+                  <button type="button" class="mi" role="menuitem" aria-label={copy.packSwitch(name)} disabled={busy !== null} onclick={() => turn(state.id, off)}><Icon name={off ? 'check' : 'close'} size="s" />{off ? words.turnOn : words.turnOff}</button>
                   {#if pack}
                     <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, pack.name)}><Icon name="trash" size="s" />{copy.uninstall}</button>
                   {/if}
                 </Menu>
               </span>
-              <!-- THE SWITCH IS LAST, on the tile's own edge, so six of them make one column down the right of the tile.
-                   It sat inside the "…" that only shows under the pointer, 45px in from the edge with nothing after it. -->
-              <button
-                type="button"
-                class="switch"
-                role="switch"
-                aria-checked={!off}
-                aria-label={copy.packSwitch(name)}
-                disabled={busy !== null}
-                onclick={() => turn(state.id, off)}
-              ><span class="switch-track"></span></button>
+{#if off}<span class="addon-off">{words.off}</span>{/if}
               <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
               {#if block}
                 <p class="addon-said" role="status">
@@ -732,6 +750,17 @@
         {/each}
       </ul>
     </Tile>
+  {/if}
+
+  {#if coreHeld.length > 0}
+    <!-- BRAINDOG'S OWN PARTS, FOLDED INTO ONE LINE: always on, updated by themselves, each opening its own page. -->
+    <p class="part-of">
+      <span class="part-of-h">{words.partOf}</span>
+      <span>
+        {#each coreHeld as c, i (c.id)}{i === 0 ? '' : i === coreHeld.length - 1 ? ' and ' : ', '}<a class="tap" href={at(`/addons/${c.id}`)}>{nameOf(c.id)}</a>{/each}
+        {words.partOfTail(coreHeld.length)}
+      </span>
+    </p>
   {/if}
 
   <!-- REMOVED, UNDER WHAT IS INSTALLED: each one uninstalled inside thirty days, what of it stays, and Put back. -->
@@ -764,7 +793,7 @@
        to date. The same row as an installed add-on, and its one press, which reads the plan. "Update all" is the
        screen's one primary, at the tile's heading. -->
   {#if updates && updates.length > 0}
-    <Tile icon="refresh" title={words.updatesTitle} count={updates.length}>
+    <Tile icon="refresh" title={words.waitingTitle} count={updates.length}>
       {#snippet actions()}
         <Button weight="primary" size="sm" disabled={busy !== null || !client} onclick={() => void showAll()}>{busy === 'all' ? words.planning : words.updateAll}</Button>
       {/snippet}
@@ -776,10 +805,10 @@
             <div class="line addon update">
               <span class="line-mark"><IconWell name="refresh" size="l" /></span>
               <span class="addon-main">
-                <span class="line-title addon-name">{u.title}</span>
-                <span class="line-detail addon-line" title={words.fromTo(u.from, u.to)}>{words.updateAvailable}</span>
+                <span class="line-title addon-name">{u.title} <span class="from-to num">{u.from} → {u.to}</span></span>
+                <span class="line-detail addon-line">{reasonOf(u)}{u.entry && u.entry.publisher?.kind !== 'braindog' ? ` ${words.outsideAsks}` : ''}</span>
               </span>
-              <Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
+              <Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.update}</Button>
               {#if s && 'filed' in s}
                 <p class="addon-said" role="status">{went}{went ? ' ' : ''}{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
               {:else if s}
@@ -804,6 +833,41 @@
 {/if}
 
 <style>
+  .from-to {
+    margin-inline-start: var(--sp-2);
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+
+  .starter-line {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 24px;
+  }
+
+  .addon-off {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .part-of {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    margin: 0;
+    padding-inline: var(--sp-1);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .part-of-h {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
   .page {
     display: flex;
     flex-direction: column;
@@ -862,10 +926,9 @@
     grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
   }
 
-  /* THE TRACK ENDS ON THE ROW'S EDGE AT EVERY TARGET SIZE: under a thumb the button is 44 wide round a 36px track, and
-     centred in it the track would sit four pixels inside the edge the tile's other rows end on. */
-  .addon > .switch {
-    justify-items: end;
+  /* "OFF" ENDS THE ROW, on the tile's own edge, where the switch was: off is said in words, never by a control alone. */
+  .addon > .addon-off {
+    justify-self: end;
   }
 
   /* THE NAME AND ITS LINE ARE ONE TARGET, the add-on's own page, so a thumb anywhere on the words opens it. */

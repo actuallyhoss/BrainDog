@@ -71,4 +71,22 @@ export const words = {
   tooBig: (kb: number) => `This file is ${kb} KB, and a shared file is at most 256 KB.`,
   gitNotOne: 'A git address reads git:owner/repo@ref:path, such as git:someone/kit@main:kit.usecase.json.',
   installed: (title: string) => `${title} is installed.`,
+  /* SETTINGS › ADD-ONS IN FOUR PARTS: what waits on you, your starter, your add-ons, and BrainDog's own parts folded into
+     one line. No row has a bare switch: turning one off is in its "⋯" and on its own page. */
+  waitingTitle: 'Waiting on you',
+  update: 'Update',
+  /* AN UPDATE FROM OUTSIDE BRAINDOG ALWAYS ASKS, and BrainDog's own one waits here only when it would lose or newly reach something. */
+  outsideAsks: 'Add-ons from outside BrainDog always ask first.',
+  yourStarter: (title: string) => `Your starter: ${title}`,
+  starterTurnedOn: (names: readonly string[]) => `Turned on ${joined(names)}`,
+  changeStarter: 'Change starter',
+  shareStarter: 'Share as a file',
+  yoursTitle: 'Your add-ons',
+  findAddons: 'Find add-ons',
+  partOf: 'Part of BrainDog',
+  /* WHAT FOLLOWS THE NAMES, each name a link to its own page: "Projects, Work and Agents are always on and update themselves." */
+  partOfTail: (n: number) => (n === 1 ? 'is always on and updates itself.' : 'are always on and update themselves.'),
+  turnOff: 'Turn off',
+  turnOn: 'Turn on',
+  off: 'Off',
 } as const;

@@ -40,8 +40,8 @@ export type Said = { kind: 'held' } | { kind: 'absent'; fix: string } | { kind: 
 export const words = {
   /** The Keys section over a record with no such register. */
   noList: 'This record has no Keys list yet.',
-  /** What to do about it, after the record's own sentence. A record grows a Keys register when the Agents add-on goes in. */
-  noListHow: 'Keys arrive with the Agents add-on. Install it on Add-ons and this section fills itself.',
+  /** What to do about it, after the record's own sentence. A record grows a Keys register when Agents goes in. */
+  noListHow: 'Keys arrive with Agents, part of BrainDog. Turn it on in Settings › Agents and this section fills itself.',
   browse: 'Browse add-ons',
   /** The Keys section when the record refused the read rather than lacking the list. */
   notYours: 'Your keys could not be listed here.',

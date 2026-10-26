@@ -330,7 +330,8 @@ test('THE OFFER NAMES ITS LISTS AND PAGES AND FOLDS ITS FIGURES INTO ONE COUNT, 
   assert.equal(foldedAdds({ ...plan!, adds: plan!.adds.slice(0, 2) }).more, 'and 1 number');
   assert.equal(foldedAdds({ ...plan!, adds: [plan!.adds[0]!] }).more, null);
   assert.equal(plan!.touches, 'Nothing you wrote is touched');
-  assert.equal(words.offerTitle, 'Add the Agents add-on?');
+  assert.equal(words.offerTitle, 'Turn on Agents?');
+  assert.doesNotMatch(words.offerTitle, /add-on/u);
   assert.doesNotMatch(plan!.touches, /0 rows|nothing you have written/u);
 });
 

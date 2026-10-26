@@ -58,7 +58,7 @@ test('THE KEYS PANEL SAYS WHAT THE RECORD SAID, and where the record holds no su
   assert.equal(absent?.title, words.noList);
   /* The record's own sentence, and then the one thing a person can do about it. */
   assert.match(absent?.body ?? '', /There is no register called credentials\./u);
-  assert.match(absent?.body ?? '', /Agents add-on/u);
+  assert.match(absent?.body ?? '', /Settings › Agents/u);
 });
 
 test('A REFUSAL ABOUT ACCESS IS DRAWN AS ONE, not as an empty list', () => {

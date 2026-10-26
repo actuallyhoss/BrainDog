@@ -18,13 +18,12 @@ test('the tiles are 12 apart, as on every other board', () => {
   assert.match(tokens, /--tile-gap: 12px;/u);
 });
 
-test('an add-on\'s switch ends its row, after the "…" that only shows under the pointer', () => {
+test('an add-on\'s row has no bare switch: on and off are in its "…", and off is said in words at the row\'s end', () => {
   const row = src.slice(src.indexOf('<div class="line addon">'), src.indexOf('{#if block}'));
+  assert.equal(row.includes('class="switch"'), false, 'a bare switch is back on the row');
   const verbs = row.indexOf('<span class="line-verbs">');
-  const sw = row.indexOf('class="switch"');
-  assert.ok(verbs > 0 && sw > verbs, 'the switch is drawn before the menu, which leaves it 45px inside the tile\'s edge');
-  assert.equal(row.slice(sw).includes('<Menu'), false);
-  /* THE TRACK ENDS ON THE EDGE AT EVERY TARGET SIZE, the 44px one under a thumb included. */
-  assert.match(rule('.addon > .switch'), /justify-items: end;/u);
+  assert.ok(verbs > 0 && row.slice(verbs).includes('words.turnOff'), 'turning an add-on off is not in its menu');
+  assert.ok(row.indexOf('class="addon-off"') > verbs, 'off is not said at the end of the row');
+  assert.match(rule('.addon > .addon-off'), /justify-self: end;/u);
   assert.match(rule('.addon'), /grid-template-columns: var\(--well-l\) minmax\(0, 1fr\) auto auto;/u);
 });
