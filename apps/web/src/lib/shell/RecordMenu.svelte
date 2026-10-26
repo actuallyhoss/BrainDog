@@ -1,30 +1,33 @@
 <!--
-  "BrainDog ▾" (frame A, 23 October): the mark and the product's name, and under them the record you are in and the
-  others to switch to. On the desk's bar and the phone's head alike; it moved here from the phone's old sheet of places,
-  the one place that held it.
+  The record switcher, at the head of the sidebar: the record's mark and its name ("Acme ▾"), never the product's, and
+  under them the record you are in and the others to switch to. `bare` draws the mark alone, for the sidebar's narrow
+  rail; `phone` sizes it for a thumb, at the head of the phone's Menu.
 -->
 <script lang="ts">
   import { at } from '../at.ts';
   import { copy } from '../copy/frame.ts';
   import { levelWord } from '../record/switcher.ts';
   import Icon from '../ui/Icon.svelte';
-  import Mark from '../ui/Mark.svelte';
   import Menu from '../ui/Menu.svelte';
   import { frame } from './frame.svelte.ts';
+  import RecordMark from './RecordMark.svelte';
 
-  let { phone = false }: { phone?: boolean } = $props();
+  let { phone = false, bare = false }: { phone?: boolean; bare?: boolean } = $props();
 
-  const words = { product: 'BrainDog', records: 'Records', opens: (name: string) => `Open ${name}` } as const;
+  const words = { records: 'Records', record: 'Record', opens: (name: string) => `Open ${name}` } as const;
   const others = $derived(frame.records.filter((r) => r.name !== frame.record));
+  const name = $derived(frame.record || words.record);
 </script>
 
-<div class="rm" data-phone={phone ? '' : undefined}>
-  <Menu label={words.records} align="start">
+<div class="rm" data-phone={phone ? '' : undefined} data-bare={bare ? '' : undefined}>
+  <Menu label={bare ? `${words.records}: ${name}` : words.records} align="start">
     {#snippet trigger()}
       <span class="rm-face">
-        <Mark height={20} />
-        <span class="rm-word">{words.product}</span>
-        <span class="rm-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+        <RecordMark size={bare ? 24 : 20} />
+        {#if !bare}
+          <span class="rm-word" dir="auto">{name}</span>
+          <span class="rm-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+        {/if}
       </span>
     {/snippet}
     {#if frame.record}
@@ -45,35 +48,55 @@
 
 <style>
   .rm {
-    flex: none;
+    flex: 0 1 auto;
     min-inline-size: 0;
   }
 
-  /* THE FACE: the mark at 20 and "BrainDog" in the display face at 17/600, a quiet caret after it. */
+  .rm :global(.menu-trigger) {
+    max-inline-size: 100%;
+    border-radius: var(--r-ctl);
+  }
+
+  /* THE FACE: the record's mark at 20 and its name in the display face at 16/600, a quiet caret after it. */
   .rm-face {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: 40px;
-    padding-inline: var(--sp-2);
+    min-inline-size: 0;
+    min-block-size: 36px;
+    padding-inline: var(--sp-1) var(--sp-2);
     color: var(--ink);
+  }
+
+  .rm[data-bare] .rm-face {
+    justify-content: center;
+    inline-size: 40px;
+    block-size: 40px;
+    padding: 0;
   }
 
   .rm[data-phone] .rm-face {
     min-block-size: var(--tap);
-    padding-inline: 0 var(--sp-2);
   }
 
   .rm-word {
+    min-inline-size: 0;
+    overflow: hidden;
     font-family: var(--font-display);
-    font-size: var(--fs-head);
+    font-size: var(--fs-ctl);
     font-weight: var(--fw-semi);
     letter-spacing: -0.01em;
+    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .rm[data-phone] .rm-word {
+    font-size: var(--fs-head);
   }
 
   .rm-caret {
     display: inline-grid;
+    flex: none;
     color: var(--ink-3);
   }
 

@@ -1,6 +1,6 @@
 <!--
-  The face (frame A, 23 October): the person's letter, and under it Settings, the keyboard keys and Sign out. It no
-  longer opens a list of everything: the sidebar holds what you own, the bar where you go.
+  The face: the person's letter, and under it only what is theirs as a person: how they sign in, the keyboard keys and
+  Sign out. Settings is the sidebar's, at its foot, and nowhere else.
 -->
 <script lang="ts">
   import { BASE, at } from '../at.ts';
@@ -12,7 +12,7 @@
 
   let { phone = false }: { phone?: boolean } = $props();
 
-  const words = { you: 'You', account: 'Account', keys: 'Keyboard keys' } as const;
+  const words = { you: 'You', account: 'Account', keys: 'Keyboard keys', signing: 'Signing in' } as const;
   const name = $derived(frame.person || words.you);
 
   /* SIGN OUT AT EVERY WIDTH (LCH-A04): auth.ts is loaded on the press, and a press that did not end the session leaves
@@ -34,7 +34,7 @@
     {#snippet trigger()}
       <span class="you-hit"><span class="you-face"><span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span><span class="sr-only">{words.account}</span></span></span>
     {/snippet}
-    <a class="you-mi" role="menuitem" href={at('/settings')}><Icon name="settings" size="s" />{copy.settings}</a>
+    <a class="you-mi" role="menuitem" href={at('/settings/signing-in')}><Icon name="key" size="s" />{words.signing}</a>
     <!-- THE KEYS ARE A KEYBOARD'S: a phone is not offered them. -->
     {#if !phone}<button type="button" class="you-mi" role="menuitem" onclick={() => (frame.keys = true)}><Icon name="keyboard" size="s" />{words.keys}</button>{/if}
     <button type="button" class="you-mi" role="menuitem" onclick={signOut}><Icon name="lock" size="s" />{copy.signOut}</button>
