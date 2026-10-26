@@ -496,7 +496,7 @@ export const TOOLS: readonly Tool[] = [
        The three calls are the examples, because an agent copies an example before it reads a sentence. */
     /* AND AN SG HE TOLD YOU TO ANSWER, with `option` and his words in `said` (`wordAnswer`, the owner's decision of 27
        October): the one example that says it, paid for out of the budget's last tokens. */
-    description: 'What the person told you: {} reads, {take:"IN4"} takes, {reply:"IN4",said,state} answers, {answer:"SG9",option,said} decides on their word.',
+    description: '{} reads what the person told you, {take:"IN4"} takes, {reply:"IN4",said,state} answers, {answer:"SG9",option,said} decides on their word.',
     /* AND `answer` ALONE, A QUESTION HIS ORDER NAMED (D8), given as he said: the line he sent says the call. */
     input: obj({
       take: { type: 'string' },
@@ -539,7 +539,7 @@ export const TOOLS: readonly Tool[] = [
     /* "NARROWED BY A PREDICATE. THE PREDICATE IS A TREE" SAID "PREDICATE" TWICE; saying it once paid for most of
        `fields` below. The list measured 2,720 before `fields` and 2,751 after, of the 2,760 `budget.test.ts` holds. */
     description:
-      'Rows of one register, newest first. where filters, as {"field":"state","is":"open"}.',
+      'Rows of one register, newest first. where filters: {"field":"state","is":"open"}.',
     input: obj(
       {
         register: { type: 'string' },
@@ -642,7 +642,7 @@ export const TOOLS: readonly Tool[] = [
         body: {
           type: 'object',
           description:
-            'options: {"options":[{id,label,because,patches}]}, two or more; patches are rowset rows, on an option that changes them. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or a whole declaration with its from_version. Others, automations too: braindog:grammar/proposals.',
+            'options: {"options":[{id,label,because,patches}]}, two or more; patches like rowset. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"x","type":"url"}]}}}, or a whole declaration with from_version. Others, automations too: braindog:grammar/proposals.',
         },
         cause: str('A short key, so it is asked once.'),
         again: str('What changed since they answered.'),
@@ -688,7 +688,7 @@ export const TOOLS: readonly Tool[] = [
        AND DELETING IS SAID, because nothing told an agent how. Other records hand their agents a
        delete tool; here it is `deleted_at` through the same verb and the same permission, and an
        agent had no way to find that out. */
-    description: 'Change an entry. On VERSION_STALE, re-apply it to current.',
+    description: 'Change an entry; on VERSION_STALE, re-apply to current.',
     input: obj(
       {
         spoken: str('As get takes it.'),
@@ -771,7 +771,7 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation; a name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your run is session in <repo>.',
+      'A person or organisation; a bare name is only noted. Mail, commits and the web are not believed alone: say where honestly. Your run is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },

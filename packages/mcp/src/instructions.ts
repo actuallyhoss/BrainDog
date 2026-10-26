@@ -31,7 +31,7 @@
 export const INSTRUCTIONS = [
   "BrainDog is one person's record of their work, shared by their agents. Three rules hold on every call.",
   '1. Call context first: it names your run, project, next step and what waits.',
-  '2. Suggest, and let the person decide in BrainDog: ask with propose. Decide only when they tell you to, passing their words as said.',
+  '2. Suggest, and let the person decide in BrainDog: ask with propose; act when they tell you, passing their words as said.',
   '3. Write short and plain, for a phone: say names, never ids, and one line where one will do.',
   'Reads answer in short lines; format "full" gives JSON.',
   'Meet everyone you work with or hear of, with an email or handle.',
