@@ -536,13 +536,18 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
   const since = new Date(nowMs - RUNS_WINDOW_DAYS * DAY).toISOString();
   const HEARD = "coalesce(json_extract(fields, '$.last_seen'), updated_at)";
   const AGENT = "coalesce(json_extract(fields, '$.client'), json_extract(fields, '$.agent'))";
+  /* A WEEK OF RUNS IS RUNS HEARD FROM HERE THIS WEEK, by `last_seen` alone. A run never heard from here (`presenceOf`'s
+     `before`: one carried in from another system, all of them written off there) has no `last_seen`, and read by its
+     row's last change, one edit of its project in a week counted every such run as one that ended abandoned this week:
+     203 of 237. */
+  const HEARD_HERE = "json_extract(fields, '$.last_seen')";
   /* A HANDOFF THE SWEEP WROTE IS A RUN THAT WENT SILENT, not one that ended: `sweepSessions` hands off a run that crashed
      after leaving a step, and its `state` line is by `system`. A run that handed off itself signs its own line. Read in
      the same query, the newest `state` line of each handoff, so a week of runs is one read and not one a run. */
   const runs = sql.all<{ state: string | null; swept: number }>(
     `SELECT state, (state = 'handoff' AND coalesce((SELECT e.actor FROM event e WHERE e.target = 'entry:' || entry.id AND e.kind = 'state'
        ORDER BY e.ts DESC, e.rowid DESC LIMIT 1), '') = 'system') AS swept
-     FROM entry WHERE register = 'session' AND deleted_at IS NULL AND ${HEARD} >= ?`,
+     FROM entry WHERE register = 'session' AND deleted_at IS NULL AND ${HEARD_HERE} >= ?`,
     since,
   );
   /* STILL OPEN LONG AFTER IT WAS LAST HEARD FROM: the sweep that writes such a run off did not. AT ANY AGE, not only this

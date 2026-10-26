@@ -356,3 +356,26 @@ test('RUNS: a run open eleven hours after it was last heard from is green, thirt
   assert.equal(sign(old, 'runs-true', NOW).said, 'Every run that ended this week ended normally.');
   old.close();
 });
+
+test('RUNS: runs carried in from elsewhere and never heard from here are not this week, however lately their rows changed', async () => {
+  const sql = await bare();
+  for (let i = 0; i < 9; i++) run(sql, 'done', HOUR);
+  /* WRITTEN OFF WHERE THEY CAME FROM, NO `last_seen`, AND EDITED AN HOUR AGO, as a rule that fills in a run's project does. */
+  for (let i = 0; i < 30; i++) {
+    runs += 1;
+    sql.exec(
+      "INSERT INTO entry (id, register, seq, fields, state, created_at, updated_at) VALUES (?, 'session', ?, ?, ?, ?, ?)",
+      `run${runs}`,
+      1000 + runs,
+      JSON.stringify({ state: 'abandoned', agent: 'claude', doing: 'Carried run', started: iso(NOW - 40 * DAY), project: 'things#1' }),
+      'abandoned',
+      iso(NOW - 40 * DAY),
+      iso(NOW - HOUR),
+    );
+  }
+  const read = sign(sql, 'runs-true', NOW);
+  assert.equal(read.state, 'green');
+  assert.equal(read.said, 'Every run that ended this week ended normally.');
+  assert.ok(read.facts.includes('9 runs this week, 9 ended, 0 of them abandoned.'), read.facts.join(' | '));
+  sql.close();
+});
