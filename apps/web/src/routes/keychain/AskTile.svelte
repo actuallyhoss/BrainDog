@@ -77,18 +77,18 @@
 
 {#if waiting.length}
   <Tile icon="lock" title={w.askTitle} count={waiting.length > 1 ? waiting.length : undefined} data-part="key-asks">
-    <ul class="ledger ledger-lead whos">
+    <ul class="ledger asks">
       {#each waiting as a (a.id)}
-        <li class="who" id={`ask-${a.id}`} data-intent="warn" data-needs data-focus={focus === a.id ? '' : undefined}>
-          <div class="line line-tall">
-            <span class="line-mark"><IconWell name="key" size="l" /></span>
-            <span class="line-main">
-              <span class="line-title who-name" data-own>{askLine(a)}</span>
-              {#if askRun(a)}<span class="line-detail who-detail" data-own>{askRun(a)}</span>{/if}
+        <li id={`ask-${a.id}`} data-intent="warn" data-needs data-focus={focus === a.id ? '' : undefined}>
+          <div class="ask">
+            <span class="ask-mark"><IconWell name="key" size="l" /></span>
+            <span class="ask-main">
+              <span class="ask-title" data-own>{askLine(a)}</span>
+              {#if askRun(a)}<span class="ask-detail" data-own>{askRun(a)}</span>{/if}
             </span>
-            <span class="line-when">{since(a.expires, now)}</span>
+            <span class="ask-when">{since(a.expires, now)}</span>
             {#if acts}
-              <span class="line-verbs">
+              <span class="ask-verbs">
                 <Button size="sm" weight="primary" disabled={busy !== null} onclick={() => void answer(a, 'once')}>{w.allowOnce}</Button>
                 <Button size="sm" disabled={busy !== null} onclick={() => void answer(a, 'always')}>{w.allowAlways}</Button>
                 <Button size="sm" weight="quiet" disabled={busy !== null} onclick={() => void answer(a, 'deny')}>{w.deny}</Button>
@@ -102,3 +102,90 @@
 {:else if focus && pointed && !pointed.waiting}
   <Tile icon="lock" title={w.askTitle} data-part="key-asks"><p class="said">{w.answered}</p></Tile>
 {/if}
+
+<style>
+  /* AN ASK IS A TALL LEDGER ROW: the key's well, what wants it over the run, when it lapses, and the three answers,
+     always shown because every ask waits on him. Hairlines between asks, as `rows.css` draws them. */
+  .ask {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--ink);
+    font-size: var(--fs-body);
+  }
+
+  .asks > li + li > .ask::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: var(--sp-3);
+    block-size: 1px;
+    background: var(--rule);
+    pointer-events: none;
+  }
+
+  .ask-mark {
+    display: grid;
+    place-items: center;
+    inline-size: var(--well-l);
+  }
+
+  .ask-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .ask-title {
+    font-weight: 500;
+    line-height: 20px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ask-detail {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .ask-when {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .ask-verbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* On a phone the answers take a line of their own under the words. */
+  @media (width < 640px) {
+    .ask {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    }
+
+    .ask-title {
+      white-space: normal;
+    }
+
+    .ask-verbs {
+      grid-column: 2 / -1;
+      flex-wrap: wrap;
+    }
+  }
+</style>
