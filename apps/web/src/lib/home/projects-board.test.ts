@@ -6,11 +6,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { boardOf, endedAs, names, quietOf, runProject, sparkOf, type BoardInput, type BoardProject } from './projects-board.ts';
+import { boardOf, endedAs, names, quietOf, runProject, trailOf, type BoardInput, type BoardProject } from './projects-board.ts';
 
 test('a line is drawn from three readings, inside its box', () => {
-  assert.equal(sparkOf([1, 2], 80, 24), null);
-  const s = sparkOf([1, 3, 2], 80, 24)!;
+  assert.equal(trailOf([1, 2], 80, 24), null);
+  const s = trailOf([1, 3, 2], 80, 24)!;
   assert.equal(s.line, 'M2.0 22.0 L40.0 2.0 L78.0 12.0');
   assert.deepEqual(s.end, [78, 12]);
 });

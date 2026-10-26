@@ -63,7 +63,7 @@ test("THE PARTS ARE TURNED FROM THE PAGE'S ANSWER: its row, its work, its runs, 
   assert.ok(read);
   assert.equal(read.key, `${projects}#1`);
   assert.equal(read.fields[title], 'Kiln');
-  assert.deepEqual(read.row, { id: '01JPROJECT00000000000000001', created_at: '2026-01-04T09:00:00.000Z' });
+  assert.deepEqual(read.row, { id: '01JPROJECT00000000000000001', created_at: '2026-01-04T09:00:00.000Z', version: 3 });
   assert.equal(read.work, work);
   assert.equal(read.via?.field, via);
   assert.deepEqual(read.rows.map((r) => r.seq), [11, 12]);

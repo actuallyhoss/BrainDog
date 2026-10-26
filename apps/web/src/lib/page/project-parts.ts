@@ -32,6 +32,13 @@ export type PartsHave = {
   band: boolean;
   /** The read is back: the agents part is drawn, even unseen, so it hears when a run arrives. */
   known: boolean;
+  /* THE PARTS OF THE PAGE OF 27 OCTOBER: the tile beside the hero by lane, its numbers, its dates, what was decided and
+     what happened. Absent is nothing to draw. */
+  side?: boolean;
+  numbers?: boolean;
+  dates?: boolean;
+  decisions?: boolean;
+  happened?: boolean;
 };
 
 /** Whether a part is drawn, how wide it is in twelfths of its row, and whether it shows anything at all. */
@@ -53,12 +60,62 @@ export function partLaid(part: string, h: PartsHave): PartLaid {
       return at(h.people, h.work ? 4 : 12);
     case 'runs-on':
       return at(h.runsOn, h.today ? 6 : 12);
+    case 'side':
+      return at(h.side === true, 4);
+    case 'numbers':
+      return at(h.numbers === true, 8);
+    case 'dates':
+      return at(h.dates === true, 6);
+    case 'decisions':
+      return at(h.decisions === true, 6);
+    case 'happened':
+      return at(h.happened === true, 12);
     case 'agents-here':
       /* DRAWN ONCE THE READ IS BACK, AND SEEN ONLY WITH SOMETHING TO SHOW: its runs are read unseen till one is on it. */
       return at(h.known, h.today && h.runsOn ? 6 : 12, h.today || h.band);
     default:
       return at(false, 12);
   }
+}
+
+/**
+ * HOW WIDE EACH PART IS IN A ROW OF THE PAGE OF 27 OCTOBER, in twelfths: each part's share as the page lays it (the hero
+ * at eight beside its lane's tile at four, the numbers at eight beside the work at four, the dates at six beside who is
+ * on it and what it runs on at three each, the agents at six beside what was decided or what happened).
+ */
+const SHARE: Readonly<Record<string, number>> = { hero: 8, side: 4, numbers: 8, 'what-is-open': 4, dates: 6, 'who-is-on-it': 3, 'runs-on': 3, 'agents-here': 6, decisions: 6, happened: 6, path: 8, money: 4 };
+
+/**
+ * The parts of one block that are drawn, each with its width and the line of the block it sits on. The parts that show
+ * something are laid in order, a line at a time, a part that would pass twelve starting the next line; then the shares
+ * on each line are stretched to fill it, so a part whose partner has nothing takes the room it left. A part drawn unseen
+ * (the agents' runs read before one is on it) takes no room, and is laid on line -1.
+ */
+export function rowLaid(parts: readonly string[], h: PartsHave): (PartLaid & { part: string; line: number })[] {
+  const laid = parts.map((part) => ({ part, ...partLaid(part, h) })).filter((x) => x.on);
+  const lines: string[][] = [];
+  let used = 12;
+  for (const x of laid) {
+    if (!x.seen) continue;
+    const share = SHARE[x.part] ?? 12;
+    if (used + share > 12) {
+      lines.push([]);
+      used = 0;
+    }
+    lines.at(-1)!.push(x.part);
+    used += share;
+  }
+  const at = new Map<string, { span: number; line: number }>();
+  lines.forEach((line, n) => {
+    const total = line.reduce((t, p) => t + (SHARE[p] ?? 12), 0);
+    let left = 12;
+    line.forEach((p, i) => {
+      const span = i === line.length - 1 ? left : Math.max(1, Math.round(((SHARE[p] ?? 12) / Math.max(1, total)) * 12));
+      left -= span;
+      at.set(p, { span: Math.max(1, span), line: n });
+    });
+  });
+  return laid.map((x) => (x.seen ? { ...x, ...at.get(x.part)! } : { ...x, span: 12, line: -1 }));
 }
 
 type Row = { kind: string; drawn?: boolean | undefined; why?: unknown; parts?: unknown; answer?: unknown };

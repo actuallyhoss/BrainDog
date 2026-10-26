@@ -38,6 +38,12 @@ import { pathOf, trendOf } from '$lib/record/visuals.ts';
 import { valueSaid } from '$lib/voice.ts';
 import { money as moneyOf, monthShort } from 'braindog-render';
 import { moneyShown, partsLaid, type PartsHave } from './project-parts.ts';
+import { rowHref } from '$lib/record/row-href.ts';
+import { updateRow } from '../record/page-write.ts';
+import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runsOnOf, sessionsOf, sideOf, type FactKpi, type FactTask, type FactsIn, type KpiAt } from './project-facts.ts';
+
+/** Where a project sends its numbers is set up. */
+const FEED_SETUP = '/automations?new=door&preset=numbers';
 
 /** A ring of done work only from five tasks, and never at nought (the audit of 22 October, U-B7). */
 const RING_FROM = 5;
@@ -291,6 +297,99 @@ export class ShapeHold {
   band = $derived(this.owner || this.here > 0);
   todayAlone = $derived(this.sessions.length > 0 && !this.band);
 
+  /* ── the page of 27 October: what each part says (`project-facts.ts`) ── */
+  /** What its page is worked out from, once the read is back. */
+  facts = $derived.by((): FactsIn | null => {
+    const read = this.read;
+    const decl = this.decl;
+    if (!read || !decl) return null;
+    const via = read.via;
+    const work = read.work;
+    const title = this.workDecl?.title ?? 'what';
+    const doneOnField = this.workDecl?.fields.find((x) => x.type === 'day' && /done|finish/u.test(x.id))?.id ?? null;
+    const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+    const day = (v: unknown) => (/^\d{4}-\d{2}-\d{2}/u.test(text(v)) ? text(v).slice(0, 10) : null);
+    const tasks: FactTask[] = via
+      ? read.rows.map((x) => {
+          const st = text(x.fields[via.state.id]);
+          return {
+            seq: x.seq,
+            title: text(x.fields[title]),
+            state: st,
+            by: via.deadline ? day(x.fields[via.deadline]) : null,
+            doneOn: doneOnField ? day(x.fields[doneOnField]) : null,
+            agent: via.agent ? text(x.fields[via.agent]) : '',
+            done: via.done.includes(st),
+            waits: WAITS.includes(st),
+            href: work ? (rowHref(`${work}#${x.seq}`) ?? `/r/${work}/${x.seq}`) : '',
+            updated: x.updated ?? null,
+            created: x.created ?? null,
+          };
+        })
+      : [];
+    const kpis: FactKpi[] = read.kpis.map((k) => {
+      const a = k as typeof k & { latest?: KpiAt | null; change?: number | null; target?: number | string | null; target_by?: string | null };
+      return {
+        name: a.name,
+        measure: a.name,
+        unit: a.unit ?? '',
+        every: a.every ?? null,
+        headline: a.headline === true,
+        points: a.points,
+        latest: a.latest ?? a.points.at(-1) ?? null,
+        change: typeof a.change === 'number' ? a.change : null,
+        target: a.target ?? null,
+        targetBy: a.target_by ?? null,
+      };
+    });
+    const lane = decl.state ? text(read.fields[decl.state]) : '';
+    const money = (m: { value: number; currency: string } | null) => (m && m.value > 0 ? { minor: m.value, currency: m.currency } : null);
+    return {
+      name: this.name,
+      lane,
+      next: this.shape?.facts.next ?? '',
+      about: text(read.fields.about),
+      since: this.status.since || null,
+      domains: Array.isArray(read.fields.domains) ? (read.fields.domains as unknown[]).map(text).filter(Boolean) : [],
+      tasks,
+      runs: read.runs,
+      services: read.services,
+      readings: read.readings,
+      recurring: read.recurring,
+      kpis,
+      decided: read.decided,
+      history: read.history,
+      money: { out: money(read.money.out), owed: money(read.money.owed) },
+      now: read.now,
+      today: localDay(read.now),
+      format: this.said,
+      hrefs: { feed: FEED_SETUP, work: this.workHref },
+    };
+  });
+  numbers = $derived(this.facts ? numbersOf(this.facts) : null);
+  heroFacts = $derived(this.facts && this.numbers ? heroFactsOf(this.facts, this.numbers) : null);
+  checklist = $derived(this.facts ? checklistOf(this.facts.next, this.facts.tasks, this.facts.now, this.facts.today) : []);
+  side = $derived(this.facts && this.numbers ? sideOf(this.facts, this.numbers) : null);
+  dates = $derived(this.facts ? datesOf(this.facts) : []);
+  runsOnLines = $derived(this.facts && this.numbers ? runsOnOf(this.facts, this.numbers) : []);
+  sessionLines = $derived(this.facts ? sessionsOf(this.facts) : []);
+  happened = $derived(this.facts && this.numbers ? happenedOf(this.facts, this.numbers) : []);
+  /** The lane as stored: earning, building, parked or retired. */
+  lane = $derived(this.facts?.lane ?? '');
+  /** The hero's date line: its lane, since when, and its domain ("Earning · since Mar 2024 · example.com"). */
+  dateLine = $derived(
+    [this.status.lane, this.status.since ? `since ${this.status.since}` : '', this.facts?.domains[0] ?? ''].filter((x) => x !== '').join(' · '),
+  );
+
+  /** Moves the project to another lane (Bring it back, Finish it): `null` when written, else what to say. */
+  async setLane(lane: string): Promise<string | null> {
+    const read = this.read;
+    const field = this.decl?.state;
+    if (!read || !field || read.row.version === null) return 'This project cannot be moved from here. Open its row to change its lane.';
+    const out = await updateRow(apiBase(), { register: this.register, seq: this.seq, version: read.row.version }, { [field]: lane }, this.name);
+    return out.from === 'written' ? null : out.fix;
+  }
+
   /** What the shape draws, so a declared block that repeats one is left out (`withoutRepeats`). */
   blocks = $derived<readonly Block[]>(this.shape ? blocksOf(this.shape.facts) : []);
   /** Whether its reads are back: until they are, nothing it may say is known. */
@@ -303,10 +402,15 @@ export class ShapeHold {
     money: this.hasMoney,
     work: this.workLists !== null,
     people: this.people.length > 0,
-    runsOn: this.runsOn.length > 0,
-    today: this.read !== null && this.todayAlone,
+    runsOn: this.runsOn.length > 0 || this.runsOnLines.length > 0,
+    today: this.read !== null && (this.todayAlone || this.sessionLines.length > 0),
     band: this.read !== null && this.band,
     known: this.read !== null,
+    side: this.side !== null && (this.side.kind !== 'none' || this.hasMoney),
+    numbers: (this.numbers?.cells.length ?? 0) > 0,
+    dates: this.dates.length > 0,
+    decisions: (this.read?.decided.length ?? 0) > 0,
+    happened: this.happened.length > 0,
   });
 
   /** The page's blocks with each part of the shape drawn where it has something, at its width (`partsLaid`). */

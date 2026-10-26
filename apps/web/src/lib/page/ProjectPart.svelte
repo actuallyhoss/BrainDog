@@ -1,25 +1,19 @@
 <!--
-  A row of a project's own shape, a block of the page about its row (C28, C29, 24 October): `parts` says which parts,
-  one or two side by side, each laid at its width in the row by what it has (`project-parts.ts` `partLaid`): stacked
-  under 1100px, and from there in twelfths, the second beside the first.
+  A block of a project's own page (C28, C29, 24 October; the page of 27 October): `parts` says which parts, each laid at
+  its width by what it has (`project-parts.ts` `rowLaid`): stacked under 1100px, and from there in twelfths, a block of
+  many parts laid a line at a time.
 
-  THE PARTS, AS THE PROJECT TEMPLATE LAYS THEM: the hero, then Path and Money (`ProjectVisuals`), Work and Who is on it,
-  Runs on and Agents here today, then who is working on it now with the box to tell agents on it (agents and MCP plan
-  §7.2). They were one hand-drawn shape above the declared blocks (`ProjectShape.svelte`, gone); each row is declared
-  now (`{ kind: project, parts }`), so the page pulled as text says it is there, and it is moved or hidden as any block
-  is.
-  The page leaves out a declared block that says what a part says (`withoutRepeats`) and lays the parts out by what each
-  has (`project-parts.ts`).
+  THE PARTS, AS THE PROJECT TEMPLATE LAYS THEM: the hero beside its lane's tile (`side`: what it brings in while it
+  earns, its dated path while it is built, what it costs to keep while parked), its numbers beside its work, then its
+  dates, who is on it, what it runs on and renews, the agents with the box to tell them at the foot, what was decided,
+  and what happened. Path and Money (`ProjectVisuals`) stay for a page declared before them.
 
-  ONE READ FOR EVERY PART (`shape-hold.svelte.ts`): the page makes the hold, and each part draws from it.
+  ONE READ FOR EVERY PART (`shape-hold.svelte.ts`), and what each says is worked out in `project-facts.ts`.
 
-  THE HERO HOLDS THE NAME (proj F7): the 56px well and the `h1` at 34 side by side, where it stands under the name ("Earning
-  · ● At risk · since Mar 2024"), one line of news with the late phrase in the red (`heroOf`), the next step once as its last
-  line, and three figures on the right: what it earned in a year, how far along it is as a ring in the project's colour,
-  and who works on it now. WHERE THE PROJECT KEEPS KEY NUMBERS, THE FIRST FIGURE IS THE ONE ITS CARD LEADS WITH (the KPI
-  plan of 21 October, 2.5): its name, the figure, how it moved, and its own line, as the card says it (`cardKpiOf`). Its
-  colour is the project's slot (`slotStyle`), the same `--ph` its card is drawn in. The project's visuals, its audits,
-  plans and designs, are drawn under it, and nothing where it holds none. While the read is out the hero holds the screen.
+  THE HERO'S HEADLINE IS A FACT, never the next step: what is late, what it brought in, that its numbers stopped, or
+  since when it is parked. Over it the name with its date line (lane, since when, its domain); under it one line more,
+  the model's where the record kept one; then the next step once, as a checklist with its days; then the red button for
+  the most urgent thing, and a quiet one beside it.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -39,27 +33,22 @@
   import Face from '$lib/ui/Face.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import { Ring } from '$lib/viz/index.ts';
+  import Button from '$lib/ui/Button.svelte';
   import type { ShapeHold } from './shape-hold.svelte.ts';
-  import { partLaid } from './project-parts.ts';
+  import { rowLaid } from './project-parts.ts';
 
   let { hold, parts }: { hold: ShapeHold; parts: readonly string[] } = $props();
 
   /* WHO WROTE THE LINE, on hover: the model, from this project's figures (C4). */
   const WROTE = 'Written by BrainDog from this project’s figures';
+  /* THE RUNS-ON LINES SHOWN BEFORE "AND N MORE". */
+  const LINES_SHOWN = 6;
   /* THREE OF EACH COLUMN OF WORK, and how many more. */
   const SHOWN = 3;
-  /* FOUR OF WHAT IT RUNS ON, AND HOW MANY MORE, SINCE the audit of 22 October (U-B10, U-B12): eight keys in two columns,
-     each with "Key" under it and nothing saying eight more were left out, on a page that should end under 1,500px. */
-  const RUNS_ON_SHOWN = 4;
-
   const hours = (t: number, day0: number) => Math.max(0, Math.min(1, (t - day0) / 86_400_000));
-  const clock = (t: number) => {
-    const d = new Date(t);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  };
-  const RUNS_ICON: Record<string, 'key' | 'skill' | 'plug'> = { key: 'key', skill: 'skill' };
-  const runsIcon = (kind: string | undefined) => RUNS_ICON[Object.keys(RUNS_ICON).find((k) => (kind ?? '').toLowerCase().includes(k)) ?? ''] ?? 'plug';
+  type LineIcon = 'key' | 'skill' | 'plug' | 'observe' | 'service';
+  const RUNS_ICON: Record<string, LineIcon> = { key: 'key', skill: 'skill' };
+  const runsIcon = (kind: string | undefined): LineIcon => RUNS_ICON[Object.keys(RUNS_ICON).find((k) => (kind ?? '').toLowerCase().includes(k)) ?? ''] ?? 'plug';
   /* ONE LINE A NAME AND KIND: two keys of one name read as a row said twice. */
   const onceEach = <T extends { title: string; kind?: string | undefined }>(rows: readonly T[]): T[] => {
     const seen = new Set<string>();
@@ -76,17 +65,44 @@
     return m && m[1] !== 'Imported' && m[1]!.toLowerCase() !== agent.toLowerCase() ? `Imported${m[2]}` : t;
   };
   const singular = (kind: string | undefined) => (kind ?? '').replace(/s$/u, '');
-  const hereWords = {
-    working: 'Working here now',
-    tell: (name: string) => (name ? `Tell agents on ${name}` : 'Tell an agent'),
-  } as const;
+  /* THE BARS OF ITS MONTHS, in a 336 by 72 box, the last one in the project's colour. */
+  const barsOf = (values: readonly number[]): { x: number; y: number; h: number; last: boolean }[] => {
+    const hi = Math.max(1, ...values);
+    const w = 336 / Math.max(1, values.length);
+    return values.map((v, n) => {
+      const h = Math.max(1.5, (Math.max(0, v) / hi) * 70);
+      return { x: n * w, y: 72 - h, h, last: n === values.length - 1 };
+    });
+  };
+
+  /* A LANE MOVED FROM HERE: what the record said where it refused, else nothing. */
+  let moving = $state(false);
+  let moveSaid = $state<string | null>(null);
+  const moveTo = async (lane: string) => {
+    moving = true;
+    moveSaid = await hold.setLane(lane);
+    moving = false;
+  };
 
   const read = $derived(hold.read);
   const arrived = $derived(hold.arrived);
   /* THE ROW'S PARTS THAT ARE DRAWN, each at its width. THE AGENTS' PART WITH NOTHING TO SHOW, for a reader who may not
      tell, is drawn unseen so it hears when a run arrives, and takes no room; a row of nothing else takes none either. */
-  const laid = $derived(parts.map((part) => ({ part, ...partLaid(part, hold.have) })).filter((x) => x.on));
+  const laid = $derived(rowLaid(parts, hold.have));
   const empty = $derived(laid.every((x) => !x.seen));
+  /* THE SESSIONS SAID AS LINES, less the ones on it now, which the run rows under them draw with their controls. */
+  const agentLines = $derived(hold.here > 0 ? hold.sessionLines.filter((s) => !s.open) : hold.sessionLines);
+  /* WHAT IT RUNS ON, ONE LIST: its services with when each renews, the numbers feed (its setup behind it), then the keys,
+     tools and skills its agents used, one line a name and kind. */
+  type RunsLine = { name: string; sub: string; right: string; tone: 'warn' | 'good' | 'plain'; href: string | null; icon: LineIcon };
+  const runsLines = $derived<RunsLine[]>([
+    ...hold.runsOnLines.map((l): RunsLine => {
+      const feed = l.name === 'Numbers feed';
+      return { ...l, href: feed && hold.facts ? hold.facts.hrefs.feed : l.href, icon: feed ? 'observe' : 'service' };
+    }),
+    /* A SERVICE IS SAID ONCE, above, with when it renews; a cancelled one not at all. */
+    ...onceEach(hold.runsOn.filter((x) => !/service/iu.test(x.kind ?? ''))).map((x): RunsLine => ({ name: x.title, sub: singular(x.kind), right: '', tone: 'plain', href: null, icon: runsIcon(x.kind) })),
+  ]);
 </script>
 
 <div class="shape-row" data-empty={empty ? '' : undefined}>
@@ -95,98 +111,114 @@
   {/each}
 </div>
 
-<!-- ONE PART, as the shape drew it. -->
+<!-- ONE PART. -->
 {#snippet one(part: string)}
   {#if part === 'hero'}
-    {#if hold.drawsHero && hold.hero && read}
-      {@const hero = hold.hero}
+    {#if hold.drawsHero && read && hold.heroFacts}
+      {@const facts = hold.heroFacts}
       {@const status = hold.status}
       {@const name = hold.name}
       <section class="hero" aria-label={name} style={slotStyle(hold.hue)} data-quiet={status.quiet || undefined} id="part-overview" data-part="Overview" data-part-icon="eye">
-        <span class="h-well"><ProjectWell mark={hold.mark} {name} hue={hold.hue} size="xl" /></span>
-        <div class="h-name">
-          <h1 class="h-title" dir="auto">{name}</h1>
-          {#if status.lane || status.health || status.since}
-            <p class="h-status">
-              {status.lane}{#if status.health}{#if status.lane}{' · '}{/if}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span>{/if}{#if status.since}{#if status.health}{' · '}{:else if status.lane}{' '}{/if}since {status.since}{/if}
-            </p>
-          {/if}
+        <div class="h-top">
+          <span class="h-well"><ProjectWell mark={hold.mark} {name} hue={hold.hue} size="l" /></span>
+          <div class="h-name">
+            <p class="h-title" dir="auto">{name}</p>
+            {#if hold.dateLine || status.health}
+              <p class="h-status">
+                {hold.dateLine}{#if status.health}{#if hold.dateLine}{' · '}{/if}<span class="h-health" data-tone={status.health.tone}><span class="dot" aria-hidden="true"></span>{status.health.word}</span>{/if}
+              </p>
+            {/if}
+          </div>
         </div>
+        <h1 class="h-head" dir="auto">{facts.headline}</h1>
         {#if hold.modelLine}
           <p class="h-say" title={WROTE} dir="auto">{hold.modelLine}</p>
-        {:else if hero.sentences.length > 0}
-          <p class="h-say">
-            {#each hero.sentences as s, n (n)}{#if n > 0}{' '}{/if}{#each s as piece, k (k)}{#if piece.figure}<b class="fig num">{piece.text}</b>{:else if piece.late}<span class="late">{piece.text}</span>{:else}{piece.text}{/if}{/each}{/each}
-          </p>
+        {:else if facts.lede}
+          <p class="h-say" dir="auto">{facts.lede}</p>
         {/if}
-        {#if hold.nextLine}
-          {@const nextLine = hold.nextLine}
-          {#if nextLine.href}
-            <a class="h-next" href={at(nextLine.href)}><Icon name="arrow" size="s" /><span dir="auto">{nextLine.text}</span></a>
-          {:else}
-            <p class="h-next"><Icon name="arrow" size="s" /><span dir="auto">{nextLine.text}</span></p>
-          {/if}
+        {#if hold.checklist.length > 0}
+          <div class="h-steps">
+            <p class="h-lbl">Next step</p>
+            <ul class="ck-list">
+              {#each hold.checklist as c, n (n)}
+                <li class="ck">
+                  <span class="ck-box" aria-hidden="true"></span>
+                  {#if c.href}<a class="ck-text" href={at(c.href)} dir="auto">{c.text}</a>{:else}<span class="ck-text" dir="auto">{c.text}</span>{/if}
+                  {#if c.chip}<span class="ck-chip num" data-late={c.late ? '' : undefined}>{c.chip}</span>{/if}
+                </li>
+              {/each}
+            </ul>
+          </div>
         {/if}
-        {#if hold.figs.length > 0}
-          {@const figs = hold.figs}
-          {@const doneCount = hold.doneCount}
-          {@const trace = hold.trace}
-          <ul class="h-figs" style:--figs={figs.length}>
-            {#each figs as f (f.key)}
-              <li class="h-fig" data-arrived={arrived.has(`hero:${f.key === 'open' ? 'along' : f.key}`) ? '' : undefined}>
-                {#if f.key === 'kpi'}
-                  <span class="k k-kpi" dir="auto">{f.kpi.name}</span>
-                  <span class="v num" aria-label={f.kpi.sentence}>{f.kpi.figure}</span>
-                  {#if f.kpi.line}
-                    <svg class="trace" data-stale={f.kpi.stale ? '' : undefined} viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"
-                      >{#if f.kpi.line.area}<path d={f.kpi.line.area} class="trace-area" />{/if}<path d={f.kpi.line.line} class="trace-line" vector-effect="non-scaling-stroke" />{#if f.kpi.line.end}<path d={f.kpi.line.end} class="trace-dot" vector-effect="non-scaling-stroke" />{/if}</svg
-                    >
-                  {/if}
-                  {#if f.kpi.stale || f.kpi.move}<span class="sub move" data-tone={f.kpi.stale ? 'stale' : (f.kpi.move?.tone ?? undefined)}>{f.kpi.stale ?? f.kpi.move?.said}</span>{/if}
-                {:else if f.key === 'money'}
-                  <span class="k"><span class="long">{f.label}</span><span class="short">{HERO_WORDS.short.money}</span></span>
-                  <span class="v num">{hold.said(f.minor, f.currency)}</span>
-                  {#if trace}
-                    <svg class="trace" viewBox="0 0 84 28" aria-hidden="true"
-                      ><path d={trace.area} class="trace-area" /><path d={trace.line} class="trace-line" /><circle cx={trace.end[0]} cy={trace.end[1]} r="2.4" class="trace-end" /></svg
-                    >
-                  {/if}
-                {:else if f.key === 'along'}
-                  <span class="k"><span class="long">{f.label}</span><span class="short">{HERO_WORDS.short.along}</span></span>
-                  <span class="v-ring">
-                    <Ring value={f.value} max={100} size={40} tone="var(--ph)" subject={HERO_WORDS.along} />
-                    <span class="v num">{f.value}%</span>
-                  </span>
-                  {#if f.aim}<span class="sub">{HERO_WORDS.aim(f.aim)}</span>{/if}
-                {:else if f.key === 'open'}
-                  <span class="k"><span class="long">{HERO_WORDS.along}</span><span class="short">{HERO_WORDS.short.along}</span></span>
-                  <span class="v-ring">
-                    <Ring value={doneCount} max={doneCount + f.total} size={40} tone="var(--ph)" subject={HERO_WORDS.along} />
-                    <span class="v num">{Math.round((doneCount / Math.max(1, doneCount + f.total)) * 100)}%</span>
-                  </span>
-                  <span class="sub">{doneCount} of {doneCount + f.total} done</span>
-                {:else}
-                  <span class="k"><span class="long">{f.label}</span><span class="short">{HERO_WORDS.short.working}</span></span>
-                  <span class="v-ring faces">
-                    {#each f.now.slice(0, 3) as w (w.key)}<AgentFace agent={w.agent} run={w.run} live={w.live} size="xs" />{/each}
-                    {#if f.now.length > 0}<span class="v num">{f.now.length}</span>{:else}<span class="v-none">{HERO_WORDS.nobody}</span>{/if}
-                  </span>
-                  {#if f.now[0]?.doing || f.note}<span class="sub clamp" dir="auto">{f.now[0]?.doing ?? f.note}</span>{/if}
-                {/if}
-              </li>
-            {/each}
-          </ul>
+        {#if facts.red || facts.soft}
+          <div class="h-acts">
+            {#if facts.red}<Button weight="primary" href={facts.red.href}>{facts.red.said}</Button>{/if}
+            {#if facts.soft}<Button href={facts.soft.href}>{facts.soft.said}</Button>{/if}
+          </div>
         {/if}
       </section>
     {/if}
     {#if read && hold.register !== '' && hold.seq > 0}
-      <!-- THE PROJECT'S VISUALS, its audits, plans and designs, under the hero and over the path: nothing when it holds none. -->
+      <!-- THE PROJECT'S VISUALS, its audits, plans and designs, under the hero: nothing when it holds none. -->
       <VisualStrip on="{hold.register}#{hold.seq}" tile />
     {/if}
     {#if !hold.shape && hold.holds}
       <!-- A PROJECT THIS TAB HAS DRAWN WAITS IN ITS OWN SHAPE, the picture the page's read drew, never a list's bars. -->
       {@const known = knownRow(apiBase(), hold.key)}
       <div class="held">{#if known}<ProjectWaiting project={known} />{:else}<Waiting rows={3} />{/if}</div>
+    {/if}
+  {:else if part === 'side' && read && hold.side}
+    {@const side = hold.side}
+    {#if side.kind === 'money'}
+      <Tile icon="money" title="Money" class="t-side" id="part-side" data-part="Money" data-part-icon="money">
+        {#snippet actions()}{#if side.stale}<span class="chip-age">{side.stale}</span>{/if}{/snippet}
+        <div class="s-fig"><span class="s-big num">{side.figure}</span><span class="s-sub">{side.sub}</span></div>
+        {#if side.bars.length >= 3}
+          <svg class="s-bars" viewBox="0 0 336 72" preserveAspectRatio="none" aria-hidden="true">
+            {#each barsOf(side.bars) as b, n (n)}<rect x={b.x + 2} y={b.y} width={Math.max(2, 336 / side.bars.length - 6)} height={b.h} rx="2" data-last={b.last ? '' : undefined} />{/each}
+          </svg>
+        {/if}
+        {#if side.lines.length > 0}
+          <dl class="kv">
+            {#each side.lines as l, n (n)}<div class="kv-row"><dt dir="auto">{l.k}</dt><dd class="num">{l.v}</dd></div>{/each}
+          </dl>
+        {/if}
+      </Tile>
+    {:else if side.kind === 'path'}
+      <Tile icon="clock" title="Path" meta={side.end ? `to ${side.end}` : undefined} href={hold.workHref ?? undefined} hrefLabel={hold.workHref ? 'All' : undefined} class="t-side" id="part-side" data-part="Path" data-part-icon="clock">
+        {#if side.stops.length > 0}
+          <ol class="stops">
+            {#each side.stops as st, n (n)}
+              <li class="stop" data-tone={st.tone}>
+                <span class="st-dot" aria-hidden="true"></span>
+                <span class="st-day num">{st.day}</span>
+                <a class="st-words" href={at(st.href)}><span class="st-title" dir="auto">{st.title}</span>{#if st.sub}<span class="st-sub">{st.sub}</span>{/if}</a>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+        {#if side.aim}<p class="s-aim">Aim: {side.aim}</p>{/if}
+        {#if side.empty}<p class="s-empty">{side.empty}</p>{/if}
+      </Tile>
+    {:else if side.kind === 'keep'}
+      <Tile icon="archive" title="Keeping it" class="t-side" id="part-side" data-part="Keeping it" data-part-icon="archive">
+        {#if side.year}<p class="s-year">{side.year}</p>{/if}
+        {#if side.lines.length > 0}
+          <dl class="kv">
+            {#each side.lines as l, n (n)}<div class="kv-row"><dt><a href={at(l.href)} dir="auto">{l.k}</a></dt><dd class="num">{l.v}</dd></div>{/each}
+          </dl>
+        {/if}
+        {#if hold.owner}
+          <div class="s-acts">
+            <Button size="sm" disabled={moving} onclick={() => void moveTo('building')}>Bring it back</Button>
+            {#if hold.lane !== 'retired'}<Button size="sm" disabled={moving} onclick={() => void moveTo('retired')}>Finish it</Button>{/if}
+            {#if side.domain}<Button size="sm" weight="bare" href={side.domain.href}>Let the domain go</Button>{/if}
+          </div>
+          {#if moveSaid}<p class="s-said" role="status">{moveSaid}</p>{/if}
+        {/if}
+      </Tile>
+    {:else if hold.hasMoney}
+      <ProjectVisuals only="money" inByMonth={read.inByMonth} outByMonth={read.outByMonth} trend={hold.trend} format={hold.said} money={hold.money} moneyRows={hold.moneyRows} {arrived} />
     {/if}
   {:else if (part === 'path' || part === 'money') && read}
     <ProjectVisuals
@@ -197,12 +229,36 @@
       inByMonth={read.inByMonth}
       outByMonth={read.outByMonth}
       trend={hold.trend}
-      earnedSaid={hold.figs.some((f) => f.key === 'money')}
+      earnedSaid={false}
       format={hold.said}
       money={hold.money}
       moneyRows={hold.moneyRows}
       {arrived}
     />
+  {:else if part === 'numbers' && hold.numbers && hold.numbers.cells.length > 0}
+    {@const nums = hold.numbers}
+    <Tile icon="chart-line" title="Numbers" count={nums.more > 0 ? `${nums.cells.length} of ${nums.cells.length + nums.more}` : nums.cells.length} meta={nums.cadence || undefined} class="t-numbers" id="part-numbers" data-part="Numbers" data-part-icon="chart-line">
+      {#if nums.banner}
+        <div class="n-ban" role="status">
+          <Icon name="alert" size="s" />
+          <span class="n-ban-words"><b>{nums.banner.said}</b> {nums.banner.why}</span>
+          {#if hold.facts}<Button size="sm" href={hold.facts.hrefs.feed}>Fix the feed</Button>{/if}
+        </div>
+      {/if}
+      <ul class="n-cells">
+        {#each nums.cells as c (c.label)}
+          <li class="n-cell" data-stale={c.stale ? '' : undefined}>
+            <span class="n-label" dir="auto">{c.label}</span>
+            <span class="n-fig num">{c.figure}</span>
+            {#if c.trail}
+              <svg class="n-trail" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d={c.trail.area} class="n-area" /><path d={c.trail.line} class="n-line" vector-effect="non-scaling-stroke" /></svg>
+            {/if}
+            {#if c.sub}<span class="n-sub">{c.sub}</span>{/if}
+            {#if c.stale}<span class="chip-age">{c.age} days old</span>{/if}
+          </li>
+        {/each}
+      </ul>
+    </Tile>
   {:else if part === 'what-is-open' && hold.workLists}
     {@const w = hold.workLists}
     {@const workHref = hold.workHref}
@@ -212,20 +268,6 @@
         <span class="w-count num">{w.total} open{#if w.late > 0}, <span class="late">{w.late} late</span>{/if}</span>
       {/snippet}
       <div class="w-cols">
-        {#if w.agents.length > 0}
-          <section class="w-col" aria-label="With agents">
-            <h3 class="w-head">With agents <span class="num">{w.agents.length}</span></h3>
-            <ul class="w-list">
-              {#each w.agents.slice(0, SHOWN) as r (r.seq)}
-                <li class="w-row" data-arrived={arrived.has(`row:${r.seq}`) ? '' : undefined}>
-                  <AgentFace agent={r.agent} run="" live={r.live} size="xs" />
-                  <a class="w-words" href={at(hold.stopHref(r.seq) ?? '')}><span class="w-title" dir="auto">{r.title}</span><span class="w-sub">{r.sub}</span></a>
-                </li>
-              {/each}
-            </ul>
-            {#if w.agents.length > SHOWN && workHref}<a class="w-more" href={at(workHref)}>{w.agents.length - SHOWN} more</a>{/if}
-          </section>
-        {/if}
         {#if w.yours.length > 0}
           <section class="w-col yours" aria-label="With you">
             <h3 class="w-head">With you <span class="num">{w.yours.length}</span></h3>
@@ -240,7 +282,32 @@
             {#if w.yours.length > SHOWN && workHref}<a class="w-more" href={at(workHref)}>{w.yours.length - SHOWN} more</a>{/if}
           </section>
         {/if}
+        {#if w.agents.length > 0}
+          <section class="w-col" aria-label="With agents">
+            <h3 class="w-head">With agents <span class="num">{w.agents.length}</span></h3>
+            <ul class="w-list">
+              {#each w.agents.slice(0, SHOWN) as r (r.seq)}
+                <li class="w-row" data-arrived={arrived.has(`row:${r.seq}`) ? '' : undefined}>
+                  <AgentFace agent={r.agent} run="" live={r.live} size="xs" />
+                  <a class="w-words" href={at(hold.stopHref(r.seq) ?? '')}><span class="w-title" dir="auto">{r.title}</span><span class="w-sub">{r.sub}</span></a>
+                </li>
+              {/each}
+            </ul>
+            {#if w.agents.length > SHOWN && workHref}<a class="w-more" href={at(workHref)}>{w.agents.length - SHOWN} more</a>{/if}
+          </section>
+        {/if}
       </div>
+    </Tile>
+  {:else if part === 'dates' && hold.dates.length > 0}
+    <Tile icon="calendar" title="Dates" meta="next 4 months" class="t-dates" id="part-dates" data-part="Dates" data-part-icon="calendar">
+      <ul class="li-list">
+        {#each hold.dates as d, n (n)}
+          <li class="li" data-tone={d.tone}>
+            <span class="li-when num">{d.day}</span>
+            {#if d.href}<a class="li-text" href={at(d.href)} dir="auto">{d.text}</a>{:else}<span class="li-text" dir="auto">{d.text}</span>{/if}
+          </li>
+        {/each}
+      </ul>
     </Tile>
   {:else if part === 'who-is-on-it' && hold.people.length > 0}
     {@const people = hold.people}
@@ -255,15 +322,23 @@
         {/each}
       </ul>
     </Tile>
-  {:else if part === 'runs-on' && hold.runsOn.length > 0}
-    {@const runsOn = onceEach(hold.runsOn)}
-    <Tile icon="plug" title="Runs on" count={runsOn.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsOn.length}>
-      <ul class="r-list" data-wide={hold.todayAlone ? undefined : ''}>
-        {#each runsOn.slice(0, RUNS_ON_SHOWN) as x (x.key)}
-          <li class="r-row"><Icon name={runsIcon(x.kind)} size="s" /><span class="r-name" dir="auto">{x.title}</span>{#if x.kind}<span class="r-kind">{singular(x.kind)}</span>{/if}</li>
+  {:else if part === 'runs-on' && runsLines.length > 0}
+    <!-- WHAT IT RUNS ON AND WHEN EACH RENEWS, from its services, the soonest first; the numbers feed as one line that
+         says whether it is quiet, its setup behind it; then the keys, tools and skills its agents used. -->
+    <Tile icon="plug" title="Runs on and renewals" count={runsLines.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsLines.length}>
+      <ul class="r-list">
+        {#each runsLines.slice(0, LINES_SHOWN) as l, n (n)}
+          <li class="r-row" data-tone={l.tone}>
+            <Icon name={l.icon} size="s" />
+            <span class="r-words">
+              {#if l.href}<a class="r-name" href={at(l.href)} dir="auto">{l.name}</a>{:else}<span class="r-name" dir="auto">{l.name}</span>{/if}
+              {#if l.sub}<span class="r-kind">{l.sub}</span>{/if}
+            </span>
+            {#if l.right}<span class="r-right num">{l.right}</span>{/if}
+          </li>
         {/each}
       </ul>
-      {#if runsOn.length > RUNS_ON_SHOWN}<p class="r-more">and {runsOn.length - RUNS_ON_SHOWN} more</p>{/if}
+      {#if runsLines.length > LINES_SHOWN}<p class="r-more">and {runsLines.length - LINES_SHOWN} more</p>{/if}
     </Tile>
   {:else if part === 'agents-here' && read}
     {#snippet dayBar(now: number)}
@@ -278,43 +353,54 @@
         <div class="ticks num">{#each ['00', '06', '12', '18', '24'] as t (t)}<span>{t}</span>{/each}</div>
       </div>
     {/snippet}
-    {#snippet todayList(list: readonly SessionRow[])}
-      <ul class="a-list">
-        {#each list.slice(0, 4) as s, n (s.seq ?? n)}
-          <li class="a-row">
-            <AgentFace agent={s.agent} run={s.seq === null ? '' : `S${s.seq}`} live={s.working ? 'working' : 'stopped'} size="xs" />
-            <!-- WHAT IT DOES, NOT WHO: the face says which agent, and the Work tile names it once (proj F1). NO MACHINE NAME
-                 (VERIFY H14): "on kiln-mbp" is a host's id, not a place a person knows. -->
-            <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{unsourced(s.doing || actor(s.agent).name, actor(s.agent).name)}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
-          </li>
-        {/each}
-      </ul>
-    {/snippet}
-    {#if hold.todayAlone}
-      <Tile icon="session" title="Agents here today" class="t-today" id="part-agents" data-part="Agents" data-part-icon="session">
-        {@render dayBar(read.now)}
-        {@render todayList(hold.sessions)}
-      </Tile>
-    {/if}
-    <!-- WHO IS ON IT NOW AND THE BOX TO TELL THEM (plan §7.2): the Agents page's run rows and composer, scoped to this
-         project, so a stop or a tell from here says what it says there. With nobody on it the composer stands alone, and
-         the next run to start here gets what he types; for a reader who may not tell, nobody on it draws nothing.
-         THE DAY BAR ON TOP when a run was here today, and with nobody on it now, who was: the one tile for the agents. -->
+    <!-- THE AGENTS ON IT: today's day bar where one was here today, each session with how it ended and what it left, who
+         is on it now (`PresencePanel`, the Agents page's run rows scoped here), and the box to tell them at the foot, in
+         ink, never the page's red. For a reader who may not tell and no session yet, the runs are read unseen. -->
     {#key read.key}
-      {#if hold.band}
-        <Tile icon="session" title={hold.here > 0 ? hereWords.working : hereWords.tell(hold.name)} count={hold.here > 0 ? hold.here : undefined} class="t-here" data-working-here id="part-agents" data-part="Agents" data-part-icon="session" data-part-live={hold.here > 0 ? '' : undefined}>
-          {#if hold.sessions.length > 0}
-            {@render dayBar(read.now)}
-            {#if hold.here === 0}{@render todayList(hold.sessions)}{/if}
+      {#if hold.band || hold.sessionLines.length > 0 || hold.sessions.length > 0}
+        <Tile icon="session" title="Agents" count={hold.here > 0 ? `${hold.here} on it now` : hold.sessionLines.length > 0 ? `${hold.sessionLines.length} recent` : undefined} class="t-agents" id="part-agents" data-part="Agents" data-part-icon="session" data-part-live={hold.here > 0 ? '' : undefined}>
+          {#if hold.sessions.length > 0}{@render dayBar(read.now)}{/if}
+          {#if agentLines.length > 0}
+            <ul class="a-list">
+              {#each agentLines as s (s.seq)}
+                <li class="a-row">
+                  <AgentFace agent={s.agent} run={`S${s.seq}`} live={s.open ? 'working' : 'stopped'} size="xs" />
+                  <span class="a-words" title={actor(s.agent).name}>
+                    <span class="a-name" dir="auto">{unsourced(s.title, actor(s.agent).name)}<span class="a-when">, {s.when}</span></span>
+                    <span class="a-sub" dir="auto">{s.ended}{#if s.said}{' · '}{s.said}{/if}</span>
+                  </span>
+                </li>
+              {/each}
+            </ul>
           {/if}
           <PresencePanel owner={hold.owner} project={read.key} oncount={(n) => (hold.here = n)} />
-          <TellPanel owner={hold.owner} project={read.key} projectName={hold.name} first={3} />
+          <div class="a-tell"><TellPanel owner={hold.owner} project={read.key} projectName={hold.name} first={3} /></div>
         </Tile>
       {:else}
-        <!-- NOBODY ON IT YET, for a reader who may not tell: the runs are read unseen, and the tile comes once one is. -->
         <div hidden><PresencePanel project={read.key} oncount={(n) => (hold.here = n)} /></div>
       {/if}
     {/key}
+  {:else if part === 'decisions' && read && read.decided.length > 0}
+    <Tile icon="decide" title="Decided" count={read.decided.length} class="t-decided" id="part-decided" data-part="Decided" data-part-icon="decide">
+      <ul class="li-list">
+        {#each read.decided as d, n (n)}
+          <li class="li">
+            <span class="li-text" dir="auto">{d.question}{#if d.answer}<span class="li-sub">{d.answer}</span>{/if}</span>
+          </li>
+        {/each}
+      </ul>
+    </Tile>
+  {:else if part === 'happened' && hold.happened.length > 0}
+    <Tile icon="history" title="What happened" class="t-happened" id="part-happened" data-part="What happened" data-part-icon="history">
+      <ul class="li-list">
+        {#each hold.happened as h, n (n)}
+          <li class="li" data-tone={h.tone}>
+            <span class="li-when num">{h.day}</span>
+            <span class="li-text" dir="auto">{h.text}{#if h.by}<span class="li-sub">{h.by}</span>{/if}</span>
+          </li>
+        {/each}
+      </ul>
+    </Tile>
   {/if}
 {/snippet}
 
@@ -327,21 +413,18 @@
   }
 
   /* ── the hero ── */
-  /* THE PROJECT'S COLOUR AT A LOW TINT OVER THE TILE, never a gradient.
-     8% IN BOTH SCHEMES. Dark took 12%, and the late count's `--red` over it read 4.2 to 4.4 to 1 for every slot, the
-     amber and the lime lowest; at 8% the lightest slot keeps it over 4.5, and the tint still reads as the project's. */
-  /* THE NAME FIRST, THEN ONE LINE OF NEWS, SINCE the audit of 22 October (U6, U-B7). The bento boards' lead tile of the
-     same day put the name small and the sentence under it at 40px, and on a record whose sentence was what the project
-     is, every page opened on a tagline at headline size. Now the 56 well and the name at 34/40 in the display face (28/34
-     on a phone) with where it stands under it, and the news at 17 under them: what is late, and who worked on it last. */
+  /* THE PROJECT'S COLOUR AT A LOW TINT OVER THE TILE, never a gradient: 8% in both schemes, so the late chip's red holds.
+     THE NAME SMALL OVER ITS DATE LINE, THEN THE FACT AT HEADLINE SIZE (the page of 27 October): the headline is what is
+     true of it, the line under it says one more thing, the next step is a checklist, and one red button ends it. */
   .hero {
     --ph: var(--ink);
     --h-wash: 8%;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    column-gap: 12px;
-    row-gap: 12px;
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 12px;
+    block-size: 100%;
+    box-sizing: border-box;
     padding: 16px;
     border-radius: var(--r-tile, 16px);
     background: color-mix(in oklab, var(--ph) var(--h-wash), var(--tile));
@@ -357,27 +440,30 @@
     opacity: 0.7;
   }
 
+  .h-top {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
   .h-well {
     display: grid;
   }
 
   .h-name {
-    display: flex;
-    flex-direction: column;
+    display: grid;
     gap: 2px;
     min-inline-size: 0;
   }
 
   .h-title {
-    min-inline-size: 0;
     margin: 0;
     overflow: hidden;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--fs-page);
+    font-size: var(--fs-head);
     font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 34px;
+    line-height: 22px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -407,23 +493,25 @@
     font-weight: 600;
   }
 
-  .h-health[data-tone='off'] .dot {
-    background: var(--warn);
+  /* THE FACT, at the page's size in the display face: 24/30 on a phone, 30/36 wide. */
+  .h-head {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 30px;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
   }
 
-  /* THE ONE LINE OF NEWS, at the size of a line read, not a headline: the name is what the page opens on. */
   .h-say {
-    grid-column: 1 / -1;
     margin: 0;
     color: var(--ink-2);
-    font-size: var(--fs-head);
-    line-height: 24px;
+    font-size: var(--fs-body);
+    line-height: 22px;
     overflow-wrap: anywhere;
-  }
-
-  .fig {
-    color: var(--ink);
-    font-weight: 600;
   }
 
   .late {
@@ -431,50 +519,354 @@
     font-weight: 600;
   }
 
-  .h-next {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: 22px;
-    text-decoration: none;
-  }
-
-  .h-next :global(.icon) {
-    flex: none;
-    margin-block-start: 3px;
-    color: var(--ph);
-  }
-
-  a.h-next:hover span {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  .h-figs {
-    grid-column: 1 / -1;
+  .h-steps {
     display: grid;
-    grid-template-columns: repeat(var(--figs, 3), minmax(0, 1fr));
-    gap: 8px;
+    gap: 4px;
+    margin-block-start: 4px;
+  }
+
+  .h-lbl {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .ck-list {
+    display: grid;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .h-fig {
+  .ck {
     display: grid;
-    align-content: start;
-    gap: 6px;
-    min-inline-size: 0;
-    padding: 12px;
-    border-radius: 12px;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-block-size: 36px;
+  }
+
+  .ck + .ck {
+    border-block-start: 1px solid color-mix(in oklab, var(--rule) 70%, transparent);
+  }
+
+  .ck-box {
+    box-sizing: border-box;
+    inline-size: 16px;
+    block-size: 16px;
+    border: 1.5px solid var(--rule-strong);
+    border-radius: 4px;
     background: var(--tile);
   }
 
-  .k {
+  .ck-text {
+    min-inline-size: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 20px;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+
+  a.ck-text:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .ck-chip,
+  .chip-age {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--tile-2);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .ck-chip[data-late] {
+    background: color-mix(in oklab, var(--red) 12%, var(--tile));
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  /* PAST TWICE ITS CADENCE: amber, never red. */
+  .chip-age {
+    background: color-mix(in oklab, var(--warn) 14%, var(--tile));
+    color: var(--warn);
+    font-weight: 600;
+  }
+
+  .h-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-inline-size: 0;
+    margin-block-start: 4px;
+  }
+
+  /* A LONG TASK NAME IN THE BUTTON IS CUT, never wider than the hero. */
+  .h-acts :global(.btn) {
+    display: inline-block;
+    max-inline-size: 100%;
+    overflow: hidden;
+    line-height: var(--ctl-h);
+    text-overflow: ellipsis;
+  }
+
+  @media (width >= 640px) {
+    .hero {
+      padding: 24px;
+    }
+
+    .h-head {
+      font-size: 30px;
+      line-height: 36px;
+    }
+  }
+
+  /* ── the tile beside the hero ── */
+  .s-fig {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .s-big {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--fs-figure);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .s-sub,
+  .s-aim,
+  .s-empty,
+  .s-said {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .s-aim,
+  .s-empty,
+  .s-said {
+    margin: 8px 0 0;
+  }
+
+  .s-year {
+    margin: 8px 0 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 600;
+  }
+
+  .s-bars {
+    display: block;
+    inline-size: 100%;
+    block-size: 72px;
+    margin-block-start: 12px;
+  }
+
+  .s-bars rect {
+    fill: color-mix(in oklab, var(--ph) 40%, var(--tile));
+  }
+
+  .s-bars rect[data-last] {
+    fill: var(--ph);
+  }
+
+  .kv {
+    display: grid;
+    margin: 12px 0 0;
+  }
+
+  .kv-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-block: 7px;
+    border-block-start: 1px solid var(--rule);
+    font-size: var(--fs-body);
+    line-height: 20px;
+  }
+
+  .kv-row dt {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .kv-row dt a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .kv-row dd {
+    margin: 0;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .s-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-block-start: 12px;
+  }
+
+  /* THE DATED PATH, a line down the left, a dot a stop: done filled, late in red, the reader's in amber. */
+  .stops {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .stop {
+    position: relative;
+    display: grid;
+    grid-template-columns: 12px 52px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding-block: 6px;
+  }
+
+  .stop + .stop::before {
+    content: '';
+    position: absolute;
+    inset-block: -6px 50%;
+    inset-inline-start: 5px;
+    inline-size: 2px;
+    background: var(--rule);
+  }
+
+  .st-dot {
+    position: relative;
+    z-index: 1;
+    box-sizing: border-box;
+    inline-size: 12px;
+    block-size: 12px;
+    margin-block-start: 4px;
+    border: 2px solid var(--rule-strong);
+    border-radius: 50%;
+    background: var(--tile);
+  }
+
+  .stop[data-tone='done'] .st-dot {
+    border-color: var(--ph);
+    background: var(--ph);
+  }
+
+  .stop[data-tone='doing'] .st-dot {
+    border-color: var(--ph);
+  }
+
+  .stop[data-tone='late'] .st-dot {
+    border-color: var(--red);
+  }
+
+  .stop[data-tone='you'] .st-dot {
+    border-color: var(--warn);
+  }
+
+  .st-day {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 20px;
+  }
+
+  .st-words {
+    display: grid;
+    min-inline-size: 0;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .st-title {
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .st-sub {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .stop[data-tone='late'] .st-sub {
+    color: var(--red);
+  }
+
+  .stop[data-tone='you'] .st-sub {
+    color: var(--warn);
+  }
+
+  /* ── numbers ── */
+  .n-ban {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-block-end: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--warn) 10%, var(--tile));
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .n-ban :global(.icon) {
+    flex: none;
+    color: var(--warn);
+  }
+
+  .n-ban-words {
+    flex: 1 1 220px;
+    min-inline-size: 0;
+  }
+
+  .n-ban-words b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .n-cells {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (width >= 900px) {
+    .n-cells {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+  }
+
+  .n-cell {
+    display: grid;
+    align-content: start;
+    justify-items: start;
+    gap: 4px;
+    min-inline-size: 0;
+  }
+
+  .n-label {
+    max-inline-size: 100%;
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -483,210 +875,111 @@
     white-space: nowrap;
   }
 
-  /* A KEY NUMBER'S NAME IS THE PERSON'S OWN AND HAS NO SHORT FORM, so on a phone it wraps to two lines where it was cut
-     to "Revenue a ...". Every label in the row then holds two lines, so the figures under them still share a baseline. */
-  .k-kpi {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .h-figs:has(.k-kpi) .k {
-    min-block-size: 36px;
-  }
-
-  .k .long {
-    display: none;
-  }
-
-  .v {
+  .n-fig {
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: calc(var(--fs-figure) - 2px);
+    font-size: 22px;
     font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
+    letter-spacing: -0.02em;
+    line-height: 28px;
   }
 
-  .v-ring {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-inline-size: 0;
-  }
-
-  .v-ring :global(.viz-ring) {
-    flex: none;
-    inline-size: 28px;
-  }
-
-  .faces {
-    gap: 0;
-  }
-
-  /* NOBODY ON IT NOW is said in words, never a nought standing for a person. */
-  .v-none {
+  .n-cell[data-stale] .n-fig {
     color: var(--ink-2);
-    font-size: var(--fs-body);
-    font-weight: 500;
-    line-height: 26px;
   }
 
-  .faces :global(.agent-face + .agent-face) {
-    margin-inline-start: -6px;
+  .n-trail {
+    inline-size: 100%;
+    max-inline-size: 160px;
+    block-size: 32px;
   }
 
-  .faces .v {
-    margin-inline-start: 8px;
+  .n-line {
+    fill: none;
+    stroke: var(--ph);
+    stroke-width: 1.75;
+    stroke-linejoin: round;
+    stroke-linecap: round;
   }
 
-  .sub {
-    display: none;
+  .n-area {
+    fill: color-mix(in oklab, var(--ph) 12%, transparent);
+  }
+
+  .n-cell[data-stale] .n-line {
+    stroke: var(--ink-3);
+  }
+
+  .n-cell[data-stale] .n-area {
+    fill: color-mix(in oklab, var(--ink-3) 10%, transparent);
+  }
+
+  .n-sub {
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
   }
 
-  .clamp {
-    display: none;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
+  /* ── dates, what was decided and what happened: a day and a line ── */
+  .li-list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  .trace {
-    display: none;
-    inline-size: 84px;
-    block-size: 28px;
+  .li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 12px;
+    padding-block: 8px;
   }
 
-  .trace-line {
-    fill: none;
-    stroke: var(--ph);
-    stroke-width: 2;
-    stroke-linejoin: round;
-    stroke-linecap: round;
+  .li + .li {
+    border-block-start: 1px solid var(--rule);
   }
 
-  .trace-area {
-    fill: color-mix(in oklab, var(--ph) 12%, transparent);
+  .li:not(:has(.li-when)) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .trace-end {
-    fill: var(--ph);
+  .li-when {
+    min-inline-size: 76px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 20px;
+    white-space: nowrap;
   }
 
-  /* A KEY NUMBER'S LINE, drawn in the renderer's box at the hero's size: its dot is a round stroke, so it stays round. */
-  .trace-dot {
-    fill: none;
-    stroke: var(--ph);
-    stroke-width: 5;
-    stroke-linecap: round;
+  .li[data-tone='late'] .li-when,
+  .li[data-tone='late'] .li-text {
+    color: var(--red);
   }
 
-  .trace[data-stale] .trace-line,
-  .trace[data-stale] .trace-dot {
-    stroke: var(--ink-3);
-  }
-
-  .trace[data-stale] .trace-area {
-    fill: color-mix(in oklab, var(--ink-3) 10%, transparent);
-  }
-
-  /* HOW IT MOVED, with its words: the good way in the good colour, the other and stale in the warn, never red. */
-  .move {
-    text-wrap: balance;
-  }
-
-  .move[data-tone='good'] {
-    color: var(--good);
-  }
-
-  .move[data-tone='warn'],
-  .move[data-tone='stale'] {
+  .li[data-tone='warn'] .li-text {
     color: var(--warn);
   }
 
-  @media (width >= 640px) {
-    .hero {
-      column-gap: 12px;
-      padding: 24px;
-    }
-
-    .h-title {
-      font-size: var(--fs-hero);
-      line-height: 40px;
-    }
-
-    .h-figs {
-      gap: 12px;
-    }
-
-    .h-fig {
-      min-block-size: 112px;
-      padding: 14px 16px;
-    }
-
-    /* WIDE, A NAME HAS ITS LINE: no second one is held under the labels. */
-    .h-figs:has(.k-kpi) .k {
-      min-block-size: 0;
-    }
-
-    .k .long {
-      display: inline;
-    }
-
-    .k .short {
-      display: none;
-    }
-
-    .v {
-      font-size: calc(var(--fs-figure) + 2px);
-    }
-
-    .v-ring :global(.viz-ring) {
-      inline-size: 40px;
-    }
-
-    .sub {
-      display: block;
-    }
-
-    .clamp {
-      display: -webkit-box;
-    }
-
-    .trace {
-      display: block;
-    }
+  .li-text {
+    display: grid;
+    min-inline-size: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 20px;
+    text-decoration: none;
+    overflow-wrap: anywhere;
   }
 
-  /* FROM 1100px THE FIGURES STAND ON THE RIGHT, three tiles 168 wide over the hero's three rows. */
-  @media (width >= 1100px) {
-    .hero {
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      align-items: start;
-    }
+  a.li-text:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 
-    .h-name {
-      align-self: center;
-    }
-
-    .h-say,
-    .h-next {
-      grid-column: 1 / 3;
-    }
-
-    .h-figs {
-      grid-column: 3;
-      grid-row: 1 / span 3;
-      grid-template-columns: repeat(var(--figs, 3), 168px);
-      align-self: start;
-    }
+  .li-sub {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   /* ── the row and its parts ──
@@ -884,17 +1177,7 @@
     font-weight: 600;
   }
 
-  /* ── runs on ── */
-  .r-list[data-wide] {
-    column-gap: 24px;
-  }
-
-  @media (width >= 900px) {
-    .r-list[data-wide] {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
+  /* ── runs on and renewals ── */
   .r-row {
     display: grid;
     grid-template-columns: 16px minmax(0, 1fr) auto;
@@ -905,22 +1188,79 @@
     color: var(--ink-3);
   }
 
+  .r-words {
+    display: grid;
+    min-inline-size: 0;
+  }
+
   .r-name {
     overflow: hidden;
     color: var(--ink);
     font-size: var(--fs-body);
+    line-height: 20px;
+    text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  a.r-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .r-kind {
+    overflow: hidden;
     font-size: var(--fs-meta);
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .r-right {
+    font-size: var(--fs-meta);
+    white-space: nowrap;
+  }
+
+  .r-row[data-tone='warn'] .r-right {
+    color: var(--warn);
+    font-weight: 600;
+  }
+
+  .r-row[data-tone='good'] .r-right {
+    color: var(--good);
   }
 
   .r-more {
     margin: var(--sp-2) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+  }
+
+  /* ── the agents ── */
+  /* THE BOX TO TELL THEM, AT THE FOOT AND IN INK: Send is the screen's red everywhere else, and here the hero's button
+     is the one red thing on the page. */
+  .a-tell {
+    margin-block-start: 8px;
+  }
+
+  .a-tell :global(.ins-send) {
+    background: var(--ink);
+    color: var(--tile);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .a-tell :global(.ins-send:hover:not(:active)) {
+      background: var(--ink-2);
+    }
+  }
+
+  .a-tell :global(.ins-send:active) {
+    background: var(--ink-2);
+  }
+
+  .a-when {
+    color: var(--ink-3);
+    font-weight: 400;
   }
 
   /* ── agents here today ── */

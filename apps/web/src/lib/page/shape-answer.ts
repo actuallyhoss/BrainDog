@@ -32,15 +32,17 @@ import { entryOf, learn, refMapOf, targetsOf, type RecordRow, type RefMap } from
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import { spokenTargets } from '../record/row-live.ts';
 import { recordNow } from '../record/boot-live.ts';
+import { rowHref } from '../record/row-href.ts';
+import type { FactDecided, FactReading, FactRecurring, FactRun, FactService, Money } from './project-facts.ts';
 
-export type WorkRow = { seq: number; fields: Readonly<Record<string, unknown>> };
+export type WorkRow = { seq: number; fields: Readonly<Record<string, unknown>>; created?: string | null; updated?: string | null };
 
 /** What the shape is drawn from. */
 export type ShapeRead = {
   key: string;
   fields: Readonly<Record<string, unknown>>;
   /** The row as the record answered it, its own `id` and the day it was made among it, for a panel that needs them. */
-  row: { id: string; created_at: string | null };
+  row: { id: string; created_at: string | null; version: number | null };
   incoming: Parameters<typeof shapeOf>[0]['incoming'];
   history: Parameters<typeof shapeOf>[0]['history'];
   money: { in: Figure | null; out: Figure | null; owed: Figure | null };
@@ -61,6 +63,14 @@ export type ShapeRead = {
   last: { name: string; said: string } | null;
   /** The key number its card leads with, as the `kpis` source answered it, where it keeps one. */
   kpi: KpiAnswered | null;
+  /** Every key number it keeps, as the `kpis` source answered them. */
+  kpis: KpiAnswered[];
+  /** Its runs, newest heard first; what it runs on; its readings, newest first; its repeating money; what was decided. */
+  runs: FactRun[];
+  services: FactService[];
+  readings: FactReading[];
+  recurring: FactRecurring[];
+  decided: FactDecided[];
   now: number;
 };
 
@@ -75,7 +85,87 @@ export type ShapeAnswer = {
   runs: { list: string; field: string; rows: unknown[] } | null;
   kpis: unknown[] | null;
   figures: Readonly<Record<string, unknown>>;
+  services?: { list: string; field: string; rows: unknown[] } | null;
+  readings?: { list: string; field: string; rows: unknown[] } | null;
+  recurring?: { list: string; field: string; rows: unknown[] } | null;
+  decided?: unknown[] | null;
 };
+
+type Raw = { seq?: unknown; fields?: Record<string, unknown>; updated_at?: unknown };
+const t = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+const moneyIn = (v: unknown): Money | null => {
+  const m = v as { amount?: unknown; currency?: unknown } | null;
+  return m && typeof m.amount === 'number' && typeof m.currency === 'string' && m.currency !== '' ? { minor: m.amount, currency: m.currency } : null;
+};
+const rowsIn = (part: { rows?: unknown } | null | undefined): Raw[] => (Array.isArray(part?.rows) ? (part.rows as Raw[]).filter((r) => isObject(r) && isObject(r.fields)) : []);
+
+/** The runs on it as the page reads them, newest heard first. */
+export function runsIn(rows: readonly Raw[]): FactRun[] {
+  return rows.flatMap((r) => {
+    const f = r.fields ?? {};
+    const at = t(f.last_seen) || t(r.updated_at);
+    if (typeof r.seq !== 'number' || at === '') return [];
+    return [
+      {
+        seq: r.seq,
+        agent: t(f.agent) || 'other',
+        doing: t(f.doing),
+        at,
+        started: t(f.started) || at,
+        state: t(f.state),
+        closedAs: t(f.closed_as),
+        next: t(f.next),
+        notes: Array.isArray(f.notes) ? f.notes.map(t).filter(Boolean) : [],
+        wrote: typeof f.wrote === 'number' ? f.wrote : null,
+        repo: t(f.repo),
+      },
+    ];
+  });
+}
+
+/** What it runs on, as the services list holds it. */
+export function servicesIn(part: { list: string; rows?: unknown } | null | undefined): FactService[] {
+  const list = part?.list ?? '';
+  return rowsIn(part).flatMap((r) => {
+    const f = r.fields ?? {};
+    const name = t(f[REGISTERS[list]?.title ?? 'name']) || t(f.name);
+    if (typeof r.seq !== 'number' || name === '') return [];
+    const renews = t(f.renews);
+    return [{ seq: r.seq, name, provider: t(f.provider), kind: t(f.kind), renews: /^\d{4}-\d{2}-\d{2}/u.test(renews) ? renews.slice(0, 10) : null, cost: moneyIn(f.cost), cycle: t(f.cycle), state: t(f.state), note: t(f.note), href: rowHref(`${list}#${r.seq}`) ?? `/r/${list}/${r.seq}` }];
+  });
+}
+
+/** Its readings, newest first. */
+export function readingsIn(part: { rows?: unknown } | null | undefined): FactReading[] {
+  return rowsIn(part).flatMap((r) => {
+    const f = r.fields ?? {};
+    const at = t(f.at);
+    const name = t(f.name);
+    if (at === '' || name === '') return [];
+    return [{ name, value: typeof f.value === 'number' && Number.isFinite(f.value) ? f.value : null, amount: moneyIn(f.amount), unit: t(f.unit), at, source: t(f.source) }];
+  });
+}
+
+/** Its repeating money. */
+export function recurringIn(part: { rows?: unknown } | null | undefined): FactRecurring[] {
+  return rowsIn(part).flatMap((r) => {
+    const f = r.fields ?? {};
+    const amount = moneyIn(f.amount);
+    if (!amount) return [];
+    const next = t(f.next_due);
+    return [{ what: t(f.what), direction: t(f.direction), amount, every: t(f.every), nextDue: /^\d{4}-\d{2}-\d{2}/u.test(next) ? next.slice(0, 10) : null, state: t(f.state) || 'live' }];
+  });
+}
+
+/** What was decided about it, latest first. */
+export function decidedIn(rows: unknown): FactDecided[] {
+  return (Array.isArray(rows) ? (rows as Raw[]) : []).flatMap((r) => {
+    const f = isObject(r) && isObject(r.fields) ? r.fields : null;
+    if (!f) return [];
+    const question = t(f.question);
+    return question === '' ? [] : [{ question, answer: t(f.answer_label) || t(f.answer), at: t(f.at) }];
+  });
+}
 
 /** The newest run of those read (newest first), as the hero says it: who, and how long ago in words. */
 export function lastOf(runs: readonly { fields?: Readonly<Record<string, unknown>>; updated_at?: string }[], now: number): { name: string; said: string } | null {
@@ -140,7 +230,11 @@ export async function shapeFrom(base: string, said: unknown, io?: NonNullable<Cl
   const work = said.work?.list ?? null;
   if (work !== null && REGISTERS[work] === undefined) await learn(client.schema, work, asked);
   const via = work !== null ? viaOf(REGISTERS[work], r) : null;
-  const rows: WorkRow[] = (said.work?.rows ?? []).flatMap((x) => (isObject(x) && typeof x.seq === 'number' && isObject(x.fields) ? [{ seq: x.seq, fields: x.fields }] : []));
+  const rows: WorkRow[] = (said.work?.rows ?? []).flatMap((x) =>
+    isObject(x) && typeof x.seq === 'number' && isObject(x.fields)
+      ? [{ seq: x.seq, fields: x.fields, created: typeof x.created_at === 'string' ? x.created_at : null, updated: typeof x.updated_at === 'string' ? x.updated_at : null }]
+      : [],
+  );
   const now = recordNow();
   const open = via ? openWorkOf(rows, via, localDay(now), said.work?.cursor != null) : null;
   const runs = (said.runs?.rows ?? []) as Parameters<typeof sessionsOf>[0];
@@ -158,7 +252,7 @@ export async function shapeFrom(base: string, said: unknown, io?: NonNullable<Cl
   return {
     key: spoken,
     fields,
-    row: { id: typeof raw.id === 'string' ? raw.id : '', created_at: typeof raw.created_at === 'string' ? raw.created_at : null },
+    row: { id: typeof raw.id === 'string' ? raw.id : '', created_at: typeof raw.created_at === 'string' ? raw.created_at : null, version: Number.isInteger(raw.version) ? (raw.version as number) : null },
     incoming,
     history,
     stateSince,
@@ -173,6 +267,12 @@ export async function shapeFrom(base: string, said: unknown, io?: NonNullable<Cl
     sessions: sessionsOf(runs, midnightOf(now), now),
     last: lastOf(runs, now),
     kpi: leadIn(said.kpis),
+    kpis: (Array.isArray(said.kpis) ? said.kpis : []).filter((k): k is KpiAnswered => isObject(k) && typeof (k as { name?: unknown }).name === 'string' && Array.isArray((k as { points?: unknown }).points)),
+    runs: runsIn(runs as unknown as Raw[]),
+    services: servicesIn(said.services),
+    readings: readingsIn(said.readings),
+    recurring: recurringIn(said.recurring),
+    decided: decidedIn(said.decided),
     now,
   };
 }

@@ -48,13 +48,13 @@ export function modelLineOf(blocks: readonly { kind: string; lead?: unknown; dra
  * THE PROJECT'S SHAPE WHERE ITS PAGE DECLARES NONE (the audit of 25 October, Z1). The shape's parts became blocks of the
  * project's page in founder 3.3.0 and team 2.25.0 (C28, C29), and a record still on an older version, whose page declares
  * no `project` block, drew a project's page with no name, no hero and nothing of its work: blank on a phone. Such a page
- * is drawn with the two blocks those versions declare, in their order, so it looks as it did before the shape was
- * declared. AFTER THE DECLARED BLOCKS, so every index a write finds a block by is the block's own; the shape's parts are
+ * is drawn with the blocks the current versions declare (three since founder 3.7.0 and team 2.28.0), in their order. AFTER THE DECLARED BLOCKS, so every index a write finds a block by is the block's own; the shape's parts are
  * drawn over both columns before the rest wherever they are (`PageBody.svelte` `shapeParts`).
  */
 export const SHAPE_DEFAULT = [
-  { kind: 'project', parts: ['hero', 'path', 'money'], heading: 'Overview', icon: 'eye', span: 12, key: 'shape-first' },
-  { kind: 'project', parts: ['what-is-open', 'who-is-on-it', 'runs-on', 'agents-here'], heading: 'Work, people and agents', icon: 'task', span: 12, key: 'shape-second' },
+  { kind: 'project', parts: ['hero', 'side'], heading: 'Overview', icon: 'eye', span: 12, key: 'shape-first' },
+  { kind: 'project', parts: ['numbers', 'what-is-open'], heading: 'Numbers and work', icon: 'chart-line', span: 12, key: 'shape-second' },
+  { kind: 'project', parts: ['dates', 'who-is-on-it', 'runs-on', 'agents-here', 'decisions', 'happened'], heading: 'Dates, people, agents and what happened', icon: 'calendar', span: 12, key: 'shape-third' },
 ] as const;
 
 /** A project page's blocks with the shape's two blocks after them where it declares no part of the shape, else as they are. */

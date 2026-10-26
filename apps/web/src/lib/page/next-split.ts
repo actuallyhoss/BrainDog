@@ -30,6 +30,9 @@ const BRACKETED = new RegExp(`\\s*\\((?:about|around|by|due|on|until|before|c\\.
 /* A DAY AFTER A WORD THAT SAYS IT IS THE JOB'S DAY, "by Sat 31 Oct", taken out with that word. */
 const LED = new RegExp(`\\s*\\b(?:by|before|on|due|until|till)\\s+${DAY_SAID}`, 'iu');
 
+/** The words that start a clause hanging on the job before it, after which a comma is not a new job. */
+const HANGS = /^\s+(?:before|after|until|till|once|when|while|so|because|since|as|if|unless|where|which|who|by|on|due)\b/iu;
+
 /* THE WORDS A JOB STARTS WITH, so "and" splits "Answer Lena and pick the asks" and not "with the video and deck". */
 const VERBS = new Set(
   'add answer ask book build call cancel chase check choose close confirm decide deploy design draft email file finish fix get hire invite launch list look make mark meet merge move open order pay pick plan post print publish push put read record reply review run schedule send set ship sign start submit switch talk tell test try turn update upload wire write'.split(
@@ -114,7 +117,8 @@ function pieces(text: string): string[] {
     }
     if (c === ':') listed = true;
     if (listed) continue;
-    if ((c === ',' || c === ';') && /^[,;]\s/u.test(rest)) {
+    /* NOT BEFORE A CLAUSE THAT HANGS ON THE JOB: "Settle the licence, before the issue announces it" is one job. */
+    if ((c === ',' || c === ';') && /^[,;]\s/u.test(rest) && !HANGS.test(rest.slice(1))) {
       cut(i, 1);
       continue;
     }

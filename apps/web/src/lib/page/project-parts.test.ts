@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { moneyShown, partLaid, partsLaid, type PartsHave } from './project-parts.ts';
+import { moneyShown, partLaid, partsLaid, rowLaid, type PartsHave } from './project-parts.ts';
 
 const ALL: PartsHave = { hero: true, path: true, money: true, work: true, people: true, runsOn: true, today: true, band: false, known: true };
 
@@ -58,4 +58,39 @@ test('MONEY SAYS SOMETHING with a line of this month, a period earned, bars or a
   assert.equal(moneyShown([{}], null, null, null), true);
   assert.equal(moneyShown([], { currency: 'GBP', before: 0, now: 5 }, null, null), true);
   assert.equal(moneyShown([], null, null, months([0, 0, 40])), true);
+});
+
+test('A ROW OF THE PAGE OF 27 OCTOBER fills twelve: the hero at eight beside its lane, and a part alone takes the row', () => {
+  const all = { ...ALL, side: true, numbers: true, dates: true, decisions: true, happened: true };
+  assert.deepEqual(rowLaid(['hero', 'side'], all).map((x) => [x.part, x.span]), [['hero', 8], ['side', 4]]);
+  assert.deepEqual(rowLaid(['dates', 'who-is-on-it', 'runs-on'], all).map((x) => x.span), [6, 3, 3]);
+  assert.deepEqual(rowLaid(['dates', 'who-is-on-it', 'runs-on'], { ...all, people: false }).map((x) => [x.part, x.span]), [['dates', 8], ['runs-on', 4]]);
+  assert.deepEqual(rowLaid(['hero', 'side'], { ...all, side: false }).map((x) => [x.part, x.span]), [['hero', 12]]);
+  assert.deepEqual(rowLaid(['agents-here', 'decisions'], { ...all, today: false, band: false }).map((x) => [x.part, x.span, x.seen]), [['agents-here', 12, false], ['decisions', 12, true]]);
+});
+
+test('ONE BLOCK OF MANY PARTS IS LAID IN LINES: a part that would pass twelve starts the next line, each line filled', () => {
+  const all = { ...ALL, side: true, numbers: true, dates: true, decisions: true, happened: true };
+  const rest = ['dates', 'who-is-on-it', 'runs-on', 'agents-here', 'decisions', 'happened'];
+  assert.deepEqual(
+    rowLaid(rest, all).map((x) => [x.part, x.span, x.line]),
+    [
+      ['dates', 6, 0],
+      ['who-is-on-it', 3, 0],
+      ['runs-on', 3, 0],
+      ['agents-here', 6, 1],
+      ['decisions', 6, 1],
+      ['happened', 12, 2],
+    ],
+  );
+  /* NOTHING DECIDED: what happened comes up beside the agents. No people: the dates and what it runs on share a line. */
+  assert.deepEqual(
+    rowLaid(rest, { ...all, decisions: false, people: false }).map((x) => [x.part, x.span, x.line]),
+    [
+      ['dates', 8, 0],
+      ['runs-on', 4, 0],
+      ['agents-here', 6, 1],
+      ['happened', 6, 1],
+    ],
+  );
 });

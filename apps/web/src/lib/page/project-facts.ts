@@ -1,0 +1,516 @@
+/**
+ * WHAT A PROJECT'S PAGE SAYS, WORKED OUT FROM ITS SHAPE (`shape-answer.ts` reads it, `shape-hold.svelte.ts` holds it,
+ * `ProjectPart.svelte` draws it): the hero's headline, which is a fact and never the next step again; the next step once,
+ * as a checklist with its days as chips; the tile beside the hero by lane (money while it earns, the dated path while it
+ * is built, what it costs to keep while parked); its numbers with their lines, how they moved and how old they are; its
+ * dates; what it runs on and when each renews; the agents' sessions and how each ended; and what happened, in words,
+ * with the edits to its own row folded into one line.
+ *
+ * PURE, AND NODE LOADS IT.
+ */
+
+import { nextSplit } from './next-split.ts';
+import { ago, dayChip, daysBetween, endedAs, trailOf } from '../home/projects-board.ts';
+
+/* ── what is read ──────────────────────────────────────────────────────── */
+
+export type Money = { minor: number; currency: string };
+export type FactTask = { seq: number; title: string; state: string; by: string | null; doneOn: string | null; agent: string; done: boolean; waits: boolean; href: string; updated: string | null; created: string | null };
+export type FactRun = { seq: number; agent: string; doing: string; at: string; started: string; state: string; closedAs: string; next: string; notes: readonly string[]; wrote: number | null; repo: string };
+export type FactService = { seq: number; name: string; provider: string; kind: string; renews: string | null; cost: Money | null; cycle: string; state: string; note: string; href: string };
+export type FactReading = { name: string; value: number | null; amount: Money | null; unit: string; at: string; source: string };
+export type FactRecurring = { what: string; direction: string; amount: Money; every: string; nextDue: string | null; state: string };
+/** A key number's reading as the record answers it: a value, or an amount as "USD 4,815.00". */
+export type KpiAt = { at: string; value?: number | null | undefined; amount?: string | null | undefined };
+export type FactKpi = {
+  name: string;
+  measure: string;
+  unit: string;
+  every: string | null;
+  headline: boolean;
+  points: readonly KpiAt[];
+  latest: KpiAt | null;
+  change: number | null;
+  target: number | string | null;
+  targetBy: string | null;
+};
+export type FactDecided = { question: string; answer: string; at: string };
+export type FactHistory = { note: string; by: string; at: string };
+
+export type FactsIn = {
+  name: string;
+  lane: string;
+  next: string;
+  about: string;
+  since: string | null;
+  domains: readonly string[];
+  tasks: readonly FactTask[];
+  runs: readonly FactRun[];
+  services: readonly FactService[];
+  readings: readonly FactReading[];
+  recurring: readonly FactRecurring[];
+  kpis: readonly FactKpi[];
+  decided: readonly FactDecided[];
+  history: readonly FactHistory[];
+  money: { out: Money | null; owed: Money | null };
+  now: number;
+  today: string;
+  format: (minor: number, currency: string) => string;
+  /** Where the feed of numbers is set up, and where all its work opens. */
+  hrefs: { feed: string; work: string | null };
+};
+
+/* ── small words ───────────────────────────────────────────────────────── */
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SHORT = MONTHS.map((m) => m.slice(0, 3));
+const day10 = (s: string | null | undefined): string | null => (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(s) ? s.slice(0, 10) : null);
+/** "28 Sep", with its year when it is not this one. */
+export const daySaid = (day: string, today: string): string => `${Number(day.slice(8, 10))} ${SHORT[Number(day.slice(5, 7)) - 1]}${day.slice(0, 4) === today.slice(0, 4) ? '' : ` ${day.slice(0, 4)}`}`;
+const plural = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+const lateSaid = (days: number): string => (days === 1 ? 'a day late' : `${days} days late`);
+const quoted = (t: string): string => `“${t.length > 60 ? `${t.slice(0, 57).trimEnd()}…` : t}”`;
+const fold = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/gu, ' ').trim();
+
+/** A measure's name without the project's on its own page: "Players a day, Lantern" is "Players a day". */
+export function stripName(label: string, project: string): string {
+  const p = project.trim();
+  if (p === '') return label;
+  const esc = p.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  const out = label.replace(new RegExp(`\\s*[,(–-]\\s*${esc}\\)?\\s*$`, 'iu'), '').replace(new RegExp(`^${esc}\\s*[:·–-]\\s*`, 'iu'), '').trim();
+  return out === '' ? label : out;
+}
+
+/** An amount as a point holds it (`USD 8,750.00`), in minor units. */
+export function amountOf(said: string | null | undefined): Money | null {
+  const m = /^([A-Z]{3})\s+(-?[\d,]+(?:\.\d+)?)$/u.exec(typeof said === 'string' ? said.trim() : '');
+  if (!m) return null;
+  const n = Number(m[2]!.replace(/,/gu, ''));
+  return Number.isFinite(n) ? { minor: Math.round(n * 100), currency: m[1]! } : null;
+}
+
+/* ── the next step, once, as a checklist ──────────────────────────────── */
+
+export type CheckItem = { text: string; chip: string | null; late: boolean; href: string | null };
+
+/**
+ * THE NEXT STEP AS ITS JOBS (`next-split.ts`), each with its day as a chip, late past today. A job that is the title of an
+ * open task opens it.
+ */
+export function checklistOf(next: string, tasks: readonly FactTask[], now: number, today: string): CheckItem[] {
+  return nextSplit(next, now).map((x) => {
+    const task = tasks.find((t) => !t.done && fold(t.title) === fold(x.text));
+    const day = x.day ?? task?.by ?? null;
+    const late = day !== null && day < today;
+    return { text: x.text, chip: day === null ? null : late ? `due ${daySaid(day, today)}` : dayChip(day), late, href: task?.href ?? null };
+  });
+}
+
+/* ── its numbers ───────────────────────────────────────────────────────── */
+
+export type NumberCell = { label: string; figure: string; sub: string; points: readonly number[]; age: number; stale: boolean; trail: ReturnType<typeof trailOf> };
+export type Numbers = {
+  cells: NumberCell[];
+  measures: number;
+  readings: number;
+  /** "Daily, last 28 Sep". */
+  cadence: string;
+  /** The feed stopped: how long, and what it was. */
+  banner: { said: string; why: string } | null;
+  more: number;
+  /** The newest reading's day, and how old it is. */
+  newest: string | null;
+  age: number;
+};
+
+const EVERY_DAYS: Readonly<Record<string, number>> = { '1h': 1, '1d': 1, '1w': 7, '1m': 31 };
+const EVERY_WORD: Readonly<Record<number, string>> = { 1: 'Daily', 7: 'Weekly', 31: 'Monthly' };
+
+type Measure = { label: string; points: { at: string; v: number; money: Money | null }[]; every: number; kpi: FactKpi | null; unit: string };
+
+/** The usual days between readings: the middle of the gaps between days that have one. */
+function cadenceOf(ats: readonly string[]): number {
+  const days = [...new Set(ats.map((a) => a.slice(0, 10)))].sort();
+  if (days.length < 2) return 31;
+  const gaps = days.slice(1).map((d, i) => Math.max(1, daysBetween(days[i]!, d))).sort((a, b) => a - b);
+  return gaps[Math.floor(gaps.length / 2)]!;
+}
+
+const figureOf = (v: number, money: Money | null, unit: string, format: FactsIn['format']): string =>
+  money ? format(money.minor, money.currency) : `${Number.isInteger(v) ? v.toLocaleString('en-GB') : v.toLocaleString('en-GB', { maximumFractionDigits: 1 })}${unit === '%' ? '%' : ''}`;
+
+/** How a measure moved over its last month of readings, in words: "up 1,445 since 20 Aug". */
+function movedOf(m: Measure, format: FactsIn['format'], today: string): string {
+  if (m.kpi?.change !== null && m.kpi?.change !== undefined && Number.isFinite(m.kpi.change)) {
+    const pct = Math.round(Math.abs(m.kpi.change) * 100);
+    return pct === 0 ? 'no change' : `${m.kpi.change > 0 ? 'up' : 'down'} ${pct}%`;
+  }
+  const last = m.points.at(-1);
+  if (!last || m.points.length < 2) return m.points.length === 1 ? 'one reading' : '';
+  const from = m.points.find((p) => daysBetween(p.at.slice(0, 10), last.at.slice(0, 10)) <= 31) ?? m.points[0]!;
+  const d = last.v - from.v;
+  if (from === last || d === 0) return 'flat';
+  const by = last.money && from.money ? format(Math.abs(last.money.minor - from.money.minor), last.money.currency) : Math.abs(d).toLocaleString('en-GB', { maximumFractionDigits: 1 });
+  return `${d > 0 ? 'up' : 'down'} ${by} since ${daySaid(from.at.slice(0, 10), today)}`;
+}
+
+/**
+ * ITS NUMBERS, FOUR AT MOST: its key numbers first, in its own order, then the measures its readings hold, the most read
+ * first. Each says its newest value, how it moved, its line from its readings, and how old it is, stale past twice how
+ * often it arrives. When every one is stale the feed has stopped, and a banner says so once.
+ */
+export function numbersOf(f: Pick<FactsIn, 'name' | 'kpis' | 'readings' | 'today' | 'format'>, most = 4): Numbers {
+  const measures: Measure[] = [];
+  const seen = new Set<string>();
+  for (const k of f.kpis) {
+    const pts = k.points.flatMap((p) => {
+      const money = amountOf(p.amount);
+      const v = typeof p.value === 'number' ? p.value : money ? money.minor / 100 : Number.NaN;
+      return Number.isFinite(v) ? [{ at: p.at, v, money }] : [];
+    });
+    if (pts.length === 0) continue;
+    measures.push({ label: stripName(k.name, f.name), points: pts, every: k.every ? (EVERY_DAYS[k.every] ?? cadenceOf(pts.map((p) => p.at))) : cadenceOf(pts.map((p) => p.at)), kpi: k, unit: k.unit });
+    seen.add(fold(stripName(k.measure || k.name, f.name)));
+    seen.add(fold(stripName(k.name, f.name)));
+  }
+  const byName = new Map<string, FactReading[]>();
+  for (const r of f.readings) {
+    const key = stripName(r.name, f.name);
+    if (seen.has(fold(key))) continue;
+    byName.set(key, [...(byName.get(key) ?? []), r]);
+  }
+  const fromReadings = [...byName.entries()]
+    .map(([label, rs]): Measure => {
+      const pts = rs
+        .flatMap((r) => {
+          const v = r.value ?? (r.amount ? r.amount.minor / 100 : Number.NaN);
+          return Number.isFinite(v) ? [{ at: r.at, v, money: r.amount }] : [];
+        })
+        .sort((a, b) => a.at.localeCompare(b.at));
+      return { label, points: pts, every: cadenceOf(pts.map((p) => p.at)), kpi: null, unit: rs[0]?.unit ?? '' };
+    })
+    .filter((m) => m.points.length > 0)
+    .sort((a, b) => b.points.length - a.points.length || (b.points.at(-1)!.at ?? '').localeCompare(a.points.at(-1)!.at ?? ''));
+  const all = [...measures, ...fromReadings];
+  const cells = all.slice(0, most).map((m): NumberCell => {
+    const last = m.points.at(-1)!;
+    const age = Math.max(0, daysBetween(last.at.slice(0, 10), f.today));
+    const stale = age > Math.max(2 * m.every, 2);
+    const pts = m.points.slice(-45).map((p) => p.v);
+    return { label: m.label, figure: figureOf(last.v, last.money, m.unit, f.format), sub: movedOf(m, f.format, f.today), points: pts, age, stale, trail: trailOf(pts, 120, 32) };
+  });
+  const newest = all
+    .map((m) => m.points.at(-1)!.at.slice(0, 10))
+    .sort()
+    .at(-1) ?? null;
+  const age = newest ? Math.max(0, daysBetween(newest, f.today)) : 0;
+  const every = all.length > 0 ? Math.min(...all.map((m) => m.every)) : 31;
+  const allStale = cells.length > 0 && cells.every((c) => c.stale) && age >= 7;
+  const fromImport = f.readings.length > 0 && f.readings.every((r) => /import/iu.test(r.source));
+  return {
+    cells,
+    measures: all.length,
+    readings: all.reduce((n, m) => n + m.points.length, 0),
+    cadence: newest ? `${EVERY_WORD[every] ?? `Every ${every} days`}, last ${daySaid(newest, f.today)}` : '',
+    banner: allStale
+      ? { said: `Nothing has arrived for ${plural(age, 'day', 'days')}.`, why: fromImport ? `Every reading came from an import, and that stopped on ${daySaid(newest!, f.today)}.` : `The last came on ${daySaid(newest!, f.today)}.` }
+      : null,
+    more: Math.max(0, all.length - most),
+    newest,
+    age,
+  };
+}
+
+/* ── the hero ──────────────────────────────────────────────────────────── */
+
+export type Act = { said: string; href: string } | null;
+export type HeroFacts = { headline: string; lede: string | null; red: Act; soft: Act };
+
+const lateOf = (tasks: readonly FactTask[], today: string): FactTask[] => tasks.filter((t) => !t.done && t.by !== null && t.by < today).sort((a, b) => a.by!.localeCompare(b.by!));
+const dueOf = (tasks: readonly FactTask[], today: string, days = 7): FactTask[] =>
+  tasks.filter((t) => !t.done && t.by !== null && t.by >= today && daysBetween(today, t.by) <= days).sort((a, b) => a.by!.localeCompare(b.by!));
+
+/** The money key number an earning project leads with, where it keeps one: its newest month and the one before. */
+export function moneyKpiOf(kpis: readonly FactKpi[]): { kpi: FactKpi; now: Money; at: string; before: Money | null; points: number[] } | null {
+  const k = kpis.find((x) => x.headline && /^[A-Z]{3}$/u.test(x.unit)) ?? kpis.find((x) => /^[A-Z]{3}$/u.test(x.unit));
+  if (!k || !k.latest) return null;
+  const now = amountOf(k.latest.amount) ?? (typeof k.latest.value === 'number' ? { minor: Math.round(k.latest.value * 100), currency: k.unit } : null);
+  if (!now) return null;
+  const pts = k.points.map((p) => amountOf(p.amount)?.minor ?? (typeof p.value === 'number' ? Math.round(p.value * 100) : Number.NaN)).filter((n) => Number.isFinite(n));
+  const prev = k.points.length > 1 ? k.points[k.points.length - 2]! : null;
+  const before = prev ? (amountOf(prev.amount) ?? (typeof prev.value === 'number' ? { minor: Math.round(prev.value * 100), currency: k.unit } : null)) : null;
+  return { kpi: k, now, at: k.latest.at.slice(0, 10), before, points: pts };
+}
+
+/**
+ * THE HERO'S HEADLINE, A FACT THE RECORD HOLDS, and never the next step (which the checklist under it says once): what
+ * is late, else what it brought in while it earns, else its numbers gone quiet, else how long it has been parked, else
+ * what falls due this week, else who worked on it last, else what it is. The lede says the next fact or two. The red
+ * button is the most urgent thing to open; the soft one the next.
+ */
+export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
+  const facts: string[] = [];
+  const late = lateOf(f.tasks, f.today);
+  const due = dueOf(f.tasks, f.today);
+  const open = f.tasks.filter((t) => !t.done);
+  if (late.length === 1) facts.push(`${quoted(late[0]!.title)} was due ${dayChip(late[0]!.by!)} and is ${lateSaid(daysBetween(late[0]!.by!, f.today))}.`);
+  else if (late.length > 1) facts.push(`${late.length} tasks on ${f.name} are late, ${quoted(late[0]!.title)} by ${plural(daysBetween(late[0]!.by!, f.today), 'day', 'days')}.`);
+  const money = f.lane === 'earning' ? moneyKpiOf(f.kpis) : null;
+  if (money) {
+    const month = MONTHS[Number(money.at.slice(5, 7)) - 1];
+    const prevMonth = MONTHS[(Number(money.at.slice(5, 7)) + 10) % 12];
+    let moved = '';
+    if (money.before && money.before.currency === money.now.currency && money.before.minor > 0) {
+      const pct = Math.round(((money.now.minor - money.before.minor) / money.before.minor) * 100);
+      moved = pct === 0 ? `, the same as ${prevMonth}` : `, ${Math.abs(pct)}% ${pct > 0 ? 'more' : 'less'} than ${prevMonth}`;
+    }
+    facts.push(`${f.name} brought in ${f.format(money.now.minor, money.now.currency)} in ${month}${moved}.`);
+  }
+  if (numbers.banner && numbers.newest) facts.push(`No numbers have come from ${f.name} since ${daySaid(numbers.newest, f.today)}.`);
+  if (f.lane === 'parked' && f.since) facts.push(`${f.name} has been parked since ${f.since}.`);
+  if (due.length > 0) facts.push(due.length === 1 ? `${quoted(due[0]!.title)} is due ${dayChip(due[0]!.by!)}.` : `${due.length} tasks fall due this week, the first ${dayChip(due[0]!.by!)}.`);
+  const run = f.runs[0];
+  if (run) facts.push(`${agentName(run.agent)} worked on it ${ago(run.at, f.now)}, and the session ${endedAs({ state: run.state, closedAs: run.closedAs, handed: run.next !== '' || run.notes.length > 0 }).said.replace(/^still open$/u, 'is still open')}.`);
+  if (f.about !== '' && fold(f.about) !== fold(f.next)) facts.push(/[.!?]$/u.test(f.about) ? f.about : `${f.about}.`);
+  const kept = facts.filter((s) => fold(s) !== fold(f.next));
+  const headline = kept[0] ?? (open.length > 0 ? `${plural(open.length, 'task is', 'tasks are')} open on ${f.name}.` : `Nothing on ${f.name} has a date yet.`);
+  const lede = kept.slice(1, 3).join(' ') || null;
+
+  const red: Act =
+    late.length === 1
+      ? { said: `Open ${quoted(late[0]!.title)}`, href: late[0]!.href }
+      : late.length > 1 && f.hrefs.work
+        ? { said: `Open the ${late.length} late tasks`, href: f.hrefs.work }
+        : numbers.banner
+          ? { said: 'Fix the numbers feed', href: f.hrefs.feed }
+          : due.length > 0
+            ? { said: `Open ${quoted(due[0]!.title)}`, href: due[0]!.href }
+            : null;
+  const soft: Act =
+    late.length > 0 && numbers.banner
+      ? { said: 'Fix the numbers feed', href: f.hrefs.feed }
+      : open.length > 1 && f.hrefs.work && red?.href !== f.hrefs.work
+        ? { said: `Open all ${open.length} tasks`, href: f.hrefs.work }
+        : null;
+  return { headline, lede, red, soft };
+}
+
+const agentName = (agent: string): string => {
+  const a = agent.trim().toLowerCase();
+  const known: Record<string, string> = { claude: 'Claude', codex: 'Codex', cursor: 'Cursor', gemini: 'Gemini', other: 'An agent' };
+  return known[a] ?? (agent.trim() === '' ? 'An agent' : agent.charAt(0).toUpperCase() + agent.slice(1));
+};
+
+/* ── the tile beside the hero, by lane ─────────────────────────────────── */
+
+export type Stop = { day: string; title: string; sub: string | null; tone: 'late' | 'doing' | 'you' | 'done' | 'plain'; href: string };
+export type SideTile =
+  | { kind: 'money'; figure: string; sub: string; stale: string | null; bars: number[]; lines: { k: string; v: string }[] }
+  | { kind: 'path'; end: string | null; stops: Stop[]; aim: string | null; empty: string | null }
+  | { kind: 'keep'; about: string; lines: { k: string; v: string; href: string }[]; year: string | null; domain: FactService | null }
+  | { kind: 'none' };
+
+const PER_YEAR: Readonly<Record<string, number>> = { monthly: 12, month: 12, yearly: 1, year: 1, annual: 1, annually: 1, weekly: 52, quarterly: 4, fortnightly: 26 };
+const PER_MONTH: Readonly<Record<string, number>> = { weekly: 52 / 12, fortnightly: 26 / 12, twice_monthly: 2, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 };
+const live = (s: FactService): boolean => !/cancel|ended|gone/u.test(s.state);
+
+export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
+  if (f.lane === 'earning') {
+    /* WHAT IT BROUGHT IN BY ITS MONEY KEY NUMBER where it keeps one, its repeating money as lines under it; else what
+       repeats into it, a month. */
+    const rec = f.recurring.filter((r) => r.direction === 'in' && r.state !== 'ended');
+    const out = f.money.out;
+    const paused = rec.find((r) => r.state === 'paused');
+    const next = rec.filter((r) => r.state === 'live').map((r) => r.nextDue).filter((d): d is string => !!d).sort()[0];
+    const recLines = [...(next ? [{ k: 'Next pay', v: dayChip(next) }] : []), ...rec.slice(0, 3).map((r) => ({ k: r.what, v: `${f.format(r.amount.minor, r.amount.currency)} ${r.every.replace('_', ' ')}` }))];
+    const m = moneyKpiOf(f.kpis);
+    if (m) {
+      const month = SHORT[Number(m.at.slice(5, 7)) - 1];
+      const age = Math.max(0, daysBetween(m.at, f.today));
+      const stale = age > 45 ? `${age} days old` : null;
+      const kept = out && out.currency === m.now.currency ? m.now.minor - out.minor : null;
+      return {
+        kind: 'money',
+        figure: f.format(m.now.minor, m.now.currency),
+        sub: `in, ${month}`,
+        stale,
+        bars: m.points.slice(-13),
+        lines: [
+          ...(out ? [{ k: 'Out this month', v: f.format(out.minor, out.currency) }] : []),
+          ...(kept !== null ? [{ k: 'Kept', v: `about ${f.format(kept, m.now.currency)}` }] : []),
+          ...(f.money.owed ? [{ k: 'Still to come in', v: f.format(f.money.owed.minor, f.money.owed.currency) }] : []),
+          ...recLines,
+        ].slice(0, 5),
+      };
+    }
+    if (rec.length > 0) {
+      const cur = rec[0]!.amount.currency;
+      const minor = rec.filter((r) => r.amount.currency === cur).reduce((n, r) => n + Math.round(r.amount.minor * (PER_MONTH[r.every] ?? 1)), 0);
+      return {
+        kind: 'money',
+        figure: f.format(minor, cur),
+        sub: 'in, a month',
+        stale: paused ? `paused${paused.nextDue ? `, was due ${daySaid(paused.nextDue, f.today)}` : ''}` : null,
+        bars: [],
+        lines: [...(out ? [{ k: 'Out this month', v: f.format(out.minor, out.currency) }] : []), ...recLines],
+      };
+    }
+    return { kind: 'none' };
+  }
+  if (f.lane === 'parked' || f.lane === 'retired') {
+    const kept = f.services.filter(live);
+    let year: Money | null = null;
+    for (const s of kept) {
+      if (!s.cost) continue;
+      const k = PER_YEAR[s.cycle] ?? 1;
+      if (year === null) year = { minor: 0, currency: s.cost.currency };
+      if (s.cost.currency === year.currency) year.minor += Math.round(s.cost.minor * k);
+    }
+    const domain = kept.find((s) => s.kind === 'domain') ?? null;
+    return {
+      kind: 'keep',
+      about: f.about,
+      lines: kept.slice(0, 4).map((s) => ({ k: `${s.name}${s.provider ? ` · ${s.provider}` : ''}`, v: s.renews ? `renews ${daySaid(s.renews, f.today)}` : s.cost ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}` : '', href: s.href })),
+      year: year && year.minor > 0 ? `${f.format(year.minor, year.currency)} a year to keep` : kept.length === 0 ? 'Nothing it runs on is still paid for.' : null,
+      domain,
+    };
+  }
+  /* BUILDING: the dated path from its tasks, the late and open first by day, the last one done before them. */
+  const dated = f.tasks.filter((t) => t.by !== null);
+  const openDated = dated.filter((t) => !t.done).sort((a, b) => a.by!.localeCompare(b.by!));
+  const doneDated = dated.filter((t) => t.done).sort((a, b) => (b.doneOn ?? b.by!).localeCompare(a.doneOn ?? a.by!));
+  const stops: Stop[] = [
+    ...doneDated.slice(0, 1).map((t): Stop => ({ day: daySaid(t.doneOn ?? t.by!, f.today), title: t.title, sub: 'done', tone: 'done', href: t.href })),
+    ...openDated.slice(0, 6).map((t): Stop => {
+      const late = t.by! < f.today;
+      return {
+        day: daySaid(t.by!, f.today),
+        title: t.title,
+        sub: late ? lateSaid(daysBetween(t.by!, f.today)) : t.waits ? 'waits on you' : t.agent ? `${agentName(t.agent)} has it` : null,
+        tone: late ? 'late' : t.waits ? 'you' : t.agent ? 'doing' : 'plain',
+        href: t.href,
+      };
+    }),
+  ];
+  const aimK = f.kpis.find((k) => k.target !== null);
+  const aimMoney = aimK && typeof aimK.target === 'string' ? amountOf(aimK.target) : null;
+  const aim = aimK
+    ? `${aimMoney ? f.format(aimMoney.minor, aimMoney.currency) : String(aimK.target)}${aimK.every === '1m' ? ' a month' : ''}${aimK.targetBy ? `, the aim by ${SHORT[Number(aimK.targetBy.slice(5, 7)) - 1]} ${aimK.targetBy.slice(0, 4)}` : ''}`
+    : null;
+  if (stops.length === 0 && aim === null) return { kind: 'path', end: null, stops: [], aim: null, empty: `No task on ${f.name} has a day yet. Give one a day and its path is drawn here.` };
+  return { kind: 'path', end: openDated.at(-1) ? daySaid(openDated.at(-1)!.by!, f.today) : null, stops, aim, empty: null };
+}
+
+/* ── its dates ─────────────────────────────────────────────────────────── */
+
+export type DateLine = { day: string; at: string; text: string; tone: 'late' | 'plain'; href: string | null };
+
+/** WHAT FALLS DUE ON IT IN FOUR MONTHS, the late first: its tasks, the days in its next step, renewals and repeating money. */
+export function datesOf(f: FactsIn, most = 6): DateLine[] {
+  const ahead = (d: string) => daysBetween(f.today, d) <= 122;
+  const out: DateLine[] = [];
+  for (const t of f.tasks) if (!t.done && t.by !== null && ahead(t.by)) out.push({ at: t.by, day: dayChip(t.by), text: t.title, tone: t.by < f.today ? 'late' : 'plain', href: t.href });
+  for (const x of nextSplit(f.next, f.now)) if (x.day && x.day >= f.today && ahead(x.day) && !out.some((o) => o.at === x.day && fold(o.text) === fold(x.text))) out.push({ at: x.day, day: dayChip(x.day), text: x.text, tone: 'plain', href: null });
+  for (const s of f.services) if (live(s) && s.renews && s.renews >= f.today && ahead(s.renews)) out.push({ at: s.renews, day: dayChip(s.renews), text: `${s.name} renews${s.cost && s.cost.minor > 0 ? `, ${f.format(s.cost.minor, s.cost.currency)}` : ''}`, tone: 'plain', href: s.href });
+  for (const r of f.recurring) if (r.state === 'live' && r.nextDue && r.nextDue >= f.today && ahead(r.nextDue)) out.push({ at: r.nextDue, day: dayChip(r.nextDue), text: `${r.what}, ${f.format(r.amount.minor, r.amount.currency)} ${r.direction === 'in' ? 'in' : 'out'}`, tone: 'plain', href: null });
+  for (const k of f.kpis) if (k.targetBy && k.targetBy >= f.today && ahead(k.targetBy)) out.push({ at: k.targetBy, day: dayChip(k.targetBy), text: `${stripName(k.name, f.name)} should reach its target`, tone: 'plain', href: null });
+  return out.sort((a, b) => Number(b.tone === 'late') - Number(a.tone === 'late') || a.at.localeCompare(b.at)).slice(0, most);
+}
+
+/* ── what it runs on, and when each renews ────────────────────────────── */
+
+export type RunsOnLine = { name: string; sub: string; right: string; tone: 'warn' | 'good' | 'plain'; href: string | null };
+
+export function runsOnOf(f: Pick<FactsIn, 'services' | 'today' | 'format'>, numbers: Numbers): RunsOnLine[] {
+  const lines: RunsOnLine[] = f.services
+    .filter(live)
+    .sort((a, b) => (a.renews ?? '9999').localeCompare(b.renews ?? '9999'))
+    .map((s) => {
+      const soon = s.renews !== null && daysBetween(f.today, s.renews) <= 30;
+      return {
+        name: s.name,
+        sub: [s.kind, s.provider, s.cost && s.cost.minor > 0 ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}`.trim() : ''].filter(Boolean).join(' · '),
+        right: s.renews ? `renews ${daySaid(s.renews, f.today)}` : '',
+        tone: soon ? 'warn' : 'plain',
+        href: s.href,
+      };
+    });
+  if (numbers.measures > 0)
+    lines.push({
+      name: 'Numbers feed',
+      sub: plural(numbers.readings, 'reading', 'readings'),
+      right: numbers.banner && numbers.newest ? `quiet since ${daySaid(numbers.newest, f.today)}` : numbers.cadence,
+      tone: numbers.banner ? 'warn' : 'good',
+      href: null,
+    });
+  return lines;
+}
+
+/* ── the agents' sessions ─────────────────────────────────────────────── */
+
+export type SessionLine = { seq: number; agent: string; title: string; when: string; said: string | null; ended: string; open: boolean };
+
+/** Each session on it, newest first: what it did, when, what it left, and how it ended. */
+export function sessionsOf(f: Pick<FactsIn, 'runs' | 'today' | 'name'>, most = 4): SessionLine[] {
+  return f.runs.slice(0, most).map((r) => {
+    const from = day10(r.started) ?? day10(r.at)!;
+    const to = day10(r.at) ?? from;
+    const ended = endedAs({ state: r.state, closedAs: r.closedAs, handed: r.next !== '' || r.notes.length > 0 });
+    const doing = r.doing.trim();
+    const generic = doing === '' || /^(claude|codex|cursor|agent)( code)? (run|in .*)$/iu.test(doing);
+    return {
+      seq: r.seq,
+      agent: r.agent,
+      title: generic ? `${agentName(r.agent)}${r.repo ? ` in ${r.repo}` : ''}` : doing,
+      when: from === to ? daySaid(to, f.today) : `${daySaid(from, f.today)} to ${daySaid(to, f.today)}`,
+      said: r.notes[0] ?? (r.next !== '' ? `Next: ${r.next}` : null),
+      ended: `${ended.said}${r.wrote ? ` · ${plural(r.wrote, 'write', 'writes')}` : ''}`,
+      open: ended.open,
+    };
+  });
+}
+
+/* ── what happened ─────────────────────────────────────────────────────── */
+
+export type HappenedLine = { at: string; day: string; text: string; by: string | null; tone: 'plain' | 'warn' };
+
+/**
+ * WHAT HAPPENED ON IT, IN WORDS, newest first: work finished and added, sessions and what they left, the last numbers
+ * that came in, and the edits to its own row folded into one line a day ("its note and next step were rewritten").
+ */
+export function happenedOf(f: FactsIn, numbers: Numbers, most = 6): HappenedLine[] {
+  const out: HappenedLine[] = [];
+  /* TASKS ADDED, ONE LINE A DAY: a plan written in one sitting is one line, its first two named. */
+  const added = new Map<string, string[]>();
+  for (const t of f.tasks) {
+    if (t.done && t.doneOn) out.push({ at: t.doneOn, day: daySaid(t.doneOn, f.today), text: `Finished: ${t.title}.`, by: null, tone: 'plain' });
+    else if (t.created) added.set(t.created.slice(0, 10), [...(added.get(t.created.slice(0, 10)) ?? []), t.title]);
+  }
+  for (const [d, titles] of added) {
+    const text =
+      titles.length === 1
+        ? `A task was added: ${titles[0]}.`
+        : `${plural(titles.length, 'task', 'tasks')} were added: ${titles.slice(0, 2).join(', ')}${titles.length > 2 ? ` and ${titles.length - 2} more` : ''}.`;
+    out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain' });
+  }
+  for (const r of f.runs.slice(0, 6)) {
+    const d = day10(r.at);
+    if (!d) continue;
+    const what = r.notes[0] ?? (r.doing.trim() !== '' && !/ run$/iu.test(r.doing) ? r.doing : null);
+    out.push({ at: d, day: daySaid(d, f.today), text: what ? `${/[.!?]$/u.test(what) ? what : `${what}.`}` : `A session ${endedAs({ state: r.state, closedAs: r.closedAs, handed: r.next !== '' }).said}.`, by: agentName(r.agent), tone: 'plain' });
+  }
+  if (numbers.newest && numbers.banner) out.push({ at: numbers.newest, day: daySaid(numbers.newest, f.today), text: 'The last numbers arrived. Nothing since.', by: null, tone: 'warn' });
+  /* THE ROW'S OWN EDITS, ONE LINE A DAY: a tidy that rewrote its note and its next step is one line, not five. */
+  const edits = new Map<string, string[]>();
+  for (const h of f.history) {
+    const d = day10(h.at);
+    if (d) edits.set(d, [...(edits.get(d) ?? []), h.note.trim()]);
+  }
+  for (const [d, notes] of edits) {
+    const said = notes.find((n) => n !== '') ?? '';
+    const first = said.charAt(0).toUpperCase() + said.slice(1);
+    const text = notes.length === 1 && first !== '' ? `${first.replace(/[.]$/u, '')}.` : `${plural(notes.length, 'edit', 'edits')} to its record${first !== '' ? `, among them: ${first.replace(/[.]$/u, '')}` : ''}.`;
+    out.push({ at: d, day: daySaid(d, f.today), text, by: null, tone: 'plain' });
+  }
+  return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, most);
+}

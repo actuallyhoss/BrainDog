@@ -32,8 +32,10 @@ test('THE HERO SAYS IT FIRST, WITH WHO WROTE IT ON HOVER, and the page hands it 
   const part = readFileSync(new URL('./ProjectPart.svelte', import.meta.url), 'utf8');
   const hero = part.slice(part.indexOf("{#if part === 'hero'}"));
   const line = hero.indexOf('{#if hold.modelLine}');
-  const rules = hero.indexOf('hero.sentences');
-  assert.ok(line > 0 && line < rules, "the model's line is said before the rules' sentences, in their place");
+  /* UNDER THE HEADLINE SINCE the page of 27 October, which is a fact the rules say, in place of the rules' own lede. */
+  const head = hero.indexOf('{facts.headline}');
+  const rules = hero.indexOf('facts.lede');
+  assert.ok(head > 0 && head < line && line < rules, "the model's line is said under the headline, before the rules' lede, in its place");
   assert.match(hero, /<p class="h-say" title=\{WROTE\} dir="auto">\{hold\.modelLine\}<\/p>/u);
   assert.match(part, /const WROTE = 'Written by BrainDog from this project’s figures';/u);
   const view = readFileSync(new URL('./PageView.svelte', import.meta.url), 'utf8');

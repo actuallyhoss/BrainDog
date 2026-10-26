@@ -142,15 +142,16 @@ for (const id of ['founder', 'team']) {
       const title = held.REGISTERS[page.param.register]!.title;
       assert.ok(String(read.fields[title] ?? '').trim() !== '', 'the hero has the project’s name to draw');
 
-      /* AND THE PAGE IS DRAWN WITH THE TWO BLOCKS THE NEWER VERSIONS DECLARE, after its own, so every write keeps its index. */
+      /* AND THE PAGE IS DRAWN WITH THE BLOCKS THE NEWER VERSIONS DECLARE, three since founder 3.7.0 and team 2.28.0,
+         after its own, so every write keeps its index. */
       const drawn = page.blocks.map((b) => blockOf(b as never, new Map(), NOW));
       const parted = withShape(drawn, (raw) => blockOf({ ...raw, parts: [...raw.parts], rows: [], matched: 0, refusals: [] } as never, new Map(), NOW));
-      assert.equal(parted.length, drawn.length + 2);
+      assert.equal(parted.length, drawn.length + 3);
       assert.deepEqual(parted.slice(0, drawn.length), drawn, 'the declared blocks are where they were');
       const shaped = onProject(parted as (LiveBlock & { key?: string })[], page.param.register);
-      const laid = partsLaid(shaped, { hero: true, path: true, money: true, work: true, people: true, runsOn: true, today: false, band: true, known: true });
+      const laid = partsLaid(shaped, { hero: true, path: true, money: true, work: true, people: true, runsOn: true, today: false, band: true, known: true, side: true, numbers: true, dates: true, decisions: true, happened: true });
       const parts = laid.filter((b) => b.kind === 'project' && b.drawn).flatMap((b) => partsOf(b) ?? []);
-      assert.deepEqual(parts, ['hero', 'path', 'money', 'what-is-open', 'who-is-on-it', 'runs-on', 'agents-here'], 'the name, the hero, Runs on and the agents are drawn');
+      assert.deepEqual(parts, ['hero', 'side', 'numbers', 'what-is-open', 'dates', 'who-is-on-it', 'runs-on', 'agents-here', 'decisions', 'happened'], 'the name, the hero, Runs on and the agents are drawn');
     } finally {
       sql.close();
     }

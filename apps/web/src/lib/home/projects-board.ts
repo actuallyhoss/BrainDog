@@ -594,7 +594,7 @@ export function boardOf(input: BoardInput): Board {
  * A SMALL LINE OF A NUMBER'S READINGS in a box `w` by `h`, oldest left: its path, the area under it and its last point.
  * `null` under three readings, since a line of two says nothing a figure does not.
  */
-export function sparkOf(points: readonly number[], w: number, h: number): { line: string; area: string; end: [number, number] } | null {
+export function trailOf(points: readonly number[], w: number, h: number): { line: string; area: string; end: [number, number] } | null {
   const vs = points.filter((v) => Number.isFinite(v));
   if (vs.length < 3) return null;
   const lo = Math.min(...vs);

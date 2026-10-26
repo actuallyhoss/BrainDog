@@ -55,6 +55,11 @@ test('sentences split, a dotted name does not, and a name keeps its case', () =>
   assert.deepEqual(texts('a16z form and iOS build'), ['a16z form and iOS build']);
 });
 
+test('a clause that hangs on the job after a comma stays with it', () => {
+  assert.deepEqual(texts('Settle the licence, before the spring issue announces it'), ['Settle the licence, before the spring issue announces it']);
+  assert.deepEqual(texts('Ship the beta, once the store review lands, then tell the testers'), ['Ship the beta, once the store review lands', 'Tell the testers']);
+});
+
 test('nothing written is no job, and the soonest day is found', () => {
   assert.deepEqual(nextSplit('', NOW), []);
   assert.deepEqual(nextSplit(null, NOW), []);

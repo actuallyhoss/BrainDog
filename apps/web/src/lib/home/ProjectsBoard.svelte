@@ -24,7 +24,7 @@
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import { slotStyle } from './project-cards.ts';
-  import { sparkOf, type Board, type BoardRow } from './projects-board.ts';
+  import { trailOf, type Board, type BoardRow } from './projects-board.ts';
   import { readBoard } from './projects-board-read.ts';
 
   let { list, entries }: { list: string; entries: readonly { seq?: unknown; id?: unknown; fields?: Record<string, unknown> }[] } = $props();
@@ -48,7 +48,7 @@
 
   const W = 80;
   const H = 24;
-  const spark = (r: BoardRow) => (r.number.kind === 'kpi' ? sparkOf(r.number.points, W, H) : null);
+  const trail = (r: BoardRow) => (r.number.kind === 'kpi' ? trailOf(r.number.points, W, H) : null);
   const share = (minor: number, total: number) => `${Math.max(2, Math.round((minor / Math.max(1, total)) * 100))}%`;
 </script>
 
@@ -106,7 +106,7 @@
           <h3 class="g-head">{g.name} <span>{g.said}</span></h3>
           <ul class="rows">
             {#each g.rows as r (r.key)}
-              {@const s = spark(r)}
+              {@const s = trail(r)}
               <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined}>
                 <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title" dir="auto">{r.name}</span></a>
                 <p class="r-next" dir="auto" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
@@ -114,7 +114,7 @@
                 <div class="r-num" style={slotStyle(r.hue)}>
                   {#if r.number.kind === 'kpi'}
                     <div class="n-words"><span class="n-fig num" data-stale={r.number.stale ? '' : undefined}>{r.number.figure}</span><span class="small" dir="auto">{r.number.sub}</span></div>
-                    {#if s}<svg class="spark" data-stale={r.number.stale ? '' : undefined} viewBox="0 0 {W} {H}" width={W} height={H} aria-hidden="true"><path d={s.area} class="sp-area" /><path d={s.line} class="sp-line" /><circle cx={s.end[0]} cy={s.end[1]} r="2.2" class="sp-end" /></svg>{/if}
+                    {#if s}<svg class="trail" data-stale={r.number.stale ? '' : undefined} viewBox="0 0 {W} {H}" width={W} height={H} aria-hidden="true"><path d={s.area} class="sp-area" /><path d={s.line} class="sp-line" /><circle cx={s.end[0]} cy={s.end[1]} r="2.2" class="sp-end" /></svg>{/if}
                   {:else if r.number.kind === 'aim'}
                     <div class="n-words"><span class="muted">{r.number.said}</span><span class="small">{r.number.sub}</span></div>
                   {:else}
@@ -620,7 +620,7 @@
     color: var(--ink-2);
   }
 
-  .spark {
+  .trail {
     flex: none;
   }
 
@@ -640,15 +640,15 @@
     fill: var(--ph);
   }
 
-  .spark[data-stale] .sp-line {
+  .trail[data-stale] .sp-line {
     stroke: var(--ink-3);
   }
 
-  .spark[data-stale] .sp-end {
+  .trail[data-stale] .sp-end {
     fill: var(--ink-3);
   }
 
-  .spark[data-stale] .sp-area {
+  .trail[data-stale] .sp-area {
     fill: color-mix(in oklab, var(--ink-3) 10%, transparent);
   }
 
