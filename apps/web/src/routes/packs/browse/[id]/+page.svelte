@@ -52,7 +52,7 @@
   import PreviewPage from '$lib/market/PreviewPage.svelte';
   import { addsOf, namesOf } from '$lib/market/adds.ts';
   import { readCounts } from '$lib/market/counts.ts';
-  import { actionOf, entryOf, latestOf, listingKey, listingsOf, type ListingKind } from '$lib/market/listing.ts';
+  import { actionOf, entryOf, latestOf, listingKey, listingsOf, unlistedListing, type ListingKind } from '$lib/market/listing.ts';
   import { readVersionPreview, type PreviewRead } from '$lib/market/preview.ts';
   import { words } from '$lib/market/words.ts';
   import { readyFor, readyWords, type Ready } from '$lib/market/update-ready.ts';
@@ -83,12 +83,13 @@
 
   /* AN ADDRESS WITH NO `?kind=` IS READ AS A USE CASE FIRST, for the links written before add-ons had pages, and then as
      whatever else goes by that id: `/packs/browse/reading-list` said "nothing here by that name" for an add-on the
-     catalogue lists. A kind that is said is kept to. */
+     catalogue lists. A kind that is said is kept to. AND AN ADD-ON THE CATALOGUE HOLDS UNLISTED IS SHOWN BY ITS ID
+     (`unlistedListing`): it installs by id, and its address said there was nothing by that name. */
   const listing = $derived.by(() => {
     const all = listingsOf({ kennel, counts });
-    const exact = all.find((l) => l.key === listingKey(kind, id));
-    if (exact || page.url.searchParams.has('kind')) return exact ?? null;
-    return all.find((l) => l.id === id) ?? null;
+    const said = page.url.searchParams.has('kind');
+    const found = all.find((l) => l.key === listingKey(kind, id)) ?? (said ? undefined : all.find((l) => l.id === id));
+    return found ?? unlistedListing(kennel, id, said ? kind : null);
   });
   const entry = $derived(listing ? entryOf(kennel, listing) : null);
   const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);

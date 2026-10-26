@@ -162,23 +162,7 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
      offers nothing to install (`listedEntries` in the catalogue, the scope of 24 October, E17). */
   const kennel = (input.kennel?.entries ?? [])
     .filter((e) => e.unlisted !== true && e.versions.some((v) => v.yanked === undefined) && !taken.has(listingKey(e.kind, e.id)))
-    .map((e): Listing => ({
-      key: listingKey(e.kind, e.id),
-      kind: e.kind,
-      id: e.id,
-      installedId: e.kind === 'usecase' ? `usecase-${e.id}` : e.id,
-      title: e.title,
-      summary: e.summary,
-      author: e.author,
-      license: e.license,
-      categories: [...(e.categories ?? [])],
-      publisher: e.publisher ?? null,
-      source: 'kennel',
-      latest: offered(e.versions, e.latest),
-      versions: e.versions,
-      count: counted(listingKey(e.kind, e.id)),
-      ...(e.icon !== undefined ? { icon: e.icon } : {}),
-    }));
+    .map((e) => listingOfEntry(e, counted(listingKey(e.kind, e.id))));
 
   /* ONE LISTING PER THING (the scope of 24 October, E19): a use case and the add-on it stands on shared a title
      ("Landlord" twice), and two add-ons were both "Mercury". The first of a title is kept, a module before a use case
@@ -191,6 +175,40 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
     seen.add(said);
     return true;
   });
+}
+
+/** One catalogue entry as a listing, with its rounded count. */
+function listingOfEntry(e: CatalogueEntry, count: number | null): Listing {
+  return {
+    key: listingKey(e.kind, e.id),
+    kind: e.kind,
+    id: e.id,
+    installedId: e.kind === 'usecase' ? `usecase-${e.id}` : e.id,
+    title: e.title,
+    summary: e.summary,
+    author: e.author,
+    license: e.license,
+    categories: [...(e.categories ?? [])],
+    publisher: e.publisher ?? null,
+    source: 'kennel',
+    latest: offered(e.versions, e.latest),
+    versions: e.versions,
+    count,
+    ...(e.icon !== undefined ? { icon: e.icon } : {}),
+  };
+}
+
+/**
+ * An entry the catalogue leaves out of every listing (`unlisted`) by its id, and its kind when one is said, for the page
+ * an address names: it installs by id, so the page that installs it says what it is. `null` for one listed (that is
+ * `listingsOf`'s), one with every version taken back, or none by that id.
+ *
+ * MEASURED ON THE LIVE RECORD: a question asking to install an add-on the catalogue holds unlisted could only be
+ * proposed again, and the add-on's own address under Browse said there was nothing by that name.
+ */
+export function unlistedListing(index: CatalogueIndex | null, id: string, kind: ListingKind | null): Listing | null {
+  const e = (index?.entries ?? []).find((x) => x.unlisted === true && x.id === id && (kind === null || x.kind === kind) && x.versions.some((v) => v.yanked === undefined));
+  return e ? listingOfEntry(e, null) : null;
 }
 
 /** The Kennel's entry behind a listing, for the trust and file reads only a catalogue entry has. */
