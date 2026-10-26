@@ -1941,11 +1941,11 @@ const DECLARED: Record<string, Version> = {
       metric.cash-by-book metric.cash-cross-check metric.cash-now metric.categories-against-direction metric.chasing
       metric.currencies-held metric.days-late-in metric.due-30d metric.due-items-30d metric.every-month-by-category
       metric.every-month-in metric.every-month-out metric.filed-by-rule-30d metric.filed-for-you-30d metric.filed-today metric.in-30d
-      metric.in-ahead-by-month metric.in-by-month metric.in-due-by-month metric.installments-after-next-by-plan metric.installments-due-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-after-next-by-plan metric.installments-due-30d
       metric.installments-late metric.installments-left metric.installments-left-by-plan metric.installments-next-due-by-plan
       metric.installments-paid-by-plan metric.installments-total-by-plan metric.instalments-in-no-book metric.lasts-no-income
       metric.late-in metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days metric.ledger-rows-7d metric.net-by-month
-      metric.nights-missed-30d metric.out-30d metric.out-ahead-by-month metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.nights-missed-30d metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
       metric.owed-to-you metric.plan-last-due metric.plan-left metric.plan-next-due metric.plan-paid metric.plan-parts
       metric.plan-parts-open metric.plan-parts-paid metric.project-in-by-month metric.project-in-month metric.project-kept-month
       metric.project-out-by-month metric.project-out-month metric.project-owed metric.received-30d metric.received-7d
@@ -1967,52 +1967,9 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'f622b9b3dad561d4',
+    declares: '0d94dfc31a24262d',
     history: [
-      "Money 3.27.0: `page.money`'s In and out, by month reads its months ahead off `metric.in-ahead-by-month` and `metric.out-ahead-by-month`, the walk Cash ahead draws, and Cash ahead on `page.money` and `page.money-book` opens on twelve weeks -> 74076d8938aa73b8",
-      "Money 3.27.0: Lasts on `page.money` is how long `metric.lasts-no-income` lasts with a sentence of the day it ends on and what falls due then, and the day `metric.runs-out-on` names only while there is one -> b8350a22f5adb3fc",
-      "Money 3.27.0: `page.money`'s first line says Cash now in each currency apart and about what that comes to at the day's rate, over the accounts `metric.cash-by-account` lists -> ef720f5f29513147",
-      "Money 3.27.0: Every month on `page.money` says `metric.leaving-30d`, what goes out in the next thirty days as Today says it, beside the two repeating figures -> f622b9b3dad561d4",
-    ],
-  },
-  'money-core@3.27.1': {
-    holds: `
-      metric.account-ages metric.arriving-30d metric.balances-stale metric.bills-in-no-book metric.book-cash metric.book-in-by-month
-      metric.book-in-month metric.book-lasts-until metric.book-net-by-month metric.book-net-month metric.book-out-by-month
-      metric.book-out-month metric.book-owed-by metric.book-owed-to metric.book-spent-month metric.books-held metric.budget-passed-on
-      metric.budgets-set metric.card-to-pay metric.card-to-pay-on metric.cash-accounts metric.cash-as-of metric.cash-by-account
-      metric.cash-by-book metric.cash-cross-check metric.cash-now metric.categories-against-direction metric.chasing
-      metric.currencies-held metric.days-late-in metric.due-30d metric.due-items-30d metric.every-month-by-category
-      metric.every-month-in metric.every-month-out metric.filed-by-rule-30d metric.filed-for-you-30d metric.filed-today metric.in-30d
-      metric.in-ahead-by-month metric.in-by-month metric.in-due-by-month metric.installments-after-next-by-plan metric.installments-due-30d
-      metric.installments-late metric.installments-left metric.installments-left-by-plan metric.installments-next-due-by-plan
-      metric.installments-paid-by-plan metric.installments-total-by-plan metric.instalments-in-no-book metric.lasts-no-income
-      metric.late-in metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days metric.ledger-rows-7d metric.net-by-month
-      metric.nights-missed-30d metric.out-30d metric.out-ahead-by-month metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
-      metric.owed-to-you metric.plan-last-due metric.plan-left metric.plan-next-due metric.plan-paid metric.plan-parts
-      metric.plan-parts-open metric.plan-parts-paid metric.project-in-by-month metric.project-in-month metric.project-kept-month
-      metric.project-out-by-month metric.project-out-month metric.project-owed metric.received-30d metric.received-7d
-      metric.repeating-in-no-book metric.repeating-overdue metric.rule-filed metric.rules-filing metric.rules-filing-30d
-      metric.runs-out-on metric.runway-days metric.settled-in-7d metric.spent-30d metric.spent-by-category-last-month
-      metric.spent-by-category-month metric.spent-by-category-to-date-last-month metric.spent-last-month metric.spent-vs-last-month
-      metric.statement-oldest-days metric.txn-uncategorised metric.uncategorised-share-30d
-      page.money page.money-account page.money-bill page.money-book page.money-plan page.money-rules
-      register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments
-      register.obligations register.plans register.recurring register.snapshots register.transactions
-      rule.bill-moves-line rule.bill-takes-book rule.card-limit-owes rule.card-text-owes rule.category-taught rule.category-teaches
-      rule.entry-takes-book rule.installment-due-soon rule.instalment-settles rule.invoice-chased rule.invoice-late
-      rule.part-counts-plan rule.part-takes-book rule.payment-matches rule.payment-settles rule.payment-unsettles
-      rule.plan-links-parts rule.plan-made-one rule.recurring-ended rule.recurring-missed rule.recurring-stopped rule.recurring-went-through
-      rule.repeat-takes-book rule.rule-files-back rule.txn-categorise
-      script.book_from_account script.card_owed script.file_back script.last_day script.learn_category script.match_payment
-      script.move_line script.plans_from_names script.settle script.settle_matched_line script.unsettle
-      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
-      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
-      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
-    `,
-    declares: '85dab58aa5bbfc4c',
-    history: [
-      "Money 3.27.1: `script.book_from_account` and `script.plans_from_names` read each list in row number order, so a list that is not in that order no longer loses rows between pages -> 85dab58aa5bbfc4c",
+      "Money 3.27.0: `script.settle_matched_line` may write Bills and invoices, and \"It went through\" marks the one open bill for the line's money paid; no id added or taken away -> 0d94dfc31a24262d",
     ],
   },
   'work@1.17.0': {

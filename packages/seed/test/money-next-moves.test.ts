@@ -202,6 +202,23 @@ test('"It went through" moves Next one cycle on and writes nothing else', async 
   assert.ok(m.log.includes(`${LANDLORD} went through for 1 October, and Next is 1 November.`), said(m.log));
 });
 
+test('"It went through" marks the open bill for the same money paid, and moves the line on', async () => {
+  const m = await money();
+  const line = m.made('recurring', LINE);
+  const bill = m.made('obligations', { what: LANDLORD, direction: 'owed_by_me', amount: gbp(400_000), due: '2026-10-01', state: 'open' });
+  const other = m.made('obligations', { what: 'Somebody else', direction: 'owed_by_me', amount: gbp(400_000), due: '2026-10-01', state: 'open' });
+  await m.turn();
+  const q = m.open().find((x) => x.body?.about === `recurring#${line.seq}`)!;
+  value(m.k.decide(q.id, { decide: { option: q.body!.options!.find((o) => o.label === 'It went through')!.id, reason: 'It went.' } }, 'p_1'));
+  await m.turn();
+  assert.equal(fieldsOf(m.k, line.id).next_due, '2026-11-01', said(m.log));
+  assert.deepEqual([fieldsOf(m.k, bill.id).state, fieldsOf(m.k, bill.id).settled], ['paid', '2026-10-03'], said(m.log));
+  assert.equal(fieldsOf(m.k, other.id).state, 'open');
+  assert.ok(m.log.includes(`${LANDLORD} is marked paid, since you said it went through.`), said(m.log));
+  /* AND THE BILL BEING PAID ASKS NOTHING MORE: its line has moved on already. */
+  assert.ok(!m.open().some((x) => x.body?.options?.some((o) => o.label === 'Move it on')), said(m.log));
+});
+
 test('"It went through" pressed after the payment moved the line skips no cycle', async () => {
   const m = await money();
   const line = m.made('recurring', LINE);

@@ -173,12 +173,8 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
-      version: '3.27.1',
-      notes: 'Nothing is skipped now when Money files lines in the book of their account or counts the parts of a plan, however many there are.',
-    },
-    {
       version: '3.27.0',
-      notes: 'The months ahead of In and out, by month are what Cash ahead walks, every part of a plan in the month it falls due, and Cash ahead opens on twelve weeks. Lasts says how long the money lasts with nothing coming in, the day that ends on and what falls due then. The first line keeps each currency apart, with about what they come to at the rate, and counts the accounts the Accounts tile lists. Every month says what goes out in the next thirty days as Today does, parts of plans with it.',
+      notes: 'Answering "It went through" about a repeating line marks its open bill for the same money paid as well, where the bill stayed open and read late on Today.',
     },
     {
       version: '3.26.0',
