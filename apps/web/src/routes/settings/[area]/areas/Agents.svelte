@@ -44,6 +44,7 @@
   } from '$lib/agents/profile.ts';
   import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
   import ChatAnswer from '$lib/agents/ChatAnswer.svelte';
+  import OnWord from '$lib/agents/OnWord.svelte';
   import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
   import { lineOf as appLineOf, madeByOther, partsOf } from '$lib/record/apps.ts';
@@ -771,6 +772,10 @@
   <!-- ANSWER FROM INSIDE CHAT APPS, the owner's one switch for the decision card in Claude and ChatGPT
        (`lib/agents/ChatAnswer.svelte`): off, its buttons open BrainDog. -->
   <ChatAnswer prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+
+  <!-- AGENTS MAY ANSWER WHEN YOU TELL THEM, the owner's one switch for answering on his word (`lib/agents/OnWord.svelte`):
+       on until he turns it off, and off every agent asks. -->
+  <OnWord prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
 
   <!-- CONNECT AN AGENT is the first tile's one primary; the sheet it opens is a chunk of its own, asked for on the first
        press, and the six-digit field rides in it under the setup line while no machine waits above. -->
