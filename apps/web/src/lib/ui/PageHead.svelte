@@ -19,11 +19,14 @@
   separate one-line title at 17/600 fades in where the name was, and the name fades out, over `--d-swap`. The name used
   to animate its own font size, which laid the head out on every frame.
 
-  BELOW 900px THE HEAD IS A PHONE'S, THREE ROWS. The bar is always a row of its own, 56 under the notch, and stays: the
-  back link (a chevron and the parent's name) or "BrainDog ▾" (the record switcher) on the left, the search button and
-  the face (Settings and Sign out, never a list of everything) on the right, each 44 square. Under it the kicker when
-  there is one, then the name at 22/28, two lines at most, with its count inline and the page's actions at the end;
-  then the sentence. The bar says the title on one line once the name has gone under it, fading in over the switcher.
+  BELOW 900px THE HEAD IS A PHONE'S, THREE ROWS. The bar is always a row of its own, 56 under the notch, and stays, ONE
+  SHAPE ON EVERY PAGE: the record's mark (or a back chevron where the page has a parent), where you are in words (the
+  shell's lit row, `frame.here`), then Ask, the bell and the face, each 44 square. Under it the kicker when there is one,
+  then the name at 22/28, two lines at most, with its count inline and the page's actions at the end; then the
+  sentence. The bar says the title on one line once the name has gone under it, fading in over where you are.
+
+  FROM 900px UP THE BAR'S CRUMB IS THE WAY BACK (`frame.crumbed`), so the kicker's link and a headless head's back link
+  are not drawn a second time over the name.
 
   THE SENTENCE HOLDS ITS ROOM WHILE IT IS ON ITS WAY (motion F2.2): until the screen settles a page that has not said one
   yet keeps an empty line (two on a phone), so the tiles under the head never jump down when it lands.
@@ -51,7 +54,9 @@
   import { at, here } from '../at.ts';
   import { copy } from '../copy.ts';
   import { palette } from '../palette/open.svelte.ts';
-  import RecordMenu from '../shell/RecordMenu.svelte';
+  import Bell from '../shell/Bell.svelte';
+  import { frame } from '../shell/frame.svelte.ts';
+  import RecordMark from '../shell/RecordMark.svelte';
   import YouMenu from '../shell/YouMenu.svelte';
   import { partsOf, stopped } from '../shell/headline.ts';
   import { settled } from './screen.svelte.ts';
@@ -186,8 +191,22 @@
      browser may break at), and one longer than the row still breaks inside itself rather than running off the screen. */
   const named = $derived(title.split(/\s+/u).filter((w) => w !== ''));
 
-  /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT; without one it carries the mark and the record's name. */
+  /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT; without one it carries the record's mark. */
   const wayBack = $derived(Boolean(kicker && back));
+
+  /* THE PAGE'S NAME, FOR THE BAR'S CRUMB: said while this head is drawn, and taken back when it goes. */
+  $effect(() => {
+    const said = title;
+    frame.title = said;
+    return () => {
+      if (frame.title === said) frame.title = '';
+    };
+  });
+
+  /* ON A DESK WITH THE CRUMB IN THE BAR, the head draws no way back of its own. */
+  const crumbed = $derived(frame.crumbed && !narrow.current);
+  /* WHERE YOU ARE, IN THE PHONE'S BAR: the shell's lit row, else this page's name. */
+  const where = $derived(frame.here || title);
 
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
   const parts = $derived(typeof sentence === 'string' ? partsOf(stopped(sentence), needs) : null);
@@ -207,17 +226,17 @@
 -->
 <div class="head-bar" bind:this={bar} data-under={under ? '' : undefined} data-past={past ? '' : undefined}>
   {#if wayBack}
-    <a class="back tap" href={at(back!)}>
-      <span class="back-mark"><Icon name="chevron" size="l" /></span><span class="back-name">{kicker}</span>
+    <a class="back tap" href={at(back!)} aria-label={kicker}>
+      <span class="back-mark"><Icon name="chevron" size="l" /></span>
     </a>
-    <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
   {:else}
-    <div class="bar-lead">
-      <!-- "BRAINDOG ▾" ON EVERY PHONE SCREEN: the record you are in and the others to switch to (frame A). -->
-      <span class="bar-brand"><RecordMenu phone /></span>
-      <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
-    </div>
+    <span class="bar-mark"><RecordMark size={24} /></span>
   {/if}
+  <div class="bar-lead">
+    <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
+    <p class="bar-where" dir="auto">{where}</p>
+    <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
+  </div>
   <span class="bar-end">
     {#if barred && actions}<span class="head-actions bar-actions">{@render actions()}</span>{/if}
     {#if !searching}
@@ -225,10 +244,11 @@
         <Icon name="search" size="l" />
       </button>
     {/if}
+    <Bell phone />
     <YouMenu phone />
   </span>
 </div>
-{#if crumb && !headless && !tiled}
+{#if crumb && !headless && !tiled && !crumbed}
   <!-- Over the name and scrolling with the page: the row that stays is the name's. -->
   {#if back}
     <a class="kicker kicker-link tap" href={at(back)}>{crumb}</a>
@@ -242,7 +262,7 @@
     {#if tiled}
       <!-- THE NAME IS THE LEAD TILE'S. -->
     {:else if headless}
-      {#if back && kicker}
+      {#if back && kicker && !crumbed}
         <a class="head-back tap" href={at(back)}><span class="back-mark"><Icon name="chevron" size="m" /></span>{kicker}</a>
       {/if}
     {:else}
@@ -643,26 +663,20 @@
       padding: env(safe-area-inset-top) var(--sp-3) 0;
     }
 
-    /* CLEAR OVER THE BOARD, AND THE BOARD ITSELF WITH A HAIRLINE UNDER IT ONCE ANYTHING HAS SCROLLED UNDER IT, as the
-       docked tab bar is at the bottom: flat and opaque, no glass and no blur. */
+    /* ON THE NAV'S SURFACE WITH A HAIRLINE UNDER IT, as the docked tab bar is at the bottom and the desk's bar is at the
+       top: flat and opaque, no glass and no blur, the same on every page. */
     .head-bar::before {
       content: '';
       position: absolute;
       inset: 0;
       z-index: -1;
-      background: var(--board);
+      background: var(--nav);
       box-shadow: inset 0 -1px 0 var(--rule);
-      opacity: 0;
       pointer-events: none;
-      transition: opacity var(--d-swap) var(--ease-out);
     }
 
-    .head-bar[data-under]::before {
-      opacity: 1;
-    }
-
-    /* THE MARK AND THE RECORD'S NAME, AND OVER THEM THE TITLE ONCE THE NAME HAS GONE UNDER THE BAR: one cell, two
-       pieces, a cross-fade and no layout. */
+    /* WHERE YOU ARE, AND OVER IT THE TITLE ONCE THE NAME HAS GONE UNDER THE BAR: one cell, two pieces, a cross-fade
+       and no layout. */
     .bar-lead {
       display: grid;
       flex: 1 1 0;
@@ -675,75 +689,49 @@
       min-inline-size: 0;
     }
 
-    .bar-brand {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--sp-2);
-      min-inline-size: 0;
-      color: var(--ink);
-      transition: opacity var(--d-swap) var(--ease-out);
-    }
-
-    /* GONE UNDER THE TITLE, the switcher takes no press meant for the title over it. */
-    .head-bar[data-past] .bar-brand {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    /* The back link: a 20px chevron and the parent's name at 15/500, 44px tall. IT TAKES THE ROOM THERE IS until the
-       title shows, then two fifths of the bar and the name in it ellipses. */
+    /* THE RECORD'S MARK, or the back chevron in its place: one 44 slot at the bar's start on every page. */
+    .bar-mark,
     .back {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--sp-1);
-      flex: 0 1 auto;
-      min-inline-size: 0;
-      min-block-size: var(--tap);
-      padding-inline-end: var(--sp-2);
+      display: grid;
+      place-items: center;
+      flex: none;
+      inline-size: var(--tap);
+      block-size: var(--tap);
+      margin-inline-start: calc(-1 * var(--sp-2));
       color: var(--ink);
-      font-size: var(--fs-body);
-      font-weight: var(--fw-medium);
       text-decoration: none;
     }
 
-    .head-bar[data-past] .back {
-      flex: none;
-      max-inline-size: 40%;
-    }
-
-    .back-name {
-      min-inline-size: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    /* The title on one line at 17/600, and only once the large one has gone under the bar. Beside a back link it asks
-       for no room of its own until then. */
+    .bar-where,
     .bar-title {
-      flex: 1 1 0;
-      min-inline-size: 0;
       margin: 0;
       overflow: hidden;
       color: var(--ink);
+      font-family: var(--font-display);
       font-size: var(--fs-head);
       font-weight: var(--fw-semi);
       text-overflow: ellipsis;
       white-space: nowrap;
-      opacity: 0;
       transition: opacity var(--d-swap) var(--ease-out);
     }
 
+    .bar-title {
+      opacity: 0;
+    }
+
+    .head-bar[data-past] .bar-where {
+      opacity: 0;
+    }
+
     .head-bar[data-past] .bar-title {
-      flex-basis: auto;
       opacity: 1;
     }
 
-    /* SEARCH AND THE FACE AT THE END, 44 square each and 4 apart. */
+    /* ASK, THE BELL AND THE FACE AT THE END, 44 square each and touching: three targets in the room of three. */
     .bar-end {
       display: inline-flex;
       align-items: center;
-      gap: var(--sp-1);
+      gap: 0;
       flex: none;
       margin-inline-start: auto;
     }

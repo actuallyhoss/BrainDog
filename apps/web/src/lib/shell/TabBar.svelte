@@ -1,11 +1,10 @@
 <!--
   Below 900px the rail becomes a tab bar. Not a shrunken desktop (2.A.23).
 
-  FIVE PLACES, AS ON 19 OCTOBER (chosen 20 October): Today, Needs you, Projects, Money, Agents (`tabsOf`), the same
-  five the top bar draws, with the rail's glyphs and words: a place whose glyph or word differs between two shapes is a
-  place learnt twice. NO MORE TAB. The Projects tab is the sidebar as a page (frame A): the projects, then Work, People
-  and every list. Settings is under the face at the top of each screen (`PageHead.svelte`). Search is the 44px button
-  beside that face, never a tab.
+  FOUR PLACES AND MENU: Today, Needs you, Projects and Money (`tabsOf`, or the four picked in Settings › Navigation),
+  with the sidebar's glyphs and words, then Menu, which is the sidebar drawn as a page: every other place, the projects,
+  every list and Settings. MENU IS LIT FOR EVERY PAGE THE FOUR ARE NOT, so one tab is lit on every page, and it wears
+  the agents' live dot while one is at work. Search and the bell are in each page's head, never tabs.
 
   FLAT, AND DOCKED TO THE BOTTOM EDGE, on the nav's own surface with one hairline over it, as the top bar
   is: equal tabs, 24px glyphs over 12/500 captions, every target 44 or more. The tab you are on wears its glyph on a
@@ -26,18 +25,27 @@
 
   let {
     tabs,
+    menu,
+    live = false,
   }: {
-    /** The five tabs, as `tabsOf` reads them from the rail's places. */
+    /** The four tabs, as `tabsOf` reads them from the rail's places. */
     tabs: readonly FlatItem[];
+    /** Where Menu opens: the sidebar as a page. */
+    menu: string;
+    /** An agent is at work now: Menu wears the live dot. */
+    live?: boolean;
   } = $props();
+
+  const words = { menu: 'Menu', working: 'An agent is at work' } as const;
 
   /* COMPARED INSIDE THE RECORD, the address with the base and the slug taken off (`lib/at.ts`). */
   const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
+  const lit = $derived(tabs.find((t) => isHere(t, path))?.key ?? null);
 </script>
 
-<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length}`}>
+<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`}>
   {#each tabs as tab (tab.key)}
-    <a class="tab tap" href={at(tab.href)} aria-current={isHere(tab, path) ? 'page' : undefined}>
+    <a class="tab tap" href={at(tab.href)} aria-current={lit === tab.key ? 'page' : undefined}>
       <span class="badge-slot">
         <Icon name={tab.icon as IconName} size="xl" />
         {#if tab.count && tab.key === 'decide'}<span class="badge"><Count n={tab.count} size="s" label={`${tab.count} ${copy.openQuestions}`} /></span>{/if}
@@ -45,6 +53,13 @@
       <span class="tab-name">{tab.label}</span>
     </a>
   {/each}
+  <a class="tab tap" href={at(menu)} aria-current={lit === null ? 'page' : undefined}>
+    <span class="badge-slot">
+      <Icon name="rows" size="xl" />
+      {#if live}<span class="tab-live" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
+    </span>
+    <span class="tab-name">{words.menu}</span>
+  </a>
 </nav>
 
 <style>
@@ -133,6 +148,27 @@
     inset-block-start: calc(-1 * var(--sp-1));
     inset-inline-start: 24px;
     display: flex;
+  }
+
+  /* THE AGENTS' LIVE DOT ON MENU'S CORNER, where Needs you wears its count. */
+  .tab-live {
+    position: absolute;
+    inset-block-start: 1px;
+    inset-inline-end: 8px;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
+    background: var(--live);
+    outline: 2px solid var(--nav);
+  }
+
+  .sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* FORCED COLOURS KEEP THE BAR'S EDGE, and the tab you are on an outline of its own. */
