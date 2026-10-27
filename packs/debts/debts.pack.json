@@ -232,7 +232,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Add what you are paying off and the two ways of clearing it are worked out below. The avalanche pays the highest rate first and costs the least interest; the snowball pays the smallest balance first and clears a debt soonest. Change the extra on either plan and both are worked again."
+          "body": "Two ways to clear what you are paying off, and what each saves in interest."
         },
         {
           "kind": "cards",
@@ -335,6 +335,11 @@
           ],
           "limit": 2,
           "empty": "Nothing to compare yet. The extra you pay each month is typed here once a plan exists, and both plans are worked again."
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "The avalanche pays the highest rate first and costs the least interest. The snowball pays the smallest balance first and clears a debt soonest. Type a new extra on either plan and both are worked again."
         },
         {
           "kind": "table",
