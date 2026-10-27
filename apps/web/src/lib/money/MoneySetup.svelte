@@ -122,7 +122,7 @@
 <section class="ms" aria-labelledby="ms-title">
   {#if finished}
     <h2 class="ms-title" id="ms-title">{finished.left.length > 0 || finished.failed.length > 0 ? words.doneSome : words.done}</h2>
-    {#each finished.failed as f (f)}<p class="ms-warn" role="alert">{f}</p>{/each}
+    {#each finished.failed as f, i (i)}<p class="ms-warn" role="alert">{f}</p>{/each}
     {#if finished.left.length > 0}
       <ul class="ms-left">
         {#each finished.left as l (l.href)}<li><a href={at(l.href)}>{l.label}</a></li>{/each}
