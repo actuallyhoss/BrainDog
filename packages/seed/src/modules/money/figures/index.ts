@@ -6,6 +6,7 @@
 
 import type { SeedMetric } from '../../base.ts';
 import { withTargetSetting, type Decl } from '../settings.ts';
+import { ACCOUNT_FIGURES } from './accounts.ts';
 import { CASH_FIGURES } from './cash.ts';
 import { DIRECTION_FIGURES } from './direction.ts';
 import { DUE_FIGURES } from './due.ts';
@@ -86,6 +87,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   ...BUDGET_PAGE_FIGURES,
   ...PAYEE_FIGURES,
   ...HEALTH_FIGURES,
+  ...ACCOUNT_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */
