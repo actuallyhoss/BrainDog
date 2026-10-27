@@ -493,6 +493,8 @@ importers:
 
   packs/team-board: {}
 
+  packs/trips: {}
+
   packs/week-in-money: {}
 
   packs/work: {}
