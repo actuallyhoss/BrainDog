@@ -2062,7 +2062,7 @@ const DECLARED: Record<string, Version> = {
       metric.book-in-by-month metric.book-in-month metric.book-lasts-until metric.book-net-by-month metric.book-net-month
       metric.book-out-by-month metric.book-out-month metric.book-owed-by metric.book-owed-to metric.book-spent-month metric.books-held
       metric.budget-passed-on metric.budgets-set metric.budgets-total metric.budgets-unset metric.card-to-pay metric.card-to-pay-on
-      metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check metric.cash-now
+      metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check metric.cash-foreign-share metric.cash-now
       metric.categories-against-direction metric.chasing metric.currencies-held metric.days-late-in metric.due-30d
       metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-net metric.every-month-out metric.filed-by-rule-30d
       metric.filed-for-you-30d metric.filed-today metric.in-30d metric.in-ahead-by-month metric.in-by-month metric.in-due-by-month
@@ -2086,24 +2086,26 @@ const DECLARED: Record<string, Version> = {
       page.money-forecast page.money-ledger page.money-payees page.money-plan page.money-reports page.money-rules
       register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments
       register.obligations register.plans register.recurring register.snapshots register.transactions
-      rule.bill-moves-line rule.bill-takes-book rule.card-limit-owes rule.card-text-owes rule.category-taught rule.category-teaches
+      rule.bill-moves-line rule.bill-takes-book rule.budget-near rule.budget-over rule.card-limit-owes rule.card-text-owes rule.category-taught rule.category-teaches
       rule.entry-takes-book rule.installment-due-soon rule.instalment-settles rule.invoice-chased rule.invoice-late
       rule.part-counts-plan rule.part-takes-book rule.payment-matches rule.payment-settles rule.payment-unsettles
       rule.plan-links-parts rule.plan-made-one rule.recurring-ended rule.recurring-missed rule.recurring-stopped
       rule.recurring-went-through rule.repeat-takes-book rule.rule-files-back rule.txn-categorise
-      script.book_from_account script.card_owed script.file_back script.last_day script.learn_category script.match_payment
+      script.book_from_account script.budget_watch script.card_owed script.file_back script.last_day script.learn_category script.match_payment
       script.move_line script.offer_budgets script.plans_from_names script.settle script.settle_matched_line script.unsettle
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'cba568698b10ef25',
+    declares: 'd0a54b82ff5bdaa6',
     history: [
       'Money 3.29.0: Money is a section, with `page.money-accounts`, `page.money-ledger`, `page.money-budgets`, `page.money-coming`, `page.money-forecast`, `page.money-reports` and `page.money-payees` under it, each its line alone, and `register.categories` gains `icon`, `colour`, `budget_alert`, `rollover` and `parent` -> cd223ca9d727a38b',
       'Money 3.29.0, the rest of the section: the home leads with one hero and Coming up, the pages are filled, `script.offer_budgets` offers budgets from last month, and `metric.payees-paid-90d`, `metric.account-now` and the other figures the pages read come with it, and Coming up and Forecast draw each list the whole row -> c39958b1099af6a1',
       'Money 3.29.0, polish: Coming up adds what is left every month (`metric.every-month-net`), the home goes red under nothing and says how old its rate is -> 9f6db23eb5f872a2',
       'Money 3.29.0 takes 3.27.1 in: `script.book_from_account` and `script.plans_from_names` read each list in row number order -> fc0797c342345df5',
       'Money 3.29.0, a plan\'s page laid out as Property\'s: where it stands with what is late, one track with the next part under it as Money\'s Instalments tile draws it (five figures of one plan by plan, `metric.plan-parts-paid-by-plan` to `metric.plan-after-next-by-plan`), what was paid in all by each quarter (`metric.plan-paid-by-quarter`, a running line), the next six parts to tick and the parts paid, the rest folded; `metric.plan-late` and `metric.plan-parts-cancelled` added -> cba568698b10ef25',
+      'Money 3.29.0, warnings and health: `script.budget_watch` marks a category near or over its budget each month and `rule.budget-near` and `rule.budget-over` say so once, `register.categories` gains `budget_warned` and `warned_month`, and `metric.cash-foreign-share` says how much of Cash now is in other currencies -> c1744441b38109d0',
+      'Money 3.29.0, the plan page and the warnings together: `metric.cash-foreign-share` now sits before the plan page figures -> d0a54b82ff5bdaa6',
     ],
   },
   'work@1.17.0': {

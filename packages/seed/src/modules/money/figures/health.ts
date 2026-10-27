@@ -1,6 +1,7 @@
 /** Money's health figures: how much of what comes in is kept, how many months the cash lasts, and how much is held in other currencies. */
 
 import type { SeedMetric } from '../../base.ts';
+import { ROLLED } from '../legs.ts';
 import { MONEY } from './shared.ts';
 
 /** What moved, as every figure of the Ledger counts it: cleared and not between a person's own accounts. */
@@ -18,10 +19,13 @@ const MOVED = 'state is cleared, transfer is false';
  *
  * A FIFTH OR MORE KEPT IS THE MARK, the share a household that saves aims at, and no currency is named by it.
  *
- * HOW MANY MONTHS THE CASH LASTS AND WHAT IS HELD IN OTHER CURRENCIES ARE NOT HERE YET. Each sets a figure of one list
- * against a figure of another (cash on accounts against spending on the Ledger, a currency against the home one), and
- * a figure in this build reads one list. Money's Lasts tile already says the day the cash lasts to with nothing coming
- * in (`lasts-no-income`), which is the first in days.
+ * HOW LONG THE CASH LASTS IS NOT A FIGURE HERE: `lasts-no-income` (`figures/runway.ts`) already walks Cash now down
+ * by everything that goes out with nothing coming in, in days, and Reports' Health reads that one.
+ *
+ * WHAT IS HELD IN OTHER CURRENCIES, SINCE money-core 3.29.0: of Cash now, the share in a currency other than the home
+ * one, both halves converted at the rates held (`read: 'foreign'`, `foreignShare` in
+ * `packages/kernel/src/money-figures.ts`). The same accounts and the same roll as Cash now. No home currency, or a rate
+ * missing, reads nothing rather than a share of a part. No target a share could miss: holding dollars is a choice.
  *
  * THE MONTH SO FAR, EACH WAY: money in since the first, and money out, which is `spent-by-category-month`'s whole.
  */
@@ -41,6 +45,19 @@ export const HEALTH_FIGURES: Record<string, SeedMetric> = {
     format: 'pct',
     target: { gte: 0.2 },
     window: '90d',
+    compare: 'none',
+  },
+
+  'cash-foreign-share': {
+    metric: 'cash-foreign-share',
+    name: 'Cash in other currencies',
+    source: 'register.accounts',
+    /* CASH NOW'S OWN ACCOUNTS (`figures/cash.ts`). */
+    where: 'liquid is true, state is not closed',
+    value: { rolled: { ...ROLLED.rolled, read: 'foreign' } },
+    format: 'pct',
+    target: { gte: 0 },
+    window: '30d',
     compare: 'none',
   },
 

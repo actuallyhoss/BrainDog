@@ -54,6 +54,8 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   'installment-due-soon': 'Say when a part falls due',
   'recurring-missed': 'Catch a repeat that did not happen',
   'recurring-ended': 'End a schedule on its last day',
+  'budget-near': 'Say when a budget is nearly spent',
+  'budget-over': 'Say when a budget is over',
 };
 
 /**

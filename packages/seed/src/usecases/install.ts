@@ -72,7 +72,7 @@ const startersIn = (lists: Iterable<string>): { register: string; fields: Body }
  * own entries, and only into a list that holds nothing yet.
  */
 export function starterRows(id: string): { register: string; fields: Body }[] {
-  const declared = ((firstPartyDocument(id, { seeds: [] })?.declarations ?? []) as Body[]).flatMap((d) => (typeof d.register === 'string' ? [d.register] : []));
+  const declared = ((firstPartyDocument(id, { seeds: [] })?.declarations ?? []) as Body[]).flatMap((d) => (typeof d.register === 'string' && d.rule === undefined ? [d.register] : []));
   return startersIn(declared);
 }
 

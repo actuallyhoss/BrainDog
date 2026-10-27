@@ -79,7 +79,8 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       empty: 'Nothing moved in these months.',
     },
     {
-      /* HOW THE QUARTER WENT: what was kept of what came in, and what went out against the month before. */
+      /* HOW THE QUARTER WENT: what was kept of what came in, and what went out against the month before; how long the
+         cash lasts with nothing coming in, and how much of it is in other currencies. */
       kind: 'stat',
       heading: 'Health',
       icon: 'heart-pulse',
@@ -88,6 +89,8 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
         { metric: 'kept-share-90d', label: 'Kept of money in', note: 'The last 90 days, after everything that went out' },
         { metric: 'spent-30d', label: 'Spent, 30 days', note: 'Against the 30 days before' },
         { metric: 'received-30d', label: 'Came in, 30 days', note: 'Against the 30 days before' },
+        { metric: 'lasts-no-income', label: 'Lasts with no income', note: 'Cash now, spent at the pace it goes out' },
+        { metric: 'cash-foreign-share', label: 'In other currencies', note: 'Of cash now, at the rates you hold' },
       ],
       when: { metric: 'out-by-month', gt: 0 },
     },

@@ -96,9 +96,10 @@ export type RolledMoves = { register: string; by: string; on: string; amount: st
 
 /**
  * What a rolled figure answers in place of the money: the oldest day an account was last confirmed, that day's age in
- * whole days, or how many accounts were last confirmed longer ago than `after` (or never).
+ * whole days, how many accounts were last confirmed longer ago than `after` (or never), or the share of the money held
+ * in a currency other than the home one (`foreign`, `foreignShare`).
  */
-export const ROLLED_READS = ['as_of', 'age', 'stale'] as const;
+export const ROLLED_READS = ['as_of', 'age', 'stale', 'foreign'] as const;
 
 /**
  * `value: { rolled }` (`modules.md` C3): each account's own balance and day, the lists that restart it, and its moves.
@@ -444,6 +445,7 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     /* A FIGURE ABOUT AGE IS A PLAIN NUMBER, never money, so it has no currency and nothing to convert. Each group says
        its own accounts' answer, which is what lets a line name each old account. Oldest first when the answer is a
        day, with a group never confirmed before every dated one; otherwise the largest age or count first. */
+    if (reads === 'foreign') return { whole: foreignShare(all, home.home, home.rates, on), since, groups: null, more: 0 };
     if (reads !== undefined) {
       const whole: Summed = { value: agesSay(days, on), unit: null };
       if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };
@@ -499,6 +501,30 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     ...(now.since !== null ? { as_of: now.since } : {}),
     ...(now.groups ? { groups: now.groups, more: now.more } : {}),
   });
+}
+
+/**
+ * THE SHARE OF THE MONEY HELD OUTSIDE THE HOME CURRENCY, as a fraction: the amounts in any other currency over every
+ * amount, each half converted into the home currency at the rates the record holds on the day asked about.
+ *
+ * NO VALUE RATHER THAN A WRONG ONE. With no home currency there is no "other"; with a rate missing for any amount a half
+ * is only at least, and a share of a part is no share; with nothing held above nought a share of it means nothing. A
+ * record whose money is all in the home currency reads nought.
+ */
+function foreignShare(amounts: readonly Amount[], home: string | null, rates: EvalRates, today: string): Summed {
+  if (home === null) return { value: null, unit: null };
+  const whole = summed(amounts, home, home, rates, today);
+  const away = summed(
+    amounts.filter((a) => a.currency !== home),
+    home,
+    home,
+    rates,
+    today,
+  );
+  const fx = whole.fx ? { fx: whole.fx } : {};
+  const one = (s: Summed): boolean => s.value !== null && !s.parts && !s.atLeast && (s.unit === home || s.unit === null);
+  if (!one(whole) || !one(away) || whole.unit !== home || !(whole.value! > 0)) return { value: null, unit: null, ...fx };
+  return { value: away.value! / whole.value!, unit: null, ...fx };
 }
 
 /** A day as SQLite compares one in `readRolled`: the first ten characters of a stored text, or `null` for none. */

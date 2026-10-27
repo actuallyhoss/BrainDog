@@ -109,6 +109,16 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
     { id: 'budget_alert', label: 'Warn at percent', type: 'int', min: 1, max: 100 },
     { id: 'rollover', label: 'Carries over', type: 'bool', default: false },
     { id: 'parent', label: 'Under', type: 'ref', to: 'categories' },
+    /* WHERE THIS MONTH STANDS AGAINST THE BUDGET, written once a day by `scripts/budget-watch.js` and read by the rules
+       `budget-near` and `budget-over`, which tell of each once a category a month (`warned_month`). */
+    {
+      id: 'budget_warned',
+      label: 'Budget warning',
+      type: 'enum',
+      values: ['near', 'over'],
+      labels: { near: 'Near its most', over: 'Over its most' },
+    },
+    { id: 'warned_month', label: 'Warned for', type: 'text' },
     { id: 'state', label: 'Status', type: 'enum', values: ['live', 'retired'], default: 'live', index: true, required: true },
     { id: 'note', type: 'text' },
   ],

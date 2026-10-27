@@ -11,6 +11,7 @@
 import type { SeedRule } from '../base.ts';
 import { OBLIGATIONS_REGISTER } from './lists/obligations.ts';
 import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
+import { BUDGET_WATCH_SCRIPT } from './scripts/budget-watch.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { FILE_BACK_SCRIPT } from './scripts/file-back.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
@@ -176,6 +177,29 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * moves `ends` forward is out of the filter anyway, and one who moves it to another past day is
    * asking for it to end again and gets that.
    */
+  /**
+   * A BUDGET PAST ITS WARNING, AND ONE OVER, SINCE money-core 3.29.0: told once a category a month. A month's spending is
+   * a sum over the Ledger and a rule reads one row, so `script.budget_watch` works it out once a day and marks the
+   * category `near` or `over` with the month; these tell of the mark. `once_per: [entry, warned_month]` is once a
+   * category a month for each, so the warning is not said again the next day, and next month's says it afresh. A
+   * category that goes over without passing its warning first is told it is over and nothing else.
+   */
+  'budget-near': {
+    rule: 'budget-near',
+    pack: 'money-core',
+    register: 'categories',
+    when: 'budget_warned is near, warned_month is set',
+    then: [{ notify: { say: '{{name}} is past {{budget_alert}}% of its {{money:budget}} budget this month.' } }],
+    once_per: ['entry', 'warned_month'],
+  },
+  'budget-over': {
+    rule: 'budget-over',
+    pack: 'money-core',
+    register: 'categories',
+    when: 'budget_warned is over, warned_month is set',
+    then: [{ notify: { say: '{{name}} is over its {{money:budget}} budget this month.' } }],
+    once_per: ['entry', 'warned_month'],
+  },
   'recurring-ended': {
     rule: 'recurring-ended',
     pack: 'money-core',
@@ -476,6 +500,8 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   },
   LEARN_CATEGORY_SCRIPT,
   OFFER_BUDGETS_SCRIPT,
+  /* AND THE DAILY MARK THE TWO BUDGET RULES ABOVE TELL OF (`scripts/budget-watch.js`). */
+  BUDGET_WATCH_SCRIPT,
 ];
 
 /**
