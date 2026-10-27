@@ -19,6 +19,7 @@
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { loadCounter, writeCount, type Counted, type Loaded } from '$lib/money/cash-count-live.ts';
   import {
+    counterReady,
     countFields,
     differenceOf,
     faceSaid,
@@ -67,6 +68,9 @@
     left: 'Left as Discrepancy',
     noCash: 'No cash account to count',
     noCashBody: 'Add an account of type Cash and it will be here to count.',
+    notSetUp: 'Counting cash is not set up',
+    notSetUpBody: 'Add Count cash from the add-ons, then open the counter from Count the cash on Money.',
+    addOn: 'See the add-on',
     saved: 'Count saved',
     savedBody: 'The difference is being filed in the Ledger.',
     again: 'Count again',
@@ -80,7 +84,9 @@
   const lists = $derived((page.data as { lists?: { id: string; kernel?: true }[] } | undefined)?.lists ?? []);
   /* THE LIST IS NAMED BY THE LINK THAT OPENS THE COUNTER (`?list=`), which the add-on declares, so this screen holds no list's name. */
   const into = $derived(page.url.searchParams.get('list'));
-  const counter = read(() => (lists.length === 0 ? null : `${base} ${lists.length} ${into ?? ''}`), async (): Promise<Result<Loaded>> => {
+  /* A RECORD WITHOUT THE ADD-ON, OR THE COUNTER OPENED BARE, HAS NOWHERE TO WRITE A COUNT: an empty screen, asking nothing. */
+  const ready = $derived(counterReady(into, lists));
+  const counter = read(() => (lists.length === 0 || !ready ? null : `${base} ${lists.length} ${into ?? ''}`), async (): Promise<Result<Loaded>> => {
     if (into === null) return { ok: false, refusal: { code: 'UNREACHABLE', fix: 'Open the counter from Count the cash on Money.' } };
     const got = await loadCounter(base, lists, into);
     return got.ok ? { ok: true, value: got.value } : { ok: false, refusal: { code: 'UNREACHABLE', fix: got.fix } };
@@ -174,7 +180,11 @@
 
 <PageHead icon="money" title={words.title} sentence={words.sentence} kicker="Money" back={at('/p/money', page.url.pathname)} />
 <div class="cc-page">
-  {#if counter.state === 'waiting' || counter.state === 'refused' || counter.state === 'offline'}
+  {#if !ready}
+    <Empty kind="no-data-yet" glyph="money" title={words.notSetUp} body={words.notSetUpBody}>
+      {#snippet actions()}<Button href={at('/addons/count-cash', page.url.pathname)}>{words.addOn}</Button>{/snippet}
+    </Empty>
+  {:else if counter.state === 'waiting' || counter.state === 'refused' || counter.state === 'offline'}
     <ReadState state={counter.state} refusal={counter.refusal} onretry={counter.reread} />
   {:else if !account}
     <Empty kind="no-data-yet" glyph="money" title={words.noCash} body={words.noCashBody} />

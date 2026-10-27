@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { COUNTABLE, countFields, differenceOf, exponentOf, typedTotalOf, linesOf, noteSet, notesOf, stepped, totalOf, typedCount } from './cash-count.ts';
+import { readFileSync } from 'node:fs';
+
+import { COUNTABLE, counterReady, countFields, differenceOf, exponentOf, typedTotalOf, linesOf, noteSet, notesOf, stepped, totalOf, typedCount } from './cash-count.ts';
 
 test('each currency has its own notes, largest first, and an unknown one has none', () => {
   assert.deepEqual(noteSet('EGP').slice(0, 3), ['200', '100', '50']);
@@ -63,4 +65,18 @@ test('a typed total is worked in the currency\'s own minor unit', () => {
   assert.equal(typedTotalOf('5000', 'JPY'), 5000);
   assert.equal(typedTotalOf('abc', 'EGP'), 0);
   assert.equal(typedTotalOf('', 'EGP'), 0);
+});
+
+test('the counter opens only onto a list the record holds, and a record without the add-on gets an empty screen', () => {
+  const lists = [{ id: 'accounts' }, { id: 'cash_counts' }];
+  assert.equal(counterReady('cash_counts', lists), true);
+  assert.equal(counterReady(null, lists), false, '/count opened bare');
+  assert.equal(counterReady('', lists), false);
+  assert.equal(counterReady('cash_counts', [{ id: 'accounts' }]), false, 'the add-on is not installed');
+  assert.equal(counterReady('cash_counts', []), true, 'the lists are not known yet');
+  /* AND THE SCREEN ASKS NOTHING AND DRAWS THE EMPTY STATE FIRST, so it never settles as a refusal. */
+  const page = readFileSync(new URL('../../routes/count/+page.svelte', import.meta.url), 'utf8');
+  assert.match(page, /const ready = \$derived\(counterReady\(into, lists\)\)/u);
+  assert.match(page, /!ready \? null :/u);
+  assert.match(page, /\{#if !ready\}\s*<Empty /u);
 });

@@ -135,3 +135,13 @@ export function countFields(input: {
   }
   return fields;
 }
+
+/**
+ * Whether the counter can open: the list a count is written to, named by the link that opens it (`?list=`), is one the
+ * record holds. `/count` opened bare, or on a record without the Count cash add-on, has nowhere to write a count, and
+ * says so as an empty screen and not a refusal. While the lists are not known yet a named list is taken as there.
+ */
+export function counterReady(into: string | null, lists: readonly { id: string }[]): boolean {
+  if (into === null || into.trim() === '') return false;
+  return lists.length === 0 || lists.some((l) => l.id === into);
+}
