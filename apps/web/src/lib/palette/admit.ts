@@ -39,7 +39,7 @@ import { BINDINGS } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
 import { terms, tokensOf } from '../record/find.ts';
 import type { IconName } from '../ui/icons.ts';
-import { words } from './create.ts';
+import { MONEY_ADDS, words } from './create.ts';
 import type { Offer } from './customise.ts';
 import { words as pageWords, type Paging } from './new-page.ts';
 
@@ -63,7 +63,7 @@ import { words as pageWords, type Paging } from './new-page.ts';
  * `page` TOO (PGS-C30). `New page: Wedding` makes a page whose name is typed in the box, read by `paging()` in
  * `new-page.ts`, and what it takes is `Live.page`.
  */
-export const ACTS = ['undo', 'add', 'customise', 'page'] as const;
+export const ACTS = ['undo', 'add', 'customise', 'page', 'money'] as const;
 export type Act = (typeof ACTS)[number];
 
 /**
@@ -74,7 +74,7 @@ export type Act = (typeof ACTS)[number];
  * Tasks from the inbox, from a page and from Settings. No binding is needed to prove that, and
  * inventing one to satisfy the test would put a key in the `?` sheet that does nothing.
  */
-const NAMES_ITS_TARGET: readonly Act[] = ['add', 'customise', 'page'];
+const NAMES_ITS_TARGET: readonly Act[] = ['add', 'customise', 'page', 'money'];
 
 /** A row a query can make: the list it goes in and the words it is titled with. `create.ts` reads it. */
 export type Creation = { register: string; title: string };
@@ -95,6 +95,11 @@ export type Live = {
    * `null` or absent when the query is about something else, or nobody here may ask for a page.
    */
   page?: Paging | null;
+  /**
+   * Whether the record keeps a ledger and a page is drawn that can open the quick-add sheet (`lib/money/quick.svelte.ts`
+   * `ready`). Absent is no, so a caller that knows nothing of it is offered no money row.
+   */
+  ledger?: boolean;
 };
 
 export type Command = {
@@ -363,4 +368,6 @@ export const COMMANDS: readonly Command[] = [
     icon: 'plus',
     when: (live) => (live.page ?? null) !== null,
   },
+  /* AND THE THREE THAT ADD MONEY (`create.ts` `MONEY_ADDS`), offered while the record keeps a ledger. */
+  ...MONEY_ADDS,
 ];

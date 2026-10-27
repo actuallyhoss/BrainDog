@@ -69,7 +69,8 @@
   import Result from './Result.svelte';
   import { listName } from '../record/names.ts';
   import { commands, ranked, type Act, type Creation } from './admit.ts';
-  import { addRow, creation, homeCapture, offered, plainAdd, words as createWords, type Into, type Plain } from './create.ts';
+  import { addRow, creation, homeCapture, moneyWay, offered, plainAdd, words as createWords, type Into, type Plain } from './create.ts';
+  import { quick } from '$lib/money/quick.svelte.ts';
   import { tokensOf as lineTokens, untoken, type Chip } from './tokens.ts';
   import { homeSlugOf, labels as heardLabels, relabel, singularOf } from '../voice.ts';
   import type { Shell } from '../record/boot-live.ts';
@@ -563,6 +564,8 @@
         : [],
     /* THE PAGE THE QUERY WOULD MAKE, in the same modes: found by its words with no name yet, a sentence once it has one. */
     page: parsed.prefix === null || parsed.prefix === '>' ? paging(parsed.text, pageWho) : null,
+    /* THE MONEY ROWS, while the record keeps a ledger and a page that can open the sheet is drawn (`create.ts`). */
+    ledger: quick.ready,
   });
 
   /**
@@ -1250,6 +1253,12 @@
       return;
     }
     if (row.act === 'customise' && row.change) return customiseRun(row.change);
+    /* A MONEY ROW OPENS THE QUICK-ADD SHEET on its way, once the palette has gone, so the sheet takes the caret. */
+    if (row.act === 'money') {
+      const way = moneyWay(row.id);
+      if (way) setTimeout(() => quick.start(way), 0);
+      return;
+    }
     if (row.href !== null) goto(at(row.href));
   }
 

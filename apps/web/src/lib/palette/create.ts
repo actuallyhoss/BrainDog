@@ -22,6 +22,8 @@
  * imports are the fixture declarations the palette already loads, `may.ts` (a table and one function), and types.
  */
 
+import { copy } from '../copy.ts';
+import type { Way } from '../money/quick.ts';
 import { REGISTERS } from '../record/held.ts';
 import { may, type HeldLevel } from '../record/may.ts';
 import type { Shell } from '../record/boot-live.ts';
@@ -29,7 +31,7 @@ import type { List } from '../record/palette.ts';
 import type { Fetch } from '../record/row-live.ts';
 import type { Captured, Wrote } from '../record/rows-write.ts';
 import type { Entry, Fields } from '../record/schema.ts';
-import type { Creation } from './admit.ts';
+import type { Command, Creation } from './admit.ts';
 import { chipFields, isQuestion, type Chip } from './tokens.ts';
 
 /** Kept here rather than in `copy.ts`, so the palette's add owns its own words. */
@@ -205,3 +207,56 @@ export async function addRow(c: Creation | Plain, now: number, base: string, io?
   const { entry } = out;
   return { ok: true, entry, filled, back: () => writer.archive(c.register, entry.seq, entry.version) };
 }
+
+/**
+ * THE THREE MONEY ROWS: "Add an expense", "Add income" and "Move money between accounts" open the quick-add sheet
+ * (`lib/money/QuickAdd.svelte`) on that way, over whatever page is open.
+ *
+ * THEY NAME THEIR TARGET, which is the record's ledger, found from its declarations and never named here: so they are
+ * offered only while a ledger is known and a page is drawn that can open the sheet (`Live.ledger`), and are absent
+ * otherwise, which is the standing rule. The first is the `+` key's, and prints it.
+ */
+export const moneyWords = {
+  out: 'Add an expense',
+  in: 'Add income',
+  move: 'Move money between accounts',
+} as const;
+
+const MONEY_IDS: Readonly<Record<string, Way>> = { 'c-money-out': 'out', 'c-money-in': 'in', 'c-money-move': 'move' };
+
+/** The way a money row opens the sheet on, by the row's id; `null` for any other row. */
+export const moneyWay = (id: string): Way | null => MONEY_IDS[id] ?? null;
+
+export const MONEY_ADDS: readonly Command[] = [
+  {
+    id: 'c-money-out',
+    title: moneyWords.out,
+    href: null,
+    act: 'money',
+    binding: 'money-add',
+    group: copy.commands,
+    icon: 'arrow-up-right',
+    aliases: ['spent', 'paid', 'spend', 'purchase'],
+    when: (live) => live.ledger === true,
+  },
+  {
+    id: 'c-money-in',
+    title: moneyWords.in,
+    href: null,
+    act: 'money',
+    group: copy.commands,
+    icon: 'arrow-down-left',
+    aliases: ['received', 'earned', 'salary', 'refund'],
+    when: (live) => live.ledger === true,
+  },
+  {
+    id: 'c-money-move',
+    title: moneyWords.move,
+    href: null,
+    act: 'money',
+    group: copy.commands,
+    icon: 'arrow-up-down',
+    aliases: ['transfer', 'send'],
+    when: (live) => live.ledger === true,
+  },
+];

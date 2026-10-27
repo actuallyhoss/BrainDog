@@ -106,10 +106,10 @@ test('A ROW THAT CANNOT RUN RIGHT NOW IS ABSENT, NOT GREYED OUT', () => {
 });
 
 test('THE ROW THAT MAKES SOMETHING is declared, admitted, and there only while the query is a whole sentence', () => {
-  /* SIXTEEN, and it was fifteen: `New page` joined the add row and `Customise` (PGS-C30, `new-page.test.ts`). The
+  /* NINETEEN, and it was sixteen before the three money rows; it was fifteen: `New page` joined the add row and `Customise` (PGS-C30, `new-page.test.ts`). The
      count is exact on purpose, because a row added or lost here is a change to what every screen can reach, and it
      should arrive with the line that says so. */
-  assert.equal(COMMANDS.length, 16, `the palette declares ${COMMANDS.length} rows`);
+  assert.equal(COMMANDS.length, 19, `the palette declares ${COMMANDS.length} rows`);
   const add = COMMANDS.find((c) => c.id === 'c-add');
   assert.ok(add, 'no row adds anything');
   assert.equal(admits(add), null, `the add row is refused: ${admits(add)}`);
@@ -158,7 +158,9 @@ test('every binding a row prints is one the registry actually holds', () => {
      that checks the id is real. */
   for (const c of COMMANDS) {
     if (c.binding === undefined) continue;
-    assert.equal(registryRow(c.binding).scope, 'document', `${c.id} names the binding "${c.binding}", which is not a document-level one`);
+    /* The quick add's `+` is a page-scope key, bound by the host that draws the sheet, so it is the one allowed to be so. */
+    const want = c.binding === 'money-add' ? 'page' : 'document';
+    assert.equal(registryRow(c.binding).scope, want, `${c.id} names the binding "${c.binding}", which is not a ${want}-level one`);
   }
   /* AND THE TWO THE PANEL ITSELF PRINTS ON THE CURSOR ROW. They moved off the footer legend, so if
      the registry loses them the rows go bare and nothing else says so. */
@@ -291,7 +293,7 @@ test('AND IT REACHES THE ROWS YOU CHANGED LAST, off a ledger the record was alre
 test('every act the palette can perform is a named one, so no row smuggles in an argument', () => {
   /* A closure hanging off a declaration would let the next acting row take an object, and test 1
      would stop being checkable. The list is closed and the palette switches on the name. */
-  assert.deepEqual([...ACTS], ['undo', 'add', 'customise', 'page']);
+  assert.deepEqual([...ACTS], ['undo', 'add', 'customise', 'page', 'money']);
   for (const c of COMMANDS) {
     if (c.href !== null) continue;
     assert.ok(c.act !== undefined && (ACTS as readonly string[]).includes(c.act), `${c.id} acts, and does not say what it does`);

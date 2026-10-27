@@ -88,6 +88,9 @@
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '../at.ts';
+  import QuickHost from '$lib/money/QuickHost.svelte';
+  import { pageOfLedger } from '$lib/money/ledger.ts';
+  import { quick } from '$lib/money/quick.svelte.ts';
   import { arrivedNow, keepLook, keptHere, lookOrder, lookPage, offerKey, offered, offerUndo, placedOf, undoLook } from './look.ts';
 
   let {
@@ -738,13 +741,56 @@
   /* EVERY ID A PREVIEW WRITES CARRIES ITS PAGE, because a change can touch several pages and a screen that previews
      them draws one reader for each: a bare `preview-` would give the second page the first one's ids. */
   const pre = $derived(`preview-${slug}-`);
+
+  /* PULL TO REFRESH, on a phone: a drag down from the very top of a page rereads it, once past `PULL_AT` pixels. Only
+     a touch that starts at scroll 0 outside a field or a scrolling box counts, so a normal scroll is never taken. */
+  const PULL_AT = 72;
+  let pullFrom: number | null = null;
+  let pulled = $state(0);
+  let pullBusy = $state(false);
+  function pullStart(e: TouchEvent): void {
+    const t = e.target as HTMLElement | null;
+    const inner = t?.closest?.('input, textarea, select, [contenteditable], dialog, [role="dialog"]');
+    pullFrom = mode === 'preview' || pullBusy || inner || window.scrollY > 0 || e.touches.length !== 1 ? null : e.touches[0]!.clientY;
+  }
+  function pullMove(e: TouchEvent): void {
+    if (pullFrom === null) return;
+    const d = e.touches[0]!.clientY - pullFrom;
+    if (d <= 0 || window.scrollY > 0) {
+      pulled = 0;
+      return;
+    }
+    pulled = Math.min(d / 2, PULL_AT + 24);
+  }
+  async function pullEnd(): Promise<void> {
+    const go = pullFrom !== null && pulled >= PULL_AT / 2;
+    pullFrom = null;
+    pulled = 0;
+    if (!go) return;
+    pullBusy = true;
+    try {
+      await reread();
+    } finally {
+      pullBusy = false;
+    }
+  }
 </script>
 
 <svelte:head>
   {#if mode === 'page'}<title>{titleOf(live?.page.page.title ?? railed?.title)}</title>{/if}
 </svelte:head>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} ontouchstart={pullStart} ontouchmove={pullMove} ontouchend={pullEnd} ontouchcancel={pullEnd} />
+
+<!-- THE QUICK ADD (`lib/money`): the `+` key and the palette's money rows on every page drawn here, and the floating +
+     on a page that draws the ledger or its accounts. Not on a preview, which writes nothing. -->
+{#if pulled > 0 || pullBusy}
+  <div class="pull" role="status" style:transform={`translateY(${pullBusy ? 16 : pulled - 24}px)`}>{pullBusy ? 'Refreshing' : pulled >= PULL_AT / 2 ? 'Let go to refresh' : 'Pull to refresh'}</div>
+{/if}
+
+{#if mode !== 'preview' && live}
+  <QuickHost fab={mode === 'page' && pageOfLedger(live.page.page.requires, quick.ledger)} />
+{/if}
 
 {#if got === null}
   {#if railed}
@@ -1419,5 +1465,21 @@
     .compare :global(.compare-switch) {
       display: none;
     }
+  }
+
+  .pull {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline: 0;
+    margin-inline: auto;
+    inline-size: max-content;
+    z-index: 5;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--line, #ddd);
+    color: var(--ink-2, #555);
+    font-size: 0.8rem;
+    pointer-events: none;
   }
 </style>
