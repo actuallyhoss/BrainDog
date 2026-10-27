@@ -248,14 +248,16 @@
     gap: var(--sp-3) var(--sp-5);
   }
 
+  /* 144px, AND THE TOTAL MAY TAKE TWO LINES INSIDE IT: at 112px a total of six figures with its code ran out of the
+     hole and across the ring. */
   .split[data-form='donut'] .ring-dial {
-    inline-size: 112px;
-    block-size: 112px;
+    inline-size: 144px;
+    block-size: 144px;
   }
 
   .split[data-form='donut'] .ring-mark {
-    inline-size: 112px;
-    block-size: 112px;
+    inline-size: 144px;
+    block-size: 144px;
   }
 
   .split[data-form='donut'] .ring-track,
@@ -268,8 +270,11 @@
   }
 
   .split[data-form='donut'] .ring-figure {
+    max-inline-size: 104px;
     font-size: var(--fs-meta);
+    line-height: 1.3;
     text-align: center;
+    overflow-wrap: anywhere;
   }
 
   .split[data-form='donut'] .split-legend {
@@ -277,6 +282,45 @@
     flex: 1 1 14rem;
     gap: var(--sp-2);
     min-inline-size: 0;
+  }
+
+  /* BESIDE A DONUT, FROM 640 UP, THE LEGEND IS A TABLE: the names in one column, the figures right-aligned in the next
+     and the shares after them, so twelve parts read down as numbers do. Run on as words, each figure stood wherever its
+     name ended. */
+  @media (width >= 640px) {
+    .split[data-form='donut'] .split-legend {
+      grid-template-columns: 8px max-content max-content max-content minmax(0, 1fr);
+      gap: var(--sp-2) var(--sp-3);
+    }
+
+    .split[data-form='donut'] .split-item {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+    }
+
+    .split[data-form='donut'] .split-item > .split-dot {
+      grid-column: 1;
+    }
+
+    .split[data-form='donut'] .split-item > .split-label {
+      grid-column: 2;
+    }
+
+    .split[data-form='donut'] .split-item > .split-value {
+      grid-column: 3;
+      justify-self: end;
+    }
+
+    .split[data-form='donut'] .split-item > .split-share {
+      grid-column: 4;
+      justify-self: end;
+    }
+
+    .split[data-form='donut'] .split-item > .split-note,
+    .split[data-form='donut'] .split-item > .glyph {
+      grid-column: 5;
+    }
   }
 
   .split-cut {
@@ -640,12 +684,14 @@
     background: var(--series-3);
   }
 
+  /* MONEY IN IS GREEN AND MONEY OUT IS INK, as the forecast's marks are (`.forecast-mark`): blue meant money out in this
+     chart and a category, or an account, in the next. */
   .series-key[data-dir='in'][data-step='0'] .series-swatch {
-    background: var(--chart-1);
+    background: var(--good);
   }
 
   .series-key[data-dir='out'] .series-swatch {
-    background: var(--series-2);
+    background: color-mix(in srgb, var(--chart-1) 55%, var(--tile));
   }
 
   .series-key[data-net] .series-swatch {
@@ -737,11 +783,11 @@
   }
 
   .series-bar[data-dir='in'][data-step='0'] {
-    --bar: var(--chart-1);
+    --bar: var(--good);
   }
 
   .series-bar[data-dir='out'] {
-    --bar: var(--series-2);
+    --bar: color-mix(in srgb, var(--chart-1) 55%, var(--tile));
   }
 
   /* THE FREE END IS ROUNDED, the top of what stands up and the foot of what hangs down. */

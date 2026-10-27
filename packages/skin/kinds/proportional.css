@@ -127,6 +127,48 @@
     }
   }
 
+  /* ONE COLUMN FOR EVERY FIGURE OF A BAR, RIGHT-ALIGNED, from 640 up: each row was a grid of its own, so a longer label or
+     a note beside one figure moved it, and "EGP 66,000" and "EGP 9,942" stood ragged where a reader compares them. The
+     rows share the block's columns (subgrid), the track keeps its 480px cap, and a row with no bar keeps its figure in
+     the figures' column. */
+  @media (width >= 640px) {
+    .prop:has(> .prop-row) {
+      display: grid;
+      grid-template-columns: minmax(9ch, 20ch) minmax(0, 480px) auto auto auto;
+      justify-content: start;
+      gap: var(--sp-1) var(--sp-3);
+    }
+
+    .prop:has(> .prop-row) > * {
+      grid-column: 1 / -1;
+    }
+
+    .prop > .prop-row {
+      grid-template-columns: subgrid;
+    }
+
+    .prop-row > .prop-label {
+      grid-column: 1;
+    }
+
+    .prop-row > .prop-track {
+      grid-column: 2;
+    }
+
+    .prop-row > .prop-value {
+      grid-column: 3;
+      justify-self: end;
+    }
+
+    .prop-row > .prop-note {
+      grid-column: 4;
+    }
+
+    .prop-row > .glyph {
+      grid-column: 5;
+    }
+  }
+
   /**
    * FIVE TRACKS DO NOT FIT ON A PHONE, AND THE ONE THAT GAVE WAY WAS THE CHART: `minmax(0, 1fr)` is the only track that
    * can yield and it is the bar, measured at exactly 0px in every `bar` and `gauge` row at 390. So the row is lines of

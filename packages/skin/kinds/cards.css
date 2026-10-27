@@ -43,6 +43,13 @@
     grid-template-columns: repeat(auto-fill, minmax(max(min(17rem, 100%), calc((100% - 2 * var(--sp-5)) / 3)), 1fr));
   }
 
+  /* BUT CARDS IN GROUPS SHARE ONE SET OF COLUMNS: each group is a grid of its own, so a group of one card ran the width
+     of the tile, its date at the far edge, under a group of three in thirds. Where a tile holds more than one grid of
+     cards, every one of them keeps the auto-fill columns, and a lone card is one column wide like its neighbours. */
+  :has(> [data-kind='cards'] ~ [data-kind='cards']) > [data-kind='cards'] > .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(max(min(17rem, 100%), calc((100% - 2 * var(--sp-5)) / 3)), 1fr));
+  }
+
   /* A CARD IS A SECTION OF ITS TILE, and nothing inside it is boxed: the head, the figure and the facts with air
      between them, and a hairline over each, so a run of cards reads as a list set in columns rather than a wall of
      rounded panels inside a panel. `start` above, so a short card is its own height. */
