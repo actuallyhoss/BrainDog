@@ -280,11 +280,12 @@ export async function liveMoney(lived: Lived, steps: Step[] = MONEY_LIVED): Prom
   const heard: Heard[] = [];
   for (const step of steps) {
     await step.act(lived);
-    /* ONE PAGE A STEP, opened on its first walk read and read by the rest. */
+    /* ONE PAGE A STEP, opened on its first walk read and read by the rest: the Forecast page, where Cash ahead is walked
+       since money-core 3.29.0. Money's home draws no walk, and every walk read here was "Money drew no walk". */
     let page: Said | null = null;
     for (const read of step.reads) {
       if ('walk' in read) {
-        page ??= await lived.api.page({ slug: 'money', walk: WALKED }, lived.as);
+        page ??= await lived.api.page({ slug: 'money-forecast', walk: WALKED }, lived.as);
         const days = page.ok ? walkedOn(page.value, read.walk) : null;
         heard.push({
           step: step.say,
