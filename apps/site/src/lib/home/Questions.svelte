@@ -1,5 +1,5 @@
 <!--
-  Questions (site 2a section 7): a FAQ-style accordion. The heading and the support address on the left, five
+  Questions (site 2a section 7): an FAQ-style accordion. The heading and the support address on the left, five
   native disclosures on the right, the first open, each a flat tile whose chevron turns in 160ms. A disclosure opens
   and shuts with no script, and every answer is in the HTML.
 

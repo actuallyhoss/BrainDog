@@ -63,7 +63,7 @@ test('A CONTROL IS NEVER A MARK: the row wears its own letter instead', () => {
 
 test("A WORD THE SET DOES NOT DRAW IS THE TITLE'S FIRST LETTER, never the word's: O for Oxbow.gg, where C was", () => {
   assert.equal(markOf('paw', 'BrainDog'), 'B');
-  assert.equal(markOf('koala', 'Fernly'), 'E');
+  assert.equal(markOf('koala', 'Fernly'), 'F');
   assert.equal(markOf('sword', 'Driftwood.gg'), 'D');
   assert.equal(markOf('paw'), null);
 });

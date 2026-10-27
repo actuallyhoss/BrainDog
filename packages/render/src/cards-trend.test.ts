@@ -71,13 +71,13 @@ test('THREE POINTS THAT SAY ONE THING ARE STILL A FIGURE: one count among nought
 });
 
 test('A CARD WITH TWO POINTS SHOWS ITS FIGURE ALONE, and the card beside it with three draws the line, in both drawers', () => {
-  const src = '```cards\ntitle | figure: Done | trend: By week\nNook |2 | 1 2\nOxbow | 12 | 3 5 4\n```';
+  const src = '```cards\ntitle | figure: Done | trend: By week\nNook | 2 | 1 2\nOxbow | 12 | 3 5 4\n```';
   for (const [who, html] of [['the mirror', mirror(src)], ['the app', drawer(src)]] as const) {
     assert.equal(trends(html), 1, `${who} draws one line, for the card with three points`);
     assert.match(html, /aria-label="By week: 3, 5, 4"/u, who);
     assert.doesNotMatch(html, /aria-label="By week: 1, 2"/u, who);
-    const roomy = html.slice(html.indexOf('Nook'), html.indexOf('Oxbow'));
-    assert.match(roomy, /<span class="cards-value num">2<\/span><span class="cards-label">Done<\/span>/u, `${who} keeps the figure and its name`);
-    assert.doesNotMatch(roomy, /<svg/u, `${who} draws nothing beside it`);
+    const nook = html.slice(html.indexOf('Nook'), html.indexOf('Oxbow'));
+    assert.match(nook, /<span class="cards-value num">2<\/span><span class="cards-label">Done<\/span>/u, `${who} keeps the figure and its name`);
+    assert.doesNotMatch(nook, /<svg/u, `${who} draws nothing beside it`);
   }
 });

@@ -249,7 +249,7 @@ const SHAPES: Record<string, string> = {
   /* A CARD'S TREND FILLED BY THE RECORD, said as an array with a gap in it, beside a figure. Three known points draw
      the line (Oxbow, and Nook as `String()` says an array); two are not a chart and Twice keeps its figure alone. */
   'cards whose trend the record filled':
-    '```cards\ntitle | figure: Done | trend: By week\nOxbow | 12 | [3,null,5,4]\nNook |2 | 1,,2,2\nTwice | 3 | 1,,2\nQuiet | 0 | \n```',
+    '```cards\ntitle | figure: Done | trend: By week\nOxbow | 12 | [3,null,5,4]\nNook | 2 | 1,,2,2\nTwice | 3 | 1,,2\nQuiet | 0 | \n```',
   /* A TREND AND NO FIGURE COLUMN. A run too short to draw prints its newest number as the card's figure (Twice, Once,
      and Flat, whose one count among noughts is a single fact); Drawn keeps its line; a run with no number says nothing. */
   'cards with a trend and no figure':

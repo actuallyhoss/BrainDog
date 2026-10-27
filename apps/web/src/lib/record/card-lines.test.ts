@@ -69,10 +69,10 @@ const drawn = (rows: unknown[]): Row[] =>
 test('a note of two paragraphs is one card, its whole note in its own cell', () => {
   const rows = drawn([
     service(5, { name: 'crumb.gg', cycle: 'yearly', renews: '2027-02-28', note: 'The earner.\n\nRegistrar notes: whois.gg publishes no registrar.' }),
-    service(9, { name: 'bake (A1.Flex)', cycle: 'monthly', cost: { amount: 0, currency: 'USD' }, note: 'Uses the free allowance.' }),
+    service(9, { name: 'crumb (A1.Flex)', cycle: 'monthly', cost: { amount: 0, currency: 'USD' }, note: 'Uses the free allowance.' }),
   ]).slice(1);
   assert.equal(rows.length, 2, 'a line break inside a note made a card of its own');
-  assert.match(rows[0]!.cells[0] ?? '', /bake\.gg/u);
+  assert.match(rows[0]!.cells[0] ?? '', /crumb\.gg/u);
   assert.ok(rows.every((r) => !/^Registrar notes/u.test(r.cells[0] ?? '')), 'the registrar note is drawn as a card title');
   assert.ok(rows[0]!.cells.some((c) => c.includes('The earner. Registrar notes: whois.gg publishes no registrar.')));
 });
