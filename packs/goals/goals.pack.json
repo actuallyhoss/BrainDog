@@ -1,10 +1,10 @@
 {
   "pack": "goals",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "star",
   "title": "Goals",
   "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
-  "changes": "Renames the parent field to under. The monthly pace reads every goal and every account, however many there are.",
+  "changes": "Labels the columns of the goals table.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -411,22 +411,28 @@
               "width": "minmax(18ch,2fr)"
             },
             {
-              "field": "have"
+              "field": "have",
+              "label": "Have"
             },
             {
-              "field": "target"
+              "field": "target",
+              "label": "Target"
             },
             {
-              "field": "by"
+              "field": "by",
+              "label": "By"
             },
             {
-              "field": "need"
+              "field": "need",
+              "label": "Needed a month"
             },
             {
-              "field": "pace"
+              "field": "pace",
+              "label": "Pace"
             },
             {
-              "field": "under"
+              "field": "under",
+              "label": "Part of"
             }
           ],
           "order": [
