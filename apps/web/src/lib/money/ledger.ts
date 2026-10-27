@@ -18,6 +18,7 @@
 
 import { amountField, wayField } from '../record/money-way.ts';
 import type { FieldDecl, RegisterDecl } from '../record/schema.ts';
+import { splitAtOf } from '../record/split.ts';
 
 /** A list a ledger links to: its id, the field that names a row, and the state a row leaves it by. */
 export type SideList = {
@@ -57,6 +58,8 @@ export type Ledger = {
   note: string | null;
   /** The yes-or-no field a move between one's own accounts is marked with, when the list declares how moves pair. */
   mark: string | null;
+  /** The field one line's parts are kept in, each a category and its share of the amount (`parts_of`), when there is one. */
+  parts?: string | null;
 };
 
 /** A value that sends money out, and one that brings it in, by their own words (`money-way.ts` reads them the same). */
@@ -142,6 +145,7 @@ export function ledgerFrom(decl: RegisterDecl, byId: ReadonlyMap<string, Registe
     .sort((a, b) => Number(b.f.index === true) - Number(a.f.index === true))[0];
   const note = decl.fields.find((f) => live(f) && f.type === 'text' && f.id !== decl.title && f.search !== true && f.required !== true);
   const mark = fieldOf(decl, pairs?.mark);
+  const split = splitAtOf(decl);
   return {
     list: decl.id,
     name: decl.name,
@@ -154,6 +158,7 @@ export function ledgerFrom(decl: RegisterDecl, byId: ReadonlyMap<string, Registe
     category: categoryF ? { field: categoryF.f.id, ...categoryF.read } : null,
     note: note?.id ?? null,
     mark: mark?.type === 'bool' ? mark.id : null,
+    ...(split?.of === amount.id ? { parts: split.field } : {}),
   };
 }
 

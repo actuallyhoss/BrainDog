@@ -37,7 +37,7 @@
  * inferring from the space available, not from the data).
  */
 
-import { across, convertMinor, dayFieldOf, rateFor, type Part, type Rate } from '@braindog/kernel';
+import { across, convertMinor, dayFieldOf, rateFor, rowsBySplit, type Part, type Rate } from '@braindog/kernel';
 import { daySaid } from '@braindog/where';
 import { day as longDay, money, parse, since, sinceWords, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
@@ -48,6 +48,7 @@ import { decl as fieldDecl, display, homeCurrency, labelOf, ROW_ID, unnamed, wal
 /* WHO ASKED A QUEUE'S QUESTION, in the words the card that answers it uses. */
 import { proposer } from '../page/queue-answer.ts';
 import { REGISTERS } from './held.ts';
+import { splitAtOf } from './split.ts';
 import { draftOf } from './field-draft.ts';
 import { citedWords } from '../cite.ts';
 import { moneyInText } from './money.ts';
@@ -184,7 +185,10 @@ function barRows(block: BlockResult): string[] {
   const unset: unknown[] = [];
   /* WHAT THE RECORD ADDED UP PAST THE LABELS IT HANDED BACK, kept apart so it is no value of the field and is drawn last. */
   const past: unknown[] = [];
-  for (const e of block.matched) {
+  /* A LINE SPLIT INTO PARTS ADDS UP AS ITS PARTS when the bar adds up the money they add up to, each part under its own
+     label, as the record's own sums read it (`row-parts.ts`). */
+  const split = link ? null : splitAtOf(REGISTERS[block.register ?? '']);
+  for (const e of split && split.of === of ? rowsBySplit(block.matched, split.field) : block.matched) {
     if (isRest(e)) {
       past.push(...valuesOf(e.fields[of]));
       continue;

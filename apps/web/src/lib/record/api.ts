@@ -38,6 +38,7 @@ import { compile, declaredValue } from './where.ts';
 import type { MetricDecl } from './metrics.ts';
 import type { Entry, Fields, Filter, FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 import { listLine } from './tags.ts';
+import { largestPart, partsOf, splitAtOf, splitSaid } from './split.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
 import { actor, nameWords, runByIn, type RunBy } from './names.ts';
 import type { Byline } from './byline.ts';
@@ -733,7 +734,11 @@ export function toRows(
   const read = columns.flatMap((c) => (c.or === undefined ? [c.field] : [c.field, c.or]));
   const enums = new Set(read.filter((field) => decl(register, field)?.type === 'enum'));
   const cased = (field: string, text: string | null): string | null => (enums.has(field) && text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
+  /* A LINE SPLIT INTO PARTS IS STILL ONE ROW, and a column its parts are cut by says so in place of the line's own value:
+     "Split · 3 categories", its mark the largest part's (`split.ts`). */
+  const split = splitAtOf(REGISTERS[register]);
   return entries.map((e) => {
+    const parted = (field: string) => (split ? partsOf(e.fields, split, field) : []);
     const cell = (field: string): string | null => {
       const typed = types?.[field];
       const said = cased(field, display(register, field, e.fields[field], now, names, typed));
@@ -748,11 +753,14 @@ export function toRows(
         /* A CHIP COLUMN IS THE ROW'S CATEGORY MARK in words, its icon and colour, read from the row the link points at. */
         if (c.as === 'chip') {
           const to = decl(register, c.field)?.to;
-          const at = e.fields[c.field];
+          const parts = parted(c.field);
+          const at = parts.length > 0 ? largestPart(parts)?.by : e.fields[c.field];
           /* A LINE NOTHING HAS FILED YET WEARS A QUESTION MARK. */
           if (at === undefined || at === null || at === '') return '?';
           return to !== undefined ? (names?.chips?.get(`${to}#${at}`) ?? null) : null;
         }
+        const parts = decl(register, c.field)?.type === 'ref' ? parted(c.field) : [];
+        if (parts.length > 0) return splitSaid(parts);
         return cell(c.field) ?? (c.or === undefined ? null : cell(c.or));
       }),
     };

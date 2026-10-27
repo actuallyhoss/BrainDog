@@ -15,7 +15,7 @@ import { createClient } from '@braindog/client';
 import { copy } from '../copy.ts';
 import { REGISTERS } from '../record/held.ts';
 import { learn, type RecordRow } from '../record/remote.ts';
-import { ledgerAmong, type Ledger } from './ledger.ts';
+import { ledgerAmong, ledgerFrom, type Ledger } from './ledger.ts';
 import type { Line, Option, Past } from './quick.ts';
 import { ratesFrom, ratesListOf, type Rate } from './rates.ts';
 
@@ -54,6 +54,41 @@ async function list(client: ReturnType<typeof createClient>, register: string, l
   return got.ok ? rowsOf(got.value) : [];
 }
 
+/** A list of categories as the sheet offers them, by name, the closed ones left out. */
+function categoriesOf(rows: readonly RecordRow[], c: NonNullable<Ledger['category']>): Option[] {
+  return rows
+    .filter((r) => open(r, c.state, c.done))
+    .map((r) => ({
+      id: r.id,
+      name: text(r.fields[c.title]) || UNNAMED,
+      icon: c.icon ? idOf(r.fields[c.icon]) : null,
+      colour: c.colour ? idOf(r.fields[c.colour]) : null,
+      way: c.way ? idOf(r.fields[c.way.field]) : null,
+    }))
+    .sort((x, y) => x.name.localeCompare(y.name));
+}
+
+/** What a line's split is drawn and edited with: the field its parts are cut by, the categories, and the two ways. */
+export type SplitHeld = { by: string; categories: Option[]; way: Ledger['way']; either: readonly string[] };
+
+/**
+ * The categories a line of `register` may be split across, or `null` where the list keeps no parts or no category. Its
+ * declaration and the lists it links to are learnt first, so a line opened straight from a link is read the same.
+ */
+export async function readSplit(base: string, register: string): Promise<SplitHeld | null> {
+  const client = createClient({ base });
+  const asked = new Map<string, Promise<void>>();
+  await learn((r) => client.schema(r), register, asked).catch(() => undefined);
+  const decl = REGISTERS[register];
+  if (!decl) return null;
+  const linked = [...new Set(decl.fields.flatMap((f) => (f.type === 'ref' && typeof f.to === 'string' ? [f.to] : [])))];
+  await Promise.all(linked.map((id) => learn((r) => client.schema(r), id, asked).catch(() => undefined)));
+  const l = ledgerFrom(decl, new Map(Object.entries(REGISTERS)));
+  if (!l?.category || !l.parts) return null;
+  const rows = await list(client, l.category.list, 300);
+  return { by: l.category.field, categories: categoriesOf(rows, l.category), way: l.way, either: l.category.way?.either ?? [] };
+}
+
 /** Everything the sheet reads, at once. A list that will not answer is read as empty, and the sheet says so. */
 export async function readHeld(base: string, l: Ledger, lists: readonly Listed[]): Promise<Held> {
   const client = createClient({ base });
@@ -72,18 +107,7 @@ export async function readHeld(base: string, l: Ledger, lists: readonly Listed[]
       return { id: r.id, name: text(r.fields[a.title]) || UNNAMED, currency: typeof money?.currency === 'string' ? money.currency : null, kind: a.kind ? idOf(r.fields[a.kind]) : null };
     });
   const c = l.category;
-  const categories: Option[] = c
-    ? categoryRows
-        .filter((r) => open(r, c.state, c.done))
-        .map((r) => ({
-          id: r.id,
-          name: text(r.fields[c.title]) || UNNAMED,
-          icon: c.icon ? idOf(r.fields[c.icon]) : null,
-          colour: c.colour ? idOf(r.fields[c.colour]) : null,
-          way: c.way ? idOf(r.fields[c.way.field]) : null,
-        }))
-        .sort((x, y) => x.name.localeCompare(y.name))
-    : [];
+  const categories: Option[] = c ? categoriesOf(categoryRows, c) : [];
   const past: Past[] = lineRows.map((r) => {
     const way = text(r.fields[l.way.field]);
     return {

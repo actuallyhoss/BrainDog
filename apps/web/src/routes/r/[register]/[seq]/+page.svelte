@@ -53,6 +53,8 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Money from '$lib/ui/Money.svelte';
+  import SplitTile from '$lib/money/SplitTile.svelte';
+  import { splitAtOf, splitWords } from '$lib/record/split.ts';
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Menu from '$lib/ui/Menu.svelte';
@@ -505,6 +507,28 @@
   }
 
   /**
+   * A LINE'S SPLIT, WRITTEN IN ONE GO: its parts, or `null` to take them off. The record refuses parts that do not add up
+   * to the line, and that sentence is handed back for the tile to show under them.
+   */
+  async function saveSplit(parts: Record<string, unknown>[] | null): Promise<string | null> {
+    if (!row || !live || !splitAt) return null;
+    const register = id;
+    const n = seq;
+    const key = `${register}#${n}`;
+    writer ??= rowWriter(apiBase());
+    const out = await writer.update(register, n, { [splitAt.field]: parts } as Fields, row.version);
+    if (askedFor !== key) return null;
+    if (out.ok) {
+      got = { from: 'live', entry: out.entry, names: names ?? new Map() };
+      toasts.push(parts === null ? splitWords.removed : splitWords.saved);
+      void refreshHistory(register, n);
+      return null;
+    }
+    if (out.why === 'conflict' && out.entry) got = { from: 'live', entry: out.entry, names: names ?? new Map() };
+    return out.fix;
+  }
+
+  /**
    * PUT BACK, FROM THE SAVED EDIT'S TOAST: the field as it was, sent at the version the edit answered with.
    *
    * A SAVED EDIT HAD NO WAY BACK. The title and every field saved from this page landed with a bare "Saved", so a slip
@@ -743,12 +767,16 @@
   /* A READING SAID WHOLE IN THE HEAD (Y17), "16.4% on 28 Sep", so its number, unit and moment are not facts as well. */
   const readings = $derived.by(() => (void got, readingOf(decl)));
   const readingLine = $derived(readings && row ? readingSaid(row.fields, readings, row.created, clock) : null);
+  /* WHERE A LINE'S PARTS ARE, on a list that splits its lines across categories (`split.ts`). */
+  const splitAt = $derived.by(() => (void got, splitAtOf(decl)));
   const leadIds = $derived(
     new Set(
       [
         ...(readingLine !== null && readings ? [readings.value, readings.unit, readings.at] : []),
         figure !== null ? figureField?.id : undefined,
         paidPart?.field,
+        /* A LINE'S PARTS ARE ITS OWN TILE, where they are listed and changed (`SplitTile.svelte`), never a fact. */
+        splitAt?.field,
         finishedOn ? decl?.finished : undefined,
         movable(scopeField) ? scopeField.id : undefined,
       ].filter(
@@ -1451,6 +1479,11 @@
             </div>
           {/if}
         </Tile>
+
+        <!-- A LINE SPLIT ACROSS CATEGORIES: its parts, and the way to split it or change the split. -->
+        {#if splitAt && row}
+          <SplitTile base={apiBase()} register={id} at={splitAt} fields={row.fields} changes={Boolean(live && changes && !archived)} onsave={saveSplit} />
+        {/if}
 
         <!-- THE TILES, ONLY WHERE THERE IS A FIGURE: each a figure, its chart, and one line saying what it means. -->
         {#if !projectPage && (moneyIn || openWork)}

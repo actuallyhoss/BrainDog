@@ -147,6 +147,8 @@ export type FieldDecl = {
   currency_from?: string;
   /** `money` only: once a row holds a code here it never changes (`CURRENCY_FIXED`); the number still can. */
   currency_fixed?: boolean;
+  /** `json` only: the money field its parts add up to, each part a patch over its row (`split.ts`). */
+  parts_of?: string;
 };
 
 /**

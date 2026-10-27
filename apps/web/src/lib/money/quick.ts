@@ -3,7 +3,7 @@
  * categories come first, and the lines a press writes.
  *
  * THE LINES ARE THE LEDGER'S OWN ROWS, written through the record's ordinary create, one per line:
- *   - money out or in is one line, or one line a category when it is split;
+ *   - money out or in is one line, split into parts on that line where the ledger keeps them, else one line a category;
  *   - a move between one's own accounts is two lines, one out of the first account and one into the second, each
  *     marked as a move where the ledger declares the mark. The record pairs the two legs itself.
  *
@@ -272,6 +272,13 @@ export function linesOf(d: Draft, l: Ledger): Lines {
   const parts = d.parts.filter((p) => p.minor > 0);
   if (parts.length >= 2) {
     if (leftOf(d.minor, parts) !== 0) return { ok: false, fix: words.needSplit };
+    /* ONE LINE IN PARTS where the ledger keeps them (`parts_of`), so the bank's one payment stays one line; else a line
+       a category, as before. */
+    if (l.parts && l.category) {
+      const category = l.category.field;
+      const kept = parts.map((p) => ({ ...(p.category !== null ? { [category]: p.category } : {}), [l.amount]: { amount: p.minor, currency: d.currency } }));
+      return { ok: true, lines: [{ ...base(way, d.account, d.minor, d.currency, title), [l.parts]: kept }] };
+    }
     return { ok: true, lines: parts.map((p) => ({ ...base(way, d.account!, p.minor, d.currency, title), ...filed(p.category) })) };
   }
   return { ok: true, lines: [{ ...base(way, d.account, d.minor, d.currency, title), ...filed(d.category) }] };
