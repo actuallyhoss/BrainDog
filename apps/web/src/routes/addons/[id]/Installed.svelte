@@ -99,6 +99,7 @@
     .then(([kennel, shipped]) => (indexes = { kennel, shipped }))
     .catch(() => (indexes = { kennel: null, shipped: null }));
   const found = $derived(indexes ? foundListing({ ...indexes, counts: null, id, kind: firstPartyModules().some((m) => m.id === id) ? 'module' : null }) : null);
+  import { recordToday } from '$lib/record/zone.ts';
 
   const pack = $derived(firstPartyModules().find((p) => p.id === id));
   /* A use case's pack by its use case, never `usecase-founder`. */

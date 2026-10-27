@@ -757,7 +757,16 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.26.0 (Needs you, 25 October): `script.book_from_account`'s nightly "File them" carries at most 200 changes,
  *   the most one option may carry, where it asked for 900 and every run over 200 entries in no book was refused and asked
  *   nothing. 3.25.0 is master's. One number changed, no id added or taken away, so a minor step.
- * - money-core 3.27.0: "It went through" on a repeating line marks the one open bill for the same money paid as well
+ * - money-core 3.27.0: In and out, by month reads its months ahead off the walk Cash ahead draws (`metric.in-ahead-by-month`,
+ *   `metric.out-ahead-by-month`), where bills due once and what repeats at its monthly share left every part of a plan
+ *   out of the month it falls due, and Cash ahead opens on twelve weeks, where ten stopped short of the largest part.
+ *   Lasts is one figure, the days it lasts with nothing coming in, with a sentence of the day that ends on and what falls
+ *   due then, where "Lasts past" a year away stood beside it unexplained. The first line says Cash now in each currency
+ *   apart and about what that comes to at the rate's day, where dollars were blended in at a month-old rate unsaid, and
+ *   counts the accounts the Accounts tile lists, and Every month says what goes out in the next thirty days as Today
+ *   does (`metric.leaving-30d`), parts of plans with it. 3.26.0 is master's. Two figures added and nothing taken away, so a
+ *   minor step.
+ * - money-core 3.28.0: "It went through" on a repeating line marks the one open bill for the same money paid as well
  *   (`script.settle_matched_line` may write Bills and invoices), where the bill stayed open and read late on Today the
  *   morning after he answered. 3.27.0 is master's. One script changed, no id added or taken away, so a minor step.
  * - money-core 3.29.0: Money is a section with a page per job, `page.money-accounts`, `page.money-ledger`,
