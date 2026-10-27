@@ -261,7 +261,8 @@
    * THE COPY AND THE MONTH ONLY WHERE THE CLOUD HOLDS THIS RECORD, which is where both answers exist: a self-host has no
    * ledger, and says nothing of them rather than half a sentence. The faults, the engine and the signs are the record's
    * own on every host. Asked once for this visit to Settings, when the first of the three is opened, and never waited
-   * on: the screen is drawn without it and the sentence arrives when the record answers.
+   * on: the screen is drawn without it and the sentence arrives when the record answers, so its reads hold the quiet
+   * mark (the client counts them out) and not `data-screen`.
    *
    * A READ THAT FAILS SAYS NOTHING AND REFUSES NOTHING. A build without `faults`, `engineHealth` or `signs`, a refusal,
    * or a host that hands none is `null`, which `health.ts` says as nothing and never as healthy. Its reads close as fine
@@ -299,7 +300,6 @@
 
   async function readHealth(): Promise<void> {
     asked = true;
-    const at = opened();
     const now = Date.now();
     const hosted = hostedHere(shell);
     const client = recordClient();
@@ -310,7 +310,6 @@
       valueOf(() => client.call<{ signs: Sign[] }>('signs')),
       owns ? readFaults() : null,
     ]);
-    closed(true, at);
     if (copies?.from === 'live') copyLast = lastCopy(copies.snapshots.map((c) => c.at), now);
     if (usage?.ok === true && usage.view.from === 'ledger' && usage.view.current) {
       const records = usage.view.records;

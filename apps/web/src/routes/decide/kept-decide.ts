@@ -26,3 +26,17 @@ export function decideSpots(got: { page: { blocks: readonly Block[] } }): Spot[]
   }
   return spots;
 }
+
+/**
+ * THE LAST LIVE ANSWER THIS TAB DREW, by the record it came from: Back to Needs you is drawn from it at once, as Back to
+ * a page is (`reader.kept`), and the read behind it lands over it. Held only while the tab is open.
+ */
+let kept: { base: string; value: unknown } | null = null;
+
+/** Keep the newest live answer for `base`. */
+export function keepDecide(base: string, value: unknown): void {
+  kept = { base, value };
+}
+
+/** The answer kept for `base`, or `null`. */
+export const keptDecide = <T>(base: string): T | null => (kept !== null && kept.base === base ? (kept.value as T) : null);

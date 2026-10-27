@@ -63,7 +63,7 @@
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { EVERY, QUESTIONS } from '$lib/data/local.ts';
-  import { decideSpots } from './kept-decide.ts';
+  import { decideSpots, keepDecide, keptDecide } from './kept-decide.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live as poll } from '$lib/data/live.svelte.ts';
   import { blocksMineFirst, boardOf, callsRead, dayWord, decideDrawn, GROUP_KEY, GROUP_WORDS, mineFirst, readCalls, readDecide, WORDS, type Call, type Column, type DecideBody } from './views.ts';
@@ -127,10 +127,19 @@
   });
   const offlineNow = () => shell.offline === true || poll.state === 'offline';
 
-  async function read(): Promise<boolean> {
+  async function read(drawnKept?: () => void): Promise<boolean> {
     reading = true;
     client ??= createClient({ base: apiBase() });
     const mark = localTicket();
+    /* WHAT THIS TAB LAST DREW is drawn at once on a return, held to read like the copy's, and the read lands over it. */
+    const remembered = got === null ? keptDecide<KeptDecide>(apiBase()) : null;
+    if (remembered !== null) {
+      got = remembered.got;
+      calls = remembered.calls;
+      fromCopy = true;
+      painted('decide', 'memory');
+      drawnKept?.();
+    }
     /* One later than the wait is drawn when it lands, while the read is out and nothing is drawn. */
     if (got === null) {
       const draw = (near: Near<KeptDecide> | null) => {
@@ -159,6 +168,7 @@
         fromCopy = false;
         if (out.from === 'live') painted('decide', 'network');
       }
+      if (out?.from === 'live') keepDecide(apiBase(), { got: out, calls: called.from === 'live' ? called.value : calls });
       if (out?.from === 'live') keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS, EVERY], { got: out, calls: called.from === 'live' ? called.value : calls }, mark, {}, { spots: decideSpots(out) });
       return out?.from === 'live' || (fromCopy && offlineNow());
     } finally {
@@ -188,9 +198,17 @@
   $effect(() => {
     untrack(() => {
       const at = opened();
-      void read()
-        .then((ok) => closed(ok, at))
-        .catch(() => closed(false, at));
+      /* A RETURN DRAWN FROM WHAT THIS TAB KEPT IS THE SCREEN, so the bracket closes when it is drawn, as a page's does
+         (`/p/[slug]`); a refusal of the read behind it is still said. */
+      let released = false;
+      const close = (ok: boolean): void => {
+        if (released) return ok ? undefined : closed(false, opened());
+        released = true;
+        closed(ok, at);
+      };
+      void read(() => close(true))
+        .then((ok) => close(ok))
+        .catch(() => close(false));
     });
   });
 
