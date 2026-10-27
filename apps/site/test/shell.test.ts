@@ -85,8 +85,8 @@ test('Start draws both states: Get early access signed out (while sign-up is by 
   const Start = await component<{ size?: 'md' | 'sm'; tone?: 'red' }>('Start');
   const { body } = render(Start, { props: {} });
   assert.equal(shell.nav.start, LAUNCH.invite ? 'Get early access' : 'Start free', 'one key says the start button (SF13)');
-  assert.match(body, new RegExp(`<a class="btn red when-out" href="/app/signup" rel="external">${shell.nav.start}</a>`));
-  assert.match(body, /<a class="btn red when-in" href="\/app" rel="external">Open BrainDog<\/a>/);
+  assert.match(body, new RegExp(`<a class="btn red when-out" href="https://app.brain.dog/app/signup" rel="external">${shell.nav.start}</a>`));
+  assert.match(body, /<a class="btn red when-in" href="https:\/\/app\.brain\.dog\/app" rel="external">Open BrainDog<\/a>/);
   const small = render(Start, { props: { size: 'sm' } }).body;
   assert.match(small, /class="btn red sm when-out"/);
   assert.match(small, /class="btn red sm when-in"/);
@@ -94,7 +94,7 @@ test('Start draws both states: Get early access signed out (while sign-up is by 
 
 test('SignIn is drawn only while signed out, and the early access strip ends on Start', async () => {
   const SignIn = await component<{ class?: string }>('SignIn');
-  assert.match(render(SignIn, { props: { class: 'menu-link' } }).body, /<a class="when-out menu-link" href="\/app\/signin" rel="external">Sign in<\/a>/);
+  assert.match(render(SignIn, { props: { class: 'menu-link' } }).body, /<a class="when-out menu-link" href="https:\/\/app\.brain\.dog\/app\/signin" rel="external">Sign in<\/a>/);
   const EarlyStrip = await component<Record<string, never>>('EarlyStrip');
   const strip = render(EarlyStrip, { props: {} }).body;
   assert.ok(strip.includes(shell.early.strong) && strip.includes(shell.early.rest), 'the strip does not say early access');
