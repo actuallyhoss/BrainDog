@@ -213,8 +213,8 @@ async function fresh(): Promise<{ api: Api; sql: ReturnType<typeof openSqlite>; 
 test('INSTALLED BESIDE MONEY-CORE: a debt written by a person makes both plans, and the Debts page shows them and the debt', async () => {
   const { api, sql, close } = await fresh();
   const page0 = said<Page>(await api.page({ slug: 'debts' }, owner));
-  assert.deepEqual(page0.blocks.map((b) => b.heading), [undefined, 'Two ways to be debt-free', 'The two compared', 'What you are paying off', 'Add a debt']);
-  assert.deepEqual(page0.blocks.map((b) => b.refusals), [[], [], [], [], []]);
+  assert.deepEqual(page0.blocks.map((b) => b.heading), [undefined, 'Two ways to be debt-free', 'The two compared', undefined, 'What you are paying off', 'Add a debt']);
+  assert.deepEqual(page0.blocks.map((b) => b.refusals), [[], [], [], [], [], []]);
   assert.equal(page0.blocks[1]!.rows.length, 0, 'no plan until there is a debt');
 
   for (const [name, balance, apr, minimum] of [['Phone', 30_000, 0, 5_000], ['Sofa', 60_000, 0, 5_000]] as const)
