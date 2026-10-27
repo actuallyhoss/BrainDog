@@ -1,8 +1,11 @@
 # Verifies a tagged tree, and publishes braindog-render and the CLI to npm through trusted publishing.
+# The tag is the version; there are no GitHub Releases.
 
 name: tag
 
 on:
+  push:
+    tags: ['v*', 'render-v*', 'cli-v*']
   workflow_dispatch:
 
 permissions:
