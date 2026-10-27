@@ -185,3 +185,29 @@ test('NO LISTING BEFORE REVIEW: a file from a key nobody has trusted waits, is s
   assert.equal(version?.reviewed, NOW.toISOString());
   assert.equal(k.files.get(LISTED_AT), again);
 });
+
+test('A VERDICT NEVER HANDS A LISTED ID TO ANOTHER PUBLISHER, when a stranger\'s version waited while the owner listed the id first', async () => {
+  const { k, key: owner } = await trusted();
+  const stranger = await newAuthorKey('Mallory');
+  const first = addon();
+  const later = addon({ version: '2.0.0' });
+  /* BOTH READ THE KENNEL BEFORE EITHER WROTE: the id was free to each of them. */
+  const before = k.state();
+  const listed = await acceptSubmission(before, first, await signedBy(owner, first), NOW);
+  const waiting = await acceptSubmission(before, later, await signedBy(stranger, later), NOW);
+  assert.ok(listed.ok && waiting.ok, JSON.stringify([listed, waiting]));
+  assert.equal(listed.value.answer.state, 'listed');
+  assert.equal(waiting.value.answer.state, 'review');
+  k.apply(listed.value);
+  k.apply(waiting.value);
+
+  const verdict = reviewVerdict(k.state(), { kind: 'pack', id: 'bookshelf', version: '2.0.0', verdict: 'list', reason: 'Read it through.' }, NOW);
+  assert.equal(refusal(verdict)?.code, 'PROVIDES_CONFLICT', JSON.stringify(verdict));
+  const entry = k.index().entries.find((e) => e.id === 'bookshelf');
+  assert.equal(entry?.publisher?.id, owner.key_id, 'the entry passed to the stranger');
+  assert.equal(entry?.latest, '1.0.0');
+
+  /* REFUSING IT STILL WORKS, and takes it off the list. */
+  const no = reviewVerdict(k.state(), { kind: 'pack', id: 'bookshelf', version: '2.0.0', verdict: 'refuse', reason: 'Listed under another publisher.' }, NOW);
+  assert.ok(no.ok, JSON.stringify(no));
+});

@@ -541,6 +541,15 @@ export function reviewVerdict(state: Pick<KennelState, 'index' | 'review'>, verd
       drop: [pendingPath(path, held.version.checksum)],
     });
   }
+  /* WHO HOLDS THE ID IS READ AGAIN NOW, against the index as it stands. A submission checked while the id was free can
+     wait in review while another publisher lists that id first, because the two writes each check only their own file;
+     listing it then would hand the entry to whoever waited. So a waiting version is listed only under the publisher the
+     index already names, and only when it is later than what is listed. */
+  const listed = state.index.entries.find((e) => e.kind === kind && e.id === id) ?? null;
+  if (listed !== null && (listed.publisher === undefined || publisherKey(listed.publisher) !== publisherKey(held.entry.publisher)))
+    return no('PROVIDES_CONFLICT', `${id} is listed under another publisher now. Refuse this version, with that reason.`, { at: 'id' });
+  if (listed !== null && compareVersions(version, listed.latest) <= 0)
+    return no('ALREADY_KNOWN', `${id} ${listed.latest} is listed now, so ${version} is not later than it. Refuse this version, with that reason.`, { at: 'version' });
   const listing: CatalogueVersion = { ...held.version, reviewed: now.toISOString(), ...(verdict.preview ? { preview: true as const } : {}) };
   return ok({
     answer: { state: 'listed', ...answer },
