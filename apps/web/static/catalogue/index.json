@@ -4033,8 +4033,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "cacad2889cc7cab07fea43d082cf61f7e6c29fa3cf850e97d303ea930fae5a6d",
+          "bytes": 39443,
+          "published_at": "2026-10-27T15:51:17.048Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Property",
+              "{{name}}, property"
+            ],
+            "rules": [
+              "Make the parts of a plan",
+              "Read a pasted plan",
+              "Add up a plan when a part changes",
+              "Add up a plan when its price changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shows the next six parts on a plan and folds the rest.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "f29ffd147ff4a88621b21368532f52dc5dd0fe6b4a7263862a4464cd273d70c8",

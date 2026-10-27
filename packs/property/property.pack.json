@@ -1,10 +1,10 @@
 {
   "pack": "property",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "icon": "building",
   "title": "Property",
   "summary": "A flat or a house paid in parts: what it is worth, what you have paid, what is left and what you own beyond that, with the parts to come and the parts paid. Makes the parts for you, or reads a plan you paste.",
-  "changes": "First version.",
+  "changes": "Shows the next six parts on a plan and folds the rest.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -823,8 +823,52 @@
               "dir": "asc"
             }
           ],
-          "limit": 120,
+          "limit": 6,
           "empty": "Nothing left to pay on {{name}}."
+        },
+        {
+          "kind": "section",
+          "heading": "Every part still to come",
+          "icon": "calendar-clock",
+          "span": 12,
+          "fold": true
+        },
+        {
+          "kind": "table",
+          "span": 12,
+          "source": "register.installments",
+          "where": "plan is {{name}}, state is open",
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "left_after",
+              "label": "Left after",
+              "width": "15ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 120
         },
         {
           "kind": "table",
