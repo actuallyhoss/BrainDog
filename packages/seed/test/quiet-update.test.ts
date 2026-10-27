@@ -1863,6 +1863,8 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
       { pack: 'people', from: '3.1.0', to: FIRST_PARTY_VERSIONS.people, did: 'updated' },
       { pack: 'money-core', from: '3.13.0', to: FIRST_PARTY_VERSIONS['money-core'], did: 'updated' },
       { pack: 'work', from: '1.16.0', to: FIRST_PARTY_VERSIONS.work, did: 'updated' },
+      /* AND CORE, SINCE People 4.0.0 hands it Health, Scripts, Calendar and Activity: a record from before it gains it. */
+      { pack: 'core', from: '0.0.0', to: FIRST_PARTY_VERSIONS.core, did: 'updated' },
     ],
     JSON.stringify(steps),
   );
