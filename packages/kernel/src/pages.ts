@@ -48,7 +48,7 @@ import { CARD_FOLD, CARD_FOLD_MOST } from './declare.ts';
 import { fill } from './fill.ts';
 import { isCurrencyCode, type Json } from './coerce.ts';
 import { exponentOf, moneyText } from './ingest.ts';
-import { across, dayFieldOf as datedBy, isAtLeast, partsOf, type Amount, type Part, type Rate } from './fx.ts';
+import { across, dayFieldOf as datedBy, isAtLeast, partsOf, rateFor, type Amount, type Part, type Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, wordsOf, type EvalContext, type FxRead, type MetricDecl, type Reading } from './metrics.ts';
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
@@ -3172,7 +3172,11 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const limitField = block.columns?.[1]?.field;
   if (unit !== null && limitField !== undefined) {
     const other = rows.map((r) => r.fields[limitField]).find((v): v is { currency: string } => typeof v === 'object' && v !== null && typeof (v as { currency?: unknown }).currency === 'string' && (v as { currency: string }).currency !== unit);
-    if (other)
+    /* A ROW IN ANOTHER CURRENCY IS SET AGAINST THE FIGURE AT THE RATE THE RECORD HOLDS, when it holds one (a goal in
+       dollars on a record kept in pounds); the reader converts the row's limit the same way. With no rate it is refused. */
+    const rates = deps.ctx.fx?.().rates ?? [];
+    const convertible = other !== undefined && rateFor(rates, other.currency, unit, new Date().toISOString().slice(0, 10)) !== null;
+    if (other && !convertible)
       return {
         ...base,
         refusals: also({ code: 'MIXED_CURRENCY', fix: `A row here is in ${other.currency} and ${figure?.id} is in ${unit}, and two currencies are never set against each other. Give the row's ${limitField} in ${unit}, or read a figure in ${other.currency}.`, at: figure?.at ?? 'spent' }),
@@ -3216,7 +3220,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   }
   /* A BAR OR A SPLIT ADDS UP ITS ROWS WHERE IT IS DRAWN, so the home currency and the rates travel beside them, and the
      rows are converted or split by currency with the same arithmetic a figure uses (`fx.ts`). */
-  const held = block.kind === 'bar' || block.kind === 'split' ? deps.ctx.fx?.() : undefined;
+  const held = block.kind === 'bar' || block.kind === 'split' || (block.kind === 'progress' && figure !== undefined) ? deps.ctx.fx?.() : undefined;
   /* A RUN'S PROJECT BY ITS NAME, AND WHAT IT SAID IT IS DOING, read only for a block that asks for either: the same two
      answers `sessions.live` gives, so a run reads the same on a card whichever of the three lists it. */
   const runSaid = runs && (block.columns ?? []).some((c) => c.field === DOING_SAID);

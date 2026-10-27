@@ -283,8 +283,12 @@ function progressRows(block: BlockResult): string[] {
     const spent = block.spentBy;
     return cap(
       block.matched.map((e) => {
-        const limit = e.fields[value];
-        const currency = spent.unit ?? currencyOf(limit) ?? null;
+        const own = e.fields[value];
+        const currency = spent.unit ?? currencyOf(own) ?? null;
+        /* A LIMIT IN ANOTHER CURRENCY THAN THE FIGURE IS SAID IN THE FIGURE'S, at the rate the record sent (the kernel let it by). */
+        const from = currencyOf(own);
+        const rate = from !== null && currency !== null && from !== currency && block.fx ? rateFor(block.fx.rates as Rate[], from, currency, recordToday(clockOf(block))) : null;
+        const limit = rate ? intoHome((own as { amount: number }).amount, from!, currency!, rate.rate) : own;
         const part = spent.groups.find((g) => g.key === String(e.fields[label] ?? ''))?.value ?? 0;
         const figure = currency ? money(Math.round(part), currency) : String(part);
         return `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(figure)} | ${escapeCell(said(value, limit))} | `;

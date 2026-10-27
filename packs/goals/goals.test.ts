@@ -252,3 +252,15 @@ test('THE GOALS PAGE DRAWS THE FIGURES, A TRACK FOR EACH GOAL AND EVERY ROW, WIT
   assert.equal((track.rows ?? []).length, 2);
   close();
 });
+
+test('A GOAL IN DOLLARS ON A RECORD KEPT IN POUNDS IS DRAWN, NOT REFUSED, WHEN THE RECORD HOLDS A RATE', async () => {
+  const { api, close } = await money();
+  said(api.kernel.create('fx', { currency: 'USD', base: 'GBP', rate: 0.8, as_of: '2026-09-01' } as never, { actor: 'p_1' }));
+  goal(api, { name: 'Bike fund', kind: 'value', target: gbp(80_000), by: '2027-01-25', have: gbp(20_000) });
+  goal(api, { name: 'Trip fund', kind: 'value', target: { amount: 100_000, currency: 'USD' }, by: '2027-01-25', have: { amount: 30_000, currency: 'USD' } });
+  await settle(api);
+  const page = said<{ blocks: { kind: string; heading?: string; rows?: unknown[]; refusals: unknown[] }[] }>(await api.page({ slug: 'goals' }, owner));
+  for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
+  assert.equal((page.blocks.find((b) => b.kind === 'progress')!.rows ?? []).length, 2);
+  close();
+});
