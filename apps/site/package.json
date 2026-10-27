@@ -26,7 +26,7 @@
     "lighthouse": "13.5.0",
     "svelte-check": "4.7.6",
     "typescript": "6.0.3",
-    "vite": "8.2.2",
+    "vite": "8.2.4",
     "wrangler": "4.129.0"
   }
 }
