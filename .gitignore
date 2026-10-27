@@ -60,6 +60,9 @@ apps/site/static/desktop/
 
 # Working notes, briefs and reports kept on the machine that builds BrainDog, never in the repository.
 /loop/
+/loop
+/braindog-finish-plan-scratchpad/
+CLAUDE.local.md
 /REPORT.md
 /BUILD.md
 /CLAUDE.md
