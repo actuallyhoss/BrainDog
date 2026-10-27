@@ -1,10 +1,10 @@
 {
   "pack": "money-watch",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "icon": "money",
   "title": "Money watch",
   "summary": "Reads the Ledger for a charge made twice and a payment that repeats, and asks you once about each. Charged twice stops asking about a payee whose last three answers were Both real, and Looks like it repeats switches itself off after three No's in a row.",
-  "changes": "Charged twice and Looks like it repeats keep a short number that is part of a shop's name. Studio 54 Cafe was read as Studio, so two shops that start alike were one payee. A number of one or two digits now stays in the name unless it is the day of a date, so SPOTIFY 12 OCT, SPOTIFY 12OCT and SPOTIFY OCT 12 are all Spotify. A card number in groups, as in CARD 1234 5678 NETFLIX, is cut whole. Now draws its own icon.",
+  "changes": "The notes in Charged twice and Looks like it repeats use an invented card number in their examples. Nothing they do has changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

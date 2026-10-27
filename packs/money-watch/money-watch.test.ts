@@ -116,7 +116,7 @@ test('THE ADD-ON CARRIES twice.js AND repeats.js BYTE FOR BYTE, needs Money, cal
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'money-watch');
   /* ABOVE 1.1.0, which the catalogue holds and which is never changed in place. */
-  assert.equal((PACK as { version?: string }).version, '1.3.1');
+  assert.equal((PACK as { version?: string }).version, '1.3.2');
   /* NO EM DASH AND NO ID IN A WORD A PERSON READS. */
   assert.equal(/—/.test(TEXT), false, 'an em dash in the add-on');
 });
