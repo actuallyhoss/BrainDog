@@ -48,7 +48,9 @@ test('A SELF-HOST WITH A MODEL SAYS slash: true, and one asked to tick has Slash
     const v = await createClient({ base: `http://127.0.0.1:${at}` }).version();
     assert.ok(v.ok);
     assert.equal((v.value as { slash: boolean }).slash, true, 'a host with a Slash endpoint and a key said it had none');
-    for (let i = 0; i < 200 && running.api.kernel.prefsOf('slash')['slash.last'] === undefined; i++) await new Promise((r) => setTimeout(r, 5));
+    /* THE FIRST LOOK RUNS BRAINDOG'S OWN UPDATE CHECK BEFORE IT KEEPS THE DAY (`slashTick`), which takes about a second
+       on its own and longer beside the other files of this suite, so the wait is ten seconds at most. */
+    for (let i = 0; i < 2000 && running.api.kernel.prefsOf('slash')['slash.last'] === undefined; i++) await new Promise((r) => setTimeout(r, 5));
     assert.equal(running.api.kernel.prefsOf('slash')['slash.last'], new Date().toISOString().slice(0, 10));
     assert.deepEqual(await running.api.slashTick(), { ran: false, why: 'today' });
   } finally {

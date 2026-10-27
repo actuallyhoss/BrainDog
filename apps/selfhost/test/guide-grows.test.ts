@@ -28,7 +28,8 @@ test('A GUIDE WHOSE IDEA STAGE IS OVER IS ASKED ONCE TO ADD PROJECTS AND WORK, a
   const asked = value<{ id: string }>(await api.propose({ question: 'Use the New project guide?', body_kind: 'pack', body: { install: 'usecase-guide' } }, owner));
   value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
   const packs = () => sql.all<{ id: string }>('SELECT id FROM pack').map((p) => p.id).sort();
-  assert.deepEqual(packs(), ['usecase-guide']);
+  /* CORE COMES FIRST with every use case (`packages/seed/src/usecases/catalogue.ts` `seedCatalogue`). */
+  assert.deepEqual(packs(), ['core', 'usecase-guide']);
   /* NO EXAMPLE ROWS COME WITH THE PACK ANY MORE (`packages/seed/src/usecases/catalogue.ts`
      "NO EXAMPLE ROWS, FROM ANYTHING ON OFFER"): a plain install off the catalogue plants nothing, and what a person
      would have from onboarding is either a model's formed plan or their own typed rows. This test is about growth once
@@ -66,11 +67,11 @@ test('A GUIDE WHOSE IDEA STAGE IS OVER IS ASKED ONCE TO ADD PROJECTS AND WORK, a
   const before = count();
   const filed = await grows();
   assert.equal(filed.length, 1, 'Slash asks to add Projects and Work');
-  assert.deepEqual(packs(), ['usecase-guide'], 'asking adds nothing');
+  assert.deepEqual(packs(), ['core', 'usecase-guide'], 'asking adds nothing');
   assert.deepEqual(await grows(), [], 'and asks once');
 
   value(await api.decide({ id: filed[0]!.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
-  assert.deepEqual(packs(), ['portfolio', 'usecase-guide', 'work']);
+  assert.deepEqual(packs(), ['core', 'portfolio', 'usecase-guide', 'work']);
   assert.deepEqual(count(), before, 'every guide row is kept');
   assert.equal(sql.all("SELECT id FROM entry WHERE register IN ('things', 'tasks') AND deleted_at IS NULL").length, 0, 'no studio example rows came with them');
 });
