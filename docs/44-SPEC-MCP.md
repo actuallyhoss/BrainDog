@@ -1159,7 +1159,7 @@ the documents that still cite the earlier decision.
 
 ## 15 · Instructions, stop, settings and the pulse
 
-Built on 21 October 2026 on branch `agents-mcp`. The plan is `loop/plans/agents-mcp-2026-10-20/PLAN.md`. This section is
+Built on 21 October 2026 on branch `agents-mcp`. This section is
 what was built, and where it differs from the plan, it says so.
 
 ### 15.1 · What he tells an agent

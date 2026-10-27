@@ -190,7 +190,7 @@ or changing a property's type"* and *"creating or changing views."*
 
 ### The defaults taken on 8 October, each reversible with a word
 
-The questions only the owner could answer were put (USE-A02 in `loop/scope/area-usecases-a.md`) and never answered.
+The questions only the maintainer could answer were put and never answered.
 On 8 October every answer was taken at its default: each one below was taken on **8 October 2026** and is
 **the owner's to reverse with a word**. Each is what the code already does, except the
 last, so writing them down changes nothing in the product; each names the line that holds it, and reversing one is

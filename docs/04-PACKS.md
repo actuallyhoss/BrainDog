@@ -598,7 +598,7 @@ names the word that would find it, and the test reads that no source folder hold
 
 ### 9.2 · The twelve module questions (ruling 305)
 
-The questions of `loop/report-2026-09-11.md` section 7C, each default confirmed or replaced.
+The twelve open questions on the module redesign, each default confirmed or replaced.
 
 | # | The question | Call | The ruling |
 |---|---|---|---|
