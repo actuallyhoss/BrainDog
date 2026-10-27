@@ -149,7 +149,8 @@ test('a held list larger than its line is red, smaller is red until a line recor
   /* A RISE THE OWNER ASKED FOR, in words that stand in the owner's notes, is green; the same quote not found there is not. */
   book.held['web-lists.HELD'].lines.at(-1).by = '"Hold them, deploy tonight"';
   assert.match(run(book, budgets, m, 'nothing like it').findings.join('\n'), /its line rose .* quotes no words of the owner's/u);
-  assert.deepEqual(run(book, budgets, m, 'the answer was "Hold them, deploy tonight".').findings, []);
+  /* The owner's own notes ride along, so a rise the real ledger records on other words stays green here. */
+  assert.deepEqual(run(book, budgets, m, `${DIRECTION}\nthe answer was "Hold them, deploy tonight".`).findings, []);
 });
 
 test('a held list a gate exports and the ledger has no line for is red, and the export is found in the text', () => {
