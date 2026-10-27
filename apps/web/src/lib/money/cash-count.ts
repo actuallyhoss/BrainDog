@@ -12,7 +12,7 @@
 
 import { exponentOf } from 'braindog-render';
 
-import SETS from '../../../../../packs/count-cash/note-sets.json' with { type: 'json' };
+import SETS from '@braindog/pack-count-cash/note-sets.json' with { type: 'json' };
 
 const NOTE_SETS: Readonly<Record<string, readonly string[]>> = SETS;
 
