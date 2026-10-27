@@ -19,6 +19,11 @@
  * mid figure of this year's row, or of the latest earlier year, is written into `illustrated`. Rows it cannot read are
  * left out and nothing is made up.
  *
+ * THE ILLUSTRATION IS ALSO LAID OUT AS ROWS, one a year of the policy in `illustration_years` (year, age, low, mid, high),
+ * so the policy's page can table them and draw the three lines. A row of the illustration may name an `age`; otherwise
+ * it is the policy's `age_at_start` plus the years since it started. A year the illustration no longer holds is taken
+ * out, and a year already laid out is only written when a figure changed.
+ *
  * It never writes a fund value: that is what the insurer's statement says, typed with the day it is from.
  */
 
@@ -78,6 +83,45 @@ function illustratedMid(text, year, currency) {
   return code ? { amount: Math.round(best.mid), currency: code } : null;
 }
 
+/** The illustration's readable rows, one a year, as money in the currency the illustration or the policy is in. */
+function illustrationRows(text, currency, startYear, ageAtStart) {
+  let doc = text;
+  if (typeof doc === 'string') {
+    try { doc = JSON.parse(doc); } catch { return []; }
+  }
+  const code = doc && typeof doc.currency === 'string' ? doc.currency : currency;
+  const list = doc && Array.isArray(doc.rows) ? doc.rows : [];
+  if (!code) return [];
+  const seen = new Map();
+  for (const r of list) {
+    if (!r || !Number.isInteger(r.year) || typeof r.low !== 'number' || typeof r.mid !== 'number' || typeof r.high !== 'number') continue;
+    const age = Number.isInteger(r.age) ? r.age : startYear !== null && Number.isInteger(ageAtStart) ? ageAtStart + (r.year - startYear) : null;
+    seen.set(r.year, { year: r.year, age, low: { amount: Math.round(r.low), currency: code }, mid: { amount: Math.round(r.mid), currency: code }, high: { amount: Math.round(r.high), currency: code } });
+  }
+  return [...seen.values()].sort((a, b) => a.year - b.year);
+}
+
+/** Bring the policy's `illustration_years` rows level with its illustration. */
+async function layOut(ctx, row, cover) {
+  const f = row.fields;
+  const startYear = isDay(f.starts_on) ? Number(f.starts_on.slice(0, 4)) : null;
+  const want = f.illustration ? illustrationRows(f.illustration, cover, startYear, f.age_at_start) : [];
+  const have = await ctx.record.list('illustration_years', { field: 'policy', is: row.id });
+  const byYear = new Map(have.filter((h) => !h.fields.deleted_at && !h.deleted_at).map((h) => [h.fields.year, h]));
+  for (const w of want) {
+    const h = byYear.get(w.year);
+    byYear.delete(w.year);
+    if (!h) {
+      ctx.write('illustration_years', Object.fromEntries(Object.entries({ policy: row.id, ...w }).filter(([, v]) => v !== null)));
+      continue;
+    }
+    const patch = {};
+    for (const key of ['age', 'low', 'mid', 'high']) if (!same(h.fields[key] ?? null, w[key])) patch[key] = w[key];
+    if (Object.keys(patch).length > 0) ctx.update('illustration_years#' + h.seq, patch, h.version);
+  }
+  for (const h of byYear.values()) ctx.update('illustration_years#' + h.seq, { deleted_at: true }, h.version);
+}
+
 async function work(ctx, row, today) {
   const f = row.fields;
   const line = typeof f.premium === 'string' ? await ctx.record.get(f.premium) : null;
@@ -106,6 +150,7 @@ async function work(ctx, row, today) {
   const mid = f.illustration ? illustratedMid(f.illustration, Number(today.slice(0, 4)), cover) : null;
   if (mid !== null || f.illustrated) set('illustrated', mid);
   if (Object.keys(next).length > 0) ctx.update('policies#' + row.seq, next, row.version);
+  await layOut(ctx, row, cover);
 }
 
 /**

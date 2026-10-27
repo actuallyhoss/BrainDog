@@ -99,10 +99,10 @@ test('BEFORE THE ADD-ON: a record has no policies list and no Insurance page', a
 
 test('THE FILE: one list, a rule and its script, two pages, and no kernel change, on money-core 3', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version, doc.author], ['insurance', '1.0.0', 'BrainDog']);
+  assert.deepEqual([doc.pack, doc.version, doc.author], ['insurance', '1.1.0', 'BrainDog']);
   assert.deepEqual((doc.requires as Body).packs, { 'money-core': '>=3.0.0 <4.0.0' });
   const kinds = (key: string) => doc.declarations.filter((d) => key in d).map((d) => d[key]);
-  assert.deepEqual(kinds('register'), ['policies']);
+  assert.deepEqual(kinds('register'), ['policies', 'illustration_years']);
   assert.deepEqual(kinds('page'), ['insurance', 'policy']);
   assert.deepEqual([kinds('rule'), kinds('script')], [['insurance_figures'], ['insurance_figures']]);
   const list = doc.declarations.find((d) => d.register === 'policies')!;
@@ -123,7 +123,7 @@ test('INSTALLED FROM THE FILE with nothing refused, and it needs money-core', as
   assert.ok(diff.adds.some((a) => a.id === 'page.insurance'));
   assert.ok(diff.adds.some((a) => a.id === 'register.policies'));
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'insurance')?.version, '1.0.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'insurance')?.version, '1.1.0');
   sql.close();
 });
 
@@ -174,6 +174,26 @@ test('THE TERM, AND THE ILLUSTRATION: percent of the term gone, and this year\'s
   /* 336 days of 7305 */
   assert.equal(fields(api, id).term_pct, 5);
   assert.deepEqual(fields(api, id).illustrated, { amount: 520_000, currency: 'USD' }, 'this year, not 2030');
+  sql.close();
+});
+
+test('THE ILLUSTRATION IS LAID OUT A YEAR A ROW WITH ITS AGE, kept level when it changes, and drawn on the policy page', async () => {
+  const { api, sql } = await record();
+  const years = (): Body[] =>
+    sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'illustration_years' AND deleted_at IS NULL").map((r) => JSON.parse(r.fields) as Body).sort((x, y) => Number(x.year) - Number(y.year));
+  const id = write(api, 'policies', {
+    name: 'Harbour Life', insurer: 'Northgate Assurance', cover: usd(250_000), starts_on: '2025-11-25', matures_on: '2045-11-25', age_at_start: 34, illustration: ILLUSTRATION,
+  });
+  await settle(api);
+  assert.deepEqual(years().map((r) => [r.year, r.age, (r.mid as Money).amount]), [[2025, 34, 120_000], [2026, 35, 520_000], [2030, 39, 2_600_000]]);
+  /* ONE YEAR MOVED, ONE TAKEN OUT, ONE ADDED: the rows follow, none twice. */
+  said(api.kernel.update('policies', id, { illustration: { rows: [{ year: 2026, age: 40, low: 1, mid: 2, high: 3 }, { year: 2031, low: 4, mid: 5, high: 6 }] } } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.deepEqual(years().map((r) => [r.year, r.age, (r.mid as Money).amount]), [[2026, 40, 2], [2031, 40, 5]]);
+  const page = await pageOf(api, said<{ slug: string; about?: { register?: string } }[]>(await api.pages(owner)).find((p) => p.about?.register === 'policies')!.slug);
+  for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
+  assert.deepEqual(under(page, 'Year by year').rows?.map((r) => r.fields.year), [2026, 2031]);
+  assert.ok(page.blocks.some((b) => b.kind === 'drawn' && b.heading === 'Illustrated fund by year'), 'the chart is on the page');
   sql.close();
 });
 
