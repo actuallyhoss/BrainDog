@@ -93,6 +93,8 @@ export type FieldSpec = {
    * that names it would match nothing or sort by nothing; `derivedFault` refuses both in one sentence.
    */
   derived?: boolean;
+  /** A `json` field of parts, each a patch over its row, adding up to this money field (the kernel's `parts.ts`). */
+  parts_of?: string;
 };
 
 /** The one sentence a filter or a sort over a field worked out at read is refused with. */

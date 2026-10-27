@@ -33,6 +33,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, evaluate, jsonPath, lookupRef, parseWhere, resolveDay, unprivate, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
+import { bySplit, splitOf } from './row-parts.ts';
 import {
   GOVERNANCE_OPEN,
   RECORD_ACTIVITY,
@@ -1536,6 +1537,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   const fields = aggregationsOf(decl.value);
   if (fields.length === 0) at('VALUE_MALFORMED', 'a value is an aggregation, a ratio or a diff', 'value');
+  /* A FIGURE THAT ONLY ADDS UP THE MONEY A ROW'S PARTS ADD UP TO READS A SPLIT ROW AS ITS PARTS (`row-parts.ts`): its total
+     is the same either way, and a cut or a clause by a field the parts carry, a category, reads each part under its own.
+     A count is never read so, since a row split in three is still one row. */
+  const split = splitOf(schema);
+  if (register && split && fields.length > 0 && fields.every((f) => f.kind === 'sum' && f.field === split.of && f.lookup === undefined)) sql = bySplit(sql, register, split);
   /* `past` WAITS A WHOLE NUMBER OF DAYS, and a `by` it cannot read is refused: read as none, a line three days late
      and a line due yesterday would be the same count under a declaration that says otherwise. */
   const waits = pastFault(decl.value);

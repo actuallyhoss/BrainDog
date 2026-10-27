@@ -79,6 +79,8 @@ export type FieldDecl = {
   currency_from?: string;
   /** `money` only: once a row holds a code here, a write that would change it is `CURRENCY_FIXED` (`currencyFixed`). */
   currency_fixed?: boolean;
+  /** `json` only: the money field of this list its parts add up to, each part a patch over its row (`row-parts.ts`). */
+  parts_of?: string;
 };
 
 export type Coerced = { ok: true; value: Json } | { ok: false; refusal: Refusal };

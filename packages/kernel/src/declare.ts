@@ -4723,12 +4723,14 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *               comes without one, and never changed once a row holds it (`currencyKeysFault`).
  *   `when`      `{ holds: [people] }`: a field there only while the record holds those lists (`holdsFault`). The plan
  *               takes it out, so a stored field never says it.
+ *   `parts_of`  a `json` field of parts, each a patch over its row, adding up to the money field it names
+ *               (`partsKeysFault`, `row-parts.ts`): one payment over three categories.
  */
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
   'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'derive', 'labels', 'currency_from', 'currency_fixed', 'when',
-  'hidden_from_agents',
+  'hidden_from_agents', 'parts_of',
 ] as const;
 
 /**
@@ -4816,6 +4818,23 @@ const BY = ['decide'];
  * the field on the other list. Installed wrong, an amount sent with no code is refused on every write and nobody is
  * told the declaration is why.
  */
+/**
+ * `parts_of`, on a `json` field only, naming a money field of the same list, and on one field of a list at most: a row
+ * is split one way, and its figures read it by those parts (`row-parts.ts`).
+ */
+function partsKeysFault(id: string, fields: readonly Record<string, unknown>[]): Refusal | null {
+  const marked = fields.filter((f) => f.parts_of !== undefined);
+  for (const f of marked) {
+    const at = `${String(f.id)}.parts_of`;
+    if (f.type !== 'json') return bad('DECLARATION_INVALID', `${id}.${String(f.id)} is a ${String(f.type)}, and parts_of is for a json field of parts.`, at);
+    const of = fields.find((g) => g.id === f.parts_of);
+    if (typeof f.parts_of !== 'string' || of === undefined || of.type !== 'money')
+      return bad('DECLARATION_INVALID', `${id}.${String(f.id)}: parts_of names a money field of ${id}, the amount its parts add up to.`, at);
+  }
+  if (marked.length > 1) return bad('DECLARATION_INVALID', `${id} splits its rows one way: give parts_of to one field.`, `${String(marked[1]!.id)}.parts_of`);
+  return null;
+}
+
 function currencyKeysFault(id: string, fields: readonly Record<string, unknown>[], installed?: Known): Refusal | null {
   const a = (type: unknown): string => `${/^[aeiou]/u.test(String(type)) ? 'an' : 'a'} ${String(type)}`;
   for (const f of fields) {
@@ -6054,6 +6073,8 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   if (ruled) return ruled;
   const coded = currencyKeysFault(id, fields as unknown as Record<string, unknown>[], installed);
   if (coded) return coded;
+  const split = partsKeysFault(id, fields as unknown as Record<string, unknown>[]);
+  if (split) return split;
 
   /* A SPOKEN PREFIX NAMES ONE REGISTER, or `LN7` names two rows (`02 §2`). `#` is the default every
      register shares, which is why it never resolves bare and is not checked here. */

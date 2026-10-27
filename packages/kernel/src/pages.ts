@@ -35,6 +35,7 @@ import { listRead, searchClauses, searchWord, type SearchShape } from './page-se
 import { HANDOFFS_OPEN, KIND_SAID, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
+import { splitOf, rowsBySplit } from './row-parts.ts';
 import { kindModule } from './kinds/index.ts';
 import { sourceModule } from './sources/index.ts';
 import { ACTIONS_BLOCKING } from './sources/actions-blocking.ts';
@@ -3975,7 +3976,7 @@ function amountIn(v: unknown): { n: number; unit: string | null } | null {
  * add up costs a quarter of a second and never the whole of it. BOTH HOLD A COUNT AS WELL (`wholeLong`), which stops
  * the walk where the clock stands still and refuses a grouped answer whose parts hold more rows than a walk may read.
  */
-function wholeParts(deps: PageDeps, ask: WholeAsk): Result<WholePart[]> {
+function wholeParts(deps: PageDeps, ask: WholeAsk, split: string | null = null): Result<WholePart[]> {
   const started = performance.now();
   const late = (): Result<WholePart[]> | null => {
     const refusal = wholeLate(performance.now() - started);
@@ -3997,7 +3998,8 @@ function wholeParts(deps: PageDeps, ask: WholeAsk): Result<WholePart[]> {
     walked += page.value.rows.length;
     const long = wholeLong(Math.max(walked, Number.isFinite(page.value.matched) ? page.value.matched : 0));
     if (long) return { ok: false, refusal: long };
-    for (const row of page.value.rows) {
+    /* A SPLIT ROW ADDS UP AS ITS PARTS, as the host's grouped query reads it (`row-parts.ts`). */
+    for (const row of split === null ? page.value.rows : rowsBySplit(page.value.rows, split)) {
       const by = ask.by.map(({ field, day }): Json => {
         const v = row.fields[field];
         if (v === undefined || v === null || v === '') return null;
@@ -4097,7 +4099,7 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   const home = held?.home ?? null;
   const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
   const ask = (w: Predicate | undefined) =>
-    wholeParts(deps, { register, where: w, by: shape.by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null });
+    wholeParts(deps, { register, where: w, by: shape.by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null }, splitOf(schema)?.of === shape.value ? splitOf(schema)!.field : null);
   type Figure = Pick<WholeRow, 'value' | 'unit' | 'parts'> & { converted?: { asOf: string; stale: boolean } };
   const figure = (g: Gathered): Figure => {
     if (shape.value === null) return { value: shape.done ? g.done : g.rows };

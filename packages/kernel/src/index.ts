@@ -22,6 +22,7 @@ import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
 import { nameSpokenIn } from './spoken-names.ts';
 import { coerce, currencyFixed, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
+import { overSplit, splitFault, splitOf, splitOfFields } from './row-parts.ts';
 import { attempt } from './tx.ts';
 import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
@@ -542,6 +543,7 @@ export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { placeOnce, projectSuggestions, suggestProjects, remoteKey, SUGGEST_AFTER, type ProjectSuggestion, type SeenRun, type Candidate } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
+export { splitOf, splitOfFields, rowsBySplit, type SplitField } from './row-parts.ts';
 export { briefFromNote, cleanImportedNote, noteWithoutLeftovers, type NoteFields } from './note-clean.ts';
 export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
 /* FOR `declare`'s PLAN, which asks a widening's readers as `stranded` does and has to place an arrival's rule the same way. */
@@ -2464,6 +2466,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             /* AND WHETHER IT IS WORKED OUT AT READ, which `where` refuses a filter or a sort over: nothing is stored
                under it to compare (`derivedFault`). */
             ...(f.derived === true ? { derived: true } : {}),
+            /* AND WHERE A ROW'S PARTS ARE, so a figure that adds up their money reads a split row as its parts (`row-parts.ts`). */
+            ...(typeof (f as { parts_of?: unknown }).parts_of === 'string' ? { parts_of: (f as { parts_of: string }).parts_of } : {}),
           },
         ]),
     ),
@@ -4699,6 +4703,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         // Absent is one thing, not three: null, "" and [] all remove the key (K2).
         if (isAbsent(out.value)) delete merged[key];
         else merged[key] = out.value;
+      }
+
+      /* A ROW SPLIT INTO PARTS (`parts_of`, `row-parts.ts`): checked whenever the parts or the amount they add up to is
+         written, so a line whose amount changes under its parts is refused with the parts, never left out by some. */
+      const split = splitOfFields(decl.fields as unknown as { id: string; type: string; parts_of?: string }[]);
+      if (split && (touched.includes(split.field) || touched.includes(split.of))) {
+        const parts = splitFault([...known.values()] as unknown as FieldDecl[], split, merged, decl.state, lookAt);
+        if (!parts.ok) return parts;
+        if (parts.value !== null) merged[split.field] = parts.value;
       }
 
       /* ── where the row applies, on a token's write ──
@@ -7907,8 +7920,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const group = Array.from({ length: by.length + 2 }, (_, n) => n + 1).join(', ');
       /* THE SAME ROWS `list` READS FOR THE PAGE'S READER, so a sum is never over a row kept private from them. */
       const kept = admitClause(q.register, undefined, viewer);
+      /* A SPLIT ROW IS ADDED UP AS ITS PARTS when the sum is of the money its parts add up to (`row-parts.ts`), so a part is
+         counted under its own label and the total stays the row's. */
+      const split = splitOf(schema);
+      const grouped = `SELECT ${cols.join(', ')} FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})${kept === null ? '' : ` AND (${kept.sql})`} GROUP BY ${group}`;
       const rows = sql.all<Record<string, unknown>>(
-        `SELECT ${cols.join(', ')} FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})${kept === null ? '' : ` AND (${kept.sql})`} GROUP BY ${group}`,
+        split && q.value === split.of ? overSplit(grouped, q.register, split.field) : grouped,
         q.register,
         ...c.params,
         ...(kept === null ? [] : kept.params),
