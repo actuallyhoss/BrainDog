@@ -380,8 +380,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.1.1",
       "versions": [
+        {
+          "version": "1.1.1",
+          "checksum": "2840f63d7e60aa930216650cb68b2c5631745399804ffbd9ff326b037ac1d36a",
+          "bytes": 24049,
+          "published_at": "2026-10-27T14:17:09.837Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shows what each certificate will be worth when it matures, and Cash ahead walks that value as the money coming back.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "f4df2505dc322ff650a892eac3f689d522a1f50b92909056bd70b697268521b9",

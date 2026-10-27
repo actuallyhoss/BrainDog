@@ -70,7 +70,7 @@ test('THE PACK CARRIES ITS TWO SCRIPTS AS THEIR SOURCE, byte for byte; neither f
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'certificates');
-  assert.equal(file.value.pack.manifest.version, '1.1.0');
+  assert.equal(file.value.pack.manifest.version, '1.1.1');
 });
 
 test('THE SCRIPT STEPS A PAYOUT BY THE WALK’S OWN LEG, written into its source as data', () => {

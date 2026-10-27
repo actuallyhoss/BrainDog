@@ -1,6 +1,6 @@
 {
   "pack": "certificates",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "icon": "landmark",
   "title": "Certificates",
   "summary": "Bank certificates and fixed deposits: the rate, what each has earned so far, when it pays next and when it matures. Its payouts and the principal coming back are walked into Cash ahead.",
@@ -11,7 +11,7 @@
     "format": 1,
     "primitives": 1,
     "packs": {
-      "money-core": ">=3.0.0 <4.0.0"
+      "money-core": ">=3.29.0 <4.0.0"
     }
   },
   "declarations": [
