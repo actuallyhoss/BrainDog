@@ -348,7 +348,7 @@ test('A STORED LOOK IS READ FORGIVINGLY: what still reads is kept and the rest d
   });
 });
 
-/* ── the edges audit 17 found (L1) ───────────────────────────────────────── */
+/* ── the edges testing found ───────────────────────────────────────── */
 
 test('A LEAD NEVER PUSHES A PINNED BLOCK DOWN: with one between it and the top it stays, and is not said to lead', () => {
   const blocks = keyed(
@@ -437,7 +437,7 @@ test('A QUEUE NEVER LEADS A PAGE ABOUT SOMETHING ELSE: Money keeps its cash ahea
   assert.deepEqual(look.next, { row: 'SG4', text: 'Let it read the bank texts?' }, 'it is still the one next action');
   assert.deepEqual(keysOf(applyLook(blocks, look).blocks), [sentence, ahead, waiting, accounts]);
 
-  /* NOR DOES SOMETHING LATE, PAST THE CASH AHEAD (the audit of 20 October: Money opened on Instalments): it is the next
+  /* NOR DOES SOMETHING LATE, PAST THE CASH AHEAD (Money opened on Instalments): it is the next
      action, and the walk stays the page's first answer. */
   const late = keyed(...blocks, block({ kind: 'table', source: 'register.tasks', heading: 'Due', rows: [row('tasks', 3, { what: 'Pay rent', by: '2026-10-02' })], matched: 1 }));
   const due = keysOf(late)[4];

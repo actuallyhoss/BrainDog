@@ -1,5 +1,5 @@
 /**
- * A FIGURE OVER A LIST THAT HOLDS NOTHING HAS NO VERDICT (audit-38-39, finding 11).
+ * A FIGURE OVER A LIST THAT HOLDS NOTHING HAS NO VERDICT (audit-38-39).
  *
  * `ledger-rows-7d` and `currencies-held` (the seed's money signs) are counts held to `gte: 1`. On a fresh record the
  * Ledger and the accounts are empty, the count is 0, and the kernel answered `met: false`, so an agent reading the

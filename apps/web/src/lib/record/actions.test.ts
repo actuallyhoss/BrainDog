@@ -258,7 +258,7 @@ test("SLASH'S LINE IS ASKS AND THE MODEL'S WORK, never neurons, and an allowance
      whole of `/usage` into "BrainDog could not reach this record". */
   const [studio] = usageFromLedger(ledger(0), '2026-09', '2026-09-15').records;
   assert.equal(studio?.slash, "Slash was asked 41 times this month, and the model did 12,300 units of work answering.");
-  /* A NEURON IS THE HOST'S BILLING UNIT, and a person reading their usage was never told what one is (audit 34). */
+  /* A NEURON IS THE HOST'S BILLING UNIT, and a person reading their usage was never told what one is. */
   assert.doesNotMatch(studio?.slash ?? '', /neuron/iu, "the host's unit reached the page");
   assert.deepEqual(studio?.asks, { asks: 41, neurons: 12_300, cap: null });
   assert.doesNotMatch(studio?.slash ?? '', /credit|of the|allows/u, 'an allowance was said that the answer never carried');

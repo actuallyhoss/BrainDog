@@ -1,5 +1,5 @@
 /**
- * Sign-in on production, with the canary's own passkey, the way a person signs in (PRF-A09).
+ * Sign-in on production, with the canary's own passkey, the way a person signs in.
  *
  *   CANARY_PASSKEY=<credential> DEPLOY_HOST=brain.dog SMOKE_SLUG=ops [CANARY_SESSION=<file>] node tools/gates/signin-live.mjs
  *   node tools/gates/signin-live.mjs                      (no credential: self-host only)
@@ -23,7 +23,7 @@
  * rise between any two runs, fit the four bytes the count has until 2106, and are above any count a fresh passkey
  * reaches by hand.
  *
- * NO CREDENTIAL, SELF-HOST ONLY, AND IT SAYS SO. Until the owner's sitting (`loop/scope/area-proof-a.md` section 5, item 1)
+ * NO CREDENTIAL, SELF-HOST ONLY, AND IT SAYS SO. Until the owner's sitting
  * there is no canary, and this runs the same four steps against a fresh self-host in the job: in by the server key,
  * a passkey added on the device and read back, then a second browser with that credential alone. Its last line
  * starts `signin-live: self-host only`, which the lane reads as "not proven on brain.dog", never as green there.

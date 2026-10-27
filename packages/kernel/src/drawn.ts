@@ -261,7 +261,7 @@ const held = (row: unknown, field: string): unknown => {
  * block draws, so each card is a dash under the block's heading. ONE VALUE ON ONE ROW KEEPS THE BLOCK AND EVERY CARD IN
  * IT, so a card with a name is never left out: a service imported with no cost is still what the project runs on.
  *
- * NOT WHAT TOOK THE DASH OFF "WHERE IT STANDS" (audit 59, claim 4). That block is titled by the health and draws only
+ * NOT WHAT TOOK THE DASH OFF "WHERE IT STANDS". That block is titled by the health and draws only
  * while its `when:` counts one of its four fields said, so on a project nobody had described it is already out with
  * `why: 'when'`, and when it is drawn a card says something and this answers no. This catches the cards block that
  * carries no such gate. The tile left standing over nothing on that page was the boxed section under it (`panelHeld`).
@@ -289,7 +289,7 @@ function valuesUnsaid(b: Drawable): boolean {
  * figure's parts when no row the figure read sits in any part, a row of figures every one of which adds up a field
  * nobody filled in, or cards of which not one says anything (`cardsUnsaid`). Each draws only that a field is empty on
  * every row: "How they are going" was one grey track of eleven over "Not said yet" on the founder's Projects
- * (`loop/research-real-record.md`).
+ *.
  *
  * A COLUMN THAT NAMES NO FIELD IS NOT ASKED ABOUT, and a block the record refused, a registered kind's, or one whose
  * author keeps its nought, is not this rule's to judge.
@@ -349,7 +349,7 @@ export function leadOf(blocks: readonly Drawable[]): number {
  * project's scheduled actions may be none, and the host draws nothing for none, so a boxed section naming `actions`
  * over blocks that all went was a tile holding only its heading ("More about Pinwheel").
  *
- * KEPT BY DEFAULT (audit 61, claim 1). The record cannot see the host's panel, and a section handed no `actions` is one
+ * KEPT BY DEFAULT. The record cannot see the host's panel, and a section handed no `actions` is one
  * nobody counted for: shutting it took the heading off a project with one scheduled action and nothing else under the
  * box, which is worse than a heading over nothing. Only a section handed its `actions` as a list of none is shut.
  */

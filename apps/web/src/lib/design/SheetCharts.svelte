@@ -1,6 +1,6 @@
 <!--
   The look sheet called "Charts and marks": every chart form the renderer draws, at every size it has to survive, and
-  every face and mark the product puts beside a name (EXP-C01, decision 2 of the experience area).
+  every face and mark the product puts beside a name (decision 2 of the experience area).
 
   THE RECORD IT IS OPENED ON COMES FIRST. Its pages are read as any page is (`pageReader`), and the first block of each
   chart kind is drawn by the page's own reader (`BlockSlot`), under the name of the page it is on. Reading stops when
@@ -15,7 +15,7 @@
   A STALE SPECIMEN IS STALE DATA: its newest point is days or months old. What a stale chart looks like is the
   renderer's to draw, and this sheet shows whatever it draws.
 
-  THE THIRD OPEN CALL IS DRAWN TWICE HERE, the default labelled (decision 7): a failed run in red, or in words alone.
+  THE THIRD OPEN CALL IS DRAWN TWICE HERE, the default labelled: a failed run in red, or in words alone.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -52,7 +52,7 @@
   type ChartKind = SheetKind;
 
   const FAILED = ['red', 'plain'] as const;
-  /* THE DEFAULT OF THE CALL (EXP-C01, "Needs him"): a failed run is red. */
+  /* THE DEFAULT OF THE CALL ("Needs him"): a failed run is red. */
   const FAILED_DEFAULT = 'red';
 
   /** How many pages are read looking for the record's own charts, at most. */

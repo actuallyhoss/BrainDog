@@ -16,7 +16,7 @@
   beside it says what is wrong, so the red is never the only sign. The rows stay in ink, the fix in the quieter colour.
   A link is 44 tall under a thumb.
 
-  AND WHAT THE PAGES PRINT RAW, EVERY ONE (C39): the night's page lint, which the sign `pages-clean` carries six of, as a
+  AND WHAT THE PAGES PRINT RAW, EVERY ONE: the night's page lint, which the sign `pages-clean` carries six of, as a
   second part under the first, a line a finding and none held back (`printedRows`).
 -->
 <script lang="ts">

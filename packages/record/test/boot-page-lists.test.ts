@@ -1,6 +1,6 @@
 /**
  * Every list a page reads, said by the record on `boot` (`pages[].lists`), so the rail can hold a place back until one
- * of them has something in it (USE-B02). `list` beside it is unchanged: the one list a page draws, or `null`.
+ * of them has something in it. `list` beside it is unchanged: the one list a page draws, or `null`.
  *
  * `lists` leaves out three things. A read across the whole record (`*`), which is no list. A list this caller may not
  * read, whose id she is never handed. And a list that holds only what an add-on planted and nobody has touched, such

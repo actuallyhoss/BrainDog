@@ -25,11 +25,11 @@
  *
  * THE WEEK OFFER IS THE ONE DRAWN FROM USE (`weeksOffered`): a list with a day, four or more of its entries falling in
  * this week, read on three different weeks, and no page that groups it by week, is offered a page of its week. It is
- * never made before `PEN_YOUNG_DAYS` days since a person first used the record (ENG-B17: "a fortnight of use is not a
+ * never made before `PEN_YOUNG_DAYS` days since a person first used the record ("a fortnight of use is not a
  * habit"), counted from a person's own writes (`usedOf`) and never from the oldest day its entries say, so an import,
  * an agent or the night's sweep does not make a record old. Its own reads on three different weeks are the days of use.
  *
- * ONE OFFER A LIST, IN ONE PLACE, THREE AT ONCE (USE-B03, ENG-B14: "max 3 waiting"). `penRanked` keeps one offer a list
+ * ONE OFFER A LIST, IN ONE PLACE, THREE AT ONCE ("max 3 waiting"). `penRanked` keeps one offer a list
  * and drops a list Slash already asked a page for on Decide; `penFor` shows what the one queue holds (`design-agent.ts`
  * `queueOf` over `recommend`), `WAITING_MOST` at most, each with the day it lapses, so the rail, Settings and the Slash
  * page count the same small number. An offer's id is made by `signatureOf` alone, so Slash's growing list can name the
@@ -322,7 +322,7 @@ export type PenQueue = {
  * ONE PLACE A LIST. A list Slash already asked a page for on Decide, still waiting or turned down there, is not offered
  * one here (`slashAsked`): the same question in two places is a nag, and an answer in one must hold in the other.
  *
- * WHERE TWO RANK THE SAME (USE-B03): a list the person opened in the last seven days first, then the list with the
+ * WHERE TWO RANK THE SAME: a list the person opened in the last seven days first, then the list with the
  * newest entry. Both are read from the record's store, so without `use` the order above is the rank.
  *
  * A DISMISSAL IS TERMINAL, as it was: a dismissed id is never made, so no basis brings it back. A LAPSE IS COMPUTED,
@@ -804,9 +804,9 @@ function shapesOffered(deps: PenDeps): Offer[] {
 
 /* ── the week a list is read by ─────────────────────────────────────────────────────────────────────────────────── */
 
-/** The days a record is watched and offered nothing drawn from use: a fortnight of use is not a habit (ENG-B17). */
+/** The days a record is watched and offered nothing drawn from use: a fortnight of use is not a habit. */
 export const PEN_YOUNG_DAYS = 14;
-/** The different days a person wrote on before a record is no longer young, however long ago they began (ENG-B17). */
+/** The different days a person wrote on before a record is no longer young, however long ago they began. */
 export const PEN_USE_DAYS = 5;
 /** The entries a list holds in this week before its week is worth a page of its own. */
 export const PEN_WEEK_FEWEST = 4;
@@ -836,7 +836,7 @@ const thisWeek = (field: string, unfinished: Json | null = null): Json => ({
  * This week on `field` exactly, Monday to Sunday of `today`, which is what the offer counts and says. Counted with the
  * page's own words, a Sunday's "4 due this week" was four due in the week after it.
  *
- * `unfinished` NARROWS BOTH TO WHAT IS STILL TO DO (batch 53, finding 1): on a Thursday "4 due this week" counted the
+ * `unfinished` NARROWS BOTH TO WHAT IS STILL TO DO (batch 53): on a Thursday "4 due this week" counted the
  * orders sent on Monday, beside a line on the same screen that did not. A finished entry is not due.
  */
 const weekOf = (field: string, today: string, unfinished: Json | null = null): Json => {
@@ -897,7 +897,7 @@ const AHEAD_WORD = /^\+(\d{1,4})([dw])$/iu;
 
 /**
  * Whether `where` holds one of `days` to the days just ahead: `due before +8d` in a sentence, or `{field, lt: '+7d'}`
- * in a tree, at any depth. That is a page reading the list by the week in other words (batch 53, finding 1): the shop's
+ * in a tree, at any depth. That is a page reading the list by the week in other words (batch 53): the shop's
  * Due this week says no `bow`, so a shop that had the table was offered a page of the same table.
  */
 function daysAhead(where: Json | undefined, days: ReadonlySet<string>): boolean {
@@ -988,7 +988,7 @@ const saysMany = (name: string): boolean => {
   return last.length >= 4 && /s$/iu.test(last) && !NOT_MANY.test(last);
 };
 
-/** The plurals English does not build from the singular, by the singular's last word (audit 58, claim 4: "5 childs"). */
+/** The plurals English does not build from the singular, by the singular's last word ("5 childs"). */
 const ODD_MANY: ReadonlyMap<string, string> = new Map([
   ['child', 'children'],
   ['life', 'lives'],

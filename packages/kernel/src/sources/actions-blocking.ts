@@ -12,7 +12,7 @@ import type { Entry } from '../index.ts';
 import type { BlockResult, PageBlock, PageDeps, SourceKit } from '../pages.ts';
 import type { Also, Source } from './index.ts';
 
-/** The source a block names for one project's actions in its way (REC-C09). */
+/** The source a block names for one project's actions in its way. */
 export const ACTIONS_BLOCKING = 'actions.blocking';
 
 /**

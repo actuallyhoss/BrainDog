@@ -1,5 +1,5 @@
 /**
- * What reaches a screen of a look Slash composed, through the real record (ENG-B09), and the one number `context`
+ * What reaches a screen of a look Slash composed, through the real record, and the one number `context`
  * gains (AGT-C18 job c).
  *
  * A LOOK IS READ OVER THE PAGE AS IT READS WHEN IT IS WRITTEN, not as it read when the model was asked. The ask hands

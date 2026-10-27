@@ -1,5 +1,5 @@
 /**
- * A question an automation puts to a person, asking for a choice, an amount, a number, a text or a date (SHL-D06).
+ * A question an automation puts to a person, asking for a choice, an amount, a number, a text or a date.
  *
  * THE RUNNER IS DRIVEN STRAIGHT, over a fresh record's tables, with its own `ask` beside it. The kernel's own `ask`
  * files every question as a choice of options, and the gate refuses one with fewer than two, so a shaped question

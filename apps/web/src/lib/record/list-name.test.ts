@@ -1,5 +1,5 @@
 /**
- * Renaming a list that no use case gives a word for (the audit of 25 October, Y21): Words and money listed 13 lists
+ * Renaming a list that no use case gives a word for: Words and money listed 13 lists
  * of a record holding 29, because only the speaking use case's lists had a box.
  */
 

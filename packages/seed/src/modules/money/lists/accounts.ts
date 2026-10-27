@@ -21,7 +21,7 @@ export const ACCOUNTS_REGISTER: MoneyRegister = {
    */
   delete: 'refuse_while_referenced',
   /**
-   * AN ACCOUNT CLOSES (REC-B15), which is the way out the refusal above had none of: one money moved through cannot
+   * AN ACCOUNT CLOSES, which is the way out the refusal above had none of: one money moved through cannot
    * be deleted, so it stayed in Cash now and in every form for good. Closed is the list's finished status, so a form
    * leaves it out of the accounts it offers, and the figures of cash leave it out of the count, of Cash now and of its
    * parts (`figures/cash.ts`, `HELD`). Its payments stay its own, so every month it was open reads as it did.

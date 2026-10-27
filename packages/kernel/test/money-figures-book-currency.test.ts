@@ -4,7 +4,7 @@
  *
  * MEASURED ON THE OWNER'S RECORD: Harbour says `currency: USD`, and its page led with its cash in pounds Egyptian,
  * converted, while its part of "What you have, by book" was a bar in EGP beside the others
- * (`loop/research-real-record.md`, Today 2). A book's currency is its owner's own statement about it, so a figure about
+ * (Today 2). A book's currency is its owner's own statement about it, so a figure about
  * that book takes it at its word. Two currencies are never added, and parts in two are never ranked on one axis.
  */
 
@@ -133,7 +133,7 @@ test('EACH BOOK’S PART OF CASH NOW BY BOOK IS IN THE BOOK’S CURRENCY, so no 
   for (const decl of [CASH_BY_BOOK, HELD_BY_BOOK]) {
     const by = read(k, decl);
     const parts = Object.fromEntries((by.groups ?? []).map((g) => [g.label, { value: g.value, parts: g.parts }]));
-    /* CASH NOW BY BOOK SAYS A BOOK OF TWO CURRENCIES IN EACH (the audit of 20 October): Harbour's E£50,000.00 beside its
+    /* CASH NOW BY BOOK SAYS A BOOK OF TWO CURRENCIES IN EACH: Harbour's E£50,000.00 beside its
        $4,000.00, never turned into $1,000.00 and added, so the part reads as the Accounts tile beside it does. */
     const harbour = decl === CASH_BY_BOOK ? [{ currency: 'EGP', amount: 5_000_000 }, { currency: 'USD', amount: 400_000 }] : [{ currency: 'USD', amount: 500_000 }];
     assert.deepEqual(

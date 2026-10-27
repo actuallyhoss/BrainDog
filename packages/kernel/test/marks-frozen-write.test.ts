@@ -1,5 +1,5 @@
 /**
- * The mark rules on the write path and the figure through the record (REC-C17), where `marks-unknown.test.ts` holds the
+ * The mark rules on the write path and the figure through the record, where `marks-unknown.test.ts` holds the
  * two functions by themselves: a write that would change or clear a mark naming a picture is refused with
  * `MARK_IS_FROZEN`, a word that draws nothing takes one more write, and `marks-unknown` is read by the record's own
  * `metric`, which is what a stat block calls.

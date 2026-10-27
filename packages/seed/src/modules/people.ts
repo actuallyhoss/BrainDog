@@ -79,7 +79,7 @@ export const PEOPLE: Fields[] = [
  *
  * - A MAIL NO DOOR'S PATTERN CLAIMED (`untriaged`) IS FROM SOMEBODY, unless its address says nobody reads replies to it
  *   (noreply, no-reply, donotreply, mailer-daemon). It was met by address and name, and a no-reply sender as the
- *   organisation behind it; since the audit of October 6th the name is kept as a mention and nobody is written (below).
+ *   organisation behind it; the name is kept as a mention and nobody is written (below).
  * - A MAIL A DOOR'S PATTERN CLAIMED IS FROM A SYSTEM: a bank's alert, a shop's receipt. Meeting it as a person made a
  *   person called "Alerts" one mail at a time, so it meets the organisation by its domain, the rule below.
  *
@@ -101,7 +101,7 @@ export const PEOPLE: Fields[] = [
  * prints who sent it as `quill.harbour@instapay`, most often a person's, and an organisation called by that address is
  * a name nobody reads as one.
  *
- * MAIL NOBODY'S PATTERN CLAIMED MAKES NOBODY, SINCE THE AUDIT OF OCTOBER 6TH (`loop/research-audit-17.md`, H1). Anybody
+ * MAIL NOBODY'S PATTERN CLAIMED MAKES NOBODY. Anybody
  * can send a mail and write any name above it: a forged `"Rohan Mehta" <rohanmehta@evil.test>` made a person, the
  * strong rules then folded it into the real Rohan on the same two words and a long enough local part, and his keys
  * took the stranger's address, so every later mail from that domain was filed as his. Spam made a person a sender. So
@@ -115,7 +115,7 @@ export const PEOPLE: Fields[] = [
  * AND A NO-REPLY SENDER NOBODY'S PATTERN CLAIMED IS NOBODY TO MEET: a newsletter, a notification, or a forgery of
  * either. One a door's pattern reads, a bank's alert, is met by `rule.meet-sender-organisations` below.
  *
- * WHERE IS THE SENDER'S DOMAIN, NEVER THE SUBJECT (audit 17, M2). The line said `mail: <subject>`, and the subject of
+ * WHERE IS THE SENDER'S DOMAIN, NEVER THE SUBJECT. The line said `mail: <subject>`, and the subject of
  * any mail reached the person's `met` lines, the merge cards, the model's reading and the mention table, which grew a
  * row per subject.
  */
@@ -125,7 +125,7 @@ const NO_REPLY = ['noreply', 'no-reply', 'donotreply', 'do-not-reply', 'mailer-d
 const MAIL_FROM = 'mail from {{trigger.body.from_domain}}';
 
 /**
- * MAIL HOSTS ANYBODY CAN SIGN UP TO, WHOSE DOMAIN SAYS NOTHING ABOUT WHO A SENDER WORKS FOR (audit 17, M4): a mail from
+ * MAIL HOSTS ANYBODY CAN SIGN UP TO, WHOSE DOMAIN SAYS NOTHING ABOUT WHO A SENDER WORKS FOR: a mail from
  * one is a person's own account, and the display name above it is whatever they typed. Named in the rule itself, so a
  * person reading `rule.meet-sender-organisations` sees which hosts it passes over and can add their own country's.
  *
@@ -179,7 +179,7 @@ export const PEOPLE_AUTOMATIONS: Record<string, unknown>[] = [
     ],
   },
   {
-    /* NEVER AN ORGANISATION NAMED AFTER WHOEVER WROTE FROM A PUBLIC HOST (audit 17, M4). A mail a pattern claimed from
+    /* NEVER AN ORGANISATION NAMED AFTER WHOEVER WROTE FROM A PUBLIC HOST. A mail a pattern claimed from
        `gmail.com` or `yahoo.com.eg` named an organisation after the first sender's display name, keyed by the host, and
        filed every later mail from that host under it. A mail with no address is passed over too, since a name alone
        would be matched against the organisations by name. */
@@ -244,7 +244,7 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
        `projects` field it names, so a student's People still installs and `meet` records a person and links nobody.
        `in_touch` SINCE People 2.4.0: `meet` moves Last in touch to the day of the line it writes, so an agent meeting
        someone or a mail arriving from them keeps the People page's figures current without anyone typing a day. */
-    /* `keys`, `org`, `self` AND `aliases` SINCE People 3.0.0 (`loop/contract-17.md`): every way a person is known as
+    /* `keys`, `org`, `self` AND `aliases` SINCE People 3.0.0: every way a person is known as
        `kind:value` (an address, a login, a phone), the organisation they are with, whether this is the record's own
        person, and the other names they go by. `meet` matches on any key and adds the new ones it hears, so the second
        address of somebody already met finds them, where one unique `email` could only make a second row. */
@@ -353,7 +353,7 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       /* WHERE IT WAS SEEN, one dated line each with where: the evidence a match was made on. */
       { id: 'met', label: 'Seen in', type: 'list', of: 'text' },
       { id: 'merged_into', label: 'Merged into', type: 'ref', to: 'organisations' },
-      /* THE DAY IT WAS PUT AWAY, SINCE People 3.8.0 (the audit of 25 October, Y2): a shop met by a name a card text cut
+      /* THE DAY IT WAS PUT AWAY, SINCE People 3.8.0: a shop met by a name a card text cut
          short is retired on his yes, kept with its payments and never deleted, and People lists it no more. */
       { id: 'retired_on', label: 'Retired on', type: 'day' },
       /* A DOCUMENT, AS FOUNDER'S WAS, so a row written under it reads the same. */
@@ -401,7 +401,7 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
-    /* REMEMBERED EACH NIGHT, SINCE People 3.4.0 (PGS-C18), so the page's figure draws how many you were in touch with
+    /* REMEMBERED EACH NIGHT, SINCE People 3.4.0, so the page's figure draws how many you were in touch with
        over the month as a line (`trend: 30d` on In touch). A save writes the figure and asks nothing. Until the record
        has kept three nights the cell is the figure alone. */
     snapshot: { grain: 'day', into: 'series.people-in-touch-30d' },
@@ -440,7 +440,7 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     metric: 'organisations-count',
     name: 'Organisations',
     source: 'register.organisations',
-    /* AND NEVER A SHOP MET ON A CARD TEXT, SINCE People 3.9.0 (the pass of 27 October): a payee a bank text named is
+    /* AND NEVER A SHOP MET ON A CARD TEXT, SINCE People 3.9.0: a payee a bank text named is
        met with no kind (`rule.meet-payees` gives none), so "Organisations 13" listed nine cut-off shop names beside the
        four companies he deals with. Those are counted apart, below. */
     where: 'merged_into is empty, retired_on is empty, kind is set',
@@ -497,7 +497,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * who they are with and where they were met; the lists go. Who has gone quiet is still said first and by name, in the
    * page's line, and `people-in-touch-90d` stays declared and draws nothing, as `people-in-touch-12w` does.
    *
-   * WHAT WAITS ON YOU ABOUT THEM, SINCE People 3.4.0 (PGS-C18). The line opens on how many questions about somebody here
+   * WHAT WAITS ON YOU ABOUT THEM, SINCE People 3.4.0. The line opens on how many questions about somebody here
    * are open, and Waiting on you under it answers three. In touch says how many you were in touch with in the month,
    * with its line, and What agents did, last, what the runs changed here. Six tiles at most, and no fold: Waiting on
    * you, the note on somebody held twice, In touch, Everyone, Organisations and What agents did, each drawn only while
@@ -506,7 +506,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
   people: {
     page: 'people',
     title: 'People',
-    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101): the lead pages sit Work, Orders, Projects,
        Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
     nav: { section: 'People', order: 10, place: 50 },
     icon: 'people',
@@ -527,7 +527,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'people-quiet', is: 0 },
         /* NOT HOW MANY WERE IN TOUCH, SINCE People 3.4.0: In touch under it says that figure with its month as a line,
            and a page says a figure once. */
-        /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM (the pass of 27 October): "Add Priya to People?"
+        /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM: "Add Priya to People?"
            names no row of its own, and the line said no question was open while it waited in Needs you. The kernel
            counts a rowset on People here now (`openOnList`), and Waiting on you lists it. */
         body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)',
@@ -543,7 +543,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         body: '{{questions-open-in:people}} question(s) for you, {{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too',
       },
       {
-        /* WHAT IS ASKED ABOUT SOMEBODY ON THIS RECORD, SINCE People 3.4.0 (PGS-C18), answered where they are shown, three
+        /* WHAT IS ASKED ABOUT SOMEBODY ON THIS RECORD, SINCE People 3.4.0, answered where they are shown, three
            at a time, and the rest are in Decide. Each line above opens on how many (`questions-open-in:people`, the open
            questions whose row is on People), a clause the writer leaves out at nought, so the line and the queue count
            the same questions. Under the line, since it is the one tile here that needs the person, and only while
@@ -558,7 +558,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'questions-open-in:people', gt: 0 },
       },
       {
-        /* SOMEBODY HELD TWICE (AGT-D05): the record's own figure of the people it holds more than once, as far as the
+        /* SOMEBODY HELD TWICE: the record's own figure of the people it holds more than once, as far as the
            plain rules can tell (two of one name, one of them with no address or handle; a second marked as the
            record's own person). Under the page's line and never a second headline, since a page opens on one sentence,
            and left off at nought. THE FIGURE'S WORDS, THEN THE NUMBER, as the notes over a record's keys are written,
@@ -567,14 +567,14 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            the kernel) is called by nothing yet, so a line promising a question would promise one that never comes.
            No intent: it is a thing to look at, not a thing gone wrong.
 
-           AND SOMETHING TO PRESS (audit 69, finding 3), where the line said a number and stopped: the list of people,
-           opened at the ones this figure counted. THE PEOPLE HELD TWICE AND NOT THE WHOLE LIST (audit 74, claim 4): the
+           AND SOMETHING TO PRESS, where the line said a number and stopped: the list of people,
+           opened at the ones this figure counted. THE PEOPLE HELD TWICE AND NOT THE WHOLE LIST: the
            link used to open everyone in order of name and tell the reader to look for the same person listed twice,
            since a list's address narrowed by a field's value, a search and an order, and "held twice" is a pair the
            kernel works out and no value a field holds. The list takes the word `twice` in its address now and asks
            the record for those people itself, so the note says "See them" and the looking is the record's.
 
-           THE NUMBER IS HOW MANY TOO MANY, AND SAYS SO (audit 78, claim 1). The figure counts the ones that would go
+           THE NUMBER IS HOW MANY TOO MANY, AND SAYS SO. The figure counts the ones that would go
            if each pair were one person, and the link shows every one of each pair, so "twice: 1" stood over a list of
            two and "twice: 2" over three of one name. The figure is the kernel's and stays as it is; the words now say
            what it counts, so a list longer than the number is what the line promised.
@@ -603,7 +603,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         kind: 'cards',
         heading: 'Everyone',
         icon: 'people',
-        /* HALF, WITH THE ORGANISATIONS BESIDE IT (the UI pass of 20 October, money F13): two lists a page wide left a
+        /* HALF, WITH THE ORGANISATIONS BESIDE IT (money F13): two lists a page wide left a
            third of each row empty at 1512. Half and not two thirds, since a table's floor is half a row (`floorFor`
            in apps/web), so two thirds and a third drew the organisations under it. On a phone each takes the width. */
         span: 6,
@@ -620,7 +620,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         /* NAME, ROLE AND WHEN YOU LAST SPOKE, and not who they are with (money F13): a phone's line holds two values
            after the name, and "With" took the place of Last spoke there, so the one fact a person scans People for was
            dropped on a phone. Who they are with is on their own page, first line. */
-        /* ONE LINE A PERSON, SINCE People 3.9.0 (the pass of 27 October): their name, what they are to you in
+        /* ONE LINE A PERSON, SINCE People 3.9.0: their name, what they are to you in
            the words written about them (the note's first line, under the name), the projects they are on as chips, and
            when you last spoke. "Role · Other" stood under most of them as a field and its value. */
         columns: [
@@ -657,7 +657,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'name', dir: 'asc' }],
       },
       {
-        /* THE SHOPS CARD TEXTS NAMED, IN ONE LINE, SINCE People 3.9.0 (the pass of 27 October): how many and the
+        /* THE SHOPS CARD TEXTS NAMED, IN ONE LINE, SINCE People 3.9.0: how many and the
            first few by name, and the list to look them over, where nine half names stood in Organisations. */
         kind: 'note',
         span: 6,
@@ -665,7 +665,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         body: '{{organisations-from-card-texts}} shop(s) from card texts, {{organisations-from-card-texts.names}}, kept apart from the organisations. [See them](/r/organisations).',
       },
       {
-        /* WHAT AGENTS DID HERE, SINCE People 3.4.0 (PGS-C18): who an agent met, merged or wrote down, one group per run,
+        /* WHAT AGENTS DID HERE, SINCE People 3.4.0: who an agent met, merged or wrote down, one group per run,
            from the record's own log, as the Agents page draws what runs added to the brain. `first:` folds each run's
            rest into one line with its count, so one busy run cannot push the others off the page. No `empty:`: with no
            agent's change to a person or an organisation the block is not drawn. Last, because the people come first. */

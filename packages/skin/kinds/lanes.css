@@ -34,7 +34,7 @@
     --lanes-lane: 20px;
     --lanes-name: 200px;
     --lanes-head: 24px;
-    /* A row at work names its agent's hue here, inline (SF9); a row that names none is ink. */
+    /* A row at work names its agent's hue here, inline; a row that names none is ink. */
     --lane-c: var(--ink);
     display: grid;
     grid-template-columns: var(--lanes-name) minmax(0, 1fr);
@@ -160,7 +160,7 @@
     background: var(--chart-other);
   }
 
-  /* A LANE AT WORK TAKES ITS AGENT'S HUE (SF9, SPEC 1.3): `--lane-c`, set per row from the agent's mark
+  /* A LANE AT WORK TAKES ITS AGENT'S HUE (SPEC 1.3): `--lane-c`, set per row from the agent's mark
      (`packages/skin/agent-marks.ts`: Claude's clay, Gemini's blue, a slot for one with neither), and ink where the
      row names none (the default on `.lanes`). Never red: red is for late and needs you, and a lane at work is neither. */
   .lanes-item[data-intent='info'] .lanes-bar {
@@ -292,7 +292,7 @@
   }
 
   /* NOW IS THE ONE HAIRLINE, in the ink, down the lanes and no further, and its word in the hours' row, ending a step
-     before the line (UI pass of 21 October, P32): the axis says where it stops, so 15:00 is not read as an hour still to
+     before the line (P32): the axis says where it stops, so 15:00 is not read as an hour still to
      come. A WINDOW ENDS AT NOW AS A RULE, which puts the line at 100%: it is held one pixel inside, or the axis would
      clip it away on every block. The box ends on the line and is as wide as its word; the line is its end edge's
      background, from under the hours down. */

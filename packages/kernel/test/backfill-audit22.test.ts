@@ -1,10 +1,10 @@
 /**
- * The walk, held to what research-audit-22 found in it: a folder is a sure place only where the run worked in it or its
- * project names the run's repository (M4), `~` and a Mac's case read as the machine reads them; each run question
- * carries the whole places of exactly its own runs (H2); a payee shaped like a person's name is never a business by a
- * surname or two initials (L3); a line describing itself, "SALARY OCTOBER", names nobody; a walk's undo leaves a key
- * somebody put back and marks the batch undone only for what it put back (L2); a dry walk says the project it would
- * place a run in; and the server's undo plan of a walk batch says each row by its list and number (M2).
+ * The walk, held to what was found in it: a folder is a sure place only where the run worked in it or its
+ * project names the run's repository, `~` and a Mac's case read as the machine reads them; each run question
+ * carries the whole places of exactly its own runs; a payee shaped like a person's name is never a business by a
+ * surname or two initials; a line describing itself, "SALARY OCTOBER", names nobody; a walk's undo leaves a key
+ * somebody put back and marks the batch undone only for what it put back; a dry walk says the project it would
+ * place a run in; and the server's undo plan of a walk batch says each row by its list and number.
  */
 
 import { test } from 'node:test';

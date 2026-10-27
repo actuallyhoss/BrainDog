@@ -360,10 +360,10 @@ test('and the two areas that report rather than offer say which deployment this 
      being deleted, because what `49 §8` requires is that the instruction is on this screen and not
      which sentence carries it. */
   const key = `${copy.theKeyIs} ${copy.theKeyWhere}`;
-  /* SAID PLAINLY SINCE THE UI PASS OF 20 OCTOBER (agents F27): where the key is, and to keep a copy elsewhere. */
+  /* SAID PLAINLY (agents F27): where the key is, and to keep a copy elsewhere. */
   assert.match(key, /keep a copy somewhere else/i);
   assert.match(key, /cannot show it to you/i);
-  /* AND THE FILE BY ITS NAME, ON A SELF-HOST (audit 25 October, X20): "If you run BrainDog yourself" was said to the one
+  /* AND THE FILE BY ITS NAME, ON A SELF-HOST: "If you run BrainDog yourself" was said to the one
      person who does. */
   assert.match(copy.theKeyWhere, /the file named kek/i, 'the screen no longer says where the key is');
   /**
@@ -474,7 +474,7 @@ test('THE RECORD PUBLISHES THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE', () =
   assert.doesNotMatch(SIGNING_KEY.publicKey, /public|key|studio|stamped/iu, 'the key is a sentence rather than a key');
   assert.ok(SIGNING_KEY.since, 'the key has no date, so nobody can tell a rotation from the original');
 
-  /* THE SCREEN DRAWS NO KEY, AND NO SENTENCE ABOUT ONE EITHER (Y22): the tile that said it was not here yet is gone. */
+  /* THE SCREEN DRAWS NO KEY, AND NO SENTENCE ABOUT ONE EITHER: the tile that said it was not here yet is gone. */
   assert.equal('theSignatureNotHere' in copy, false, 'a sentence about a key nobody can see is back');
 });
 

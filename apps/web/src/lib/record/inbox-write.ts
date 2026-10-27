@@ -88,7 +88,7 @@ export const fileArrival = (base: string, id: string, register: string, io: Fetc
   post(base, 'fileArrival', { id, register }, io);
 
 /**
- * File a message skipped as a repeat after all, as a second one beside the row it looked like (REC-A03): "It is a second
+ * File a message skipped as a repeat after all, as a second one beside the row it looked like: "It is a second
  * one". The record runs it again with its pattern's repeat check off for this one run, so the answer is where it went,
  * filed or waiting. The record refuses a message not skipped, or skipped by a rule rather than marked as a repeat.
  */

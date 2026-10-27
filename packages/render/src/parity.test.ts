@@ -127,7 +127,7 @@ const SHAPES: Record<string, string> = {
      the head of one cell, and if the two renderers read them differently one of them prints a glyph
      nobody asked for. */
   'a todo with an agent working on one of its rows': '```todo\n[ ] ●︎ Draft the September issue | due Friday\n[x] Send the quote | done\n```',
-  /* A TITLE LONG ENOUGH TO BE A NAME AND A QUIET REST (E23), with the working dot in front of it. */
+  /* A TITLE LONG ENOUGH TO BE A NAME AND A QUIET REST, with the working dot in front of it. */
   'a todo whose title runs on past its first clause':
     '```todo\n[ ] ●︎ Review the Kiln payout batch before Friday. Check the three refunds Stripe flagged, then write back to both creators | due Friday\n```',
   /* A TODO'S THIRD AND FOURTH CELLS ARE ONE LINE, and a row with them blank draws no line at all: the
@@ -803,7 +803,7 @@ test('A RUN TOO SHORT TO DRAW PRINTS ITS NEWEST NUMBER where the card has no fig
   for (const drawn of [toHTML([beside]), render(Block, { props: { block: beside } }).body].map(tree)) assert.deepEqual(figures(drawn), ['12 Done', '2 Done', '3 Done', '0 Done']);
 });
 
-test("A CARD WITH EDIT AND NO WRITER IS THE MIRROR'S TEXT (PGS-C15): the box is drawn only where the host hands a writer", () => {
+test("A CARD WITH EDIT AND NO WRITER IS THE MIRROR'S TEXT: the box is drawn only where the host hands a writer", () => {
   const src = '```cards\ntitle: Name | reply\nOxbow | A kiln for hire\n```';
   const opts = { edits: [null, { field: 'about', max: 120 }] };
   assert.equal(tree(render(Block as Component<{ block: BlockSegment; opts?: unknown }>, { props: { block: page(src), opts } }).body), tree(toHTML([page(src)])));
@@ -977,7 +977,7 @@ test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and 
   assert.equal(tree(render(Filters, { props: { filters: [] } }).body), '', 'nothing to narrow by draws nothing');
 });
 
-test("A PROJECT'S CHIP WEARS ITS DOT in both renderers, and a value with no hue wears none (E24)", () => {
+test("A PROJECT'S CHIP WEARS ITS DOT in both renderers, and a value with no hue wears none", () => {
   const dotted = [{ field: 'thing', label: 'Project', values: [{ value: '1', label: 'Kiln', count: 46, hue: 210 }, { value: '2', label: 'BrainDog', count: 1, hue: 30 }, { value: '', label: 'No project', count: 2 }] }];
   const svelte = tree(render(Filters, { props: { filters: dotted } }).body);
   assert.equal(svelte, tree(filtersHTML(dotted)));
@@ -1026,7 +1026,7 @@ test("AND A RUN THE HOST HANDS WEARS ITS MAKER'S MARK IN BOTH, undimmed, and a r
   assert.doesNotMatch(svelte, /data-quiet/u, 'a run the host handed was dimmed');
 });
 
-/* ── a part with no value is not drawn (PGS-A05) ───────────────────────────── */
+/* ── a part with no value is not drawn ───────────────────────────── */
 
 /**
  * Each part the rule reads, once with a part whose value is missing beside parts that hold one, as his project pages
@@ -1122,7 +1122,7 @@ for (const [name, { src, gone, kept }] of Object.entries(NOUGHTS)) {
   });
 }
 
-/* ── a row's mark is a picture (PGS-A06) ───────────────────────────────────── */
+/* ── a row's mark is a picture ───────────────────────────────────── */
 
 test('A CARD\'S MARK THAT NAMES A PICTURE IS THE PICTURE IN BOTH RENDERERS, and never the first letter of its name', () => {
   const block = page('```cards\nmark: Icon | title: Project\ncake | Oxbow.gg\nKiln | Kiln\nclose | Lanternfish\n```');
@@ -1134,7 +1134,7 @@ test('A CARD\'S MARK THAT NAMES A PICTURE IS THE PICTURE IN BOTH RENDERERS, and 
   }
 });
 
-/* ── what a page prints (PGS-B02): a chip's figure is read, and a path that names nothing is not a hole ──── */
+/* ── what a page prints: a chip's figure is read, and a path that names nothing is not a hole ──── */
 
 /** The record a page reads: `tasks.open` holds 7, `cash.due` names a figure with no value yet, and nothing else is named. */
 const VALUES: Record<string, string | null> = { 'tasks.open': '7', 'cash.due': null };

@@ -1,5 +1,5 @@
 /**
- * THE ONE RECOMMENDER AND THE ONE QUEUE (ENG-B14, decision 5 of `loop/scope/area-engine-b.md`).
+ * THE ONE RECOMMENDER AND THE ONE QUEUE.
  *
  * Three things recommended in three places under two caps: rules in the daily look (`slash.ts`), the pen (`emergent.ts`)
  * and two rules in the browser. On the owner's record that read "4 suggested" in the rail and seven on the Slash page, two
@@ -13,7 +13,7 @@
  *
  * THE ORDER IS SET: pages first, for a thing with no page as drawn and for a list that grows; then the blocks and
  * columns a list has earned; then icons, only when the host has handed the glyph names. A tier is never outranked by
- * one below it, so the order offers come in is their rank. THE NAVIGATION SHAPE IS NO LONGER WEIGHED (C11, 24 Oct): one
+ * one below it, so the order offers come in is their rank. THE NAVIGATION SHAPE IS NO LONGER WEIGHED (24 Oct): one
  * sidebar and one bar are drawn for everyone since nav A, so a shape offer would change nothing anyone sees.
  *
  * A THING THAT HAS A PAGE IS NEVER OFFERED ONE, and "has a page" is read off the pages as drawn: a page made for a row
@@ -409,7 +409,7 @@ export function answeredAlready(open: readonly Pick<Held, 'key'>[], signals: Pic
 export const FILED_RANK_MOST = 1000;
 /**
  * The kernel's scale cut into one band a tier, the lowest band for a rank under every tier (an ask no rule weighed).
- * SIX BANDS STILL, the shape's top one left empty since it went (C11), so a rank filed before reads on the same scale.
+ * SIX BANDS STILL, the shape's top one left empty since it went, so a rank filed before reads on the same scale.
  */
 const BAND = Math.floor(FILED_RANK_MOST / 6);
 
@@ -464,7 +464,7 @@ export type Unpictured =
 /* ── when the rules cannot draw it: the model ──────────────────────────────────────────────────────────────────── */
 
 /**
- * THE MODEL STEP (C14, §45 "Thinking and cost"): a thing that earned a drawing whose rules' draft the design check
+ * THE MODEL STEP (§45 "Thinking and cost"): a thing that earned a drawing whose rules' draft the design check
  * refused, or that the rules could not draft at all, is asked of the model once, in these words, about its page. What
  * comes back is held to the same check before it is filed (`describe`), and the offer says what it cost.
  *

@@ -1,5 +1,5 @@
 /**
- * The names a block's or a page's `icon:` may give (PGS-A19), and the three nearest when it gives one the set does not
+ * The names a block's or a page's `icon:` may give, and the three nearest when it gives one the set does not
  * draw, so an agent or a person who misspells a glyph is told the right name at once.
  *
  * A LEAF THE KERNEL MAY IMPORT. The kernel imports no renderer, so the list is the kernel's own copy: `MARK_GLYPHS` in

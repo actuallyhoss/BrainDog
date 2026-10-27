@@ -243,7 +243,7 @@ test('every gate a workflow names is one the registry knows', () => {
   }
 });
 
-/* SELECTION BY NEED, NOT BY NAME (PRF-B01). A list of names is a gate somebody adds tomorrow that runs nowhere, and
+/* SELECTION BY NEED, NOT BY NAME. A list of names is a gate somebody adds tomorrow that runs nowhere, and
    the ten names the gates job once left out were each a place for that. So `gates` runs `--unbuilt`, `build` runs
    `--built`, and the one list left is the build job's `--except layout,a11y`, which PRF-B10 removes once a red screen
    check stops the deploy. Any other name in a run line of ci.yml is red here. */
@@ -269,7 +269,7 @@ test('the build job runs every gate a web build satisfies, and names only the tw
   assert.deepEqual(everyName, ['a11y', 'layout'], `ci.yml names gates in its run lines beyond the PRF-B10 pair: ${everyName.join(', ')}`);
 });
 
-/* THE SITE'S TESTS READ THE SITE AS BUILT, AND THEY RAN NOWHERE THAT HAD ONE (LCH-B01). The `apps` leg builds no site,
+/* THE SITE'S TESTS READ THE SITE AS BUILT, AND THEY RAN NOWHERE THAT HAD ONE. The `apps` leg builds no site,
    so they skipped there, and the job that builds it ran none of them. `SITE_BUILT=1` makes a missing build a failure
    instead of a skip (`apps/site/test/built.ts`), so this step without the flag would be the same green as before. */
 test('the build job tests the site against its build, with a missing build a failure', () => {
@@ -284,7 +284,7 @@ test('the build job tests the site against its build, with a missing build a fai
   assert.match(all[tests].body, /^ {8}env:\n {10}SITE_BUILT: '1'$/m, 'the site\'s tests run without SITE_BUILT=1, so a missing build skips again');
 });
 
-/* AND THE RUNNER'S OWN TESTS RUN SOMEWHERE (PRF-B01). `tools` is no workspace, so no leg reaches `tools/gates/test`,
+/* AND THE RUNNER'S OWN TESTS RUN SOMEWHERE. `tools` is no workspace, so no leg reaches `tools/gates/test`,
    and the tests that hold what a gate needs and how a run is cut had run on no runner. */
 test('the build job runs the gate runner\'s own tests by their glob, after the builds', () => {
   const all = steps(job(ci, 'build'));
@@ -302,7 +302,7 @@ test('the build job runs the look\'s own tests by their glob', () => {
   assert.equal(all[look].if, null);
 });
 
-/* AND THE WATCH'S (LCH-C01): `tools/watch` is no workspace either, so the test of what launch watches ran nowhere. */
+/* AND THE WATCH'S: `tools/watch` is no workspace either, so the test of what launch watches ran nowhere. */
 test('the build job runs the watch\'s own tests by their glob, beside the look\'s', () => {
   const all = steps(job(ci, 'build'));
   const watch = at(all, /node --test tools\/watch\/\*\.test\.mjs/, 'runs tools/watch');
@@ -310,7 +310,7 @@ test('the build job runs the watch\'s own tests by their glob, beside the look\'
   assert.equal(all[watch].if, null);
 });
 
-/* A REAL CLIENT'S HANDSHAKE, WITH THE BUNDLE THAT SHIPS (PRF-A06). After the command is built, so it greets what an agent
+/* A REAL CLIENT'S HANDSHAKE, WITH THE BUNDLE THAT SHIPS. After the command is built, so it greets what an agent
    app starts; before the diff check, so a file it wrote would be seen; and with `BRAINDOG_CLI_BUILT=1`, without which a
    missing bundle quietly falls back to the source the `apps` leg already ran. */
 test('the build job greets the bundled command with real MCP clients, after building it', () => {

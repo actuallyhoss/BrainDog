@@ -1,5 +1,5 @@
 /**
- * THE FIRST RUN FROM A PERSON'S OWN AGENT (USE-B12): the lines Settings, Agents shows, the one line to paste, the build
+ * THE FIRST RUN FROM A PERSON'S OWN AGENT: the lines Settings, Agents shows, the one line to paste, the build
  * waiting and then arriving among the record's open questions, and Make it mine pressing the accept once.
  *
  * A FAKE RECORD, NOT A SOCKET, as `accept.test.ts` has it: the two calls the page makes, `governance` and `call`.

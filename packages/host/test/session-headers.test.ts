@@ -1,5 +1,5 @@
 /**
- * The command's build, read off every call (AGT-B01, batch 37): `x-braindog-cli` is a date or `dev` and a commit, kept when
+ * The command's build, read off every call (batch 37): `x-braindog-cli` is a date or `dev` and a commit, kept when
  * it has that shape and dropped when it does not, on the headers and over `/mcp`'s `_meta.session` alike.
  */
 

@@ -154,7 +154,7 @@
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
   const live = $derived(got?.from === 'live' ? got : null);
 
-  /* ── the page's declared head (PGS-A14) ────────────────────────────────────
+  /* ── the page's declared head ────────────────────────────────────
      A PAGE THAT SAYS `header:` IS ANSWERED A HEAD, drawn round its title and sentence as they are: the kicker over the
      name, the count beside it, the state with its mark and words, the one primary button, a search the address holds
      and a way back. A page with none, or one this build cannot read (`headOf`), draws exactly as it did. */
@@ -202,7 +202,7 @@
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
   /* ── the project's shape ───────────────────────────────────────────────────
      A PAGE ABOUT A ROW READS THE ROW'S PROJECT ONCE (`shape-hold.svelte.ts`), and every part of the shape the page
-     declares (`{ kind: project, part }`, C28 and C29) is drawn from that one read in its own slot (`BlockSlot.svelte`,
+     declares (`{ kind: project, part }`) is drawn from that one read in its own slot (`BlockSlot.svelte`,
      through `shape-key.ts`). The hold's code is fetched only for a page about a row, so Today carries none of it. WHAT
      IT DRAWS IS IN THE PAGE'S OWN ANSWER (`shape`, scope 2026-10-24 A20), so it asks the record nothing, and each answer
      of the page, read again when the record moves, is handed to it. A page that carries none has no parts. */
@@ -234,7 +234,7 @@
   const shapeDrew = $derived<readonly Block[]>(shapeBox.hold?.blocks ?? []);
   const shapeRow = $derived<Readonly<Record<string, unknown>> | null>(shapeBox.hold?.shape && shapeBox.hold.read ? shapeBox.hold.read.fields : null);
   /* Whether the shape's reads are back. Until they are, what it runs on is taken as the shape's, so a declared Runs on
-     does not stand empty and then go when the shape lands (the audit of 20 October, on a project page). */
+     does not stand empty and then go when the shape lands (on a project page). */
   const shapeKnown = $derived(shapeBox.hold?.known ?? false);
   /* A PAGE ABOUT A PROJECT'S ROW (proj section 4): its hero holds the name, so the head is the way back and the actions. */
   const projectPage = $derived(about !== null && isProject(REGISTERS[about.register]));
@@ -287,7 +287,7 @@
     const more = moreSaid(laidFrom);
     return `${slotStyle(hue)};--chart-1:var(--ph);--chart-2:color-mix(in oklab, var(--ph) 55%, var(--tile));--chart-3:color-mix(in oklab, var(--ph) 28%, var(--tile))${more ? `;--more-said:${JSON.stringify(more)}` : ''}`;
   });
-  /* WHAT THE PAGE IS ABOUT, SHARED WITH PEOPLE (sharing plan §3.1): a project's page shares the project, everything
+  /* WHAT THE PAGE IS ABOUT, SHARED WITH PEOPLE: a project's page shares the project, everything
      that names it; a page about any other row shares that row. */
   /* WHO MAY SHARE, as `ShareLazy` asks it: an owner or an Admin, and never while the record is seen as somebody. */
   const sharable = $derived(seeingAs() === null && canShare((route.data as { me?: Parameters<typeof canShare>[0] }).me));
@@ -422,7 +422,7 @@
    * WHAT FOLLOWS A PROJECT'S SHAPE WAITS FOR IT, on a page about a project's row, until the shape's reads are back. Which
    * blocks are drawn hangs on what the shape says (`withoutRepeats`), and the shape's hold fills the screen under the
    * head, so the blocks under it stood below the fold and then jumped up into view when a shorter shape landed (CLS 0.15
-   * on a project's first open, `loop/perf/r3-diag.mjs`). They are drawn with the shape, in one frame. Not while the page
+   * on a project's first open). They are drawn with the shape, in one frame. Not while the page
    * is arranged, which moves the blocks as they are declared.
    */
   const shapeWaits = $derived(projectPage && about !== null && !shapeKnown && !arranging && arrangement.slots === null);
@@ -457,15 +457,15 @@
    */
   /* A PAGE ABOUT A ROW is the row's own: the template's default line is not his words, so it is left off there too. NOR
      ON A PAGE AN ADD-ON BROUGHT: Money on a record whose version of it has no line of its own opened on the filler, a
-     line about pages in general, above its cash (the audit of 20 October). Its own blocks say what it is. */
+     line about pages in general, above its cash. Its own blocks say what it is. */
   const fromPack = $derived(!!live && typeof (live.page.page as { pack?: unknown }).pack === 'string');
   const headlined = $derived(!!live && (about !== null || fromPack || judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true)));
 
   /**
-   * A PLACE WITH NOTHING IN IT YET SAYS SO IN ONE SENTENCE, by its own first step (the audit of 22 October, U-C2): Money
+   * A PLACE WITH NOTHING IN IT YET SAYS SO IN ONE SENTENCE, by its own first step: Money
    * on a new record drew its name and an Add an account box over an empty board. Only where every block the page
    * declares draws nothing but a box to add the first entry, and never on a row's own page. AND THEN IT IS THE ONLY
-   * LINE (audit C, X7): the generic "One screen that gathers what you keep an eye on" stood under it on a new Orders.
+   * LINE: the generic "One screen that gathers what you keep an eye on" stood under it on a new Orders.
    */
   const blank = $derived.by(() => {
     if (!live || about !== null || arranging || showSource) return null;
@@ -480,13 +480,13 @@
      one block for each it declares, and a body nobody installed yet is installed by the first Done. */
   const shell = $derived(route.data as unknown as Shell);
 
-  /* THE HEAD IS KNOWN BEFORE THE RECORD ANSWERS (EXP-D04): the rail already holds this page's name and glyph, so while
+  /* THE HEAD IS KNOWN BEFORE THE RECORD ANSWERS: the rail already holds this page's name and glyph, so while
      its blocks read the head is drawn from that entry and bars stand only where the blocks go. A page the rail does not
      hold (one past its budget, or opened by its address alone) waits with the head's bar as before. */
   const railed = $derived(mode === 'page' && got === null ? ((shell?.nav ?? []).find((n) => n.id === slug) ?? null) : null);
 
   /* ── the reader's mark ─────────────────────────────────────────────────────
-     A PAGE THAT DRAWS WHAT IS NEW SINCE THE MARK STAMPS THE MARK WHEN THE READER LEAVES IT (PGS-C02), through the one
+     A PAGE THAT DRAWS WHAT IS NEW SINCE THE MARK STAMPS THE MARK WHEN THE READER LEAVES IT, through the one
      stamp Home and Activity use (`read-mark.ts`): one mark a visit, and a mark that did not land is tried at the next
      leave. A declared page with a `feed` `since: seen` never moved it, so the lines it called new were new again at
      every visit until Home or Activity was opened.
@@ -548,7 +548,7 @@
   });
   /**
    * THE BODY A HOME IS BUILT FROM WHILE THE RECORD HOLDS NONE, as its first Done keeps it (`previewedBody`), for Change
-   * this page to draft over (C25, C26): the record's week with it, as Edit layout reads it.
+   * this page to draft over: the record's week with it, as Edit layout reads it.
    */
   const builtBody = async (): Promise<unknown> => previewedBody(slug, holdsOf(shell, undefined, await weekHeld(shell)));
   /** The home's body as the mode moves it, from the moment Edit layout is chosen until the arrangement is let go. */
@@ -617,7 +617,7 @@
     /* ON A PROJECT'S PAGE, WHAT THE HERO AND ITS TILES SAY IS NOT SAID AGAIN, and More about is folded (`project-page.ts`).
        Not while the page is arranged, which moves the blocks as they are declared. */
     const reading = projectPage && !arrangement.editing && arrangement.slots === null && !toArrange;
-    /* A PAGE OF AN OLDER USE CASE DECLARES NO PART OF THE SHAPE, and is drawn with the two its newer versions declare (`withShape`, Z1). */
+    /* A PAGE OF AN OLDER USE CASE DECLARES NO PART OF THE SHAPE, and is drawn with the two its newer versions declare (`withShape`). */
     const parted = reading ? withShape(drawn, (raw) => blockOf({ ...raw, parts: [...raw.parts], rows: [], matched: 0, refusals: [] } as never, new Map(), live?.now ?? 0)) : drawn;
     const shaped = reading ? onProject(parted, about?.register ?? '') : drawn;
     const repeats = about && !shapeKnown ? withoutRepeats(shaped, ['runs-on'], counted?.length ?? null, null) : about && shapeDrew.length > 0 ? withoutRepeats(shaped, shapeDrew, counted?.length ?? null, shapeRow) : shaped;
@@ -637,7 +637,7 @@
    * Every block drawn: the page's own, then the reader's note. NOT WHILE AN ARRANGEMENT IS IN FORCE, where a block added
    * in the mode takes the next place after the declared ones and the note is nothing a person can move or save.
    */
-  /* THE MODEL'S LINE ON A PROJECT'S LEAD (the thinking scope of 24 October, C4), which the hero says in place of its rules'
+  /* THE MODEL'S LINE ON A PROJECT'S LEAD (the thinking scope of 24 October), which the hero says in place of its rules'
      line: the declared lead is not drawn under the hero (`project-page.ts`), so the hero is where a kept line is read. */
   const modelLine = $derived(modelLineOf(live?.page.blocks ?? []));
   const all = $derived<LiveBlock[]>(arrangement.editing || arrangement.slots !== null ? own : [...own, ...feet]);
@@ -836,7 +836,7 @@
     <Waiting head={mode === 'page'} />
   {/if}
 {:else if got.from === 'refused'}
-  <!-- A REFUSAL IN A PERSON'S WORDS (U-A14): what happened and one Try again; the record's own sentence waits behind
+  <!-- A REFUSAL IN A PERSON'S WORDS: what happened and one Try again; the record's own sentence waits behind
        Read details. Offline says so, since the record's sentence about a read that never left is no help. -->
   {@const said = typeof navigator !== 'undefined' && navigator.onLine === false ? copy.errorPage.offline : copy.errorPage.broken}
   <div class="said">
@@ -900,7 +900,7 @@
              menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
         <!-- EDIT DETAILS IS THE ⋯ MENU'S FIRST ROW ON A PROJECT (proj F7, VERIFY H13): a button of its own made the phone
              head three controls wide, beside Share and the menu. -->
-        <!-- SHARE WITH PEOPLE IS SHARE'S FIRST CHOICE, for an owner or an Admin (sharing plan §3.1), so the head stays two. -->
+        <!-- SHARE WITH PEOPLE IS SHARE'S FIRST CHOICE, for an owner or an Admin, so the head stays two. -->
         <ShareMenu {slug} people={sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={copy.shareWithPeopleOpen} />
         {#if sharing && sharable}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
         <ChangePage
@@ -994,7 +994,7 @@
     <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
     {#await import('./SourceView.svelte') then { default: SourceView }}<SourceView {slug} title={live.page.page.title} />{/await}
   {:else}
-    <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, the parts its page declares (C28, C29); its other
+    <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, the parts its page declares; its other
          blocks follow. THE SHAPE'S CODE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a
          project's shape, so its first load does not carry one. While it is on its way the project waits in its own shape
          (`waiting`), and the page's other blocks wait on the shape's reads (`shapeWaits`). -->
@@ -1405,7 +1405,7 @@
     }
   }
 
-  /* A DECLARED HEAD'S LINE (PGS-A14): one row under the sentence that wraps on a phone. Flat, on the board: no tile,
+  /* A DECLARED HEAD'S LINE: one row under the sentence that wraps on a phone. Flat, on the board: no tile,
      no edge. A state is its mark and its words; late and needs-you take the deeper red, and the mark says it too. */
   .declared-head {
     display: flex;

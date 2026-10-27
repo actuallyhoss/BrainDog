@@ -1,5 +1,5 @@
 /**
- * A shop's name a card text cut short makes no organisation (the audit of 25 October, Y2).
+ * A shop's name a card text cut short makes no organisation.
  *
  * A CARD NETWORK PRINTS A SHOP IN A FIELD OF FIXED WIDTH, the processor's prefix included, and a text message prints
  * that field as it came: `FAWRY*` and a name cut at the twentieth character. The walk over the past met each such cut as

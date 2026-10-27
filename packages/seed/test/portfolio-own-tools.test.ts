@@ -1,5 +1,5 @@
 /**
- * A project page says nothing about what the project does not have (the Pinwheel picture, `loop/research-prepare-59.json`).
+ * A project page says nothing about what the project does not have (the Pinwheel picture).
  *
  * ITS PAGE LISTED THREE TOOLS THAT WERE NOT PINWHEEL'S. `runs_on` answers a project's own first and the ones that apply
  * everywhere after them, so a project with no tool of its own filled Tools and servers with three of everybody's. The

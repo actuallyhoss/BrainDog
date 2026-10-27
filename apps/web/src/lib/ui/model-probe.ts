@@ -1,5 +1,5 @@
 /**
- * "Test the model now", under Slash's health line in Settings then Agents (ENG-A08, health shown).
+ * "Test the model now", under Slash's health line in Settings then Agents (health shown).
  *
  * The health line says what the engine's own ledger last saw; this asks now. `engineProbe` asks each candidate of the
  * answer route the fixed prompt, the path a real ask takes, and answers one entry a candidate: whether it served,

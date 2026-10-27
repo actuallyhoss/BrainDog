@@ -260,7 +260,7 @@ export function symbolOf(currency: string): string | null {
 /**
  * THE SMALLEST AMOUNT A TILE SAYS IN WHOLE UNITS: ten thousand of the currency. Below it the fraction is a part of the
  * figure a person checks against a statement, and "£100" for £100.49 or "£1,000" for £999.50 was a different amount
- * (research audit 14-15a, M6). From ten thousand up the fraction is a rounding a glance does not miss.
+ * From ten thousand up the fraction is a rounding a glance does not miss.
  */
 const WHOLE_FROM = 10_000n;
 
@@ -351,7 +351,7 @@ function amountIn(currency: string, minus: string, whole: string, fraction = '')
  * a phone does not have and says nothing a round figure does not. A fraction that is not all zeros is part of the figure
  * and stays. A HEADLINE OF TEN THOUSAND OR MORE IS WHOLE UNITS: "EGP 1,086,213.41" over Today is
  * "EGP 1,086,213", with the piastres gone; "£999.50" stays "£999.50", since a smaller
- * amount rounded is a different amount (research audit M6). A bar asks for `figure`, which is never rounded. `true` is
+ * amount rounded is a different amount. A bar asks for `figure`, which is never rounded. `true` is
  * `headline` and `false` is `sentence`, as the callers that predate the settings pass them; a table cell asks for `exact`.
  */
 export function symbolText(text: string, home: string | null, setting: Setting | boolean = 'sentence'): string {

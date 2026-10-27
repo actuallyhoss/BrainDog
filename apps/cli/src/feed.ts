@@ -1,5 +1,5 @@
 /**
- * `braindog feed propose <file>`: a setup file of live feeds, each asked on Decide as the add-on it fills (REC-C01).
+ * `braindog feed propose <file>`: a setup file of live feeds, each asked on Decide as the add-on it fills.
  *
  * THE FILE IS A LIST OF FILLS IN THE FILL'S OWN SHAPE, the `FeedSpec` of `packs/live-feed/fill.ts` field for field:
  * `[{ "id": "oxbow-gg", "url": "https://oxbow.gg/api/stats", "every": "1d", "measures": [...] }, ...]`. So a person's

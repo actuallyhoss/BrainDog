@@ -67,7 +67,7 @@ export type Booted = { from: 'live'; boot: Boot } | ({ from: 'refused' } & Said)
  * What the record said instead of its `boot`: its code, its sentence, and where the refusal is about when it said.
  *
  * `at` IS KEPT because a screen branches on it and never on the sentence: `level.append` is a person at "Adds only",
- * and Home draws the one button that is hers under her sentence (USE-A11). Left off when the record sent none, so every
+ * and Home draws the one button that is hers under her sentence. Left off when the record sent none, so every
  * refusal that never carried one reads exactly as it did.
  */
 export type Said = { code: string; fix: string; at?: string };
@@ -259,7 +259,7 @@ export type Shell = ShellBase & {
 };
 
 /**
- * THE RECORD'S CLOCK (SF3): what time it is on the record, ticking on from the instant its `boot` said.
+ * THE RECORD'S CLOCK: what time it is on the record, ticking on from the instant its `boot` said.
  *
  * TWO CLOCKS SAID TWO DAYS. The list measured "late" from the record's `now` and a row's own page, the saved view and
  * Usage from the browser's, so one bill was 64 days late in the list and 111 on its page, and Usage offered October on a
@@ -553,7 +553,7 @@ let reach: Promise<Answer<SwitcherRow[]>> | null = null;
 let reached: Answer<SwitcherRow[]> | null = null;
 
 /**
- * Ask for the account's records once for the tab, and the answer. NEVER WAITED ON BEFORE THE FIRST PAINT (EXP-D03): the
+ * Ask for the account's records once for the tab, and the answer. NEVER WAITED ON BEFORE THE FIRST PAINT: the
  * rail reads it once it lands, and only a screen that lists the records waits for it.
  */
 export function recordsReach(io: Fetch, origin: string, after: Promise<void> | null = null): Promise<Answer<SwitcherRow[]>> {
@@ -1011,7 +1011,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
      keeps the page, as above. */
   const rows = new Map(b.registers.map((r) => [r.id, r.count]));
   const named = new Map(b.registers.map((r) => [r.name.trim().toLowerCase(), r.id]));
-  /* AND A PAGE THAT NAMES ITS PLACE ON THE RAIL (`nav.place`) NEVER WAITS (the audit of 22 October, U-C2). On day one
+  /* AND A PAGE THAT NAMES ITS PLACE ON THE RAIL (`nav.place`) NEVER WAITS. On day one
      every list is empty, so every place a person asked for (Money, Projects, Agents) waited, and their first Today drew
      Today, Needs you and People and nothing they had named. A place opens on its first entry; only a side page waits. */
   const waiting = (p: NonNullable<Boot['pages']>[number]) => {

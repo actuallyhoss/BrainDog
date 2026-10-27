@@ -10,7 +10,7 @@ import { appSaid, folderSaid, heardSaid, idleSaid, lastSaid, looksSaid, openNow,
 import { LIVE_WORDS, type WorkingRow } from './desk.ts';
 
 /**
- * THE ROWS AS `presence` SAYS THEM (agents and MCP plan §4.4, §7.2; the pass of 27 October), over the rows `boot` drew at
+ * THE ROWS AS `presence` SAYS THEM (agents and MCP plan §4.4, §7.2), over the rows `boot` drew at
  * the first paint: each run that wrote, asked or said what it does and was heard inside the hour (`openNow`), named by
  * its app with where it works beside it ("Claude Code", Lanternfish or the Developer folder), the last thing it did under it
  * ("Asked you: …", "Wrote 3 changes"), and when it was last heard; what he told it that it holds, and whether he paused

@@ -1,5 +1,5 @@
 /**
- * The door prints the record's card and composes none (AGT-B07, jobs 3 and 4): "the same card from context".
+ * The door prints the record's card and composes none (jobs 3 and 4): "the same card from context".
  *
  * A BRIEFING WITH A CARD IS THAT CARD, BYTE FOR BYTE, then the lines that are not a card (open work, the Home page,
  * the habits). A BRIEFING WITH NONE, from a host too old to send one, is one line naming the record and the call that

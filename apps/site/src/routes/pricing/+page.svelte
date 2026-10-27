@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Pricing. WHILE BILLING IS OFF it is the one-plan early access page (D2, 20 October, `copy/pricing.ts` `early`):
+   * Pricing. WHILE BILLING IS OFF it is the one-plan early access page (20 October, `copy/pricing.ts` `early`):
    * the night head, the early access card on the night with its $0 and what it holds, a paper tile that says paid
    * plans come later, three questions, and no close. No paid plan's name or price is drawn.
    *

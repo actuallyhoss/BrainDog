@@ -247,7 +247,7 @@ export function linesNearest(plan: Pick<LinesPlan, 'points'>, fraction: number):
   return Math.max(0, Math.min(n - 1, Math.round(fraction * (n - 1))));
 }
 
-/** A reading older than this many days says how old it is beside the lead (the audit of 22 October, U6). */
+/** A reading older than this many days says how old it is beside the lead. */
 export const LINES_OLD_DAYS = 7;
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -269,8 +269,7 @@ function labelDay(label: string, now: number): number | null {
 /**
  * HOW OLD THE LEAD IS, WHEN IT IS OLD: "Last reading 27 Sep, 26 days ago" once the newest point of the first current
  * line is more than `LINES_OLD_DAYS` days before `now`, and '' while it is fresh, when no clock is given, or when the
- * point is no day (a month's bucket). A chart whose line stopped weeks ago drew its last figure as today's (the audit of
- * 22 October, U-B4), with only the page's foot saying when numbers last arrived.
+ * point is no day (a month's bucket). A chart whose line stopped weeks ago drew its last figure as today's, with only the page's foot saying when numbers last arrived.
  */
 export function linesAge(plan: Pick<LinesPlan, 'last'>, now?: number): string {
   if (now === undefined || plan.last === '') return '';

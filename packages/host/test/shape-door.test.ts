@@ -1,5 +1,5 @@
 /**
- * The shape door, `POST /api/shape` (PRF-A13): a shape grant's bearer takes a scrambled copy, and nothing else does.
+ * The shape door, `POST /api/shape`: a shape grant's bearer takes a scrambled copy, and nothing else does.
  *
  * OVER A REAL RECORD. The door is handed the record's own `shapeExport` from `methods/shape.ts`, as a host wires it,
  * and the grant is asked for, approved and exchanged through the record's device methods, so a pass here is the door,

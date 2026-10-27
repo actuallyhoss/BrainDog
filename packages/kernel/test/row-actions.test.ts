@@ -1,5 +1,5 @@
 /**
- * The verbs a page may name on a block and on each row (PGS-A12): the table, the check an install and a read share, and
+ * The verbs a page may name on a block and on each row: the table, the check an install and a read share, and
  * the cut that sends a reader only what they may press. Invented lists and fields throughout.
  */
 

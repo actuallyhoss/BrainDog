@@ -35,7 +35,7 @@ type Block = {
 export const PLAN_BY_DATE = 'Plan by date';
 
 /**
- * THE MODEL'S LINE ON A PROJECT'S LEAD (the thinking scope of 24 October, C4), which the hero says in place of its rules'
+ * THE MODEL'S LINE ON A PROJECT'S LEAD (the thinking scope of 24 October), which the hero says in place of its rules'
  * line (`ProjectPart.svelte`): the lead note the record sent with the line it kept (`modelLine`, `page-live.ts`), drawn,
  * with words in it. `null` where the rules speak: no lead, a lead the rules wrote, or one not drawn.
  */
@@ -45,8 +45,8 @@ export function modelLineOf(blocks: readonly { kind: string; lead?: unknown; dra
 }
 
 /**
- * THE PROJECT'S SHAPE WHERE ITS PAGE DECLARES NONE (the audit of 25 October, Z1). The shape's parts became blocks of the
- * project's page in founder 3.3.0 and team 2.25.0 (C28, C29), and a record still on an older version, whose page declares
+ * THE PROJECT'S SHAPE WHERE ITS PAGE DECLARES NONE. The shape's parts became blocks of the
+ * project's page in founder 3.3.0 and team 2.25.0, and a record still on an older version, whose page declares
  * no `project` block, drew a project's page with no name, no hero and nothing of its work: blank on a phone. Such a page
  * is drawn with the blocks the current versions declare (three since founder 3.7.0 and team 2.28.0), in their order. AFTER THE DECLARED BLOCKS, so every index a write finds a block by is the block's own; the shape's parts are
  * drawn over both columns before the rest wherever they are (`PageBody.svelte` `shapeParts`).

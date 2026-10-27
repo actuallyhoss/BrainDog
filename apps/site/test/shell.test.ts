@@ -110,7 +110,7 @@ test('PageHead draws one h1 and its lead', async () => {
   assert.ok(head.includes('Every plan has the whole app.'));
 });
 
-test('the header row is Slash, Agents, Pricing, Security and Docs (site F12)', () => {
+test('the header row is Slash, Agents, Pricing, Security and Docs', () => {
   const row = reachable({ public: false }).filter((p) => p.header);
   assert.deepEqual(row.map((p) => p.label), ['Slash', 'Agents', 'Pricing', 'Security', 'Docs']);
   assert.deepEqual(row.map((p) => p.path), ['/slash', '/agents', '/pricing', '/security', '/docs']);
@@ -138,13 +138,13 @@ test('the footer names GitHub only with LAUNCH.repo, and Terms and Privacy only 
   assert.ok(legal.includes('Terms') && legal.includes('Privacy'), 'the live texts are not in the footer');
 });
 
-test("the footer is Product, Who it's for and Help, plain links and no blurb (site F10)", () => {
+test("the footer is Product, Who it's for and Help, plain links and no blurb", () => {
   const groups = footerGroups({ ...LAUNCH, legal: false, repo: false });
   assert.deepEqual(
     groups.map((g) => [g.title, g.links.map((l) => l.label)]),
     [
       ['Product', ['Slash', 'Agents', 'Pricing', 'Security']],
-      /* NO TEAMS WHILE INVITING PEOPLE IS HELD (U-C5): its page answers 404, so the footer draws no link to it. */
+      /* NO TEAMS WHILE INVITING PEOPLE IS HELD: its page answers 404, so the footer draws no link to it. */
       ["Who it's for", ['Small businesses', 'Developers']],
       ['Help', ['Docs', 'Support', 'Legal']],
     ],

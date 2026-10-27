@@ -22,7 +22,7 @@ test('Appearance says the look is kept per record, and where it waits when the r
   assert.match(src, /pref\.whereKept\(\)/u);
 });
 
-test('NOTIFICATIONS SENDS THE RULES THAT TELL YOU TO AUTOMATIONS (U-C7), says no digest, and reads no rule to settle', () => {
+test('NOTIFICATIONS SENDS THE RULES THAT TELL YOU TO AUTOMATIONS, says no digest, and reads no rule to settle', () => {
   const src = area('Notifications');
   assert.doesNotMatch(wordsOf(src), /digest/u, 'a muted rule is still said to leave a digest that carries no rule notices');
   assert.match(src, /<Button weight="quiet" href="\/automations">\{words\.openRules\}<\/Button>/u);

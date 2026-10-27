@@ -265,7 +265,7 @@ test('context HANDS WHAT WAS LEARNED IN THE SAME ORDER, so the twenty a place it
   /* A method written first and never touched again, then twenty-two facts: by the day last changed it would be cut. */
   await learn(r, NOW - 30 * DAY, 'Run the proof before the release.', 'method', false);
   for (let i = 0; i < 22; i++) await learn(r, NOW - 20 * DAY + i * MIN, `Fact number ${String(i)} of the order test.`, 'fact', false);
-  /* FIVE IN THE BRIEF ANSWER AND TWENTY IN THE FULL ONE (AGT-B09), each the ones the read leads with. */
+  /* FIVE IN THE BRIEF ANSWER AND TWENTY IN THE FULL ONE, each the ones the read leads with. */
   for (const [format, n] of [['brief', 5], ['full', 20]] as const) {
     const told = value<{ registers: { id: string; inherited: { lesson?: unknown }[] }[] }>(
       await r.api.context({}, format === 'full' ? ({ ...owner, session: { ...(owner as { session?: object }).session, format } } as typeof owner) : owner),

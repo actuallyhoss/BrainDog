@@ -219,7 +219,7 @@ export const words = {
   /* The usage page. */
   usage: 'Usage',
   /* WHAT A DRAW FAULT'S DETAILS SAY, in words and never the thrown message, which named a field or a line of code to a
-     person who can do nothing with either (audit 34). The first is an answer missing a part, the second the page itself. */
+     person who can do nothing with either. The first is an answer missing a part, the second the page itself. */
   usageShape: "This month's answer was missing a part this page needs, so the page stopped before drawing it.",
   usageThrew: "A part of this page stopped while drawing the month. The fault is in BrainDog, not in the record.",
   byProject: 'By project',
@@ -245,7 +245,7 @@ export const words = {
   meterFull: (resets: string) => `Used up. Actions wait until ${resets}.`,
   meterPast: (share: string) => `${share} of the month's allowance.`,
   binding: (noun: string) => `The limit this record is nearest is its ${noun}.`,
-  /* UNDER AN HOUR IN MINUTES (audit 25 October, X22): "0 hours of 50 hours" stood beside "<1%" on a month that ran. */
+  /* UNDER AN HOUR IN MINUTES: "0 hours of 50 hours" stood beside "<1%" on a month that ran. */
   hours: (n: number) =>
     n > 0 && n * 60 < 1
       ? 'under a minute'
@@ -263,7 +263,7 @@ export const words = {
   /* SLASH IN THE LEDGER'S OWN TERMS: asks and the neurons the model spent on them, and an allowance only when the answer
      carries one. It said "credits left" out of `included` and `packs`, two keys the Directory never sent. `when` is
      "this month" or "in September". A NEURON IS THE HOST'S UNIT AND NOBODY'S WORD, so it is said as the units of work the
-     model did (audit 34). */
+     model did. */
   slashLine: (asks: number, neurons: number, cap: number | null, when: string) =>
     asks === 0
       ? `Slash was not asked anything ${when}${cap !== null ? `, of the ${cap.toLocaleString('en-GB')} asks a month allows` : ''}.`
@@ -480,7 +480,7 @@ export type UsageView = {
   fired?: number;
   /**
    * The month the earliest record in the view was made, `YYYY-MM`, so the switcher offers no month from before it
-   * (audit 25 October, X22: "August" on a record made in September). `null` where the host does not say.
+   * ("August" on a record made in September). `null` where the host does not say.
    */
   since?: string | null;
 };

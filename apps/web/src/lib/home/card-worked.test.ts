@@ -1,5 +1,5 @@
 /**
- * A project card's who and when from the record's one figure (the audit of 25 October, Z7): Projects said "Worked on 4
+ * A project card's who and when from the record's one figure: Projects said "Worked on 4
  * days ago" of a project Today said "Claude worked on it 20 minutes ago" of, because Projects read the tasks and Today the
  * runs. Both read `project-worked` now, which reads them together, and draw it through `withWorked` and `lifeOf`.
  */

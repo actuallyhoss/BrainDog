@@ -11,13 +11,13 @@ import { plant } from './plant.mjs';
 import { mark, openFor, reach, SHAPES, UNFOLD } from './shared.mjs';
 
 /**
- * AND WITH A PANEL DOCKED BESIDE THE WORK, which no pass above ever opened (research-audit-16 L12).
+ * AND WITH A PANEL DOCKED BESIDE THE WORK, which no pass above ever opened.
  *
  * The docked right panel takes a column of its own from 1,280 up, and every screen that opens a task or a
  * row narrows beside it. Every pass above measures a screen at rest, so the three things that go wrong only while a
  * panel is open swept green: the work squeezed under the panel or scrolling sideways beside it, blocks paired into
- * halves by the window's width when the panel has taken a third of it (H2), and the column opening in one frame while
- * the panel takes a quarter of a second to arrive, so a strip of bare ground shows where it will be (M1).
+ * halves by the window's width when the panel has taken a third of it, and the column opening in one frame while
+ * the panel takes a quarter of a second to arrive, so a strip of bare ground shows where it will be.
  *
  * AT 1,280, 1,440 AND 1,728 (`dockedAtPx`): where the panel first docks, where blocks begin to pair, and the owner's
  * wide laptop. On all three shapes, because the panel's column is a track of each shape's own grid.
@@ -99,7 +99,7 @@ const PAIRED = () => {
 
 export async function dock(run, { at: dockAt, seeds: dockSeeds }) {
   const { findings, budgets: B } = run;
-  /* UNDER THE SEEDS, ONE PAGE WITH THE PANEL OPEN PER SEED, AND NOT NONE (research-audit-16 L12: this pass skipped the
+  /* UNDER THE SEEDS, ONE PAGE WITH THE PANEL OPEN PER SEED, AND NOT NONE (this pass skipped the
      seed, so `self-test` had never once asked it to go red). The first width, the rail and Work: the seeded heading is
      2000px wide, so it reaches under the panel at every width on every shape, and `self-test` holds the run to naming
      that; the panel hidden before the press is a panel that never arrives. In the first part only, like every width no

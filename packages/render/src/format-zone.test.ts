@@ -1,5 +1,5 @@
 /**
- * The reader's own day, and money by its digits (PGS-B04).
+ * The reader's own day, and money by its digits.
  *
  * "Today" was counted from midnight UTC, so between midnight and two or three in the morning in Cairo a deadline
  * named the day before. And money divided by a power of ten into a float, which keeps sixteen digits, so a figure

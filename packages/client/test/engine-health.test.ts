@@ -1,5 +1,5 @@
 /**
- * `client.engineHealth` ASKS THE RECORD WHETHER THE ENGINE'S MODEL ANSWERS (ENG-A02), as a read of the method
+ * `client.engineHealth` ASKS THE RECORD WHETHER THE ENGINE'S MODEL ANSWERS, as a read of the method
  * `engineHealth`, and hands back the record's answer: the state from the engine's own ledger and the one sentence a
  * person reads about it, or `null` from a host that hands the record no engine.
  *

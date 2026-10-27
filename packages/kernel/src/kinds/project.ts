@@ -1,5 +1,5 @@
 /**
- * `project`: parts of a project's own shape on the page about its row (C28, C29, 24 October): its hero, its path and
+ * `project`: parts of a project's own shape on the page about its row (24 October): its hero, its path and
  * its money, its work and who is on it, what it runs on and the agents on it.
  *
  * THE PAGE DECLARES THE PARTS, the host draws them. They were drawn by hand above the declared blocks of every

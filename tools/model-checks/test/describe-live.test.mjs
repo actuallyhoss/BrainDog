@@ -1,5 +1,5 @@
 /**
- * The live run of the seventeen descriptions, held without a model (ENG-B11): `describe-live.mjs` asks each description
+ * The live run of the seventeen descriptions, held without a model: `describe-live.mjs` asks each description
  * through a host's own door on a fresh record, as the Slash page asks, and counts what drew clean on the first ask apart
  * from what drew clean only after a repair. The host here is a stub host, the shipped record and door over the stub model
  * of `packages/record/eval/stub.ts`, and the provider in the last two tests is stood up on localhost, so no test spends
@@ -88,7 +88,7 @@ test('there are seventeen descriptions, and the four before the last ask for wha
   }
 });
 
-test("THE TRUNK BAR BY DESCRIBING IT: three sentences in his words that ask for the six parts, and a good answer has all six (C36)", () => {
+test("THE TRUNK BAR BY DESCRIBING IT: three sentences in his words that ask for the six parts, and a good answer has all six", () => {
   const c = CASES.find((x) => x.n === 17);
   assert.ok(c?.parts, 'the seventeenth names its parts');
   assert.equal(sentences(c.asked).length, 3);
@@ -124,12 +124,12 @@ test('with a stub host, seventeen are asked through the door, and a first ask is
     assert.ok(c.drew.includes('capture') && c.drew.some((k) => CHARTS.includes(k)), `description ${c.n} drew ${c.drew.join(', ')}`);
     assert.equal(c.built.join(','), 'register,metric,metric,page,rule', `description ${c.n}`);
   }
-  /* AND THE TRUNK DREW CLEAN WITH ALL SIX PARTS, so the record can hold that page from one ask (C36). */
+  /* AND THE TRUNK DREW CLEAN WITH ALL SIX PARTS, so the record can hold that page from one ask. */
   const trunk = r.cases.find((c) => c.n === 17);
   assert.equal(trunk.clean, 'first');
   assert.equal(trunk.parts.drew.length, 6, trunk.parts.missing.join(', '));
   assert.ok(['note', 'queue', 'cards', 'steps', 'capture', 'inputs'].every((k) => trunk.drew.includes(k)), trunk.drew.join(', '));
-  /* THREE PAGES FROM ONE ASK, KEPT AS ONE DRAFT (C37): the desk, a page for each part, and the price check. */
+  /* THREE PAGES FROM ONE ASK, KEPT AS ONE DRAFT: the desk, a page for each part, and the price check. */
   assert.equal(trunk.built.filter((k) => k === 'page').length, 3, trunk.built.join(', '));
   assert.equal(trunk.kept, 1);
   /* A STUB IS NEVER A MEASUREMENT OF A MODEL, whatever it scored. */

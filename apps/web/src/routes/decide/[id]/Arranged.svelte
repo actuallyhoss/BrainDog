@@ -40,7 +40,7 @@
   {#if compact}
     <p class="arr-summary">{arranged.summary ? copy.arrangeLeadSummary(arranged.lead, arranged.summary) : arranged.lead}</p>
   {:else}
-    <!-- ON ITS OWN PAGE, ONE SENTENCE for the whole change, and the parts under it (scope E37). -->
+    <!-- ON ITS OWN PAGE, ONE SENTENCE for the whole change, and the parts under it. -->
     <p class="arr-lead">{arranged.said ?? arranged.lead}</p>
   {/if}
   {#if picking && ticks}
@@ -184,7 +184,7 @@
         {@const said = p.appears.map(appearsSaid)}
         <section class="arr-part" aria-label={copy.proposalWillAppear}>
           <h3 class="arr-h">{copy.proposalWillAppear}</h3>
-          <!-- WHAT CAN BE SAID IN A SENTENCE IS (scope E37); a page drawn, a look's colour or a list's lines stay the preview's. -->
+          <!-- WHAT CAN BE SAID IN A SENTENCE IS; a page drawn, a look's colour or a list's lines stay the preview's. -->
           {#if said.some((x) => x !== null)}
             <ul class="arr-lines arr-said">
               {#each said.flatMap((x) => x ?? []) as line, i (i)}<li>{line}</li>{/each}

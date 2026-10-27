@@ -1,5 +1,5 @@
 /**
- * `setup`, the one call that makes a record from what a person accepted (USE-B04): routed as an ADMIN write and handed
+ * `setup`, the one call that makes a record from what a person accepted: routed as an ADMIN write and handed
  * to the record method of its name with the body as sent and the caller as the host knew them. The record says who may
  * (the owner, in a browser), so the host passes its refusal on with its status and decides nothing itself.
  *

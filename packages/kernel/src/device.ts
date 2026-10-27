@@ -22,7 +22,7 @@ import { DEFAULT_DAYS, createToken, endedByCutOff, revokeToken, type TokenDeps }
 /**
  * `device_grant.reach`, as migration 33's CHECK has it.
  *
- * `shape` IS A STANDING GRANT FOR SHAPE COPIES (PRF-A13): approved once with six digits, it lives as a runner's does and
+ * `shape` IS A STANDING GRANT FOR SHAPE COPIES: approved once with six digits, it lives as a runner's does and
  * is not spent on use, so the loop on the owner's machine takes a scrambled copy of the record with no prompt. It opens
  * that and nothing else: its bearer is held on this table alone, so `verifyToken` never finds it, and `keychainGrant`,
  * `operationGrant` and the runner's check each match their own reach. `shapeGrant` is its one reader.

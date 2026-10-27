@@ -190,7 +190,7 @@
     }
   }
 
-  /* AND WHERE A CARD HAS A MENU, UNDER A FINGER TOO (audit B of 25 October, Y8): the menu's Move to is the touch path
+  /* AND WHERE A CARD HAS A MENU, UNDER A FINGER TOO: the menu's Move to is the touch path
      there, so a select under every card was a second menu on each, said in the lane's own name. Kept in the tree as
      above, for the tab stop and a screen reader. */
   .grid[data-menu] .board-move:not(:focus-visible) {
@@ -240,7 +240,7 @@
       row-gap: var(--sp-5);
     }
 
-    /* ONE LANE AT A TIME, WHERE THE BOARD HAS A SWITCH (audit B of 25 October, Y8): every lane stacked was one list of
+    /* ONE LANE AT A TIME, WHERE THE BOARD HAS A SWITCH: every lane stacked was one list of
        15,000 px on his phone. The switch is a row of the lanes' names and counts that scrolls sideways inside itself
        when they outrun the width, each a 44px press; the pressed one wears the control's fill. */
     .block[data-kind='board'] .board-lanes {

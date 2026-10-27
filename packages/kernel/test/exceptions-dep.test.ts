@@ -1,5 +1,5 @@
 /**
- * What went quiet, handed to a page through the record's own deps (`PageDeps.exceptions`, ENG-B13).
+ * What went quiet, handed to a page through the record's own deps (`PageDeps.exceptions`).
  *
  * `exceptions-source.test.ts` holds the source to its columns and its refusals. This file holds the wire: a record
  * opened the ordinary way hands `openExceptions` to every page it draws, so a block over `exceptions` on any page

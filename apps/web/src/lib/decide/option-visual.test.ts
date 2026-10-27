@@ -114,7 +114,7 @@ test('a change to many rows draws what it moves them to, and new rows draw by na
   assert.equal(visualOf(ask({ rows_said: { list: 'Keys', rows: 40, adds: [], more: 0, moves: [] } }), { key: 'accept' }, { now }), null);
 });
 
-/* THE KINDS HIS OPEN CARDS DREW BARE (the look of 24 October, C20): an option's own patches, a bank's tail, and a note. */
+/* THE KINDS HIS OPEN CARDS DREW BARE (the look of 24 October): an option's own patches, a bank's tail, and a note. */
 
 test('AN OPTION THAT PATCHES ROWS ITSELF DRAWS WHAT IT MOVES THEM TO, and one that leaves them draws nothing', () => {
   const q = ask({ kind: 'options' });

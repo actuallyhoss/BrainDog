@@ -34,7 +34,7 @@ export type Outcomes = {
   slash: KindOutcome[];
   folds: { made: number; undone: number } | null;
   outside: number | null;
-  /** How Slash's offers were graded (ENG-B17): the predictions that came due (`scored`) and how many did what they said. */
+  /** How Slash's offers were graded: the predictions that came due (`scored`) and how many did what they said. */
   predictions?: { scored: number; met: number };
 };
 
@@ -154,7 +154,7 @@ export function outcomeLines(readings: Outcomes | null | undefined): OutcomeLine
   const out = readings.outside;
   if (out !== null && out > 0) lines.push({ key: 'outside', text: words.outside(out), bad: words.bad });
   else if (out === 0 && lines.length > 0) lines.push({ key: 'outside', text: words.clean });
-  /* THE GRADED SUGGESTIONS (ENG-B17), beside the brake: "Of 4 suggestions graded, 3 did what they said." */
+  /* THE GRADED SUGGESTIONS, beside the brake: "Of 4 suggestions graded, 3 did what they said." */
   const p = readings.predictions;
   if (p && p.scored > 0) {
     const one = p.scored === 1;

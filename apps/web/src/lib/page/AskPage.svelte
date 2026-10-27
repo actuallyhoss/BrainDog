@@ -6,7 +6,7 @@
   same reader every declared page goes through (`PageView mode="preview"`). Only then does a press file it: "Keep it"
   files it and accepts it in one go, "Ask in Needs you" files it for later, and "Throw away" drops it unfiled. "Try again"
   asks the same words once more with the draft shown handed back as turned down, so Slash drafts another way; the one
-  turned down is dropped unfiled, and the record leaves it out if it comes back (C34).
+  turned down is dropped unfiled, and the record leaves it out if it comes back.
 
   ONE COMPONENT FOR BOTH PLACES A DESCRIPTION IS TYPED. With `page` it is the sheet a page's head opens, about that
   page; without it it is the Slash screen's describe field, about the whole BrainDog. The drafts are drawn the same

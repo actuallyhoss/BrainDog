@@ -24,7 +24,7 @@
   asked (`in-place.ts`): Enter accepts, a six-second Undo follows, and Needs you is only its second action. Left
   unanswered, it waits on Decide, where the record filed it.
 
-  A MODEL THAT DOES NOT ANSWER IS SAID ABOVE THE ASK TILE (ENG-A02): the record's `engineHealth` sentence, "Slash's
+  A MODEL THAT DOES NOT ANSWER IS SAID ABOVE THE ASK TILE: the record's `engineHealth` sentence, "Slash's
   model has not answered since 6 October. That is ours to fix. Until it is back, BrainDog works from its rules." Its
   first sentence in the deeper red, in words. Answering, or a build without the read, says nothing here.
 
@@ -168,7 +168,7 @@
   }
 
   /**
-   * WHAT CAME OF ITS SUGGESTIONS (ENG-B01, ENG-A16 seen): read from `engineReadings`, the record asked whatever the shell says, and the tile
+   * WHAT CAME OF ITS SUGGESTIONS (ENG-A16 seen): read from `engineReadings`, the record asked whatever the shell says, and the tile
    * (`SlashOutcomes.svelte`) fetched by `import()` only once the read has lines, so a record with nothing to say, an old
    * host and a refusal load nothing more.
    */
@@ -203,7 +203,7 @@
   );
 
   /**
-   * THE ONE DECISION CARD, WHERE HE ASKED (ENG-B16): an answer that proposes a change draws the
+   * THE ONE DECISION CARD, WHERE HE ASKED: an answer that proposes a change draws the
    * palette's own card (`in-place.ts` `cardInPlace`, through `filedCard`) under the Ask field. Enter in the field accepts
    * it while the field still holds its question, a six-second Undo follows on its line, and once answered it reads
    * "Slash suggested · Mara accepted". The record filed it when it answered, so a card left unanswered, by asking again or

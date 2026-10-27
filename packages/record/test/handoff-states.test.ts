@@ -1,5 +1,5 @@
 /**
- * The states a run hands itself into (AGT-C04, the record's line): `handoff` takes exactly idle, handoff and done, from
+ * The states a run hands itself into (the record's line): `handoff` takes exactly idle, handoff and done, from
  * one exported constant the agent door's tool reads too. `active` is refused with why and with the same call without
  * it, and a refused call opens no run.
  */

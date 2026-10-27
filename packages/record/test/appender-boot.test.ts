@@ -1,5 +1,5 @@
 /**
- * What a person at "Adds only" is told when the app's first read is refused (USE-A11).
+ * What a person at "Adds only" is told when the app's first read is refused.
  *
  * The sentence every level gets ends "Ask an owner to raise your access.", which at `append` asks the owner to undo his
  * own invitation. Hers says what she can do and where, and carries `at: 'level.append'` so Home can draw the one button

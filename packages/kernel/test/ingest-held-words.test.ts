@@ -1,5 +1,5 @@
 /**
- * Every reason the kernel writes on an arrival it holds is words a person reads (REC-A03).
+ * Every reason the kernel writes on an arrival it holds is words a person reads.
  *
  * THE REASON NAMED THE PATTERN BY ITS ID. "bank-from-out could not read account, on out of this one" was what the
  * owner's Inbox said under his own bank texts: a handle nobody chose for him to read, and two field ids joined by a

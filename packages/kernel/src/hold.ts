@@ -1,5 +1,5 @@
 /**
- * The seven-day hold (PRF-A18, scope section 2.7): how many days in a row, ending yesterday, every hold sign on this
+ * The seven-day hold (scope section 2.7): how many days in a row, ending yesterday, every hold sign on this
  * record read green, and the operator's hand marks that end such a run.
  *
  * WHY THIS EXISTS. "and his record's vital signs have stayed green for seven days running". Before this, the
@@ -24,7 +24,7 @@ import type { Sql } from '@braindog/ports';
 
 import { dayIn } from './finished.ts';
 
-/** The ten hold signs: the nine of scope 2.2 and `arrived` (PRF-A20). Never the automation signs of `signs-flow.ts`. */
+/** The ten hold signs: the nine of scope 2.2 and `arrived`. Never the automation signs of `signs-flow.ts`. */
 export const HOLD_SIGNS = [
   'arrivals-filed',
   'doors-silent',

@@ -140,7 +140,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     version,
     /* THE LISTS THE RECORD HOLDS, so an update keeps a list the older version declared (`useCaseDocument`), and none of
        the use case's example rows. */
-    /* AND CUT TO THEM (`fitted`, USE-B08): a use case that says `needs` goes in with only what it stands on (`modules`
+    /* AND CUT TO THEM (`fitted`): a use case that says `needs` goes in with only what it stands on (`modules`
        above), so a page or a link over a module it does not stand on goes in without that list, as `usecase` installs a
        file, rather than refusing the arrangement REGISTER_UNRESOLVED. A record that holds every list reads the whole. */
     doc: ({ holds }) => {

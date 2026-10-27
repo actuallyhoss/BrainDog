@@ -207,7 +207,7 @@ test('THE TITLE IS THE BUSINESS FIRST, in the words heard, and none where nothin
   assert.equal(title("I'm Ana and I have a design business"), "Ana's Design Business");
   assert.equal(title("I'm Ana and I run a business"), null, 'a business alone says nothing of which one');
   assert.equal(title('Sami, I run Kiln Studio and we bill Fenwick'), 'Kiln Studio', 'a project named is the business');
-  /* A TRADE WITH NO NAME IS THE RECORD'S NAME, in sentence case (audit C, X2): it was null, and the record was then
+  /* A TRADE WITH NO NAME IS THE RECORD'S NAME, in sentence case: it was null, and the record was then
      named for the email's local part, "mariam", although "a small ceramics studio" was heard. */
   assert.equal(title('I run a small candle shop'), 'Candle shop', 'a trade with no name heard is named as it was said');
   assert.equal(title("I'm a student"), null);
@@ -353,7 +353,7 @@ test("A MODEL'S READING TAKES THE DEVICE'S CURRENCY THE SAME WAY, and the rules'
   assert.equal(none.currency, null, 'nothing the model kept holds money');
 });
 
-/* ── finding 3 of the audit of batches 49 and 50: what the heard lines say ── */
+/* ── what the heard lines say ── */
 
 const linesOf = (p: { heard: { phrase: string; became: string }[] }): string[] => p.heard.map((h) => `${h.phrase} > ${h.became}`);
 
@@ -434,7 +434,7 @@ test('A REFUSAL IS CARRIED ACROSS "OR", "AND" AND COMMAS, and past had, longer, 
 test('A REFUSAL IS READ THROUGH WANT, NEED, TRACK, SEND, TAKE, KEEP, USE AND CHASE', () => {
   const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
 
-  /* THE SENTENCES THE AUDIT OF BATCH 54 TYPED AS A STRANGER. */
+  /* THE SENTENCES TYPED AS A STRANGER. */
   const tasks = propose('I do not want to track taxes or orders, just my tasks', CAIRO);
   assert.deepEqual(linesOf(tasks), ['tasks > Work']);
   assert.ok(!tasks.modules.includes('money-core') && !tasks.modules.includes('portfolio') && tasks.usecase !== 'shop', 'neither taxes nor orders turned a part on');
@@ -471,7 +471,7 @@ test('A REFUSAL IS READ THROUGH THE "-ING" OF A VERB: no more tracking of orders
   const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
   const shop = (p: ReturnType<typeof propose>): boolean => p.usecase === 'shop' || p.also.includes('shop') || p.places.some((x) => x.name === 'Orders');
 
-  /* THE SENTENCE THE AUDIT OF BATCH 56 TYPED AS A STRANGER. */
+  /* THE SENTENCE TYPED AS A STRANGER. */
   const tasks = propose('No more tracking of orders, just tasks', CAIRO);
   assert.deepEqual(linesOf(tasks), ['tasks > Work']);
   assert.ok(!shop(tasks) && !tasks.modules.includes('money-core'), 'the orders turned no part on');
@@ -520,7 +520,7 @@ test('A WORD OF HAVING STOPPED REFUSES ONLY A THING THAT ENDS THE CLAUSE, and ne
   const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
   const shop = (p: ReturnType<typeof propose>): boolean => p.usecase === 'shop' || p.also.includes('shop') || p.places.some((x) => x.name === 'Orders');
 
-  /* THE TWO SENTENCES THE AUDIT OF BATCH 60 TYPED AS A STRANGER: both keep Orders. */
+  /* THE TWO SENTENCES TYPED AS A STRANGER: both keep Orders. */
   for (const s of ['I stopped keeping orders on paper and now track them here', 'I never stopped taking orders', 'I stopped guessing and started tracking orders']) {
     const p = propose(s, CAIRO);
     assert.ok(lit(p, /orders/iu) && shop(p), s);
@@ -603,7 +603,7 @@ test('A WORD OF HAVING STOPPED REFUSES ONLY A THING THAT ENDS THE CLAUSE, and ne
   }
 });
 
-test('WHAT THE AUDIT OF BATCH 61 TYPED AS A STRANGER: used to, no longer, my old things, a run decided whole, a denial through a word of thinking', () => {
+test('WHAT TYPED AS A STRANGER: used to, no longer, my old things, a run decided whole, a denial through a word of thinking', () => {
   const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
   const shop = (p: ReturnType<typeof propose>): boolean => p.usecase === 'shop' || p.also.includes('shop') || p.places.some((x) => x.name === 'Orders' || x.name === 'Products');
 
@@ -660,7 +660,7 @@ test('WHAT THE AUDIT OF BATCH 61 TYPED AS A STRANGER: used to, no longer, my old
   }
 });
 
-test('WHAT THE AUDIT OF BATCH 63 TYPED AS A STRANGER: a "used to" taken up again carries on, and a stopping that says when it happened stops', () => {
+test('WHAT TYPED AS A STRANGER: a "used to" taken up again carries on, and a stopping that says when it happened stops', () => {
   const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
   const orders = (p: ReturnType<typeof propose>): boolean => p.places.some((x) => x.name === 'Orders');
 
@@ -854,7 +854,7 @@ test('A THING NEVER DONE OR ONLY WISHED FOR IS NOT HEARD: "I never ran a shop", 
   };
   const kept = (s: string, word: RegExp): void => assert.ok(lit(propose(s, CAIRO), word), s);
 
-  /* THE FOUR SENTENCES OF THE AUDIT OF BATCH 69, word for word. */
+  /* THE FOUR SENTENCES, word for word. */
   none('I never ran a shop', /shop/iu);
   none('I wish I had a shop', /shop/iu);
   none('I used to love taking orders', /orders/iu);
@@ -1052,7 +1052,7 @@ test('A NEVER THAT THE CLAUSE TAKES BACK REFUSES NOTHING: "I never ran a shop be
   const has = (p: ReturnType<typeof propose>, name: string): boolean => p.places.some((x) => x.name === name);
   const both = (s: string): string[] => [s, `I'm a freelance designer. ${s}`];
 
-  /* THE FIVE SENTENCES OF THE AUDIT OF BATCH 71, word for word. */
+  /* THE FIVE SENTENCES, word for word. */
   for (const typed of both('I never ran a shop before but I just opened one')) assert.ok(lit(propose(typed, CAIRO), /shop/iu), typed);
   for (const typed of both('My wife never ran the shop, I do')) assert.ok(lit(propose(typed, CAIRO), /shop/iu), typed);
   for (const typed of both('I never kept track of orders, I want to start')) {
@@ -1206,7 +1206,7 @@ test('WHAT WAS LEFT OPEN SINCE BATCH 69, each sentence word for word: "I never u
   kept('I am used to taking orders', /orders/iu);
   kept('I never used to chase people, now I send invoices', /invoices/iu);
 
-  /* "DIDN'T" REFUSES AS "DID NOT" DOES (audit 80, claim 3): whoever says "I didn't run a shop" was handed a shop. */
+  /* "DIDN'T" REFUSES AS "DID NOT" DOES: whoever says "I didn't run a shop" was handed a shop. */
   none("I didn't send invoices", /invoices/iu);
   none('I didn’t take orders', /orders/iu);
   none("I didn't run a shop", /shop/iu);
@@ -1217,7 +1217,7 @@ test('WHAT WAS LEFT OPEN SINCE BATCH 69, each sentence word for word: "I never u
   kept("I didn't quit my shop", /shop/iu);
   kept("I didn't stop taking orders", /orders/iu);
 
-  /* ONE HAD FOR YEARS AND RUN NOW IS HAD (audit 80, claim 4), as one had and run is with no how long said. */
+  /* ONE HAD FOR YEARS AND RUN NOW IS HAD, as one had and run is with no how long said. */
   kept('I had the shop for years and I run it', /shop/iu);
   kept('I had the shop for years and I have it', /shop/iu);
   kept('I had the shop for years and I still run it', /shop/iu);
@@ -1275,7 +1275,7 @@ test('WHAT WAS LEFT OPEN SINCE BATCH 69, each sentence word for word: "I never u
   none('I used to take orders and my sister still does', /orders/iu);
   kept('I used to take orders. I still do.', /orders/iu);
 
-  /* WHOEVER SPEAKS WITH SOMEBODY ELSE STILL SPEAKS: "my friend and I", the sentence of the audit of batch 77. */
+  /* WHOEVER SPEAKS WITH SOMEBODY ELSE STILL SPEAKS: "my friend and I", a sentence that was misread. */
   kept('I never ran a shop but my friend and I are opening one', /shop/iu);
   kept('I have never ran a shop and my friend and I are opening one', /shop/iu);
   kept('I never ran a shop before, but my wife and I just opened one', /shop/iu);
@@ -1358,7 +1358,7 @@ for (const s of READ_SET.sentences.filter((x) => x.trap !== undefined)) {
   });
 }
 
-/* MONEY SAID IS MONEY KEPT (the audit of 22 October, U-C2): a catalogue use case that keeps hours and claims "invoices"
+/* MONEY SAID IS MONEY KEPT: a catalogue use case that keeps hours and claims "invoices"
    left an agency that sends invoices with no Money on its first Today. */
 test('AN AGENCY THAT SENDS INVOICES KEEPS MONEY, though a use case that keeps no money claims the word', () => {
   const hours = { id: 'hours-kept', signals: ['retainers', 'clients', 'invoices'], modules: ['people'] };
@@ -1368,7 +1368,7 @@ test('AN AGENCY THAT SENDS INVOICES KEEPS MONEY, though a use case that keeps no
   assert.ok(p.modules.includes('money-core'), p.modules.join(', '));
 });
 
-/* A STRANGER'S FIRST FIVE MINUTES (audit C, 25 October, X1): with the model off, this reading is what everybody gets. */
+/* A STRANGER'S FIRST FIVE MINUTES (25 October): with the model off, this reading is what everybody gets. */
 test('A CERAMICS STUDIO IS A SHOP WITH MONEY AND PEOPLE, never somebody’s savings, and its firings are heard', () => {
   const said = 'I run a small ceramics studio with two potters. I sell online and at markets, and I lose track of kiln firings, orders and who owes me money.';
   const p = propose(said, CAIRO);

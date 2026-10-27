@@ -14,7 +14,7 @@
  *
  * TWO MORE IN THE SAME 3.16.0, which was never released:
  * - `statement-oldest-days`, how many days old the oldest liquid account's balance is, read from the newest statement
- *   each account restarts from (`rolled.read: 'age'`, REC-B03), so a bank message's balance after counts.
+ *   each account restarts from (`rolled.read: 'age'`), so a bank message's balance after counts.
  * - `nights-missed-30d`, of the last 30 nights how many kept no point on the cash line (`series.cash-now` read as
  *   `{ count: 'missing' }`). It waited until `figureLists` (`money-figures.ts`) named the lists Cash now reads for its
  *   line, so a member who may not see Cash now is not shown how many nights it missed either.
@@ -22,10 +22,10 @@
  * ONE MORE IN 3.17.0 (REC-B11 step 8):
  * - `repeating-overdue`, how many live repeating lines have a "Next" more than three days gone. `settle` moves "Next"
  *   when a payment is matched to the line, and until this nothing said when one was not. In the same unreleased 3.17.0
- *   (repeating-sign-fix-69, audit 67 claim 1) it counts only a line a payment was matched to before, so a line just
+ *   (repeating-sign-fix-69) it counts only a line a payment was matched to before, so a line just
  *   added is not judged by a day nothing could have moved. And it is named for that, "Matched repeating lines past
- *   their day" (repeating-sign-72, audit 69 finding 5): a line nothing was matched to is not counted, so its nought is
- *   no word on those. And with no matched line to read it says no value (audit 72 finding 5), so a record whose lines
+ *   their day" (repeating-sign-72): a line nothing was matched to is not counted, so its nought is
+ *   no word on those. And with no matched line to read it says no value, so a record whose lines
  *   were never matched is not shown a mark it met; with matched lines and none past its day it says 0 and met, since
  *   the day is counted (`past`) and no longer in the `where` (signs-metric-75-76, repeating-overdue-past-78).
  */
@@ -144,7 +144,7 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
    * mark cannot be taken off in its place, since a figure with no target is refused. So a line never matched whose
    * money truly stopped is not counted here; the question on its day asks about it (`rules.ts`, "Did it go through?").
    *
-   * SO THE NAME SAYS MATCHED LINES, AND NOUGHT IS NOT "NOTHING STOPPED" (repeating-sign-72, audit 69 finding 5). A line
+   * SO THE NAME SAYS MATCHED LINES, AND NOUGHT IS NOT "NOTHING STOPPED" (repeating-sign-72). A line
    * Money watch wrote (`packs/money-watch/repeats.js`, `add`) has no "Last paid", and the one thing that writes one is
    * `settle` (`scripts/settle.js`), which nobody runs by itself. On a record where no payment was ever matched to a
    * line, every line is left out and this reads 0 whatever stopped: it is blind there, not clean. Under its first
@@ -153,7 +153,7 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
    * alone, which holds that the seed never writes it.)
    * A page that draws it says matched too, and never offers it as a watch on every repeating line.
    *
-   * AND WITH NONE TO READ IT SAYS NO VALUE, NEVER NOUGHT (audit 72 finding 5). The name was not enough: the blind
+   * AND WITH NONE TO READ IT SAYS NO VALUE, NEVER NOUGHT. The name was not enough: the blind
    * record still read 0 and met its mark, a clean answer from a sign that saw none of its lines. So the count is read
    * per the states its lines are in, the way `uncategorised-share-30d` above reads nothing for a month of nothing. The
    * `where` keeps live lines alone, so that is one state when a line is read, and the figure is the count itself, a

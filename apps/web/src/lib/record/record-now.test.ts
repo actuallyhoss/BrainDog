@@ -1,5 +1,5 @@
 /**
- * One clock (SF3): `recordNow()` is the record's instant from its `boot`, ticking on, and every screen that says late,
+ * One clock: `recordNow()` is the record's instant from its `boot`, ticking on, and every screen that says late,
  * today or this month reads it.
  *
  * TWO CLOCKS SAID TWO DAYS. The list measured a bill against the record's `now` and the bill's own page against the
@@ -59,8 +59,8 @@ const SCREENS = [
   '../page/shape-answer.ts',
 ];
 /* AND THE SCREENS HANDED THEIR DAY BY ONE THAT READS IT: the Path and Money of a project are drawn from the shape's read,
-   on its day (`shape-hold.svelte.ts`), since the UI pass of 20 October (proj F3), and read no clock of their own, nor
-   do the parts drawn from it (`ProjectPart.svelte`, C28 and C29). The shape itself comes with the page's own answer
+   on its day (`shape-hold.svelte.ts`) (proj F3), and read no clock of their own, nor
+   do the parts drawn from it (`ProjectPart.svelte`). The shape itself comes with the page's own answer
    and is turned once (`shape-answer.ts`), on the record's day (scope 2026-10-24 A20). */
 const HANDED = ['../page/ProjectVisuals.svelte', '../page/ProjectPart.svelte', '../page/shape-hold.svelte.ts'];
 

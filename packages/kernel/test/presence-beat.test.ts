@@ -1,5 +1,5 @@
 /**
- * A real heartbeat (AGT-C03) and the carried day (AGT-C10), on the one clock.
+ * A real heartbeat and the carried day, on the one clock.
  *
  * MEASURED BEFORE: `last_seen` moved when a run wrote and at no other time, so a session that read, thought or edited
  * files for half an hour read as Quiet beside one that had died; and an imported run's age was the import's morning,

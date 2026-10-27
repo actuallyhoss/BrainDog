@@ -1,6 +1,6 @@
 /**
  * What one machine holds, written down by the record itself: `toolsSeen` (DATA), the servers, command lines and
- * integrations a machine's agents use, each matched to its row by what it runs (AGT-D02, decision 2).
+ * integrations a machine's agents use, each matched to its row by what it runs.
  *
  * BEFORE THIS THE COMMAND LINE MADE THE MATCH, by scope and exact name, against the tools one context shows, and stopped
  * adding past that cut. So a 22nd server was never recorded, `x` and `x-mcp` running one package were two rows, and a
@@ -120,7 +120,7 @@ function scriptOf(path: string): string | null {
 }
 
 /**
- * WHAT A TOOL RUNS, WHEREVER IT LIVES (decision 2): an address, a package a runner fetches, a script an interpreter
+ * WHAT A TOOL RUNS, WHEREVER IT LIVES: an address, a package a runner fetches, a script an interpreter
  * runs, a module, or a command by its base name. A command line with no transport is its name, and an integration is
  * its address or its name. Two machines that run one thing from different folders read the same.
  */
@@ -332,7 +332,7 @@ export function methods(deps: RecordDeps) {
         const among = (p: string | null) => liveFirst(held.filter((h) => h.place === p));
         const scopes = place === null && project !== null ? [among(null), among(project)] : [among(place)];
         /* A SCRIPT IS ONE PROGRAM ONLY WHEN THE NAMES AGREE OR ITS PATH NAMES THE ROW: two scripts in folders of one name
-           are otherwise two tools (decision 2, its cost). */
+           are otherwise two tools (its cost). */
         const sameProgram = (h: Held) =>
           h.program === program && (!program.startsWith('script:') || folded(h.fields.name) === folded(name) || start.toLowerCase().includes(folded(h.fields.name)));
         let match: Held | undefined;

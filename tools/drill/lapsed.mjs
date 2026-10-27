@@ -1,7 +1,7 @@
 /**
  * The drill's lapse step: a record whose billing lapsed still exports, still reads, and refuses a write in the lapse's
- * own sentence; then billing resumes and a write goes through again (LCH-C04, RQ-LCH-314,
- * `loop/scope/area-launch-c.md:472-535`; "and a restore drill of his backup"). The promise a lapse makes is that a
+ * own sentence; then billing resumes and a write goes through again.
+ * The promise a lapse makes is that a
  * person who stopped paying keeps their way out, and this step proves it on every run that asks for it, not only in a
  * unit test (`apps/worker/test/billing-packs.test.ts`).
  *

@@ -79,7 +79,7 @@ export function exampleOf(lists: readonly { name: string; fields?: readonly { id
 export const askable = (text: string): boolean => text.trim().length > 0;
 
 /**
- * AN AUTOMATION SAID WHOLE, AS ONE SENTENCE (the pass of 27 October): what starts it and every step in order, "When
+ * AN AUTOMATION SAID WHOLE, AS ONE SENTENCE: what starts it and every step in order, "When
  * an item in Bills and invoices has its Status set to paid, run the script Move a repeating line on." Its page opened on
  * the steps, each card one part, and "Run its script" never said which. `start` is the trigger's own words and `steps`
  * each step's, the script named; `''` where nothing starts it or it does nothing yet.

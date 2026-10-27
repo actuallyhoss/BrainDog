@@ -420,7 +420,7 @@ const objectStorage = () => {
 
 /** Workers AI's `run`, answering the pass-1 draft `slash-demo.test.ts` answers with, and counting every run. */
 let aiRuns = 0;
-/* THE ASK'S OWN SEARCH MAY EMBED ITS WORDS ONCE (ENG-B18), on the background allowance: counted apart, so `aiRuns` is Slash's model. */
+/* THE ASK'S OWN SEARCH MAY EMBED ITS WORDS ONCE, on the background allowance: counted apart, so `aiRuns` is Slash's model. */
 let aiEmbeds = 0;
 const countedAi = {
   run: async (model: string) => {

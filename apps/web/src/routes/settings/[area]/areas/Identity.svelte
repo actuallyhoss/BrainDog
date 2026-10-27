@@ -98,7 +98,7 @@
     outSaid = out.ok ? copy.signedOut : copy.signOutFailed;
   }
 
-  /* ── a passkey's name (LCH-A04) ────────── */
+  /* ── a passkey's name ────────── */
 
   /**
    * ONE PASSKEY RENAMED AT A TIME, in place on its own line. A passkey is named for the device that made it
@@ -153,7 +153,7 @@
   /* THE FACE IS A LETTER OF THE NAME, or of the address before there is a name, and never of an id. */
   const faceName = $derived(myName ?? myEmail ?? copy.you);
   const passkeysHere = $derived(s.hostAuth?.passkey === true && s.liveKeys !== null);
-  /* WHETHER LOSING ONE DEVICE WOULD LOCK YOU OUT (REC-A15), said over the passkeys already listed; nothing new is read. */
+  /* WHETHER LOSING ONE DEVICE WOULD LOCK YOU OUT, said over the passkeys already listed; nothing new is read. */
   const keysSaid = $derived(passkeysSaid(s.liveKeys ?? []));
   /* A LINK CAN BE MAILED ONLY WHERE THIS HOST SENDS SIGN-IN MAIL; elsewhere Change email would be a 404 behind a button. */
   const mailsHere = $derived(s.hostAuth?.magic === true && !!s.hostAuth.me && !signedOut);
@@ -431,13 +431,13 @@
           <li class="fact-act">
             <IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span>
             <span class="fact-value">{(s.liveKeys?.length ?? 0) === 0 ? copy.identityPasskeys(0) : keysSaid.line}</span>
-            <!-- ONE ADD A PASSKEY ON THE SCREEN (audit 25 October, X18): it is the Passkeys tile's, under this one, so
+            <!-- ONE ADD A PASSKEY ON THE SCREEN: it is the Passkeys tile's, under this one, so
                  this row says the count and links down to it. -->
             {#if keysSaid.short}<span class="fact-do"><Button weight="bare" href="#passkeys">{identityWords.seeBelow}</Button></span>{/if}
           </li>
         {/if}
         {#if passkeysHere && (s.liveKeys?.length ?? 0) > 0}
-          <!-- EACH PASSKEY BY ITS NAME, with Rename on its own line (LCH-A04); the form takes the line's place while open. -->
+          <!-- EACH PASSKEY BY ITS NAME, with Rename on its own line; the form takes the line's place while open. -->
           {#each s.liveKeys ?? [] as k (k.id)}
             {@const name = k.label ?? copy.passkeyUnnamed}
             <li class="fact-act">

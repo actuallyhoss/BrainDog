@@ -1,5 +1,5 @@
 /**
- * The shape door: `POST /api/shape`, the half both hosts share (PRF-A13, `area-proof-a.md`).
+ * The shape door: `POST /api/shape`, the half both hosts share (`area-proof-a.md`).
  *
  * THE BEARER IS A SHAPE GRANT AND NOTHING ELSE. A device grant of reach `shape`, approved once by the owner with six
  * digits, standing for ninety days (`shapeGrant` in the kernel's `device.ts`). The door hands the bearer to the record's

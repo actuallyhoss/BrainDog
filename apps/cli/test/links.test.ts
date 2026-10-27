@@ -4,7 +4,7 @@
  *
  * PURE, SO NO HOST. The target is the one `target` in http.ts builds, from the same `hostKey`.
  *
- * AND EVERY DOOR OF THE COMMAND THAT FILES A QUESTION PRINTS IT (AGT-C20): `skills sync` and `tools scan` too, over a
+ * AND EVERY DOOR OF THE COMMAND THAT FILES A QUESTION PRINTS IT: `skills sync` and `tools scan` too, over a
  * stand-in client in a temporary home, so this machine's own Claude folder and `~/.claude.json` are never read.
  */
 

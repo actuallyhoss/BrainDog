@@ -1,5 +1,5 @@
 /**
- * An add-on's settings fit on a phone (the audit of 25 October, Y10): the Money add-on drew fourteen empty "Most …"
+ * An add-on's settings fit on a phone: the Money add-on drew fourteen empty "Most …"
  * limit boxes, each followed by "Takes effect now.", 4,000 px of the same two lines. The set ones are shown, the blank
  * limits fold under "More limits", and when they take hold is said once at the foot.
  */

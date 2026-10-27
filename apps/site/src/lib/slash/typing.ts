@@ -1,6 +1,6 @@
 /**
  * The question typing itself into the bar, then the "Reading your record" or "Drafting" line, then the answer: the
- * prototype's `typeInto` (loop/site-2026-10-17/src/site.html ~:1234-1246), shared by the home card's scene, the desk's
+ * prototype's `typeInto`, shared by the home card's scene, the desk's
  * bar and anything else that draws Slash answering.
  *
  * IT PAINTS FRAMES AND DRAWS NOTHING. A caller keeps `typed` and `phase` in its own state and draws them; this only

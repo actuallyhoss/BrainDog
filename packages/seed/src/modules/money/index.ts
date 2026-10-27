@@ -33,7 +33,7 @@
  * figure, field or setting says who owes whom any more: money due in is receivables and money due out is payables, and
  * every id stays.
  *
- * ONE FILE A PART, SINCE REC-B01 (`loop/scope/area-record-b.md`, section 2.5). `money.ts` was 2,858 lines, and every
+ * ONE FILE A PART, SINCE REC-B01 (section 2.5). `money.ts` was 2,858 lines, and every
  * unit after it edits Money, so it is cut into this folder: the sample rows, the settings, the walk, one file a list,
  * the figures by what they read, the rules, and each page with one file a tile under `pages/parts/`. A PURE MOVE: the
  * pack's document is the same to the byte (the 3.14.0 fingerprint in `test/pack-versions.test.ts`), and `money.ts`

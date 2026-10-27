@@ -1,5 +1,5 @@
 <!--
-  Each import, and his answer to whether all of it is his own (ENG-A13: untrusted text drops the run to Ask).
+  Each import, and his answer to whether all of it is his own (untrusted text drops the run to Ask).
   It sits in the trust tile under the two lines no rung reaches, and `TrustRows.svelte` loads it only when the
   record holds an import, so nothing of it reaches a screen that has none.
 

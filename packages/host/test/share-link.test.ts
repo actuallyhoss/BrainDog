@@ -1,5 +1,5 @@
 /**
- * A read-only link's door and its shape (USE-A06): what a stranger holding a link learns, and what the owner is handed.
+ * A read-only link's door and its shape: what a stranger holding a link learns, and what the owner is handed.
  *
  * EVERY LINK THAT DOES NOT OPEN IS ONE 404 WITH NO BODY. A forged token, a good token moved under another record's
  * name, and a good token for a record this host does not hold all answer the same, and none of them wakes the record.

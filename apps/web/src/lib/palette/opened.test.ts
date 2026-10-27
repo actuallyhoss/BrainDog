@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { openedKept, questionsOf, titleIn, withOpened, TODAY_QUESTIONS } from './opened.ts';
 
-test('THE EMPTY PALETTE OFFERS THREE QUESTIONS: asked with a model, else the shell screen that answers each (E55)', () => {
+test('THE EMPTY PALETTE OFFERS THREE QUESTIONS: asked with a model, else the shell screen that answers each', () => {
   const asked = questionsOf(true);
   assert.equal(asked.length, 3);
   assert.deepEqual(asked.map((a) => a.ask), TODAY_QUESTIONS.map((q) => q.title));
@@ -33,7 +33,7 @@ test('THE NAME IS THE SCREEN\'S OWN, from its tab title, and what was kept reads
   assert.deepEqual(openedKept(JSON.stringify([{ href: '/a', title: 'A', at: 1 }, { href: 2 }])), [{ href: '/a', title: 'A', at: 1 }]);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z24 (`add-390-light.png`): Recent listed "SG240", the handle a question's tab said before
+/* Recent listed "SG240", the handle a question's tab said before
    the question named itself. A handle is never kept as a name, and one kept before is not read back. */
 test('RECENT NEVER NAMES A PLACE BY ITS HANDLE: SG240, S42 or tasks#4', () => {
   assert.equal(titleIn('SG240 · BrainDog', 'BrainDog'), null);
@@ -44,7 +44,7 @@ test('RECENT NEVER NAMES A PLACE BY ITS HANDLE: SG240, S42 or tasks#4', () => {
   assert.deepEqual(openedKept(JSON.stringify([{ href: '/decide/SG240', title: 'SG240', at: 1 }, { href: '/p/people', title: 'People', at: 2 }])).map((o) => o.title), ['People']);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Y30 (`people-390-light-palette.png`): Recent said "Browse" for Add-ons' Browse, and "Add-ons 2"
+/* Recent said "Browse" for Add-ons' Browse, and "Add-ons 2"
    for two places it had both kept as "Add-ons". */
 test('RECENT NAMES A PLACE INSIDE ANOTHER BY BOTH, AND ONE NAME ONCE', () => {
   assert.equal(titleIn('Browse · Add-ons · BrainDog', 'BrainDog'), 'Add-ons: Browse');

@@ -38,7 +38,7 @@ test('THE ROW EXISTS ONLY WITH A MODEL BEHIND IT, and then only for plain text t
   assert.equal(offersSlash({ ...ASK, text: '  late invoices ' }), 'late invoices');
 });
 
-test('THREE WORDS ARE A QUESTION: "what needs me today" puts the ask row first, whatever else matched (E53)', () => {
+test('THREE WORDS ARE A QUESTION: "what needs me today" puts the ask row first, whatever else matched', () => {
   const asked = 'what needs me today';
   /* SIX ROWS SHARED A WORD WITH IT on his record, and the row was not offered at all. */
   assert.equal(offersSlash({ ...ASK, text: asked, places: 6 }), asked);

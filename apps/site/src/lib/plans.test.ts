@@ -1,7 +1,7 @@
 /**
  * The plans the site prices, held to the code that sells them and the code that meters them.
  *
- * WHY THIS TEST. Every figure of a plan is `PLAN_TABLE`'s (`packages/record/src/plans.ts`, LCH-A08), and `plans.ts`
+ * WHY THIS TEST. Every figure of a plan is `PLAN_TABLE`'s (`packages/record/src/plans.ts`), and `plans.ts`
  * holds its three sold rows as `TABLE` until the site declares `@braindog/record`. The first check is every field of
  * every row against the table, with a planted fault beside it so the comparison is seen to fail. Three other files
  * act on the same figures: the checkout sells `HOSTED_PLANS` and makes Free as

@@ -1,6 +1,5 @@
 <!--
-  A line somebody copies and pastes somewhere else: an agent prompt, a terminal command, a key's name (the UI pass of
-  20 October, 2.A.19).
+  A line somebody copies and pastes somewhere else: an agent prompt, a terminal command, a key's name.
 
   THE BLOCK: `--tile-2`, radius 8, 8 by 12 in, the line at 13/20 in the app's mono face and in ink, wrapping anywhere
   so a long command never pushes the page sideways at 320. One Copy at its trailing edge, a quiet small button; pressed,
@@ -8,7 +7,7 @@
   browser refuses is said once, in the toast, because the button cannot say it.
 
   WHOLE WORDS (`words`): a command breaks only at its spaces, and a word longer than the block scrolls inside it, so
-  "install.sh" is never read as "instal / l.sh" (audit C, X3).
+  "install.sh" is never read as "instal / l.sh".
 
   INLINE (`inline`): a name in a sentence, 13px mono on `--tile-2` at radius 4, 2 by 6 in, no button.
 -->

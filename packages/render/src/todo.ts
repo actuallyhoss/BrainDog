@@ -9,11 +9,11 @@
 /** What sits between the two facts. The same dot a figure in several currencies is written with. */
 export const TODO_META_JOIN = ' · ';
 
-/** The most characters a task's title says before the rest of it is drawn quiet (E23). */
+/** The most characters a task's title says before the rest of it is drawn quiet. */
 export const TITLE_HEAD_MOST = 80;
 
 /**
- * A TASK'S TITLE AS A SHORT NAME AND THE REST QUIET (E23), for both renderers. Work drew whole paragraphs as titles, six
+ * A TASK'S TITLE AS A SHORT NAME AND THE REST QUIET, for both renderers. Work drew whole paragraphs as titles, six
  * lines a task: the first clause is the name, up to the first full stop, colon, semicolon or dash, and at most
  * `TITLE_HEAD_MOST` characters; what follows is drawn after it in the quiet colour. A title with no such clause inside the
  * limit, or holding a link or a marked phrase, is left whole. `rest` is `''` when there is none.

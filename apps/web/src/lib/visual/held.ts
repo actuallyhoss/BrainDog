@@ -1,5 +1,5 @@
 /**
- * The visuals a thing holds (DIRECTION §45, "Shown where it lives"): a page with its pictures hung on a task, a project,
+ * The visuals a thing holds: a page with its pictures hung on a task, a project,
  * a question or a decision, read here the way the app shows it. The record's half is `packages/record/src/methods/visuals.ts`.
  *
  * CLOSED, A VISUAL IS A STILL OR A QUIET CARD (`VisualStrip.svelte`): its first picture, read through the file door with
@@ -10,7 +10,7 @@
  * pictures read here and handed in as `data:` addresses, since the frame has no network, and its versions newest first,
  * with arrows to step them and Undo on the newest through the record's own undo of the write that made it.
  *
- * A DRAFT IS MARKED, AND SETTLED WHERE IT SHOWS (DIRECTION §45). A version handed in as a draft waits beside the one the
+ * A DRAFT IS MARKED, AND SETTLED WHERE IT SHOWS. A version handed in as a draft waits beside the one the
  * visual stands at and never replaces it. The strip marks its card and the viewer opens on it, each with Keep, Try
  * again and Throw away (`settle`, the record's `settleVisual`). Try again throws it away and tells the run that drew it
  * to draw it again, so it is offered only on a version a run drew.

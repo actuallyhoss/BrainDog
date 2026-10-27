@@ -1,6 +1,6 @@
 /**
  * Batch 58, what the owner's real screens showed (faults C, I and J of the look) and one way to write an amount
- * in the two drawers (REC-C05, jobs 3 and 4).
+ * in the two drawers (jobs 3 and 4).
  *
  * THE AMOUNTS: told the record's home currency, a stat, a bar, a legend, a card's figure, a gauge and a ring say an
  * amount exactly as `writeAmount` does, in the mirror and in the Svelte drawers alike, and a host that does not say
@@ -84,7 +84,7 @@ const EGP = 'EGP 702,318.00';
 const USD = 'USD 2,947.95';
 const HOME = { home: 'EGP' } as const;
 
-/* ---- One way to write an amount (REC-C05, jobs 3 and 4) --------------------------------------------------- */
+/* ---- One way to write an amount (jobs 3 and 4) --------------------------------------------------- */
 
 const AMOUNTS: Record<string, { src: string; cls: string; at: number[] }> = {
   'a stat': { src: `\`\`\`stat\nIn Cairo | ${EGP} | \nHarbour | ${USD} | \n\`\`\``, cls: 'cell-figure num', at: [0, 1] },

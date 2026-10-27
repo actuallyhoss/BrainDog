@@ -1,7 +1,7 @@
 /**
  * The links between a use case's example rows, made after its pack is installed.
  *
- * A SEED CARRIES NO `ref` VALUE (42 §5.2, D9): a seed is applied inside the install, before any row it could
+ * A SEED CARRIES NO `ref` VALUE (42 §5.2): a seed is applied inside the install, before any row it could
  * point at has a sequence. So a student's example assignment arrived with no course and a guide's first step with
  * no milestone, and Studies drew an empty Course column. The installer that puts the examples in links them
  * afterwards, by title, through the ordinary write path, as a person would. The kernel knows nothing of it.

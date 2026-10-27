@@ -1,5 +1,5 @@
 /**
- * The four reads an agent asks where it stands, at the agent door (ENG-B12, ENG-B13, ENG-B02, AGT-C18 job d):
+ * The four reads an agent asks where it stands, at the agent door (AGT-C18 job d):
  * `braindog:briefing` is what matters, `braindog:exceptions` what stopped, `braindog:about/<name>` what one thing is,
  * and `braindog:stale` what went stale here with the one call that clears each.
  *

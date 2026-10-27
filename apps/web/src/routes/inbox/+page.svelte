@@ -34,7 +34,7 @@
   archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back`.
 
   UNDER THEM, WHAT EACH PATTERN DID (`patterns.ts`): the record's report of the fortnight, per pattern what it filed and
-  what it held and why, and the messages it held as repeats, each with "It is a second one", which files it (REC-A03).
+  what it held and why, and the messages it held as repeats, each with "It is a second one", which files it.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -82,7 +82,7 @@
    * sentence here that named the allowance would be wrong the day the door moves it.
    */
   const words = {
-    /** A refused read, in a person's words (U-A14): the record's own sentence waits behind Read details. */
+    /** A refused read, in a person's words: the record's own sentence waits behind Read details. */
     refusedTitle: 'The messages could not be listed',
     refusedBody: 'Nothing was changed. This sign-in may not be allowed to read the messages, so open the inbox in the app to see them.',
     refusedBelow: ' What the rules did is below.',
@@ -275,7 +275,7 @@
 
   /**
    * WHAT EACH PATTERN DID, the record's report of the fortnight drawn as one tile under "What comes in", and the messages
-   * it held as repeats, each with the press that files it as a second one (REC-A03). A report the record does not answer
+   * it held as repeats, each with the press that files it as a second one. A report the record does not answer
    * draws no tile, and a press answers in place: the line says it was filed, or says the record's own sentence.
    */
   let report = $state.raw<PatternReport | null>(null);
@@ -328,7 +328,7 @@
   /* NOTHING HAS EVER COME IN, by the record's own tally, so the board is the one tile that says so. A pattern waiting
      on Decide is something to show, so it keeps the board. */
   const never = $derived(patterns.length === 0 && nothingEver(tally, ways, INBOX.length));
-  /* THE ONE STEP TO AN ADDRESS, by the host (X25): a self-host's is printed by one command on its machine. */
+  /* THE ONE STEP TO AN ADDRESS, by the host: a self-host's is printed by one command on its machine. */
   const quiet = $derived(
     quietOf(
       route.data.host === 'cloud' || route.data.host === 'self-host' ? route.data.host : undefined,
@@ -1432,7 +1432,7 @@
   }
 
   /* AN EMPTY INBOX IS A TILE ON THE BOARD like everything else on it: `Empty`'s own, at most 640 wide on the start
-     edge (2.A.18). A second tile round it stretched it across the page and dropped its own. */
+     edge. A second tile round it stretched it across the page and dropped its own. */
   .clear {
     display: contents;
   }

@@ -48,7 +48,7 @@ test('THE LAST SHARE STOPPED: the guest is refused on the next call and the reco
   assert.deepEqual(stopped.out.value?.['left'], [bo.value.id]);
 
   /* TOLD THEIR ACCESS ENDED, IN THE OWNER'S NAME, at the root and under the record's name, with the header the service
-     worker deletes its copy on (sharing plan §2.8). */
+     worker deletes its copy on. */
   for (const path of ['/api/whoami', '/app/studio/api/whoami']) {
     const res = await c.ask(path, { method: 'POST', cookie: guest, body: '{}' });
     assert.equal(res.status, 403, path);

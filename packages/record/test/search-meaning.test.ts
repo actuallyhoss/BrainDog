@@ -1,5 +1,5 @@
 /**
- * The search method's meaning (ENG-B18), wired through `RecordDeps.meaning`: with no `meaning`, or one that says no,
+ * The search method's meaning, wired through `RecordDeps.meaning`: with no `meaning`, or one that says no,
  * the hits are the words' hits exactly as before; with one that answers, a row that shares no word with the query is
  * fused in and marked `by: 'meaning'`, and the answer says how it searched. The host's `meaning` is a fake here: no
  * model is called.

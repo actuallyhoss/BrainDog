@@ -110,7 +110,7 @@
     }
   }
 
-  /* CODE TAKES THE APP'S MONO FACE, AT THE SIZE OF THE WORDS ROUND IT (SF1). The browser's default is its own monospace
+  /* CODE TAKES THE APP'S MONO FACE, AT THE SIZE OF THE WORDS ROUND IT. The browser's default is its own monospace
      at 13px, so a `code` in a sentence was a different face and a smaller size from the ids and key caps beside it. */
   code,
   kbd,

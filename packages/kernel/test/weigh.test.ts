@@ -88,7 +88,7 @@ test('a body this build cannot read is the cheapest band, not a throw', () => {
   assert.equal(costOf('pack', { disable: 42 }), 'shape');
 });
 
-/* ── how long a question can wait (AGT-C08) ── */
+/* ── how long a question can wait ── */
 
 const NOW = Date.UTC(2026, 9, 9, 9);
 const ASKED = new Date(NOW - 3_600_000).toISOString();

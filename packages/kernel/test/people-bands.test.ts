@@ -362,7 +362,7 @@ test('A ROW ONLY ARRIVALS VOUCH FOR IS NEVER FOLDED IN THE TOP BAND, and a score
   const { k, sql } = await record();
   const project = value<Entry>(k.create('things', { name: 'Lanternfish' }, OWNER));
   const known = person(k, { name: 'Teodor Vance', projects: [project.id] });
-  /* MADE BY A MAIL AND MET ONLY IN MAIL: text anybody could have written, however sure a model is of it (H1). */
+  /* MADE BY A MAIL AND MET ONLY IN MAIL: text anybody could have written, however sure a model is of it. */
   const mailed = person(k, { name: 'Teo Vance', projects: [project.id], met: ['2026-10-01 · mail from a sender'] });
   const never = { write: () => assert.fail('a row only arrivals vouch for was folded') } as const;
   const said = answer([[known, mailed, 0.99]]);

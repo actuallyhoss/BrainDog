@@ -1,5 +1,5 @@
 /**
- * The rail's line that makes a page (`Sidebar.svelte`, PGS-C30): what it says to whoever owns the record and to
+ * The rail's line that makes a page (`Sidebar.svelte`): what it says to whoever owns the record and to
  * anybody else, which place holds it, and where the markup draws it.
  *
  * The two functions live in the component's module script, which Node cannot import, so this reads the lines between

@@ -20,7 +20,7 @@ const andOf = (items: readonly string[]): string =>
 /**
  * THE FIVE STARTING POINTS OF USE CASE 6: a shop, a freelancer, a student, a founder of a few
  * companies and a team, as a person would say each. No screen draws them any more (the chips under the prompt were a
- * chip cloud, the UI pass of 20 October, first F6); the reading is still held to understand each one, so they are the
+ * chip cloud); the reading is still held to understand each one, so they are the
  * reading's fixtures and not the screen's words.
  */
 export const STARTING_POINTS = ['I run a small shop', 'I freelance', "I'm a student", 'I run a few companies', "I'm part of a team"] as const;
@@ -38,7 +38,7 @@ export const firstRun = {
      the build beside the words, so a thin reading is never taken for the most this can do. */
   readByRulesAny: 'Simple rules read this. Check what was heard, and tell it more.',
   /* BEFORE THE PRESS, UNDER THE FIELD: what the press does with the words, and never who reads them. It said "a model
-     reads what you wrote" on a host where no model does, above "Simple rules read this" (the audit of 22 October, U-C3):
+     reads what you wrote" on a host where no model does, above "Simple rules read this":
      which reads them is said after, by what read them. */
   readOnPress: "Pressing That's me sets this up from what you wrote. Nothing is kept until you keep it.",
 

@@ -1,6 +1,6 @@
 /**
  * `braindog keys put --from <file or folder> [--project <name>] [--opens <what>] [--kind <kind>] [--dry-run] [--host
- * <host>]`: a whole file or folder of keys into the Keychain in one command (AGT-D08). His 72 went in one `keys put` at a
+ * <host>]`: a whole file or folder of keys into the Keychain in one command. His 72 went in one `keys put` at a
  * time, and this is the bulk path.
  *
  * A FILE IS `NAME=value` LINES, as a `.env` is: blanks and `#` comments skipped, `export ` and one pair of quotes taken

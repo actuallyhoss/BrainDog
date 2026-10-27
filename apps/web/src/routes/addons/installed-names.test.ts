@@ -1,6 +1,5 @@
 /**
- * AN INSTALLED ADD-ON IS NAMED AND DESCRIBED AS ITS CATALOGUE DOES, with or without the Kennel (the audit of 25 October,
- * Z11).
+ * AN INSTALLED ADD-ON IS NAMED AND DESCRIBED AS ITS CATALOGUE DOES, with or without the Kennel.
  *
  * WHAT WAS WRONG. On his record the Installed list read "Bank hsbc eg" for the pack titled "HSBC Egypt alerts", and
  * described Holdings as "Holdings" (`packs-390-light.png`). Neither is one of this build's modules, so the page named it

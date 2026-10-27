@@ -1,5 +1,5 @@
 /**
- * The walk's second pass at understanding (loop/research-understanding-judge.md, changes 2, 3 and 5): a payee one word
+ * The walk's second pass at understanding (changes 2, 3 and 5): a payee one word
  * longer than a known one is that payee, a held organisation is asked about rather than keyed, a run under an owner
  * whose repositories one project holds is one question, a single guess is asked with the places it is about, and a
  * service is matched by its first word and its domain's label and gives its project the domain. And nothing in the walk
@@ -126,7 +126,7 @@ test('A PAYEE IS NEVER FOLDED UNDER A WORD THAT ONLY SAYS WHAT KIND OF SHOP IT I
   sql.close();
 });
 
-test('A HELD ORGANISATION A PAYEE ONLY EXTENDS IS ASKED ABOUT, never keyed and never linked (research-audit-21 item 12)', async () => {
+test('A HELD ORGANISATION A PAYEE ONLY EXTENDS IS ASKED ABOUT, never keyed and never linked', async () => {
   const { k, sql, deps } = await record();
   const amazon = value<Entry>(k.create('organisations', { name: 'Amazon', keys: ['bank:amazon'] }, OWNER)).id;
   const exact = line(k, 'Order', { counterparty_text: 'AMAZON' });

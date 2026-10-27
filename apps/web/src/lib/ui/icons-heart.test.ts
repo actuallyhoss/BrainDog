@@ -1,5 +1,5 @@
 /**
- * Settings' Health row draws its heart at once (audit 25 October, Y7). `heart-pulse` was a glyph only the late set held,
+ * Settings' Health row draws its heart at once. `heart-pulse` was a glyph only the late set held,
  * and the index's well, drawn once inside a page's text, stayed empty at both widths. It is drawn by hand now, as the
  * people glyphs Settings leads with are, so it needs nothing that arrives later.
  */

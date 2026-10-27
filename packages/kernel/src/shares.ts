@@ -1,5 +1,5 @@
 /**
- * The share rows as the lens reads them, the access epoch, and the lens cache (sharing plan §2.2, §2.8).
+ * The share rows as the lens reads them, the access epoch, and the lens cache.
  *
  * LOADERS, NOT DECISIONS. `lens.ts` decides what a caller holds from what these hand it, and `members.ts`'s `access` is
  * the one place both meet. Every reader here fails closed the way the lens does: a share row whose JSON cannot be read

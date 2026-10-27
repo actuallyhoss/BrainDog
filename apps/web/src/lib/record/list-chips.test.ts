@@ -174,7 +174,7 @@ test('the register page reads its chips through chipsOf, and draws a control for
    * saying so and no way back but the address bar. The bar's own rule is that which filters are on
    * is the whole of what the grid underneath is showing.
    */
-  /* EVERY CLAUSE IS ITS OWN RECTANGLE NOW (the UI pass of 20 October, money F7), a list clause among them: the page
+  /* EVERY CLAUSE IS ITS OWN RECTANGLE NOW (money F7), a list clause among them: the page
      words each one that is on (`chipRects`) and the bar draws a press that takes it off. */
   assert.match(route, /const chipRects = \$derived/, 'the bar does not know which clauses are on');
   assert.match(route, /\{#each chips as/, 'the bar draws no control for a clause');

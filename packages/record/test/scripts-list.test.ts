@@ -154,7 +154,7 @@ test('A SCRIPT THAT TOUCHES NO LIST IS SHOWN WHERE A RULE WITH NO ROW IS: to a c
 });
 
 /**
- * `/scripts` IS A DECLARED PAGE (C33): its table reads the kernel's `scripts` source, which is this same read, so the
+ * `/scripts` IS A DECLARED PAGE: its table reads the kernel's `scripts` source, which is this same read, so the
  * page, the command line and an agent cannot list different scripts.
  */
 test('a page block over scripts draws the same scripts, one row each, with where each stands', async () => {

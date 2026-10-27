@@ -17,7 +17,7 @@ export const automations = {
      record whose only door took a build server's results read a section about bank texts. The
      sender is whatever posts, and `webhook-doors.test.ts` fails if a use case comes back into these words. */
   doorsTitle: 'Web addresses that take things in',
-  /* NO "TOKEN" (audit 25 October, X26): what a person needs to know is that the address is private. */
+  /* NO "TOKEN": what a person needs to know is that the address is private. */
   doorsHow: 'Each address below takes posts from a phone, a script or another service and files them in a list. Each address is private: whoever has it can post to this list.',
   /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
      token back, and a blank where a value would go reads as "you have none". */

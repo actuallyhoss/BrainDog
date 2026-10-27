@@ -338,7 +338,7 @@ const RUNNING_SUMS: readonly string[] = ['money', 'int', 'decimal', 'duration', 
 const RUNNING_ORDERS: readonly string[] = ['day', 'instant', 'int', 'decimal'];
 
 /**
- * A RUNNING TOTAL'S OR A TREND'S OWN SHAPE, which needs no record to check (REC-B09).
+ * A RUNNING TOTAL'S OR A TREND'S OWN SHAPE, which needs no record to check.
  *
  * `running: { sum, order, until: { gte } }` and `trend: { of, ahead }` are the two shapes `metrics.ts` reads that name
  * their parts inside one object, so `valueFields` reads nothing out of them and every part went unasked. Each refusal
@@ -690,7 +690,7 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
 }
 
 /**
- * WHAT A RUNNING TOTAL OR A TREND NAMES, ASKED OF THE RECORD (REC-B09).
+ * WHAT A RUNNING TOTAL OR A TREND NAMES, ASKED OF THE RECORD.
  *
  * A running total over a name adds nothing up, and one walked in order of a name stops at a row no one would call
  * first. A trend is a line fitted to a figure's buckets (`trend.ts`), so a figure that is one number has no line: the
@@ -1097,7 +1097,7 @@ function whenLeafFault(leaf: unknown, said: string): string | null {
     if (beside.length > 0)
       return `${said} says beyond and ${beside.join(' and ')}. A walk that never went under has no value to compare, so beyond is the whole test: { metric, beyond: true }. Two tests are two leaves: { all: [{ metric, beyond: true }, { metric, ... }] }.`;
   }
-  /* `empty:` IS THE ONE TEST A FIGURE WITH NO VALUE MEETS (PGS-C06). No comparison holds of a figure nobody has
+  /* `empty:` IS THE ONE TEST A FIGURE WITH NO VALUE MEETS. No comparison holds of a figure nobody has
      given a value, so "No balance has been typed yet" could not be said where the sentence about cash goes.
      `empty: true` holds while the figure has no value and no amount in any currency, `empty: false` once it has
      one. It is the leaf's whole test: beside a comparison one of the two would never be read. */
@@ -1122,7 +1122,7 @@ function whenFault(when: unknown, said: string): string | null {
   return whenTreeFault(when, said, whenLeafFault);
 }
 
-/* ── a part that waits on what the record holds (SHL-A08) ──────────────────────────────────────────────────────── */
+/* ── a part that waits on what the record holds ──────────────────────────────────────────────────────── */
 
 /**
  * `when: { holds: [...] }`: a part of an add-on that is there only while the record holds every list or role it names.
@@ -1608,7 +1608,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       );
     if (!PAGE_KEYS.has(key)) return bad('DECLARATION_INVALID', `${id}: ${unreadPageKey(key)}`, key, [...PAGE_KEYS]);
   }
-  /* A HEAD OVER THE TITLE (PGS-A16), checked by `page-head.ts`, the figures it counts against those installed. */
+  /* A HEAD OVER THE TITLE, checked by `page-head.ts`, the figures it counts against those installed. */
   if (body.header !== undefined) {
     const figures = installed ? new Set([...installed.keys()].filter((k) => k.startsWith('metric.')).map((k) => k.slice('metric.'.length))) : null;
     const fault = headerFault(body.header, { figures, fields: null });
@@ -1976,7 +1976,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     if ((kind === 'cards' || kind === 'series') && block.most !== undefined && !isInt(block.most, 1, 24))
       return bad('DECLARATION_INVALID', `${id}.${at}'s most is how many it shows before "Show all", a whole number from 1 to 24.`, `${at}.most`);
-    /* A GROUPED `lines` BLOCK'S `most:` IS HOW MANY READINGS IT LISTS under the lines (E26, `MEASURES_LISTED` at most). */
+    /* A GROUPED `lines` BLOCK'S `most:` IS HOW MANY READINGS IT LISTS under the lines (`MEASURES_LISTED` at most). */
     if (kind === 'lines' && block.most !== undefined && !isInt(block.most, 1, MEASURES_LISTED))
       return bad('DECLARATION_INVALID', `${id}.${at}'s most is how many readings a grouped lines block lists, a whole number from 1 to ${MEASURES_LISTED}.`, `${at}.most`);
     const grouped = kind === 'cards' || kind === 'table' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
@@ -2178,7 +2178,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
           if (n > CARD_FACTS) return bad('OUT_OF_BOUNDS', `${id}.${at} has ${n} columns as fact. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`, at);
           continue;
         }
-        /* `edit: true` IS A CARD'S LINE TYPED ON IN PLACE (PGS-C15), written to the one field it draws, so it is a card's,
+        /* `edit: true` IS A CARD'S LINE TYPED ON IN PLACE, written to the one field it draws, so it is a card's,
            it names that field alone, and it is a line drawn as words. Whether the field is text is the read's to say,
            where the list is in hand: a field that is not text draws as text, as on a reader who cannot write. */
         if (column !== null && typeof column === 'object' && column.edit !== undefined) {
@@ -3821,7 +3821,7 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
         ['.', ','],
       );
 
-    /* OR THE ACCOUNT'S OWN CURRENCY (REC-A03): `{ of: <field>, field: <the account's field> }`, read off the row another
+    /* OR THE ACCOUNT'S OWN CURRENCY: `{ of: <field>, field: <the account's field> }`, read off the row another
        field of the pattern looked up. Which field that is, and that it is a lookup, is the pattern's to say and is asked
        where the whole extract is in hand (`currencyOfFault`). */
     if (only === 'money' && 'currency' in args && !isCur(args.currency) && !isCurrencyOf(args.currency))
@@ -3958,7 +3958,7 @@ const FIELD_ID_RE = /^[a-z][a-z0-9_]{0,31}$/u;
 const NESTING_CEILING = 3;
 
 /**
- * A lookup's three optional keys (REC-A02): `says`, the noun its question uses for what the message printed; `where`, a
+ * A lookup's three optional keys: `says`, the noun its question uses for what the message printed; `where`, a
  * filter over the list; `split`, that the field holds several values parted by commas.
  *
  * EACH IS HELD TO ITS SHAPE HERE, and `where` to the list's fields where the batch says what they are
@@ -4468,10 +4468,10 @@ function createFault(
  *             it signs with, and the state a row moves to when an agent takes it (`HAND_PARTS`, `handFault` below).
  *             The app's "Hand to" reads it, and nothing in the kernel names the list that declares it.
  *   `once`    the fields an add-on plants and never patches: its own later write (`WriteContext.pack`) leaves them as
- *             a row holds them, and a person's edit is not narrowed (the write path in `index.ts`, SHL-A09).
+ *             a row holds them, and a person's edit is not narrowed (the write path in `index.ts`).
  *   `same`    `{ fields, within?, fold, keep? }`: what makes two of its rows the same thing, its text `fields` folded by
  *             `fold` (`text` or `exact`) within one value of `within`, its scope or a link; `keep` is which of two is
- *             kept, `oldest` unless it says `latest` or `sealed` (`sameFault` below, `entities.ts`'s `rowKeys`, AGT-C13).
+ *             kept, `oldest` unless it says `latest` or `sealed` (`sameFault` below, `entities.ts`'s `rowKeys`).
  *
  * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits that the document does
  * not publish. They landed in a change that did not include the document or that test.
@@ -4539,7 +4539,7 @@ const SAME_KEEPS = ['oldest', 'latest', 'sealed'] as const;
 const KEEPS_OWN_KEYS = ['meets', 'org', 'scopes'] as const;
 
 /**
- * Why a list's `same:` would key its rows by what they cannot hold, or `null` when it can be read (AGT-C13).
+ * Why a list's `same:` would key its rows by what they cannot hold, or `null` when it can be read.
  *
  * EVERY PART IS CHECKED HERE, AT INSTALL, because a key built from a field a row does not have is no key at all: every
  * row would answer to nothing, and the duplicates it was declared against would stay. `within` is where two rows must
@@ -5494,7 +5494,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     const over = patternFault((decl.body as { when?: unknown }).when, decl.id);
     if (over) return over;
 
-    /* A LINK THAT FILTERS OR TAKES A FIELD THE LINKED LIST DOES NOT DECLARE (`rules.ts` `linkFault`, REC-B10). Compiled,
+    /* A LINK THAT FILTERS OR TAKES A FIELD THE LINKED LIST DOES NOT DECLARE (`rules.ts` `linkFault`). Compiled,
        such a filter matches nothing, so the rule installed and filed nothing for ever. A list not installed yet is not
        refused here: such a link has always linked nothing. */
     if (installed) {
@@ -5979,7 +5979,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     if (fault) return fault;
   }
 
-  /* A LIST'S OWN ORDER (PGS-B06): what a read of it that names no order comes back in, where it came back by last change.
+  /* A LIST'S OWN ORDER: what a read of it that names no order comes back in, where it came back by last change.
      One field of this list that sorts, read lowest first or, with `dir: desc`, highest first: the Ledger by its date,
      newest first. A money field does not sort, since two amounts in two currencies have no order. */
   if (decl.body.order !== undefined) {
@@ -7291,7 +7291,7 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
          day's rate into the currency the figure is held in, the one it declares or else the home one. It was dropped, and
          the figure was held to the number written beside the setting instead, whatever the person had typed. With no
          rate, or no currency to hold it in, that number still stands, since a sum in one currency is never read as
-         another's. ONLY THE HOME CURRENCY THE RECORD RECORDED BEFORE THIS ONE (`homeBefore`, audit 16 M6): a limit
+         another's. ONLY THE HOME CURRENCY THE RECORD RECORDED BEFORE THIS ONE (`homeBefore`): a limit
          typed in a third currency, which was never the record's, is not floated with the day's rate either. */
       const into = currency ?? home;
       const fx = ctx?.fx?.();

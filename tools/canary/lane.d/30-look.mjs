@@ -1,5 +1,5 @@
 /**
- * The lane's third step: the look at the canary, every screen at 390 and 1512, light and dark (PRF-A09).
+ * The lane's third step: the look at the canary, every screen at 390 and 1512, light and dark.
  *
  * `tools/look/run.mjs --source canary --set all`, drawn through the session `20-signin-live.mjs` kept, into
  * `LANE_OUT/look`, which the workflow hangs on the run as the canary's sheet. The canary's data is invented, so the

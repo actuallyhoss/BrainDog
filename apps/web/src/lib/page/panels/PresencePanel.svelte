@@ -6,7 +6,7 @@
   writes. Tell aims the composer above (`aim`); a stop, a pause or a resume is an instruction the record applies at once,
   and the other panel is told to read again (`told`).
 
-  ON THE AGENTS PAGE, ONE LINE A RUN (the pass of 27 October, `openNow`): each run is named by its app and where it
+  ON THE AGENTS PAGE, ONE LINE A RUN (`openNow`): each run is named by its app and where it
   works ("Claude Code in Lanternfish", "Claude in the Developer folder"), with the last thing it did under it ("Asked you: …",
   "Wrote 3 changes"), how many changes it wrote and when it was last heard. Only those runs are counted. The ones open
   with nothing written fold into one line ("2 open, nothing written") that opens onto them; each machine silent over an
@@ -18,7 +18,7 @@
   READ BY ANYONE WHO READS THE RUNS (`level: read`); the presses are drawn for the owner alone, since only a person
   signed in as the owner can instruct.
 
-  SCOPED WHERE ANOTHER SCREEN HOLDS IT (plan §7.2): `run` draws that one run (Today's run sheet), `project` the runs on
+  SCOPED WHERE ANOTHER SCREEN HOLDS IT: `run` draws that one run (Today's run sheet), `project` the runs on
   that project (a project's "Working here now"), and `oncount` tells the host how many it draws, for its heading. Both
   keep the full row with its presses, since there the run is what the screen is about.
 -->
@@ -116,12 +116,12 @@
   listen(load, () => pressing.size > 0);
 
   const viewOf = (r: LiveRun): PresenceView => {
-    /* ONE RUN ALONE (Today's sheet) SAYS NO PROFILE AND NO BRANCH (Y25). */
+    /* ONE RUN ALONE (Today's sheet) SAYS NO PROFILE AND NO BRANCH. */
     const v = presenceOf(r, rows, projects, threads, { bare: run !== null });
     return { ...v, href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
   };
 
-  /* THE ONE-LINE ROW (the pass of 27 October): who and where ("Claude Code in Lanternfish"), the last thing it did under it,
+  /* THE ONE-LINE ROW: who and where ("Claude Code in Lanternfish"), the last thing it did under it,
      how many changes it wrote, and when it was last heard; never "Working now" again on every row. */
   const projectOf = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
   const lineOf = (r: LiveRun): PresenceView => ({

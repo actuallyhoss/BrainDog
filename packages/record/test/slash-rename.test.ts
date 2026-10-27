@@ -1,7 +1,7 @@
 /**
  * Slash's rename card (`noticeUsage`, THE WORDS FOLLOW USE): which lists it is offered for, and the singular it carries.
  *
- * Three faults the audit of October 2nd found (`loop/research-audit-11-13.md` item 11), each tested below against a
+ * Three faults a review found, each tested below against a
  * reading built by hand, since the rule is pure:
  *   - the card set the singular without its question saying so;
  *   - the singular was made by lowercasing the whole name, so "HSBC cards" became "hsbc card", Boxes "boxe", Series "sery";

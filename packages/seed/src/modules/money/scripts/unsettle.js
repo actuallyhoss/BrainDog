@@ -48,7 +48,7 @@ export function unsettle(item, before, gone) {
   const held = moneyOf(f.paid_so_far);
   const counted = held && held.currency === due.currency ? held.amount : null;
   if (f.state === 'paid' && counted === null) return { nothing: `${name} was marked paid by hand, so the deleted payment changed nothing.` };
-  /* A SUM SOMEBODY TYPED IS LEFT ALONE, as `settle` leaves it (audit 62, claim 1), when what the payment counted for is
+  /* A SUM SOMEBODY TYPED IS LEFT ALONE, as `settle` leaves it, when what the payment counted for is
      known. Not known, the count is written, since the sum the script wrote is the only one it can tell from a typed one. */
   if (Number.isSafeInteger(gone) && counted !== null && counted !== before && counted !== before + gone)
     return { nothing: `${name} has a Paid so far that somebody typed, so the deleted payment changed nothing.` };

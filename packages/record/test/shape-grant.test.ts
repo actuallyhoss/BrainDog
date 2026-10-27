@@ -1,5 +1,5 @@
 /**
- * The shape copy's record half (PRF-A13): an owner's shape grant takes a copy again and again, every other bearer is
+ * The shape copy's record half: an owner's shape grant takes a copy again and again, every other bearer is
  * refused before a row is read, and the copy holds the record's shape and none of its words.
  *
  * THE METHOD FILE OVER A REAL RECORD. `methods/shape.ts` is read on its own, handed the record's kernel and clock, so

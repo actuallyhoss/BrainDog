@@ -1,5 +1,5 @@
 /**
- * Faults: work BrainDog does for itself that keeps failing (AGT-C06).
+ * Faults: work BrainDog does for itself that keeps failing.
  *
  * A FAULT IS NEVER A QUESTION. "Nothing an operator must fix is asked of him". A job that dies at the end of
  * the outbox's ladder, or a scheduled thing that never runs, used to file a question opened by `system`: "infer.resolve
@@ -122,7 +122,7 @@ export function clearFault(sql: Sql, cause: string, nowMs: number): boolean {
 type FaultRow = { cause: string; kind: string; said: string; count: number; first_at: string; last_at: string; error: string };
 
 /**
- * The outbox kinds that died with no line in `fault`, one per kind (audit 36-37, finding 2).
+ * The outbox kinds that died with no line in `fault`, one per kind.
  *
  * MIGRATION 30 CLOSED THE OLD DEAD-JOB QUESTIONS AND RAISED NOTHING IN THEIR PLACE, so the jobs behind them were in no
  * list at all until the next full eight-rung death, a day later or never. So a kind that has `dead` jobs and has never

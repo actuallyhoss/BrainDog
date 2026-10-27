@@ -1,5 +1,5 @@
 /**
- * The provider's own words in a refusal's `detail` (`modelMissing`, audit 35 finding 10): no key survives into them, the
+ * The provider's own words in a refusal's `detail` (`modelMissing`): no key survives into them, the
  * cut is 300, and nothing but the operator's log reads them.
  *
  * WHY THE LAST TEST IS A READ OF THE SOURCE. `detail` is safe because of where it goes, not because of what it holds:

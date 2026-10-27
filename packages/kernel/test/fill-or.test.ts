@@ -1,5 +1,5 @@
 /**
- * `{{path or "words"}}`: what a run writes where a path reaches nothing, said by the rule (SHL-D06).
+ * `{{path or "words"}}`: what a run writes where a path reaches nothing, said by the rule.
  *
  * WHAT WAS WRONG. A run path that reached an empty or missing value was written as the dash, so a note read
  * `Keys: —` and the owner read it as a failed run on brace values (H.774). The rule can now say what goes there.

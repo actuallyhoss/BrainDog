@@ -388,7 +388,7 @@ export const keyDecides = (rows: readonly AgentRow[]): boolean => rows.some((r) 
 export type AgentGroup = { row: AgentRow; chips: AgentRow[] };
 
 /**
- * THE LIST GROUPED BY AGENT (UI audit of 22 October, 11): a kind's row, with each profile of it, and each row bound to
+ * THE LIST GROUPED BY AGENT: a kind's row, with each profile of it, and each row bound to
  * one of its keys or machines, as a chip under it, so twenty rows of "Claude Code as studio" read as one agent with
  * four profiles. A row whose kind has no row of its own, and Defaults, stay rows.
  */

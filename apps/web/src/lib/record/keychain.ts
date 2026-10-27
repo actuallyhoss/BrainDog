@@ -94,7 +94,7 @@ export const words = {
   packInstalled: 'Agents is on.',
   seeds: (n: number) => `${n} example ${n === 1 ? 'row' : 'rows'}, marked example, clearable in one action`,
   touches: 'Nothing you wrote is touched',
-  /* THE OFFER'S FIGURES, FOLDED: forty engineer-worded names were a wall under Settings › Agents (audit C, X16). */
+  /* THE OFFER'S FIGURES, FOLDED: forty engineer-worded names were a wall under Settings › Agents. */
   moreFigures: (n: number) => `and ${String(n)} ${n === 1 ? 'number' : 'numbers'}`,
   conflict: (name: string, pack: string) => `${name} already exists, from ${pack}`,
   /* WHAT AN UPDATE CHANGES. A declaration another pack handed this one is taken over, said by both names; one of its own
@@ -379,7 +379,7 @@ function expiresOf(field: unknown, grant: GrantState | undefined): { expires?: s
  * bytes are gone, does not go on describing them.
  */
 /**
- * WHAT A KEY IS, SAID ONCE (the pass of 27 October): a row of the Keys list that is not retired. The Keychain lists
+ * WHAT A KEY IS, SAID ONCE: a row of the Keys list that is not retired. The Keychain lists
  * and counts these; the Keys list itself, and Search's "every entry, finished ones too", count the retired as well, so
  * the Keychain says how many are retired beside its own count and the two add up.
  */

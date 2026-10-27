@@ -1,5 +1,5 @@
 /**
- * The profiles placed again after `braindog update` swaps the command (AGT-A04, job 2).
+ * The profiles placed again after `braindog update` swaps the command.
  *
  * WHY IT RUNS THE NEW FILE AND NOT THIS ONE. The Agent Skill rides inside the bundle as `__SKILL__`, and the hook shims
  * are written beside the bundle by `hookScripts()`, so what `install --apply` places is whatever the running build

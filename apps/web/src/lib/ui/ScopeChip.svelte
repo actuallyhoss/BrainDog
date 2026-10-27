@@ -1,6 +1,5 @@
 <!--
-  Where a row applies, as one chip: the project's 8px dot in its slot and its name, or the globe and "Everywhere" (the
-  UI pass of 20 October, 2.A.12). It is `Chip`'s box: 28 tall, radius 8, `--tile-2`, the name at `--fs-ctl`.
+  Where a row applies, as one chip: the project's 8px dot in its slot and its name, or the globe and "Everywhere". It is `Chip`'s box: 28 tall, radius 8, `--tile-2`, the name at `--fs-ctl`.
 
   Every row of a list with a `scope` field wears it, on its list, on its page and in Needs you, so the answer to "which
   project is this for" reads the same wherever the row is. IN A META LINE (`inline`) it is no box at all: the dot and

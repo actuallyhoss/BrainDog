@@ -1,5 +1,5 @@
 /**
- * A table's rows in groups (ENG-B10): each group under its own heading, its name once and its count, in both renderers.
+ * A table's rows in groups: each group under its own heading, its name once and its count, in both renderers.
  *
  * THE ROWS CARRY THEIR GROUP BY NAME, `group` on the row, as a host builds them from the record's `PageRow.group`
  * (`apps/web/src/lib/record/page-live.ts`). The kernel's read that puts a state's group on a table's rows was being

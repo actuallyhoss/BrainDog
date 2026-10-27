@@ -1,6 +1,5 @@
 <!--
-  A chip: a short label in its own small box, or, given a tone, a state as its dot and its word (the UI pass of
-  20 October, 2.A.12).
+  A chip: a short label in its own small box, or, given a tone, a state as its dot and its word.
 
   THE BOX IS NEVER A PILL. 28 tall, radius 8, `--tile-2`, the word at `--fs-ctl` in `--ink-2`: the shape of a control's
   label, so a chip beside a button reads as one family. Pills are for counts only (`Count.svelte`).

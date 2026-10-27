@@ -583,7 +583,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     },
     {
       /**
-       * `look.theme`: which installed look the person is drawn in (PGS-A21, `packages/record/src/theme-pick.ts`). The
+       * `look.theme`: which installed look the person is drawn in (`packages/record/src/theme-pick.ts`). The
        * record reads the pick at `boot` and answers that look's tokens, so the page's accent is the measurement, as it is
        * for `look.accent`. Unset, the record draws its own look; `house` is the house look on purpose.
        *
@@ -697,7 +697,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    *
    * IT USED TO SAY THE KEY "CHANGES NO SCREEN AT ALL", AND THAT WAS FALSE. Settings promises a muted rule's notices leave
    * the person's digest, and Today's activity is a screen; it drew muted notes all the same, and the excuse is what kept
-   * anybody from looking (`loop/research-audit-11-13.md`). Whether a muted note leaves Today is the record's to test, where
+   * anybody from looking. Whether a muted note leaves Today is the record's to test, where
    * the activity block is built: `packages/record/test/activity-muted.test.ts`.
    *
    * `agents.answer_on_word` DRAWS NOTHING: it decides whether an agent's answer on the owner's word is taken, and the

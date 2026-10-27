@@ -61,7 +61,7 @@ const stampOf = (result) => result?._meta?.braindog?.stamp ?? null;
  * A task the record holds, by its spoken id, for the `get` read, or `null` when the list named none.
  *
  * ASKED, NEVER ASSUMED. The bench read `tasks#1`, which his record deleted long ago: `get` was refused 30 times of 30
- * (24 Oct, H1) and its time was a refusal's. The newest task the list answers is one that is there.
+ * (24 Oct) and its time was a refusal's. The newest task the list answers is one that is there.
  */
 export function rowOf(result) {
   const rows = result?.structuredContent?.rows;

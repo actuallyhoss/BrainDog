@@ -324,7 +324,7 @@ test('EXPECT.JSON NAMES ONLY PAGES THE SHEET HAS, and every rule says where to l
     assert.ok(file.rules.some((r) => r.page === page), `no rule is read on ${page}`);
 });
 
-/* ── 1.1.0: a project's own values, and a day in two zones (PGS-B03 job d, PGS-B04) ──────────────── */
+/* ── 1.1.0: a project's own values, and a day in two zones (PGS-B03 job d) ──────────────── */
 
 /** 1.0.0 as the catalogue published it at 63423720, never changed in place: the version an update starts from. */
 const RELEASED = new URL('../../apps/web/static/catalogue/packs/rule-sheet/1.0.0.pack.json', import.meta.url);

@@ -2,8 +2,8 @@
  * Batch 47's kernel index lines, one case a line (kernel-index-47): each goes red when its line in `index.ts` goes.
  *
  * The leftovers of 43 to 45 (the replay mark, the host's build, a one-block preview's inbox reach, the key scan's
- * night), the runs carried in and the beat (AGT-C10, AGT-C03), the queue's draw bound as one list (AGT-B03), a script's
- * question (F61), and the hand marks that end the hold's green days (PRF-A18). Each is read through the kernel's own
+ * night), the runs carried in and the beat, the queue's draw bound as one list, a script's
+ * question, and the hand marks that end the hold's green days. Each is read through the kernel's own
  * verbs, as a host reaches it, never through the module the line calls.
  */
 

@@ -1,6 +1,6 @@
 /**
  * A match the record made by itself carries its Undo: `isFold` says a batch is one, and `foldPlan` says what putting it
- * back would do, in names, before anything is done (ENG-B04, "shown with Undo").
+ * back would do, in names, before anything is done ("shown with Undo").
  *
  * What is asserted is that the plan is a reading and nothing else. It writes no line, it names people and never their
  * ids, it leaves what somebody changed since and says so, and `undoMerge` then does what it said.

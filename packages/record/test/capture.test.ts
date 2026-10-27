@@ -1,5 +1,5 @@
 /**
- * `capture` (use case 6, step 5; EXP-D10): one sentence kept as several entries across lists under one batch, so one
+ * `capture` (use case 6, step 5): one sentence kept as several entries across lists under one batch, so one
  * Undo takes them all back; all or none; one to eight; a retry answers the first call's batch.
  *
  * THE METHOD FILE OVER A REAL KERNEL. The record's own guards are stood in for by ones that refuse as they do: a shared

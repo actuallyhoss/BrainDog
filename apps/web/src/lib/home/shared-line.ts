@@ -1,5 +1,5 @@
 /**
- * Today's one line about what the owner has shared out (sharing plan §3.5, T12): the words and the link's own words.
+ * Today's one line about what the owner has shared out: the words and the link's own words.
  *
  * ASKED AFTER TODAY HAS DRAWN (`sharedOut`, an owner's or an Admin's), never a part of `boot`, which an owner is
  * answered byte for byte as before sharing.
@@ -9,7 +9,7 @@
  * the shares are with, by name, "Shared with Priya, Sam and 2 more.", and "See who". `needs` is the record's: a wide
  * share made today on an account with no passkey to have confirmed it, the one line of its kind drawn in red.
  *
- * Digits, never number words (SF14); names, never ids; no em dashes.
+ * Digits, never number words; names, never ids; no em dashes.
  */
 
 /** What `sharedOut` answers: live shares, who they are with by name, those made today, and whether one needs him. */

@@ -1,5 +1,5 @@
 /**
- * The record's `engineReadings` on a self-host (ENG-B01): `src/server.ts` hands the record the ledger Slash writes.
+ * The record's `engineReadings` on a self-host: `src/server.ts` hands the record the ledger Slash writes.
  *
  * `engineLedgerRead` reads `slash_call` out of the Slash SQLite and the record counts it by purpose. Until the host
  * handed that read to the record as `engineLedger` the method answered `null` here, whatever Slash had been asked. This

@@ -1,5 +1,5 @@
 <!--
-  A block of a project's own page (C28, C29, 24 October; the page of 27 October): `parts` says which parts, each laid at
+  A block of a project's own page (24 October; the page of 27 October): `parts` says which parts, each laid at
   its width by what it has (`project-parts.ts` `rowLaid`): stacked under 1100px, and from there in twelfths, a block of
   many parts laid a line at a time.
 
@@ -39,7 +39,7 @@
 
   let { hold, parts }: { hold: ShapeHold; parts: readonly string[] } = $props();
 
-  /* WHO WROTE THE LINE, on hover: the model, from this project's figures (C4). */
+  /* WHO WROTE THE LINE, on hover: the model, from this project's figures. */
   const WROTE = 'Written by BrainDog from this project’s figures';
   /* THE RUNS-ON LINES SHOWN BEFORE "AND N MORE". */
   const LINES_SHOWN = 6;

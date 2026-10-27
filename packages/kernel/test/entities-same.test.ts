@@ -1,5 +1,5 @@
 /**
- * A list declaring `same:` keys its rows by what they say (AGT-C13): `same:<list>:<where>:<what>`, one live row per key
+ * A list declaring `same:` keys its rows by what they say: `same:<list>:<where>:<what>`, one live row per key
  * and the first keeps it, as a person's keys are kept. Two skills called `Ponytail` and `ponytail (copy)` in one
  * project are one thing; the same name in two projects is two; `exact` keeps the spellings apart. A person's keys are
  * what they were.

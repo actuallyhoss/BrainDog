@@ -1,5 +1,5 @@
 /**
- * THE KEY SENTENCE (SHL-A11): what an install sends out, said by key label and host, from the plan's `calls_out`.
+ * THE KEY SENTENCE: what an install sends out, said by key label and host, from the plan's `calls_out`.
  *
  * The plan already carries every action that would leave the record (`@braindog/declare`'s `Diff.calls_out`). The
  * approval read `CALLS OUT api.stripe.com · every 1h · grant "stripe"`, which is the diff's line, not a sentence.

@@ -21,7 +21,7 @@ export type Methods = {
   passkey: boolean;
   /**
    * Whether an emailed link signs in here. `'down'` is a host that offers links whose mail is not going out now (no
-   * sender, or its last sends failed): the page offers no link then and says so (LCH-A04).
+   * sender, or its last sends failed): the page offers no link then and says so.
    */
   magic: boolean | 'down';
   /** The self-host's server key is accepted here. */
@@ -240,7 +240,7 @@ export async function passkeySignIn(io: Io = live()): Promise<Said<Who>> {
 }
 
 /**
- * "Confirm it's you", inside the Share sheet (sharing plan §6, default 1): a passkey asked for where the person is,
+ * "Confirm it's you", inside the Share sheet (default 1): a passkey asked for where the person is,
  * which replaces the session with one proved now, as `afresh` does. NEVER A SIGN-IN PAGE: where no passkey can be asked
  * for here this answers false and the sheet says so, because the record asks for a proof only of somebody who has a
  * passkey to give.
@@ -293,7 +293,7 @@ const CHALLENGE_LIFE = 300_000;
 
 /**
  * Offer this site's passkeys in the email field's autofill (`autocomplete="username webauthn"`), so a returning phone
- * signs in with one touch and nothing typed (LCH-A04).
+ * signs in with one touch and nothing typed.
  *
  * ONE CHALLENGE AT A TIME. The offer holds the browser's one pending request and one challenge from
  * `/auth/passkey/assert/options`. A button pressed on the page calls `stop` and waits for it before asking for its own,
@@ -362,7 +362,7 @@ async function afresh<T>(io: Io, run: () => Promise<Said<T>>): Promise<Said<T>> 
 }
 
 /**
- * The name a new passkey is given, from the device that made it (LCH-A04).
+ * The name a new passkey is given, from the device that made it.
  *
  * A LIST OF KEYS THAT ALL SAY "Unnamed" CANNOT BE PRUNED. Recovery asks a person to keep more than one passkey, and
  * then to remove the one on the phone they lost, which they can only do if the rows say which is which. The host has
@@ -441,7 +441,7 @@ export async function removePasskey(id: string, io: Io = live()): Promise<Said<n
 }
 
 /**
- * Give one of the person's own passkeys a name (`POST /auth/passkey/rename`, LCH-A04), and answer the passkey as the
+ * Give one of the person's own passkeys a name (`POST /auth/passkey/rename`), and answer the passkey as the
  * host now holds it. What a name may be is the host's to say: one line, at most 64 characters, trimmed, and an empty
  * one refused with its sentence, which comes back as `refused` with `fix`. A name changes no way in, so no fresh proof.
  */
@@ -453,7 +453,7 @@ export async function renamePasskey(id: string, label: string, io: Io = live()):
 }
 
 /**
- * Sign out from the frame's account menu, then load the sign-in screen in full (LCH-A04).
+ * Sign out from the frame's account menu, then load the sign-in screen in full.
  *
  * A FULL LOAD AND NOT A MOVE, for the reason the sign-in page's onward buttons are full loads: everything this tab
  * holds was read under the session that just ended, and a client-side move would draw it again. `go` is

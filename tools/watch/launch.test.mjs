@@ -1,5 +1,5 @@
 /**
- * The outside watch (`tools/watch/launch.mjs`, LCH-C01) against a stub server: every question asked over real HTTP with
+ * The outside watch (`tools/watch/launch.mjs`) against a stub server: every question asked over real HTTP with
  * `redirect: 'manual'`, the stub answering each URL the watch names as the test tells it.
  *
  * THE STUB IS ONE PLAIN-HTTP SERVER ON LOOPBACK, and the watch's `ask` sends each question to it with the URL the watch
@@ -207,7 +207,7 @@ test('QUESTION 7: open beside a reason that stops sign-up is a miss, as a build 
   assert.ok(lines.includes(`           why: ${refused}`));
 });
 
-/* AUDIT 36-37, FINDING 12: THE WATCH IS HELD TO launch.ts'S EXPORTED STOPPING, and to a sentence nobody has written yet.
+/* THE WATCH IS HELD TO launch.ts'S EXPORTED STOPPING, and to a sentence nobody has written yet.
    The regex this replaced let a stop sentence through that did not end on its two phrases; the last case is one. */
 test('QUESTION 7 MISSES EVERY STOPPING SENTENCE BESIDE open OR invite, AND A NEW ONE', async () => {
   const novel = 'The letter service refuses this host, so sign-up waits.';

@@ -413,7 +413,7 @@ export type Helpers = number | readonly unknown[] | null | undefined;
 /**
  * A run's helpers as its card says them, "1 helper" or "9 helpers", or null for none or none said.
  *
- * A RUN THAT STARTED NINE HELPERS READ AS ONE QUIET CARD (AGT-C12): the read folds each run's helpers under it, so the
+ * A RUN THAT STARTED NINE HELPERS READ AS ONE QUIET CARD: the read folds each run's helpers under it, so the
  * Agents page counted one agent at work and nothing on the card said how much was running under it. The line sits
  * under the card's sentence in the reply's quieter voice, and a run with no helpers draws nothing, as an empty reply
  * draws nothing.

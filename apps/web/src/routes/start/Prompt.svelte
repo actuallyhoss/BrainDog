@@ -1,5 +1,5 @@
 <!--
-  THE PROMPT, ONE PART FOR /start AND /signup (USE-B06): the box and its chips while the person types, the line of what
+  THE PROMPT, ONE PART FOR /start AND /signup: the box and its chips while the person types, the line of what
   was said once it is read, and the questions under it (`questionsOf`, `$lib/start/questions.ts`), at most two.
 
   MOVED AS IT IS from the two pages, so no look changes: the field at the size of a sentence in the well, the chips as

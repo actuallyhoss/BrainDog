@@ -26,7 +26,7 @@ import type { Also, Source } from './index.ts';
  * the project's own, so a host fills the card's `quiet` role from it and draws the global rows faint, as it draws a run
  * gone quiet on `sessions.live`. A declaration does not name that role (`declare.ts` `CARD_ROLES`).
  *
- * `used_runs` AND `used_agents` SAY WHO USED IT, AND HOW OFTEN, over ninety days (AGT-D12): how many runs, and the agents
+ * `used_runs` AND `used_agents` SAY WHO USED IT, AND HOW OFTEN, over ninety days: how many runs, and the agents
  * of those runs by name, newest first and three at most, "Claude Code, Codex". `used_agent` stays beside them, the one
  * agent of the run that used it last, for the pages that name it. A thing nobody used has 0 and nothing.
  *

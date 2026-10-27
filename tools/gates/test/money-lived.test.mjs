@@ -10,7 +10,7 @@
  * does not hold, naming it.
  *
  * TWO RECORDS. The first is the person in London the steps were written for. The second is in Cairo, whose rest days are
- * Friday and Saturday, and walks the paydays (REC-B13): a line on "15, last", one on the 30th, and one on the 30th moved
+ * Friday and Saturday, and walks the paydays: a line on "15, last", one on the 30th, and one on the 30th moved
  * to the working day before. Each is its own file in memory, its own clock pinned to the seed's today.
  */
 

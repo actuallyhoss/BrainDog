@@ -1,5 +1,5 @@
 /**
- * Count the cash, seen on Money (REC-B18, 1.4.0): with the pack installed, Money has a box to count the cash in while a
+ * Count the cash, seen on Money (1.4.0): with the pack installed, Money has a box to count the cash in while a
  * balance there is old, and the newest count says how far out the record was and what happened.
  *
  * BEFORE 1.4.0 NOTHING OF IT WAS ON MONEY. The pack compared a count against the rolled figure and filed the difference,
@@ -7,7 +7,7 @@
  * to count the box had to find the Cash counts list first. The two blocks are the pack's `adds`, read by the record's
  * own install path, so taking the pack out takes them off the page and leaves Money's own declaration as it was.
  *
- * WITH HEADS UP SINCE 1.4.1. 1.4.0 placed both after What it holds today, and the UI pass of 20 October took that box off
+ * WITH HEADS UP SINCE 1.4.1. 1.4.0 placed both after What it holds today, and the redesign took that box off
  * Money (Heads up's line on the oldest balance says Update balances instead), so an `after` naming it laid both at the
  * foot of the page, under Where it went. They follow Heads up now, a heading Money has kept since money-core 3.5.0, and
  * stand in the main column: inside Heads up's box where it is in the main column (3.16.0), and under the Ledger beside it

@@ -1,5 +1,5 @@
 /**
- * `most`: HOW MANY OF A REPEATING BLOCK ARE DRAWN BEFORE THE REST WAIT BEHIND "Show all N" (EXP-B10: a page
+ * `most`: HOW MANY OF A REPEATING BLOCK ARE DRAWN BEFORE THE REST WAIT BEHIND "Show all N" (a page
  * shows less rather than more). A block of fourteen cards drew all fourteen down a page; it draws six now, and the app opens
  * the rest in place while the export says how many it left out. One answer for both drawers, so `Cards.svelte` and
  * `html.ts` cut at the same card and the parity test holds them to one tree.

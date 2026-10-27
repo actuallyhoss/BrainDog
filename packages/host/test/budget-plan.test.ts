@@ -1,9 +1,9 @@
 /**
- * The background allowance is one pool with a floor for each purpose, and no purpose starves another's floor (ENG-A10).
+ * The background allowance is one pool with a floor for each purpose, and no purpose starves another's floor.
  *
  * THE MONTH USED TO BE CUT BY WALLS: so many for the page headlines and no more, so many for reading who is who inside
  * the rest. A wall holds a purpose back while the month still has room nobody else is owed, and it lets the rest spend
- * what reading was owed. The plan (`../src/budget-plan.ts`, `loop/scope/area-engine-a.md` "The budget's plan") keeps a
+ * what reading was owed. The plan (`../src/budget-plan.ts`,  "The budget's plan") keeps a
  * floor for each purpose and lets any of them spend what is left once the floors nobody has used yet are set aside.
  *
  * The first tests are pure. The last ones go through `backgroundMeter` over a ledger built here, as

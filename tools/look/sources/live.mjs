@@ -1,7 +1,7 @@
 /**
  * `live:<record>`: a real record, read through the command's own sign-in, and nothing pressed.
  *
- * A FORWARDER THAT CANNOT PRESS (`loop/scope/area-proof-a.md` 2.4). The allow-list is the host's own route table:
+ * A FORWARDER THAT CANNOT PRESS. The allow-list is the host's own route table:
  * a route goes on only when its row says `writes: false` (or `postRead`, a read sent as a POST) and it sits in one of
  * the two reading groups, DATA and READ+. Every other request is answered here with a refusal and counted, so a screen
  * that tries to write while it only draws shows up as "writes blocked" above 0 and never reaches his record. When a
@@ -148,7 +148,7 @@ export async function open(record, { env = process.env, now = Date.now(), send =
   }
 
   /**
-   * THE STORE'S CATALOGUE IS PUBLIC, SO IT IS READ AS ANYBODY READS IT (the audit of 25 October, Y9): a GET or HEAD
+   * THE STORE'S CATALOGUE IS PUBLIC, SO IT IS READ AS ANYBODY READS IT: a GET or HEAD
    * under `/api/kennel/v1/`, with no query, sent with no token and nothing of the page's. Refused, Browse drew only the
    * built-ins and an add-on's page said it was gone.
    */

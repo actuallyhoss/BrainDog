@@ -18,10 +18,10 @@
  * answered every few minutes through the days the model that writes did not, and health said "answering" for all of them.
  *
  * NO MODEL ID, JOB NAME OR CODE IN WHAT A PERSON READS. `said` names the model as "Slash's model" and the key as "your own
- * key", because a person cannot act on `@cf/...` or `UNREACHABLE`; the operator reads those in the Worker's log
- * (ENG-A01), which is where the provider's own words are kept.
+ * key", because a person cannot act on `@cf/...` or `UNREACHABLE`; the operator reads those in the Worker's log,
+ * which is where the provider's own words are kept.
  *
- * BESIDE THE SENTENCE, WHAT SETTINGS SAYS UNDER IT (ENG-A05, ENG-A06, "health shown"): which model answered
+ * BESIDE THE SENTENCE, WHAT SETTINGS SAYS UNDER IT ("health shown"): which model answered
  * last and when, the provider's own words for the newest failure (scrubbed again, never a key), how many asks needed a
  * second model, and this month's asks by whose allowance they spent. "Rules are the fallback, not the engine.":
  * a fallback that doubles the bill unseen is the risk the scope names, so the share is read here and not guessed.
@@ -38,7 +38,7 @@ export type EngineHealth = {
   /** The first failure after `last_ok`, where the state is a failure, and `null` otherwise. */
   since: string | null;
   /*
-   * WHAT THE LEDGER SAYS BESIDE THE STATE (ENG-A05, ENG-A06), each ABSENT AND NEVER ZERO OR NULL where the ledger has
+   * WHAT THE LEDGER SAYS BESIDE THE STATE, each ABSENT AND NEVER ZERO OR NULL where the ledger has
    * nothing to say: a host restates the three fields above (`packages/host/src/engine-health.ts`) and its tests hold a
    * failing ledger to exactly them, and an older host hands none of these, so a reader treats absent as "not said".
    */
@@ -100,7 +100,7 @@ export const LEDGER_ANSWERED =
  * An ask turned away because the month's asks were spent: neither an answer nor a failure, and never one of the two above.
  *
  * `health` passes it over, since Settings says the month's meter beside it (`asks` in `status`), but the vital sign reads
- * it as a fact of its own: before this, five answers and then fifty refusals read "answered all 5" there (audit 40-42, 5).
+ * it as a fact of its own: before this, five answers and then fifty refusals read "answered all 5" there (5).
  * `SPARK_BUDGET_SPENT` is the old name `call.ts`'s migration renames, kept so a ledger not yet migrated counts the same.
  * UNDER `-` ONLY (`TURNED_AWAY_SQL`): a per-call neuron ceiling refuses under the model's own name (the worker's
  * `budgetSpent`), and that is one call too large, never the month spent.

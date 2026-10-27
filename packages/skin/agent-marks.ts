@@ -14,8 +14,8 @@
  * draw in black or white are drawn in `--ink`, so they turn over with the scheme.
  *
  * THE APPS' MARKS (the owner's notes: real marks, never drawn ones) are the two the site names that are
- * no agent of the app's own: ChatGPT, OpenAI's mark from LobeHub's icon set (MIT), and VS Code, from Simple Icons 9
- * (CC0), in its blue (`--agent-vscode`, Look B's tokens). They sit apart from `AGENT_MARKS` because that table's ids
+ * no agent of the app's own: ChatGPT, OpenAI's mark from LobeHub's icon set (MIT), and VS Code, from Simple Icons 9,
+ * in its blue (`--agent-vscode`, Look B's tokens). They sit apart from `AGENT_MARKS` because that table's ids
  * are the app's agents and the host's header words, and `openai` already names Codex. `markOf` draws either by name.
  */
 

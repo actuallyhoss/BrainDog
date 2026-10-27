@@ -492,7 +492,7 @@ test('a cash walk, a feed and a diff the record answered are drawn from its answ
   assert.equal(feed.cannot, undefined, 'a feed the record read was drawn as one it cannot');
   assert.deepEqual(feed.rows.map((r) => r.cells[0]), ['agent', 'seen', 'you'], 'the read mark sits under the rows newer than it');
   assert.notEqual(feed.rows[1]!.cells[1], '', 'a reader with a read mark was drawn as one who has not looked');
-  /* A BURST SAYS ITS ALIKE LINES IN WORDS AFTER IT, and a note reads on from who wrote it (the audit of 25 October, Z22). */
+  /* A BURST SAYS ITS ALIKE LINES IN WORDS AFTER IT, and a note reads on from who wrote it. */
   assert.equal(feed.rows[0]!.cells[2], '1');
   assert.equal(feed.rows[0]!.cells[5], 'and 1 more like this');
   assert.equal(feed.rows[0]!.cells[3], 'deleted Kiln', 'a row the record named was drawn by its id');
@@ -970,7 +970,7 @@ test('A SUM OVER A FIELD NOBODY HAS FILLED IN DRAWS NO VERDICT AND NO DOOR, and 
   assert.ok((said as { href?: string } | undefined)?.href, 'and keep their door');
 
   /* AND A FIGURE MADE OF TWO HALVES IS ONE TOO, which the first writing of this test did not hold:
-     an audit measured that `reducedFields`' pair branch could be deleted whole and
+     testing measured that `reducedFields`' pair branch could be deleted whole and
      this file stayed 26 of 26, while `projects-earning-change` (`diff` of two sums, both over
      `revenue is set`) is a tile the Overview draws. */
   const change = blockOf(
@@ -1053,7 +1053,7 @@ test('A BAR OVER A LIST OF LINKS FINDS THE ROWS IT NAMES, whether the element ar
 
 /**
  * A FIGURE GROUPED BY A REF IS KEYED BY ULIDS, and the founder's Today drew each one: "Book #01M3VMPSHV07AM4S51WDTFM5XG"
- * beside the cash in it (`loop/research-real-record.md`). A `metric.` source names no list, so no list was walked to name
+ * beside the cash in it. A `metric.` source names no list, so no list was walked to name
  * the parts, and `display` read the ULID as a row number.
  */
 test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own label first, and never by its id', async () => {
@@ -1300,7 +1300,7 @@ test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules'
   const said = blockOf({ ...lead, said: 'GBP 33,850.00 across HSBC and Monzo, steady on last month.' }, new Map(), AT);
   assert.equal(said.body, 'GBP 33,850.00 across HSBC and Monzo, steady on last month.');
   assert.equal(Object.hasOwn(said, 'said'), false, 'the line rode through onto the block as a key of its own');
-  /* AND IT SAYS THE MODEL WROTE IT (C4), so a project's hero that says it in place of the rules' line can say who wrote it. */
+  /* AND IT SAYS THE MODEL WROTE IT, so a project's hero that says it in place of the rules' line can say who wrote it. */
   assert.equal(said.modelLine, true);
   assert.equal(blockOf(lead, new Map(), AT).modelLine, undefined);
   /* A LINE THAT IS NOT TEXT, OR IS BLANK, IS NO LINE: the rules say theirs. */
@@ -1596,7 +1596,7 @@ test('a day figure answered as its ISO day is said as the day, with its paramete
   assert.equal(resolverOf({ note: '2027-06-01' })('note'), '2027-06-01', 'a word that is no day figure is said as written');
 });
 
-/* A STORE PREVIEW DRAWS A LIST THE RECORD DOES NOT HOLD YET (audit C of 25 October, X11): with no rows to label there is
+/* A STORE PREVIEW DRAWS A LIST THE RECORD DOES NOT HOLD YET: with no rows to label there is
    nothing it cannot draw, so it says its heading and its own empty line, never that it cannot be drawn. */
 test('an empty table on a list this record does not hold draws its heading and empty line', () => {
   const block = blockOf(

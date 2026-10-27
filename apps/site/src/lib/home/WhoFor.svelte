@@ -1,13 +1,13 @@
 <!--
-  "Who it's for" (site F2, 2a section 2): three readers, three tiles, each with its own fill, a real icon in a 40px
+  "Who it's for" (2a section 2): three readers, three tiles, each with its own fill, a real icon in a 40px
   well, a title, one line, a small drawing that differs per tile, and the way on. Fills are category slots, not status
   hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for client work. The words are
   `copy/home.ts`; the names in the drawings are Maya's (`demo/maya.ts`).
 
-  CLIENT WORK IS DRAWN WITH AGENTS, SINCE THE AUDIT OF 22 OCTOBER (U-C5): one person and Claude, Cursor and Codex is what
+  CLIENT WORK IS DRAWN WITH AGENTS: one person and Claude, Cursor and Codex is what
   brain.dog takes today, so the faces are the makers' marks, never colleagues.
 
-  ON A PHONE, THREE PLAIN LINES (U-C10): each tile is its icon and its way on, one line with an arrow, and the title is
+  ON A PHONE, THREE PLAIN LINES: each tile is its icon and its way on, one line with an arrow, and the title is
   said to a screen reader. The cards and their sentences were most of a screen at 390.
 -->
 <script lang="ts">
@@ -233,7 +233,7 @@
     }
   }
 
-  /* ON A PHONE each tile is one plain line, its icon and its way on with the arrow (U-C10): the drawings and the sentences
+  /* ON A PHONE each tile is one plain line, its icon and its way on with the arrow: the drawings and the sentences
      are a desk's luxury, and the title is said to a screen reader. */
   @media (max-width: 760px) {
     .draw,

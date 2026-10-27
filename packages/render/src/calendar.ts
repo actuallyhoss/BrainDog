@@ -35,7 +35,7 @@ export const CALENDAR_TODAY = 'Today';
 /** What a strip's week with nothing on it says, where a narrow screen lists only the days that hold something. */
 export const CALENDAR_WEEK_NONE = 'Nothing this week.';
 /**
- * A FEW ENTRIES ARE A LIST, NOT A MONTH (the money review, F5): five bills on a five-week grid spent 520px on empty days
+ * A FEW ENTRIES ARE A LIST, NOT A MONTH (the money review): five bills on a five-week grid spent 520px on empty days
  * and said no amount. A calendar of this many rows or fewer is marked `data-few`, and the host shows its agenda, with
  * each row's amount, in the grid's place; "Month" brings the grid back where the host draws the choice.
  */

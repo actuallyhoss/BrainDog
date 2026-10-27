@@ -1,5 +1,5 @@
 /**
- * A look's widths and columns (`compose.ts`, `span` and `area`, PGS-B07): the person's own look says how wide a block is
+ * A look's widths and columns (`compose.ts`, `span` and `area`): the person's own look says how wide a block is
  * drawn and which column it sits in, so Done in Edit layout keeps them as his look and the page stays the add-on's.
  *
  * ONLY HIS. A rule's or Slash's look places nothing; the install refuses one that tries (`lookPlacesFault`), and the read

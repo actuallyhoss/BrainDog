@@ -1,5 +1,5 @@
 /**
- * MANNERS, ASKED OF A REAL MODEL (AGT-C01 job e, `loop/scope/area-agents-c.md`).
+ * MANNERS, ASKED OF A REAL MODEL (AGT-C01 job e).
  *
  * Ten fresh Claude Code sessions, signed in to the record the way a stranger signs in, are each given one small task in
  * a scratch repository of their own. The prompt names the task and nothing else: what the session knows about its run,

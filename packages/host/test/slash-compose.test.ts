@@ -43,7 +43,7 @@ test('THE ANSWER’S SHAPE HOLDS lead, order, hide, next AND group, and a bare l
     SLASH_COMPOSE_INSTRUCTIONS,
     /\{"headline":"<the line>","lead":"<key>","order":\["<key>"\],"hide":\["<key>"\],"next":\{"row":"<handle>","text":"<the phrase>"\},"group":\{"<key>":"<field>"\}\}/u,
   );
-  /* AND THE THIRD LEVER (ENG-B10): a field it was handed for that part, and none where nothing is long. */
+  /* AND THE THIRD LEVER: a field it was handed for that part, and none where nothing is long. */
   assert.match(SLASH_COMPOSE_INSTRUCTIONS, /only a field handed in that part's `group`/u);
   assert.match(SLASH_COMPOSE_INSTRUCTIONS, /Leave `group` out when nothing is long/u);
   /* WHAT THE RECORD'S CHECKS HOLD EACH PART TO, said first. */

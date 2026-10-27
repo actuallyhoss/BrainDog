@@ -1,5 +1,5 @@
 /**
- * The card the record composes (AGT-B07), held to its shape and its size.
+ * The card the record composes, held to its shape and its size.
  *
  * THE BRIEF IS FIVE SHORT TRUE LINES, NAMES FIRST (batch 108): who and where, then `Next`, `Waiting`, `Learned` and
  * `More`, each left out when it has nothing but the first and last, with a `Signs` line only when a sign names this

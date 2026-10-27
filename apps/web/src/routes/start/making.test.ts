@@ -1,5 +1,5 @@
 /**
- * The record being made, watched (USE-B04, USE-B07): after the press the build's tiles each say "Making", "Made", or
+ * The record being made, watched: after the press the build's tiles each say "Making", "Made", or
  * "Not made" with the record's own sentence, read from the add-ons the record holds every 400 ms while `setup` runs.
  *
  * WHAT IS UNDER TEST IS THE READING, which is plain code (`makingStates`, `watchHeld` in `building.ts`), and the two

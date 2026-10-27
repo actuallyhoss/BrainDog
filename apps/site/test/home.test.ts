@@ -1,5 +1,5 @@
 /**
- * The home page of the UI pass of 20 October (`loop/ui-pass-2026-10-20/site.md` 2a): its words, and the page the
+ * The home page after the redesign: its words, and the page the
  * build writes from them.
  *
  * THE WORDS ARE THE REVIEW'S, with the spec's changes. `copy/home.ts` holds them at the key paths the claims ledger

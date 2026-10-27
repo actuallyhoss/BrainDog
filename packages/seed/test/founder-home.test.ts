@@ -258,7 +258,7 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
   const asBefore = (blocks: Block[]): Block[] =>
     blocks.flatMap((b): Block[] => {
       if (b.kind === 'kpis' || (b.kind === 'steps' && b.heading === 'The road')) return [];
-      /* AND THE PROJECT'S SHAPE AS BLOCKS, SINCE founder 3.3.0 (C28, C29): its two blocks, and More about declared folded
+      /* AND THE PROJECT'S SHAPE AS BLOCKS, SINCE founder 3.3.0: its two blocks, and More about declared folded
          as it was drawn, laid back here too. */
       if (b.kind === 'project') return [];
       if (b.kind === 'section' && b.box === true && b.fold === true) {
@@ -275,7 +275,7 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
       }
       const all = (b.when as { all?: unknown[] } | undefined)?.all;
       if (b.kind === 'roadmap' && Array.isArray(all)) return [{ ...b, when: all[0] }];
-      /* AND FOUNDER 3.4.0 (Z7, Z20 of 25 October): Last worked read the tasks alone, and the numbers were headed thirty
+      /* AND FOUNDER 3.4.0 (Z20 of 25 October): Last worked read the tasks alone, and the numbers were headed thirty
          days, laid back here as 2.6.0 drew them. */
       if (b.kind === 'lines' && b.heading === 'Numbers') return [{ ...b, heading: 'Numbers, 30 days' }];
       if (b.kind === 'stat' && Array.isArray(b.cells))
@@ -291,16 +291,16 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
     const at = rest.findIndex((b) => b.heading === 'More about {{name}}');
     return [...rest.slice(0, at), ...plan, ...send, ...rest.slice(at)];
   };
-  /* AND THE DASHBOARD'S TWO CHARTS SINCE founder 3.4.0 (Z20): the one headed with its age taken out, and the other's
+  /* AND THE DASHBOARD'S TWO CHARTS SINCE founder 3.4.0: the one headed with its age taken out, and the other's
      gate on the age. */
   const dashboardBefore = (blocks: Block[]): Block[] =>
     blocks.flatMap((b): Block[] => {
-      /* AND 3.5.0 (Y16, Y2): the Organisations table leaves out the ones put away. */
+      /* AND 3.5.0: the Organisations table leaves out the ones put away. */
       if (b.kind === 'table' && b.heading === 'Organisations') return [{ ...b, where: 'merged_into is empty' }];
       if (b.kind !== 'lines') return [b];
       if (String(b.heading).startsWith('Numbers, last reported')) return [];
       const all = (b.when as { all?: unknown[] } | undefined)?.all;
-      /* AND THE SHAPE NUMBERS' PAGE DRAWS, two charts and forty listed (3.5.0, Y16). */
+      /* AND THE SHAPE NUMBERS' PAGE DRAWS, two charts and forty listed (3.5.0). */
       const { limit: _limit, most: _most, ...rest } = b as Block & { limit?: unknown; most?: unknown };
       return [Array.isArray(all) ? { ...rest, when: all[0] } : rest] as Block[];
     });

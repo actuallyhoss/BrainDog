@@ -223,7 +223,7 @@ test('THE LINE THE BRIEF GAVE: "words: 12 on 5 screens; counts disagree: in play
   assert.ok(got.lines.every((l) => !l.includes('\u2014')), 'no em dash in what it says');
 });
 
-/* ── blank screens (the audit of 25 October, Z2) ───────────────────────────────────────────────────────────── */
+/* ── blank screens ───────────────────────────────────────────────────────────── */
 
 const DRAWN = { heading: true, words: 240, project: false, hero: false };
 

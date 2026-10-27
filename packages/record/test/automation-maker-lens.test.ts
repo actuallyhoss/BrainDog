@@ -1,5 +1,5 @@
 /**
- * A colleague's automation runs bounded by what that colleague can see (sharing plan §2.12): a rule whose live version
+ * A colleague's automation runs bounded by what that colleague can see: a rule whose live version
  * a person put in who is not an owner now reads and writes through their lens, never the owner's, and once they can no
  * longer reach the record it stops, saying why. Both paths: a rule run inside the write, and a run of steps.
  *

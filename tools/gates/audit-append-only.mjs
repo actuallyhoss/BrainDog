@@ -1,5 +1,5 @@
 /**
- * `audit-append-only`: nothing rewrites the audit log but the statements on one list, each with its reason (REC-A17).
+ * `audit-append-only`: nothing rewrites the audit log but the statements on one list, each with its reason.
  *
  *   node tools/gates/audit-append-only.mjs [root]
  *

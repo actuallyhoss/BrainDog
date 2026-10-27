@@ -178,7 +178,7 @@ const NOT_YET = [
   /\bthe repository is private\b/i,
   /* SIGN-UP OPENED ON 8 OCTOBER, so a sentence that waits for launch or for sign-up to open is false
      the day it is read, and so is one that puts off a part with a vague "soon". `packs.ts` said "Anyone can start a
-     record at launch." beside an open door until the copy audit of 9 October. */
+     record at launch." beside an open door until the copy was checked. */
   /\b(at|after|until|before) launch\b/i,
   /\bwhen the product launches\b/i,
   /\bsign[- ]?ups? opens\b/i,

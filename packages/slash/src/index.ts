@@ -181,7 +181,7 @@ const GRANT_ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/u;
 /**
  * The tier a patch asks for, or `undefined` for one that leaves it: `source` first, then the older `tier`.
  *
- * `included` IS `a` WHATEVER `tier` SAYS (ENG-A07, "tiers a/b/byo become included or own key"). It once answered `byo`
+ * `included` IS `a` WHATEVER `tier` SAYS ("tiers a/b/byo become included or own key"). It once answered `byo`
  * where the patch said `byo` too, so a save from the settings door could still write the third form the owner retired.
  * A row already stored on `byo` is left as it was saved and reads as `included` with its model name (`status`, and the
  * save of nothing below), so a self-host that set it keeps its model and its count. A bare `tier` is the store's own
@@ -320,7 +320,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     const model = typed === null ? null : typed.trim();
     if (tier !== 'a' && (model === null || model === ''))
       return no('VALUE_MALFORMED', 'Name the model your key or your endpoint answers with.', { at: 'model' });
-    /* "INCLUDED" ON A SELF-HOST TAKES A MODEL NAME, the one its own endpoint serves, where `byo` used to (ENG-A07). A host
+    /* "INCLUDED" ON A SELF-HOST TAKES A MODEL NAME, the one its own endpoint serves, where `byo` used to. A host
        runs a typed name on its endpoint where it runs `byo` at all; the Cloud names `a` and `b` alone, and there a name on
        tier `a` would go to the included model's own table, which is why it is dropped there. A name is kept where this
        patch typed it, or where it was the host's own model's already and the patch leaves the tier (a new limit, or

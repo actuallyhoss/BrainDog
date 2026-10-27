@@ -146,7 +146,7 @@
   ink, and one line saying which limit the month turns on. Drawn only where the ledger answered with this record's
   allowance: a plan with no limit has no meters, and a number tile without a chart is the one thing a tile may not be.
 -->
-<!-- THE TWO WAYS ON, AT THE TILE'S FOOT (UI pass of 21 October, H36): they were loose on the board under it. -->
+<!-- THE TWO WAYS ON, AT THE TILE'S FOOT: they were loose on the board under it. -->
 {#snippet foot()}
 <div class="row-actions">
   <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
@@ -210,7 +210,7 @@
                   <p class="bill-state" data-state={r.state}>{said}</p>
                 {/if}
                 {#if credits.left}<p class="bill-state num">{credits.left}</p>{/if}
-                <!-- SLASH CREDIT PACKS (LCH-A10), under what the record says of its plan: one quiet rectangle a pack, each
+                <!-- SLASH CREDIT PACKS, under what the record says of its plan: one quiet rectangle a pack, each
                      with its credits and the Worker's price. None while the host sells no pack, so that answer is today's. -->
                 {#if credits.buy.length > 0}
                   <div class="bill-packs" role="group" aria-labelledby="packs-{r.record}">
@@ -261,7 +261,7 @@
     </div>
   </Tile>
 {:else}
-  <!-- THE CARD SAYS WHAT IT HOLDS (audit 25 October, X23): it was "Billing" under a page called Billing, over a row
+  <!-- THE CARD SAYS WHAT IT HOLDS: it was "Billing" under a page called Billing, over a row
        saying Not billed. The state is the card's title now, and the host's sentence its one line. -->
   <Tile icon="money" class="section" data-surface="tile" title={copy.billingNotBilled}>
     <div class="section-body">

@@ -1,5 +1,5 @@
 /**
- * The palette's way in to a new page (PGS-C30): the sentence, the row it draws, and what a press does.
+ * The palette's way in to a new page: the sentence, the row it draws, and what a press does.
  *
  * NOT THE MARKUP, as `palette.test.ts` says of itself. `paging` is the row as a pure function over the words in the
  * box, and `pressed` is the press with the page maker, the address bar and the toast handed in, so the three things
@@ -120,7 +120,7 @@ test('A PRESS MAKES THE PAGE ONCE, OPENS IT, AND SHOWS ONE TOAST WITH UNDO', asy
   const at = desk(async () => made);
   await pressed({ title: 'Wedding', suggest: false }, at.desk);
   /* The shell is read before the page opens, so the rail lists it when it is on screen. */
-  /* AND IT OPENS ON "DESCRIBE IT" (ENG-B11): the address carries the mark the page's own menu reads. */
+  /* AND IT OPENS ON "DESCRIBE IT": the address carries the mark the page's own menu reads. */
   assert.equal(describedHref('wedding'), '/p/wedding?describe=1');
   assert.deepEqual(at.did, ['make Wedding', 'refresh', `go ${describedHref('wedding')}`, 'toast']);
   assert.equal(at.toasts.length, 1);

@@ -146,7 +146,7 @@ test('ONE NAME, ONE SET: the record and this app mean the same seven kinds by RE
 test('A REDUCING BLOCK PAST ONE READ IS ADDED UP WHOLE BY THE RECORD AND DRAWN FROM THAT WHOLE BY THE APP', async () => {
   const blocks = await record();
 
-  /* THE RECORD'S HALF (PGS-B05): 301 matched against a read of 200 was a figure short by a hundred and one rows, and
+  /* THE RECORD'S HALF: 301 matched against a read of 200 was a figure short by a hundred and one rows, and
      then a refusal. Now the block carries `wholeRead`, its parts added up over every row, beside the first 200. */
   for (const heading of ['By state', 'Shared out']) {
     const block = of(blocks, heading) as Answered & { wholeRead?: { rows: { rows: number }[] } };
@@ -170,7 +170,7 @@ test('AND A SECTION OVER THE SAME 301 ROWS IS REFUSED BY NEITHER, because it add
 
   /* THE RECORD DOES NOT REFUSE IT: a heading over 301 rows has nothing to be wrong about, and a section in the refusing
      set would have refused it. AND IT SENDS ITS COUNT AND NO ROWS, which it draws none of: a page whose sections each
-     carried their rows' whole notes answered 760 KB and froze the browser (`loop/research-real-record.md`). */
+     carried their rows' whole notes answered 760 KB and froze the browser. */
   assert.deepEqual(section.refusals ?? [], []);
   assert.equal(section.matched, ROWS_HELD);
   assert.equal((section.rows ?? []).length, 0, 'a section sent rows it draws only the count of');

@@ -297,7 +297,7 @@ test('the layout draws the hairline from the live store, not from a constant', (
   assert.match(layout, /follow\(data\.live === true \?/, 'and the poll is started, for a live record only');
 });
 
-/* ── access: a share changed, or ended (sharing plan §2.8) ── */
+/* ── access: a share changed, or ended ── */
 
 test('an access epoch that moved boots the tab again; nobody no share let in is ever re-booted by it', () => {
   assert.equal(regranted(4, 5), true, 'a share changed');

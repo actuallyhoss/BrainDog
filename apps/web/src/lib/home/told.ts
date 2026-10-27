@@ -10,7 +10,7 @@
  * (a ULID) is dropped. What the record left out (replaced, faded, more than were asked) is counted in one foot line.
  *
  * A TILE AND NEVER A QUESTION: nothing here asks, confirms, replaces or folds, and nought draws nothing. Whether a
- * lesson is replaced is his to rule in the record (loop/progress/learnings-replaced-92.md), never this tile's.
+ * lesson is replaced is his to rule in the record, never this tile's.
  *
  * IT NEVER FAILS THE SCREEN. A host built before the read answers `ROUTE_UNKNOWN` or `NOT_IN_THIS_BUILD`, a reader it
  * refuses answers a refusal, and an answer of another shape is none: each is `null`, and `null` draws nothing.

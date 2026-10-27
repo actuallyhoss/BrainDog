@@ -1,5 +1,5 @@
 /**
- * One question per list and digits, whatever door printed them (REC-A02): "Which account is the card ending 1234?"
+ * One question per list and digits, whatever door printed them: "Which account is the card ending 1234?"
  *
  * MEASURED ON THE OWNER'S RECORD: about seventeen of his twenty-five questions were one bank text each, every one
  * "bank-card-used-sms could not read account out of this one", none asking which account, and Accept refused because the

@@ -70,7 +70,7 @@ function named(title: string, href: unknown): string {
 /**
  * WHO A LANE IS, WHERE ITS ROW SAYS: the record answers a lane's row beside it, at the same place (`rows`), and a row of
  * the list of runs names its `agent`. Written as the lane's fourth cell, before its tone, so the drawer draws the run's
- * face and paints its bar in that agent's hue (SF9). Nothing where the row names none, or the answer carries no rows.
+ * face and paints its bar in that agent's hue. Nothing where the row names none, or the answer carries no rows.
  */
 function whoOf(result: unknown, at: number): string {
   const rows = result !== null && typeof result === 'object' ? (result as { rows?: unknown }).rows : null;
@@ -117,7 +117,7 @@ export function windowRow(result: unknown, fallback: number): string | null {
   const at = instant(now) ?? (writable(fallback) ? fallback : null);
   /* A DAY'S WINDOW IS TODAY WHEN EVERY LANE IN IT IS TODAY'S (agents F7): the window opens at the record's midnight, so
      yesterday's hours are not drawn empty inside "Today's runs" and its axis names no date. MIDNIGHT IS THE READER'S
-     SINCE THE UI PASS OF 21 OCTOBER (P32), the clock every instant here is written on and the hours are named in, so the
+     (P32), the clock every instant here is written on and the hours are named in, so the
      axis runs from 00:00 to now with 00, 06, 12 and 18 along it; the record's midnight on another clock started it at
      02:00. A lane that ended before midnight keeps the whole window. */
   const zone = -new Date(b).getTimezoneOffset();

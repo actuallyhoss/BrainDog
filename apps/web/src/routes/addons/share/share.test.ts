@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { publishWords } from '../../../lib/market/publish.ts';
 import { words } from './share.ts';
 
-test('SHARE THIS SETUP IN TWO STEPS (E22): numbered, the skills behind one counted line, and no "Kennel"', () => {
+test('SHARE THIS SETUP IN TWO STEPS: numbered, the skills behind one counted line, and no "Kennel"', () => {
   assert.match(words.about, /^1\. /u);
   assert.match(words.send, /^2\. /u);
   assert.equal(words.skillsPicked(3, 35), 'Skills to include: 3 of 35');

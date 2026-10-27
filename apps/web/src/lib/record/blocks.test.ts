@@ -315,7 +315,7 @@ const shownFor = (block: Answered): { title: string; lines: string[] } => {
 
 test('A CHART PAST THE CEILING IS NOT A FILTER NOBODY UNDERSTOOD, and the heading may not say it was', async () => {
   const { blocks, admitted } = await ledger();
-  /* THE LEDGER'S OWN BAR IS ADDED UP WHOLE (PGS-B05): every one of the 216 rows is in its parts, and nothing is refused. */
+  /* THE LEDGER'S OWN BAR IS ADDED UP WHOLE: every one of the 216 rows is in its parts, and nothing is refused. */
   const went = answeredBlock(blocks, 'Where it went, 12 months') as Answered & { wholeRead?: { rows: { rows: number }[] } };
   assert.deepEqual(went.refusals ?? [], []);
   assert.equal(went.wholeRead?.rows.reduce((a, r) => a + r.rows, 0), GOES_OUT);

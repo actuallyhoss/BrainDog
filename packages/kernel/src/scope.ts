@@ -101,7 +101,7 @@ export function namedAs(name: string): string[] {
 }
 
 /**
- * The one project a run's own folder is called (scope D5): its name (`namedAs`), or a bare repository it lists, case and
+ * The one project a run's own folder is called: its name (`namedAs`), or a bare repository it lists, case and
  * punctuation folded. Only for a run that says no remote and no repository of another spelling, which is where
  * `sam/lantern` and somebody else's `lantern` would part; `null` when none or two match. The nightly walk places a
  * finished run by this (`exactFolder`), and the ladder a working one, so a run at work in `~/Code/oxbow` is Oxbow.gg's
@@ -126,7 +126,7 @@ export function folderNamed(projects: readonly Candidate[], where: Whereabouts):
  *      read under the home the working folder is in.
  *   4. Then a repository name equal to a bare name a project lists among its repositories (`portage`).
  *   4b. Then, with no remote and no other repository name, the run's own folder called what one project is called, or
- *      a bare repository it lists (`folderNamed`, scope D5), unless a name up its path points at another project.
+ *      a bare repository it lists (`folderNamed`), unless a name up its path points at another project.
  *   5. Two projects matching at the same rung, or with folders of the same length, leave the run
  *      global and are named in `ambiguous`, because picking one would file work under a guess.
  *   6. And a match by last name alone (`matchProject`) is never settled: the project or projects it
@@ -190,7 +190,7 @@ export function matchProject(projects: readonly Candidate[], where: Whereabouts)
   const claimed = projects.filter((p) => p.repos.some((r) => bare(r) && names.has(lastName(r))));
   if (claimed.length) return settle(claimed, 'repo');
 
-  /* A RUN'S OWN FOLDER CALLED WHAT ONE PROJECT IS CALLED (scope D5), as the nightly walk already places a finished run.
+  /* A RUN'S OWN FOLDER CALLED WHAT ONE PROJECT IS CALLED, as the nightly walk already places a finished run.
      The walk leaves a working run to this ladder, and the ladder had no such rung, so a run at work in such a folder was
      on no project for as long as it worked (24 Oct, H26: two of three runs at work named none). */
   const own = folderNamed(projects, where);
@@ -246,7 +246,7 @@ export type SeenRun = Whereabouts & { project?: string | null | undefined; at: s
 export const SUGGEST_AFTER = 3;
 
 /**
- * Folders any machine has that are never a project (scope D6, "Start a project for Temp?"): a temporary or scratch
+ * Folders any machine has that are never a project ("Start a project for Temp?"): a temporary or scratch
  * folder, the home, desktop, downloads and documents folders, the folder code sits in, and a worktree an agent opened.
  */
 const GENERIC = new Set(['temp', 'tmp', 'desktop', 'downloads', 'documents', 'developer', 'dev', 'code', 'repos', 'src', 'home', 'scratch', 'scratchpad', 'worktree', 'worktrees']);

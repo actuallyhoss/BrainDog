@@ -777,7 +777,7 @@ test('A NOTE IS A `note`, AND IT DOES NOT MOVE THE ROW', async () => {
   assert.ok(api.kernel.version() > before, 'the ledger did not move at all, so nothing can see the note');
 
   /* AND IT IS `append`, NOT `write`. 20 §1 puts `log` in the append half beside `create` and
-     `propose`. BUT A NOTE IS ABOUT A ROW, AND A ROW IS WRITTEN ONLY WHERE IT IS READ (sharing plan §2.6): an appender
+     `propose`. BUT A NOTE IS ABOUT A ROW, AND A ROW IS WRITTEN ONLY WHERE IT IS READ: an appender
      who reads nothing is answered as for a row that is not there, so a note cannot test which numbers exist. With read
      on the list beside it, she notes. */
   assert.deepEqual(

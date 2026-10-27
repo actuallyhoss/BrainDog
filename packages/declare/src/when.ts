@@ -1,5 +1,5 @@
 /**
- * The parts of an add-on that wait on what the record holds (SHL-A08): `when: { holds: [people] }`.
+ * The parts of an add-on that wait on what the record holds: `when: { holds: [people] }`.
  *
  * A PART IS THERE ONLY WHILE THE RECORD HOLDS EVERY LIST OR ROLE IT NAMES. The plan lays the add-on over what the record
  * holds and what the add-on itself brings (`holdsOf`), keeps each part whose names are all held with the key taken off,

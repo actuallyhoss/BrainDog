@@ -1,5 +1,5 @@
 /**
- * A long note reads as a note (the audit of 25 October, Y13): a person's memo printed its `**`, `##` and table pipes as
+ * A long note reads as a note: a person's memo printed its `**`, `##` and table pipes as
  * one 2,600 px block. Its headings, bold and table draw, and it opens folded with "Show all".
  */
 

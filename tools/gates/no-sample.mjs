@@ -1,5 +1,5 @@
 /**
- * `no-sample`: nothing of the sample record is left in what ships (LCH-A06, "also get rid of that whole sample record
+ * `no-sample`: nothing of the sample record is left in what ships ("also get rid of that whole sample record
  * stuff please").
  *
  *   node tools/gates/no-sample.mjs [root]

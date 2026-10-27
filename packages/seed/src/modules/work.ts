@@ -233,7 +233,7 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
     pack: 'work',
     fields: [
       { id: 'body', label: 'Update', type: 'document', required: true, search: true },
-      /* SAID IN SENTENCE CASE, SINCE the UI pass of 20 October (proj F11): a thread's composer offers On track, At risk and
+      /* SAID IN SENTENCE CASE (proj F11): a thread's composer offers On track, At risk and
          Off track, the words a project says its health in. */
       { id: 'health', type: 'enum', values: ['on_track', 'at_risk', 'off_track'], labels: { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' }, index: true, required: true },
       { id: 'track', label: 'Thread', type: 'ref', to: 'tracks', index: true, required: true },
@@ -323,7 +323,7 @@ const LIVE = 'state is not done or dropped';
 /** Work somebody has taken on: in play, and not kept for later. What Open counts. */
 const OPEN = 'state is not backlog or done or dropped';
 
-/** OPEN AND NOT WRITTEN IN THREE MONTHS: what has not moved, which the old Work screen counted after 90 days (C32). */
+/** OPEN AND NOT WRITTEN IN THREE MONTHS: what has not moved, which the old Work screen counted after 90 days. */
 const STALE = `${OPEN}, updated_at before -90d`;
 
 /**
@@ -378,7 +378,7 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     snapshot: { grain: 'day', into: 'series.open-tasks' },
   },
   /* EVERY TASK NOT FINISHED, kept for later included: what Work's head counts, so it equals the chips under it, which
-     count every row not in a done state (E24). */
+     count every row not in a done state. */
   'tasks-in-play': {
     metric: 'tasks-in-play',
     name: 'Open',
@@ -620,7 +620,7 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
   /**
-   * OPEN WORK THAT BELONGS TO NO PROJECT, SINCE work 1.19.0 (AGT-D14): what Open counts, with the project left empty,
+   * OPEN WORK THAT BELONGS TO NO PROJECT, SINCE work 1.19.0: what Open counts, with the project left empty,
    * which With no project draws and is gated on. A task typed into the capture line has no project, and the Board
    * showed such tasks with a dash under Project and nowhere said how many. Over `thing`, so it is left out with every
    * figure over a project on a record that holds no projects (`without` in `packs/first-party.ts`).
@@ -847,7 +847,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     page: 'work',
     /* CALLED WORK, as the section it heads is, because the page is the to-do and not a report about one. */
     title: 'Work',
-    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101): the lead pages sit Work, Orders, Projects,
        Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
     nav: { section: 'Work', order: 10, place: 10 },
     icon: 'task',
@@ -857,19 +857,19 @@ export const WORK_PAGES: Record<string, SeedPage> = {
        every band, where the Work screen drew the same choice as a select, as chips and as a tile. The field is the
        tasks' `thing`, which the page calls Project; a record without Projects has no such field, and no strip
        (`without` in `packs/first-party.ts`). */
-    /* A HEAD BESIDE THE NAME, SINCE work 1.19.0 (PGS-A14): how many are open, one Add and a search box, so Work opens
+    /* A HEAD BESIDE THE NAME, SINCE work 1.19.0: how many are open, one Add and a search box, so Work opens
        with its name, its count and the two things done first on it. The count is Open's own figure; the search is held
        in the address as `q`, and narrowing the page by it is the page read's. BEFORE `filters`, which a record without
        Projects goes without, so the page's keys keep one order whether the strip is there or not. */
-    /* NO SEARCH BOX, SINCE the UI pass of 20 October (proj F10): "Search this page" floated between the name and the line
+    /* NO SEARCH BOX (proj F10): "Search this page" floated between the name and the line
        with no field round it, and the frame's own search is one press away on every screen. */
-    /* THE HEAD COUNTS WHAT THE CHIPS COUNT, SINCE the screens scope of 24 October (E24): every task not finished, the
+    /* THE HEAD COUNTS WHAT THE CHIPS COUNT, SINCE the screens scope of 24 October: every task not finished, the
        folded Later among them, so Open equals the project chips added up. It read Open 39 beside one project's chip of 46. */
     header: {
       count: { metric: 'tasks-in-play' },
       action: { verb: 'row.create', label: 'Add' },
     },
-    /* WHOSE WORK, SINCE work 1.19.0 (C32): Yours, Agents or All, as the old Work screen's toolbar picked, narrowing every
+    /* WHOSE WORK, SINCE work 1.19.0: Yours, Agents or All, as the old Work screen's toolbar picked, narrowing every
        band. Yours is what no agent holds and Agents what one does, the cut every band already makes by `agent`. */
     filters: [
       { field: 'thing', control: 'chips' },
@@ -912,7 +912,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'tasks-late-yours', gt: 0 },
-        /* AND FIRST, THE QUESTIONS ABOUT TASKS, SINCE work 1.19.0 (PGS-C18): "2 questions for you, 1 late". Decide's
+        /* AND FIRST, THE QUESTIONS ABOUT TASKS, SINCE work 1.19.0: "2 questions for you, 1 late". Decide's
            badge counted them while this line said only the tasks, so the page read quiet with calls waiting on its own
            work. `questions-open-in:tasks` counts what Questions for you below draws, and at nought the clause goes. Not
            "wait on you", which would read beside the tasks waiting on you as the same thing said twice. */
@@ -944,7 +944,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         register: 'tasks',
       },
       {
-        /* WHAT A RULE OR AN AGENT ASKED ABOUT A TASK, SINCE work 1.19.0 (PGS-C18), answered here, three at a time, one
+        /* WHAT A RULE OR AN AGENT ASKED ABOUT A TASK, SINCE work 1.19.0, answered here, three at a time, one
            tile each, and the rest in Decide: the questions whose row is on tasks (`list is tasks`), counted by
            `questions-open-in:tasks`, and drawn only while that is above nought, so a quiet day has no band for it.
            QUESTIONS FOR YOU AND NOT WAITING ON YOU, which is the band of tasks handed back to a person further down.
@@ -962,7 +962,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'questions-open-in:tasks', gt: 0 },
       },
       {
-        /* FOUR BANDS IN HIS ORDER, SINCE the screens scope of 24 October (E24): Late, Waiting on you, This week, With an
+        /* FOUR BANDS IN HIS ORDER, SINCE the screens scope of 24 October: Late, Waiting on you, This week, With an
            agent, half the row each, so a phone reads them in that order. Late and this week was one list, and the late
            task sat among the week's. Each is a `todo`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ; its second line
            is when it is due, then its project. */
@@ -984,7 +984,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         /* WHAT WAITS ON A PERSON, with the note as the reason it waits and, under it, when the task falls due and its
            project. `todo` is `cells: 4, optional: 2` in `braindog-render`'s `kinds.ts`, and both renderers draw the third
            and fourth cells as one quiet line joined by a dot (`src/todo.ts`, held by `test/waiting-due.test.ts`). SECOND,
-           after Late (E24). */
+           after Late. */
         kind: 'todo',
         heading: 'Waiting on you',
         icon: 'hourglass',
@@ -1014,7 +1014,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       },
       {
         /* WHAT AGENTS HOLD NOW, with the dot on the one an agent is on this minute. Not what they handed back: that
-           waits on you. LAST OF THE FOUR (E24). */
+           waits on you. LAST OF THE FOUR. */
         kind: 'todo',
         heading: 'With an agent',
         icon: 'session',
@@ -1077,7 +1077,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'tasks-later', gt: 0 },
       },
       {
-        /* OPEN WORK WITH NO PROJECT, FOLDED SHUT, SINCE work 1.19.0 (AGT-D14): a fold of its own, so the tile is below
+        /* OPEN WORK WITH NO PROJECT, FOLDED SHUT, SINCE work 1.19.0: a fold of its own, so the tile is below
            the fold whatever else the page draws, and a tap away where a project can be given. Not under Not this week,
            which is drawn only while something is further off, and a task with no project may be due today. */
         kind: 'section',
@@ -1089,7 +1089,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       },
       { ...WITH_NO_PROJECT },
       {
-        /* WHAT HAS NOT MOVED IN THREE MONTHS, FOLDED SHUT, SINCE work 1.19.0 (C32): open work last written more than 90
+        /* WHAT HAS NOT MOVED IN THREE MONTHS, FOLDED SHUT, SINCE work 1.19.0: open work last written more than 90
            days ago, the longest untouched first, a tap away to be done, dated or dropped. NO FIGURE
            GATES IT: a block with nothing in it is not drawn, and a heading over nothing goes with it (`emptyHidden`). */
         kind: 'section',
@@ -1150,7 +1150,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    * NO HEADING OVER THE BOARD, SINCE work 1.16.0 (the second design review's fix 2). It read "By status" under a page
    * called Board whose every column is headed by its status, so the tile said what it was three times.
    *
-   * AND NO LIST UNDER IT, SINCE the audit of 25 October (Y8): Everything open drew every open task a second time, with
+   * AND NO LIST UNDER IT: Everything open drew every open task a second time, with
    * a count of its own beside the line's, and on a phone it ran on under a board already fifteen thousand pixels long.
    */
   'work-board': {
@@ -1172,7 +1172,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       },
       {
         /* THE BOARD'S ONE LINE, since work 1.10.0: how much is on it, and the two columns that need somebody. WHAT IS
-           KEPT FOR LATER IS SAID TOO, SINCE the audit of 25 October (Y8): Later is a column of this board, and the line
+           KEPT FOR LATER IS SAID TOO: Later is a column of this board, and the line
            counted only Open, so the columns that are not Done added up to more than it said. */
         kind: 'note',
         lead: true,
@@ -1200,8 +1200,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         source: 'register.tasks',
         where: 'state is not dropped',
         /* EACH COLUMN BY TIER, THEN BY DUE DAY. A board keeps its rows in the order they are read within each column
-           (`render/src/board.ts`), so the order the record reads them in is the order a column draws. BY STATE FIRST,
-           SINCE the audit of 25 October (Y8): read by tier alone, finished urgent work came before open work of a lower
+           (`render/src/board.ts`), so the order the record reads them in is the order a column draws. BY STATE FIRST:
+          read by tier alone, finished urgent work came before open work of a lower
            tier, the read stopped at fifty inside Open, and the line said 36 open over columns holding 34. The record
            sorts an enum by its declared order, so every task in play is read before any done one, and Done takes what
            room is left. */

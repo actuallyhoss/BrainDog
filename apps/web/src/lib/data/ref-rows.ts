@@ -3,7 +3,7 @@
  *
  * A REF ARRIVES AS THE TARGET ROW'S ULID, so a screen that draws one walks the whole target list to name it. Each reader
  * kept its own walk, and the readers are made per screen: Today, a project page and a list each walked Projects again,
- * and on his record that is 497 KB, fetched 14 times over nine screens (`loop/audit-2026-10-20`). Here one walk serves
+ * and on his record that is 497 KB, fetched 14 times over nine screens. Here one walk serves
  * every reader in the tab, and a walk out is shared by whoever asks while it is out.
  *
  * KEPT BY WHAT THE LOG SAYS OF THE LIST (`keptToken`): where the local copy has caught up with the record, the walk
@@ -79,7 +79,7 @@ export async function rowsSaid(client: Pick<Client, 'list'>, base: string, regis
   if (young && kept.token === byVersion) return kept.walked;
   /* A WALK THE COPY VOUCHED FOR IS ASKED OF IT AGAIN once its catch-up has landed, as before. WITH NONE TO VOUCH FOR, the
      walk goes now and is kept by the version (`keptToken`'s own fallback): Today's first open waited for the copy's
-     first catch-up before it walked the lists its page names, a round trip in front of the page (`loop/perf`). */
+     first catch-up before it walked the lists its page names, a round trip in front of the page. */
   const vouched = young && kept.token.startsWith('log ');
   const said = vouched ? await keptToken([register]) : await Promise.race([keptToken([register]), new Promise<null>((done) => setTimeout(() => done(null), 0))]);
   const token = `${said ?? versionKept()} w${wrote()}`;

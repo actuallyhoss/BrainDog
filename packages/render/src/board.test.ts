@@ -118,7 +118,7 @@ test('a drop carrying a column this board does not have is refused', () => {
 
 /* ── the lane a phone shows ───────────────────────────────────────────────── */
 
-/* ON A PHONE THE BOARD IS ONE LANE AT A TIME (audit B of 25 October, Y8): stacked, the lanes were one list 15,000 px
+/* ON A PHONE THE BOARD IS ONE LANE AT A TIME: stacked, the lanes were one list 15,000 px
    long. The lane it opens on is where the work is, so the busiest one, and never the last, where work ends up. */
 test('a phone opens on the busiest lane before the last, the first of a tie', () => {
   assert.equal(laneShown(lanes(WORK), null), 'Todo');

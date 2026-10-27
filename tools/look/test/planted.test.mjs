@@ -61,7 +61,7 @@ test('THE SOURCE ANSWERS AS THE SEED DOES, with the faults in what it says', asy
   }
 });
 
-test("A PROJECT'S PAGE IS PLANTED BLANK: answered without its shape, so it draws no name and no hero (Z2)", () => {
+test("A PROJECT'S PAGE IS PLANTED BLANK: answered without its shape, so it draws no name and no hero", () => {
   const page = { ok: true, value: { param: { register: 'things', seq: 1 }, blocks: [{ kind: 'project', parts: ['hero'] }], shape: { register: 'things', seq: 1 } } };
   const got = plant('/api/page', page);
   assert.equal('shape' in got.value, false);

@@ -96,7 +96,7 @@ function lexiconOf(offers: readonly Offer[]): Map<string, PackId[]> {
 
 const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const COUNT = `(\\d{1,3}|${Object.keys(NUMBER_WORDS).join('|')})`;
-/* AND A COUNT OF PEOPLE BY THEIR WORK after "with", "have" or "employ" (audit C, X1): "a ceramics studio with two
+/* AND A COUNT OF PEOPLE BY THEIR WORK after "with", "have" or "employ": "a ceramics studio with two
    potters" went unheard. A word that ends as a worker's does, never one of the things a shop counts ("two orders"). */
 /* A thing a shop counts that ends as a worker's word does, by its stem: "two orders", "two others", "two posters". */
 const THINGS_COUNTED = ['ord', 'oth', 'numb', 'lett', 'pap', 'post', 'stick', 'fly', 'cov', 'lay', 'mark', 'contain', 'fold', 'filt', 'should', 'answ'];
@@ -119,7 +119,7 @@ const BILLING = /\b(?:invoic(?:e|es|ed|ing)|bill(?:s|ed|ing)?|retainers?|charg(?
 
 /* A capitalised word in any script: `Kiln`, `Élodie`, `O'Neill`. Never a currency code before a
    figure, or "Halden EGP 5,000" would be somebody called Halden EGP. A FULL STOP ENDS IT unless a letter follows
-   (`St.Clair`): "my partner Ada. We send invoices" was a person called "Ada. We" (the audit of 22 October, U-C3). */
+   (`St.Clair`): "my partner Ada. We send invoices" was a person called "Ada. We". */
 const CAP = "(?![A-Z]{3}\\s?\\d)\\p{Lu}(?:[\\p{L}\\p{M}\\d'’-]|\\.(?=\\p{L}))*";
 /* Up to three words, `&` allowed between them: `Pell & Vine`. */
 const NAME = `${CAP}(?:\\s+(?:&\\s+)?(?!I\\b|And\\b)${CAP}){0,2}`;

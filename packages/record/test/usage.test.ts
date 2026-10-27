@@ -153,7 +153,7 @@ test('USAGE IS PER PROJECT, PER ACTION AND PER DAY, the month is the sum of its 
   const mine = u.records[0]!;
   assert.equal(mine.slug, 'the-studio');
   assert.equal(mine.plan, 'hosted');
-  /* THE DAY THE RECORD WAS MADE, so `/usage` offers no month from before it (audit 25 October, X22). */
+  /* THE DAY THE RECORD WAS MADE, so `/usage` offers no month from before it. */
   const made = sql.one<{ created_at: string }>('SELECT created_at FROM dir_record WHERE id = ?', record)!.created_at;
   assert.equal(mine.since, made.slice(0, 10));
   assert.match(mine.since, /^\d{4}-\d{2}-\d{2}$/u);

@@ -1,5 +1,5 @@
 <!--
-  One add-on, one page: `/addons/<id>` (the add-ons pass of 27 October). The add-on as this record holds it when it holds
+  One add-on, one page: `/addons/<id>`. The add-on as this record holds it when it holds
   it, from the store or from Settings › Add-ons alike, and the store's page for it when it does not (`found.ts`). The
   store's page is also where an update's plan is read, `?update`, so the head's update press opens it.
 

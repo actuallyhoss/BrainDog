@@ -219,7 +219,7 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
 /**
  * Rows of a list whose rows fade, in the order the read hands them: for `context`, which cuts each place to its first
  * few and so must cut in this order, or the card's two lessons would be the two last touched and not the two that
- * matter (AGT-C14). `where` is the one place every row handed is in.
+ * matter. `where` is the one place every row handed is in.
  */
 export function learnedSorted(fields: readonly Field[], rows: readonly Entry[], where: Learned['where'], nameOf: (id: string) => string): Entry[] {
   const order = learnedOrder(kindsOf(fields));

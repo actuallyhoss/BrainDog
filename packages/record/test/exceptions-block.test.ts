@@ -1,5 +1,5 @@
 /**
- * What went quiet, drawn as a block on a page, through the record (ENG-B13): the kernel's `exceptions` source read by
+ * What went quiet, drawn as a block on a page, through the record: the kernel's `exceptions` source read by
  * the record's own `page`, for the owner and for somebody held from a list.
  *
  * THE BLOCK NAMES EVERY LIST, so it is drawn only for a reader of all of them. Somebody invited to one list is told so

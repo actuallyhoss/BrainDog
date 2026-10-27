@@ -2,7 +2,7 @@
   Every page the first run would make, drawn before it is made: one row a page in a tile, each opening the page as the
   record would draw it, with its layout, its rail and its tabs, over what the person gave it and nothing else.
 
-  NOTHING IS DRAWN THAT NOBODY TYPED (USE-B07). The rows laid over each call are the person's name, the entries their
+  NOTHING IS DRAWN THAT NOBODY TYPED. The rows laid over each call are the person's name, the entries their
   sentence filled and the first entries of their file, which `asked` already carries (`ownRows`, `withOwn`). A page none
   of those reaches is its name and one line of what it will hold (`pageShown`), and opens nothing.
 

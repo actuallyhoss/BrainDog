@@ -66,7 +66,7 @@ test('who says the app and where, never a path in full or an id', () => {
   for (const s of runTalk(FULL, PARTS, NOW, UTC)) for (const line of s.lines) assert.doesNotMatch(line, /\/Users|projects#|S4[12]\b/u);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z23 (`-more/run-904-390-dark-full.png`): "Who and where: claude-code, in braindog on
+/* "Who and where: claude-code, in braindog on
    master". The app by its name and the project by its name. */
 test('WHO SAYS Claude Code IN BrainDog, never the app\'s slug or the folder', () => {
   const s904 = row({ agent: 'claude', client: 'claude-code', repo: 'braindog', branch: 'master', project: 'things#2', started: '2026-10-22T19:21:00.000Z' });
@@ -140,7 +140,7 @@ test('a note that is only a path is said by its last plain words, never the path
   const r = row({
     agent: 'claude',
     notes: [
-      '/Users/someone/Developer/orchard/loop/progress/garden-beds-12.md',
+      '/Users/someone/Developer/orchard/notes/progress/garden-beds-12.md',
       'apps/web/src/lib/page/panels/run-talk.ts',
       '~/Desktop/letter-to-pell.txt',
       'C:\\Work\\orchard\\plans\\spring_planting.md',
@@ -219,7 +219,7 @@ test('readRunParts reads the questions, the helpers and the run it took from', a
   assert.deepEqual(section(FULL, parts, 'took')?.lines, ['Took the step Codex left 2h earlier']);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z24 (`-more/run-904-390-dark-full.png`, What it noted): "SG242 overlaps SG286/SG287" and
+/* "SG242 overlaps SG286/SG287" and
    "Record tidy filed for Ada: SG262, SG263, SG278, SG280-SG284, plus SG273-SG275 (new people)." A question is said
    by its words, and handles side by side by how many they are. */
 test('A RUN\'S NOTES SAY A QUESTION BY ITS WORDS AND A RUN OF THEM BY HOW MANY, never SG242', async () => {

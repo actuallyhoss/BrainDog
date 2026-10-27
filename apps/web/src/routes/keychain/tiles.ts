@@ -50,7 +50,7 @@ export const words = {
   everyKey: 'Show every key',
   /* Over the keys, only when the read stopped before the record ran out of them. */
   moreKeys: (n: number) => `The first ${n === 1 ? 'key is' : `${n} keys are`} listed. This record holds more.`,
-  /* THE BOX THAT FINDS A KEY AS IT IS TYPED (Y26), and how many keys each project's fold holds. */
+  /* THE BOX THAT FINDS A KEY AS IT IS TYPED, and how many keys each project's fold holds. */
   find: 'Find a key',
   keysIn: (n: number) => (n === 1 ? '1 key' : `${n} keys`),
   /* A KEY THE RECORD HOLDS TWICE, as Health counts them. */
@@ -208,7 +208,7 @@ export const rowPath = (k: KeyRow): string | null => {
 export type KeyGroup = { name: string; scope: KeyRow['scope']; services: { provider: string | null; keys: KeyRow[] }[] };
 
 /**
- * THE KEYCHAIN BY PROJECT, THEN BY SERVICE (24 October, U-B23): one flat list of 176 read as a dump. Each project's keys
+ * THE KEYCHAIN BY PROJECT, THEN BY SERVICE (24 October): one flat list of 176 read as a dump. Each project's keys
  * under its name, the projects by name and the keys that apply everywhere last; inside each, a group a service by who
  * the key is with, by name, and the keys that name nobody after them. Each key keeps the order it came in.
  */
@@ -254,7 +254,7 @@ export function opensInWords(text: string, keys: readonly KeyRow[], now: number 
     .replace(HANDLE, (whole) => named.get(whole) ?? whole);
 }
 
-/* ── found, folded and marked (Y26) ───────────────────────────────────── */
+/* ── found, folded and marked ───────────────────────────────────── */
 
 /**
  * WHETHER THE PROJECTS OPEN UNFOLDED: while a search is typed, so what it found shows, and where there is only one

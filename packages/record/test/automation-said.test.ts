@@ -1,5 +1,5 @@
 /**
- * The line history keeps when an agent changes an automation (SHL-D15, job 2): who, which one, and the change in the
+ * The line history keeps when an agent changes an automation: who, which one, and the change in the
  * steps' own words, never an id or a verb key, at most 200 characters.
  *
  * The kernel's `stepsDiff` is imported from its source here, as the record will read it from the kernel's index once

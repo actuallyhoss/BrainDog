@@ -99,7 +99,7 @@ const bare = (text: string): string => text.replaceAll(/<!--[\s\S]*?-->/gu, '').
 test('THE TILE IS THE ONE TILE WITH ITS ICON, HAS NO BORDER OR SHADOW, NOTHING TO PRESS, AND ITS WORDS ARE 15 OR MORE', () => {
   const part = readFileSync(new URL('./Told.svelte', import.meta.url), 'utf8');
   const style = /<style>([\s\S]*)<\/style>/u.exec(part)![1]!;
-  /* THROUGH `Tile` SINCE THE UI PASS OF 20 OCTOBER (today F19): the heading in the tile's own head, with its icon. */
+  /* THROUGH `Tile` (today F19): the heading in the tile's own head, with its icon. */
   assert.match(part, /<Tile icon="skill" title=\{tile\.heading\}/u);
   assert.doesNotMatch(style, /box-shadow|gradient|backdrop-filter/u);
   assert.doesNotMatch(style.replace(/@media \(forced-colors: active\)[\s\S]*$/u, ''), /\bborder:/u);

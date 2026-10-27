@@ -368,7 +368,7 @@ export function hostOpened(opens: unknown): string | null {
 }
 
 /**
- * The host a key is held to (SHL-C05): `hostOpened`, and only a name with a dot or a colon in it.
+ * The host a key is held to: `hostOpened`, and only a name with a dot or a colon in it.
  *
  * ONE WORD IS A NAME, NOT A HOST. An entry that says "Stripe" or "Oxbow" parses as the host `stripe`, which no action
  * can call, so holding the key to it would refuse every send of it; it names no host, and its first approval pins one.
@@ -399,7 +399,7 @@ export const runnerCannotOpen = (key: Key): string | null =>
 /**
  * The sentence an approval list used to end with when any line sent a key.
  *
- * NO LONGER SAID (SHL-C05). A key is held to its own project or to every project at declaration (`keyOutOfScope`) and
+ * NO LONGER SAID. A key is held to its own project or to every project at declaration (`keyOutOfScope`) and
  * to its own host when it is sent, so "any action can send any key" stopped being true. KEPT EXPORTED, UNUSED, until the
  * index stops re-exporting it, so a reader that filtered it out (`arrange.ts`) filters nothing rather than failing.
  */
@@ -410,7 +410,7 @@ export const KEYS_REACH_ALL = 'Keys are not kept per project yet, so any action 
  *
  * ONCE, AT THE END, AND NOT UNDER EVERY LINE, for the reason the old sentence was: it is the same fact however many
  * actions are approved. It is the true one now. A scheduled run opens its key with nobody there, so whatever server runs
- * it can open it as well, and that is the honest edge of "we cannot read your record" (D0b.54).
+ * it can open it as well, and that is the honest edge of "we cannot read your record".
  */
 export const KEY_OPENED_UNATTENDED = 'A scheduled action opens this key with nobody present, so the server that runs it can open it too.';
 
@@ -1785,7 +1785,7 @@ type ScriptHeader = { script: string; runs?: { every?: unknown; door?: unknown; 
  * clock are one decision, and splitting them would let a reader approve two lines of three. `host` is the first origin,
  * because `Egress` holds one and the plan diff compares by it; the line carries them all.
  *
- * AND A SCRIPT THAT READS AND FETCHES SAYS SO IN ITS OWN SENTENCE (design section 2, point 5). Reading and fetching
+ * AND A SCRIPT THAT READS AND FETCHES SAYS SO IN ITS OWN SENTENCE (design section 2). Reading and fetching
  * together is the one exfiltration path a script has, and the sentence is the owner's only chance to see it.
  *
  * `trigger` HAS NO WORD FOR A DOOR. It is the plan diff's closed union, owned by `@braindog/declare`, and a door-started

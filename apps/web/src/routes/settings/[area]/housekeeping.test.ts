@@ -1,5 +1,5 @@
 /**
- * THE OWNER'S HOUSEKEEPING SCREENS (audit of 25 October, lane C4): Signing in, People & sharing, Backups, Billing and
+ * THE OWNER'S HOUSEKEEPING SCREENS (lane C4): Signing in, People & sharing, Backups, Billing and
  * Delete, read from their own text, the way `one-list.test.ts` reads the areas. Each test names the row it holds.
  */
 
@@ -87,7 +87,7 @@ test('X20: Backups says Needs you, one line per state, and how each going back i
   const area = markup(backups);
   assert.match(area, /copyLines\.length > 0 \? copy\.restoreLive : copy\.restoreFirst/u, 'the copies above are named with none above');
   assert.match(area, /title=\{firstTonight \? copy\.copiesFirst : copy\.noSnapshots\}/u, 'First copy tonight and No backup yet are both said');
-  /* SINCE THE PASS OF 27 OCTOBER: the night's copy is a row of its own, the exports another, and a night that did
+  /*: the night's copy is a row of its own, the exports another, and a night that did
      not run is said once, with no "No nightly copies" under it. */
   assert.match(area, /\{:else if !failedNight && !missed\}[\s\S]*?words\.noNightly/u, 'a night that did not run is said twice');
   assert.match(area, /title=\{words\.exports\}/u, 'the exports he took are not said');

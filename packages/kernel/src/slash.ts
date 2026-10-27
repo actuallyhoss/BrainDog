@@ -20,7 +20,7 @@
  * repository and not an event in somebody's business. A `Result` would be a refusal nobody is
  * listening for.
  *
- * AND ONE DECLARATION, SAID BY NAME (ENG-A16). A model arranges a page: the look it writes is a declaration, and the
+ * AND ONE DECLARATION, SAID BY NAME. A model arranges a page: the look it writes is a declaration, and the
  * `declare` line of that install is signed `slash`. So the query above gains one exception and no more, a `declare`
  * whose target is a look that says it is Slash's, and `SLASH_MAY` below is where it is written.
  */

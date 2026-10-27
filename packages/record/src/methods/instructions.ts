@@ -8,13 +8,13 @@
  * `instructionsMine` is the agent's: what is pending for its own run (and marking it seen), taking one, and answering
  * it. The MCP tool `instructions` is that door.
  *
- * HIS VOICE IS MARKED (§10.2). Every instruction reaches an agent as `Teodor said in BrainDog (IN4): "…"`, a line built
+ * HIS VOICE IS MARKED (§10.2). Every instruction reaches an agent as `Teodor said in BrainDog: "…"`, a line built
  * here once (`toldOf`), which the briefing, the pulse and this door all hand on, so no path words it another way.
  *
  * RECEIPTS ARE NOT STORED (§8.1). They are read from the log: the run's batches between `taken_at` and `replied_at`,
  * and the run's head before and after (`receiptsOf`).
  *
- * AN ORDER MAY NAME QUESTIONS AND HIS ANSWER TO EACH (D8). "Accept SG243", sent from BrainDog, where it is provably him,
+ * AN ORDER MAY NAME QUESTIONS AND HIS ANSWER TO EACH. "Accept SG243", sent from BrainDog, where it is provably him,
  * lets the run that takes it answer SG243 with Accept, once, and nothing else: `instructionsMine`'s `answer`. The
  * answer is his own `decide`, made as him and said as his order's (`ordered`), so Undo takes it back as any decision,
  * and `admin` and `keychain` refuse it. Only the run that took the order, under his own key, while it holds it; only the
@@ -225,13 +225,13 @@ const LIST_TAKES = ['state', 'project', 'task', 'run', 'limit', 'cursor'] as con
  */
 const MINE_TAKES = ['take', 'reply', 'said', 'state', 'seen', 'how', 'answer', 'option'] as const;
 
-/** The words he may say a yes or a no in, each group one answer, its question's own id found among them (D8). */
+/** The words he may say a yes or a no in, each group one answer, its question's own id found among them. */
 const SAME_ANSWER: readonly (readonly string[])[] = [
   ['accept', 'approve', 'yes'],
   ['reject', 'decline', 'no'],
 ];
 
-/** At most this many instructions a minute on one record (plan §10.9). */
+/** At most this many instructions a minute on one record. */
 export const INSTRUCT_PER_MINUTE = 30;
 
 /** The most threads one page of `instructionList` answers, and the page when none is asked. */
@@ -416,7 +416,7 @@ export function methods(deps: RecordDeps) {
 
   /**
    * The questions an order names, each as the kernel keys it, with his answer and the question's version as he sees it
-   * now (D8). Each is one he is shown, open, a choice or a set of rows, and answered with one of its own answers; a
+   * now. Each is one he is shown, open, a choice or a set of rows, and answered with one of its own answers; a
    * pack, a script or a setting installs, and is answered in BrainDog, where what it installs is shown whole.
    */
   const answersNamed = async (ctx: CallContext, given: unknown): Promise<Result<InstrAnswer[]>> => {
@@ -448,7 +448,7 @@ export function methods(deps: RecordDeps) {
   };
 
   /**
-   * A run answers a question his order named (D8): the order it took and holds, which names that question, and his
+   * A run answers a question his order named: the order it took and holds, which names that question, and his
    * answer to it, given as his own `decide`. Every check is the order's, not the run's: the run's key is his, the order
    * is his and he is an owner still, the question is the one he saw and is open, and it is answered once.
    */
@@ -749,7 +749,7 @@ export function methods(deps: RecordDeps) {
 
       const run = runOfCaller(ctx, 'opened: instructions');
       if (!run.ok) return tail(run as Result<never>);
-      /* A QUESTION HE TOLD IT TO ANSWER, his words sent with it (`wordAnswer`); else one his order named, as he said (D8). */
+      /* A QUESTION HE TOLD IT TO ANSWER, his words sent with it (`wordAnswer`); else one his order named, as he said. */
       if (typeof a.answer === 'string' && (a.said !== undefined || a.option !== undefined)) return tail(await wordAnswer(run.value, a.answer.trim(), a.option, a.said, ctx));
       if (typeof a.answer === 'string') return tail(await orderAnswer(run.value, a.answer.trim(), ctx));
       if (typeof a.take === 'string') {

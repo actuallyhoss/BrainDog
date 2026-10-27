@@ -1,5 +1,5 @@
 /**
- * A figure declared `vital: true` is one of the record's vital signs (PRF-A01): red when its reading misses its target.
+ * A figure declared `vital: true` is one of the record's vital signs: red when its reading misses its target.
  *
  * A SIGN WITH NOTHING TO MISS WOULD READ NONE FOREVER while saying it watches something, so `vital` on a figure with no
  * target is refused at install with the sentence that says how to give it one. A declared sign never joins the hold.

@@ -15,11 +15,11 @@
   the skill, and a lesson two projects learned, with "Keep it once". That press puts the question to the person and
   opens Decide; while it waits it cannot be pressed again, and a refusal is said under its line in plain words.
 
-  AND WHAT THE TIDY FOUND, finder by finder, in a fold under the list (AGT-C18): "Empty runs: 41 stale, 3 cleared this
+  AND WHAT THE TIDY FOUND, finder by finder, in a fold under the list: "Empty runs: 41 stale, 3 cleared this
   week". It is read only once this part is drawn, by `import()` of `tidy-week.ts`, so Home's own read is never held for
   it. It is words alone: nothing in the fold tidies, asks or files, and a finder the record refused is not in it.
 
-  AND WHAT IS HERE TWICE, IN A TILE OF ITS OWN (audit 25 October, Y4): a list's twins are not things gone stale, so they
+  AND WHAT IS HERE TWICE, IN A TILE OF ITS OWN: a list's twins are not things gone stale, so they
   are never counted in the stale heading. Their heading says what they are, "32 things are here twice", and each list is
   a line that opens where its twins fold.
 

@@ -763,7 +763,7 @@ applies, or a refusal.
 operator sets `BRAINDOG_OUTBOUND=on` and starts it again.** Scheduled actions and scripts that call out are held, each
 with the sentence below, and run again at their next turn once it is on. The release note opens with this line,
 before anything else it says, because an operator who updates and reads nothing else would otherwise find their
-feeds stopped (SHL-C11, HD.306).
+feeds stopped (HD.306).
 
 | | |
 |---|---|

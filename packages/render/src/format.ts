@@ -14,7 +14,7 @@ const MINUS = '−';
 const NUM = 'en-u-nu-latn';
 
 /**
- * THE HOME CURRENCY, AS THE OLD NAMES BELOW ARE TOLD IT (REC-C05). `symbolFigure`, `headlineFigure`, `barFigure`,
+ * THE HOME CURRENCY, AS THE OLD NAMES BELOW ARE TOLD IT. `symbolFigure`, `headlineFigure`, `barFigure`,
  * `axisFigure` and `leadingCode` each wrote an amount their own way, from text, with a sign table of their own. Told
  * the record's home currency (a code, or `null` for a record that has none) each is one call of the one writer in
  * `money.ts`: the figure is read once (`readFigure`) and written once (`writeAmount`), by the one table there. So a
@@ -495,7 +495,7 @@ export const datesIn = (text: string, now: number = Date.now()): string =>
  * moment", and which a person reads to say which change they mean out loud.
  *
  * UTC, ON PURPOSE, THOUGH THE READER'S ZONE IS KNOWN NOW. `relative()` and `since()` count the
- * reader's own day (PGS-B04), because "today" and "in 1d" are about where the reader is. This is not:
+ * reader's own day, because "today" and "in 1d" are about where the reader is. This is not:
  * the ledger stores an instant, and the moment it names is the one number on that screen that has to
  * read the same for two people looking at it from different places, so one of them can say it to the
  * other. `day()` above it is UTC for its own reason, a named day held at noon.
@@ -719,7 +719,7 @@ const UNIT_WORDS: Readonly<Record<string, string>> = { min: 'minute', h: 'hour',
 /**
  * A SHORT TIME SAID AS A SENTENCE SAYS IT: "10d ago" as "10 days ago", "in 1w" as "in 1 week", "5h ago" as "5 hours
  * ago". The ladder is `relative()`'s and `since()`'s, so a sentence and the row beside it never band one day two ways;
- * only the unit is written out. SINCE the audit of 22 October's leftovers: Money's first line said a part was "due 10d
+ * only the unit is written out.'s leftovers: Money's first line said a part was "due 10d
  * ago", the short form a row's corner may take, in a sentence a person reads aloud.
  */
 export const inWords = (short: string): string =>
@@ -860,7 +860,7 @@ export function valueWord(value: string, lead = false): string {
 }
 
 /**
- * BANK TEXT AS A PERSON WRITES IT (2.A.8): "KILN STOREFRONT PAYOUT" is "Kiln Storefront Payout", and "TALLYARD" is
+ * BANK TEXT AS A PERSON WRITES IT: "KILN STOREFRONT PAYOUT" is "Kiln Storefront Payout", and "TALLYARD" is
  * "Tallyard". A bank sends its lines in capitals, and capitals down a ledger read as shouting and hide the one word that
  * tells two lines apart.
  *

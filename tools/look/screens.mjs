@@ -1,6 +1,5 @@
 /**
- * Which screens a look draws, and which row, question and project each one shows (`loop/scope/area-proof-a.md` 2.4,
- * PRF-A02 job 3).
+ * Which screens a look draws, and which row, question and project each one shows.
  *
  * THREE SETS. `six` is the walk made before a push and after a deploy (Today, Decide, Money, Projects, one
  * project, Agents). `nine` is the acceptance set of the look (Today, Decide, a question, Work, Money, a project, a list, a

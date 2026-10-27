@@ -57,7 +57,7 @@
   import SettingsIndex from './SettingsIndex.svelte';
   /* THE ROWS EVERY AREA SHARES, scoped under `.settings-place` below; the file says why it is global. */
   import './settings.css';
-  /* THE FORM LAYOUT EVERY AREA'S FORMS WEAR (2.A.26): two columns from 1100px, checkbox groups, number fields, the
+  /* THE FORM LAYOUT EVERY AREA'S FORMS WEAR: two columns from 1100px, checkbox groups, number fields, the
      submit row at the tile's foot. */
   import '$lib/ui/forms.css';
   /* EVERY AREA TAKES `{ shell, area }`, so each arm of the chain below is the same line. Sharing alone also takes People
@@ -211,7 +211,7 @@
   const label = $derived.by(() => {
     if (!known) return undefined;
     const named = labelIn(groups, known.id) ?? known.label;
-    /* DELETE SAYS WHAT GOES (Y22): "Delete this record", where the index left its own words. The record's name read as
+    /* DELETE SAYS WHAT GOES: "Delete this record", where the index left its own words. The record's name read as
        its owner's ("Delete Marta"), so the name stays in the sentence under it. */
     return known.id === 'delete' && named === areaOf('delete')?.label ? copy.deleteRecord : named;
   });
@@ -335,7 +335,7 @@
   const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt, backupsAt: '/settings/backups', inboxAt: owns ? '/inbox' : null }) : null);
 
   /**
-   * TRY AGAIN AND DETAILS, under the sentence while a fault is open (AGT-C06). Try again queues the job behind the fault
+   * TRY AGAIN AND DETAILS, under the sentence while a fault is open. Try again queues the job behind the fault
    * the sentence names, now rather than at tonight's retry (`retryFault`, the owner's); a refusal shows the record's own
    * sentence under it. Details lists every open fault: its sentence, how often and since when, and the raw error where
    * the record hands it (the owner of a self-hosted record).
@@ -436,7 +436,7 @@
 {:else}
 <!-- AN AREA'S HEAD LINKS BACK TO THE INDEX: the kicker at 1440, the back link in the phone's bar. The
      index's own head is the one word, with nowhere above it to go back to, and its one tool. -->
-<!-- THE INDEX'S "⋯" (agents F28, F29): reordering the areas, the owner's, and the design book. Nothing else sits on the
+<!-- THE INDEX'S "⋯" (agents F28): reordering the areas, the owner's, and the design book. Nothing else sits on the
      head, so the list under it is the first thing read. -->
 {#snippet indexTools()}
   {#if mayArrange || import.meta.env.DEV}
@@ -616,7 +616,7 @@
     color: var(--ink);
   }
 
-  /* A FAILED NIGHT'S REASON, in plain words (A22): read, so the second ink. */
+  /* A FAILED NIGHT'S REASON, in plain words: read, so the second ink. */
   .fault-why {
     color: var(--ink-2);
   }
@@ -671,7 +671,7 @@
     pointer-events: none;
   }
 
-  /* THE ONE IRREVERSIBLE ACT IS DATA'S LAST ROW, ITS NAME IN RED (U-C9), at the rows' own rhythm: the 16 it stood apart
+  /* THE ONE IRREVERSIBLE ACT IS DATA'S LAST ROW, ITS NAME IN RED, at the rows' own rhythm: the 16 it stood apart
      by left a hole under a group of one. */
   .settings-index :global(.list[data-kind='link'] > .item > a[href$='/settings/delete']) {
     color: var(--red);

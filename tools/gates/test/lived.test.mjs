@@ -8,8 +8,7 @@
  * construction reads red on a record that does not. Each sign is asserted in both states here, on records built through
  * the product's own verbs, so a sign that stops seeing its fault and a builder that stops making it both go red.
  *
- * THE SENTENCES ARE ASSERTED IN THEIR FORM, the form an owner's record printed them in (`loop/scope/area-proof-a.md`
- * 2.2): the count of messages and the date of the newest Ledger row, the count of series and the day the numbers
+ * THE SENTENCES ARE ASSERTED IN THEIR FORM, the form an owner's record printed them in: the count of messages and the date of the newest Ledger row, the count of series and the day the numbers
  * stopped, the number of questions one cause holds. The two records' readings are printed side by side as the test's
  * diagnostics, for a report to quote.
  *
@@ -42,7 +41,7 @@ async function signsOf(name, over) {
 const FLOW = new Set(['scripts-paused', 'scripts-refused', 'scripts-sourceless', 'automations-failed', 'automations-parked', 'automations-idle', 'automations-stopped-chains']);
 
 /**
- * The signs of what runs by itself and what arrives (SHL-C01, `signs-actions.ts`) that may read green on the untended
+ * The signs of what runs by itself and what arrives (`signs-actions.ts`) that may read green on the untended
  * record, each with why. The others of the five read none on both profiles: neither declares a scheduled action.
  */
 const UNTENDED_GREEN = new Map([
@@ -79,7 +78,7 @@ test('DEFAULT: arrivals, numbers and questions by cause read red, in the sentenc
   for (const s of signs) t.diagnostic(`default     ${s.state.padEnd(5)} ${s.name}: ${s.said}`);
   for (const id of HIS) assert.equal(of(signs, id).state, 'red', `${id} read ${of(signs, id).state}: ${of(signs, id).said}`);
   /* AND NONE GREEN: an untended record that reads well anywhere has a sign that cannot see it. Outside the automation
-     signs (SHL-D01, `signs-flow.ts`): neither profile writes a script or an automation that fails, so on both they
+     signs (`signs-flow.ts`): neither profile writes a script or an automation that fails, so on both they
      read what is true of that, which is green or nothing to judge by. And outside `UNTENDED_GREEN`, each with its reason. */
   for (const s of signs) if (!FLOW.has(s.sign) && !UNTENDED_GREEN.has(s.sign)) assert.notEqual(s.state, 'green', `${s.sign} reads green on an untended record: ${s.said}`);
   for (const [id, why] of UNTENDED_GREEN) t.diagnostic(`default     may read green: ${id}, since ${why}`);

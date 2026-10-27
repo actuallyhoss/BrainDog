@@ -51,11 +51,11 @@ export const NEXT_30: Record<string, unknown>[] = [
        agenda of the days under it. This month and the next, because thirty days from today cross into it. Only while
        something falls due (`due-items-30d`, the same sentence); what is already late is the two notes above.
 
-       NO HEADING OF ITS OWN, SINCE money-core 3.21.0 (the audit of 25 October, Z18), for the reason the walk above lost
+       NO HEADING OF ITS OWN, SINCE money-core 3.21.0, for the reason the walk above lost
        its own in 3.13.0: on Money it opens Coming and going, and the tile read two headings, each with its glyph, one
        straight over the other. The month it draws says which days it is.
 
-       EVERY LIST'S MONEY, SINCE money-core 3.21.0 (the audit of 25 October, Z14): it read Bills and invoices alone, so on
+       EVERY LIST'S MONEY, SINCE money-core 3.21.0: it read Bills and invoices alone, so on
        his record it marked one premium while Today's Due soon named the premium and a salary coming in. Now it reads what
        falls due across every list, as Due soon does (`source: deadlines`), with money on it, and what the cash walk
        moves: a repeating line and a part of a plan as well as a bill, a bill that repeats once, on its line. Drawn

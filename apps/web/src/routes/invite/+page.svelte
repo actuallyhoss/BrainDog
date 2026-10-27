@@ -64,7 +64,7 @@
   const recordName = $derived(seen?.ok ? (seen.value.record ?? null) : null);
 
   /**
-   * AN INVITATION THAT GIVES "ADDS ONLY" AND NOTHING TO READ (USE-A11). Every screen of the app reads first, so the
+   * AN INVITATION THAT GIVES "ADDS ONLY" AND NOTHING TO READ. Every screen of the app reads first, so the
    * one door that is hers is her agent's key, and Accept leads there instead of to a Home that can only refuse her.
    * Adds only on the whole record, or no whole record and every list at adds only; a host older than these fields,
    * which names neither, keeps the usual way on.
@@ -316,7 +316,7 @@
   }
 
   /* A label above its field (`.field-label` puts 6 under it), as every field in the product has, and the field the
-     column's width. Its own name, not the ledger's `.row` (SF5), which drew a rule under it and cut the field short. */
+     column's width. Its own name, not the ledger's `.row`, which drew a rule under it and cut the field short. */
   .name-row {
     display: flex;
     flex-direction: column;

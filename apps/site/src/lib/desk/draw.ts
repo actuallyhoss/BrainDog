@@ -2,7 +2,7 @@
  * The desk's little drawings as path strings: a project's sparkline, the cash line, Tidepool's monthly bars.
  *
  * PURE AND SERVER-SAFE, so the prerendered page carries every drawing in its HTML and a test can read the numbers.
- * The shapes are the prototype's (`loop/site-2026-10-17/src/site.html`, `spark`, `area` and the bars in `project()`),
+ * The shapes are the prototype's (`spark`, `area` and the bars in `project()`),
  * with every coordinate rounded to one place so the served bytes stay short.
  */
 

@@ -85,7 +85,7 @@ test('WHERE THE BINDING FAILS WITHOUT THE GATEWAY TOO, THE LEDGER AND HEALTH SAY
   assert.match(engineSaid(h, T0).text, /^Slash's model has not answered since 22 October\./);
 });
 
-/* THE DIGEST'S ASK AS THE BINDING HEARS IT (B29). `glm-5.3-flash` reasons and spends its thinking from `max_tokens`, so
+/* THE DIGEST'S ASK AS THE BINDING HEARS IT. `glm-5.3-flash` reasons and spends its thinking from `max_tokens`, so
    the digest is sent the low effort and the room for it (`LOW_THINKING_ROOM`): at 120 tokens the thinking ran the
    ceiling out before the two sentences began. */
 test('A DIGEST IS ASKED OF THE FLASH MODEL WITH reasoning_effort LOW AND ROOM TO THINK, as the binding hears it', async () => {

@@ -7,7 +7,7 @@
  * file decides whether a share may be kept: the grammar's rules (`checkShare`), never an owner as the target, the Plus
  * hook for somebody not on the record yet, and the inline confirm (§6, default 1).
  *
- * AGENTS NEVER SHARE (T3). The owner's and Admin's methods are `team`, which refuses every token
+ * AGENTS NEVER SHARE. The owner's and Admin's methods are `team`, which refuses every token
  * `NEEDS_BROWSER_SESSION`; the grantee's two refuse a token the same way before anything else, because a person
  * shares and their agents do not, whatever the token's scope. `sharing` is this file's list of shares; `shares` was
  * already the page links' (`shares.ts`), and one surface keeps one method per name.
@@ -52,10 +52,10 @@ import type { RecordDeps } from './index.ts';
 
 /** How long an ended share stays on the Sharing page, in days (§3.2, "Ended: the last 30 days"). */
 export const SHARES_ENDED_DAYS = 30;
-/** The most live shares one person holds, their groups' among them (T14). */
+/** The most live shares one person holds, their groups' among them. */
 export const SHARES_PER_PERSON_MOST = 50;
 /**
- * The most bytes one person's lens may take on the hop to the record (§2.13, T13), the Worker's `CTX_HEADER_MOST`. A
+ * The most bytes one person's lens may take on the hop to the record (§2.13), the Worker's `CTX_HEADER_MOST`. A
  * share that would take somebody past it is refused at save in the plan's own sentence.
  */
 export const SHARE_CTX_MOST = 32 * 1024;
@@ -155,7 +155,7 @@ export type GroupRow = { id: string; name: string; people: { id: string; name: s
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const refuse = (code: string, fix: string, at: string): Result<never> => ({ ok: false, refusal: { code, fix, at } });
 
-/** A token is never a sharer (T3): the one sentence every share route gives one, before it reads anything. */
+/** A token is never a sharer: the one sentence every share route gives one, before it reads anything. */
 const AGENTS_NEVER: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; an agent cannot share or see what is shared.', at: 'principal' };
 const personOnly = (ctx: CallContext): Refusal | null => (ctx.principal.kind === 'person' ? null : AGENTS_NEVER);
 
@@ -214,7 +214,7 @@ export function sharedSaid(sql: Pick<Sql, 'one'>, catalog: LensCatalog, waiting:
 }
 
 /**
- * WHAT THE OWNER HAS SHARED OUT, as Today says it in one line (sharing plan §3.5, T12, §6 default 1): how many live
+ * WHAT THE OWNER HAS SHARED OUT, as Today says it in one line (T12, §6 default 1): how many live
  * shares, who they are with by name (three, then how many more), and the shares made in the last day, each as "You shared Kiln with
  * priya@studio.co." `needs` is true when one of those is wide (an address at Edit or Manage, or no end) and the owner
  * has no passkey to have confirmed it with, which is the one case the record could not ask "Confirm it's you" and so

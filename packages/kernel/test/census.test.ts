@@ -1,5 +1,5 @@
 /**
- * THE PAGES CENSUS (PGS-A01): one page's answer counted, so a daily read says which pages draw a refused block, print
+ * THE PAGES CENSUS: one page's answer counted, so a daily read says which pages draw a refused block, print
  * a path that named nothing, or show a dash. Read off the answer: a block not drawn counts in `blocks` and nowhere else.
  */
 

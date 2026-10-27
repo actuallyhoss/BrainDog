@@ -1,5 +1,5 @@
 /**
- * THE DESIGN AGENT ASKS THE MODEL WHEN THE RULES CANNOT DRAW (C14, §45 "Thinking and cost"): a list on a page with days
+ * THE DESIGN AGENT ASKS THE MODEL WHEN THE RULES CANNOT DRAW (§45 "Thinking and cost"): a list on a page with days
  * and nothing that shows them by day, whose rules' calendar the design check refuses, is asked of the model once. What
  * comes back passes the same check before it is filed as the day's one "I drew X. Keep it?", and it says what it cost.
  * The model here is the test's own; nothing is spent.

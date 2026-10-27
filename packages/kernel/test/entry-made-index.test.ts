@@ -1,5 +1,5 @@
 /**
- * Migration 39's `entry_made` is what a list read in its default order walks (audit 49-50 finding 7).
+ * Migration 39's `entry_made` is what a list read in its default order walks.
  *
  * MEASURED BEFORE: a list that declares no order reads `ORDER BY created_at DESC, id DESC`, and the one index it had
  * was `entry_live (register, updated_at DESC)`. The plan found the list's rows and then said `USE TEMP B-TREE FOR ORDER

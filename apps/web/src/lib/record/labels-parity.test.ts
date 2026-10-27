@@ -5,7 +5,7 @@
  *
  * THREE READINGS OF ONE WORD, and each had its own matcher. `compile` reads the filter (through the record's own
  * parser now), `declaredValue` turns the word into what a URL and the live reader carry, and `inheritedFrom`
- * decides what a capture line under the filter writes. An audit found the last two disagreeing with
+ * decides what a capture line under the filter writes. Testing found the last two disagreeing with
  * the kernel: `declaredValue` never read a label at all, and `inheritedFrom` folded case but not the kernel's runs of
  * spaces and underscores, so `state is to_check` filled `review` on a record and nothing on the demo.
  */

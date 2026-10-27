@@ -1,5 +1,5 @@
 /**
- * The understanding layer as an agent meets it (`loop/contract-17.md`): `meet` answers in names with how
+ * The understanding layer as an agent meets it: `meet` answers in names with how
  * it matched, a merged row is followed to the one kept, the card says who is in touch here, and two questions that
  * differ by a name, an amount or a row's words are never said as one.
  *

@@ -1,5 +1,5 @@
 /**
- * The record's own vitals (SHL-A06): three readings in the shape `signs.ts` sets (PRF-A01), joined to its closed list
+ * The record's own vitals: three readings in the shape `signs.ts` sets, joined to its closed list
  * with one import and one spread. Every write has an author, the file says the format this build reads, and every
  * amount is whole minor units with a currency.
  *
@@ -26,7 +26,7 @@
  * AND ONE BESIDE THE THREE (pairs-fx-guard-62-63): `rate-age`, how old the newest rate is. Two currencies pair by
  * themselves only on a rate at most `PAIR_RATE_DAYS` old (`pairs.ts`); past that both halves of a move stay counted,
  * and nothing on the record said why until this did. NOBODY IS ASKED YET (the question is built in `pairs.ts` and
- * wired nowhere), so the sign does not say anybody is (audit 65, claim 3).
+ * wired nowhere), so the sign does not say anybody is.
  */
 
 import { unprivate } from '@braindog/where';

@@ -1,5 +1,5 @@
 /**
- * `quietSign`, the kernel's: a sign as a reader without the inbox reach reads it (audit 38-39, finding 1). Every sign
+ * `quietSign`, the kernel's: a sign as a reader without the inbox reach reads it. Every sign
  * with a `QUIET` sentence loses the message and question words its own sentence carried, a sign read `none` keeps its
  * sentence, and every sign's facts are emptied. The record's `signs` method re-exports this same function.
  */

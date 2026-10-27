@@ -292,7 +292,7 @@ export function runWords(fields: Readonly<Record<string, unknown>>): string | nu
 /** Who a run is, as a person reads it: the app it ran in ("Claude Code"), else its agent's name, else `null`. */
 export function runWho(fields: Readonly<Record<string, unknown>>): string | null {
   const raw = typeof fields.client === 'string' && fields.client.trim() !== '' && !/[/\\:@]/u.test(fields.client) ? fields.client.trim() : null;
-  /* AN APP'S OWN SLUG IS SAID AS ITS NAME (the audit of 25 October, Z23): MCP's `clientInfo` names Claude Code
+  /* AN APP'S OWN SLUG IS SAID AS ITS NAME: MCP's `clientInfo` names Claude Code
      `claude-code`, and a run's page said "claude-code, in braindog on master". */
   const app = raw !== null && /^[a-z0-9]+(?:[-_][a-z0-9]+)+$/u.test(raw) ? raw.split(/[-_]/u).map((w) => (w === 'cli' ? 'CLI' : `${w[0]!.toUpperCase()}${w.slice(1)}`)).join(' ') : raw;
   const agent = typeof fields.agent === 'string' && fields.agent !== '' && fields.agent !== 'other' ? actor(fields.agent).name : null;
@@ -313,7 +313,7 @@ export function gapSaid(from: string, to: string): string | null {
 }
 
 /**
- * WHAT A RUN LEFT AND WHAT BECAME OF IT (AGT-C05), off its own row: the next step it left, when, and whether another run
+ * WHAT A RUN LEFT AND WHAT BECAME OF IT, off its own row: the next step it left, when, and whether another run
  * took it, a person or an agent dropped it, or nobody took it in thirty days. `open` is a step still waiting, which a
  * person may close. `taker` is the words for the run that took it (`runWho`), when the page could read that run.
  * `null` for a run that left no step.
@@ -1842,7 +1842,7 @@ const feedMore = (n: number): string => `and ${integer(n)} more`;
 /**
  * WHAT A BURST'S LINE SAYS OF THE LINES ALIKE UNDER IT, after its words: "and 7 more like this". It was a bare number in
  * a column of its own before the face, "8", which on a project's What changed read as a stray digit beside a line that
- * said one thing (the audit of 25 October, Z22, `-more/row-braindog-390-light.png`).
+ * said one thing (`-more/row-braindog-390-light.png`).
  */
 const feedAlike = (n: number): string => `and ${integer(n)} more like this`;
 
@@ -1852,7 +1852,7 @@ const UNDO_NOTE = 'Put back by an undo.';
 /**
  * A NOTE SAID AFTER WHO WROTE IT, as part of one sentence: "Claude Code added the visual…", where it read "Claude Code
  * Added the visual…", and an undo as what was done, "You undid a change to Kiln", where it read "You Put back by an
- * undo." (Z22). Only a first word that is a verb in the past is lowered, so a note that opens on a name keeps it.
+ * undo.". Only a first word that is a verb in the past is lowered, so a note that opens on a name keeps it.
  */
 export function noteAfterWho(note: string, thing: string | null): string {
   if (note.trim() === UNDO_NOTE) return thing ? `undid a change to ${thing}` : 'undid a change';
@@ -2085,7 +2085,7 @@ export type SearchHit = {
   spoken?: string;
   /** The searchable field that answered, when the title did not — `find.ts`'s `why`. */
   why?: string;
-  /** Found by meaning and by no word typed. Counted, never printed beside the row (E54). */
+  /** Found by meaning and by no word typed. Counted, never printed beside the row. */
   meaning?: true;
 };
 

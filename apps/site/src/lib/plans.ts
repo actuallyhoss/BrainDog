@@ -5,7 +5,7 @@
  * and the subscriptions are an extra for pros.
  * Free is drawn first and loudest everywhere; Cloud and Cloud Plus follow it, quieter, as the plans for pros.
  *
- * EVERY FIGURE IS `PLAN_TABLE`'S (LCH-A08), `packages/record/src/plans.ts`: the price, the runs, requests, bytes and
+ * EVERY FIGURE IS `PLAN_TABLE`'S, `packages/record/src/plans.ts`: the price, the runs, requests, bytes and
  * script time, the Slash credits, the agents and the people. The cards below are made from `TABLE` and type no
  * figure of their own. `TABLE` is the table's three sold rows, whole, because the site does not declare
  * `@braindog/record` yet and a relative climb into it is the `graph` gate's "cross-package relative import". The day
@@ -21,7 +21,7 @@
  * SLASH IS COUNTED IN CREDITS (since 26 September), because a price of $0.10 a Slash ask reads badly.
  * One question or draft is one credit, however much work it takes, and each plan includes a month of them.
  *
- * PACKS ARE SHOWN WITH BILLING ON, AND ONLY THEN (LCH-A10). The checkout sells the table's two packs beside the plans
+ * PACKS ARE SHOWN WITH BILLING ON, AND ONLY THEN. The checkout sells the table's two packs beside the plans
  * (`apps/worker/src/billing.ts`, in Stripe's test mode while billing is not live), so `PACKS` is `packsOnSale` of
  * `LAUNCH.billing`: the table's packs, each with its price, when the site says a card is charged, and none before. Billing
  * stays off or in test mode until the owner's word to charge, so today the site names no pack and says

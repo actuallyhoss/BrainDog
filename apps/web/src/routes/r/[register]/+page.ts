@@ -1,5 +1,5 @@
 /**
- * A LIST WITH A PAGE OF ITS OWN OPENS ON IT (E26). A page that says `list: <id>` is that list's page, where its rows are
+ * A LIST WITH A PAGE OF ITS OWN OPENS ON IT. A page that says `list: <id>` is that list's page, where its rows are
  * read the way they are meant to be: Numbers grouped by project, each kind of number once. So `/r/datapoints` sends a
  * reader to `/p/numbers`, and the list's own screen, its rows as a table, is one word away (`?rows=1`), as is every
  * address that asks for anything of the list (a row, a view, a filter).

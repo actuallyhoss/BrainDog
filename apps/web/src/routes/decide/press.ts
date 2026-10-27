@@ -4,14 +4,14 @@
  * after the answer rather than a reason demanded before it.
  *
  * WHY. The walk of 2 October pressed "Park it another year" on Decide and got a round trip to the record and then a box
- * asking "Why? (one line)", with the question still there and the page scrolled (`loop/research-ux-walk.md` #3). Two of
+ * asking "Why? (one line)", with the question still there and the page scrolled. Two of
  * the owner's 69 decisions carried the reasons "f" and "y", which agents read back later as the why. So a press is the
  * answer, the reason is offered after a decline or an edit and never demanded, and a note somebody chose to write is
  * worth more than a sentence somebody was made to type.
  *
  * THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, the owner's own pick, on every question that has one. It once went
- * where the choice is hard to undo or money moves, which hid the agent's advice exactly where it matters most (audit 19
- * M10). What leaves those questions is Enter alone (`acceptKey`): a mark is advice, a key is an answer given unread.
+ * where the choice is hard to undo or money moves, which hid the agent's advice exactly where it matters most.
+ * What leaves those questions is Enter alone (`acceptKey`): a mark is advice, a key is an answer given unread.
  *
  * PURE, with relative imports, so `press.test.ts` loads it in Node.
  */
@@ -148,7 +148,7 @@ type Declared = { fields: readonly { id: string; type: string }[] };
  * and nothing when the proposal writes no money or its list declares none.
  *
  * THE NET WHEN EVERY AMOUNT POINTS ONE WAY, AND WHAT MOVES WHEN THEY DO NOT. Amounts of -£5 and +£3 netted to £2 on the
- * button, though £8 is written (audit M5), and a transfer of £3 out and £3 in netted to nothing at all, drew the
+ * button, though £8 is written, and a transfer of £3 out and £3 in netted to nothing at all, drew the
  * suggestion and let Enter accept it. So a currency whose amounts point both ways names all of them, each counted once
  * whichever way it goes, and a button never says less than what accepting writes.
  */

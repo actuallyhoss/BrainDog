@@ -205,7 +205,7 @@ test('a report key reads as its name and the list it sends to, never as its labe
   assert.equal(reportKeyOf(null), null);
 });
 
-/* ── who is connected, in three parts (AGT-A06) ── */
+/* ── who is connected, in three parts ── */
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');
 const daysAgo = (n: number): string => new Date(NOW - n * 86_400_000).toISOString();
@@ -237,7 +237,7 @@ test('a key with no client reads its label and is a key you made', () => {
   assert.equal(nameOf(c), 'nightly-report');
 });
 
-test('A KEY THE READER MADE IS THEIRS, never "made by" their own name; a colleague’s says whose (audit C, X17)', () => {
+test('A KEY THE READER MADE IS THEIRS, never "made by" their own name; a colleague’s says whose', () => {
   const c = only(key({ person_id: 'p_owner', person_name: 'The Studio' }));
   assert.equal(lineOf(c, partsOf(c, NOW), 'p_owner'), 'A key you made');
   assert.equal(madeByOther(c, 'p_owner'), null);

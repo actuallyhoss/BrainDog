@@ -7,7 +7,7 @@
  * when migration 23 lands, and erase removes a row's keys with the row (`erase.ts`).
  *
  * ONE LIVE ROW PER KEY, AND THE FIRST TO CLAIM IT KEEPS IT. A second live row whose fields carry a key the first holds
- * does not take it: the record refuses that write at its own door (D3), and a row written past it simply does not
+ * does not take it: the record refuses that write at its own door, and a row written past it simply does not
  * answer to the key. A key whose holder is gone (deleted, erased, purged) is free again.
  *
  * A MERGED ROW'S KEYS POINT AT THE ROW IT WAS FOLDED INTO. The row stays in the file, deleted, with `merged_into` naming
@@ -18,7 +18,7 @@
  * of the chain it points into, and an unfold takes its keys back from wherever along that chain they went, or undoing
  * A's merge after B's left A answering to nothing and C answering to A's address.
  *
- * A PROJECT HOLDS KEYS TOO, AND SHARES THEM (ENG-B02). The one list declaring `scopes:` is the third entity list. A
+ * A PROJECT HOLDS KEYS TOO, AND SHARES THEM. The one list declaring `scopes:` is the third entity list. A
  * project's keys are the places and sites its row lists (`remote:`, `folder:`, `domain:`) and what it is called
  * (`name:`, a weak key). They are held beside the others' and never in their place, because none of them is a project's
  * alone: a company and its project live at one domain, a monorepo's two projects list one repository, and two projects
@@ -26,7 +26,7 @@
  * lists a place holds it, and `holderOf('domain:…')` still answers the organisation and nothing else. `claimed` reads
  * them back, and `settledBy` says whether what was found decides: one project by a place or a site, never by a name.
  *
- * A LIST CAN SAY WHAT MAKES TWO OF ITS ROWS ONE (AGT-C13). A list declaring `same:` holds one key a row, built from
+ * A LIST CAN SAY WHAT MAKES TWO OF ITS ROWS ONE. A list declaring `same:` holds one key a row, built from
  * the text fields its rule names, folded as it says, within one value of its scope or a link: `same:<list>:<where>:
  * <what>`. Kept as a person's are, one live row per key and the first keeps it, so a second skill saying what the first
  * says is known to be the same row (`keyLists`, `sameLists`). These are not entities: `entityLists` never answers one.
@@ -120,7 +120,7 @@ export type KeyList = EntityList | SameList;
 const KEEPS = ['oldest', 'latest', 'sealed'] as const;
 
 /**
- * The lists declaring `same:` (AGT-C13), each with its rule read whole and `keep` filled in as `oldest`.
+ * The lists declaring `same:`, each with its rule read whole and `keep` filled in as `oldest`.
  *
  * KEPT APART FROM `entityLists`, which `about.ts` and `resolve.ts` read as the people, organisations and projects a
  * mention can be: a skill is not somebody met. And a list already playing a role is that and not also this, so a row's

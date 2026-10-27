@@ -63,7 +63,7 @@ export const FIRST = PROJECTS[0].name;
 export const SECOND = PROJECTS[1].name;
 export const EVERYWHERE = ['ripgrep', 'jq', 'httpie'];
 export const OWN_TOOL = 'bindery-cli';
-/** HOW THE PAGE SAYS IT: a name typed as a slug is said in words (`wordsOf`, E2), so the tool is read as "Bindery cli". */
+/** HOW THE PAGE SAYS IT: a name typed as a slug is said in words (`wordsOf`), so the tool is read as "Bindery cli". */
 export const OWN_TOOL_SAID = 'Bindery cli';
 
 /** A project's page address, from its name as the record makes a slug of a title. */

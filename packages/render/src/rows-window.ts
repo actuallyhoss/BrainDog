@@ -1,11 +1,11 @@
 /**
  * WHICH ROWS OF A LONG TABLE ARE DRAWN: the ones on screen and a few either side, between two spacers that hold the
- * rest of the height (PGS-A16).
+ * rest of the height.
  *
  * `Table.svelte` builds every row it is handed, and its own header says why that was the call: a virtualised scroll
  * breaks find-in-page and the scrollbar as a position cue. That held while a table took a page of 200. A list of 2,527
  * entries read a page at a time is 2,527 rows of controls by the end, and Ledger at 200 was already 9,212 pixels and
- * 1,529 buttons (`evidence-screens.md`, fault 7). So past `ROWS_WINDOW_FROM` a table is drawn through
+ * 1,529 buttons (`evidence-screens.md`). So past `ROWS_WINDOW_FROM` a table is drawn through
  * `svelte/p/RowsWindow.svelte`, which asks this file what to draw. The scrollbar stays honest, because the spacers add up
  * to the height every row would have taken; the screen reader's count stays honest, because every drawn row keeps its
  * own `aria-rowindex` and the grid keeps the whole `aria-rowcount`.

@@ -1,5 +1,5 @@
 /**
- * The connect sheet's decisions (AGT-A07): six ways in, in order, the lines each hands over, the live row's three
+ * The connect sheet's decisions: six ways in, in order, the lines each hands over, the live row's three
  * states, the poll, and names, never ids, in anything the sheet says.
  */
 

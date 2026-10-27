@@ -1,5 +1,5 @@
 /**
- * A field worked out at read (SHL-B18) holds nothing in the store, so a filter or a sort over it is refused in one
+ * A field worked out at read holds nothing in the store, so a filter or a sort over it is refused in one
  * sentence, with the code a field that cannot be asked a test gets. A stored field beside it compiles as before.
  */
 

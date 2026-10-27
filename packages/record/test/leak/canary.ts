@@ -1,10 +1,10 @@
 /**
- * The canaries of the leak matrix (sharing plan §4.1) and the one check every property ends in: does an answer carry
+ * The canaries of the leak matrix and the one check every property ends in: does an answer carry
  * anything its caller may not see.
  *
  * A ROW CARRIES ITS OWN WORD IN EVERY TEXT FIELD. `zq<hex>` on a row a grantee may be kept from, `zp<hex>` on a row
  * its maker kept private, and a unique prime as its amount. `zh<hex>` is a task's notes beside its word, the value a
- * share that hides a field keeps from its grantee (sharing plan §2.7). A row is in or out of sight per caller, so the
+ * share that hides a field keeps from its grantee. A row is in or out of sight per caller, so the
  * word belongs to the row and the caller decides whether it is a leak: whatever an answer carries of a row out of the
  * caller's sight (its word, its id, its amount), or of a field hidden from them on a row in sight, is named by `leaks`.
  * `zk<hex>` is the owner's own: what he told an agent, what a run was doing and what it answered, which nobody but an

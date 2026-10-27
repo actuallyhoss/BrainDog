@@ -1,7 +1,7 @@
 /**
  * A screen, drawn with no browser: the web's own parts (`Sidebar.svelte`, `PageView.svelte`) compiled for the server and
  * rendered from a `boot` a host answered, then read into the snapshot `first-screen.mjs` judges (`{ path, width, text,
- * roles, counts }`). Audit 71, finding 8: five of the seven first-screen checks read nothing because no screen was
+ * roles, counts }`). Five of the seven first-screen checks read nothing because no screen was
  * handed in, and the rail's Pages heading and Today's line on the vital signs were among what nobody read.
  *
  * WHAT IS REAL AND WHAT IS NOT. The markup is the product's: the same components, the same readers the layout and Home

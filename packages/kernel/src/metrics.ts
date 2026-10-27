@@ -22,7 +22,7 @@
  * ungrouped figure would be a number under a heading that says it is grouped, which is worse than
  * an em dash.
  *
- * A RUNNING TOTAL AND A MEASURED TREND ARE READ (REC-B09). `{ running: { sum, order, until } }` walks
+ * A RUNNING TOTAL AND A MEASURED TREND ARE READ. `{ running: { sum, order, until } }` walks
  * the entries in order and answers the total at the end or at its stop, with the entry that reached
  * the line (`crossedAt`). `{ trend: { of, ahead } }` reads another figure in its buckets and answers
  * what `trend.ts` says of them (`readTrend`). Neither is half of a ratio or a difference.
@@ -112,7 +112,7 @@ export type Aggregation =
   | { past: string; by?: string | undefined };
 
 /**
- * The window a difference takes its second half from (REC-B19): the same `where`, read against the clock moved back.
+ * The window a difference takes its second half from: the same `where`, read against the clock moved back.
  *
  * `previous` moves it by the figure's `window` and `year_ago` by a year, as `compare` does. `month_ago` moves it to the
  * same day number last month (`monthBefore`), which thirty days does not: 31 October less thirty days is still October.
@@ -128,7 +128,7 @@ export type Before = (typeof BEFORE)[number];
 export type Value = Aggregation | { ratio: { of: Aggregation; per: Aggregation } } | { diff: { of: Aggregation; per: Aggregation; before?: Before | undefined } };
 
 /**
- * A FIGURE THAT ADDS OTHER FIGURES (REC-B06): cash held less what is owed out is a net position, `{ sum_of: [{ metric:
+ * A FIGURE THAT ADDS OTHER FIGURES: cash held less what is owed out is a net position, `{ sum_of: [{ metric:
  * cash-now }, { metric: owed-out, minus: true }] }`. Each part is an installed figure by its id, with a parameter after
  * the first colon as a walk's opening takes one (`book-cash:Kiln`), and `minus` takes it away (`readSumOf`).
  *
@@ -198,7 +198,7 @@ export type MetricDecl = {
   /** `true` offers the figure to a forecast's sell control as something that could be sold for cash. */
   sellable?: true | undefined;
   /**
-   * `true` makes the figure one of the record's vital signs (PRF-A01): red on the day its reading misses its target,
+   * `true` makes the figure one of the record's vital signs: red on the day its reading misses its target,
    * green when it meets it. Only on a figure with a target, which `declare.ts` holds. A declared sign is shown with the
    * record's own; it never joins the signs the hold is counted on, so a pack cannot move the clock (`vitalOf`).
    */
@@ -413,7 +413,7 @@ export type Reading = {
   /** Present when the rows were in a currency other than the one the figure is added up in: converted, or in `parts`. */
   fx?: FxRead;
   /**
-   * A SUM THAT CONVERTED WHAT IT COULD AND LEFT THE REST OUT (`fx.ts` `atleast`, REC-B05). `parts[0]` is then the least
+   * A SUM THAT CONVERTED WHAT IT COULD AND LEFT THE REST OUT (`fx.ts` `atleast`). `parts[0]` is then the least
    * the whole can be, in `fx.into`, and `noRate` is what no rate reached, one amount a currency, each more than nought;
    * `parts` is the two together and `fx.missing` names each pair. `value` STAYS `null`: a lower bound in `value` is
    * drawn as the total by every reader that has not learnt the mark, and no reader has yet. Absent on every other figure.
@@ -577,7 +577,7 @@ export function windowMs(text: string): number | null {
 
 /** The published shapes with no consumer here, each named rather than ignored. */
 const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket'] as const;
-/** The two shapes that are a figure of their own (REC-B09): read at the top of a value, refused by name inside one. */
+/** The two shapes that are a figure of their own: read at the top of a value, refused by name inside one. */
 const WHOLE_SHAPES = ['running', 'trend'] as const;
 
 /**
@@ -649,7 +649,7 @@ export const monthBefore = (nowMs: number): number => {
  * nothing in it, a window before with under half the entries, and a window before worth nothing each answer `null` and
  * a reason, because a change read off them is a fact about how much was written down and not about what happened.
  *
- * `both` ASKS IT OF THE CURRENT WINDOW TOO, and a difference against the window before does (REC-B19): three entries
+ * `both` ASKS IT OF THE CURRENT WINDOW TOO, and a difference against the window before does: three entries
  * this month against forty last month is the first week of a month reading as good news. The comparison every figure has
  * always carried is asked one way, as it was.
  */
@@ -922,7 +922,7 @@ export type EvalContext = {
    */
   tz?: string | undefined;
   /**
-   * THIS READ IS A KEPT POINT'S (`snapshot`, REC-B05). A row in a sum takes the nearest rate there is and says how old
+   * THIS READ IS A KEPT POINT'S (`snapshot`). A row in a sum takes the nearest rate there is and says how old
    * it is; a point in a line is drawn as that day's, so each amount needs a rate of its own day or the day before (or of
    * the last day one was published, `RATE_QUIET_DAYS`), and never a later one standing in. Without one the figure has no `value` and names the pair (`pointSaid`), so the night
    * writes no point: a gap in the line is honest, and a point that is quietly wrong is not. Absent on every other read.
@@ -1310,13 +1310,13 @@ export type SourceReader = (sql: Sql, ctx: EvalContext, decl: MetricDecl) => Res
  * here, and `evaluateMetric` asks this before it reads a list.
  *
  * `governance.open`: the open questions, which are not rows of a list; `questions-open:<what>` comes with its `about`
- * filled and counts that one thing's. `record.signs`: what arrives and what runs (REC-A01). `sessions.working`: how many
+ * filled and counts that one thing's. `record.signs`: what arrives and what runs. `sessions.working`: how many
  * agents are working now, by the one clock (`presence.ts`). `handoffs.open`: the steps left for the next run.
- * `record.vitals`: `signs-red` and `green-days` (PRF-A05). `record.rates`: how old the newest rate is (REC-B02).
- * `record.door`: the agent door's own signs (AGT-B01). `record.places`: projects with no repository or folder, and
- * `record.keys`: keys whose sealed value cannot be opened (AGT-D01), and `record.key-scan`: keys written in plain text
+ * `record.vitals`: `signs-red` and `green-days`. `record.rates`: how old the newest rate is.
+ * `record.door`: the agent door's own signs. `record.places`: projects with no repository or folder, and
+ * `record.keys`: keys whose sealed value cannot be opened, and `record.key-scan`: keys written in plain text
  * (`key-scan.ts`). `record.lists` and `record.paths`: what the night counted, the lists that shrank with nothing deleted
- * (REC-A17) and the placeholders that name nothing (REC-A13). Each answers no value, never nought, with nothing to read.
+ * and the placeholders that name nothing. Each answers no value, never nought, with nothing to read.
  *
  * BUILT ON THE FIRST READ, NOT AS THE FILE LOADS: `built-in-figures.ts` reaches back here through `handoff.ts` and the
  * rest, so a table built at load could meet its words before they were set, and break the kernel's own load.
@@ -1374,7 +1374,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const shift = decl.window ? windowMs(decl.window) : null;
   if (decl.window && shift === null) at('VALUE_MALFORMED', `${decl.window} is not a window: write 30d, 4w or 3m`, 'window');
 
-  /* A FIGURE OVER A KEPT LINE (REC-B01): `series.<figure>` reads the points that figure's nights wrote, and the one thing
+  /* A FIGURE OVER A KEPT LINE: `series.<figure>` reads the points that figure's nights wrote, and the one thing
      this build asks of them is how many days of the window hold none (`readSeriesGaps`). Anything else over a line is
      still a source this build does not read, as it was before it read this, and says what it does read. */
   if (decl.source.startsWith('series.')) {
@@ -1386,7 +1386,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     return readSeriesGaps(sql, decl, ctx, shift!);
   }
 
-  /* A FIGURE OVER WHO MADE A LIST'S ENTRIES (REC-B20): `events.<list>` reads the history for who made each entry of one
+  /* A FIGURE OVER WHO MADE A LIST'S ENTRIES: `events.<list>` reads the history for who made each entry of one
      list, and the one thing this build asks of it is how many were made in the window (`readMade`). Its `where` narrows by
      who and by nothing else, because the entries' own fields are `register.<list>`'s to ask about. */
   if (decl.source.startsWith('events.')) {
@@ -1424,7 +1424,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   /* CASH ROLLED FORWARD AND THE WALK AHEAD ARE READ IN THEIR OWN FILE (`money-figures.ts`), after the two keys every
      figure needs and before anything that assumes one aggregation over one list. */
-  /* A SUM OF FIGURES (REC-B06) reads each part back through here and adds the readings (`readSumOf`). */
+  /* A SUM OF FIGURES reads each part back through here and adds the readings (`readSumOf`). */
   if (isSumOf(decl.value)) {
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return readSumOf(sql, decl, ctx);
@@ -1438,7 +1438,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return readCrosscheck(sql, decl, ctx);
   }
-  /* AND A TREND (REC-B09), which reads the figure it is of back through here and hands its buckets to `trend.ts`. */
+  /* AND A TREND, which reads the figure it is of back through here and hands its buckets to `trend.ts`. */
   if (isShape(decl.value, 'trend')) {
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return readTrend(sql, decl, ctx);
@@ -1478,13 +1478,13 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * spelling of a thing they spelled correctly. `08 §2.2` is the document they read, and it says
    * `median` is real — so the record has to say *not here yet*, not *not a thing*.
    */
-  /* A DIFFERENCE'S HALVES MAY NAME THE GROUPING THEMSELVES (REC-B19), and from here on it is the figure's own: one
+  /* A DIFFERENCE'S HALVES MAY NAME THE GROUPING THEMSELVES, and from here on it is the figure's own: one
      field, read once, by everything below. Two fields are refused by name, as every half's `group_by` was before. */
   const lifted = liftedGrouping(decl);
   if (lifted.said) at('NOT_IN_THIS_BUILD', lifted.said, 'group_by');
   decl = lifted.decl;
 
-  /* A RUNNING TOTAL IS A SUM, WALKED (REC-B09). From here on the figure is the sum of the field it names, so the
+  /* A RUNNING TOTAL IS A SUM, WALKED. From here on the figure is the sum of the field it names, so the
      field, the `where`, the currencies and the as-of day are checked and read by everything a sum is read by, and the
      walk is one more read at the end (`crossedAt`). */
   const run = runningOf(decl, schema, register, at, ctx.schemaOf);
@@ -1505,7 +1505,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * only with one, because a bar per distinct date is a list rather than a chart. A ratio of groups
    * is a second dimension of arithmetic this build does not do, so it says so.
    *
-   * A DIFFERENCE IS GROUPED (REC-B19): both halves are read over one part's entries and subtracted there, so each part
+   * A DIFFERENCE IS GROUPED: both halves are read over one part's entries and subtracted there, so each part
    * answers its own difference (`groupsOf`). It was refused with the ratio, and Money could not say which category
    * moved against last month.
    *
@@ -1630,7 +1630,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     ctx.tz,
   );
   /**
-   * A DIFFERENCE AGAINST THE WINDOW BEFORE (`diff.before`, REC-B19) READS ITS SECOND HALF THERE: the same words at a
+   * A DIFFERENCE AGAINST THE WINDOW BEFORE (`diff.before`) READS ITS SECOND HALF THERE: the same words at a
    * moved clock, ended at that clock's day and never past the day this window starts, which is the window the
    * comparison below reads and is built the same way. `moved` is whether the words name a day at all.
    */
@@ -1813,7 +1813,7 @@ function backsOf(sql: Sql, schema: Schema, value: Value, predicate: Predicate | 
   return { backs, ...(added > backs.length ? { backsMore: added - backs.length } : {}) };
 }
 
-/* ── a running total and a trend (REC-B09) ─────────────────────── */
+/* ── a running total and a trend ─────────────────────── */
 
 /** Whether a value is the shape called `word` at its top: `{ running: … }`, `{ trend: … }`. */
 const isShape = (value: unknown, word: string): value is Record<string, unknown> =>
@@ -1973,7 +1973,7 @@ const flatSaid = (why: string, n: number, bucket: Bucket): string =>
       : `the ${bucket}s do not tell growth from flat`;
 
 /**
- * A TREND: what `trendOf` says of another figure's buckets (REC-B09).
+ * A TREND: what `trendOf` says of another figure's buckets.
  *
  * THE FIGURE IT IS OF IS READ THROUGH `evaluateMetric`, AS ANY PAGE READS IT, so its `where`, its currencies, its as-of
  * day and which bucket is unfinished are that figure's own and are decided in one place. It is read off its stored
@@ -2048,7 +2048,7 @@ function readTrend(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading
   });
 }
 
-/* ── a sum of figures (REC-B06) ────────────────────────────────── */
+/* ── a sum of figures ────────────────────────────────── */
 
 /** How many figures one sum adds, and how many sums deep a sum of sums may go. */
 export const SUM_OF_PARTS_MOST = 8;
@@ -2196,7 +2196,7 @@ function readSumOf(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading
 }
 
 /**
- * A verdict as a reading over `held` things may give it: A MISS OVER NOTHING HELD IS NO VERDICT (audit 38-39, #11). A
+ * A verdict as a reading over `held` things may give it: A MISS OVER NOTHING HELD IS NO VERDICT. A
  * count held to at least one over a Ledger nobody has started read as missed, so a fresh record was told two things were
  * wrong with it. Only the miss is withheld: nothing held meets an `lte` (no late bill on an empty list), and nought over
  * rows that exist still misses, since a Ledger that holds rows and kept none this week has stopped.
@@ -2272,7 +2272,7 @@ export function pointedRows(sql: Sql, to: string, ids: readonly string[]): Map<s
   if (title === null && currency === null) return out;
   const said = (v: unknown): string | null =>
     typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' || typeof v === 'boolean' ? String(v) : null;
-  /* THE IDS ARE ONE BOUND ARRAY (AGT-B03), so the statement binds two values at any number of ids: the Durable Object
+  /* THE IDS ARE ONE BOUND ARRAY, so the statement binds two values at any number of ids: the Durable Object
      refuses a statement over 100, and one value an id crashed a page of 101. */
   const rows = sql.all<{ id: string; t: unknown; c: unknown }>(
     `SELECT id, ${title === null ? 'NULL' : `json_extract(fields, '${jsonPath(title)}')`} AS t, ${currency === null ? 'NULL' : `json_extract(fields, '${jsonPath(currency)}')`} AS c
@@ -2295,7 +2295,7 @@ export type GroupNames = { label: (key: string) => string | undefined; currency:
  *
  * AN ENUM BY ITS DECLARED LABEL, A YES OR NO BY THE WORD, A REF BY THE TITLE OF THE ROW IT POINTS AT. Cash now by book
  * groups by `accounts.book`, a ref, so every key is the ULID the row stores, and every reader that drew one said "Book
- * #01M3VMPSHV07AM4S51WDTFM5XG" (`loop/research-real-record.md`, Today 1), an agent's `get` included. A grouping by text
+ * #01M3VMPSHV07AM4S51WDTFM5XG" (Today 1), an agent's `get` included. A grouping by text
  * is keyed by its words already and carries no label, and so does a key no row answers for.
  *
  * A LIST THE CALLER MAY NOT READ NAMES NOTHING (`EvalContext.reads`): its rows' titles are not handed to a member invited
@@ -2362,7 +2362,7 @@ function groupsOf(
   decl: MetricDecl,
   ctx: EvalContext,
   fx?: Across,
-  /* A DIFFERENCE AGAINST THE WINDOW BEFORE (REC-B19): the window its second half is read over, and the gate each part's
+  /* A DIFFERENCE AGAINST THE WINDOW BEFORE: the window its second half is read over, and the gate each part's
      change is put through, which the caller holds because it knows whether the window moved at all. */
   then?: { predicate: Predicate | undefined; change: (now: { value: number | null; rows: number }, before: { value: number | null; rows: number }) => { delta: number | null; why: string } },
 ): Result<Pick<Reading, 'groups' | 'current' | 'more'>> {
@@ -2526,7 +2526,7 @@ export type DeclaredSign = { sign: string; name: string; state: 'green' | 'red' 
  * no rate, a refusal) is `none`, never green, so a sum over nothing does not pass for want of a number. A count of none is
  * a number and is judged: `lte: 0` over a list that exists and holds nothing is green, because nothing is the answer.
  *
- * A READING THAT COULD NOT BE TAKEN SAYS SO (audit 36-37, finding 9). `null` is the figure refused whole (its list is
+ * A READING THAT COULD NOT BE TAKEN SAYS SO. `null` is the figure refused whole (its list is
  * gone, or its source is one this build does not read), and refusals on a reading are a part of it that could not be
  * read. Either is `none`, and its sentence says the figure could not be read, never "nothing to judge by yet", which
  * is a quiet list's sentence and would have him wait for rows that cannot come. Its number is not shown, since a 0 from
@@ -2692,7 +2692,7 @@ function read(
   decl: MetricDecl,
   lookups?: Record<string, Record<string, number>> | undefined,
   fx?: Across,
-  /* FOR A DIFFERENCE (REC-B19). `before` is the window its second half is read over, and `clause` is one part of a grouped
+  /* FOR A DIFFERENCE. `before` is the window its second half is read over, and `clause` is one part of a grouped
      one: the whole query with one more clause, on both halves, as `groupsOf` reads a part of anything else. */
   opts: { before?: { predicate: Predicate | undefined } | undefined; clause?: { sql: string; params: (string | number)[] } | undefined } = {},
 ): Result<Read> {
@@ -2911,7 +2911,7 @@ function one(
       refusals: [],
     });
 
-  /* THE ROWS WHOSE DAY IS GONE, COUNTED INSIDE A WIDER `where` (signs-metric-75-76, audit 74 claim 7). A ratio's two
+  /* THE ROWS WHOSE DAY IS GONE, COUNTED INSIDE A WIDER `where` (signs-metric-75-76). A ratio's two
      halves share the one `where`, so with the day in it "every matched line is on time" and "no line was ever
      matched" were both no row, and a sign could not say nought of the first without saying it of the second. Here the
      `where` holds who is judged and this counts the late among them: no row is still nought over nothing, which a
@@ -2974,7 +2974,7 @@ function one(
   if (product) {
     const table = lookups?.[product[1].lookup] ?? {};
     const byExpr = `json_extract(fields, '${jsonPath(product[1].by)}')`;
-    /* THE TABLE'S KEYS ARE ONE BOUND ARRAY (AGT-B03), not one value a key: a table of 101 broke the Durable Object's
+    /* THE TABLE'S KEYS ARE ONE BOUND ARRAY, not one value a key: a table of 101 broke the Durable Object's
        limit. An empty table still excludes only the unset, as `NOT IN (NULL)` did. */
     const known = Object.keys(table);
     const marks = known.length === 0 ? 'NULL' : 'SELECT value FROM json_each(?)';
@@ -3210,7 +3210,7 @@ export function unaggregatableIn(value: Value, schema: Schema): string | null {
 }
 
 /**
- * A difference whose halves name the grouping, as one whose figure does (REC-B19).
+ * A difference whose halves name the grouping, as one whose figure does.
  *
  * BOTH HALVES NAME THE SAME FIELD, OR IT IS TWO QUESTIONS. Subtracting what each shop took from what each category cost
  * has no part to put the answer in, and one half grouped beside one that is not is the same fault. `said` is the
@@ -3438,13 +3438,13 @@ const NO_RATE_SOURCE = 'night.no-rate';
 
 /**
  * `missing` is every day asked for that got no point, and `noRate` is how many of those are missing for want of a rate
- * of that day (REC-B05): the figure had its rows and no way to price them as that day's. `rewrote` is how many days of
+ * of that day: the figure had its rows and no way to price them as that day's. `rewrote` is how many days of
  * the night's window (`REWRITE_DAYS`) held a point whose value or unit the night moved.
  */
 export type Snapshot = { series: string; wrote: number; backfilled: number; rewrote: number; missing: number; noRate: number };
 
 /**
- * HOW MANY DAYS, YESTERDAY FIRST, EACH NIGHT READS AGAIN AND CORRECTS (REC-B06): yesterday and the two before it.
+ * HOW MANY DAYS, YESTERDAY FIRST, EACH NIGHT READS AGAIN AND CORRECTS: yesterday and the two before it.
  *
  * A bank's text for a Friday lands on the Saturday, and an entry dated Thursday is written down on Saturday morning. Kept
  * fill-only, the point of Thursday was the cash before that entry for as long as the line lasted. Three is a weekend and
@@ -3526,7 +3526,7 @@ export const point = (value: number, unit: string | null | undefined): { value: 
 };
 
 /**
- * How many days of a figure's window hold no point in its kept line (REC-B01): the nights `snapshot` could not write,
+ * How many days of a figure's window hold no point in its kept line: the nights `snapshot` could not write,
  * which it counts (`missing`) and keeps nowhere, read back from `metric_point` by the record's own days.
  *
  * THE WINDOW ENDS YESTERDAY, the last day a night writes, in the record's zone (`clockOf`); today has no point until

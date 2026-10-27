@@ -1,5 +1,5 @@
 /**
- * Twenty trials by agents a UTC day on one record (`src/script-try-cap.ts`, SHL-D05).
+ * Twenty trials by agents a UTC day on one record (`src/script-try-cap.ts`).
  *
  * The count is the caller's; this holds the line it is read against: nineteen run leaves one, twenty run refuses the
  * next in the words an agent reads, and a count that could not be read refuses rather than opening the cap.

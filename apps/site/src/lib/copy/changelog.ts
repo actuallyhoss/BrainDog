@@ -27,7 +27,7 @@ export const changelog = {
     lede: "What shipped and when, in the repository's own words.",
     count: (n: number, days: number) => `${entries(n)} over ${days} days`,
 
-    /* THE KIND IS A WORD AND A SHAPE, NEVER A HUE (site F17): the control and each entry's tag name it beside its own
+    /* THE KIND IS A WORD AND A SHAPE, NEVER A HUE: the control and each entry's tag name it beside its own
        glyph, and a month's tally says it in lower case. */
     filter: { shipped: 'Shipped', fixed: 'Fixed', changed: 'Changed' },
     kind: { shipped: 'shipped', fixed: 'fixed', changed: 'changed' },

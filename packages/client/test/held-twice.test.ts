@@ -1,5 +1,5 @@
 /**
- * `heldTwice` through the client (AGT-D05): a read sent to the route of its name with the list, answered with the
+ * `heldTwice` through the client: a read sent to the route of its name with the list, answered with the
  * numbers of the people who may be on the record twice as the record answers them; nothing, never an empty answer, for
  * a list that is not where the record keeps people; and a record without the method answers `NOT_IN_THIS_BUILD` as a
  * refusal the screen can say.

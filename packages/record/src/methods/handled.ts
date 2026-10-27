@@ -6,7 +6,7 @@
  * READ FROM THE DECISIONS THE RECORD ALREADY KEEPS, signed by `rule:handled` (`handledFault` in the kernel), with no
  * table of its own. One that was put back since is left out, and so is one in a list the caller may not read whole.
  *
- * AND THE QUESTIONS AN ANSWER COVERED (scope D13): one a newer question said it answers too is closed as moot when that
+ * AND THE QUESTIONS AN ANSWER COVERED: one a newer question said it answers too is closed as moot when that
  * one is answered, and is told here under its own words, with the answer that settled it and that decision's Undo.
  *
  * IT WRITES NOTHING. Undoing a line is the record's own `undo` on its decision.

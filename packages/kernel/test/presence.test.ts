@@ -1,5 +1,5 @@
 /**
- * One clock for a run (AGT-C02): working, quiet, left a step, ended, stopped, or from before, worked out in one place.
+ * One clock for a run: working, quiet, left a step, ended, stopped, or from before, worked out in one place.
  *
  * MEASURED BEFORE: the foot of the rail on the owner's record said 4 working while two of the four were last heard from
  * two and four hours before, because eight readers compared `last_seen` with the clock eight ways. What is asserted is

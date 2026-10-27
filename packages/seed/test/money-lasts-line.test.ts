@@ -1,5 +1,5 @@
 /**
- * What Money's first line says of money that lasts the year (money-lasts-line-76, left by founder-lasts-74, REC-B07).
+ * What Money's first line says of money that lasts the year (money-lasts-line-76, left by founder-lasts-74).
  *
  * WHEN IT RUNS OUT IS THE TILE'S since money-core 3.11.0 (`parts/runway.ts`), and that tile is drawn only while the walk
  * has a day it goes under on. So a record whose money lasts read nothing of how long anywhere on Money: the line said
@@ -91,11 +91,10 @@ const bill = (k: Kernel, amount: number, due: number): void =>
   void value(k.create('obligations', { what: 'Corporation tax', direction: 'owed_by_me', amount: gbp(amount), due: day(due), state: 'open' }, OWNER));
 
 /* EACH LINE ENDS ON HOW LONG THE CASH LASTS WITH NO INCOME, since money-core 3.17.0 (money-lasts-no-income-95), BUT
-   THE ONE WHERE THE WALK GOES UNDER: there the Lasts tile says it, beside the day on what is due (the UI pass of 20
-   October, money F3), and the line says what there is. */
-/* AND EACH ENDS ON THE PART THAT IS LATE, since money-core 3.18.0 (the audit of 22 October, U4): a sentence of its own,
+   THE ONE WHERE THE WALK GOES UNDER: there the Lasts tile says it, beside the day on what is due, and the line says what there is. */
+/* AND EACH ENDS ON THE PART THAT IS LATE, since money-core 3.18.0: a sentence of its own,
    which the app leaves out whole while no part is late (`leadOf`). With two books the line says the money there is. */
-/* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0 (B8), left out whole with no card that says it. */
+/* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0, left out whole with no card that says it. */
 const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
 /* THE LINE SAYS WHERE THE MONEY IS KEPT, since money-core 3.29.0: how much there is, and in which currencies, is the hero's. */
 const ACCOUNTS = '{{cash-by-account.groups}} account(s)';

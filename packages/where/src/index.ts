@@ -1229,7 +1229,7 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
         if (!checkEnum(value)) return '';
         const bound = bind(value, decl.type);
         if (bound === null) {
-          /* NULL IS ASKED AS EMPTY (audit D, W13): `is: null` is how most query languages ask for a missing value, and the
+          /* NULL IS ASKED AS EMPTY: `is: null` is how most query languages ask for a missing value, and the
              refusal named no way to ask it here. */
           const empty = value === null ? ` For rows where it is ${op === 'not' ? 'set' : 'empty'}, send {"field":"${field}","${op === 'not' ? 'present' : 'empty'}":true}.` : '';
           bad.push(refuse('VALUE_MALFORMED', `${field} cannot be compared with ${JSON.stringify(value)}.${empty}`, field));

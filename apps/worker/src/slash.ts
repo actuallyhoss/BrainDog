@@ -160,7 +160,7 @@ const RECORD_TOKENS = 2_048;
    here: no test spends a neuron, so the first alpha answer after the switch is the measurement. */
 const DRAFTS: JsonSchema = { type: 'object', properties: { drafts: { type: 'array', items: { type: 'object' } } }, required: ['drafts'] };
 const PLAN: JsonSchema = { type: 'object', properties: { plan: { type: 'object' } }, required: ['plan'] };
-/* A PAGE'S WHOLE LOOK (ENG-B09), keyed by the page's id: the bare line, or every part `lookAnswerOf` in
+/* A PAGE'S WHOLE LOOK, keyed by the page's id: the bare line, or every part `lookAnswerOf` in
    `packages/record/src/compose-look.ts` reads, `{ headline, lead, order, hide, next, group }`, and nothing it does not.
    `LINES` once declared `lines` alone, so a model holding to the schema had nowhere to put a lead, a hide or a next, and
    Today on the Cloud was never arranged as a self-host's is. Each part is still checked by the record (`headlineFault`,
@@ -203,7 +203,7 @@ const ABOUT: JsonSchema = {
 };
 
 /**
- * One call to a model that did not answer, for the operator (ENG-A01): what `index.ts` writes as an `op: 'model'` line
+ * One call to a model that did not answer, for the operator: what `index.ts` writes as an `op: 'model'` line
  * and mails as "BrainDog model".
  *
  * `why` IS THE PORT'S PHRASE, or `schema` for an answer that broke the JSON it was pinned to; `raw` is the provider's own
@@ -336,7 +336,7 @@ export function includedInference(
       const budget = refusal?.code === 'SLASH_BUDGET_SPENT';
       if (!ran) {
         if (!budget) told(onFail, { model: call.model, provider: '', why: phraseOf(fix), raw, sent: false, whose: 'operator', streak: 0 });
-        /* THE CEILING'S NO CARRIES ITS CODE, so a route's walk stops here (ENG-A06): every candidate after it hears the same no. */
+        /* THE CEILING'S NO CARRIES ITS CODE, so a route's walk stops here: every candidate after it hears the same no. */
         throw Object.assign(new NotSent(fix, budget ? fix : phraseOf(fix), raw), budget ? { code: 'SLASH_BUDGET_SPENT' } : {});
       }
       if (refusal?.code === 'PROPOSAL_SCHEMA') {
@@ -621,7 +621,7 @@ export type SlashEngineDeps = SlashWire & {
  */
 export const CLOUD_TIERS = ['a', 'b'] as const;
 
-/* ── the route (ENG-A06) ─────────────────────────────────────────────────────────────────────────────────────────── */
+/* ── the route ─────────────────────────────────────────────────────────────────────────────────────────── */
 
 /** The included model's two rows (`inference.ts` `MODELS`), as the router names them. Tier `a`: the operator's account. */
 const FLASH: Candidate = { id: 'flash', model: INCLUDED_MODEL, tier: 'a', source: 'included' };
@@ -731,7 +731,7 @@ export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, dep
   const slash = await import('@braindog/slash');
   /* ONLY TIER `a` IS PRICED IN NEURONS, the package's default: those calls are Workers AI on the operator's account, and
      a call on his own key is on his provider's bill, which this host has no rate for. */
-  /* THE ROUTE, ON THE INCLUDED MODEL ALONE (ENG-A06): when it fails, the next model the operator set is asked before the
+  /* THE ROUTE, ON THE INCLUDED MODEL ALONE: when it fails, the next model the operator set is asked before the
      rules speak. On his own key there is no route, so his key never falls to another model. */
   const route = included === undefined ? undefined : includedRoute(env, deps.send);
   const engine = slash.createSlash(
@@ -817,7 +817,7 @@ export const PLAN_AGENTS = 'plan.agents';
 const NEXT_PLAN: Readonly<Record<Plan, Plan | null>> = { free: 'hosted', hosted: 'plus', plus: null, selfhost: null };
 
 /**
- * A record's count of agent keys, moved with its plan (LCH-A08): `PLAN_TABLE`'s `agents`, its name and the plan above it,
+ * A record's count of agent keys, moved with its plan: `PLAN_TABLE`'s `agents`, its name and the plan above it,
  * which `createToken` reads where every key is minted. A plan with no count, or one this table does not know, takes the
  * row away, and absent is no cap.
  *
@@ -1448,7 +1448,7 @@ const ledgerMark = (sql: Sql): number =>
 /**
  * Slash's daily look, asked on an alarm and after a request: the record decides whether it is due. It never throws.
  *
- * A LOOK THAT FAILS IS SEEN IN HEALTH (ENG-B09). It once wrote one console line and went on, so a dead look was invisible
+ * A LOOK THAT FAILS IS SEEN IN HEALTH. It once wrote one console line and went on, so a dead look was invisible
  * in the engine's readings. Now the asks that failed during the tick, and a tick that threw, are counted where the
  * readings count a failed background ask (`lookCounted`), with the provider's words, so Settings says "Today's look
  * failed: ..." and never a key or an address. `ledger` names Slash's store; absent, the store the record's model noted

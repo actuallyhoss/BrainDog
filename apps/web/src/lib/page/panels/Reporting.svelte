@@ -88,7 +88,7 @@
   /*
    * HELD OPEN AS ONE OF THE SCREEN'S CALLS (`screen.svelte.ts`), and a read that fails draws nothing: the page said it was
    * drawn while this was still out, so a look of his record caught "Send numbers here" over an empty card on every
-   * project, and a read that threw left the held place empty for good (the audit of 25 October, Z21).
+   * project, and a read that threw left the held place empty for good.
    */
   async function load() {
     const at = opened();

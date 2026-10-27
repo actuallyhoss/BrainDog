@@ -1,6 +1,6 @@
 /**
  * The one line in the Keys tile that says how many keys look like they belong to a project, with the one button that
- * puts the move on Decide (AGT-D04, on the screen he reads). Today every key on his record reads "Everywhere" and
+ * puts the move on Decide (on the screen he reads). Today every key on his record reads "Everywhere" and
  * nothing on this screen offers a way out; this is that way out, and it is only a question: nothing moves until he
  * answers it on Decide.
  *

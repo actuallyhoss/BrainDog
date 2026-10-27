@@ -87,7 +87,7 @@ export const needs = ['web-build'];
 export const slices = 2;
 
 /**
- * EVERY RULE IN THIS GATE, AND THE FAULT EACH ONE IS PROVED ON (PRF-B02, `loop/scope/area-proof-b.md`).
+ * EVERY RULE IN THIS GATE, AND THE FAULT EACH ONE IS PROVED ON.
  *
  * It had one planted fault for five rules, a 2000px heading, which proves the overflow rule and nothing else: the target
  * rule, the readiness wait, the full-width pass and the panel's arrival could each have stopped looking and the
@@ -241,7 +241,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     '/automations/new',
   ];
   /* AT THE SAMPLES IT HAD BEFORE, ONLY TO REFUSE A ROUTE WITH NO SAMPLE BEFORE A PORT IS TAKEN; the sweep reads them again
-     at the record's own ids once the record is up (`routesFor`, PRF-B04). */
+     at the record's own ids once the record is up (`routesFor`). */
   let { routes: ROUTES, unsampled } = await routesFor(join(root, 'apps', 'web'), null, { extra: EXTRA });
   /** The addresses the record had nothing for, drawn as not found: said in the summary, never dropped. */
   let unseen = [];
@@ -305,7 +305,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
        handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
     record = await startRecord(0, { variants: true });
-    /* THE ROUTES AT THE RECORD'S OWN IDS (PRF-B04): an automation and a catalogue entry by a real id, settled, and not
+    /* THE ROUTES AT THE RECORD'S OWN IDS: an automation and a catalogue entry by a real id, settled, and not
        measured as not found. */
     ({ routes: ROUTES, unseen, missing } = await routesFor(join(root, 'apps', 'web'), record, { extra: EXTRA }));
 

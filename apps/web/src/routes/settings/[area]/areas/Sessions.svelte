@@ -139,7 +139,7 @@
   </div>
 </Tile>
 
-<!-- ONLY ONCE SOMETHING IS KEPT (audit 25 October, X18): a card saying nothing was kept here was a
+<!-- ONLY ONCE SOMETHING IS KEPT: a card saying nothing was kept here was a
      card with nothing in it to act on. Just forgotten, it says so once. -->
 {#if forgot || (kept !== null && kept.answers > 0)}
 <Tile icon="download" class="section" data-surface="tile" title={keptWords.title}>

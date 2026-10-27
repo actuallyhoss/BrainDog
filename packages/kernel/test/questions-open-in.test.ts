@@ -1,5 +1,5 @@
 /**
- * `questions-open-in:<list>`, the open questions about one list's rows (PGS-C18): the rule a queue's `list is <list>`
+ * `questions-open-in:<list>`, the open questions about one list's rows: the rule a queue's `list is <list>`
  * keeps, so Work's sentence says how many of its own questions wait while Decide's badge counts the whole record.
  *
  * WHAT WAS MEASURED BEFORE IT: nothing counted one list's questions, so a page could say all was quiet while 25 waited.

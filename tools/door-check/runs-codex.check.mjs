@@ -1,5 +1,5 @@
 /**
- * CODEX ON RUNS, EVERY LINE READ BACK FROM THE RECORD (AGT-C01 job c, `loop/scope/area-agents-c.md`).
+ * CODEX ON RUNS, EVERY LINE READ BACK FROM THE RECORD (AGT-C01 job c).
  *
  * Claude Code has hooks and says its session's id; Codex and Cursor say neither. Each starts the command as its MCP
  * server, `braindog mcp --agent codex` (the docs' "As a process"), which tells the record the agent's kind, the app's

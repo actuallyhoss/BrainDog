@@ -1,5 +1,5 @@
 /**
- * `trust`, each agent's standing on the ladder (ENG-A12): routed as a READ+ read that writes nothing, handed to the
+ * `trust`, each agent's standing on the ladder: routed as a READ+ read that writes nothing, handed to the
  * record method of the same name, and answered `NOT_IN_THIS_BUILD` by a record built before it had one, never a 500.
  *
  * THE GROUP IS WHAT `router-groups` COUNTS (`docs/30-BLUEPRINT.md` §5): READ+, so the route table's READ+ rows grow by

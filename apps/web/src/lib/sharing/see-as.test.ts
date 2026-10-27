@@ -1,5 +1,5 @@
 /**
- * See as (sharing plan §3.3): the header goes on every call to this origin's record and nowhere else, and a change the
+ * See as: the header goes on every call to this origin's record and nowhere else, and a change the
  * host refused for See as is said with the person's name.
  */
 

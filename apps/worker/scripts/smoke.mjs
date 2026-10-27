@@ -23,7 +23,7 @@
  * count of migrations the serving build carries, which must be the count of files in `packages/kernel/src/migrations/`
  * here, or the version answering is not the one this job built.
  *
- * AND THE SIGNED-IN HALF, WHEN THE OPERATOR HAS MADE A CANARY RECORD FOR IT (LCH-C02). With `SMOKE_TOKEN` (a token at
+ * AND THE SIGNED-IN HALF, WHEN THE OPERATOR HAS MADE A CANARY RECORD FOR IT. With `SMOKE_TOKEN` (a token at
  * `propose`) and `SMOKE_SLUG` (its record) both in the environment, the canary is opened the way a first draw opens a
  * record: `boot` 200; `version` 401 without the bearer and 200 with it; the same token at a second name no record
  * holds refused, the answer naming nothing of the canary; and every read of the app's first screens 200, the list
@@ -35,7 +35,7 @@
  * IT WRITES NOTHING. GETs with no cookie and, but for the canary's, no bearer; one GET that must be redirected; one
  * empty POST to an `/in/` door no record has minted, which `serveIngest` refuses with a 404 before any record is named;
  * and the canary's `previewPage`, a POST because its body is long, which draws a page and installs nothing. The one
- * exception is the fence's (`fence.mjs`, LCH-C08): on the canary alone, a 1x1 picture put at its own hash, the same
+ * exception is the fence's (`fence.mjs`): on the canary alone, a 1x1 picture put at its own hash, the same
  * bytes every run, and three puts the fence must refuse or file by their bytes. A fault already scoped and not yet
  * fixed is printed HELD, said and not counted, so a deploy is not red for it.
  *

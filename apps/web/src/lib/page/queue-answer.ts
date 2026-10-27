@@ -39,7 +39,7 @@ export const queueWords = {
   hard: (verb: string) => `${verb}${HARD_TAIL}`,
   /** The same care, as the end of a button whose name is drawn on its own. */
   hardTail: HARD_TAIL,
-  /** The same care as a line of its own under a row of answers, where the filled one is the hard one (audit Z28). */
+  /** The same care as a line of its own under a row of answers, where the filled one is the hard one. */
   hardLine: 'Can’t be undone easily',
   /** And naming the answers it is said of, where those are not the filled one alone. */
   hardOf: (names: string) => `${names} can’t be undone easily`,
@@ -126,7 +126,7 @@ export const QUEUE_FILE = 'queue-file';
  * elsewhere tells another host who is reading and when. A card handed no way to an address, a file the page does not
  * hold and an address of another host all leave the visual out, and the option reads by its name.
  *
- * A FIGURE IS WORDS SOMEBODY ELSE WROTE, as the label is, so it is read through `spoken` too (audit 72 #3), and it is
+ * A FIGURE IS WORDS SOMEBODY ELSE WROTE, as the label is, so it is read through `spoken` too, and it is
  * drawn only when `spoken` takes nothing out of it: "3" is not what "3 of tasks#8" said, and a figure with a part gone
  * would be a number nobody wrote. A citation in braces is no figure either. Such an option reads by its name.
  */
@@ -154,7 +154,7 @@ const WORD = /^(?:\p{L}[\p{L}\p{M}]*(?:['\u2019./-]\p{L}[\p{L}\p{M}]*)*\.?|[+\u2
 const COUNTED = /\p{Nd}{12}/u;
 
 /**
- * WHETHER WORDS ARE A PLAIN FIGURE (audit 74 #3: no raw id or raw timestamp on a person's pages). `spoken` takes
+ * WHETHER WORDS ARE A PLAIN FIGURE (no raw id or raw timestamp on a person's pages). `spoken` takes
  * out the ids it knows by their spelling, and a run's name, a ULID with a letter no ULID holds, a machine's time and a
  * key pass it untouched. So a figure is held to what a figure IS and not to what an id is not: it says a number, and
  * every word of it is a number, a short name with its number, or a word that stands beside one.
@@ -197,7 +197,7 @@ export type Way = { key: string; label: string; because: string; recommended: bo
  * stored money sentence is drawn in the record's currency, as the renderer's fence is.
  *
  * NOR AN ADDRESS OR AN ID. Whoever asked wrote the answers too, and an agent titles one "Merge into rohan@x.com" as
- * readily as "Merge into Rohan": each label and reason is read through `spoken`, as the question is (audit 21 #4).
+ * readily as "Merge into Rohan": each label and reason is read through `spoken`, as the question is.
  *
  * `file` IS THE PAGE'S WAY TO A FILE IT HOLDS: with it an option that is a picture carries its address, and without it
  * the option reads by its name (`visualOf`).

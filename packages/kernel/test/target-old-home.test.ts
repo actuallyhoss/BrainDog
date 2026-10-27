@@ -4,7 +4,7 @@
  * MEASURED BEFORE: `liveTarget` held a money setting to the figure only when it was typed in the figure's currency or the
  * home one as it is now. A person who set "most spent: £500" and later made the record's home currency Egyptian pounds
  * had the ceiling dropped, and the figure was held to the number written beside the setting in the declaration, which
- * nobody typed (`loop/research-audit-11-13.md`, kernel-queue-walk).
+ * nobody typed (kernel-queue-walk).
  */
 
 import { test } from 'node:test';
@@ -94,7 +94,7 @@ test('WITH NO RATE BETWEEN THE TWO, the declared number stands: a sum in pounds 
   assert.deepEqual(target(k), { lte: 1, setting: 'most_spent' });
 });
 
-test('A CEILING TYPED IN A CURRENCY THE RECORD NEVER HAD AS HOME IS NOT FLOATED WITH THE DAY’S RATE (audit 16, M6)', async () => {
+test('A CEILING TYPED IN A CURRENCY THE RECORD NEVER HAD AS HOME IS NOT FLOATED WITH THE DAY’S RATE', async () => {
   const k = await record();
   /* Dollars were never this record's home: converting them each day moved a ceiling nobody had changed. */
   value(k.create('fx', { currency: 'USD', base: 'GBP', rate: 0.8, as_of: '2026-10-06' }, OWNER));

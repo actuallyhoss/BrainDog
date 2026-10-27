@@ -10,7 +10,7 @@
   below), so moving between screens asks nothing again; a payment made in Stripe's page comes back as a new page load,
   which asks afresh.
 
-  IN THE FLOW, NEVER FIXED, AND DRAWN AS THE ONE BANNER (`Banner.svelte`, the UI pass of 20 October 2.A.17): the
+  IN THE FLOW, NEVER FIXED, AND DRAWN AS THE ONE BANNER (`Banner.svelte`): the
   red tint with the red lock, "Pay again" primary and "Export" quiet. It sits where the layout mounts it and pushes the
   screen down, so it can never cover the phone's tab bar, and at 390 its buttons stack under its sentence.
 -->

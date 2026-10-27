@@ -67,7 +67,7 @@
   const owner = $derived(ownsRecord(shell.me));
 
   /* THIS AREA'S OWN WORDS. They name the person's things: their currency, their lists, what the record says. */
-  /** "British pounds (£)" for GBP, as a person says it (UI pass of 21 October, P43); the code where Intl cannot. */
+  /** "British pounds (£)" for GBP, as a person says it (P43); the code where Intl cannot. */
   function currencySaid(code: string): string {
     try {
       const part = (display: 'name' | 'narrowSymbol') =>
@@ -308,7 +308,7 @@
     if (dirty) soon();
   }
 
-  /* SAVED AS YOU TYPE (U-C8): a pause of most of a second sends what changed, and the line under the lists says Saved,
+  /* SAVED AS YOU TYPE: a pause of most of a second sends what changed, and the line under the lists says Saved,
      with Undo for the last save. There is no Save button to forget. */
   let saveSaid = $state<'' | 'pending' | 'saved'>('');
   let undoLast = $state<(() => void) | null>(null);
@@ -339,7 +339,7 @@
 
   /* ── the lists no use case names ───────────────────────────────────────── */
 
-  /* EVERY LIST THE RECORD HOLDS IS HERE (Y21): the use case names some, and the rest are renamed by their own name. */
+  /* EVERY LIST THE RECORD HOLDS IS HERE: the use case names some, and the rest are renamed by their own name. */
   const others = $derived(spoken ? othersOf(spoken.lists.map((l) => l.list), shell.index.registers) : []);
 
   /** A list's own name, kept when the box is left: the record's change, accepted at once for the owner. */
@@ -433,7 +433,7 @@
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">
                   <IconWell name={iconOf(l.list)} />
-                  <!-- ONE ROW A LIST, RENAMED IN PLACE (U-C8): the name, and its singular offered from it as it is typed. A list
+                  <!-- ONE ROW A LIST, RENAMED IN PLACE: the name, and its singular offered from it as it is typed. A list
                        the use case gives only a singular says which list it is, with that one word to rename. -->
                   {#if l.name}
                     {@const name = l.name}
@@ -465,7 +465,7 @@
                   {/if}
                 </div>
               {/each}
-              <!-- THE LISTS THE USE CASE NAMES NOTHING FOR, renamed by their own name when the box is left (Y21). -->
+              <!-- THE LISTS THE USE CASE NAMES NOTHING FOR, renamed by their own name when the box is left. -->
               {#each others as r (r.id)}
                 <div class="list-words">
                   <IconWell name={r.icon} />

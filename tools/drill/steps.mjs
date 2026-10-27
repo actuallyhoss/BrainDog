@@ -1,6 +1,5 @@
 /**
- * The drill's first five steps: a stranger's sign-up, over HTTP, against any host (LCH-A03 job 1,
- * `loop/scope/area-launch-a.md:365-418`; "a test sign-up passed", H.572).
+ * The drill's first five steps: a stranger's sign-up, over HTTP, against any host.
  *
  * EACH STEP IS A NAMED RESULT WITH THE WORDS SEEN, `{ name, pass, said }`, and a step that cannot run says why and
  * `skipped: true`, so a red is always one thing that went wrong and never a step that had nothing to do. A step that

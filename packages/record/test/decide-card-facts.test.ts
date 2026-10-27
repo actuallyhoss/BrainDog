@@ -1,6 +1,5 @@
 /**
- * The decision card's facts wherever the record answers a question outside a page's queue (`loop/research-audit-19.md`
- * H3): `governance`, which /decide/<id> reads, and `propose`, which an agent says back. The run that asked and its app,
+ * The decision card's facts wherever the record answers a question outside a page's queue: `governance`, which /decide/<id> reads, and `propose`, which an agent says back. The run that asked and its app,
  * the money accepting writes, and what changes from what to what, each in names and never as an id.
  */
 

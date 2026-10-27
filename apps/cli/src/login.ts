@@ -428,7 +428,7 @@ export async function approveRunner(raw: string, io: FlowIo & { label?: string |
 }
 
 /**
- * A standing shape grant for `braindog export --shape` (PRF-A13): the host as `hostKey` spells it, and the bearer of
+ * A standing shape grant for `braindog export --shape`: the host as `hostKey` spells it, and the bearer of
  * reach `shape` with its expiry and label, or the exit code once the reason has been said.
  *
  * THE LOGIN'S OWN FLOW; the caller keeps it beside the login (`keepShape` in `brainfile.ts`) and never prints it.

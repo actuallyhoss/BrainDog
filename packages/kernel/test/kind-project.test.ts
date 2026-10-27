@@ -1,5 +1,5 @@
 /**
- * The `project` kind (C28, C29): parts of a project's shape declared on the page about its row, which the record
+ * The `project` kind: parts of a project's shape declared on the page about its row, which the record
  * answers as the block and its `when:` and the host draws from its own read of the project.
  *
  * THE KIND IS REGISTERED BEFORE THE KERNEL LOADS, where the registry does not hold it already, for the reason

@@ -1,5 +1,5 @@
 /**
- * A project's shape as blocks of its page (C28, C29, 24 October): the hero, Path and Money, Work and Who is on it, Runs
+ * A project's shape as blocks of its page (24 October): the hero, Path and Money, Work and Who is on it, Runs
  * on and the agents on it were drawn by hand over the page's declared blocks (`ProjectShape.svelte`, gone); the page
  * declares each row now (`{ kind: project, parts: [path, money] }`, the portfolio project template), and this says,
  * once the project is read, which parts have something to draw and how wide each is in its row.

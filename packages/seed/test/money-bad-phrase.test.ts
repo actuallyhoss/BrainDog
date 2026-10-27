@@ -16,7 +16,7 @@ import { inline, text, type Inline } from '../../render/src/inline.ts';
 
 import { HEADS_UP } from '../src/modules/money/pages/parts/heads-up.ts';
 
-/* "LATE", THE WORD EVERY OTHER SCREEN USES (the UI pass of 20 October, money F5), where it said "past their due date". */
+/* "LATE", THE WORD EVERY OTHER SCREEN USES (money F5), where it said "past their due date". */
 const LATE = 'late';
 
 /**
@@ -41,7 +41,7 @@ const bads = (nodes: readonly Inline[]) =>
   nodes.filter((n): n is Extract<Inline, { type: 'bad' }> => n.type === 'bad');
 
 for (const [metric, whole] of [
-  /* EACH LINE ENDS ON ITS ONE WAY TO ACT, since the UI pass of 20 October. */
+  /* EACH LINE ENDS ON ITS ONE WAY TO ACT. */
   ['late-in', 'Invoices late: 3 to come in. See them'],
   ['overdue', 'Bills late: 3 to pay. See them'],
 ] as const) {

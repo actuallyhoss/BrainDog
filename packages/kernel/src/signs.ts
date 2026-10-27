@@ -1,5 +1,5 @@
 /**
- * The record's vital signs (PRF-A01): a short closed list of readings about the record itself, each
+ * The record's vital signs: a short closed list of readings about the record itself, each
  * green, red or none, read on demand and kept a row a day in `sign_reading` (migration 27).
  *
  * WHY THIS EXISTS. His record stood still for nine days after the move, 32 messages waited, 17 of 25 open questions were
@@ -10,7 +10,7 @@
  * FIVE ARE READ HERE, OVER THE KERNEL'S OWN TABLES: arrivals, numbers, questions by cause, the oldest question, runs.
  * FIVE ARE FILED by the layers that know more, through `fileSignReading`: whether the model answers and whether agents
  * get the tool list (the host), whether the briefing is true (the record), whether pages print clean (the host), whether
- * what shipped has arrived (the record, PRF-A20). Until one is filed it reads `none`. The automation signs and those of
+ * what shipped has arrived (the record). Until one is filed it reads `none`. The automation signs and those of
  * what runs by itself join by a spread each (`signs-flow.ts`, `signs-actions.ts`), then the three vitals of SHL-A06
  * (`signs-vitals.ts`).
  *
@@ -92,7 +92,7 @@ export type SignReader = {
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
-/* ── the thresholds, one line each, as 2.2 of `loop/scope/area-proof-a.md` sets them ───────────────── */
+/* ── the thresholds, one line each, as 2.2 of  sets them ───────────────── */
 
 /** An arrival waits once it is older than this and still unfiled. */
 export const ARRIVAL_WAIT_MS = DAY;
@@ -262,7 +262,7 @@ function readArrivals(sql: Sql, nowMs: number, tz: string): SignReading {
     /* A MESSAGE FILED COUNTS FOR THE LIST ITS PATTERN WROTE INTO; one still waiting holds every list at its door behind.
        THE PATTERNS AND THE DOORS GO IN AS ONE JSON LIST EACH, read by `json_each`, never a `?` apiece: a Durable Object
        refuses a statement with more than 100 bound values, and a list fed by a hundred patterns threw the night's whole
-       read of signs (audit 36-37, finding 10). An empty list of patterns matches nothing, as `IN ()` would. */
+       read of signs. An empty list of patterns matches nothing, as `IN ()` would. */
     const came = sql.one<{ at: string | null }>(
       `SELECT max(r.ts) AS at FROM inbox_raw r
        WHERE ((r.state = 'matched' AND EXISTS (SELECT 1 FROM ingest_receipt x WHERE x.raw_id = r.id AND x.ingest_id IN (SELECT value FROM json_each(?))))
@@ -329,7 +329,7 @@ function feedsOn(sql: Sql): { name: string; everyMs: number; lastGoodMs: number 
     const decl = sql.one<{ body: string; created_at: string }>('SELECT body, created_at FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', id);
     const body = parsed(decl?.body);
     if (decl === undefined || body === null) continue;
-    /* A SCRIPT WHOSE EGRESS IS EMPTY FETCHES NOTHING (F60): a daily script over the record's own rows is not a feed, and
+    /* A SCRIPT WHOSE EGRESS IS EMPTY FETCHES NOTHING: a daily script over the record's own rows is not a feed, and
        its quiet days would read as numbers that did not arrive. */
     if (row.kind === 'script' && Array.isArray(body.egress) && body.egress.length === 0) continue;
     const every = intervalMs(String((row.kind === 'script' ? (body.runs as { every?: unknown } | undefined)?.every : body.every) ?? ''));
@@ -372,7 +372,7 @@ const ARRIVED = '(mp.series, mp.source) IN (SELECT series, source FROM arrived)'
 
 /**
  * NOTHING BRINGS NUMBERS IN ON A SCHEDULE, said as that. A record whose numbers were typed or imported holds thousands
- * of them, and "No numbers come in on this record yet" stood over 2,527 (audit 25 October, Y5). The sign judges what
+ * of them, and "No numbers come in on this record yet" stood over 2,527. The sign judges what
  * arrives on a clock, so that is what it says is missing.
  */
 const NO_NUMBER_FEED = 'No number arrives on a schedule on this record, so there is nothing to judge by.';
@@ -510,7 +510,7 @@ function readCauses(sql: Sql, nowMs: number): SignReading {
   const said = biggest
     ? `${biggest.length} open questions share one cause: ${askedIn(sql, biggest[0]!)} One answer closes them.`
     : faults.length > 0
-      ? /* THE FAULT'S OWN WORDS (UI pass of 21 October, P36), not "a fault of the record". */
+      ? /* THE FAULT'S OWN WORDS (P36), not "a fault of the record". */
         faults.length === 1
         ? `Something went wrong, not a choice for you: ${joined(askedIn(sql, faults[0]!.id))}`
         : `${faults.length} open questions are things that went wrong, not choices for you. The first: ${askedIn(sql, faults[0]!.id)}`
@@ -648,13 +648,13 @@ function readRatesCurrent(sql: Sql, nowMs: number, tz: string): SignReading {
 /* ── the closed list ───────────────────────────────────────────────────── */
 
 /* A READER WHOSE RULE CHANGED WITHOUT A THRESHOLD MOVING TAKES THE NEXT VERSION, so its days read under the old rule keep
-   the old `rule`. Version 2 (audit 35): arrivals all set aside, a young series read by its feed, a run the sweep handed off. */
+   the old `rule`. Version 2: arrivals all set aside, a young series read by its feed, a run the sweep handed off. */
 const kernel = (sign: string, name: string, thresholds: Record<string, number>, read: NonNullable<SignReader['read']>, version = 1): SignReader => ({ sign, name, hand: 'kernel', version, thresholds, read });
 const filed = (sign: string, name: string, hand: 'record' | 'host', version = 1): SignReader => ({ sign, name, hand, version, thresholds: {}, read: null });
 
 /**
- * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then `arrived` (PRF-A20, filed by the record), the
- * seven automation signs (SHL-D01, `signs-flow.ts`) and the five of what runs by itself and arrives (SHL-C01,
+ * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then `arrived` (filed by the record), the
+ * seven automation signs (`signs-flow.ts`) and the five of what runs by itself and arrives (SHL-C01,
  * `signs-actions.ts`), a spread each, the vitals of `signs-vitals.ts`, and last `rates-current` (REC-B02 step 7), how old
  * the newest exchange rate is on a record with money in more than one currency. The ids are 2.2's; a person reads the names.
  */
@@ -701,7 +701,7 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
   );
   if (row === undefined) return reading('none', null, 'Nothing has been filed for this sign yet.');
   /* NOT `> FILED_STANDS_MS`: a `read_at` that does not parse is NaN, and NaN is never more than a day, so the filing
-     would stand forever. Written so a time that cannot be read reads as old (audit 38-39, finding 8). */
+     would stand forever. Written so a time that cannot be read reads as old. */
   const t = Date.parse(row.read_at);
   if (!(nowMs - t <= FILED_STANDS_MS))
     return reading('none', null, Number.isNaN(t) ? 'Not read on any day this record can tell.' : `Not read since ${dateSaid(t, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
@@ -829,7 +829,7 @@ export function runSignsNight(sql: Sql, nowMs: number, tz: string): number {
  * could not be read.", "Nothing has been asked on this record yet."), and one written here could not tell those apart.
  */
 export const QUIET: Readonly<Record<string, (s: VitalSign) => string>> = {
-  /* RED IS NOT ALWAYS MESSAGES WAITING (the pass of 27 October): a list behind its doors, or a day set aside as
+  /* RED IS NOT ALWAYS MESSAGES WAITING: a list behind its doors, or a day set aside as
      repeats, reads red with none waiting, and "Messages wait to be filed." sent him to an Inbox that listed none. What
      is true of all three is that messages came in and were not filed. */
   'arrivals-filed': (s) =>
@@ -841,6 +841,6 @@ export const QUIET: Readonly<Record<string, (s: VitalSign) => string>> = {
 /**
  * A sign as a reader without the inbox reach reads it: no facts, and no message or question in its sentence. Pure, so
  * the record's `signs` method, the briefing's red signs and a page's `signs` block hold the inbox's words back by one
- * rule (audit 38-39, finding 1).
+ * rule.
  */
 export const quietSign = (s: VitalSign): VitalSign => ({ ...s, said: s.state === 'none' ? s.said : (QUIET[s.sign]?.(s) ?? s.said), facts: [] });

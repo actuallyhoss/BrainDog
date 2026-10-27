@@ -41,7 +41,7 @@ export const live = $state<{ state: LiveState; version: number | null; from: num
   state: 'open',
   version: null,
   from: null,
-  /* THE DOOR SAID THIS PERSON'S ACCESS ENDED (sharing plan §2.8), in its own sentence with the owner's name: the layout
+  /* THE DOOR SAID THIS PERSON'S ACCESS ENDED, in its own sentence with the owner's name: the layout
      draws the ended screen over everything, and the copies are already gone. */
   ended: null,
 });

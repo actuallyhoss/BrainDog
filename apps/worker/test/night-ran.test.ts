@@ -1,5 +1,5 @@
 /**
- * `ran` on `/healthz` is said only over a night that ran whole (audit-35, finding 5).
+ * `ran` on `/healthz` is said only over a night that ran whole (audit-35).
  *
  * BEFORE THIS, THE NIGHT SAID IT RAN WHEN IT DID NOT: when the walk reached no record at all, when the deleted records'
  * copies would not expire, when keys stayed under an old root key, when erasures stayed open or the install counts were

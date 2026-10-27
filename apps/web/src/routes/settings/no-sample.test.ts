@@ -49,7 +49,7 @@ test('and nothing on it says the demo sentence', () => {
 });
 
 test('the signing key is not drawn, because the only key this screen ever drew was invented', () => {
-  /* THE TILE THAT SAID "Not here yet" WENT TOO (Y22): a card about a key nobody can see ended the Export screen. */
+  /* THE TILE THAT SAID "Not here yet" WENT TOO: a card about a key nobody can see ended the Export screen. */
   const arm = strip(readFileSync(new URL('areas/Export.svelte', DIR), 'utf8'));
   assert.doesNotMatch(arm, /icon="key"|theSignature|SIGNING_KEY/u);
 });

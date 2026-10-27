@@ -677,7 +677,7 @@ const option = (id: string, label: string, because: string, recommended = false)
  * 1 and move only when `propose` and `decide` allocate from them, so SG27 or D41 could only be
  * reached by filing twenty-six questions and forty decisions the sample never shows. They are filed
  * in the order of the sample's ids instead, with D41's question first because it is the oldest:
- * SG1 (D1), SG2, SG3, SG4, SG5, SG6 (D2), SG7.
+ * SG1, SG2, SG3, SG4, SG5, SG6, SG7.
  */
 export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
   const thing = (name: string) => {

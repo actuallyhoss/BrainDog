@@ -388,7 +388,7 @@ expiry of a closed record sweeps it again. `sealedPut` is the one `/api` body al
 The page a person opens is `/app/s#<token>`, which is the app's shell like any
 page under `/app`. The token rides in the fragment, which no browser sends, so it never reaches a server's log; the
 app reads it and wipes it from the address as it opens.
-*(Amended October 14th 2026 (USE-A07): the link was `/app/s/<token>`. The app's page still reads the path form, and
+*(Amended October 14th 2026: the link was `/app/s/<token>`. The app's page still reads the path form, and
 reading the fragment is the next job.)* The shell reads the page with `GET /api/sharedPage` and
 `Authorization: Share <token>`. Nothing is served at a bare `/s/*`, which the site does not forward.
 

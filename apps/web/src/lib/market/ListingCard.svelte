@@ -2,7 +2,7 @@
   One use case as a card on browse (`listing.ts`): its Home drawn small, its name, two lines of what it is for, the lists
   it brings by name, and at its foot the one cue that says what its page will offer.
 
-  A PICTURE FIRST, THEN THE WORDS (the UI pass of 20 October, agents F9). The cards were a grid of the same glyph, the
+  A PICTURE FIRST, THEN THE WORDS (agents F9). The cards were a grid of the same glyph, the
   same grey box of text lines and "By BrainDog" thirteen times. Each card now leads with what is its own: a miniature of
   the Home it installs (`drawing`, which browse no longer passes since its grey bars read as loading), or, for a use case from outside with a trusted
   preview, its first page through the real renderer (`PreviewPage.svelte`). Its glyph is its own (the Home's or its first
@@ -78,7 +78,7 @@
   /* ITS OWN LISTS BY NAME, and what it turns on beside them by the names the modules go by. */
   const lists = $derived(reach?.lists ?? []);
   const brings = $derived(
-    /* BY NAME OR NOT AT ALL (E20): a module this build does not know was said by its id. */
+    /* BY NAME OR NOT AT ALL: a module this build does not know was said by its id. */
     reach && reach.modules.length > 0 ? broughtBy(reach.modules.flatMap((id) => firstPartyModules().find((m) => m.id === id) ? partName(id) : [])) : null,
   );
 
@@ -308,7 +308,7 @@
     white-space: nowrap;
   }
 
-  /* UNDER THE POINTER THE CARD'S FILL CHANGES, and nothing moves (SF15). */
+  /* UNDER THE POINTER THE CARD'S FILL CHANGES, and nothing moves. */
   @media (hover: hover) and (pointer: fine) {
     .card:hover .cue:not([data-held]) {
       background: var(--hover);

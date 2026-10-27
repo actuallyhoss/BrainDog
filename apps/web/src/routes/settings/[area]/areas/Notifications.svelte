@@ -111,7 +111,7 @@
   /* ON PUTS THE DEFAULT BACK rather than inventing a window: 21:00 to 08:00 is what a record holds until somebody sets one. */
   const flip = (): void => void put(on ? 'off' : null);
 
-  /* SEND A TEST (REC-A15): a person proves their phone rings, on their own press, so a dead subscription is found now
+  /* SEND A TEST: a person proves their phone rings, on their own press, so a dead subscription is found now
      and not when a real notice never arrives. The record rings every device of theirs and says how many; a press
      inside a minute is its `RATE_LIMITED`, whose `fix` already says when the next may go.
 
@@ -149,7 +149,7 @@
   <p class="said-once">{words.interrupts}</p>
 </Tile>
 
-<!-- THE RULES THAT TELL YOU ARE AUTOMATIONS' (U-C7): one row to them, where each rule's own page turns its notices off for
+<!-- THE RULES THAT TELL YOU ARE AUTOMATIONS': one row to them, where each rule's own page turns its notices off for
      you. Listing them here read every rule, one by one, before the screen settled. -->
 {#snippet toRules()}<Button weight="quiet" href="/automations">{words.openRules}</Button>{/snippet}
 <Tile>

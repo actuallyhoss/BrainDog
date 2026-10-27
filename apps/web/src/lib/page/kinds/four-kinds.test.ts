@@ -60,7 +60,7 @@ test('A CALENDAR OVER A LIST WRITES EACH ROW\'S TITLE AS A DOOR TO IT AND ITS DA
   ]);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z14 (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`): Money's calendar of the
+/* Money's calendar of the
    next thirty days reads every list's money, as Today's Due soon does, so each line over what falls due says its amount,
    signed by the way it goes: the premium going out and the salary coming in. */
 test('A CALENDAR OVER WHAT FALLS DUE SAYS EACH LINE\'S MONEY, signed by the way it goes', () => {

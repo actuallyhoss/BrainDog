@@ -45,7 +45,7 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
     const theirs = kept.filter((e) => byOf(e.actor) === 'agent');
     return { ...base, feed: listed(agentRows(theirs, block.first)), matched: theirs.length };
   }
-  /* A FEED'S DAYS AND RUNS (PGS-C24): `group: day` is a heading each day, counted in the record's own zone as the page
+  /* A FEED'S DAYS AND RUNS: `group: day` is a heading each day, counted in the record's own zone as the page
      holds it, and `fold: run` is one line a run. Any other word is refused here as the install refuses it, so a block
      handed straight to the read never draws a fold nobody asked for. A feed that says neither is read as it was. */
   const fault = feedSaysFault(block, 'This feed');

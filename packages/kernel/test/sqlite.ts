@@ -35,7 +35,7 @@ const firstLine = (text: string): string => text.trim().split('\n', 1)[0]!.trim(
  * Three of the Durable Object's ceilings, checked before `node:sqlite` sees the statement.
  *
  * THE TEST DATABASE HAS NONE OF THEM, and that is how a list of 130 ids bound as 130 placeholders passed every test and
- * answered INTERNAL on production (AGT-B03). Both hosts wrap their database in `guarded`; the tests did not, so the
+ * answered INTERNAL on production. Both hosts wrap their database in `guarded`; the tests did not, so the
  * class of fault could only show up on a live record. The message carries the statement's first line, because the
  * test that goes red has to say which statement to bind as one array.
  */

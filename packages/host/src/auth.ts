@@ -484,7 +484,7 @@ export type Why = 'not-configured' | 'insecure';
  * gone, so there is nothing to offer and the key is not sent. The web reads an absent
  * key as `false`, so an app older than this host draws the same screen.
  *
- * `magic: 'down'` IS A HOST THAT MEANS TO MAIL AND CANNOT (LCH-A04): the Worker with no sender set, a Directory that
+ * `magic: 'down'` IS A HOST THAT MEANS TO MAIL AND CANNOT: the Worker with no sender set, a Directory that
  * offers links on a host that gave `serveAuth` no `mail`, or `mailDown` saying the last sign-in letters all failed.
  * The screen then says mail is not going out, rather than that a link is on its way. It is the host's fault and never
  * an address's, so it says nothing about who has an account.
@@ -667,7 +667,7 @@ export async function deriveSessionKey(material: Uint8Array): Promise<Uint8Array
 
 /**
  * What a record's `access` answers about one person, as every door reads it: the role, the ceiling, the per-list levels
- * and rules, and what the lens adds when shares made the answer (sharing plan §2.4).
+ * and rules, and what the lens adds when shares made the answer.
  */
 export type HeldAccess<L extends string = string> = {
   level: L | null;
@@ -697,7 +697,7 @@ export type HeldParts<L extends string = string> = {
 const says = (o: object | undefined): o is object => o !== undefined && Object.keys(o).length > 0;
 
 /**
- * THE ONE PLACE A HELD ANSWER BECOMES A CONTEXT (sharing plan §2.5, choke point 2). Every door calls it: the session path
+ * THE ONE PLACE A HELD ANSWER BECOMES A CONTEXT (choke point 2). Every door calls it: the session path
  * here, the Worker's bearer and the self-host's two, so a key the lens grows tomorrow is one edit and no door can forget
  * it. `wheres` goes wherever `levels` goes, the rows of each list a narrowed grant reaches, and `writes`, `hides`, `nots`
  * and `grant` go with them. A key that says nothing is left off, so a caller holding no share gets the context it always
@@ -739,7 +739,7 @@ export function sessionContext<L extends string>(
     ...heldContext(held),
     credentialed: true,
     provedAt: who.provedAt,
-    /* WHETHER THEY CAN CONFIRM IT IS THEM WITH A PASSKEY, inline, as a share that widens asks (sharing plan §6). */
+    /* WHETHER THEY CAN CONFIRM IT IS THEM WITH A PASSKEY, inline, as a share that widens asks. */
     confirmable: who.passkey === true,
   };
 }
@@ -760,7 +760,7 @@ export const accessHeaders = (refusal: { at?: string | undefined } | undefined):
 const SEE_AS_MOST = 64;
 
 /**
- * "See as Priya" (sharing plan §3.3, T11): a live session's context replaced by the one the named person would have,
+ * "See as Priya": a live session's context replaced by the one the named person would have,
  * marked `preview`, or a refusal, or `null` when the request asks nothing of the kind.
  *
  * AN OWNER OR AN ADMIN, AND NEVER AS AN OWNER. Anybody else asking is refused, and so is asking to see as somebody who
@@ -768,7 +768,7 @@ const SEE_AS_MOST = 64;
  * for them), so every answer is theirs; `preview` makes it read-only twice over (the router and `allows`) and makes the
  * viewer nobody, so no row they keep private is shown. `provedAt` stays the viewer's.
  *
- * `previewBy` IS WHO IS SEEING, the session's own person, for the audit (sharing plan §2.10): the record counts each
+ * `previewBy` IS WHO IS SEEING, the session's own person, for the audit: the record counts each
  * read made this way as `preview:<person>` against them, and never as the person's own.
  */
 export async function seeAs<L extends string>(
@@ -955,7 +955,7 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
       return { flow, sid: sid ?? '', id: text(body.id) };
     case 'switch':
       return { flow, sid: sid ?? '', slug: text(body.slug) };
-    /* A PERSON NAMING ONE OF THEIR OWN PASSKEYS (LCH-A04): the Directory keeps the name to one line of 64 characters,
+    /* A PERSON NAMING ONE OF THEIR OWN PASSKEYS: the Directory keeps the name to one line of 64 characters,
        refuses an empty one and renames only the person's own key (`passkey.rename` in `record/src/identity.ts`). */
     case 'passkey.rename':
       return { flow, sid: sid ?? '', id: text(body.id), label: text(body.label) };

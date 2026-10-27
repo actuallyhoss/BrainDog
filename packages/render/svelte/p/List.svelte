@@ -28,7 +28,7 @@
   hands it the row and itself to anchor a menu to. With neither the row is exactly `toHTML`'s, the same branch the box
   makes: a control that cannot act is absent.
 
-  A ROW'S OWN ACTIONS (PGS-A12) sit at its end, through `Actions` at the row's size, only where the host hands both the
+  A ROW'S OWN ACTIONS sit at its end, through `Actions` at the row's size, only where the host hands both the
   block's `row_actions` and `act`. On `todo`, `timeline` and a plain list; the kinds with drawers of their own above
   (feed, queue, agents, roadmap, path) do not draw them yet.
 -->
@@ -97,7 +97,7 @@
     /** Where the host hears that focus moved into a row, with its key and the row. */
     onrowfocus?: ((key: string, row: Row) => void) | undefined;
     /**
-     * EACH ROW'S DECLARED ACTIONS (PGS-A12, the block's `row_actions`) and where a press goes, with the row it was on.
+     * EACH ROW'S DECLARED ACTIONS (the block's `row_actions`) and where a press goes, with the row it was on.
      * Drawn at the row's end only when both are handed; with either absent the row is exactly `toHTML`'s.
      */
     rowActions?: readonly unknown[] | null | undefined;

@@ -1,5 +1,5 @@
 /**
- * Search by meaning: the rows nearest a query's own vector, fused with the word hits (ENG-B18).
+ * Search by meaning: the rows nearest a query's own vector, fused with the word hits.
  *
  * `rerank.ts` only re-orders what the words found, so a query that shares no word with the right row finds nothing.
  * Here the query itself has a vector, and the rows whose vectors lie closest to it are answered beside the word hits.

@@ -51,7 +51,7 @@ function kitCarries(named: Named | undefined): void {
 }
 kitCarries(recordNamed);
 
-const PATHS = '/Users/x/loop/batch.workflow.js wf_01ABC';
+const PATHS = '/Users/x/work/batch.workflow.js wf_01ABC';
 const SAID = 'Fixing the invoice totals';
 
 /** A record with two projects and the runs a card is drawn from, each heard from within the last few minutes. */

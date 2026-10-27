@@ -455,7 +455,7 @@ export function readiness(gate, timeoutMs, root, { quietMs = 0 } = {}) {
   };
 }
 
-/* ── one way to open a page (PRF-B04) ────────────────────────────────────── */
+/* ── one way to open a page ────────────────────────────────────── */
 
 /**
  * The plan for one page a gate opens, made without a browser, so a test reads it whole.

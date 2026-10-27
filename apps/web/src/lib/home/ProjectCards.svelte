@@ -1,5 +1,5 @@
 <!--
-  The projects that are live, as cards on Today (Today as the desk; the UI pass of 20 October, today F16, proj section 4).
+  The projects that are live, as cards on Today (Today as the desk; the redesign, today F16, proj section 4).
 
   ONE CARD EVERYWHERE: each live project is `ui/ProjectCard.svelte`, the card Projects draws too, and the whole card opens
   the project's page. ON TODAY THE CARDS FILL THEIR ROW (the Today polish of 20 October): one to three share the width,

@@ -1,6 +1,6 @@
 /**
  * What one thing on the record is, and where it was seen: `about` (READ+), the record's door to the kernel's about read
- * (ENG-B02, job 5; `packages/kernel/src/about.ts`).
+ * (`packages/kernel/src/about.ts`).
  *
  * BEFORE THIS NOTHING ANSWERED "WHAT IS NORTHBANK". The kernel can say what a person, an organisation or a project is
  * (`aboutOfRow`) and which rows a text may be about (`candidatesFor`), and no caller could ask it: the owner in the

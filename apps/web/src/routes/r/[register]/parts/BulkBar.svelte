@@ -10,7 +10,7 @@
   rather than in the stylesheet once swallowed this into the card arm, so a desktop selection raised
   no bulk bar at all. The page draws it whichever body is on the screen.
 
-  IT TAKES THE TOOLBAR'S PLACE (the UI pass of 20 October, money F7). It floated at the bottom of the window with a
+  IT TAKES THE TOOLBAR'S PLACE (money F7). It floated at the bottom of the window with a
   border and a shadow, over the rows it acts on, and covered the Due cell of the row under it. While anything is picked
   it is the tile's first row instead, the toolbar's height, flat: how many are picked, then the verbs, every one the
   same quiet button, then Clear at the end. ON A PHONE it docks above the tab bar as a flat strip the screen's width,

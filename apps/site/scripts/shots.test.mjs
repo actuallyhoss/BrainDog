@@ -13,7 +13,7 @@
  * THE CAPTURE SCRIPTS ARE READ AS TEXT AND NOT IMPORTED, because importing either one runs it: both
  * open a browser at the top level, and `usecases.mjs` starts a record per use case. `shot.mjs` is the
  * one that is imported: its work sits under `import.meta.main`, so what arrives here is the bounds
- * reader the daily look at the live site fails on (LCH-B02), with no browser behind it.
+ * reader the daily look at the live site fails on, with no browser behind it.
  */
 
 import { test } from 'node:test';
@@ -101,7 +101,7 @@ test('usecases.mjs writes nothing into static/shots', () => {
   assert.doesNotMatch(text, /['"]static['"],\s*['"]shots['"]/, 'usecases.mjs builds a path into static/shots again');
 });
 
-/* THE LIVE BOUNDS (LCH-B02). The facts below are a site inside every bound; each test after the first
+/* THE LIVE BOUNDS. The facts below are a site inside every bound; each test after the first
    plants one fact outside and the reader has to name it, and only it. */
 const BOUNDS = JSON.parse(readFileSync(join(import.meta.dirname, 'live-bounds.json'), 'utf8'));
 

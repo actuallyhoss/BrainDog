@@ -1,5 +1,5 @@
 /**
- * A write that can be sent again (AGT-B05, RQ-AGT-407): `create` and `update` take an `op_id`, the agent door passes it
+ * A write that can be sent again: `create` and `update` take an `op_id`, the agent door passes it
  * to the record, and the record replays the write it was minted for. An agent whose answer was lost sends the same call
  * once more and lands one write: one task for "add a task called Buy stamps", one version for one change.
  *

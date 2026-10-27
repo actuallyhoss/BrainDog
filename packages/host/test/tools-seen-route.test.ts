@@ -1,5 +1,5 @@
 /**
- * `toolsSeen`, what one machine holds (AGT-D02): routed as one DATA write, taking the machine as text and the tools as
+ * `toolsSeen`, what one machine holds: routed as one DATA write, taking the machine as text and the tools as
  * JSON, and handed to the record method of the same name.
  *
  * THE GROUP IS WHAT `router-groups` COUNTS (`docs/30-BLUEPRINT.md` §5): DATA, since the method's first statement is

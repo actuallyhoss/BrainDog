@@ -1,5 +1,5 @@
 /**
- * Whether each block of a page is drawn, for every reader (`src/drawn.ts`, PGS-A05).
+ * Whether each block of a page is drawn, for every reader (`src/drawn.ts`).
  *
  * THE BLOCKS ARE THE RECORD'S OWN SHAPE (`BlockResult`), so a change to that type that the rule can no longer read is a
  * compile error here rather than a page that quietly draws everything again.
@@ -199,7 +199,7 @@ test('A BLOCK WRITTEN OUT IN THE PAGE HOLDS WHAT ITS AUTHOR WROTE, and one with 
   assert.deepEqual(whys(markDrawn([lead, written, bareRing])), ['drawn', 'drawn', 'empty']);
 });
 
-/* THE PINWHEEL SHAPE (audit 59, claim 4): the project page of an imported project nobody has described. "Where it
+/* THE PINWHEEL SHAPE: the project page of an imported project nobody has described. "Where it
    stands" is two blocks under one heading, each behind a `when:` (`packages/seed/src/modules/portfolio.ts`): the cards
    while one of the four fields is said, the figures while none is. Under them, the boxed section "More about
    Pinwheel" names the host's `actions` panel over what the project runs on. */
@@ -248,7 +248,7 @@ test('A BOXED ACTIONS SECTION IS SHUT WHEN THE RECORD SEES NO SCHEDULED ACTION a
 });
 
 test('A BOXED ACTIONS SECTION IS KEPT BY DEFAULT: a project with one scheduled action and no other block keeps its heading', () => {
-  /* NOBODY COUNTED (audit 61, claim 1): no host hands the section its actions, so the record cannot say the panel is
+  /* NOBODY COUNTED: no host hands the section its actions, so the record cannot say the panel is
      empty, and the heading the host draws "Nightly import" under stays though every block under it went. */
   const uncounted = markDrawn(pinwheel());
   assert.deepEqual(whys(uncounted).slice(3), ['drawn', 'empty', 'empty', 'empty']);

@@ -1,5 +1,5 @@
 /**
- * A card's line typed on in place (PGS-C15): which column is a box, and what a pause in the typing sends.
+ * A card's line typed on in place: which column is a box, and what a pause in the typing sends.
  */
 
 import { test } from 'node:test';

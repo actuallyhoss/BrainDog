@@ -26,11 +26,11 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
   state: 'state',
   done: ['cleared', 'void'],
   pack: 'money-core',
-  /* NEWEST DAY FIRST, SINCE money-core 3.16.0 (PGS-B06). A list that names no order came back by last change, so an
+  /* NEWEST DAY FIRST, SINCE money-core 3.16.0. A list that names no order came back by last change, so an
      import that touched July's rows last opened the Ledger on 13 July with December under it. `on` is the day the money
      moved, the field a person reads the Ledger by; the kernel breaks a tie by the row's id. */
   order: { field: 'on', dir: 'desc' },
-  /* A PAYMENT AN INSTALMENT NAMES IN "Paid by" IS NOT DELETED OUT FROM UNDER IT (REC-B11), as an account is not from
+  /* A PAYMENT AN INSTALMENT NAMES IN "Paid by" IS NOT DELETED OUT FROM UNDER IT, as an account is not from
      under its movements (`accounts.ts`): the record says which list still points at it, and the person clears that first. */
   delete: 'refuse_while_referenced',
   /**
@@ -139,7 +139,7 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
       required: true,
     },
     /**
-     * A ROW'S CURRENCY COMES FROM ITS ACCOUNT, AND STAYS, SINCE money-core 3.16.0 (REC-B04). "`currency` from the
+     * A ROW'S CURRENCY COMES FROM ITS ACCOUNT, AND STAYS, SINCE money-core 3.16.0. "`currency` from the
      * account" and "a transaction's currency" are among the things that never change. An amount written
      * with no code takes the code of its account's balance (`currency_from`), so a bank text or an agent that sends
      * 97999 on an account kept in EGP files EGP 979.99, and an account with no balance to give refuses it in one
@@ -162,7 +162,7 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
     /* REQUIRED, because a movement with no account is a number nobody can reconcile. */
     { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
     { id: 'category', type: 'ref', to: 'categories', index: true },
-    /* WHICH RULE FILED IT, SINCE money-core 3.17.0 (REC-B10), written by `txn-categorise` in the step that writes the
+    /* WHICH RULE FILED IT, SINCE money-core 3.17.0, written by `txn-categorise` in the step that writes the
        category, and empty on an entry a person filed. Not indexed: the eight below are spent, and what counts entries
        by rule groups on it without one. */
     { id: 'filed_by', label: 'Filed by', type: 'ref', to: 'filing_rules' },
@@ -177,17 +177,17 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
        only name nobody or file a coffee shop as somebody met, so it named nobody, and none of a real ledger's 217 rows
        carried one. Still a link (`LINKS` in `packs/first-party.ts`), so Money installs with People off. */
     { id: 'party', label: 'Who', type: 'ref', to: 'organisations' },
-    /* THE PAYEE AS THE BANK WROTE IT, SINCE money-core 3.10.0 (`loop/contract-17.md`): `GEIDEA*BRIDGE ST COFFEE`,
+    /* THE PAYEE AS THE BANK WROTE IT, SINCE money-core 3.10.0: `GEIDEA*BRIDGE ST COFFEE`,
        which a bank door fills and the record resolves to an organisation by its `bank:` key, kept beside `party` so
        the words a match was made on are never lost. MONEY'S AND NOT EACH BANK'S: three bank add-ons laying a field of
        this one id on this one list (`extends`) is `PROVIDES_CONFLICT` for the second of them on any record that keeps
        two banks, so the list declares it once and every door writes it. Searchable, because it is what a person
        remembers off a statement.
 
-       LABELLED AS WHAT IT IS, SINCE money-core 3.17.0 (REC-B16): it was "Paid to or from", which promised a name and
+       LABELLED AS WHAT IT IS, SINCE money-core 3.17.0: it was "Paid to or from", which promised a name and
        showed a statement line. The id stays, since every bank add-on and the filing rules write and read it. */
     { id: 'counterparty_text', label: 'As the bank wrote it', type: 'text', search: true },
-    /* WHO IT WAS PAID TO OR FROM, IN A PERSON'S WORDS, SINCE money-core 3.17.0 (REC-B16): `Bridge Street Coffee`
+    /* WHO IT WAS PAID TO OR FROM, IN A PERSON'S WORDS, SINCE money-core 3.17.0: `Bridge Street Coffee`
        beside the bank's `GEIDEA*BRIDGE ST COFFEE`, so a name can be put right without losing the words a match was
        made on. Optional, because most ways an entry arrives say only what the bank wrote. Searchable, as the bank's
        words are. NOT INDEXED, FOR THE REASON `party` IS NOT: the list's eight are spent, and nothing filters on it. */

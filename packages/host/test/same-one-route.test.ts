@@ -1,5 +1,5 @@
 /**
- * `sameOne`, a person asking whether entries held twice are one (AGT-D05): routed as a DATA write, handed to the record
+ * `sameOne`, a person asking whether entries held twice are one: routed as a DATA write, handed to the record
  * method of the same name with the list and the entries as they were sent, and answered `NOT_IN_THIS_BUILD` by a record
  * built before it had one, never a 500.
  *

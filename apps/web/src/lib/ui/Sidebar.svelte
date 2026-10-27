@@ -191,7 +191,7 @@
   }
 
   /**
-   * A NEW PAGE, FROM THE FOOT OF PAGES (PGS-C30). The line becomes a box for the name, and Enter sends it through
+   * A NEW PAGE, FROM THE FOOT OF PAGES. The line becomes a box for the name, and Enter sends it through
    * `newPage`, the one call the palette makes too: whoever owns the record gets the page and is taken to it, with one
    * toast whose Undo takes it back out; anybody else files it on Decide and stays where they are. A refusal is its own
    * sentence on a toast, and the box keeps what was typed.
@@ -475,7 +475,7 @@
       {#if refused}<p class="mi-note">{refused}</p>{/if}
       <hr class="mi-rule" />
       <a class="mi" role="menuitem" href={at('/settings/signing-in')}><Icon name="settings" size="s" />{copy.recordSettings}</a>
-      <!-- SIGN OUT AT EVERY WIDTH (LCH-A04): the rail's account menu says it as the phone's More does, with auth.ts loaded
+      <!-- SIGN OUT AT EVERY WIDTH: the rail's account menu says it as the phone's More does, with auth.ts loaded
            on the press. A press that did not end the session leaves the page where it is and says so. -->
       <button type="button" class="mi" role="menuitem" onclick={() => void import('../auth.ts').then((m) => m.signOutAndLeave(`${BASE}/signin`)).then((out) => { if (!out.ok) toasts.push(copy.signOutFailed, { intent: 'warn' }); }, () => toasts.push(copy.signOutFailed, { intent: 'warn' }))}><Icon name="lock" size="s" />{copy.signOut}</button>
     </Menu>

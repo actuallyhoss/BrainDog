@@ -1,5 +1,5 @@
 /**
- * `actionRun`, the door behind Run now on a scheduled action (`src/methods/action-run.ts`, SHL-C06).
+ * `actionRun`, the door behind Run now on a scheduled action (`src/methods/action-run.ts`).
  *
  * The kernel's own test holds the press (`packages/kernel/test/nudge.test.ts`). What is held here is the door: the owner
  * in a browser presses and the event names her; a reader and a member at `write` in a browser are refused; a token whose

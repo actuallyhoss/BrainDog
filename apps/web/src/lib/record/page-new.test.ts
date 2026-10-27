@@ -1,5 +1,5 @@
 /**
- * A person makes a new page (PGS-C30: people can create very dynamic project pages).
+ * A person makes a new page (people can create very dynamic project pages).
  *
  * AGAINST A REAL KERNEL over `node:sqlite`, as `field-retire.test.ts` runs it and for its reason: `@braindog/record` is
  * not a dependency of this app, so the envelope is written here and `install`, `retire`, `propose` and `decide` are the

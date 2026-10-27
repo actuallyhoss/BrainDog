@@ -41,7 +41,7 @@ import type { RecordDeps } from './index.ts';
 export type TextFaultsRead = { count: number; pages: number; line: string; faults: TextFault[]; truncated: boolean; computedAt: string | null; printed?: Printed };
 
 /**
- * WHAT THE PAGES PRINT RAW, EVERY FINDING OF THE NIGHT'S PAGE LINT (C39): the sign `pages-clean` carries six of them, and
+ * WHAT THE PAGES PRINT RAW, EVERY FINDING OF THE NIGHT'S PAGE LINT: the sign `pages-clean` carries six of them, and
  * this is the whole round (`keptRound` in `page-lint.ts`), handed only to a reader of the whole record, with when it ran,
  * how many pages it read and how many it did not reach. Absent before the first round.
  */

@@ -53,7 +53,7 @@
     background: var(--tile-2);
   }
 
-  /* A PROJECT'S DOT (E24): the row's own hue, in the mark's lightness and chroma, as the sidebar draws a project. */
+  /* A PROJECT'S DOT: the row's own hue, in the mark's lightness and chroma, as the sidebar draws a project. */
   .filters-dot {
     flex: none;
     inline-size: 8px;

@@ -199,7 +199,7 @@ export const SLASH_SKILL_INSTRUCTIONS = [
 /**
  * What the model is told when it composes each page (`SlashModel.headline`): the line at its top and its look, in the
  * background ask for every page whose figures or pressing things moved, Home among them. It took the place of the
- * headline instructions (ENG-B09), and it keeps their rule for calm: leave out what the page already does well.
+ * headline instructions, and it keeps their rule for calm: leave out what the page already does well.
  *
  * A NUMBER IS WRITTEN AS ITS HOLE, NEVER TYPED. Each figure is handed with its `id`, and the line says it as
  * `{{<figure id>}}`; the record fills the hole from the page's own figure (`headlineFault` and `filledHeadline` in
@@ -242,7 +242,7 @@ export const SLASH_HEADLINE_INSTRUCTIONS = SLASH_COMPOSE_INSTRUCTIONS;
 export type SlashHeadlineModel = SlashModel & { headline: NonNullable<SlashModel['headline']> };
 
 /**
- * What the model is told for the briefing (ENG-B12, `packages/record/src/briefing.ts`): the few cards Today opens on.
+ * What the model is told for the briefing (`packages/record/src/briefing.ts`): the few cards Today opens on.
  *
  * THE SAME BAR AS A HEADLINE, a card at a time. It is handed facts, each with a handle, and answers cards that name a
  * handle it was handed; a number is the hole of a figure of that same fact, filled by the record, so a line can never

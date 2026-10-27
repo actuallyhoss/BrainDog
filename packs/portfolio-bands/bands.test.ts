@@ -66,7 +66,7 @@ const scriptOf = (doc: Record<string, unknown>): ScriptBody => (doc as PackDoc).
 const SCRIPT = scriptOf(template());
 
 /**
- * WHETHER THE RECORD READS A COLUMN ADDITION YET (PGS-C29). 2.2.0 adds a column into Portfolio's In play cards, and until
+ * WHETHER THE RECORD READS A COLUMN ADDITION YET. 2.2.0 adds a column into Portfolio's In play cards, and until
  * `readAdds` in `packages/declare/src/index.ts` takes `into` and `column` (its ADDITION_KEYS, and the call to
  * `readAddColumn`), it refuses the file at that entry's `into`. Asked of the file as it ships, so the day that line lands
  * every install below takes the whole file and the test marked `todo` runs.

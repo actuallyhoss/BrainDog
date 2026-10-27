@@ -1,5 +1,5 @@
 /**
- * What putting a match back would do, said before it is done (ENG-B04, "shown with Undo").
+ * What putting a match back would do, said before it is done ("shown with Undo").
  *
  * `undoMerge` (`index.ts`) puts a fold back by the fold's own lines, and answers only the names it restored. A screen
  * that draws Undo on a match needs the other half first: is this batch a fold the record made, and what would pressing

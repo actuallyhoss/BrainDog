@@ -76,7 +76,7 @@ test('THE RECORD IS NAMED FOR THE BUSINESS HEARD FIRST, then the person, then th
   assert.equal(namesHeard(propose('I am Dana, I run Kiln Studio and we bill Fenwick £2,000 a month', CTX)).business, 'Kiln Studio');
 });
 
-test('WITH NO NAME HEARD THE TRADE NAMES THE RECORD, never the email (audit C, X2)', () => {
+test('WITH NO NAME HEARD THE TRADE NAMES THE RECORD, never the email', () => {
   const p = propose('I run a small ceramics studio with two potters. I lose track of kiln firings and who owes me money.', CTX);
   assert.equal(p.title, 'Ceramics studio');
   assert.deepEqual(namesHeard(p), { person: null, business: 'Ceramics studio' });
@@ -319,7 +319,7 @@ test('STEP 4: THE PASSKEY IS OFFERED STRAIGHT AFTER THE LINK, before the build, 
   assert.match(PAGE, /<PasskeyFirst ondone=\{lockDone\} \/>/, 'nothing goes on past the passkey');
 });
 
-test('THE MAKING STEP HAS NO BAR THAT MOVES FOR EVER (USE-B07)', () => {
+test('THE MAKING STEP HAS NO BAR THAT MOVES FOR EVER', () => {
   assert.doesNotMatch(PAGE, /class="bar"|\.bar-fill/);
 });
 
@@ -364,7 +364,7 @@ test('SIGNED IN, NO EMAIL: the address field and the link are only for somebody 
   assert.match(PAGE, /\{#if signedIn === null && plan === 'free'\}<p class="quiet open-here">/, 'a person signed in is told to open a link');
 });
 
-test('BOTH FORMS LINK THE TERMS AND THE PRIVACY POLICY, in one short line under the press (F8)', () => {
+test('BOTH FORMS LINK THE TERMS AND THE PRIVACY POLICY, in one short line under the press', () => {
   const line = `${words.agree} ${words.terms} ${words.agreeAnd} ${words.privacy}.`;
   assert.ok(line.length <= 48, `"${line}" fits one line at 390`);
   assert.doesNotMatch(line, /—/u);

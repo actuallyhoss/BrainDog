@@ -62,7 +62,7 @@ const GENERAL = [
  * `kindsReading`, which reads both, rather than this table.
  */
 /*
- * `actions` IS GENERAL AND `row_actions` IS NOT (PGS-A12): any block may offer a press of its own, such as Add one, and
+ * `actions` IS GENERAL AND `row_actions` IS NOT: any block may offer a press of its own, such as Add one, and
  * only a block that draws rows has a row to press one on. A registered kind that draws rows names `row_actions` in its
  * own module's keys, as it names any key of its own, and joins these.
  */
@@ -287,7 +287,7 @@ export function kpisFault(block: Readonly<Record<string, unknown>>, who: string)
   return null;
 }
 
-/* ── a block's `actions` and `row_actions` (PGS-A12) ───────────────────────────────────────────────────── */
+/* ── a block's `actions` and `row_actions` ───────────────────────────────────────────────────── */
 
 /**
  * WHERE THE FIELDS ARE NOT KNOWN, EVERY NAME IS ONE: an arg is then checked for its shape and the verb it belongs to,
@@ -345,7 +345,7 @@ export function actionsFault(block: Readonly<Record<string, unknown>>, who: stri
   return read.ok ? null : read.fault;
 }
 
-/* ── a `when:` tree, and a note's `says:` (PGS-A13) ──────────────────────────────────────────────────────── */
+/* ── a `when:` tree, and a note's `says:` ──────────────────────────────────────────────────────── */
 
 /** The two ways a `when:` joins its tests: `all`, every one holds, and `any`, at least one does. */
 export const WHEN_JOINS = ['all', 'any'] as const;
@@ -357,7 +357,7 @@ export const WHEN_DEPTH = 2;
 export type WhenLeafFault = (leaf: unknown, said: string) => string | null;
 
 /**
- * WHO READS THE PAGE (PGS-A17): its owner, a member signed in, an agent on a token, or somebody holding a link. A leaf
+ * WHO READS THE PAGE: its owner, a member signed in, an agent on a token, or somebody holding a link. A leaf
  * `{ reader: owner }` or `{ reader: [owner, member] }` holds while the reader is one of them, so a block can be shown to
  * its owner alone. A host that does not say who reads is shown no block that asks (`pages.ts` `leafHolds`).
  */

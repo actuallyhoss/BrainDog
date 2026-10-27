@@ -143,7 +143,7 @@ test('ONE CALL TO offered, AND NO READ OF ANY RESOURCE: nothing drawn, no figure
 });
 
 test('AN ADDRESS THE RECORD DOES NOT DECIDE IS STILL READ BEFORE IT IS LISTED, and that is all that is read', async () => {
-  /* THE BRIEFING, WHAT STOPPED, WHAT WENT STALE AND THE LEARNINGS ARE THE RECORD'S TO DECIDE NOW (bench 24 Oct, H1): each
+  /* THE BRIEFING, WHAT STOPPED, WHAT WENT STALE AND THE LEARNINGS ARE THE RECORD'S TO DECIDE NOW (bench 24 Oct): each
      was read whole to learn it answers. A stand-in that does not offer `stale` has it left out, and none of the four is read. */
   const { surface, calls } = offering({ ...OFFER, fixed: OFFER.fixed.filter((a) => a !== 'stale') });
   const asked = (method: string) => async (_a: unknown, ctx: Ctx): Promise<Result<unknown>> => {
@@ -231,7 +231,7 @@ test('A FIGURE THE CALLER MAY NOT READ IS NOT LISTED, nor its list or its page, 
   sql.close();
 });
 
-/* ── the list held to 15 KB (agents plan §6.4) ─────────────────────────── */
+/* ── the list held to 15 KB ─────────────────────────── */
 
 /**
  * MEASURED BEFORE: on the owner's record `resources/list` answered 225,553 bytes, 754 of its 933 pages one per agent run;

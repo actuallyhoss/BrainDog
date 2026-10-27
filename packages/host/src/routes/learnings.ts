@@ -11,7 +11,7 @@
  * `takes` SAYS THE SHAPE AND NOTHING MORE. `limit` is a whole number and may be left out, so a call asking by anything
  * else is refused here, at `limit`. How many it may ask for is the record's question.
  *
- * ONE LESSON LEARNED TWICE (AGT-D15). `learningsTwice` is READ+ and writes nothing: which lessons two projects learned
+ * ONE LESSON LEARNED TWICE. `learningsTwice` is READ+ and writes nothing: which lessons two projects learned
  * on their own, each with the question it would be put as. `promoteLearnings` is DATA and a person's only: it files
  * each such question on Decide, signed by the person who pressed, and the record refuses it to any key. Both take
  * nothing.

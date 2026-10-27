@@ -79,7 +79,7 @@ export type State =
     };
 
 /**
- * How long the sent screen waits before its second line, "Nothing yet? Check the address, or send it again." (LCH-A04)
+ * How long the sent screen waits before its second line, "Nothing yet? Check the address, or send it again."
  *
  * THE HOST ANSWERS ALIKE FOR AN ADDRESS IT KNOWS AND ONE IT DOES NOT, and the letter goes out after the answer, so the
  * screen can never say the letter failed. What it can say, once a letter would normally have come, is the two things

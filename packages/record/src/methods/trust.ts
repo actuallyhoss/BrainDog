@@ -1,5 +1,5 @@
 /**
- * Where every agent stands on the ladder of trust, the record's half: `trust`, READ+ (ENG-A12, "a ladder
+ * Where every agent stands on the ladder of trust, the record's half: `trust`, READ+ ("a ladder
  * per agent and kind").
  *
  * WHAT A RUNG IS AND WHAT MOVES IT IS THE LADDER'S (`ladder.ts`), which ran on every agent's write with nothing to read

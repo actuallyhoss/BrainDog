@@ -65,7 +65,7 @@ export type Event = {
 export function noteOf(register: string, e: Event, names?: Names): string {
   if (e.note) return e.note;
   if (e.kind === 'create') return 'created';
-  /* AN EDIT THAT NAMES NO FIELD (the audit of 25 October, Y3): a person's Activity read "An agent edit". */
+  /* AN EDIT THAT NAMES NO FIELD: a person's Activity read "An agent edit". */
   if (!e.field) return e.kind === 'edit' ? 'changed this' : e.kind.replace(/[._]/g, ' ');
   const f = REGISTERS[register]?.fields.find((x) => x.id === e.field);
   const name = f ? labelOf(f).toLowerCase() : e.field.replace(/_/g, ' ');
@@ -74,7 +74,7 @@ export function noteOf(register: string, e: Event, names?: Names): string {
   const kept = (v: unknown): boolean => typeof v === 'string' && /^--(?:redacted|erased)--$/u.test(v);
   if (kept(e.to) || kept(e.from)) return e.to === null || e.to === undefined || e.to === '' ? `${name} cleared` : e.from === null || e.from === undefined || e.from === '' ? `${name} set` : `${name} changed`;
   /* A LIST IS SAID BY WHAT IT GAINED AND LOST, and never as the whole list twice: a person's history read "projects
-     from 01M3MV… to 01M3MV…, 01M4TW…" and "met set to 2026-10-24 · commit 891072f in larkspur" (Y3). */
+     from 01M3MV… to 01M3MV…, 01M4TW…" and "met set to 2026-10-24 · commit 891072f in larkspur". */
   const was = listOf(e.from);
   const now = listOf(e.to);
   if ((was !== null || now !== null) && (f === undefined || f.type === 'list')) {

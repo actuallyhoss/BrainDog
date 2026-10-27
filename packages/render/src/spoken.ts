@@ -1,5 +1,5 @@
 /**
- * WORDS A PERSON READS, WITH NO ADDRESS OR ID IN THEM (audit 19 M11, audit 21 #4). Whoever asked a question wrote its
+ * WORDS A PERSON READS, WITH NO ADDRESS OR ID IN THEM. Whoever asked a question wrote its
  * words, its answers and why each is offered, and an agent writes `alex@acme.com`, `tasks#8` or a file path into them
  * as readily as a name. Every line of the one decision card that came from somebody else is read through `spoken`.
  *
@@ -22,7 +22,7 @@ const RELATIVE = /(?<=^|[\s("'\u201C\u2018])[\w.-]*[A-Za-z][\w.-]*(?:\/[\w.-]+){
 /* A SHORT ONE, of two parts, is a path only when the last part is a file's name: it ends in an extension that starts
    with a letter ("docs/review.md"). So "and/or", "24/7", "w/o" and "1.5/2.0" stay words. The extension is in one case,
    so a stop with no space after it ("50/50.Then") starts no file's name.
-   AND IT IS TOLD FROM TWO WORDS THAT HAPPEN TO HOLD A STOP (audit 81, claim 2), which went with their sentence's words:
+   AND IT IS TOLD FROM TWO WORDS THAT HAPPEN TO HOLD A STOP, which went with their sentence's words:
    the folder is more than one letter and holds no stop before a letter ("e.g./i.e.", "a/b.test", "Node.js/Deno.land"
    stay), and the file's name starts with two letters or is all extension ("v1/v2.beta" stays, "docs/.env" goes). */
 const SHORT = /(?<=^|[\s("'\u201C\u2018])(?!\w\/)(?![\w.-]*\.[A-Za-z])[\w.-]+\/(?:[A-Za-z]{2}[\w.-]*)?\.(?:[a-z][a-z0-9]*|[A-Z][A-Z0-9]*)(?![\w\/-])/gu;

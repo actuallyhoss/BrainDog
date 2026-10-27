@@ -477,16 +477,16 @@
   $effect.pre(() => {
     frame.here = crumb.at(-1)?.label ?? '';
   });
-  /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT (USE-B03): an update that adds a page lands hidden. */
+  /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT: an update that adds a page lands hidden. */
   const penWaits = $derived(penCount(data.pen, (id) => navPrefs.isDismissed(id)));
   const sidePen = $derived(penWaits > 0 ? { label: suggested(penWaits), href: '/settings/navigation' } : null);
 
-  /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the sidebar's places, the projects, and Settings (2.A.15). */
+  /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the sidebar's places, the projects, and Settings. */
   const sidePlaces = $derived<FlatItem[]>([...model.places.map((p) => ({ key: p.key, href: p.href, label: p.label, icon: p.icon, near: p.near })), ...(projectsPlace ? [projectsPlace] : [])]);
   const goPlaces = $derived([...sidePlaces, { key: 'settings', href: '/settings', label: copy.settings, icon: 'settings', near: ['/settings'] }]);
 
   /**
-   * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE (USE-B02): a place is drawn when it has something to show, so the day
+   * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE: a place is drawn when it has something to show, so the day
    * the first account is typed Money appears, and one toast says "Money is in your rail now." No badge and no count.
    *
    * `arrivedIn` IS THE WHOLE RULE, and `place-arrived.test.ts` cuts it out of this file and runs it, so it stays one
@@ -667,7 +667,7 @@
   });
 
   /**
-   * BACK TAKES YOU BACK TO WHERE YOU WERE, AND A NEW PAGE STARTS AT ITS NAME (motion F4, F5.1).
+   * BACK TAKES YOU BACK TO WHERE YOU WERE, AND A NEW PAGE STARTS AT ITS NAME (motion F4).
    *
    * The window never scrolls here: `.body` is the one scroll container, so the browser's own restoring and SvelteKit's
    * restore nothing, and every Back landed at the top. So the place each screen was read to is kept as it is left (the
@@ -723,7 +723,7 @@
   }
 
   /* WHAT THE READER LAST DID, A KEY OR A PRESS, heard before anything else hears it, so a page's name focused after a
-     move wears its ring only for a keyboard (`quiet-focus.ts`, Z26). */
+     move wears its ring only for a keyboard (`quiet-focus.ts`). */
   $effect(() => {
     const opts = { capture: true, passive: true } as const;
     addEventListener('keydown', heard, opts);
@@ -734,7 +734,7 @@
     };
   });
 
-  /* WHERE HE WENT, KEPT ON THIS DEVICE for the empty palette's Recent (E55). The first screen counts too. */
+  /* WHERE HE WENT, KEPT ON THIS DEVICE for the empty palette's Recent. The first screen counts too. */
   afterNavigate((nav) => {
     if (nav.to) noteOpened(`${nav.to.url.pathname}${nav.to.url.search}`, PRODUCT);
   });
@@ -800,7 +800,7 @@
           if (h1 && (now === null || now === document.body)) {
             if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1;
             /* QUIET UNLESS THE LAST THING WAS A KEY (`quiet-focus.ts`): script focus with no press before it counts as
-               `:focus-visible`, so a cold open drew a ring round the name (Z26). */
+               `:focus-visible`, so a cold open drew a ring round the name. */
             quietFocus(h1);
           }
           return false;
@@ -996,7 +996,7 @@
   });
 
   /**
-   * THE DOOR SAID THIS PERSON'S ACCESS ENDED (sharing plan §2.8): the poll heard it (`live.ended`) or `boot` was refused
+   * THE DOOR SAID THIS PERSON'S ACCESS ENDED: the poll heard it (`live.ended`) or `boot` was refused
    * `at: 'access'`, and the window is the ended screen in the door's own sentence. `undefined` for everybody else.
    */
   const endedSaid = $derived(live.ended !== null ? live.ended.said : data.refused?.at === 'access' ? data.refused.fix : undefined);
@@ -1069,7 +1069,7 @@
   });
 
   /**
-   * WHO IS WORKING AND WHAT WAITS, READ AGAIN WITH `boot` WHENEVER THE POLL HEARS THE RECORD MOVE (EXP-D03), so a run that
+   * WHO IS WORKING AND WHAT WAITS, READ AGAIN WITH `boot` WHENEVER THE POLL HEARS THE RECORD MOVE, so a run that
    * starts or stops and a question answered elsewhere show up without a reload. One request, the shell's own, in place
    * of the page the rail asked the record to draw on every screen and every version; the answer is kept for the tab, so
    * the next screen's shell is the record as it is now.
@@ -1109,7 +1109,7 @@
   });
 
   /**
-   * THE RECORDS THIS PERSON CAN REACH, read after the shell has drawn (EXP-D03): the root load asks and does not wait, so
+   * THE RECORDS THIS PERSON CAN REACH, read after the shell has drawn: the root load asks and does not wait, so
    * the switcher starts with the record in the address and fills in once the account answers. A load after that carries
    * the list itself.
    */
@@ -1143,7 +1143,7 @@
   });
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
-  /* EVERY PLACE IN THE RAIL HAS A LETTER NOW, read from the rail by `lib/a11y/goto.ts` (EXP-D09): the seven of the old
+  /* EVERY PLACE IN THE RAIL HAS A LETTER NOW, read from the rail by `lib/a11y/goto.ts`: the seven of the old
      table first and unmoved, `g s` among them, then a letter of each place's own name. It was a table of seven here, so
      Money, Work or a page somebody put in the rail had none. Loaded when `g` arms or `?` asks for the sheet, never in
      the entry; the sheet is drawn again (`sheetSays`) once its `g` row says this rail's letters. */
@@ -1296,7 +1296,7 @@
 <div class="live" data-state={live.state} aria-hidden="true"></div>
 
 {#if endedSaid !== undefined}
-  <!-- THEIR ACCESS ENDED (sharing plan §3.4): the whole window says so in the door's sentence, and nothing of the record
+  <!-- THEIR ACCESS ENDED: the whole window says so in the door's sentence, and nothing of the record
        is drawn under it. Its own chunk, since nobody else ever loads it. -->
   <main id="main" class="bare" data-screen={settled()}>
     {#await import('$lib/sharing/AccessEnded.svelte') then { default: AccessEnded }}<AccessEnded said={endedSaid} />{/await}
@@ -1748,7 +1748,7 @@
     outline: none;
   }
 
-  /* NOR ON A COLD OPEN, which the browser counts as `:focus-visible` (`quiet-focus.ts`, Z26). */
+  /* NOR ON A COLD OPEN, which the browser counts as `:focus-visible` (`quiet-focus.ts`). */
   :global(main h1[data-quiet]:focus) {
     /* focus-ok: marked only while the reader's last act was not a key; Tab takes the mark off and the ring shows. */
     outline: none;
@@ -1856,7 +1856,7 @@
    * opening a task or a question narrows the work beside it rather than drawing over it, and the work's scrollbar, a
    * sticky head and anything full width all stop where the panel starts, which page padding could not do.
    *
-   * THE ROOM OPENS WITH THE SLIDE (scope E40). Given when the slide was over, the whole list jumped 360px in one frame
+   * THE ROOM OPENS WITH THE SLIDE. Given when the slide was over, the whole list jumped 360px in one frame
    * after the panel landed (fluid F13, CLS 0.11), so `--dock-col` now opens over the panel's step on its curve and the
    * work narrows as the panel's edge comes. Closing, the column goes at once and the panel slides out over the work as
    * it widens.

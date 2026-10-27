@@ -224,7 +224,7 @@ export function dropChip(p: URLSearchParams, at: number): void {
 
 /**
  * THE QUICK FILTER: the slices a list with a deadline and finished states is looked at by, in one segmented control
- * over its rows (the UI pass of 20 October, money F7): "All 38 · Late 4 · Due soon 2 · Paid 10". Each is a set of the
+ * over its rows (money F7): "All 38 · Late 4 · Due soon 2 · Paid 10". Each is a set of the
  * address's own chips, so a link, Back and a saved view read it as any filter; the segment is on when the chips on its
  * two fields (the state and the deadline) are exactly its own. Counted over the whole list only (`counted`), since a
  * count of the rows in hand is a false one while the list is still paging.
@@ -515,7 +515,7 @@ export function standOf(decl: RegisterDecl | undefined, value: string, late: boo
 }
 
 /**
- * A STATE AS ITS DOT (`StateDot`, the UI pass of 20 October, 2.A.6): a finished state is the filled slate, a state that
+ * A STATE AS ITS DOT (`StateDot`): a finished state is the filled slate, a state that
  * says part of it is done ("Part paid") the half-filled ring, and every other open state the hollow ring. NEVER RED: a
  * row's lateness is said where the date is, in the word "late" beside a red dot, and not in its state's colour.
  */
@@ -656,11 +656,11 @@ export function readingOf(
   /* "TO SETTLE" ON A LIST OF AMOUNTS (money F16): "28 open" read against a board's "Open 22", which counts one state; a
      bill part paid is still to settle, and the words say what the number counts. */
   const settles = decl.fields.some((f) => f.type === 'money') && Boolean(decl.done?.length);
-  /* A STATE WITH NO FINISHED VALUE IS A KIND, NOT A STAGE (the audit of 25 October, Z32): Projects' lane is Building,
+  /* A STATE WITH NO FINISHED VALUE IS A KIND, NOT A STAGE: Projects' lane is Building,
      Earning, Parked or Finished and declares none of them done, so every row read as open, and "30 open." stood over
      Parked and Finished rows. Such a list says how many it holds, in its own word. */
   const staged = Boolean(decl.done?.length);
-  /* A LIST OF RENEWALS RENEWS, IT IS NOT SETTLED (the audit of 25 October, Y23): Services' deadline is the day a domain or a
+  /* A LIST OF RENEWALS RENEWS, IT IS NOT SETTLED: Services' deadline is the day a domain or a
      plan renews, so "34 to settle" over them was the bills' word. It says what renews and which comes next, by name. */
   const renews = Boolean(dated && /^renew/iu.test(dated) && decl.done?.length);
   const lead =
@@ -687,7 +687,7 @@ export function readingOf(
 }
 
 /**
- * WHETHER A SIDE OF THE MONEY TILE DRAWS ITS BAR (Y23): the bar splits a side by state, so a side holding one state is
+ * WHETHER A SIDE OF THE MONEY TILE DRAWS ITS BAR: the bar splits a side by state, so a side holding one state is
  * a full bar whatever it holds, and two sides of two different sums drew two bars of one length. A side's late part and
  * the rest are two parts, so it still draws.
  */
@@ -949,7 +949,7 @@ export function withPrivate<T extends { seq: number; private?: true }>(pages: re
 }
 
 /**
- * THE HEAD'S COUNT (the audit of 25 October, Y18): the answer's own count, which the record says with the first page,
+ * THE HEAD'S COUNT: the answer's own count, which the record says with the first page,
  * and never a floor of what has been loaded. Numbers read "200+ of 2,527" over a list the record had counted. The cap
  * line counts against the same number, and a row typed here before the record counted it is counted.
  */

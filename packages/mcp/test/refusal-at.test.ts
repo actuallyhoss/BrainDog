@@ -149,7 +149,7 @@ test('A WRITE THE LADDER TURNED INTO A PROPOSAL IS REFUSED AT update\'s OWN FIEL
   assert.match(lost.content[0]!.text, /^Refused, VALUE_MALFORMED: A patch changes at least one field\.$/mu);
 });
 
-test('A FIELD THE RECORD NAMES BARE IS SAID INSIDE THE ARGUMENT THAT CARRIES THE ROW (audit D, W12)', async () => {
+test('A FIELD THE RECORD NAMES BARE IS SAID INSIDE THE ARGUMENT THAT CARRIES THE ROW', async () => {
   const bare = (code: string, fix: string, at: string) => async (): Promise<Result<never>> => ({ ok: false, refusal: { code, fix, at } });
   const { surface } = stub({
     create: bare('REQUIRED_MISSING', 'tasks needs what.', 'what'),

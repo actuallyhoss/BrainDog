@@ -1,5 +1,5 @@
 /**
- * Cloudflare's bot check script on the sign-up page, and what the page says while it waits for it (LCH-A02).
+ * Cloudflare's bot check script on the sign-up page, and what the page says while it waits for it.
  *
  * LOADED BY THE SIGN-UP ROUTE ONLY, never by the entry: the page imports it, so it rides in that route's chunk.
  *

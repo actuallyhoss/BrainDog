@@ -1,5 +1,5 @@
 /**
- * A list as a page the record composes (PGS-A23), at `/r/<list>?declared` until the list board is signed off: the kernel's
+ * A list as a page the record composes, at `/r/<list>?declared` until the list board is signed off: the kernel's
  * `listPage` drawn by the one renderer, with the panel every declared page opens on each row, and the screen as it was
  * left where it is.
  *

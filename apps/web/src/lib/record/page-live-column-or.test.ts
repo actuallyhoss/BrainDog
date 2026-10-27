@@ -1,5 +1,5 @@
 /**
- * A COLUMN'S SECOND FIELD REACHES A LIVE PAGE (audit 72 finding 2).
+ * A COLUMN'S SECOND FIELD REACHES A LIVE PAGE.
  *
  * WHAT WAS MEASURED. `toRows` read `or:` where the first field held nothing, and `api-column-or.test.ts` proved it with a
  * column made by hand. Every live page makes its columns in `columnsOf`, which copied six keys and dropped `or`, so the

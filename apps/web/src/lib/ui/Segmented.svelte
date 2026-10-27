@@ -20,7 +20,7 @@
   IT JUMPS, TOO, when the track has wrapped to two lines (a diagonal slide says nothing) and under reduced motion.
   Before the first measure, and with no script at all, the chosen segment is filled the way it always was.
 
-  ITS HEIGHT IS HELD BEFORE ITS LABELS LAND (the UI pass of 20 October, 2.A.9, motion F2.4): the track is 36 tall at
+  ITS HEIGHT IS HELD BEFORE ITS LABELS LAND (motion F2.4): the track is 36 tall at
   least, 48 under a thumb or on a phone, so a segment whose count arrives a beat late does not push the page down.
 
   `full` IS A PAGE'S OWN CONTROL ON A PHONE: below 640px the track is the page's width and its segments share it by
@@ -235,7 +235,7 @@
       flex-wrap: nowrap;
     }
 
-    /* SHARED BY THEIR WORDS, NOT IN EQUAL PARTS (Y30): an equal share cut "Comfortable" while "Roomy" had room to
+    /* SHARED BY THEIR WORDS, NOT IN EQUAL PARTS: an equal share cut "Comfortable" while "Roomy" had room to
        spare, and eight of padding a side lets four tabs fit 390 whole. */
     .segmented[data-full] > :global(.segment) {
       flex: 1 1 auto;
@@ -247,7 +247,7 @@
       white-space: nowrap;
     }
 
-    /* AND WHEN THEY DO NOT FIT, A GROUP OF CHOICES WRAPS, every choice whole (Y30): a strip cut at the edge hid "Roomy"
+    /* AND WHEN THEY DO NOT FIT, A GROUP OF CHOICES WRAPS, every choice whole: a strip cut at the edge hid "Roomy"
        with no sign there was more. */
     .segmented[data-full][data-wrap] {
       flex-wrap: wrap;

@@ -622,7 +622,7 @@ export function trendCell(trend: readonly (number | null)[] | undefined, money =
 }
 
 /* AND A VALUE'S OWN LINE BREAKS ARE SPACES: a row is one line of the dialect, so a note of two paragraphs broke its row,
-   and the rest of the note was drawn as a card of its own (the audit of 25 October, Z21). */
+   and the rest of the note was drawn as a card of its own. */
 const escapeCell = (c: string): string =>
   c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|');
 
@@ -1226,7 +1226,7 @@ function linkedCharted(block: BlockResult, of: string): Split | null {
 
 /**
  * The day a bar or a split over a list's own money was converted at out of date rates, or `null`: for the page's foot
- * (`page-live.ts` `oldestStale`), which could not ask before (audit 80, claim 5). It reads what `toSegments` is about
+ * (`page-live.ts` `oldestStale`), which could not ask before. It reads what `toSegments` is about
  * to draw and changes none of it, so the day is the one the line under the chart says.
  */
 export function staleOf(block: BlockResult): string | null {
@@ -1939,7 +1939,7 @@ export function draw(
  * How a cell of a block of `kind` says its money: a tile's figure as a headline, a bar's or a split's value as a figure,
  * a table's to the penny, and the rest as a sentence. A BAR'S VALUE IS A FIGURE READ AGAINST THE BARS BESIDE IT, in the
  * record's own sign and exact, never rounded to whole units: two books a few piastres apart must not read the same
- * (research audit M6). Only a tile's figure, standing alone, drops them from ten thousand up.
+ * Only a tile's figure, standing alone, drops them from ten thousand up.
  */
 const exactness = (kind: string, cell: number): 'headline' | 'figure' | 'exact' | 'sentence' =>
   cell === 1 && kind === 'stat'

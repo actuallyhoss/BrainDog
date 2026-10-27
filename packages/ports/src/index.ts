@@ -244,7 +244,7 @@ const WRITE = [
   'CURRENCY_UNKNOWN',
   'OUT_OF_BOUNDS', 'IMMUTABLE_FIELD', 'UNIQUE_VIOLATION', 'ALREADY_KNOWN', 'REF_REGISTER_MISMATCH',
   'DELETE_WHILE_REFERENCED', 'VERSION_STALE', 'LEVEL_REQUIRED',
-  /* A ROW'S CURRENCY DOES NOT CHANGE, 2026-10-09 (REC-B04): a money field declaring `currency_fixed` keeps the code it
+  /* A ROW'S CURRENCY DOES NOT CHANGE, 2026-10-09: a money field declaring `currency_fixed` keeps the code it
      was filed in, and its number stays free. Not `IMMUTABLE_FIELD`, which says the whole field is set once and would
      send a caller correcting an amount away from a write that is allowed; the repair here is delete and add again. */
   'CURRENCY_FIXED',
@@ -269,7 +269,7 @@ const AUTH = [
      every client, until he resumes it. Not `FORBIDDEN`, which says the credential is short and sends an agent looking
      for a bigger one; a stopped run is told to answer and end, and a paused one to wait. Both 403. */
   'RUN_STOPPED', 'RUN_PAUSED',
-  /* A TOOL HE SWITCHED OFF FOR THIS AGENT in Settings > Agents, 2026-10-21 (plan §6.2, §6.5), refused at the door before
+  /* A TOOL HE SWITCHED OFF FOR THIS AGENT in Settings > Agents, 2026-10-21 (§6.5), refused at the door before
      it runs, for a client whose cached list still has it. Not `FORBIDDEN`: no bigger key turns it back on, only he does. */
   'TOOL_OFF',
   /* A KEY SET TO ASK FIRST, 2026-10-26 (Keychain access): a machine's keychain grant reached it, and the owner has been

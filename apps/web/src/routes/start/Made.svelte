@@ -1,7 +1,7 @@
 <!--
   The end of the first run, and the first of the five minutes: the BrainDog is made, and the person connects their agent.
 
-  ONE APP AT A TIME (the UI pass of 20 October, first F1). A segmented control of the five apps, Claude Code first and
+  ONE APP AT A TIME (first F1). A segmented control of the five apps, Claude Code first and
   chosen, each with its maker's mark; under it that app's steps only, numbered where there are two, each step's command
   or address in its own block with its own Copy (`CodeLine`). All of it in one tile at most 720 wide, on the frame's
   start edge. Under the tile the live sign: "Waiting for your agent…" beside a grey dot until the record hears its
@@ -10,12 +10,12 @@
   and "Go to Today" both go to Today, so nobody is held here.
 
   `.cmd`, NEVER `.line`: the ledger's global `.line` (`rows.css`) is a four-column grid, and it broke every command
-  into a 120px column with its Copy a whole window away (SF5).
+  into a 120px column with its Copy a whole window away.
 
   NO KEY IS SHOWN: an MCP app signs in by OAuth and `braindog setup` signs in itself.
 
   `modules` (`made.modules`) is what was just made; nothing here reads it, and the prop stays so `/start`'s call is unchanged.
-  `places` are the names of the places made, said in one line over the apps (audit C, X3), so the screen first says what
+  `places` are the names of the places made, said in one line over the apps, so the screen first says what
   was built. On a phone (under 640) Claude comes first and chosen, since nobody runs a terminal command there, and a
   command breaks only at its spaces (`CodeLine` `words`).
 -->
@@ -81,7 +81,7 @@
   let heard = $state<Heard[]>([]);
   const sign = $derived(signOf(heard));
   /* THE YES OR NO ALONE, which the poll hangs on: `signOf` makes a new object each time, and an effect over it ran
-     again on every answer. A kept read answers from memory at once, so that loop never let the page paint (U-C1). */
+     again on every answer. A kept read answers from memory at once, so that loop never let the page paint. */
   const connected = $derived(sign.connected);
 
   /** The same calls, heard at the same times: a kept read's answer moves nothing. */

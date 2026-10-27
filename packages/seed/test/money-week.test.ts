@@ -1,5 +1,5 @@
 /**
- * Money this week (use case 6, step 6; `loop/progress/planner-47.md`, "The onboarding target"), read through the kernel
+ * Money this week (use case 6, step 6, "The onboarding target"), read through the kernel
  * on a record that installed Money the way a person does, with no example entries and no account.
  *
  * A shop owner says "Nadia paid 900 on InstaPay" on her first day. She holds no account, so the payment is kept as an

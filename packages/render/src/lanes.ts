@@ -152,7 +152,7 @@ function ticksOf(from: number, to: number, offset: number, now: number | null): 
   const days = wallOf(to - 1, offset).date !== wallOf(from, offset).date || length > DAY;
   const hourly = length <= 2 * DAY;
   /* A DAY OR LESS IS NAMED AT MOST FOUR TIMES, on the hours a day is read by (00:00, 06:00, 12:00, 18:00): eight names
-     along a day's axis were a ruler, and the lanes under it are what is read (the UI pass of 20 October, agents F7). */
+     along a day's axis were a ruler, and the lanes under it are what is read (agents F7). */
   const day = hourly && length <= DAY && length >= 6 * HOUR;
   const steps = hourly ? [5 * MINUTE, 10 * MINUTE, 15 * MINUTE, 30 * MINUTE, ...(day ? [1, 2, 3, 6, 12] : [1, 2, 3, 4, 6, 12]).map((h) => h * HOUR)] : [1, 2, 7, 14].map((d) => d * DAY);
   const most = day ? TICKS_DAY : TICKS_MOST;
@@ -287,7 +287,7 @@ export const laneWho = (cells: readonly string[]): string => (cells[3] ?? '').tr
 
 /**
  * THE HUE A LANE AT WORK IS PAINTED IN, as the inline style's tail: its agent's maker colour (`--agent-claude`), and
- * nothing where the mark is drawn in ink or there is no mark, which leaves the sheet's own ink (SF9). Never red.
+ * nothing where the mark is drawn in ink or there is no mark, which leaves the sheet's own ink. Never red.
  */
 export const laneHue = (tone: string | null | undefined): string =>
   tone && tone !== 'ink' && /^[a-z]+$/u.test(tone) ? `;--lane-c:var(--agent-${tone}, var(--ink))` : '';

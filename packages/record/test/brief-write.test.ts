@@ -1,5 +1,5 @@
 /**
- * The model's half of the briefing (ENG-B12, `brief-write.ts`): what the model is handed, the one answer kept under a
+ * The model's half of the briefing (`brief-write.ts`): what the model is handed, the one answer kept under a
  * pref, when it is asked again (a new slot of the day, a basis that moved), the day's cap, and what is kept when the
  * model is not there to answer. Pure: a stand-in ask and a Map as the store.
  */

@@ -90,7 +90,7 @@ test('A PROJECT WITH BOTH DRAWS BOTH, AND A SHAPE KEPT FOR IT DRAWS ONLY THAT ON
   assert.deepEqual([drawn(headed(roadmap, 'The road')[0]), drawn(headed(roadmap, 'The plan')[0])], [false, true]);
 });
 
-test('TWO PROJECTS KEPT TWO WAYS DRAW TWO PLANS: Marsh its road, Ferris its roadmap (C19)', async () => {
+test('TWO PROJECTS KEPT TWO WAYS DRAW TWO PLANS: Marsh its road, Ferris its roadmap', async () => {
   const k = await seeded();
   const project = (name: string, drawn_as: string): string => {
     const made = k.create('things', { name, lane: 'building' }, PERSON);

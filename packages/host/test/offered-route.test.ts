@@ -1,5 +1,5 @@
 /**
- * `offered`, the agent door's list of resources in one read (AGT-B04): the record's method takes the caller alone,
+ * `offered`, the agent door's list of resources in one read: the record's method takes the caller alone,
  * `(ctx)`, so `handlersFor` wires it by hand, as it does `figures`, and the `routes/` loop leaves a handler written above
  * it alone. Before that the loop called it `(args, ctx)` and GET /api/offered answered 500 INTERNAL. A record built
  * before the method answers `NOT_IN_THIS_BUILD`, which is what the door falls back on.

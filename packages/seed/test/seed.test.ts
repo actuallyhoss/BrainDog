@@ -249,7 +249,7 @@ test('A SEEDED RUN CARRIES WHAT ONLY THE RECORD WRITES, and the refusal guarding
     const out = k.create('session', { doing: 'x', [field]: value }, { actor: 'p_seed' });
     assert.equal(out.ok ? 'accepted' : 'refusal' in out ? out.refusal.code : 'conflict', 'IMMUTABLE_FIELD', `${field} was taken from a caller`);
   }
-  /* last_seen ON A CREATE IS CARRIED, never taken (AGT-C10, run-carried.ts): it lands as seen_before, a day the run
+  /* last_seen ON A CREATE IS CARRIED, never taken (run-carried.ts): it lands as seen_before, a day the run
      was seen elsewhere, and the record's own last_seen stays unwritten. */
   const carried = k.create('session', { doing: 'x', last_seen: hours(0) }, { actor: 'p_seed' });
   assert.ok(carried.ok, 'a run carried in with its last day was refused');

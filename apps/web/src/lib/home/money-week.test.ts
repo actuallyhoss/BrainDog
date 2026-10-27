@@ -5,7 +5,7 @@
  * WHAT WOULD BE SILENTLY WRONG: the tile reading the Ledger's money in, which counts a transfer between her own accounts
  * and never sees a payment kept as a paid invoice ("Nothing came in" on the week she was paid); two currencies, or the
  * two figures, added into one number; a week with nothing paid saying "Paid 0"; two cells both named "In"; and a Today kept by the arrange mode's
- * first Done losing its week (B46.8).
+ * first Done losing its week.
  *
  * The tile is read off a real record (`openRecord`, Money and People installed with no example entries), each figure
  * drawn by the reader every page uses (`tileOf`), then shaped by Home (`homeDrawn`).

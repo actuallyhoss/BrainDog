@@ -309,7 +309,7 @@ export type AckDeps = {
  * `done` closes it. `failed` walks the ladder: `attempts + 1`, and a `retry` row that will put the
  * job back to `pending`. At the eighth failure the job is `dead` and a fault is raised — because a
  * notification that silently gave up is worse than one that never existed. A fault and not a question,
- * because retrying it or changing what produces it is an operator's work, never the owner's (AGT-C06).
+ * because retrying it or changing what produces it is an operator's work, never the owner's.
  */
 export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
   const row = sql.one<{ kind: string; payload: string; attempts: number; leased_until: string | null }>(
@@ -437,7 +437,7 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
         return no<null>('VALUE_MALFORMED', `Job ${args.id} came back without a question and a body kind, so there is nothing to file.`, {
           at: 'result',
         });
-      /* UNDER THE CAUSE THE JOB WAS QUEUED FOR (`ingest.ts` `patternCause`, ENG-B07), when it names one, so the question
+      /* UNDER THE CAUSE THE JOB WAS QUEUED FOR (`ingest.ts` `patternCause`), when it names one, so the question
          is the one open question of its cause and a shape asked about is found by that and not only by its samples.
          The job's own word, never the model's: a draft cannot say what it is the answer to. */
       const queued = (() => {
@@ -632,7 +632,7 @@ function finishUnawaited(sql: Sql, id: string, tried: 0 | 1): void {
 }
 
 /**
- * The end of the ladder: a fault, never a question (AGT-C06).
+ * The end of the ladder: a fault, never a question.
  *
  * "Retry it, or change what produces it" was asked of the owner in Decide, and it was never his to answer: a model with
  * no key, a mail server that refuses, a bucket that is gone are an operator's to fix, and the job comes back the next

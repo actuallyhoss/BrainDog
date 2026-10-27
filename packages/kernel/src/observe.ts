@@ -683,7 +683,7 @@ const brakeNote = (deps: AnalyseDeps, said: string): void => {
   );
 };
 
-/* ── whether Slash may file another question at all (ENG-B17) ──────────────────────────────────────────────────────── */
+/* ── whether Slash may file another question at all ──────────────────────────────────────────────────────── */
 
 /**
  * The brake as it stands: on or off, the share of the window he took up, and how many answers it was worked out from.
@@ -738,7 +738,7 @@ type Answer = { took: boolean; lapsed: boolean; at: string; seq: number };
  * HIS ANSWER, NEVER THE RECORD'S. Answered is resolved as `addressed`, `wont-fix` or `incorrect`; one withdrawn, moot,
  * asked again or still deferred was never put to him and decided, so it is in no window.
  *
- * A LAPSE IS A NO (ENG-B17, "Slash learns from being ignored"). An offer nobody answered by its `lapses` day is closed
+ * A LAPSE IS A NO ("Slash learns from being ignored"). An offer nobody answered by its `lapses` day is closed
  * by govern.ts `sweepLapsed` as `withdrawn` with `lapsedNote`, after that day; one a stronger offer took the place of
  * (`makeRoom`) or its filer took back is `withdrawn` before it, and stays out. Until the sweep runs, a lapsed offer is
  * still open with its day behind it, and that counts too, as the record's engine readings already read it (`endingOf`):

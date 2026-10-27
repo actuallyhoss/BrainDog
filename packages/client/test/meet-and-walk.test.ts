@@ -1,5 +1,5 @@
 /**
- * `meet` with the contract's input and answer (`loop/contract-17.md`), and `page` asking a forecast to walk further.
+ * `meet` with the contract's input and answer, and `page` asking a forecast to walk further.
  *
  * `fetch` is a stand-in, as in `writes.test.ts`: what is held is what goes on the wire.
  */

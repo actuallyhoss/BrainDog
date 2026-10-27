@@ -1,6 +1,6 @@
 /**
  * BRAINDOG'S OWN ADD-ONS FROM THE CATALOGUE UPDATE THEMSELVES when the update loses nothing and reaches nothing new, and
- * otherwise wait on the Updates card, never asked about at night (`packs/quiet.ts`, the add-ons pass of 27 October).
+ * otherwise wait on the Updates card, never asked about at night (`packs/quiet.ts`).
  */
 
 import { test } from 'node:test';

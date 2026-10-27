@@ -169,7 +169,7 @@
        their mail. `copy.ts` renamed the word off the inbox's own button for the same reason. */
     extract: { word: 'Read an email', icon: 'inbox' },
     propose: { word: 'Proposed', icon: 'decide' },
-    /* `Ran` AND IT WAS `Fetched` (the pass of 27 October): a rule or a script that ran is what a person reads. */
+    /* `Ran` AND IT WAS `Fetched`: a rule or a script that ran is what a person reads. */
     pull: { word: 'Ran', icon: 'refresh' },
     /* Access */
     'access.grant': { word: 'Gave access', icon: 'people' },
@@ -293,7 +293,7 @@
     const at = untrack(opened);
     void readUnseen(apiBase())
       .then((out) => {
-        /* AND THE RECORD'S OWN COUNT OF WHO, when the read carries it (`byWho`, SHL-A21): `byWhoOf` takes nothing that is
+        /* AND THE RECORD'S OWN COUNT OF WHO, when the read carries it (`byWho`): `byWhoOf` takes nothing that is
            not a count, so a read older than it is counted here as before. */
         if (out.from === 'live') unseen = { actors: out.actors, capped: out.capped, byWho: byWhoOf((out as { byWho?: unknown }).byWho), upTo: out.upTo };
       })
@@ -504,7 +504,7 @@
   const bands = $derived(dayGroups(told, clock));
 
   /**
-   * ONE PASS OF BRAINDOG'S OWN UPDATE IS ONE LINE, AND WHAT IT DID IS CLOSED AT FIRST (`passOf`, SHL-A21). A press opens
+   * ONE PASS OF BRAINDOG'S OWN UPDATE IS ONE LINE, AND WHAT IT DID IS CLOSED AT FIRST (`passOf`). A press opens
    * the steps under it and a second shuts them: unlike a run's "+9 more", the button stays, since it names the pass.
    * Kept by the pass line's key, which is its newest step's place in the log, so a page read again keeps it open.
    */
@@ -1216,7 +1216,7 @@
     white-space: nowrap;
   }
 
-  /* WHERE IT HAPPENED, AS A QUIET CHIP right after who and what (the pass of 27 October), as Recent runs and Up
+  /* WHERE IT HAPPENED, AS A QUIET CHIP right after who and what, as Recent runs and Up
      next say a project: the list a row is in, never a lone chip at the far edge. */
   .where-chip {
     flex: none;

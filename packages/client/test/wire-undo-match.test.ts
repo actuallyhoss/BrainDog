@@ -325,7 +325,7 @@ test('WITH THE HEADLINES’ SHARE OF THE MONTH SPENT THE MODEL IS NOT ASKED: the
   r.ledger.close();
 });
 
-test('A MODEL THAT WRITES THE BRIEF IS NOT ASKED FOR IT (DIRECTION §51), THROUGH THE CLIENT: ticks ask nothing and the rules cards speak', async () => {
+test('A MODEL THAT WRITES THE BRIEF IS NOT ASKED FOR IT, THROUGH THE CLIENT: ticks ask nothing and the rules cards speak', async () => {
   for (const kind of ['cards', 'down'] as const) {
     const r = await briefed(kind, true);
     await r.api.slashTick();

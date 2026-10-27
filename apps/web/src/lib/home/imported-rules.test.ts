@@ -1,5 +1,5 @@
 /**
- * Imported automations as filing rules, on Home (REC-B10, job 7): which automations are picked and which are not, the
+ * Imported automations as filing rules, on Home: which automations are picked and which are not, the
  * rules written in one capture (eight to a capture past eight), the switch-offs, the one Undo, a refusal said with its
  * field named and everything put back, and nothing drawn at nought.
  */

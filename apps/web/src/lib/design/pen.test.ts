@@ -1,6 +1,6 @@
 /**
- * The holding pen's one count (ENG-B14): the record is the one recommender, so the browser counts what the record sent
- * and adds nothing of its own. The navigation shape is never offered (C11): one sidebar and one bar for everyone.
+ * The holding pen's one count: the record is the one recommender, so the browser counts what the record sent
+ * and adds nothing of its own. The navigation shape is never offered: one sidebar and one bar for everyone.
  */
 
 import { test } from 'node:test';

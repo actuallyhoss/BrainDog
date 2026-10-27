@@ -1,5 +1,5 @@
 /**
- * A RUNNING TOTAL AND A MEASURED TREND ARE CHECKED WHEN THEY ARE INSTALLED (REC-B09).
+ * A RUNNING TOTAL AND A MEASURED TREND ARE CHECKED WHEN THEY ARE INSTALLED.
  *
  * Both shapes are read by `metrics.ts`, and both name things only the record can answer for: a running total names
  * the field it adds up and the field it walks in order of, and a trend names another figure and how many buckets

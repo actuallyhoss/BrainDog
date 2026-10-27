@@ -1,5 +1,5 @@
 /**
- * Migration 38 and what it is for: an add-on keeps the parts its plan held back (`when: { holds }`, SHL-A08).
+ * Migration 38 and what it is for: an add-on keeps the parts its plan held back (`when: { holds }`).
  *
  * A plan takes out a part that waits for something the record does not hold yet and names it in `waiting`. Before this
  * the plan was the only place that said so, and it is gone once the install lands, so nothing could plan the add-on

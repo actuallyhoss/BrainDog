@@ -120,7 +120,7 @@ export function nameFromAddress(email: string | null): string | null {
 /**
  * The `meet` call onboarding makes, or `null` when it makes none.
  *
- * FOR EVERY PERSON WHO SETS UP (USE-B06): the name they typed, else the one they answered when asked "What should I
+ * FOR EVERY PERSON WHO SETS UP: the name they typed, else the one they answered when asked "What should I
  * call you?" (`answered`), else, where the caller says so (`address`), the name in their address, so People always
  * opens on them. NONE WHEN PEOPLE IS OFF OR ABSENT: the identity the person signed in with is kernel's, not the
  * pack's, and People is never turned back on behind somebody who turned it off. None, too, where no name is found at

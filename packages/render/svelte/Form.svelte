@@ -1,5 +1,5 @@
 <!--
-  `form`: a few labelled fields and one button that adds a row to a list (PGS-A15, `src/form.ts`), drawn from the form
+  `form`: a few labelled fields and one button that adds a row to a list (`src/form.ts`), drawn from the form
   the record answered and carried on the block as `form_spec`.
 
   EVERY CONTROL HAS ITS OWN LABEL, and a required field says so with a mark AND the word, never the mark alone. The

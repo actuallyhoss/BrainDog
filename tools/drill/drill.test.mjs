@@ -1,5 +1,5 @@
 /**
- * The drill against the Cloud harness (LCH-A03): `startCloud` from `apps/worker/test/cloud-serve.ts`, the Worker's own
+ * The drill against the Cloud harness: `startCloud` from `apps/worker/test/cloud-serve.ts`, the Worker's own
  * `fetch` over a real Directory and real records, sign-up by invitation, and every letter it sends captured.
  *
  * GREEN ON THE HARNESS BEFORE IT MEETS PRODUCTION: every step passes with nothing skipped, and no line holds the address,
@@ -269,7 +269,7 @@ test('CLOSE HOLDS THE SOLE-OWNER RULE: refused with the door’s sentence while 
   assert.equal(wrong.pass, false);
 });
 
-/* ── the leak drill on a copy (sharing plan §4.5) ───────────────────────── */
+/* ── the leak drill on a copy ───────────────────────── */
 
 /** The leak matrix's record, kept as a `.brain` file the leak drill opens a copy of, with no grants of its own. */
 async function leakFile() {

@@ -259,7 +259,7 @@ export async function opsInvite(request: Request, deps: OpsApplyDeps): Promise<R
   const [code] = out.value.codes;
   if (to === null || code === undefined) return json({ ok: true, value: { links, ends_at: out.value.ends_at } }, 200);
   const left = daysOf(out.value.ends_at, deps.now());
-  /* THE LETTER GREETS THE NAME THEY APPLIED WITH (the audit of 22 October, U-C16), and "Hi there" only without one. */
+  /* THE LETTER GREETS THE NAME THEY APPLIED WITH, and "Hi there" only without one. */
   const name = (await deps.applications({ flow: 'apply.list' })).find((row) => row.email === to && row.state === 'waiting')?.name;
   const mailed = await deps.mail(to, {
     link: linkOf(deps.origin, code),

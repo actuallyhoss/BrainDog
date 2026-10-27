@@ -602,7 +602,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
          it on every visit (`lib/data/offline.ts`), and from the first reload on the worker makes the request, which
          `page.route` never sees: `arrivals` handed the Inbox two rows and the Inbox drew the record's empty one, so
          every inbox key was pressed on an empty state and read as dead. No key here is about the worker. */
-      /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): the record's clock, the widest width `a11y` audits. */
+      /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (`openPage`): the record's clock, the widest width `a11y` audits. */
       const runs = recipe.runs ?? [recipe];
       /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=keys` swallows every `y` in
          the capture phase before any handler sees it, which is exactly what a binding that was never

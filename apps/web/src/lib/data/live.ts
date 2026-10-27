@@ -205,7 +205,7 @@ export function newerBuild(own: string, heard: unknown, tried: string | null): s
 /* ── access: a share changed, or ended ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * Whether the version poll heard the access epoch move (sharing plan §2.8): `known` is the epoch the shell booted with,
+ * Whether the version poll heard the access epoch move: `known` is the epoch the shell booted with,
  * `heard` the one `version` answered, each absent for somebody no share let in. A move means the tab boots again onto
  * what the person holds now, since what they could read a moment ago may not be theirs to read.
  */

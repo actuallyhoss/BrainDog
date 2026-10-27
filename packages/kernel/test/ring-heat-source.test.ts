@@ -102,7 +102,7 @@ const wholeOf = (b: Answered): Whole => {
 };
 
 test('AND A HEAT PAST 200 ROWS IS ADDED UP WHOLE, a day a part, where it was refused at its 201st row', async () => {
-  /* 201 WAS THE FIRST COUNT PAST THE 200 A BLOCK THAT ADDS UP READ, and the block answered `OUT_OF_BOUNDS` (PGS-B05). */
+  /* 201 WAS THE FIRST COUNT PAST THE 200 A BLOCK THAT ADDS UP READ, and the block answered `OUT_OF_BOUNDS`. */
   const { k, sql } = await record(
     pageOf(HEAT),
     Array.from({ length: 201 }, (_, n) => ({ what: `Row ${n}`, on: day(-(n % 67)), hours: 1, state: 'done' })),

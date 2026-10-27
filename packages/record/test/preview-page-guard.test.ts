@@ -332,7 +332,7 @@ test('THE BYTES OF THE ANSWER ARE BOUNDED TOO, for rows few enough to pass the r
 
 test('A PREVIEW WALKS NO FURTHER THAN ITS CEILING WHATEVER LENGTHS THE KNOB OFFERS, and Money\'s Cash ahead is still drawn', async () => {
   /* THE KERNEL WALKED TO THE LONGEST OF `horizons:` (`walkReach`), so a body opening on 30 days and offering 3,650 or
-     `last` walked that far under a guard that read 30 (`loop/research-audit-11-13.md` item 1). Refusing the block for
+     `last` walked that far under a guard that read 30. Refusing the block for
      what it offers refused Money's own Cash ahead, which opens on 90 and offers two years, in every preview of Money. The
      lengths past the ceiling are left off the drawn block instead, so the walk is cut and the block still drawn. */
   const { sql, preview } = await record(5);

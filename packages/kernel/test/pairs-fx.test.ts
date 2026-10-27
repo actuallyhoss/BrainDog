@@ -10,7 +10,7 @@
  * THE SIDE A MISTAKE FALLS ON IS THE COUNTED ONE. No rate for the day, a rate too old to be the day's, a third leg as
  * near, a pending row that may be the real leg: each leaves both rows counted.
  *
- * AND A NEAR MATCH IS NOT PROOF (audit of batch 61, claim 2). Within 2% at the day's rate, two unrelated rows paired
+ * AND A NEAR MATCH IS NOT PROOF (claim 2). Within 2% at the day's rate, two unrelated rows paired
  * in silence. So the pair is made only on a rate no more than two days old AND where each row is the other's one
  * candidate; anything else is a question for a person (`crossAsks`), with the rate's age in it, and their answer
  * comes back as `Pairing.ruled`.
@@ -455,7 +455,7 @@ test('A RATE OLDER THAN TWO DAYS IS A QUESTION WITH ITS AGE IN IT: two days pair
   sql.close();
 });
 
-/* ─────────────── where a person is asked (`Pairing.asks`): the audit of batch 63, claim 3 ─────────────── */
+/* ─────────────── where a person is asked (`Pairing.asks`) ─────────────── */
 
 /** The pairing of a caller that puts `crossAsks` to a person, as the kernel will build it once it does. */
 const asking = (sql: NodeSql, ruled?: ReadonlyMap<string, boolean>): Pairing => ({ ...pairingOf(sql, ruled), asks: true });

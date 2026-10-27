@@ -211,7 +211,7 @@ test('WITH NO ACCOUNT the reading says the one sentence, and the page draws noth
 });
 
 /**
- * AN ACCOUNT THAT IS NOT CASH HAS A BALANCE, AND THE CHECK SAID NONE HAD BEEN TYPED (audit 54, item 7; audit 57, claim 6).
+ * AN ACCOUNT THAT IS NOT CASH HAS A BALANCE, AND THE CHECK SAID NONE HAD BEEN TYPED.
  * One sentence is true of both days, so the reading says the same words before the account and after it, and nothing
  * has to tell the two apart.
  */

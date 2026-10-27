@@ -2,7 +2,7 @@
  * The kinds of block a page draws, as an agent is handed them (`packages/record/src/grammar.ts`, `kinds` and `kind/<name>`).
  *
  * THE GRAMMAR LISTED THE KINDS BY NAME AND NOTHING MORE, so what a kind is for, its cells and its forms reached no agent
- * and `spec`, the block a page reaches for most, was the workhorse in a code comment only (PGS-A08). The short form is
+ * and `spec`, the block a page reaches for most, was the workhorse in a code comment only. The short form is
  * every kind with its line and is read in a turn, so it is held at or under 8 KB; the long form is one kind whole.
  */
 

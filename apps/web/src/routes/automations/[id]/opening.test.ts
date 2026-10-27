@@ -1,5 +1,5 @@
 /**
- * An automation's page says it is drawn only once it is (audit B of 25 October, Y15).
+ * An automation's page says it is drawn only once it is.
  *
  * MEASURED BEFORE THIS: at 390 dark the look caught the page blank but for the tab bar, marked ready at 0.8 s. The page
  * opened its one call, closed it when the list of automations came back, and only then asked for the automation itself.

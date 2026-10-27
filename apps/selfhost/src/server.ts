@@ -44,7 +44,7 @@ import {
   type MailNotice,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
-/* The oldest command this door still works with (AGT-A02), one day for both hosts, answered at the build address. */
+/* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
 import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
@@ -242,7 +242,7 @@ const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach t
 /** What a person an owner has stopped reads at the session door, the Worker's words exactly (`MEMBER_STOPPED`). */
 const STOPPED: Refusal = { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' };
 
-/** What a guest whose last share ended reads at the session door (sharing plan §2.8), the Worker's words exactly. */
+/** What a guest whose last share ended reads at the session door, the Worker's words exactly. */
 const endedOf = (ended: { owner: string | null } | null): Refusal | null => (ended === null ? null : { code: 'FORBIDDEN', fix: accessEndedSaid(ended.owner), at: ACCESS_ENDED_AT });
 
 /**
@@ -329,7 +329,7 @@ type Site = {
   door: Omit<AuthDoor, 'ip'>;
   /** The key doors: a keychain grant's bearer, an agent's login token at the deposit door, and this process's key store when it has one. */
   keychain: KeychainDoor<CallContext>;
-  /** The shape door (PRF-A13): a shape grant's bearer, and the record's scrambled copy. */
+  /** The shape door: a shape grant's bearer, and the record's scrambled copy. */
   shape: ShapeDoor;
   /** The app's own key doors: a browser session on one of this host's origins, and the same key store. */
   keys: KeysDoor<CallContext>;
@@ -472,7 +472,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
   if (!sent.includes('.')) return UNKNOWN();
   /* A TOKEN MADE BEFORE THE OPERATOR'S CUT-OFF IS NOT ONE THIS RECORD KNOWS, in the same sentence, and at an operation
      door it falls to `operationFor`, which holds a grant to the same instant. */
-  /* `cli` IS THE COMMAND'S BUILD (`x-braindog-cli`, AGT-A02), kept on the token row in the same write as its last use, so
+  /* `cli` IS THE COMMAND'S BUILD (`x-braindog-cli`), kept on the token row in the same write as its last use, so
      the record can say which build each key runs. The kernel drops anything that is not a build, so the header is
      handed on as sent. */
   const seen = await api.kernel.verifyToken(sent, surface, validFrom(), cli);
@@ -622,7 +622,7 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
     /* AND A COOKIE WRITE MUST COME FROM A PAGE ON THIS ORIGIN (`12 §8` CSRF). `SameSite=Lax` keeps the
        cookie off a cross-site POST; this is the half that does not depend on the browser. */
     if (!SAFE.has(request.method) && !sameOrigin(request, site.origin)) return { refused: CROSS, ...carried };
-    /* SEE AS SOMEBODY (sharing plan §3.3): an owner's or an Admin's cookie, never as an owner, read-only. */
+    /* SEE AS SOMEBODY: an owner's or an Admin's cookie, never as an owner, read-only. */
     const as = await seeAs(request.headers.get(SEE_AS_HEADER), out.body, held, (person) => api.kernel.access(person));
     if (as !== null && 'refusal' in as) return { refused: as.refusal, ...carried };
     return { ctx: as === null ? sessionContext(out.body, held) : (as.ctx as CallContext), ...carried };
@@ -973,7 +973,7 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
         ...(arrival.ingest === undefined ? {} : { ingest: arrival.ingest }),
       }),
     limit: async (ask) => spend(`${ask.channel}:${ask.key}`),
-    /* A DOOR SWITCHED OFF ANSWERS 410 AND STORES NOTHING (SHL-C13); the record counts the arrival it turned away. */
+    /* A DOOR SWITCHED OFF ANSWERS 410 AND STORES NOTHING; the record counts the arrival it turned away. */
     turnedAway: async (ask) => {
       if (ask.ingest !== undefined) api.doorTurnedAway({ ingest: ask.ingest });
     },
@@ -1094,7 +1094,7 @@ export async function start(options: {
    * this value has to be is the value this server was started with.
    */
   build?: string | undefined;
-  /** Take a shape copy on import (`--allow-shape`, PRF-A13). Absent is no: a shape copy is refused IMPORT_SHAPE. */
+  /** Take a shape copy on import (`--allow-shape`). Absent is no: a shape copy is refused IMPORT_SHAPE. */
   allowShape?: boolean | undefined;
   /**
    * A PINNED INSTANT, FOR A RECORD THAT IS A FIXTURE.
@@ -1365,7 +1365,7 @@ export async function start(options: {
         throw e;
       })),
     model: 'glm-5.3-flash',
-    /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09), read each time a background ask is about to be held. */
+    /* HIS SWITCH FOR SLASH READING ON ITS OWN, read each time a background ask is about to be held. */
     reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
   });
   /* AND WHAT ANSWERS THE RECORD'S MODEL JOBS, a pattern's draft and a digest's prose, from the same config and the same
@@ -1374,7 +1374,7 @@ export async function start(options: {
      `UNDERSTAND_ASK`. `undefined` with no model, and then the jobs wait `pending`, as they always have here. */
   const modelJobs = slashModelJobs(slashConfig, () => api, options.keys, { sql: slashSql, clock }, slashMeter);
   const jobsMeter = backgroundMeter(slashSql);
-  /* WHETHER SLASH'S MODEL ANSWERS, read from the same Slash SQLite every model call settles in (ENG-A02): the record's
+  /* WHETHER SLASH'S MODEL ANSWERS, read from the same Slash SQLite every model call settles in: the record's
      `engineHealth` and `GET /api/slash/health` both ask this one read, as the Worker's do. */
   const engineHealth = engineHealthRead({
     sql: slashSql,
@@ -1383,7 +1383,7 @@ export async function start(options: {
     load: () => import('@braindog/slash'),
     grants: () => api.kernel.grants(),
   });
-  /* AND THE PROBE (ENG-A08), as the Worker hands it: each candidate of this host's route asked on the adapter its asks
+  /* AND THE PROBE, as the Worker hands it: each candidate of this host's route asked on the adapter its asks
      use, settling in the same Slash SQLite, the package loaded on the press only, held to his switch for Slash reading. */
   const probeWire = selfhostProbeWire(slashConfig, () => api, options.keys);
   const engineProbe = engineProbeOf({
@@ -1398,7 +1398,7 @@ export async function start(options: {
     complete: probeWireOf(probeWire),
     reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
   });
-  /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01), as the Worker hands it: the same Slash
+  /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings`, as the Worker hands it: the same Slash
      SQLite, so the calls it counts are the ones the health above was read from, beside the questions still open, each
      by its cause. Handed whether or not a model is set, since the open questions are the record's own. The mentions are
      the record's own, each attached or not, read from the record's SQLite and never Slash's. */
@@ -1592,9 +1592,9 @@ export async function start(options: {
           store: slashSql,
           /* WHETHER SLASH'S MODEL ANSWERS: while it does not, the jobs wait with their attempts kept (`model-jobs.ts`). */
           health: engineHealth,
-          /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09): off, nothing is leased and no model is asked or tested. */
+          /* HIS SWITCH FOR SLASH READING ON ITS OWN: off, nothing is leased and no model is asked or tested. */
           reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
-          /* THE KERNEL'S GOVERNOR (ENG-B17): a pattern draft is held, never filed, while the floor or the brake says no. */
+          /* THE KERNEL'S GOVERNOR: a pattern draft is held, never filed, while the floor or the brake says no. */
           mayPropose: (at) => mayPropose(sql, at),
           log: (line) => console.error('slash jobs:', line),
         });
@@ -1753,7 +1753,7 @@ export async function start(options: {
     /* SLASH'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     slashModel,
     slashMeter,
-    /* A SEARCH'S OWN WORDS AS A VECTOR (ENG-B18), only where the endpoint embeds, his switch for Slash reading is on and the
+    /* A SEARCH'S OWN WORDS AS A VECTOR, only where the endpoint embeds, his switch for Slash reading is on and the
        month's background allowance has room; never on the ask ceiling. Absent where nothing embeds, and search is by words. */
     meaning: queryVector({ embed: modelJobs?.embed, meter: jobsMeter, now: () => clock.now(), reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false }),
     engineHealth,
@@ -1841,7 +1841,7 @@ export async function start(options: {
     }
     await lint();
   };
-  /* AND THE RECORD LINTS ITS OWN PAGES ONCE A DAY on the same ticker (PRF-A04), not on every hour's ask: a round draws
+  /* AND THE RECORD LINTS ITS OWN PAGES ONCE A DAY on the same ticker, not on every hour's ask: a round draws
      every page, so the day is held here as well as in the record and the hours between ask nothing of it. */
   let lintedOn = '';
   const lint = async (): Promise<void> => {

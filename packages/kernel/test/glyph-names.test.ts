@@ -1,5 +1,5 @@
 /**
- * An `icon:` that names no glyph is answered with the three nearest (PGS-A19), so `icon: rokcet` is told `rocket`
+ * An `icon:` that names no glyph is answered with the three nearest, so `icon: rokcet` is told `rocket`
  * rather than installing and drawing an empty well.
  */
 

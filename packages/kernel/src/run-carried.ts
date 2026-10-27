@@ -1,5 +1,5 @@
 /**
- * A run carried in from somewhere else keeps the day it was last seen there (AGT-C10).
+ * A run carried in from somewhere else keeps the day it was last seen there.
  *
  * THE KERNEL OWNS `last_seen`, and refused it from every caller (`KERNEL_WRITTEN`, `IMMUTABLE_FIELD`), so an adapter
  * that sent the old system's time lost the whole run, and one that left it out gave every run the import's day. On the

@@ -28,7 +28,7 @@ export type Person = {
 
 export const forPages = {
   person: {
-    /* The name a screen reader hears on the link to the other page (site F13, 2b): only the link is drawn. */
+    /* The name a screen reader hears on the link to the other page (2b): only the link is drawn. */
     others: 'Written for someone else',
 
     who: {
@@ -141,7 +141,7 @@ export const forPages = {
           "Give each client a project. Everyone sees what's next and what's waiting, and every change says who made it.",
         tag: 'For teams and agencies',
         said: "We run projects for clients. What's open, who has it, and what's late?",
-        /* "Colleagues are free" is dropped until early access says who may invite (D3). Every change keeps who made it: docs/20. */
+        /* "Colleagues are free" is dropped until early access says who may invite. Every change keeps who made it: docs/20. */
         sub: "Give each client a project. Everyone sees what's next and what's waiting, and every change says who made it.",
         rows: [
           {

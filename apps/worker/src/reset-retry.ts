@@ -1,5 +1,5 @@
 /**
- * ONE MORE TRY WHEN THE RECORD'S OBJECT WAS RESET UNDER A CALL (the audit of 25 October, Z38).
+ * ONE MORE TRY WHEN THE RECORD'S OBJECT WAS RESET UNDER A CALL.
  *
  * WHAT WAS SEEN: twenty errors in one second at 13:19:45Z on 24 October, `/api/pulse` and the Directory's calls, each
  * "Connection closed: this Durable Object instance is no longer active. Reconnect or retry the request." The platform

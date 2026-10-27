@@ -1,6 +1,5 @@
 /**
- * `project-worked:<project>`, when a project was last worked on, its tasks and its runs read together (the audit of 25
- * October, Z7).
+ * `project-worked:<project>`, when a project was last worked on, its tasks and its runs read together.
  *
  * WHAT WAS MEASURED BEFORE IT: Projects said "Worked on 4 days ago" of a project whose run had been heard from twenty
  * minutes before, while Today said "Claude worked on it 20 minutes ago" of the same one, because Projects read Work's

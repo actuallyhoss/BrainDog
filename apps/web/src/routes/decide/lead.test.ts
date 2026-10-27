@@ -102,7 +102,7 @@ test('a share is the pair the question’s body gives as data, and a sentence ne
   assert.equal(evidenceIn({ evidence: [41, 58] }), null);
   assert.equal(evidenceIn(undefined), null);
 
-  /* THE WORDS OF AN AGENT ARE NEVER EVIDENCE (audit 31-32, finding 5): "2 of 5 steps" in a reason drew a waffle. A body
+  /* THE WORDS OF AN AGENT ARE NEVER EVIDENCE: "2 of 5 steps" in a reason drew a waffle. A body
      that holds the pair only in an option's reason draws nothing. */
   assert.equal(evidenceIn({ options: [{ id: 'accept', because: '2 of 5 steps are done.' }] }), null);
 });
@@ -120,7 +120,7 @@ test('the declared page says the same sentence from a count, how many are hard t
   assert.deepEqual(sentenceOf(waiting, { options: [{ key: 'a', title: 'Per seat', body: '', recommended: true }] } as never, '', NOW), countSentence(2, 1, 'Per seat'));
 });
 
-/* WHAT IS HARD TO UNDO IS A COUNT, NEVER A PLACE (audit 60, claim 3): the queue ranks by how long a question has
+/* WHAT IS HARD TO UNDO IS A COUNT, NEVER A PLACE: the queue ranks by how long a question has
    waited before its band, so the hard one may be the fifth. "The first one is hard to undo." said it was the first. */
 test('the hard-to-undo clause names no place in the queue, whatever the counts', () => {
   for (let n = 1; n <= 12; n += 1)

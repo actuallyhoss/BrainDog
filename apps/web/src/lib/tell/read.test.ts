@@ -277,7 +277,7 @@ test("AN AMOUNT SAID BESIDE AN ORDER WITH NO PAYMENT IS WHAT IT COMES TO (uc6-wa
   }
 });
 
-/* A STRANGER'S FIRST REAL THING (audit C, X8): it was "EGP 1,200.00 in / into Bills and invoices", with no Lina, and the
+/* A STRANGER'S FIRST REAL THING: it was "EGP 1,200.00 in / into Bills and invoices", with no Lina, and the
    order left as "Not placed". "N things for X" is an order from X, and "she paid" after it is X paying for it. */
 test('"14 MUGS FOR LINA, SHE PAID 1200" IS ONE ORDER FROM LINA, paid, on the day the clause names', () => {
   const { rows, left } = tellRead('Firing on Thursday: 14 mugs for Lina, she paid 1200 already', fresh);

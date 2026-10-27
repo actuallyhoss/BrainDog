@@ -1,5 +1,5 @@
 <!--
-  The Share sheet (sharing plan §3.1): share a project, a list, the rows a view shows, or one row, with somebody here,
+  The Share sheet: share a project, a list, the rows a view shows, or one row, with somebody here,
   a group or an email, in one sheet sized for a phone. A bottom sheet under a thumb and a drawer at the window's end
   edge from 900 up, as every `Sheet.svelte` is.
 

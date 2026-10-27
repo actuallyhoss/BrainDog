@@ -1,7 +1,6 @@
 /**
  * The kept lane, as one command: a fresh founder signs up, each kept add-on is installed from the catalogue, fed from
- * the lane's stand-in, given one schedule turn, and read back; then the record is deleted (SHL-A19 jobs 1 to 4,
- * `loop/scope/area-shell-a.md:996-1044`).
+ * the lane's stand-in, given one schedule turn, and read back; then the record is deleted.
  *
  *   node tools/kept/run.mjs --host <origin> [--only a,b]
  *

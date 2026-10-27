@@ -5,7 +5,7 @@
   ONE TILE, HEADED BY WHAT THE RECORD WILL BE CALLED (`Proposal.title`, "Mariam's Candles"), or "Your BrainDog" before a
   name is heard. Under it the places it will have, Today first, each with its own glyph (`placeIcon`) and empty: the
   only things drawn in a place are the entries the person's own sentence filled. No count, no bar, no "N of M", and no
-  part that is off: a part left off is not a step behind (USE-B07). What each phrase became is said beside the words, on
+  part that is off: a part left off is not a step behind. What each phrase became is said beside the words, on
   the sign-up page itself, so it is not said twice here.
 
   NOT A LIVE REGION WHILE TYPING, or a screen reader would be told on every key: the places are a plain list, read when
@@ -13,7 +13,7 @@
 
   WHAT JUST CAME ON takes the arrival tint for a second and a half, as on /start.
 
-  WHO READ IT IS SAID UNDER THE PLACES (`readBy`, USE-B05): where the reading is the rules', for any cause (no model on
+  WHO READ IT IS SAID UNDER THE PLACES (`readBy`): where the reading is the rules', for any cause (no model on
   this host, no press yet, a refusal, a silence), one quiet line says so, and where the month's asks are spent it says
   that instead (`firstRun.readByRules`). A model's reading says nothing more, and neither does a screen with no reading.
 

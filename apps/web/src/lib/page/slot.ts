@@ -7,8 +7,7 @@
  * a question about this very page or the row it is about (a project's page and a question about that project), and
  * after it what BrainDog asked itself, a rule (`rule:<id>`) or Slash. Each in the record's own ranking
  * (`governance.open` is read ranked). NEVER A BORROWED ONE: the first of Needs you used to fill the slot when nothing
- * else did, so one question about Portage's mail headed Today, Work, Money, People and Settings alike (the audit of 22
- * October). A question that is about nothing on the page waits in Needs you, where it is asked.
+ * else did, so one question about Portage's mail headed Today, Work, Money, People and Settings alike. A question that is about nothing on the page waits in Needs you, where it is asked.
  *
  * AND NOWHERE IT IS NOT A PLACE TO DECIDE (`slotPlace`): Settings, a person, a skill, a run, Health and Calendar draw no
  * slot at all.

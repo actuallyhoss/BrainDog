@@ -166,7 +166,7 @@ test('MEETING SOMEONE MOVES THEIR LAST IN TOUCH TO TODAY, so the page stays curr
   assert.equal(listed.value.rows.find((r) => r.fields.name === quiet.name)?.fields.in_touch, on(0));
 });
 
-/* ── People 3.0.0: organisations, keys and evidence (`loop/contract-17.md`) ─────────────────────────────────────── */
+/* ── People 3.0.0: organisations, keys and evidence ─────────────────────────────────────── */
 
 test('ORGANISATIONS ARE PEOPLE\'S LIST, declared as the one `meet` writes a company into, and a person names theirs', () => {
   const orgs = REGISTERS.organisations as unknown as Record<string, unknown> & { fields: { id: string; values?: string[]; to?: string }[] };
@@ -195,8 +195,8 @@ test('MAIL NOBODY CLAIMED MAKES NOBODY: its sender is kept as a name and where, 
   const said = JSON.stringify(senders.steps);
   assert.ok(said.includes('{{trigger.body.from_name}}'));
   assert.ok(!said.includes('{{trigger.body.from}}'), 'the raw header is passed as an email again');
-  /* THE ADDRESS REACHES `meet` ONLY UNDER `only: 'known'`, so nothing a stranger writes makes a person or joins one
-     (audit 17, H1): the kernel writes a person only for an address it already knows. */
+  /* THE ADDRESS REACHES `meet` ONLY UNDER `only: 'known'`, so nothing a stranger writes makes a person or joins one:
+    the kernel writes a person only for an address it already knows. */
   const branch = senders.steps.find((s) => 'if' in s) as { if: { none: { field: string; contains?: string; empty?: boolean }[] }; then: { meet: Record<string, string> }[]; else?: unknown };
   assert.ok(branch.if.none.some((c) => c.contains === 'noreply'), 'a no-reply sender is noted');
   assert.ok(branch.if.none.some((c) => c.empty === true), 'a mail with no address is noted');
@@ -205,7 +205,7 @@ test('MAIL NOBODY CLAIMED MAKES NOBODY: its sender is kept as a name and where, 
   assert.deepEqual(Object.keys(noted).sort(), ['email', 'name', 'only', 'source', 'where']);
   assert.equal(noted.only, 'known', 'a stranger\'s address is met as a person');
   assert.equal(noted.email, '{{trigger.body.from_address}}');
-  /* WHERE IS THE DOMAIN, NEVER THE SUBJECT (audit 17, M2). */
+  /* WHERE IS THE DOMAIN, NEVER THE SUBJECT. */
   for (const rule of AUTOMATIONS.filter((a) => String(a.rule).startsWith('meet-sender')))
     assert.ok(!JSON.stringify(rule).includes('subject'), `${String(rule.rule)} writes a mail's subject into the record`);
   assert.equal(noted.where, 'mail from {{trigger.body.from_domain}}');
@@ -215,7 +215,7 @@ test('MAIL NOBODY CLAIMED MAKES NOBODY: its sender is kept as a name and where, 
   const guard = claimed.steps.find((s) => 'if' in s) as { if: Predicate; then: { meet: Record<string, string> }[] };
   assert.equal(guard.then[0]!.meet.kind, 'organisation');
   assert.equal(guard.then[0]!.meet.domain, '{{trigger.body.from_domain}}');
-  /* NEVER AN ORGANISATION NAMED AFTER A DISPLAY NAME ON A PUBLIC HOST (audit 17, M4), read with the grammar the rule is. */
+  /* NEVER AN ORGANISATION NAMED AFTER A DISPLAY NAME ON A PUBLIC HOST, read with the grammar the rule is. */
   const named = (domain: string) => evaluate(guard.if, { domain }, { register: 'vars', fields: { domain: { type: 'text' } } } as Schema);
   for (const host of ['gmail.com', 'yahoo.com.eg', 'hotmail.fr', 'outlook.co.uk', 'btinternet.com', 'mail.ru', 'icloud.com', ''])
     assert.equal(named(host), false, `${host || 'a mail with no address'} names an organisation after its sender`);

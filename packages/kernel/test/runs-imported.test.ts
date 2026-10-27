@@ -1,5 +1,5 @@
 /**
- * A run carried in keeps the day it was last seen there (AGT-C10), through the kernel's own write path.
+ * A run carried in keeps the day it was last seen there, through the kernel's own write path.
  *
  * MEASURED BEFORE: the write path refused `last_seen` from every caller (`IMMUTABLE_FIELD`), so an adapter that sent
  * the old system's time lost the run, and one that left it out gave all 295 imported runs on the owner's record the

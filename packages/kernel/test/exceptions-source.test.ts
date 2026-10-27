@@ -1,5 +1,5 @@
 /**
- * `exceptions` as a source a page names (ENG-B13, `src/sources/exceptions.ts`): what went quiet on a record, drawn as an
+ * `exceptions` as a source a page names (`src/sources/exceptions.ts`): what went quiet on a record, drawn as an
  * ordinary block. One row a thing that stopped, with what a person calls it, the day it was last there and what it was
  * doing before, in words. A record with nothing quiet draws the block empty and is not refused. It belongs to no list,
  * so a block over it is named as a read of the whole record and only a reader of the whole record is shown it.

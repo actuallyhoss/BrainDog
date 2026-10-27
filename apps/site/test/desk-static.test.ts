@@ -1,7 +1,7 @@
 /**
  * THE HERO'S LIVE DESK (`src/lib/desk/`), as a reader with scripting off receives it, and the shared asks it moves.
  *
- * ALL FIVE PLACES ARE IN THE HTML (site F5, 20 October). The desk is a real tablist over five panels, and only the
+ * ALL FIVE PLACES ARE IN THE HTML (20 October). The desk is a real tablist over five panels, and only the
  * chosen one shows once the script runs; with scripting off a <noscript> rule lays all five out one under another. So
  * the served page must hold the tablist with its five names, five panels, Today's line as plain words, and
  * that rule. No <img>: every band is the product's own parts, never a picture of them (§23, §47).

@@ -1,6 +1,6 @@
 /**
  * `COST_SQL` is `costOf` said in SQL, so a queue counts and ranks every open question without reading a body into the
- * process (audit 16, M5). The two must give one band for every body, or a count beside the queue would disagree with
+ * process. The two must give one band for every body, or a count beside the queue would disagree with
  * the order it is drawn in.
  */
 
@@ -70,7 +70,7 @@ test('COST_SQL GIVES costOf’S BAND FOR EVERY BODY, a body that is not an objec
   sql.close();
 });
 
-/* ── WAIT_SQL is waitOf said in SQL (AGT-C08) ── */
+/* ── WAIT_SQL is waitOf said in SQL ── */
 
 const NOW = Date.UTC(2026, 9, 9, 9);
 const FRESH = new Date(NOW - 3_600_000).toISOString();

@@ -290,7 +290,7 @@ export function partsOf(p: PartsIn): Part[] {
  * THE BUILD, AS IT IS DRAWN: only the parts that are on, in the order they were heard. A part a phrase turned on stands
  * where its first phrase does; one that is on for another reason (a use case needs it, or the person turned it on)
  * comes after, in the order it was offered. A part left off is not here at all, so nothing reads as a step not yet
- * taken, and nothing totals them (USE-B07).
+ * taken, and nothing totals them.
  */
 export function stepsOf(parts: readonly Part[]): Part[] {
   const on = parts.filter((p) => p.on);
@@ -615,7 +615,7 @@ export function browserCurrencyEnv(locale: string, languages: readonly string[],
 /* ── the passkey, straight after the link ─────────────────────────────── */
 
 /**
- * WHAT THIS DEVICE IS CALLED, as the passkey is named (`platformLabel` in `lib/auth.ts`, LCH-A04): "this iPhone", "this
+ * WHAT THIS DEVICE IS CALLED, as the passkey is named (`platformLabel` in `lib/auth.ts`): "this iPhone", "this
  * Mac", or Windows Hello by its own name. A device the label cannot tell is "this device".
  */
 export function deviceWord(label: string): { name: string; it: string } {

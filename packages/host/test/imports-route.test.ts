@@ -1,5 +1,5 @@
 /**
- * `imports` and `importAdopt` (ENG-A13): one READ+ read that writes nothing and takes nothing, and one ADMIN write, the
+ * `imports` and `importAdopt`: one READ+ read that writes nothing and takes nothing, and one ADMIN write, the
  * owner's press, each with a sentence a person reads. The rows are asked of `routes/imports.ts` itself, so they hold
  * before the integrator spreads them into `routes/index.ts`; once spread, each is routed once and the counts move by one
  * READ+ and one ADMIN and nothing else.

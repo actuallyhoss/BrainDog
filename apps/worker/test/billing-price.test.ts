@@ -63,7 +63,7 @@ const refusal = (r: Result<unknown>): Refusal => {
 
 const CENTS = PLAN_TABLE.hosted.cents.month;
 
-/** What Stripe says of a price sold every month (audit 43-44 #6): the fields the check now reads beside the amount. */
+/** What Stripe says of a price sold every month: the fields the check now reads beside the amount. */
 const MONTHLY = { recurring: { interval: 'month', interval_count: 1 }, active: true };
 
 test('A STRIPE PRICE THAT IS THE TABLE’S OPENS THE PAYMENT PAGE', async () => {

@@ -215,7 +215,7 @@ export function refsIn(note: string): string[] {
 }
 
 /**
- * QUESTIONS BY THEIR WORDS, NEVER THEIR HANDLES (the audit of 25 October, Z24): a run's notes said "SG242 overlaps
+ * QUESTIONS BY THEIR WORDS, NEVER THEIR HANDLES: a run's notes said "SG242 overlaps
  * SG286/SG287" and "SG262, SG263, SG278, SG280-SG284". One handle is its question's words in quotes, cut, or "a
  * question" where they could not be read; handles side by side are counted, "2 questions".
  */
@@ -269,7 +269,7 @@ function whoLines(row: RunRow, parts: RunParts): string[] {
   const who = runWho(row.fields) ?? talkWords.anAgent;
   const repo = repoName(row.fields.repo);
   const branch = branchName(row.fields.branch);
-  /* THE PROJECT BY ITS NAME WHERE THE PAGE READ IT, before the repository's folder name (the audit of 25 October, Z23:
+  /* THE PROJECT BY ITS NAME WHERE THE PAGE READ IT, before the repository's folder name (Z23:
      "in braindog on master" for a run on BrainDog). */
   const where = text(parts.project) || repo;
   const place = where !== '' ? (branch !== '' && repo !== '' ? talkWords.onBranch(where, branch) : where) : '';
@@ -398,7 +398,7 @@ async function wordsOf(client: Client, rows: readonly Bag[]): Promise<(r: Bag) =
 }
 
 
-/** The questions the notes name one by one, by their words (Z24), at most `NAMED_MOST` of them. */
+/** The questions the notes name one by one, by their words, at most `NAMED_MOST` of them. */
 export async function readQuestionWords(client: Client, notes: readonly string[]): Promise<Map<string, string> | undefined> {
   return quietly(async () => {
     const named = [...new Set(notes.flatMap(refsIn))].slice(0, NAMED_MOST);

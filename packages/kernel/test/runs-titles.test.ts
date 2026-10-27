@@ -90,7 +90,7 @@ test('ELSE ITS FIRST PROPOSAL’S TITLE: it names a run the record had named, an
   const before = k.get('S1')!;
 
   clock.advance(MIN);
-  /* BY THE TITLE THE AGENT GAVE IT, never the question's own words (audit M7). */
+  /* BY THE TITLE THE AGENT GAVE IT, never the question's own words. */
   value(k.propose({ ...options, question: 'Keep the address field on invoices?', title: 'Keep the address field on invoices?' }, as({ client_id: 'cc-1' })));
   assert.equal(doing(k, 'S1'), 'Keep the address field on invoices?');
   assert.deepEqual([k.get('S1')!.version, lines(sql, before.id)], [before.version, 1], 'naming the run was an edit with a line of its own');
@@ -173,7 +173,7 @@ test('THE OLD NAMES ARE THE RECORD’S TOO: "Claude run, 2 Oct", "Kiln, 2 Oct" i
 
   const run = (doingSaid: string, more: Record<string, string> = {}) => ({ fields: { doing: doingSaid, ...more }, created_at: '2026-10-01T21:47:40.000Z' });
   assert.deepEqual(recordNamed(run('Claude run, 1 Oct')), { name: 'Claude' });
-  /* A place must be the run's project, its repository or a known project (M2), so the name is read with it. */
+  /* A place must be the run's project, its repository or a known project, so the name is read with it. */
   assert.deepEqual(recordNamed(run('Claude Code in BrainDog'), 'BrainDog'), { name: 'Claude Code' });
   assert.deepEqual(recordNamed(run('Agent run')), { name: null });
   assert.deepEqual(recordNamed(run('Lanternly, 1 Oct'), 'Lanternly'), { name: null });

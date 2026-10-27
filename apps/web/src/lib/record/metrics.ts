@@ -61,7 +61,7 @@ export type Value =
   | Aggregation
   | { ratio: { of: Aggregation; per: Aggregation } }
   /**
-   * `before` IS THE WINDOW THE SECOND HALF IS READ FROM (REC-B19), one of the record's three words (`BEFORE`): the same
+   * `before` IS THE WINDOW THE SECOND HALF IS READ FROM, one of the record's three words (`BEFORE`): the same
    * `where` at the clock moved back, ended at that clock's day. Without it both halves read the same entries.
    */
   | { diff: { of: Aggregation; per: Aggregation; before?: Before | undefined } };
@@ -171,7 +171,7 @@ export type Reading = {
   /** How a figure across currencies was read, as the record's `fx` says it. */
   fx?: FxRead;
   /**
-   * A sum that converted what it could (REC-B05), as the record's `atLeast` and `noRate` say it: `parts[0]` is the least
+   * A sum that converted what it could, as the record's `atLeast` and `noRate` say it: `parts[0]` is the least
    * the whole can be and `noRate` is what no rate reached. `value` is `null`, and it is held to no target.
    */
   atLeast?: true;
@@ -242,7 +242,7 @@ export function fxNote(r: {
 }): string | null {
   if (!r.fx) return null;
   if (r.parts) {
-    /* A SUM THAT CONVERTED WHAT IT COULD (REC-B05): the first part is the least the whole can be, and `noRate` is what
+    /* A SUM THAT CONVERTED WHAT IT COULD: the first part is the least the whole can be, and `noRate` is what
        no rate reached. It says so, and names each pair, where it used to say nothing was added up. */
     const least = r.atLeast && r.noRate?.length ? r.parts[0] : undefined;
     if (least && r.fx.missing.length) return copy.figureAtLeast(money(Math.round(least.amount), least.currency), r.fx.missing);
@@ -537,7 +537,7 @@ export function unreadable(decl: MetricDecl): string[] {
       if (!agg || !Object.keys(agg).some((k) => READS_AGGREGATION.includes(k)))
         out.push(`value.${side}: this build reads ${READS_AGGREGATION.join(' · ')}`);
     }
-    /* A DIFFERENCE IN PARTS AND AGAINST THE WINDOW BEFORE (REC-B19), in the sentences the record refuses each with at
+    /* A DIFFERENCE IN PARTS AND AGAINST THE WINDOW BEFORE, in the sentences the record refuses each with at
        install: a ratio is still not grouped, a difference is grouped by one field, the window before is one of three
        words, and such a difference is never cut by date. */
     if ('ratio' in value && decl.group_by !== undefined) out.push('group_by: a ratio is not grouped in this build; group each half as its own figure');
@@ -591,7 +591,7 @@ function unaggregatable(decl: MetricDecl): string[] {
   return out;
 }
 
-/* ── a difference in parts, and against the window before (REC-B19) ──────── */
+/* ── a difference in parts, and against the window before ──────── */
 
 /**
  * A difference whose halves name the grouping, as one whose figure does: the record's `liftedGrouping`, in its words.
@@ -720,7 +720,7 @@ function halfOf(agg: Aggregation, rows: readonly Entry[]): HalfRead {
 export type DiffRead = Required<Pick<Reading, 'value' | 'rows' | 'delta' | 'why' | 'refusals' | 'unit'>> & Pick<Reading, 'parts' | 'halves' | 'groups' | 'more'>;
 
 /**
- * A difference over the entries a tab holds: `of` less `per`, the whole and each part (REC-B19).
+ * A difference over the entries a tab holds: `of` less `per`, the whole and each part.
  *
  * THE RECORD READS THE FIGURE, AND THIS IS FOR ENTRIES ALREADY IN HAND: a draft before it is sent, and a list a page
  * holds whole. It answers what the record's `groupsOf` answers for the same entries. A grouped difference is one
@@ -1030,7 +1030,7 @@ export const spokenWindow = (window: string): string => {
 
 /**
  * Is the figure on the right side of what was declared as good? `null` when there is no figure to hold to it, and for a
- * sum that is only at least (REC-B05): a lower bound is not the figure, so it is neither on its target nor off it.
+ * sum that is only at least: a lower bound is not the figure, so it is neither on its target nor off it.
  */
 export function meetsTarget(decl: MetricDecl, value: number | null, r?: { atLeast?: true | undefined }): boolean | null {
   if (value === null || r?.atLeast) return null;

@@ -1,5 +1,5 @@
 /**
- * THE THREE QUICK CHECKS OF A LOOK (the audit of 22 October, cause 1): every round was green on the sample record
+ * THE THREE QUICK CHECKS OF A LOOK (cause 1): every round was green on the sample record
  * while his own showed record words, the same thing counted three ways, and numbers from 28 September drawn as today's.
  * They run on the look's pictures of whichever record it draws, and a batch is judged on their one line.
  *
@@ -7,7 +7,7 @@
  *   counts  the same thing read on two screens must be one number: projects in play, and what needs you.
  *   ages    a number whose newest reading is more than a week old must say how old on the screen.
  *   blank   a screen drawn with no name and next to nothing on it, or a project's page with no name or hero, is no
- *           screen (the audit of 25 October, Z2): his project pages went blank and the look called them ready.
+ *           screen: his project pages went blank and the look called them ready.
  *
  * NO BROWSER HERE. `pageFactsIn` is the one function that runs in the page (`page.evaluate`), and everything else takes
  * what it handed back, so each check is tried on a planted string and on clean text without drawing anything.
@@ -93,7 +93,7 @@ export function pageFactsIn() {
 }
 
 /**
- * WHAT THE SCREEN DREW AT ALL (Z2), read in the page as `pageFactsIn` is (`page.evaluate(drawnIn)`): whether its main has
+ * WHAT THE SCREEN DREW AT ALL, read in the page as `pageFactsIn` is (`page.evaluate(drawnIn)`): whether its main has
  * a name, how many words it holds, and on a project's page whether its hero is drawn with the name in it.
  */
 export function drawnIn() {

@@ -105,8 +105,8 @@ test('a yes is taken from a drawing only while the board and what it governs are
     assert.deepEqual(Object.keys(images), ['candidate/specimen-390-light.png']);
     const { paths, drawn } = standing(root, 'today');
     const drawing = { board: 'today', source: 'lived', widths: [390], themes: ['light'], commit: 'abc', paths, drawn, drawings: [{ id: 'candidate', images }] };
-    const yes = yesOf(root, 'today', drawing, { said: 'yes to that', taken: 'DIRECTION 42', units: ['EXP-A01'], at: new Date('2026-10-09T10:00:00Z') });
-    assert.deepEqual(yes.taken, { on: '2026-10-09', from: 'DIRECTION 42' });
+    const yes = yesOf(root, 'today', drawing, { said: 'yes to that', taken: 'the frame decision', units: ['EXP-A01'], at: new Date('2026-10-09T10:00:00Z') });
+    assert.deepEqual(yes.taken, { on: '2026-10-09', from: 'the frame decision' });
     assert.equal(yes.seen, false);
     assert.deepEqual(yes.images, images);
     assert.deepEqual(Object.keys(yes.paths), ['packages/skin/house.css']);

@@ -16,7 +16,7 @@
   import Tile from '$lib/ui/Tile.svelte';
 
   /* THE APP'S OWN FRAME (SPEC 1.1), light and dark, written as the declarations the book reads: the board, the tiles,
-     the inks and the two reds the app is drawn in. It read the site's palette before the UI pass of 20 October. */
+     the inks and the two reds the app is drawn in. It read the site's palette before the redesign. */
   const frameCss = (scheme: 'light' | 'dark') => Object.entries(HOUSE_FRAME[scheme]).map(([k, v]) => `--${k}: ${v};`).join(' ');
   const APP_LOOK = `:root { ${frameCss('light')} } :root[data-theme="dark"] { ${frameCss('dark')} }`;
   const book = designBook({ look: APP_LOOK, scale: SCALE_CSS });

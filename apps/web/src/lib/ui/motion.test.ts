@@ -47,7 +47,7 @@ test('the typed line is swapped in place only when the record has answered it', 
   assert.match(page, /const out = await writes\(\)\.create\(id, fields\);\n\s+\/\*[^]*?\*\/\n\s+if \(out\.ok && asked === was\) swapInPlace\(\);\n\s+unline\(\);/u);
 });
 
-/* A PLACE'S FIRST DRAW ARRIVES IN ORDER AND IS STILL BY 450ms (fluid F6, scope E39): six tiles at most, 40ms apart, each
+/* A PLACE'S FIRST DRAW ARRIVES IN ORDER AND IS STILL BY 450ms (fluid F6): six tiles at most, 40ms apart, each
    over a page's 200; none on a way back, none under reduced motion. Home's sheet and the skin's tokens say the same. */
 test('the first draw rises six tiles 40ms apart and is done by 450ms, and none past six', async () => {
   const { ARRIVAL, arrivalDelay } = await import('./motion.ts');

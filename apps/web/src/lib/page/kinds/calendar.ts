@@ -70,7 +70,7 @@ function dueRows(result: BlockResult): string[] {
 const dueDated = (result: BlockResult) => entriesOf(result).filter((e) => dayOf(e.fields.day) !== null);
 
 /**
- * WHAT FALLS DUE, WITH ITS MONEY, SINCE THE AUDIT OF 25 OCTOBER (Z14): the source's amount, `{ amount, currency }`, said
+ * WHAT FALLS DUE, WITH ITS MONEY: the source's amount, `{ amount, currency }`, said
  * as the money writer says it and signed by the way it goes where the third column says how. Money's calendar of the next
  * thirty days reads every list, as Today's Due soon does, so a salary coming in reads `+` and a premium going out `−`.
  * A line with no money says none.
@@ -119,7 +119,7 @@ function amountSaid(register: string, field: string, sign: { field: string; minu
 }
 
 /**
- * THE THIRD COLUMN, THE ROW'S AMOUNT, put on the parsed rows (the money review, H20). A calendar fence takes two cells
+ * THE THIRD COLUMN, THE ROW'S AMOUNT, put on the parsed rows (the money review). A calendar fence takes two cells
  * and a tone, so the amount cannot be written into it; the kernel answers it (`columns: [title, due, amount]`), and the
  * renderer draws a row's third cell at the end of its line in the list. It was read and dropped here, so Money's
  * "Due in the next 30 days" named each bill with no amount beside it.

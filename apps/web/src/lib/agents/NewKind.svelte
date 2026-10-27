@@ -8,7 +8,7 @@
   THE KERNEL'S CHECK, DRAWN WHERE IT IS ABOUT. `kindFaultAt` runs the record's own `jobBody` on the body, and after the
   first press its sentence sits under the field it names. Nothing is sent while there is one.
 
-  ONE SENTENCE AND THREE WAYS TO START (24 October, U-A17): what it is called, what to do, and how far it may go, picked
+  ONE SENTENCE AND THREE WAYS TO START (24 October): what it is called, what to do, and how far it may go, picked
   from three presets in one column 720px wide; every tool, command and limit is under More, filled in by the preset and
   still changeable. ONE PRIMARY AT THE END, "Save as a job", AND IT ONLY FILES. A kind is approved once by the owner in Needs you, so the press opens
   that question and the line after it links there; it is not offered twice.
@@ -207,7 +207,7 @@
         </p>
       {/if}
 
-      <!-- AT THE TILE'S FOOT, ON THE START EDGE (UI pass of 21 October, H38), never loose on the board under it. -->
+      <!-- AT THE TILE'S FOOT, ON THE START EDGE, never loose on the board under it. -->
       <div class="do form-submit">
         <Button weight="primary" disabled={sending || filed !== null} onclick={() => void send()}>{sending ? words.busy : words.send}</Button>
         <Button weight="quiet" href={at('/agents')}>{words.cancel}</Button>

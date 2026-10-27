@@ -166,7 +166,7 @@ test('6. HER FIRST TODAY: green on the card gone and Paid EGP 900; red on the ti
 
 test('7. A PAGE FOR HER PATTERN: green on day 15 with Orders saying who still owes; red on an early offer, none, or a sentence with no owed clause', () => {
   const offer = { id: 'week:orders', title: 'Orders this week', why: '4 orders due this week. Want a page of their own for them?' };
-  /* WITH ITS FULL STOP, as every page's opening sentence ends since the UI pass of 20 October (P13). */
+  /* WITH ITS FULL STOP, as every page's opening sentence ends (P13). */
   const lead = '6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350.';
   const seen = { early: [], earlyDay: 13, late: [offer], lateDay: 15, weeks: 3, thisWeek: 4, lead };
   const green = expect.offer(seen, MARIAM);
@@ -268,7 +268,7 @@ async function noDoors() {
   return { origin: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => server.close(r)) };
 }
 
-/* AUDIT 75 CLAIM 8 said the command left with 0 on a red walk. It never did: the 0 was the exit code of the pipe the
+/* A REPORT said the command left with 0 on a red walk. It never did: the 0 was the exit code of the pipe the
    run was read through. These pin what it leaves with, each way it can end. */
 test('RUN AS A COMMAND ON A HOST WITH NO SIGN-UP: step 4 is red, the three after it are red, and it exits 1', { timeout: 60_000 }, async () => {
   const host = await noDoors();
@@ -279,7 +279,7 @@ test('RUN AS A COMMAND ON A HOST WITH NO SIGN-UP: step 4 is red, the three after
     await host.close();
   }
   assert.match(r.stdout, /^4\. Keep it: red\. sign-up refused/mu);
-  /* AUDIT 78 CLAIM 7: it read "sign-up refused: refused", a kind where a reason belongs. It says the step, that the
+  /* It read "sign-up refused: refused", a kind where a reason belongs. It says the step, that the
      host sent no reason, what the sign-up page shows her then, and the kind last. */
   const four = r.stdout.split('\n').find((l) => l.startsWith('4. '));
   assert.doesNotMatch(four, /sign-up refused: refused/u);

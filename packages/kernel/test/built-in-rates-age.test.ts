@@ -1,5 +1,5 @@
 /**
- * `rates-age-days` (REC-B02): how many days old the newest exchange rate is, read on a real record through `metric`, by
+ * `rates-age-days`: how many days old the newest exchange rate is, read on a real record through `metric`, by
  * the rows of the list that plays the rates, under whatever names that list gives the parts. With no rate it says
  * nothing, never nought: nought would read as fresh rates on a record that holds none.
  */

@@ -1,5 +1,5 @@
 /**
- * Example rows that count their days from install day and point at each other (SHL-A09).
+ * Example rows that count their days from install day and point at each other.
  *
  * BOTH WERE DONE BY CODE AFTER THE INSTALL. A seed held a day written on the day its author wrote it, so an example
  * "due next week" was late on every record that installed it a month on, and a function moved the days afterwards. A

@@ -1,5 +1,5 @@
 /**
- * The lane's second step: a person's sign-in on production, with the canary's own passkey (PRF-A09).
+ * The lane's second step: a person's sign-in on production, with the canary's own passkey.
  *
  * `tools/gates/signin-live.mjs`, as the runner calls it, with one thing added: where the session it keeps for the look
  * goes. A green live run signs in once more and leaves that browser state at `sessionPath` (`../lib.mjs`), in the

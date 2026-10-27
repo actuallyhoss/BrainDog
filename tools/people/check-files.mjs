@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * The five starting points (`apps/web/src/lib/first-run.ts` `STARTING_POINTS`), read as text so nothing is run. No screen
- * draws them as chips since the UI pass of 20 October (first F6); the reading is held to understand each one.
+ * draws them as chips (first F6); the reading is held to understand each one.
  */
 function startingPoints(root) {
   const src = readFileSync(join(root, 'apps/web/src/lib/first-run.ts'), 'utf8');

@@ -386,7 +386,7 @@ export function scopeOf(me: {
 }
 
 /**
- * How long a guest's copy may be drawn (sharing plan §2.8): a day after it was kept and after the last live open, and
+ * How long a guest's copy may be drawn: a day after it was kept and after the last live open, and
  * never past the end of their last share. Somebody a share let in reads it offline for a day at most.
  */
 export const GUEST_MS = 24 * 3_600_000;

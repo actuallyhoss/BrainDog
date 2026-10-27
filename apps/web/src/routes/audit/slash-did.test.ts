@@ -1,5 +1,5 @@
 /**
- * What Slash did without asking, on Activity (ENG-B15): a change a question of Slash's made that the ladder answered
+ * What Slash did without asking, on Activity: a change a question of Slash's made that the ladder answered
  * reads as Slash's, "Slash did this without asking", then who kept or undid it. A person's own change and a suggestion
  * somebody pressed read as they did. Names are invented here, inline.
  */

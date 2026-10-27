@@ -1,5 +1,5 @@
 /**
- * A list's numbers on one page (E26): a page says which list it is the page of (`list:`), so `/r/<list>` opens there, and
+ * A list's numbers on one page: a page says which list it is the page of (`list:`), so `/r/<list>` opens there, and
  * a `lines` block's sixth column lists every measure under its group, the quiet ones too, with its newest reading.
  */
 

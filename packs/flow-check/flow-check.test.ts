@@ -89,7 +89,7 @@ test('THE FILE READS CLEAN AS AN ADD-ON, and says it is left out of every listin
   assert.equal(packDoc().unlisted, true);
 });
 
-/* ── one automation for each way one starts (RQ-SHL-246, 248) ─────────────────────────────────── */
+/* ── one automation for each way one starts (248) ─────────────────────────────────── */
 
 test('A WRITE STARTS ITS AUTOMATION ONCE, and the note it writes says a check was added', async () => {
   const b = await bench();
@@ -162,7 +162,7 @@ test('RUN NOW STARTS ITS AUTOMATION ONCE, and its note names the button', async 
   b.sql.close();
 });
 
-/* ── the last day of each month (RQ-SHL-256) ──────────────────────────────────────────────────── */
+/* ── the last day of each month ──────────────────────────────────────────────────── */
 
 test("A CLOCK ON THE LAST DAY OF THE MONTH IS NEXT DUE ON THE 31ST IN THE RECORD'S ZONE, which is the 30th in UTC", async () => {
   const b = await bench();
@@ -175,7 +175,7 @@ test("A CLOCK ON THE LAST DAY OF THE MONTH IS NEXT DUE ON THE 31ST IN THE RECORD
   b.sql.close();
 });
 
-/* ── the order rules run in, and what a dry run says of it (RQ-SHL-258, 260) ──────────────────── */
+/* ── the order rules run in, and what a dry run says of it (260) ──────────────────── */
 
 test('RULES OF EQUAL PRIORITY LEAVE THE VALUE OF THE LONGEST WORD, and a lower priority number comes before them all', async () => {
   const b = await bench();
@@ -219,7 +219,7 @@ test('A DRY RUN OF A FOURTH SAYS WHICH ROWS IT WINS, WHICH IT LOSES AND TO WHICH
   b.sql.close();
 });
 
-/* ── a rule naming a row nobody has made yet (RQ-SHL-257) ─────────────────────────────────────── */
+/* ── a rule naming a row nobody has made yet ─────────────────────────────────────── */
 
 test('A RULE NAMING A PLACE NOBODY HAS MADE INSTALLS, and fires once that place is made and a check names it', async () => {
   /* IT INSTALLED: `bench` installs the whole file, `names_a_place` and its `place is Boiler room` among it, on a record
@@ -234,7 +234,7 @@ test('A RULE NAMING A PLACE NOBODY HAS MADE INSTALLS, and fires once that place 
   b.sql.close();
 });
 
-/* ── a question nobody answers (RQ-SHL-406) ───────────────────────────────────────────────────── */
+/* ── a question nobody answers ───────────────────────────────────────────────────── */
 
 test('AN UNANSWERED QUESTION WAITS ITS 15 MINUTES, and the run is still waiting a minute before', async () => {
   const b = await bench();
@@ -290,7 +290,7 @@ test('A QUESTION WITH NO wait: WAITS SEVEN DAYS, as the API says it and as the r
   b.sql.close();
 });
 
-/* ── rules starting rules (RQ-SHL-407) ────────────────────────────────────────────────────────── */
+/* ── rules starting rules ────────────────────────────────────────────────────────── */
 
 test('ONLY THE AUTOMATION THAT SAYS from_rules RUNS ON A ROW A RULE WROTE', async () => {
   const b = await bench();

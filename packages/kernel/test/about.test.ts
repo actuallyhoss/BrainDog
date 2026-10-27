@@ -1,5 +1,5 @@
 /**
- * The about read (ENG-B02, job 3): one read says what a person, an organisation or a project is and where it was seen,
+ * The about read: one read says what a person, an organisation or a project is and where it was seen,
  * and one retrieval hands a model its candidates. A candidate is a handle, a kind, a name, what else it goes by and
  * where it was seen, with no id and no address in it. A key in the text ranks first, then an alias, then a name in the
  * same project; a name proposes and never decides alone; and a deleted or folded row is not answered.

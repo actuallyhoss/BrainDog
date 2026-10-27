@@ -1,7 +1,7 @@
 /**
- * AUDIT Z10 (packs-browse-390-light.png, packs-390-light.png): Browse said "7 are already in your BrainDog" and
+ * Browse said "7 are already in your BrainDog" and
  * Installed said "9 add-ons installed". Browse counted only the installed add-ons its catalogue lists. Both tabs now say
- * the record's own count. Since the add-ons pass of 27 October the store says no count at all, so only Settings ›
+ * the record's own count. Since the add-ons redesign the store says no count at all, so only Settings ›
  * Add-ons says it, and the two can never disagree.
  */
 
@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 
 import * as packWords from './words.ts';
 
-test('Browse and Installed say one count of the add-ons in this BrainDog (audit Z10)', () => {
+test('Browse and Installed say one count of the add-ons in this BrainDog', () => {
   const installedCount = (packWords as Record<string, unknown>).installedCount as ((s: readonly unknown[] | null) => number | null) | undefined;
   assert.equal(typeof installedCount, 'function', 'the two tabs still count apart');
   assert.equal(installedCount!(Array.from({ length: 9 }, (_, n) => ({ id: `p${n}` }))), 9);

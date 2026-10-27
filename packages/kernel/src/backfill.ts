@@ -21,7 +21,7 @@
  *      an organisation, nor is the payee of a line that says it is a transfer, nor a word like "Unknown" that names
  *      nobody, nor an account on a payment network.
  *
- *      AN ORGANISATION THE PERSON HOLDS NEVER GAINS A BANK KEY FROM A PAYEE'S NAME ALONE (research-audit-21 item 12). A
+ *      AN ORGANISATION THE PERSON HOLDS NEVER GAINS A BANK KEY FROM A PAYEE'S NAME ALONE. A
  *      payer's name on a bank line is not under the owner's control, and a key routes every later text by it. So a line
  *      whose payee is a held organisation's name, exactly, is linked and the key is left off; one whose payee only extends
  *      that name is asked about (`held`). Only an organisation the walk or a door made from the bank's own words gains
@@ -31,13 +31,13 @@
  *      contradicted by the run's own repository. A bare name, a run further down a folder, a broad folder like
  *      `~/Developer`, or a last name is one question per whole place (its remote, else its folder) and guess, a single
  *      guess included ("Is that BrainDog?"), so `sam/lantern` and somebody else's `lantern` are never one question and
- *      one yes (research-audit-23 item 6). Two places of one name in a walk are each said with their owner or their
+ *      one yes. Two places of one name in a walk are each said with their owner or their
  *      folder ("acme/Lantern", "lantern in Code"). A run whose place guesses nothing better, in a repository whose owner
  *      on its host holds the repositories of exactly one project, is one question per owner ("Is that Oxbow.gg?"). Each
  *      question carries `wheres`, the whole place of every run it is about, so a yes places exactly those. Once, and
  *      never a run already placed, nor one still working, which the ladder places itself. A run with no remote whose
  *      own folder is called exactly what one project is called, or a bare repository it lists, case and punctuation
- *      folded, is that project's and is placed (`exactFolder`, scope D5); a run an import wrote, which no hook heard
+ *      folded, is that project's and is placed (`exactFolder`); a run an import wrote, which no hook heard
  *      (no `last_seen`), is never a question.
  *   3. A service with no project is linked when its name, the first word of its name, its domain, or the label of its
  *      domain matches exactly one project's name (with any domain ending left off) or domain. Linked, a domain of it
@@ -139,8 +139,7 @@ export type HeldAsk =
   | CutAsk;
 
 /**
- * THE SHOPS ALREADY MET BY A NAME A CARD TEXT CUT SHORT, asked about once and all together (the audit of 25 October,
- * Y2): each that another organisation's whole name begins with is folded into that one (`into`), and each other is
+ * THE SHOPS ALREADY MET BY A NAME A CARD TEXT CUT SHORT, asked about once and all together: each that another organisation's whole name begins with is folded into that one (`into`), and each other is
  * retired, kept with its payments and the bank's words, and left off People. Nothing is folded or retired until he says
  * yes, and a no leaves them as they are. `key` is the shops' own ids, so the same shops are asked about once.
  */
@@ -326,7 +325,7 @@ const PROCESSOR_PREFIX = /^(?:pos\s+|(?:pos|paymob|fawry|kashier|paytabs|sumup|p
  * MARKET`, `XO TELECOM`, `Sahara Spider Hosting`, `RIDEWELL TRIP`, `VODACELL RECHARGE`, `HARBOUR BANK FEES`. Never a word
  * a transfer to a person is printed with (`wire`, `transfer`, `payroll`), which would make a person a business, nor one
  * a person is named by: `Prime`, `Ride`, `Energy`, `Media`, `Mobile`, `Fee` and `Interest` are each somebody's surname,
- * and "SAM PRIME" on three lines is a question (research-audit-22 L3).
+ * and "SAM PRIME" on three lines is a question.
  */
 /** The word for an insurer in any of its forms, which a business is called by and a person never is. */
 const INSURER = /^insur(?:ance|er|ers)$/u;
@@ -652,7 +651,7 @@ function ledgerSlice(
   let last = '';
 
   /* WHETHER THE WALK, OR A DOOR, MADE AN ORGANISATION FROM A BANK'S OWN WORDS: the only kind that gains a bank key from a
-     payee's name. One the person or an agent made is held, and keeps the keys it has (research-audit-21 item 12). */
+     payee's name. One the person or an agent made is held, and keeps the keys it has. */
   const fromWords = new Map<string, boolean>();
   const madeFromWords = (id: string): boolean => {
     let said = fromWords.get(id);
@@ -738,7 +737,7 @@ function ledgerSlice(
         const same = service === undefined ? [] : (byName.get(keyOf('bank', service) ?? '') ?? []);
         if (same.length === 1) org = same[0]!;
         else if (service !== undefined) org = make(keys, service, true);
-        /* A NAME NO LINE SAYS WHOLE MAKES NOTHING AND ASKS NOTHING (the audit of 25 October, Y2): a card text cut at its
+        /* A NAME NO LINE SAYS WHOLE MAKES NOTHING AND ASKS NOTHING: a card text cut at its
            field's end named "Orbt Speciali" and "Marke" as shops. The lines keep the bank's words, and are linked once
            the record holds the shop by its key. */
         else if (count !== undefined && count.lines >= PAYEE_SEEN && count.whole) {
@@ -946,7 +945,7 @@ const folderOf = (said: string, home: string | null): string => {
 /**
  * WHERE A RUN IS SURELY IN, or the projects it may be in, by id, for the person to say.
  *
- * Only two places are sure (research-audit-22 M4). A remote a project lists, compared whole, is the repository itself.
+ * Only two places are sure. A remote a project lists, compared whole, is the repository itself.
  * A folder a project lists is sure only when the run worked in that very folder, or the project also lists the run's
  * own repository by its name or its remote, and in neither case when the run's repository is another project's: a
  * project listing `~/Developer` would otherwise claim every checkout under it, the ones no project knows included. A run
@@ -1091,7 +1090,7 @@ function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: strin
       continue;
     }
     /* A FOLDER CALLED EXACTLY WHAT ONE PROJECT IS CALLED, or a bare repository it lists, is that project's, and no
-       operator should be asked "Is braindog BrainDog?" (scope D5). Only for a run with no remote and no other
+       operator should be asked "Is braindog BrainDog?". Only for a run with no remote and no other
        repository name, which is where `sam/lantern` and somebody else's `lantern` would part; case and punctuation
        folded, never a part of a name ("brain" beside "The Studio Brain" still asks). */
     const exact = exactFolder(projects, where);
@@ -1101,7 +1100,7 @@ function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: strin
       else refused++;
       continue;
     }
-    /* A RUN AN IMPORT WROTE, which never said when it was last seen, is history, never a question for him (scope D5). */
+    /* A RUN AN IMPORT WROTE, which never said when it was last seen, is history, never a question for him. */
     if (textOf(row.fields.last_seen) === undefined) continue;
     const at = whereKey(where);
     const wheres = at === null ? [] : [at];
@@ -1117,8 +1116,8 @@ function runsSlice(deps: BackfillDeps, lists: Lists, limit: number, after: strin
     if (ids.length === 0) continue;
     /* THE PLACE AS A PERSON SAYS IT: the repository's name, never its host or a folder's path. One question for each
        WHOLE place and guess, however many runs worked there, a single guess included: kept by the remote, else the
-       folder, and never by the last name alone, which `sam/lantern` shares with every other `lantern` (research-audit-23
-       item 6). A run that says only a bare name is kept by it, and the record files no question that places nothing. */
+       folder, and never by the last name alone, which `sam/lantern` shares with every other `lantern`.
+       A run that says only a bare name is kept by it, and the record files no question that places nothing. */
     const place = where.repo ?? (where.remote ? lastSpelled(where.remote) : lastSpelled(where.cwd ?? ''));
     if (place === '') continue;
     const key = `run-project:${at ?? place.toLowerCase()}:${[...ids].sort().join(',')}`;
@@ -1289,7 +1288,7 @@ function remoteSuggestions(sql: Sql, lists: Lists): BackfillSuggestion[] {
  * every organisation it made removed, and every run it placed unplaced. In one transaction, as its own batch; a row
  * changed since by anybody else keeps what they changed, a key somebody took off and put back among them.
  *
- * THE BATCH IS MARKED UNDONE ONLY WHEN THIS PUT SOMETHING BACK AND THE RECORD REFUSED NONE OF IT (research-audit-22 L2).
+ * THE BATCH IS MARKED UNDONE ONLY WHEN THIS PUT SOMETHING BACK AND THE RECORD REFUSED NONE OF IT.
  * A line the write path refused is still the walk's, and a later undo tries it again; one somebody changed since is
  * theirs, and stays theirs. A second undo of a batch marked undone puts nothing back.
  */

@@ -1,5 +1,5 @@
 /**
- * The engine's own readings (ENG-B01), counted over a call ledger this test writes.
+ * The engine's own readings, counted over a call ledger this test writes.
  *
  * FOR EACH PURPOSE: how many asks reached a model in the last day, week and month; of the last day's, how many the model
  * answered, how many answers were kept and how many asks were refused; what is still owed a read and since when; and the
@@ -187,7 +187,7 @@ test('the reader changes nothing it was handed', () => {
   assert.doesNotThrow(() => engineReadings(of({ calls, owed })));
 });
 
-/* THE BRAKE ON SLASH'S QUESTIONS (ENG-B17): echoed with the share it was worked out from, and `null` where it was not read,
+/* THE BRAKE ON SLASH'S QUESTIONS: echoed with the share it was worked out from, and `null` where it was not read,
    never a brake that is off. */
 test('the brake reads true or false with its share, and null where none was handed in', () => {
   assert.deepEqual(engineReadings(of({ braked: { on: true, share: 0.55, of: 20 } })).braked, { on: true, share: 0.55, of: 20 });

@@ -43,7 +43,7 @@
     client: Locker | null;
     /** How many keys the Keychain holds: with none there is nothing to lock yet. */
     keys?: number;
-    /** Ask the record where the Keychain is, once, when the switch is pressed before anything said (X24). */
+    /** Ask the record where the Keychain is, once, when the switch is pressed before anything said. */
     onask?: (() => Promise<Lock>) | undefined;
     /** The Keychain after a change, or after a refusal that said where it is. */
     onturn: (lock: Lock) => void;

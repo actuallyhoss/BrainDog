@@ -2,7 +2,7 @@
  * A project page says the money on its way in the words the rest of the product says it in.
  *
  * THE HEADLINES ARE THE MONEY A PERSON HAS, NOT THE MONEY THEY ARE DUE OR OWED. Today's tile and Shop's list
- * were renamed Still to come in (audit 69 finding 4), and a project's own figure went on saying Owed to you, under a
+ * were renamed Still to come in, and a project's own figure went on saying Owed to you, under a
  * tile labelled the same. The figure's name is what heads the list the tile opens, so the two are one phrase said
  * twice, and they are held equal here rather than by hand.
  *

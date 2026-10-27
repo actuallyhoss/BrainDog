@@ -28,7 +28,7 @@
  * THE CATALOGUE ID IS THE ONE THE FILE GIVES ITSELF, not the folder's: `packs/mercury` publishes `mercury-company` and
  * `packs/rates-poll` publishes `rates-open-er-api-com`, and those are the ids a record holds them under.
  *
- * USE CASES GO THROUGH THE SAME DOOR, AS KIND `usecase` (USE-A16). A folder under `packs/` may also hold
+ * USE CASES GO THROUGH THE SAME DOOR, AS KIND `usecase`. A folder under `packs/` may also hold
  * `<id>.usecase.json`, a use case file named after the id inside it, such as the front an add-on is offered under to a
  * stranger at the first run; and the use cases this build ships are written in beside them, each as the file
  * `builtInFile` in `packages/seed/src/usecases/share.ts` already hands Browse. Each entry carries the `signals` and
@@ -49,7 +49,7 @@
  * categories worked out from its latest file by `categoriesOf`, and `unlisted` when that file says so (a pack
  * named for one person or one bank stays in the index, so it installs by id, and out of every listing).
  *
- * LISTING IS OPT IN (E18, call 12 of the 22 Oct audit): a pack is listed only when `packs/listed.json` (`LISTED_FILE`
+ * LISTING IS OPT IN (call 12 of the 22 Oct audit): a pack is listed only when `packs/listed.json` (`LISTED_FILE`
  * in the `--packs` folder) names its catalogue id, the flag only the owner sets. Every other pack, a new one first of
  * all, is `unlisted`: in the index, installable by id, and in no listing. The flag is kept apart from the pack files so
  * that writing or publishing a pack can never list it. An id there that is no pack in the index, or whose latest file
@@ -152,7 +152,7 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
   } catch {
     fail(`${where}/${folder}.pack.json is not JSON.`);
   }
-  /* A MODULE'S OWN FILE WAITS FOR THE MODULE TO GO (SHL-A13). While the build still compiles the module in, its id is
+  /* A MODULE'S OWN FILE WAITS FOR THE MODULE TO GO. While the build still compiles the module in, its id is
      one BrainDog keeps for itself and the door refuses a file that takes it, so the file is passed over here and
      neither published nor previewed. The day the id leaves `MODULES` it is published like any other pack. */
   if (MODULES.includes(doc.pack)) continue;

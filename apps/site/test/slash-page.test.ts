@@ -3,7 +3,7 @@
  *
  *   node --test apps/site/test/slash-page.test.ts
  *
- * FOUR THINGS HOLD. The page's words are the early access copy (`loop/ui-pass-2026-10-20/site.md` 2b), with the
+ * FOUR THINGS HOLD. The page's words are the early access copy, with the
  * count of asks read off `plans.ts` and no word the writing guide refuses. Every answer the made-up record holds renders
  * on the server whole, the way the prerender writes it, so a reader with scripting off has it. The typing paints the
  * finished frame at once under reduced motion and sets no timer. And the built `slash.html` has its one h1, the three
@@ -66,7 +66,7 @@ test("the page's words are the early access copy, and its one count of asks is t
   assert.ok(!('close' in slashPage), 'the page ends on the early access strip, not a close of its own (site F11)');
   assert.equal(slashPage.faq.questions.length, 4);
   assert.equal(slashPage.agents.lines.length, 4);
-  /* No paid plan is named while billing is off: one count, the early access month (site D2). */
+  /* No paid plan is named while billing is off: one count, the early access month. */
   assert.ok(slashPage.tally.say.includes(`Early access includes ${TABLE.free.credits} asks a month`));
   for (const plan of [TABLE.hosted.name, TABLE.plus.name]) assert.ok(!strings(slashPage).some((s) => s.includes(plan)), `the page names ${plan}`);
   assert.equal(slashDrawing.modes.ask.note, `One ask per question. Early access has ${TABLE.free.credits} a month.`);

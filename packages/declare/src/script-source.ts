@@ -1,6 +1,6 @@
 /**
  * What each script an install would put in or change runs: its source, its size, and on an update the lines that
- * changed (SHL-D09, "source shown in review", HD.361).
+ * changed ("source shown in review", HD.361).
  *
  * THE REVIEW IS WHERE A STRANGER'S CODE IS READ. A pack's script runs with the keys and the reads its header names, and
  * the header's `CALLS OUT` line says where it may send what it reads; the source says what it actually does. So the plan

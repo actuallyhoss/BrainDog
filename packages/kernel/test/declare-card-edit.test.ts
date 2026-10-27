@@ -1,5 +1,5 @@
 /**
- * `edit: true` on a card's column (PGS-C15): the line is typed on in place where the page can write. Checked where the
+ * `edit: true` on a card's column: the line is typed on in place where the page can write. Checked where the
  * page is installed: a card's, naming one field, on a line drawn as words, and refused otherwise in a sentence that says
  * what to change.
  */

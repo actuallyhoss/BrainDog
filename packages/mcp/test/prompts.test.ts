@@ -39,7 +39,7 @@ test('START IS CONTEXT, THEN INSTRUCTIONS, THEN A PLAN IN ONE LINE; WRAP ANSWERS
   const wrap = textOf(await ask('prompts/get', { name: 'wrap' }));
   assert.match(wrap, /instructions \{reply:"<its id>", said:/u);
   assert.match(wrap, /handoff \{done:"<task>"/u);
-  /* WHEN A LESSON IS WORTH KEEPING, and its topic the skill it bears on (scope B30). */
+  /* WHEN A LESSON IS WORTH KEEPING, and its topic the skill it bears on. */
   assert.match(wrap, /a dead end a later session would repeat, create a learning with topic/u);
 });
 

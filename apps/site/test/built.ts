@@ -4,7 +4,7 @@
  * Five files carried a copy of the same two lines, and each copy skipped when `apps/site/build` was absent. That
  * was right at a desk and wrong in CI: the leg that ran them built no site, and the job that built the site ran
  * none of them, so 37 skips rode a green run on every push and two site tests the history called red could never
- * be shown green (PRF-B01, LCH-B01).
+ * be shown green.
  *
  * A MISSING BUILD IS A SKIP THAT SAYS SO, UNLESS THE STEP SAYS THERE IS ONE. `ci.yml`'s build job runs these
  * tests with `SITE_BUILT=1` right after `pnpm --filter @braindog/site build`. There a missing page is not a reason

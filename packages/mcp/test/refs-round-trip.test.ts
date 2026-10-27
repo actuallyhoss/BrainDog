@@ -80,7 +80,7 @@ const ASK: Record<string, (fx: Fixture) => Record<string, unknown>[]> = {
   context: () => [{}],
   /* NOTHING TO ASK: `instructions` answers what he told a run, and the owner here is no run. */
   instructions: () => [],
-  /* AND `history` IS ASKED THROUGH `get`, which it was folded into (plan §6.1). */
+  /* AND `history` IS ASKED THROUGH `get`, which it was folded into. */
   get: (fx) => [fx.onDoomed, fx.onKiln, fx.second].map((r): Record<string, unknown> => ({ spoken: r.spoken })).concat([{ spoken: 'skills#5' }, { spoken: fx.onDoomed.spoken, history: true }]),
   list: (fx) => [
     { register: 'tasks', where: { field: 'what', is: fx.onDoomed.fields.what } },
@@ -247,7 +247,7 @@ async function roundTrip(fx: Fixture, mcp: Mcp, rows: Answered[], deleted: Set<s
             wrong.push(`${at}: ${JSON.stringify(said)}, and a new ref to a deleted row is refused at its field, saying so`);
           continue;
         }
-        /* A COPY MADE ON A LIST THAT SAYS WHAT MAKES TWO OF ITS ROWS THE SAME (`same:`, AGT-C13) IS THAT ROW AGAIN, refused
+        /* A COPY MADE ON A LIST THAT SAYS WHAT MAKES TWO OF ITS ROWS THE SAME (`same:`) IS THAT ROW AGAIN, refused
            ALREADY_KNOWN with the call that changes the one held, so its refs go back through the other doors only. */
         if (s.how === 'create' && !said.ok && said.refusal?.code === 'ALREADY_KNOWN' && fx.api.kernel.register(a.register)?.same !== undefined) continue;
         /* A ROWSET THAT CHANGES NOTHING IS NOT FILED (`ALREADY_KNOWN`): the row already holds exactly what was sent, which

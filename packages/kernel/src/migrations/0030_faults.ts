@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 30: `fault`, work BrainDog does for itself that keeps failing (AGT-C06).
+ * The kernel schema, migration 30: `fault`, work BrainDog does for itself that keeps failing.
  *
  * ONE ROW A CAUSE. `cause` is `outbox#<kind>` or `schedule#<kind>` (`fault.ts`), so a job that dies every night is one
  * row whose `count` climbs and whose `last_at` moves. `said` is the plain sentence a person reads, written from the

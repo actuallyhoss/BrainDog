@@ -14,7 +14,7 @@
  * here the record is the one a person has when they install this pack, the first-party packs and then this file.
  *
  * EVERY MOVEMENT BELOW IS THE BANK'S OWN WORDING, SCRUBBED (1.7.0). Each is one of the shapes his real messages take, word
- * for word as `loop/research-bank-real.md` records them from a hundred of his forwarded texts: the card alert with three
+ * for word as  records them from a hundred of his forwarded texts: the card alert with three
  * stars before the digits and its full stop after the shop, the InstaPay transfer printing eight stars, four digits and
  * its closing sentence, the `From HSBC:` line with its branch code, three stars, three digits and the sign glued to the
  * figure. The values in them are changed: the digits, the branch code, the amounts, the days, the references and the
@@ -643,7 +643,7 @@ test('THE FIVE SPELLINGS FOLD TO ONE PAYEE KEY, and Talabat\'s two to another', 
  * the account's, which the kernel resolves; so on a bare kernel the account and the amount may be unread beside the day.
  * What a claim test holds is the claim, and that nothing it names is a field the line plainly gives a bare kernel.
  *
- * THE REASON SAYS THE ADD-ON BY ITS TITLE AND THE FIELDS BY THEIR LABELS (REC-A03), so it is read back as those: which
+ * THE REASON SAYS THE ADD-ON BY ITS TITLE AND THE FIELDS BY THEIR LABELS, so it is read back as those: which
  * pattern claimed the line is `Arrived.ingest`'s to say, and the sentence carries no id. An install that kept no title
  * on the add-on's row (`normalise` in `packages/declare` drops `title` today) says "The pattern", and never the id.
  */

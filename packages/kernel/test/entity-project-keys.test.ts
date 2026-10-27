@@ -1,5 +1,5 @@
 /**
- * A project's keys (ENG-B02, job 1): the repositories, folders and domains its row lists are claimed in `entity_key`,
+ * A project's keys: the repositories, folders and domains its row lists are claimed in `entity_key`,
  * so a place or a site finds the project without the list being read whole; its name is a weak key, which proposes a
  * candidate and never decides alone; and two projects of one name, or of one repository, are both found and never tied.
  */

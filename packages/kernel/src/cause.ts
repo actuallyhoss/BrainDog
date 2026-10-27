@@ -1,7 +1,7 @@
 /**
- * A question has a cause (AGT-C07, "a question has a cause"): the key for what it is about, so it is asked once.
+ * A question has a cause ("a question has a cause"): the key for what it is about, so it is asked once.
  *
- * TWO IDENTICAL QUESTIONS SEVEN SECONDS APART were filed on the owner's record (SG89 and SG90), and "Needs you" showed
+ * TWO IDENTICAL QUESTIONS SEVEN SECONDS APART were filed on the owner's record, and "Needs you" showed
  * one question twice, word for word, because a proposal was inserted as it came with no look at what was open. A cause
  * is the look: one open question a cause, held by a unique index (migration 31), and a second proposal with the same
  * cause joins the first instead of filing.
@@ -76,7 +76,7 @@ export function causeOf(kind: string, body: Record<string, unknown>, question?: 
     return `options#${hash(canon(asked))}`;
   }
   if (kind === 'pattern' || kind === 'settings' || kind === 'arrange') {
-    /* AN OFFER'S STRENGTH AND ITS DAY ARE NOT THE ASK (ENG-B14): the same offer re-filed with a new day joins the open one. */
+    /* AN OFFER'S STRENGTH AND ITS DAY ARE NOT THE ASK: the same offer re-filed with a new day joins the open one. */
     const { cause: _c, egress: _e, approve: _a, rank: _r, lapses: _l, ...asked } = body;
     return `${kind}#${hash(canon(asked))}`;
   }
@@ -116,7 +116,7 @@ export const MOOT_HELD = 'This already says what was asked.';
 export const MOOT_GONE = 'What this asked about has since been deleted.';
 
 /**
- * Whether what a question asks is already so, and answering it would change nothing (AGT-C08, "how good is braindog's
+ * Whether what a question asks is already so, and answering it would change nothing ("how good is braindog's
  * mcp at cleaning up stale stuff?").
  *
  *   - a rowset whose every row already holds every value it proposes (`noop`), or whose rows are all deleted;

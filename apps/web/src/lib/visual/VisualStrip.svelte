@@ -1,5 +1,5 @@
 <!--
-  The visuals one thing holds, where the thing shows (DIRECTION §45, "Shown where it lives"): its row page, a project's
+  The visuals one thing holds, where the thing shows: its row page, a project's
   page, a question on Decide or in Needs you, a task's drawer. Each is a card: its first picture as a still where it has
   one, or a quiet card, its title, and who made it and when. NEVER A LIVE FRAME ON FIRST PAINT: the page opens as fast as
   one without, and the frame is drawn only when a card is pressed (`VisualViewer.svelte`, loaded then by `import()`).

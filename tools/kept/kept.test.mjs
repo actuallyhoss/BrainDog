@@ -1,5 +1,5 @@
 /**
- * The kept lane against the Cloud harness (SHL-A19): `startCloud` from `apps/worker/test/cloud-serve.ts`, as the drill's
+ * The kept lane against the Cloud harness: `startCloud` from `apps/worker/test/cloud-serve.ts`, as the drill's
  * own test runs it (`tools/drill/drill.test.mjs`), sign-up by invitation, every letter captured, and the lane's stand-in
  * in the platform's `fetch` for each turn (`harnessOf`).
  *

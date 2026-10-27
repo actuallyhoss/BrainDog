@@ -70,7 +70,7 @@ export const capSaid = (cap: number): string =>
  */
 export const LEDGER_FETCHED = 100;
 
-/* WHOSE AN ASK WAS IS WHAT THE LEDGER SAYS IT WAS FOR (ENG-A05), and no longer read out of its kind. `Purpose` in
+/* WHOSE AN ASK WAS IS WHAT THE LEDGER SAYS IT WAS FOR, and no longer read out of its kind. `Purpose` in
    `packages/slash/src/types.ts` names them: his own question, a rule of his asking at a step and a new record's first
    plan spend his allowance, and everything else the record did for itself. The background allowance's size is the
    host's to say (`status.background.cap`); the copy of it that stood here is gone, so a host that does not say it gets a

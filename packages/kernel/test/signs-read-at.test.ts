@@ -1,5 +1,5 @@
 /**
- * A filed sign whose `read_at` cannot be read stops standing (audit 38-39, finding 8). `nowMs - Date.parse(read_at) >
+ * A filed sign whose `read_at` cannot be read stops standing. `nowMs - Date.parse(read_at) >
  * FILED_STANDS_MS` was false for NaN, so a malformed time kept its filing green forever; it now reads `none`, says so
  * in words, and never throws while saying when it was last read.
  */

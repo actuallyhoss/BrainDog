@@ -1,5 +1,5 @@
 <!--
-  The first-open line for somebody a share let in (sharing plan §3.4): "Ada shared Kiln with you. You can edit tasks
+  The first-open line for somebody a share let in: "Ada shared Kiln with you. You can edit tasks
   until 1 Dec." Once for each share, on this device, with Close.
 
   ONLY FOR A GUEST: a person whose access shares made (`me.grant`) and who holds no role on the whole record. An owner, a

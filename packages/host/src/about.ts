@@ -392,7 +392,7 @@ export type AboutAttachAsk = AboutAttach & { row: string; question: string; chan
 const THINGS_SAID: readonly string[] = ['note', 'mail', 'text', 'run'];
 
 /**
- * Which attaches land as they do today and which are asked first (ENG-B15). WHAT THE TEXT WRITES LANDS: the row's own
+ * Which attaches land as they do today and which are asked first. WHAT THE TEXT WRITES LANDS: the row's own
  * name or an alias is in it (`named`), or the kernel found the row by a key the text holds (`how: 'key'`, the rules'
  * one attach), a second signal beside the model's word. WHAT RESTS ON THE MODEL ALONE ASKS,
  * as "Is the Sara in this note Sara Idris?", and is its own kind (`attach`), so it starts at Ask and can be earned.

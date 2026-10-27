@@ -34,7 +34,7 @@ export type Raw = Readonly<Record<string, unknown>>;
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
  *
- * ONE TABLE, READ ON BOTH SIDES (PGS-A17). `needs` is what the panel is about: `row` refuses it on a page about no row,
+ * ONE TABLE, READ ON BOTH SIDES. `needs` is what the panel is about: `row` refuses it on a page about no row,
  * and `none` lets it stand on any page. `level` is who the host draws it for: `read` for anyone who reads the page,
  * `write` where the page writes, `owner` for the record's owner only. `says` is the line a person or a gate is told
  * the panel is. The web holds one loader for each key (`apps/web/src/lib/page/panels/index.ts`), and a test holds the

@@ -1,6 +1,6 @@
 /**
  * A column one pack adds to another pack's block: `{ page, into: <block key>, column: { label, field? | metric?, as? } }`
- * in its manifest's `adds`, beside the whole blocks an addition already is (PGS-C29).
+ * in its manifest's `adds`, beside the whole blocks an addition already is.
  *
  * WHY A COLUMN AND NOT A BLOCK. Revenue bands works out a month, and the one place a person reads a project at a glance
  * is Portfolio's cards. A block it adds sits beside the cards and says the month again in a tile of its own; a column it

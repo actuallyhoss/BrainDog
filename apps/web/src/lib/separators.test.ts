@@ -1,5 +1,5 @@
 /**
- * A SEPARATOR KEEPS ITS SPACES (SF2).
+ * A SEPARATOR KEEPS ITS SPACES.
  *
  * Svelte trims the spaces at the ends of a text node inside an element, so `<span class="sep"> · </span>` drew "a·b"
  * in an inline line (HubRows, the late cell of a list), and a bare `·` drew it everywhere. A separator is written

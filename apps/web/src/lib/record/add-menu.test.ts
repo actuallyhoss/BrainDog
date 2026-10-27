@@ -1,5 +1,5 @@
 /**
- * The Add menu offers every kind the renderer draws, or says why not (PGS-A22, job 1).
+ * The Add menu offers every kind the renderer draws, or says why not.
  *
  * THE MENU OFFERED NINETEEN OF FORTY KINDS, and the other twenty-one went without a word: a person building a page
  * could not add a form, a strip of weeks, a heat map, a ring, a split, cards, a feed or lanes. This holds every kind of

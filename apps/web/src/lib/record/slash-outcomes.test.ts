@@ -1,5 +1,5 @@
 /**
- * What came of Slash's suggestions, on /slash (ENG-B01, ENG-A16 seen): a line a kind in whole counts with the nought
+ * What came of Slash's suggestions, on /slash (ENG-A16 seen): a line a kind in whole counts with the nought
  * parts left out, the duplicates merged, and whether Slash wrote outside what it may, the fault in its own word. Every
  * number here is invented. The words are checked because a wrong count draws as correctly as a right one.
  */
@@ -141,7 +141,7 @@ test('READ, A HOST THAT SENDS SOME OF THE FIELDS: what it sent, the rest unread 
   assert.deepEqual(texts(out), ['Slash wrote 2 changes outside what it may.']);
 });
 
-test('GRADED SUGGESTIONS (ENG-B17): one line once a prediction came due, nothing before or on numbers that do not add up', async () => {
+test('GRADED SUGGESTIONS: one line once a prediction came due, nothing before or on numbers that do not add up', async () => {
   const out = await readOutcomes(answering({ ok: true, value: { predictions: { scored: 4, met: 3 } } }));
   assert.deepEqual(out, { slash: [], folds: null, outside: null, predictions: { scored: 4, met: 3 } });
   assert.deepEqual(texts(out), ['Of 4 suggestions graded, 3 did what they said.']);

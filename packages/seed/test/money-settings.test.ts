@@ -4,7 +4,7 @@
  * THE HOME CURRENCY HAS NO DEFAULT, AND THIS IS WHERE THAT IS MEASURED. A default of `GBP` was tried: on a record with
  * one account in Egyptian pounds and one in dollars, Cash now then answered a sterling figure converted at a rate nobody
  * asked for, which reads exactly like one a person chose. These cases lived in `founder-poll.test.ts` and then in
- * `packs/rates-poll/rates-poll.test.ts`; the founder's poll builder is gone (REC-C01, the live feed fills a poll now),
+ * `packs/rates-poll/rates-poll.test.ts`; the founder's poll builder is gone (the live feed fills a poll now),
  * and the setting is Money's, so its record case lives beside Money's own tests.
  */
 

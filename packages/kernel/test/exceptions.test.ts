@@ -1,5 +1,5 @@
 /**
- * Exceptions (ENG-B13): what a record says by itself has stopped. Each case here holds the rule about absence: a
+ * Exceptions: what a record says by itself has stopped. Each case here holds the rule about absence: a
  * silence is an exception only where the record was recording presence, so a list written to once, a door that took one
  * message and a record three days old all answer none. Nothing is stored: every case reads, writes, and reads again.
  *

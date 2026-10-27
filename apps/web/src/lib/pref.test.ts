@@ -334,7 +334,7 @@ test('and with no record listening, a choice stays on the device and nothing is 
 });
 
 /**
- * A SEND THAT DID NOT ARRIVE IS OWED, NOT FORGOTTEN (the audit of batches 11 to 13, finding 4). It resolved as "device"
+ * A SEND THAT DID NOT ARRIVE IS OWED, NOT FORGOTTEN. It resolved as "device"
  * and was never sent again, and the next boot then adopted the record's older word over it, so a dark chosen offline was
  * light again after the reload.
  */

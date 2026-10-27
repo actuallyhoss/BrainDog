@@ -1,5 +1,5 @@
 /**
- * The briefing's cards (ENG-B12): what Today opens on. The facts are ranked, one a cause, thirty at most; a model's
+ * The briefing's cards: what Today opens on. The facts are ranked, one a cause, thirty at most; a model's
  * answer is kept card by card only where it names what it was handed and types no number; and with no model the rules
  * say the top five in their own sentences.
  */

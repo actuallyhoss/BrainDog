@@ -1,5 +1,5 @@
 <!--
-  Where the Share sheet answers `braindog:share-sheet` (sharing plan §3.2): the Sharing page asks for the sheet by an
+  Where the Share sheet answers `braindog:share-sheet`: the Sharing page asks for the sheet by an
   event (`askSheet` in `sharing.ts`) rather than importing it, and this listens, loads the sheet by `import()` the first
   time it is asked, and opens it on what was asked: a share to change, or a new share of anything on the record, with
   somebody already picked when the ask names them. The sheet says `braindog:shared` once it kept one.

@@ -1,5 +1,5 @@
 /**
- * An update the record made by itself is said once, and is nobody's work (SHL-A21): one pass of BrainDog's own update
+ * An update the record made by itself is said once, and is nobody's work: one pass of BrainDog's own update
  * reads as one line with its steps under it, in Activity and in "since you were away" alike, a second pass the same day
  * adds none, two ticks that meet put each version in once, and the count of who did what gives the pass to the record.
  */

@@ -1,10 +1,10 @@
 /**
- * The signs of what runs by itself and what arrives (SHL-C01 job 1): five readings in the shape `signs.ts` sets
- * (PRF-A01), joined to its closed list with one import and one spread, and the read a project's blockers take from
+ * The signs of what runs by itself and what arrives (SHL-C01 job 1): five readings in the shape `signs.ts` sets,
+ * joined to its closed list with one import and one spread, and the read a project's blockers take from
  * (`actionsBlocking`, for REC-C09).
  *
  * WHY THIS EXISTS. "Now needs to name a failed `pull` too" (P.191), "a dead job", "a run is never skipped
- * silently" (D0b.35). A paused action showed its last status in "Runs on" and nowhere else; a schedule row that failed
+ * silently". A paused action showed its last status in "Runs on" and nowhere else; a schedule row that failed
  * eight times became one question in Decide per dead job; no sign read the schedule, the meter or the doors. Since
  * AGT-C06 the eighth attempt raises a fault for the operator (`schedule.ts`), and the owner sees one line here.
  *
@@ -156,7 +156,7 @@ function statusSaid(status: number | null, outcome: string | null): string {
 
 /**
  * NOTHING HERE CALLS OUT ON A CLOCK. An action is a web call a record makes on a schedule (`ACTION_KINDS`), and "no
- * action runs on a schedule" stood beside scripts and digests that run daily (audit 25 October, Y5), so it says which.
+ * action runs on a schedule" stood beside scripts and digests that run daily, so it says which.
  */
 const NO_WEB_CALL = 'No web call runs on a schedule on this record.';
 
@@ -206,7 +206,7 @@ function readScheduleFailed(sql: Sql, _nowMs: number, tz: string): SignReading {
 /* ── doors-silent ──────────────────────────────────────────────────────── */
 
 /* A DOOR IS A LIVE PATTERN THAT FILES WHAT ARRIVES, counted by its receipts. ONE RETIRED IS NOT JUDGED: a door he turned
-   off is quiet for a good reason, the risk the brief names (SHL-C01, "Risk"), and so is one switched off at its door
+   off is quiet for a good reason, the risk the brief names ("Risk"), and so is one switched off at its door
    (`ingest_off.<id>`, the record's `door-switch.ts`). */
 function readDoorsSilent(sql: Sql, nowMs: number, tz: string): SignReading {
   const quietFrom = new Date(nowMs - DOOR_QUIET_DAYS * DAY).toISOString();
@@ -264,7 +264,7 @@ function readUnverified(sql: Sql, nowMs: number, tz: string): SignReading {
 
 /* ── what is in a project's way ────────────────────────────────────────── */
 
-/** One scheduled action in a project's way, for the record's read of its blockers (REC-C09). */
+/** One scheduled action in a project's way, for the record's read of its blockers. */
 export type ActionBlocking = {
   /** The action's handle, for an agent beside its name. Never in `said`. */
   action: string;

@@ -1,5 +1,5 @@
 /**
- * Whether a session has committed since it started (scope B31), which the bridge writes into the inbox so the Stop hook
+ * Whether a session has committed since it started, which the bridge writes into the inbox so the Stop hook
  * asks once for learnings: HEAD in the session's folder against the commit its start hook kept.
  */
 

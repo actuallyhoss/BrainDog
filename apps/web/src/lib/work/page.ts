@@ -3,7 +3,7 @@
  *
  * WORK IS A DECLARED PAGE, `page.work` from the work module, drawn by the one reader every page goes through
  * (`$lib/page/PageView.svelte`), so the person or an agent can reshape it as they can Money. The hand-written screen it
- * replaced is gone (C32, 24 October): the page narrows by whose work it is and folds what has not moved in three months,
+ * replaced is gone (24 October): the page narrows by whose work it is and folds what has not moved in three months,
  * which only that screen did. `/?work&classic` is an address somebody kept, and it opens the page.
  *
  * A RECORD THAT HOLDS TASKS AND NO WORK PAGE, which the nav still opens here (`WORK` in `lib/nav.ts`), is sent to its

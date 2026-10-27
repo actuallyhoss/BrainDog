@@ -1,5 +1,5 @@
 <!--
-  Pick a block's glyph from the set, by group (PGS-A19): a word to find one, and the glyphs under their group's heading.
+  Pick a block's glyph from the set, by group: a word to find one, and the glyphs under their group's heading.
 
   ONE CHOICE, ONE TAB STOP. Each group is a radio group named by its heading, and the glyphs of every group are walked
   as one set: the arrow keys move from the last glyph of a group to the first of the next, Home and End go to the ends,

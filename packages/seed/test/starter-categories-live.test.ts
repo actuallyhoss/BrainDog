@@ -1,5 +1,5 @@
 /**
- * Ruling 341, the half a stranger never got (audit 76 claim 3): Money's starter categories reach a record as the
+ * Ruling 341, the half a stranger never got: Money's starter categories reach a record as the
  * person's own, not as examples.
  *
  * HELD HERE AT THE TWO PLACES THAT DROPPED THEM: `moduleDocument`, which carried no row unless it was asked for

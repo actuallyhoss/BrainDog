@@ -301,10 +301,10 @@
     return /^part(?:$|[_\s-])/iu.test(value) ? 'part' : 'open';
   };
 
-  /* THE FIGURE SAYS WHICH WAY IT WENT where it is the amount the list leads with and the list says a way (Y19). */
+  /* THE FIGURE SAYS WHICH WAY IT WENT where it is the amount the list leads with and the list says a way. */
   const signs = $derived(figure !== undefined && amountField(decl)?.id === figure);
 
-  /* THE FIGURES ARE ONE SET (2.A.7): every one without pence where all are whole, and every one with two places where any
+  /* THE FIGURES ARE ONE SET: every one without pence where all are whole, and every one with two places where any
      has pence, so the column reads digit under digit. */
   const pence = $derived.by(() => {
     if (!figure) return false;
@@ -352,7 +352,7 @@
             {@const value = e.fields[figure]}
             <span class="card-figure" dir={dirOf(register, figure)}>
               {#if figureLabel}<span class="card-figure-label">{figureLabel}</span>{/if}
-              <!-- AND WHICH WAY IT WENT (Y19), as Money's page says it: "−EGP 279.03" out and "+EGP 600.00" in. -->
+              <!-- AND WHICH WAY IT WENT, as Money's page says it: "−EGP 279.03" out and "+EGP 600.00" in. -->
               {#if isMoney(value)}{@const way = signs ? wayOf(decl, e.fields) : null}{#if way === 'in'}+{/if}<Money minor={way === 'out' ? -Math.abs(value.amount) : value.amount} currency={value.currency} form={pence ? 'exact' : 'auto'} approx />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
             </span>
           {/if}

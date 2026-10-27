@@ -1,5 +1,5 @@
 /**
- * Codex, as the clients table holds it: where it keeps servers, the reader, and the writer (AGT-A07, AGT-D10, AGT-D11).
+ * Codex, as the clients table holds it: where it keeps servers, the reader, and the writer.
  *
  * WHERE AND WHAT, FROM CODEX'S OWN DOCUMENTS (developers.openai.com/codex/mcp, read 2026-10-14): a person's servers are
  * `[mcp_servers.<name>]` tables in `~/.codex/config.toml`, and a trusted repository's in its `.codex/config.toml`. A

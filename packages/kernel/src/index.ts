@@ -409,16 +409,16 @@ export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
 export const PRIVATE_NOTE = 'private';
 export { DRAFT_FIELD, TOPIC_MAX, cleanName, firstProjectFields, firstProjectName, noPlace, topicName } from './first-project.ts';
 export { KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
-/* A FIELD WORKED OUT FROM OTHER FIELDS (SHL-B18): its shapes and refusals, and the rows filled at read. `shapeOf` is the
+/* A FIELD WORKED OUT FROM OTHER FIELDS: its shapes and refusals, and the rows filled at read. `shapeOf` is the
    ingest's name here, so the derive's is exported as `deriveShapeOf`. */
 export { DERIVE_SHAPES, DERIVE_REFUSES, NORMALISE_HOW, deriveFault, derived, isDerived, shapeOf as deriveShapeOf, sourcesOf, type Derive, type DeriveField, type DeriveShape } from './derive.ts';
 export { withDerived, oneWithDerived, type DeriveResolve, type DerivableRow } from './derive-rows.ts';
 /* THE RECORD'S VITAL SIGNS (`signs.ts`): the closed list, and what a sign and a reading are. */
 export { VITAL_SIGNS, quietSign, type SignReading, type VitalSign } from './signs.ts';
-/* WHAT IS IN A PROJECT'S WAY (`signs-actions.ts`, REC-C09): its paused, failing or late actions, for a page source. */
+/* WHAT IS IN A PROJECT'S WAY (`signs-actions.ts`): its paused, failing or late actions, for a page source. */
 export { SIGNS_ACTIONS, actionsBlocking, type ActionBlocking } from './signs-actions.ts';
 export { DOOR_KINDS, type DoorMark, type DoorSigns } from './door.ts';
-/* A HANDOFF THAT CLOSES (`handoff.ts`, AGT-C05): the open steps in a place, and taken, dropped or expired. */
+/* A HANDOFF THAT CLOSES (`handoff.ts`): the open steps in a place, and taken, dropped or expired. */
 export {
   EARLIER_MS,
   EXPIRE_MS,
@@ -438,7 +438,7 @@ export {
   type Taken,
 } from './handoff.ts';
 export { SAID, clearFault, openFaults, raiseFault, type Fault } from './fault.ts';
-/* THE RECORD'S COPIES AS THREE FACTS, and the night's two writes (`copies.ts`, LCH-C03). */
+/* THE RECORD'S COPIES AS THREE FACTS, and the night's two writes (`copies.ts`). */
 export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, keptNote, nightWhy, type CopyFacts, type Lifecycle } from './copies.ts';
 /* `canon` IS ALSO MIGRATE'S NAME (a script written one way), so a value written one way is `canonValue` out here. */
 export { CAUSE, MOOT_GONE, MOOT_HELD, canon as canonValue, causeFault, causeOf, moot, mootWhy, noop, recheck, sha256 } from './cause.ts';
@@ -475,7 +475,7 @@ export {
   type RunRow,
   type WorkingRun,
 } from './presence.ts';
-/* LIVE PRESENCE (plan §4.4): the finer words for a session open now, read with the bridge's pulse. */
+/* LIVE PRESENCE: the finer words for a session open now, read with the bridge's pulse. */
 export { CALL_MS, GONE_MS, PULSE_MIN_MS, THINKING_MS, isPresent, liveStateOf, placesHeard, presentRuns, type LiveState } from './presence.ts';
 /* INSTRUCTIONS AND SETTINGS ROWS (agents and MCP plan §8.3), the kernel's half of what wave 2 builds on. The functions
    take the record's `Sql` first; the kernel's own methods of the same names (`instructionFor`, `takeInstruction`, …)
@@ -608,7 +608,7 @@ export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 /* The runs list and a run's handle, so the web's literal copies are tested against them (books-kept.test.ts). */
 export { SESSION, SESSION_PREFIX } from './session.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
-/* THE TIDY AS FIGURES (AGT-C18): the source, its reader, and the id of one finder's own figure. */
+/* THE TIDY AS FIGURES: the source, its reader, and the id of one finder's own figure. */
 export { RECORD_TIDY, readTidy, staleFigureOf, type TidyDecl } from './built-in-figures.ts';
 export { ACTIVITY_BY, RECORD_ACTIVITY, readActivity, type ActivityBy, type ActivityDecl } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
@@ -617,7 +617,7 @@ export type { Beyond, Crosscheck, Rolled, RolledCheck, RolledMoves, Walked, Walk
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, isAtLeast, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, WITHHELD_CODES, byOf, fill, pathsOf, railRoom, readBlock, readPage, resolvePages, slugify, whollyWithheld } from './pages.ts';
-/* THE PAGES CENSUS (`census.ts`, PGS-A01): what one page's answer says about itself, refused blocks, paths that named nothing, dashes. */
+/* THE PAGES CENSUS (`census.ts`): what one page's answer says about itself, refused blocks, paths that named nothing, dashes. */
 export { censusOf, type Census, type CensusAlso, type Held } from './census.ts';
 /* WHAT EVERY READER DRAWS (`drawn.ts`), one rule for the record, the web and an agent's read of a page. */
 export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, leadOf, markDrawn, says, unsaid, type Drawable, type Why } from './drawn.ts';
@@ -627,15 +627,15 @@ export { ANSWER_KEYS, BLOCK_INSTALLS, BLOCK_KEY, blockKeyOf, defaultBlockKey, ke
 export { WHEN_READERS, actionsFault, declaredActions, type WhenReader } from './block-keys.ts';
 /* THE LOOK OVERLAY (`compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
 export { applyLook, composeLook, drewNothing, lookOf, lookPlacesFault, mergeLook, questionsLead, queuesKept, LOOK_AREAS, LOOK_BY, LOOK_SPANS, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
-/* A LOOK'S GROUPING (ENG-B10, `compose.ts`): which kinds a look may group, how many, and over how many values. */
+/* A LOOK'S GROUPING (`compose.ts`): which kinds a look may group, how many, and over how many values. */
 export { GROUPED_BY_FIELD, GROUP_ROWS_OVER, GROUP_VALUES_LEAST, GROUP_VALUES_MOST, LOOK_GROUPS_MOST, groupsWell, valuesShown } from './compose.ts';
-/* THE HOLES IN A LOOK'S HEADLINE (ENG-B09, `compose.ts`): a number a line says is a hole the record fills from the page's own figures. */
+/* THE HOLES IN A LOOK'S HEADLINE (`compose.ts`): a number a line says is a hole the record fills from the page's own figures. */
 export { figureSaid, figuresOf, fillHoles, holesIn, withoutHoles } from './compose.ts';
-/* WHAT WENT QUIET (ENG-B13, `exceptions.ts`): the read, what it answers and the lists a caller hands it to watch. */
+/* WHAT WENT QUIET (`exceptions.ts`): the read, what it answers and the lists a caller hands it to watch. */
 export { LISTS_A_READ, openExceptions, type Exception, type Was, type Watched } from './exceptions.ts';
-/* THE TIDY (AGT-C18, `tidy.ts`): what is stale now and what the record cleared, a finder a line, as the hourly sweep keeps it. */
+/* THE TIDY (`tidy.ts`): what is stale now and what the record cleared, a finder a line, as the hourly sweep keeps it. */
 export { KEEP_DAYS, causeOfFinder, finderOf, finders, registerFinder, staleNow, tidied, tidyDays, tidyHour, type Finder, type Found, type TidyAsk, type TidyDay, type TidyDeps, type TidyLine } from './tidy.ts';
-/* WHAT A ROW IS AND WHERE IT WAS SEEN (ENG-B02, `about.ts`): the one read of a person, an organisation or a project, and the candidates a text may be about. */
+/* WHAT A ROW IS AND WHERE IT WAS SEEN (`about.ts`): the one read of a person, an organisation or a project, and the candidates a text may be about. */
 export { CANDIDATES, SEEN_KEPT, SEEN_SHOWN, aboutOf, aboutOfRow, candidatesFor, keysIn } from './about.ts';
 export type { About, AboutDeps, AboutKind, AboutLink, AboutSeen, Candidate as AboutCandidate, FoundBy, Handed, HandleRow } from './about.ts';
 export { admitHostSources, lookFault } from './declare.ts';
@@ -690,11 +690,11 @@ export {
 } from './backfill.ts';
 export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash, peopleTwiceIds, peopleTwiceIdsIn } from './people.ts';
 export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
-/* THE BANDS A MODEL'S ANSWER IS SETTLED IN (ENG-B04, `people.ts`). Nothing here folds by itself: `settleVerdicts` folds
+/* THE BANDS A MODEL'S ANSWER IS SETTLED IN (`people.ts`). Nothing here folds by itself: `settleVerdicts` folds
    only for a caller that hands it the switch, and no caller in this file does. */
 export { BAND_ASK, BAND_SURE, corroborated, settleVerdicts, type BandFold, type Settlement, type SettleOpts } from './people.ts';
 export { foldFill, identityFloor, type FoldField, type FoldFields, type FoldFilled, type FoldRow as FoldFillRow, type Offered } from './mentions.ts';
-/* THE OTHER PAIRS (ENG-B04, `resolve.ts`): two organisations or two projects that read as one, and a name seen that no
+/* THE OTHER PAIRS (`resolve.ts`): two organisations or two projects that read as one, and a name seen that no
    row is called. A read that writes nothing and asks nothing. */
 export { PAIRS_MOST, evidenceOf, pairsFor, type Pair, type PairHow, type PairRow, type PairSide, type Pairs } from './resolve.ts';
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
@@ -708,7 +708,7 @@ export type { IdentitySaid, KeyInput, KeyKind, SameFold } from './identity-keys.
 export { claimed, entityLists, keyLists, nameKey, noteMention, projectList, sameLists, settledBy } from './entities.ts';
 /* `Claimed` is the scheduler's name here already (`schedule.ts`), so the keys' one goes out as `KeyClaimed`. */
 export type { Claimed as KeyClaimed, EntityList, KeyList, ProjectList, SameList, SameRule } from './entities.ts';
-/* WHAT MAKES TWO ROWS THE SAME (AGT-C13): the groups here twice, and the writes that fold them, for a person's press.
+/* WHAT MAKES TWO ROWS THE SAME: the groups here twice, and the writes that fold them, for a person's press.
    `foldPlan` is already the name of what undoing a match would do (`undo-fold.ts`), so this one goes out as `sameFoldPlan`. */
 export { clashes, foldPlan as sameFoldPlan, sameListOf, sameRuleOf } from './same.ts';
 export type { FoldGroup, FoldWrite, SameDecl, SameGroup } from './same.ts';
@@ -769,10 +769,10 @@ export { AUTOMATION_INSIDE, AUTOMATION_REACHES, kindOfAutomationChange, stepsDif
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
 export { SIGNALS, WINDOWS, analyse, brakeOf, findingsFrom, mayPropose, observe, slashBrake } from './observe.ts';
-/* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS (ENG-B12): the kernel's own two readings, so the briefing writes neither again. */
+/* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS: the kernel's own two readings, so the briefing writes neither again. */
 export { moneyText } from './ingest.ts';
 export { MONEY_MASK, maskMoneyText } from './mail-read.ts';
-/* THE SHAPES OWED A PATTERN (ENG-B07): which arrivals wait on a draft, and the cause their one question is filed under. */
+/* THE SHAPES OWED A PATTERN: which arrivals wait on a draft, and the cause their one question is filed under. */
 export { owedShapes, patternCause, UNVERIFIED, type Owed } from './ingest.ts';
 export { runPlace } from './handoff.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
@@ -919,7 +919,7 @@ export type ViewRow = {
  * THE BAND A QUEUE RANKS AND COUNTS BY IS `costOf`'s, as SQL (`COST_SQL` in `weigh.ts`), and nothing beside it.
  *
  * ONE RULE NOW. It was `COST_SQL` under a clause of this file's own that said a rowset writing a money
- * value is always hard to undo (audit 19, H3), so such a question never sat in a cheap band where Enter would accept
+ * value is always hard to undo, so such a question never sat in a cheap band where Enter would accept
  * it. That clause is now `costOf`'s own rowset arm, in the same SQL (`MOVES_MONEY_SQL`), and a second copy here could
  * only ever disagree with it. `questionFrom` says the same of the question it draws, and one thing more that no body
  * can say: a money field cleared (`movesMoney` below, read by the field's declared type).
@@ -1058,7 +1058,7 @@ export type RegisterDecl = {
   steps?: StepsDecl;
   /** How two rows are the two legs of one transfer, found by the write path and marked on both (`pairs.ts`). */
   pairs?: PairsDecl;
-  /** The order a read that names none comes back in (PGS-B06): one field of this list that sorts, no `dir` lowest first, as `declare.ts` admits it. */
+  /** The order a read that names none comes back in: one field of this list that sorts, no `dir` lowest first, as `declare.ts` admits it. */
   order?: { field: string; dir?: 'asc' | 'desc' };
   /** A list a record-wide "Adds only" does not reach, as Keys and People are by their roles (`20 §1`). */
   owner_only?: true;
@@ -1068,7 +1068,7 @@ export type RegisterDecl = {
    * to when an agent takes it (checked at install by `declare.ts`'s `handFault`). */
   hand?: { person?: string; agent?: string; taken?: string };
   /**
-   * The fields an add-on writes once (SHL-A09): what it plants on a row it makes, and never patches on a row that is
+   * The fields an add-on writes once: what it plants on a row it makes, and never patches on a row that is
    * already there. A category's name is the case: the add-on's next version may spell it another way, and the person
    * has renamed theirs since. Read by the write path for a write that says it is the add-on's (`WriteContext.pack`),
    * and by nothing else: a person changes the field as they change any other, which is what `immutable` forbids and
@@ -1186,7 +1186,7 @@ export type WriteContext = {
    */
   pack?: true | undefined;
   /**
-   * The rows of the written list this writer may write (sharing plan §2.6), as the scope a reader hands `list`
+   * The rows of the written list this writer may write, as the scope a reader hands `list`
    * (`scope(ctx, register)`): the grant's rule and the private rows left out for them. Absent is every row.
    *
    * CHECKED ON BOTH SIDES OF THE WRITE, IN ITS TRANSACTION, by the SQL reads use, so there is no second evaluator. A row
@@ -1196,7 +1196,7 @@ export type WriteContext = {
    */
   within?: Json | undefined;
   /**
-   * WHO WROTE THIS, FOR THE AUDIT (sharing plan §2.10), handed only for a writer who is not an owner: the person, and
+   * WHO WROTE THIS, FOR THE AUDIT, handed only for a writer who is not an owner: the person, and
    * whether it is their agent. The write keeps one `access_via` row for its batch, IN ITS OWN TRANSACTION, naming the
    * shares whose write predicate admits the row it leaves (one SELECT per covering share), so "Priya changed M14 through
    * the Accountant share" can be said later. Like `within`, it holds for the one list the write names and never for what
@@ -1204,7 +1204,7 @@ export type WriteContext = {
    */
   via?: { who: string; agent?: boolean } | undefined;
   /**
-   * For a proposal: whether a row its body names is one the proposer may see (sharing plan §2.6). A row it does not
+   * For a proposal: whether a row its body names is one the proposer may see. A row it does not
    * admit is answered as a row that is not there. Absent, every row is.
    */
   sees?: ((register: string, id: string) => boolean) | undefined;
@@ -1495,7 +1495,7 @@ export type RecordOptions = {
    * whose marks named another build is behind. The kernel cannot know its host's build. Absent, `behind` says nothing.
    */
   build?: string | null;
-  /** A self-host started with --allow-shape: its import takes a shape copy (PRF-A13). Absent is no. */
+  /** A self-host started with --allow-shape: its import takes a shape copy. Absent is no. */
   allowShape?: boolean | undefined;
 };
 
@@ -1791,7 +1791,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   let prefixes = new Map<string, string>();
 
   /**
-   * THE DECLARATION REVISION AND WHAT HANGS OFF IT (sharing plan §2.8): the lists as the lens reads them, built once per
+   * THE DECLARATION REVISION AND WHAT HANGS OFF IT: the lists as the lens reads them, built once per
    * revision, and the lens cache, keyed on the revision so a list installed or a field retired is never answered from a
    * lens made before it. The cache holds 256 answers, the one used longest ago going first.
    */
@@ -2231,7 +2231,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
 
   /**
-   * The rows of a list this caller may change (sharing plan §2.6), as `WriteContext.within` takes them: a share's
+   * The rows of a list this caller may change, as `WriteContext.within` takes them: a share's
    * narrower write predicate (`ctx.writes`) where the lens gave one, which already holds read inside it, else the read
    * scope. The private rows left out for the viewer stay out either way.
    */
@@ -2264,7 +2264,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
 
   /**
-   * A GRANT'S RULE COMPILED ONCE AND KEPT (sharing plan §2.13, "compiled conditions are cached"): by the declaration
+   * A GRANT'S RULE COMPILED ONCE AND KEPT ("compiled conditions are cached"): by the declaration
    * revision, the record's version, the minute, the list and the rule's own text, `RULES_KEPT` of them, the one used
    * longest ago going first. Every read a narrowed caller makes compiles their rule for each list it touches, and a
    * rule written as a sentence looks its names up as it compiles; a page of reads between two writes asks it once.
@@ -2275,7 +2275,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * schema, as a read with no hop compiles it (`readerSchemaOf`).
    */
   /**
-   * `register = '<id>'`, THE LIST'S ID WRITTEN INTO THE STATEMENT (sharing plan §2.13, R5). A field declared `index: true`
+   * `register = '<id>'`, THE LIST'S ID WRITTEN INTO THE STATEMENT. A field declared `index: true`
    * is indexed only on its own list's live rows (`entry_i_<list>__<field> … WHERE register = '<list>'`), and SQLite uses
    * such a partial index only where it can see the statement holds that list, which a bound `?` does not show it. So a
    * read held to one project by a grant on an indexed field walked every live row of the list. An id is the grammar's
@@ -2301,11 +2301,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return c;
   };
 
-  /** How many ids `admittedIds` asks about in one statement: the walk's own batch (sharing plan §2.13). */
+  /** How many ids `admittedIds` asks about in one statement: the walk's own batch. */
   const ADMIT_BATCH = 500;
 
   /**
-   * Which of these rows of one list a grant admits for a viewer (sharing plan §2.5 item 3): one statement per 500 ids,
+   * Which of these rows of one list a grant admits for a viewer: one statement per 500 ids,
    * in place of one `list` per row. A deleted row is still admitted when its rule admits it, as `get` with
    * `includeDeleted` reads it; an id that is not a row of the list is never admitted.
    */
@@ -2346,7 +2346,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
 
   /**
-   * WHICH SHARES ADMIT ONE ROW FOR ONE CAPABILITY (sharing plan §2.10, `via`): of the live allows a person holds, their
+   * WHICH SHARES ADMIT ONE ROW FOR ONE CAPABILITY (`via`): of the live allows a person holds, their
    * own and their groups', the ones whose part of the lens reaches the row, asked by `admits`, one SELECT per covering
    * share and none for a share that reaches the whole list. `id` null asks of the list. An agent carries no allow its
    * person switched agents off for. A role or a member row admits rows too, and is no share: `[]` says so.
@@ -2394,7 +2394,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /**
    * The fields of a list a rule names (`row_where`, a share's condition), so a write can tell which fields decide who
-   * sees a row (sharing plan §2.6, gate fields). A rule that cannot be read names none.
+   * sees a row (gate fields). A rule that cannot be read names none.
    */
   const ruleFields = (register: string, rule: Json): string[] => {
     if (!registers.has(register)) return [];
@@ -2545,7 +2545,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       registers.has(register) ? { ...schemaOf(register), schemaOf: (r: string) => hopSchemaOf(r, reads) } : null;
 
   /**
-   * THE FAR SIDE OF A `via` (SHL-B18), held to what the reader may open: the linked rows of one list by id, and the one
+   * THE FAR SIDE OF A `via`, held to what the reader may open: the linked rows of one list by id, and the one
    * field read on each. ONE QUERY A CALL, and `withDerived` calls it once per `via` field per page, so fifty rows
    * through one link are one lookup. `reads` is the read path's own sight, the lists the caller reads whole (`hops`,
    * or `reads` without it): a list outside it, or one she sees narrowed, answers nothing, so every link into it derives
@@ -3594,7 +3594,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * first, and only a well-formed one hears that nothing here would answer it.
    */
   /**
-   * An action or a script in the batch that names a key kept for another project (`keyOutOfScope`, D0b.23).
+   * An action or a script in the batch that names a key kept for another project (`keyOutOfScope`).
    *
    * HERE AND NOT IN `declare.ts`, for the reason `unserved` is: which projects a key is kept to is read off the keychain and
    * the lists that hold keys, which the context-free lint never sees. Asked on every install path right after it.
@@ -3664,7 +3664,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     for (const one of installed) {
       if (!one.changed) continue;
       const now = sql.one<{ kind: string; body: string; pack: string | null }>('SELECT kind, body, pack_id AS pack FROM declaration WHERE id = ? AND version = ?', one.id, one.version);
-      /* SLASH SIGNS THE DECLARE OF ITS OWN LOOK AND NO OTHER (ENG-A16). Inside the install's transaction, so the throw
+      /* SLASH SIGNS THE DECLARE OF ITS OWN LOOK AND NO OTHER. Inside the install's transaction, so the throw
          takes the version with it. */
       slashMayWrite(by.actor, 'declare', now);
       const was = sql.one<{ version: number; body: string }>(
@@ -3934,7 +3934,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /* THE QUESTION'S SHAPE IS `ListQuery` IN `parts.ts`, with the reasons for each of its keys, so an extension handed
      `list` and this function read one type. */
-  /* `hide` IS THE FIELDS OF THIS LIST HIDDEN FROM THE CALLER (sharing plan §2.7): her own filter and order are read
+  /* `hide` IS THE FIELDS OF THIS LIST HIDDEN FROM THE CALLER: her own filter and order are read
      against the list less them, so naming one is `FIELD_UNKNOWN` as a field the list does not have is, and no filter or
      sort can halve its way to a value. The grant's own rule is still read against the whole list. */
   function list(q: ListQuery, grant?: Json, hide?: readonly string[]): Result<Listed> {
@@ -3943,7 +3943,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (!registers.has(q.register))
       return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
     const hidden = new Set(hide ?? []);
-    /* A LIST'S OWN ORDER WHEN THE READ NAMES NONE (PGS-B06), so the sorted path below sorts and pages by it and its
+    /* A LIST'S OWN ORDER WHEN THE READ NAMES NONE, so the sorted path below sorts and pages by it and its
        cursor comes back to a read that names no order too. The Ledger by its day, newest first, where it came back by
        last change and opened on 13 July. NOT BY A FIELD HIDDEN FROM HER, whose order would say how its values stand. */
     const own = registers.get(q.register)!.order;
@@ -3996,7 +3996,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * this branch used to write by hand. It also gets the register's mirrored state right, which
      * a name spelt here could not: one shipped register calls that field `lane`.
      */
-    /* NEWEST MADE FIRST, A LIST THAT DECLARES NO ORDER (PGS-B06), where it was last changed first and an edit moved
+    /* NEWEST MADE FIRST, A LIST THAT DECLARES NO ORDER, where it was last changed first and an edit moved
        an entry to the top. */
     let sort = 'ORDER BY created_at DESC, id DESC';
     /**
@@ -4176,7 +4176,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const rows = page.slice(0, limit).map(hydrate);
     const more = page.length > limit;
     const last = rows.at(-1);
-    /* THE PAGE LEAVES WITH ITS WORKED-OUT FIELDS FILLED (SHL-B18), after the cursor's row is chosen, and a `via` read
+    /* THE PAGE LEAVES WITH ITS WORKED-OUT FIELDS FILLED, after the cursor's row is chosen, and a `via` read
        through the reader's own sight: the lists she reads whole, as a hop from her filter is held. */
     const decl = registers.get(q.register)!;
     const out = decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(q.hops ?? q.reads)) : rows;
@@ -4224,7 +4224,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     viewer?: string | undefined;
     /** The caller's grant (`wheres`): a row its rule leaves out is neither the row asked about nor one that points at it. */
     grant?: Readonly<Wheres> | undefined;
-    /** The fields hidden from the caller, by list (sharing plan §2.7): a ref she cannot see points at nothing she is shown. */
+    /** The fields hidden from the caller, by list: a ref she cannot see points at nothing she is shown. */
     hide?: Readonly<Record<string, readonly string[]>> | undefined;
   }): Result<Backlinks> {
     const barred = schemaRefusal(state);
@@ -4443,7 +4443,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     }
     /* A SEALING WRITE BINDS A GRANT PART-WAY THROUGH ITS PERSIST STEP, so a refusal after that rolls
        back to a savepoint rather than trusting that nothing was written before it. AND A WRITE HELD TO ITS WRITER'S
-       ROWS (sharing plan §2.6) is asked once more before it commits, by the same clause, whether the row it leaves is
+       ROWS is asked once more before it commits, by the same clause, whether the row it leaves is
        still one of them: a create outside them, or an edit that moves the row out, is unwound whole, the rules pass
        with it. */
     const out =
@@ -4548,7 +4548,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         );
 
       const found = ref === null ? null : get(ref, { includeDeleted: true });
-      /* A ROW THIS WRITER MAY NOT WRITE IS A ROW THAT IS NOT THERE (sharing plan §2.6, P4): the same code and the same
+      /* A ROW THIS WRITER MAY NOT WRITE IS A ROW THAT IS NOT THERE: the same code and the same
          sentence, at the same step, so no refusal proves a row exists. */
       const current = found !== null && door.within !== undefined && found.register === register && !admits(register, door.within, found.id) ? null : found;
       if (ref !== null && !current)
@@ -4621,7 +4621,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             return row && (!row.deleted_at || holds(row.id)) ? row.id : null;
           },
           deleted: (reg: string, seq: number) => !hidden(reg) && look.deleted(reg, seq),
-          /* A BARE AMOUNT TAKES ITS ACCOUNT'S CODE (`currency_from`, REC-B04): the link this write sends, else the one
+          /* A BARE AMOUNT TAKES ITS ACCOUNT'S CODE (`currency_from`): the link this write sends, else the one
              the row holds, read as the writer may read it. A list she cannot read gives nothing, as `refId` does. */
           currencyOf: (): string | null => {
             const field = known.get(key);
@@ -4657,7 +4657,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          the same value added one, and `""` was a fourth state beside the three the kernel says are
          one. A default that is absent leaves the field absent, and a `required` field defaulted to
          nothing is `REQUIRED_MISSING` rather than quietly filled. */
-      /* A RUN CARRIED IN KEEPS THE DAY IT WAS LAST SEEN THERE (`run-carried.ts`, AGT-C10). Read before the defaults and
+      /* A RUN CARRIED IN KEEPS THE DAY IT WAS LAST SEEN THERE (`run-carried.ts`). Read before the defaults and
          the field loop, which refused its `last_seen` and lost the whole run: on a create or a run never heard from here,
          the time comes out of the patch as `seen_before`, stamped below, and a step left in another session drops. */
       const carried = register === SESSION ? carriedIn(patch, current) : null;
@@ -4676,7 +4676,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           if (!isAbsent(out.value)) merged[f.id] = out.value;
         }
 
-      /* WRITTEN ONCE BY THE ADD-ON (`once`, SHL-A09): its update leaves the field as the row holds it, set or empty,
+      /* WRITTEN ONCE BY THE ADD-ON (`once`): its update leaves the field as the row holds it, set or empty,
          and writes the rest. An existing row only: the row an add-on makes takes every field it was given. */
       const kept = new Set<string>(w.pack === true && current ? (decl.once ?? []) : []);
       /* OUT OF THE PATCH, NOT ONLY PAST THE LOOP: a field read beside another (the account a `currency_from` amount
@@ -4712,10 +4712,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             `${key} says where a key is sealed, and only the keychain writes it. Deposit the key, and the record points this field at it.`,
             { at: key },
           );
-        /* A MARK IS A PICTURE, NEVER A CONTROL (PGS-A06): a project drawn as the close cross reads as a button. */
+        /* A MARK IS A PICTURE, NEVER A CONTROL: a project drawn as the close cross reads as a button. */
         if ((decl as { identity?: { mark?: unknown } }).identity?.mark === key && isControlMark(value))
           return no<Entry>(MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, { at: key });
-        /* AND A PICTURE STAYS ONCE IT IS CHOSEN (REC-C17, `markFrozen`): a mark that names a glyph takes no change, and
+        /* AND A PICTURE STAYS ONCE IT IS CHOSEN (`markFrozen`): a mark that names a glyph takes no change, and
            before the `null` branch on purpose, so it is not cleared either. One that names no glyph takes the write. */
         if (current && (decl as { identity?: { mark?: unknown } }).identity?.mark === key) {
           const frozen = markFrozen(current.fields[key], value);
@@ -4745,7 +4745,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           JSON.stringify(current.fields[key]) !== JSON.stringify(out.value)
         )
           return no<Entry>('IMMUTABLE_FIELD', `${key} is set once and cannot be changed.`, { at: key });
-        /* THE CODE IS LOCKED AND THE NUMBER IS NOT (`currency_fixed`, REC-B04): an amount corrected stays in its currency. */
+        /* THE CODE IS LOCKED AND THE NUMBER IS NOT (`currency_fixed`): an amount corrected stays in its currency. */
         const fixed = current ? currencyFixed(field, current.fields[key], out.value, key) : null;
         if (fixed) return { ok: false, refusal: fixed };
         /* Compared the way `immutable` is, so re-sending the value a row already holds is no change. */
@@ -4756,7 +4756,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(isAbsent(out.value) ? null : out.value)
         )
           return decidedOnly(key);
-        // Absent is one thing, not three: null, "" and [] all remove the key (K2).
+        // Absent is one thing, not three: null, "" and [] all remove the key.
         if (isAbsent(out.value)) delete merged[key];
         else merged[key] = out.value;
       }
@@ -4808,7 +4808,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (f.required && value === undefined && (!current || touched.includes(f.id)))
           return no<Entry>('REQUIRED_MISSING', `${register} needs ${f.id}.`, { at: f.id });
 
-        /* A PATTERN A RULE'S LINK WILL RUN IS CHECKED AS IT IS WRITTEN (`rules.ts` `linkPatternFault`, REC-B10). A list
+        /* A PATTERN A RULE'S LINK WILL RUN IS CHECKED AS IT IS WRITTEN (`rules.ts` `linkPatternFault`). A list
            says how each row matches in `<by>_by` beside `<by>`; one stored as `pattern` is run inside a later write, and
            one that can take for ever was stored and then never run, with nothing said. Asked when either is written. */
         if (value === 'pattern' && f.id.endsWith('_by')) {
@@ -4880,7 +4880,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             value as never,
             current?.id ?? '',
           );
-          /* A ROW THE WRITER CANNOT READ IS NAMED BY NO COLLISION (sharing plan §2.6), so uniqueness is not a way to test
+          /* A ROW THE WRITER CANNOT READ IS NAMED BY NO COLLISION, so uniqueness is not a way to test
              whether a row exists: a list she cannot read, or a row outside what she may write. */
           if (clash && (hidden(register) || (door.within !== undefined && !admits(register, door.within, clash.id))))
             return no<Entry>('FORBIDDEN', `That can't be added here. ${askOwner()}`, { at: f.id });
@@ -4936,7 +4936,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const foldField = keyedHere === undefined ? undefined : mergeFieldOf(keyedHere);
       const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door, w.reads);
       if (door_) return { ok: false, refusal: door_ };
-      /* ── a second row saying what a first says, on a list declaring `same:` (`same.ts`, AGT-C13) ──
+      /* ── a second row saying what a first says, on a list declaring `same:` (`same.ts`) ──
          Refused for every write, a rule's, a flow's or an ingest's too, as a second person is; an accepted rowset is the
          owner's own word and the record's merge is its own, so both pass, and an import never comes this way. */
       if (decl.same !== undefined && !door.decided && !door.merge) {
@@ -5817,7 +5817,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /**
    * A run's first proposal names it, while the name it has is still the record's own, BY THE TITLE THE AGENT GAVE IT and
-   * never by the question's own words (audit M7): a question such as "Merge Sara into Sarah?" copied into the run's name
+   * never by the question's own words: a question such as "Merge Sara into Sarah?" copied into the run's name
    * was readable on the Agents board by anybody who can read runs and not People. In place, as `learnRun` writes. A
    * proposal with no title, from anybody who is not a run, from a run already named, or from a key that named a run
    * another key opened, changes nothing.
@@ -5836,7 +5836,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * TELLING THE PERSON AN AGENT ASKED THEM SOMETHING (AGT-C19). A run's new question, the first of its cause, is an
+   * TELLING THE PERSON AN AGENT ASKED THEM SOMETHING. A run's new question, the first of its cause, is an
    * active notice; one that cannot wait (`soon`, AGT-C08, read by the queue's own `WAIT_SQL`) is time-sensitive, pushed
    * once for its cause. Before this a question an agent filed reached nobody until Decide was opened.
    *
@@ -5930,7 +5930,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * A session saying it is still working (AGT-C03): its own run's `last_seen` moved to now, in place (`beatRun`).
+   * A session saying it is still working: its own run's `last_seen` moved to now, in place (`beatRun`).
    *
    * MEANT FOR A LONG STRETCH WITH NO WRITE. A session thinking for twenty minutes wrote nothing, so the Agents page read
    * it as gone quiet while it worked. A beat moves the clock and nothing else: no event, no version, no `updated_at`,
@@ -5987,7 +5987,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * A session that closed, ending its run once (AGT-C04): the end hook's call, through the record's `end`.
+   * A session that closed, ending its run once: the end hook's call, through the record's `end`.
    *
    * THE RECORD PICKS THE STATE, NOT THE CALLER. A run that left a fresh next step in this stretch and works for no other
    * run waits as a handoff, its step kept for the next session. Any other is done, its stale step cleared, with the note
@@ -6394,7 +6394,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * THE MERGE DOOR (`loop/research-audit-17.md` H2, L4): what a write that folds a row, unfolds it, or deletes or restores
+   * THE MERGE DOOR: what a write that folds a row, unfolds it, or deletes or restores
    * a folded one must pass, and what a restore of a keyed row must not collide with. A refusal, or `null`.
    *
    * ONLY A DECISION OR THE RECORD'S OWN MERGE MOVES `merged_into`. A plain update that set it repointed every link to the
@@ -6411,7 +6411,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * naming who holds the key; a folded row coming back through `undoMerge` takes its keys back as it unfolds, and is
    * not asked.
    *
-   * WHO HOLDS A KEY IS NAMED ONLY TO A WRITER WHO READS THAT LIST (research-audit-22 M5): `reads` says so, and a write
+   * WHO HOLDS A KEY IS NAMED ONLY TO A WRITER WHO READS THAT LIST: `reads` says so, and a write
    * that does not say what its writer reads (a rule's, a flow's, an ingest's) is told "someone on this list". Naming the
    * holder to a writer held to `append` handed them a row they may not read, one refused create at a time.
    */
@@ -6550,7 +6550,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * A merge is answered whole (`loop/research-audit-17.md` M3). A pick of some rows of a rowset that folds rows of a
+   * A merge is answered whole. A pick of some rows of a rowset that folds rows of a
    * keyed list must take every fold with the row kept, whose patch carries what they held: a fold taken without it
    * left the folded row's organisation, names and where they were met on a deleted row, and the carry taken without
    * its fold copied a live row's addresses onto another. The web card already answers a merge as one; this is the
@@ -6590,7 +6590,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * The source is who wrote it; `meet` says where it came from once the write is back (`sourceKeys`).
    */
   function rekeyEntry(before: Entry | null, after: Entry, w: WriteContext): void {
-    /* EVERY LIST THAT HOLDS KEYS, a project's among them (entity-keys-59) and a list declaring `same:` (AGT-C13):
+    /* EVERY LIST THAT HOLDS KEYS, a project's among them (entity-keys-59) and a list declaring `same:`:
        `keyedOf` is the merge door's, people and organisations alone, and the door must not see the others. */
     const list = keyLists(registers.values()).find((l) => l.register === after.register);
     if (list) rekey(sql, list, before, after, w.actor, instant(clock.now()));
@@ -7229,7 +7229,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          longer rises for one hard option beside a safe one, so the drawer marks the option and keeps a key off it. An
          option that writes money, or patches a field its list's history withholds, is hard by what it writes. */
       const hard = optionCost(one, withheld) === 'undo';
-      /* WHAT IT DOES, SAID FOR ITS PICTURE (C20): its own patches in names, and a tail's waiting money on every answer
+      /* WHAT IT DOES, SAID FOR ITS PICTURE: its own patches in names, and a tail's waiting money on every answer
          that names an account. */
       const said = Array.isArray(one.patches) ? optionSaidOf(one.patches as unknown[]) : null;
       const files = tailMoney !== null && !TAIL_LEAVES.has(one.id) ? tailMoney : null;
@@ -7282,7 +7282,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return [{ at: one.at, name: one.name, seen, ...(one.kept === true ? { kept: true as const } : {}) }];
     });
     const facts = cardFacts(r, kind, body);
-    /* WHO WAS HANDED IT TO DECIDE (USE-A13), only when somebody was, so a queue nobody handed reads as it did. */
+    /* WHO WAS HANDED IT TO DECIDE, only when somebody was, so a queue nobody handed reads as it did. */
     const decider = deciderOfIn(sql, String(r.id));
     return {
       id: String(r.id),
@@ -7635,12 +7635,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return row ? (JSON.parse(row.body) as unknown) : null;
     },
     /* THE RECORD'S VITAL SIGNS, as the record's `signs` reads them (`signs.ts`), so a page block with `source: signs`
-       draws them (PRF-A05). Without this line the block refuses as not in this build. */
+       draws them. Without this line the block refuses as not in this build. */
     signs: () => everySign(),
-    /* THE STEPS RUNS LEFT AND NOBODY TOOK, in one project or on the whole record (`openSteps`, AGT-C05), so a
+    /* THE STEPS RUNS LEFT AND NOBODY TOOK, in one project or on the whole record (`openSteps`), so a
        `handoffs.open` block draws them on Agents. Without this line the block refuses as not in this build. */
     handoffs: (project) => openSteps(sql, clock.now(), project, viewer),
-    /* WHAT WENT QUIET (`openExceptions`, ENG-B13), over every list this record declares but the kernel's own list of
+    /* WHAT WENT QUIET (`openExceptions`), over every list this record declares but the kernel's own list of
        runs, so an `exceptions` block draws them. Without this line the block refuses as not in this build. */
     exceptions: () => openExceptions(sql, clock.now(), watchedLists().filter((l) => !anyHiddenFrom(viewer, l.id) && (sees?.list(l.id) ?? true))),
     /* BLOCKING READS DECLARED ACTIONS AND THEIR SCHEDULE, NOT ROWS: owner-level bookkeeping by design, so no private-row clause. */
@@ -7682,12 +7682,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const scoped = scopeFieldOf(fields);
       const pointing = fields.filter(aims);
       const thing = projects === null ? undefined : aims(scoped) ? scoped : pointing.length === 1 ? pointing[0] : undefined;
-      /* AND THE READING AS MONEY when the block names a money field (REC-C03): minor units and a code, which `measures.ts`
+      /* AND THE READING AS MONEY when the block names a money field: minor units and a code, which `measures.ts`
          reads in place of `value`, so a reading of USD 48.15 is never drawn as 4815. THE WHOLE VALUE, read as text:
          `fieldSqlIn` on a money field reads its number alone (the path a sort uses), and a number with no code is the
          very misreading this stops. */
       const amount = q.amount ? fieldSqlIn(schema, q.amount, 'text') : 'NULL';
-      /* AND THE GROUP A MEASURE IS LISTED UNDER, the block's sixth column (E26), said as a person reads it below. */
+      /* AND THE GROUP A MEASURE IS LISTED UNDER, the block's sixth column, said as a person reads it below. */
       const grouped = q.group ? fields.find((f) => f.id === q.group && !f.retired) : undefined;
       const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${amount} AS amount, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing, ${grouped ? fieldSqlIn(schema, grouped.id) : 'NULL'} AS grp`;
       const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
@@ -7695,7 +7695,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const titles = new Map<string, string | null>();
       /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name.
          ITS ID STILL KEEPS IT APART (`project`, never drawn): two untitled projects' "Orders" were one line through both
-         projects' numbers (audit 16, L9). */
+         projects' numbers. */
       /* A GROUP BY A LINK IS ITS ROW'S NAME, by a choice its label, and anything else as it is held. */
       const labels = grouped && 'labels' in grouped && grouped.labels && typeof grouped.labels === 'object' ? (grouped.labels as Record<string, string>) : null;
       const groupOf = (v: unknown): string | null => {
@@ -7813,7 +7813,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }),
     /* THE RECORD'S SCHEDULED ACTIONS, as the `actions` read lists them: keys by label, nothing sealed read. */
     actions: () => listActions(sql, clock.now()),
-    /* THE INSTALLED SCRIPTS, as the record's `scripts` read lists them, so a `scripts` block draws `/scripts` (C33). */
+    /* THE INSTALLED SCRIPTS, as the record's `scripts` read lists them, so a `scripts` block draws `/scripts`. */
     scripts: () => scriptRows(sql, clock.now()),
     /* WHO OPENED A KEY LAST, by the grant its row's secret field names: the newest `grant.read` event, as `keyState`
        reads it. `runs_on` answers who and when, never the grant. */
@@ -7834,7 +7834,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /*
      * THE OPEN QUESTIONS, for a `queue` block: what is waiting on a person, dearest first.
      *
-     * FIRST BY HOW LONG IT CAN WAIT (`weigh.ts`, AGT-C08): one due inside two days or moving money leads, then one open
+     * FIRST BY HOW LONG IT CAN WAIT (`weigh.ts`): one due inside two days or moving money leads, then one open
      * past three days, then the rest, computed and never stored. Then RANKED BY WHAT IT WOULD COST TO GET EACH ONE WRONG (`weigh.ts`), which is `19 §6`'s fourth
      * countermeasure against the decision gate becoming a rubber stamp. The band is computed here
      * rather than stored, so it needs no migration and no proposer can assert it about their own
@@ -7848,7 +7848,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const drawn = Math.max(0, Math.floor(limit));
       const OPEN = "status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
       /* ONLY THE QUESTIONS DRAWN ARE READ WHOLE (`questionFrom`). Every other one is ranked and counted by its band in SQL
-         (`BAND_SQL`), so no body is read into this process to be counted (audit 16, M5): before, the newest past two
+         (`BAND_SQL`), so no body is read into this process to be counted: before, the newest past two
          thousand were dropped, and the counts beside the queue were counts of the two thousand. */
       const whole = (ids: readonly string[]): Map<string, Record<string, unknown>> =>
         new Map(
@@ -7974,7 +7974,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       );
       return ok(rows);
     },
-    /* A LIST ADDED UP IN ONE GROUPED QUERY, for a block that adds up (`wholeRead`, PGS-B05): by each label, by the unit
+    /* A LIST ADDED UP IN ONE GROUPED QUERY, for a block that adds up (`wholeRead`): by each label, by the unit
        of what is added, and by the day a money amount is dated, so the page converts a sum a day and never a row. */
     whole: (q) => {
       if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
@@ -8250,7 +8250,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         )?.n
           ? true
           : false,
-      /* THE RECORD'S OWN QUIET HOURS (`record.quiet`, AGT-C19): inside them `notify` sounds nothing, and what was held
+      /* THE RECORD'S OWN QUIET HOURS (`record.quiet`): inside them `notify` sounds nothing, and what was held
          leads the next digest (`held` below). Handed together, or a notice is held and then said by nothing. */
       quiet: quietOf(sql.one<{ quiet: string | null }>('SELECT quiet FROM record WHERE singleton = 1')?.quiet),
       /* HOW MANY THINGS WAIT ON THE PERSON: the open questions that are not put off, the number Decide shows. */
@@ -8304,7 +8304,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * `write` IS THE SAME WRITE PATH, re-entered. That is the whole design: a rule is a caller like
    * any other, wearing its own name, and every check a person's write answers to it answers to too.
    */
-  /* ── who a rule acts for (sharing plan §2.12) ─────────────────────────── */
+  /* ── who a rule acts for ─────────────────────────── */
 
   /** The person a rule acts for, by their lens, when that is not the record: their name, their lens and its read scope. */
   type Maker = { name: string; held: Held; ctx: { principal: { kind: 'person'; id: string }; wheres?: Readonly<Wheres> | undefined; writes?: Readonly<Wheres> | undefined } };
@@ -8790,7 +8790,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     transaction,
     write: (register, ref, patch, w) => write(register, ref, patch as Patch, w),
     registerOf: (spoken) => get(spoken)?.register ?? null,
-    /* THE ONE QUESTION A RUN MAY ASK (F61), filed through the gate's own `propose`: an `options` question whose options
+    /* THE ONE QUESTION A RUN MAY ASK, filed through the gate's own `propose`: an `options` question whose options
        carry their patches, one open per cause, signed by the run's actor. */
     propose: (p, actor) => openSuggestion(governDeps(), actor, p),
   });
@@ -8819,7 +8819,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         }
         answered(id, verdict, actor);
         /* AN ANSWER TO A QUESTION THE INBOX ASKED (which account a card's digits are, or moving what a wrong answer filed) IS
-           CARRIED OUT HERE, in the decision's transaction and batch, so one Undo puts all of it back (REC-A02). */
+           CARRIED OUT HERE, in the decision's transaction and batch, so one Undo puts all of it back. */
         if ('decide' in verdict) {
           const carried = answerAsked(ingestDeps(), { id, option: verdict.decide.option, actor, batch: out.value.batch ?? null });
           if (!carried.ok) return carried as Result<never>;
@@ -9103,7 +9103,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND A STEP A LATER RUN HERE PASSED OVER closes too, so it is not handed to every run for thirty days (`closePassed`). */
     transaction(() => closePassedHandoffs(sql, clock.now(), handoffWrite));
     /* A QUESTION THAT IS ALREADY SO is closed as moot in the same hour, with the sentence that says why (`cause.ts`
-       `recheck`, AGT-C08): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
+       `recheck`): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
     transaction(() => recheck(sql, clock.now(), mint));
     /* AND WHAT STILL WAITS AND IS SMALL SETTLES ITSELF (`settleWaiting`), small and reversible: a question asked again is closed,
        and an arrangement of the owner's own rows that BrainDog or his agent filed is answered as `rule:handled`, one
@@ -9112,7 +9112,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       transaction(() =>
         settleWaiting(sql, clock.now(), mint, (id) => attempt(sql, transaction, () => decide(governDeps(), id, { rule: 'handled', swept: true }, HANDLED_RULE))),
       );
-    /* AND THE TIDY COUNTS WHAT IS LEFT (`tidy.ts` `tidyHour`, AGT-C18): one line a finder a day in `tidy_line`, after
+    /* AND THE TIDY COUNTS WHAT IS LEFT (`tidy.ts` `tidyHour`): one line a finder a day in `tidy_line`, after
        the cleaning above, so a line says what is still stale and what this hour cleared.
 
        IT COUNTS AND ASKS NOTHING: each finder is run with its question taken off, because no question the record
@@ -9429,7 +9429,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         } catch (e) {
           observe(sql, clock.now(), [{ kind: 'write.refused', subject: `night.paths:${e instanceof Error ? e.name : 'Error'}` }]);
         }
-        /* AND THE AUDIT'S NIGHT (sharing plan §2.8, §2.10): read counters past 400 days pruned, and each share whose
+        /* AND THE AUDIT'S NIGHT: read counters past 400 days pruned, and each share whose
            date passed said once in the ledger. On its own, as the counts are. */
         try {
           transaction(() => accessNight(sql, clock.now(), mint));
@@ -9617,7 +9617,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       grant?: Readonly<Wheres> | undefined;
       hide?: Readonly<Record<string, readonly string[]>> | undefined;
       /**
-       * Amounts are hidden from the caller (sharing plan §2.7): a figure asked for is matched only where it is still in
+       * Amounts are hidden from the caller: a figure asked for is matched only where it is still in
        * the text once every amount written there is taken out (`maskedMatched`), so a row is never found by an amount
        * she is shown as "£…".
        */
@@ -9633,7 +9633,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const c = admitClause(register, grant, undefined);
       return c === null ? [] : [{ register, ...c }];
     });
-    /* A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER IS NOT ASKED OF THE INDEX (sharing plan §2.7), which holds that
+    /* A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER IS NOT ASKED OF THE INDEX, which holds that
        field's words, so a hit would say what it holds. It is searched by `contains` over the fields she is shown, under
        the same grant and private rows, its hits after the index's. */
     const plain = Object.entries(hide ?? {}).flatMap(([register, hidden]) => {
@@ -10157,7 +10157,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* FORWARDED MAIL NO PATTERN TOOK IS READ FOR WHO AND WHAT (`mail-arrival.ts`), in a transaction of its own after the
          bytes are stored. What it files or asks is the record's; mail it can place nothing in falls through, untriaged. */
       const mailMeet = (a: MeetArgs) => meetPerson(peopleDeps({ actor: 'ingest:mail' }, () => null, (p) => openSuggestion(governDeps(), 'ingest:mail', p)), a);
-      /* VERIFIED MAIL A PATTERN TOOK MEETS ITS SENDER (scope B36), in a transaction of its own after the bytes are stored, so
+      /* VERIFIED MAIL A PATTERN TOOK MEETS ITS SENDER, in a transaction of its own after the bytes are stored, so
          a meeting that throws or is refused never costs the arrival. A skip rule's mail meets nobody, and nor does a redelivery. */
       if (arrived.ok && arrival.channel === 'email' && arrival.verified !== false && !arrived.value.redelivered && (arrived.value.state === 'matched' || arrived.value.state === 'review'))
         try {
@@ -10480,7 +10480,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           .map((r) => JSON.parse(r.body) as ActionDecl),
       ),
 
-    /** How many entries hold each value of one field, in one query (PGS-B06): the page tally, for the record's `countBy`. */
+    /** How many entries hold each value of one field, in one query: the page tally, for the record's `countBy`. */
     countBy: (q: { register: string; field: string; where?: Predicate | undefined }) => pageDeps().tally!(q),
 
     /** One block, without a page around it — what a `draw` tool hands an agent. `inbox` is the reader's reach, so a
@@ -11025,7 +11025,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /**
      * Keep one share, new or changed (its `id`), with its `access.grant` event and the access epoch moved, in one
-     * transaction (sharing plan §2.10). The record has checked it (`checkShare`, who may target whom); this refuses only
+     * transaction. The record has checked it (`checkShare`, who may target whom); this refuses only
      * a share that is not the grammar, or a change to one that is not live.
      */
     shareSave: (by: string, input: ShareInput): Result<{ id: string; version: number }> =>
@@ -11070,7 +11070,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     gateFields: (list: string): string[] => gateFieldsOf(sql, catalogNow(), list, clock.now(), recordTz()),
 
     /**
-     * THE AUDIT (sharing plan §2.10). `shareVia`: which of a person's live shares admit one row (or, `id` null, reach a
+     * THE AUDIT. `shareVia`: which of a person's live shares admit one row (or, `id` null, reach a
      * list) for one capability. `accessSeen`: one read by somebody who is not an owner, counted on today's row for what
      * they read and through which shares. `accessNight`: the night's pass, the old counters pruned and each share whose
      * date passed said once in the ledger.
@@ -11148,7 +11148,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     memberStopped: (person: string): boolean => stoppedOf(sql, person),
 
     /**
-     * Whether this person's access here ended (sharing plan §2.8): they hold nothing now, and the record knew them, as a
+     * Whether this person's access here ended: they hold nothing now, and the record knew them, as a
      * member taken off or a guest whose last share ended. The owner's name rides with it, so a door can say "Ask Ada if
      * you need it back". `null` for anybody who still holds something, or whom the record never knew: a door says its
      * own words to them. A stopped member is the door's to ask first (`memberStopped`).
@@ -11181,7 +11181,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /**
      * A bearer, checked. The one way a token is recognised, and there is no other. `build` is what the command behind it
-     * said it was (`x-braindog-cli`), kept on the key in the same statement as its use (AGT-A02); a value that is not a
+     * said it was (`x-braindog-cli`), kept on the key in the same statement as its use; a value that is not a
      * build is dropped there.
      */
     verifyToken: (bearer: string, surface?: string, validFrom?: string, build?: string): Promise<Result<Verified>> =>
@@ -11194,7 +11194,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     mintChild: (bearer: string, args: ChildArgs, validFrom?: string): Promise<Result<Minted>> =>
       Promise.resolve({ ...tokenDeps(), validFrom }).then((deps) => transaction(() => mintChild(deps, bearer, args))),
 
-    /** A session on this key called a tool: its `last_tool_at` moves to now, with no event (AGT-A02). */
+    /** A session on this key called a tool: its `last_tool_at` moves to now, with no event. */
     noteTool: (tokenId: string): void => noteTool(sql, tokenId, instant(clock.now())),
 
     /* ── invitations, 12 §3 ───────────────────────────────── */
@@ -11294,7 +11294,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * Slash's rules or a model, kept on `suggestion.drafted_by`. A run's first question names the run while the
      * record's own name still stands (`nameRunBy`).
      *
-     * `cause` RIDES THROUGH IN THE BODY TO govern (AGT-C07), which derives one when none is given: a question whose cause
+     * `cause` RIDES THROUGH IN THE BODY TO govern, which derives one when none is given: a question whose cause
      * is already open answers its id with `joined` and files nothing, so asked twice is asked once.
      */
     propose: (p: Proposal & { title?: string }, w: WriteContext | string, drafted?: string): Result<Filed> =>
@@ -11353,7 +11353,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     decide: (id: string, verdict: Verdict, actor: string): Result<Decided> => decideOne(id, verdict, actor),
 
     /**
-     * Answer several the same way in one transaction and one batch, so one Undo puts every one back (scope D2). Each is
+     * Answer several the same way in one transaction and one batch, so one Undo puts every one back. Each is
      * its own savepoint: a member the gate refuses writes nothing and the rest stay written. Answers each id in order.
      */
     decideMany: (ids: readonly string[], verdict: Verdict, actor: string): { batch: string; each: { id: string; out: Result<Decided> }[] } =>
@@ -11464,7 +11464,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     foldPlan: (batch: string): FoldPlan | null => planFold(foldDeps(), batch),
 
     /**
-     * The rows of `register` here twice, by what its `same:` says makes two of them one (`same.ts`, AGT-C13): each group's
+     * The rows of `register` here twice, by what its `same:` says makes two of them one (`same.ts`): each group's
      * key, the row its `keep` keeps and the others, by row id. Empty for a list that declares no `same:`. Reads only.
      */
     sameClashes: (register: string): SameGroup[] => {
@@ -11556,7 +11556,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /**
      * Finish one. `failed` walks the ladder; the eighth failure is `dead` and raises a fault for its kind, never a
-     * question (AGT-C06), and a `done` clears that kind's fault.
+     * question, and a `done` clears that kind's fault.
      *
      * AND A PUSH'S ANSWER GOES BACK TO ITS SUBSCRIPTION, IN THE SAME TRANSACTION. `51 §5`: a 404 or 410 means the browser
      * threw the subscription away, and the deliverer acks that as `done` with `{ gone: true }`, so the row is deleted and
@@ -11841,7 +11841,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       transaction(() => rebuildKeys(sql, instant(clock.now())));
       /* AND WHICH SEALED FILES ARE WHOLE HERE, counted again from the parts this host kept (`sealed.ts`). */
       transaction(() => settleSealed(sql));
-      /* A RECORD REPLACED FROM A FILE IS A HAND ON IT (`hold.ts`, PRF-A18), marked after the import so the night it
+      /* A RECORD REPLACED FROM A FILE IS A HAND ON IT (`hold.ts`), marked after the import so the night it
          brought back does not overwrite the mark. */
       transaction(() => markHand(sql, 'The record was replaced from a file.', opts.by ?? 'an operator', clock.now(), recordTz()));
       transaction(() => lifecycleEvent('import', 'system', `import ${out!.value.rows} rows`));
@@ -11924,13 +11924,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * NOT ABOUT A ROW, so no target: the record as a whole is what was copied or put back.
      */
     lifecycle(kind: 'export' | 'import' | 'restore.pitr', actor: string, note: string, to?: string): string {
-      /* A RESTORE IS A HAND ON THE RECORD (`hold.ts`, PRF-A18): the hold's run of green days ends on the day of it. */
+      /* A RESTORE IS A HAND ON THE RECORD (`hold.ts`): the hold's run of green days ends on the day of it. */
       if (kind === 'restore.pitr') return transaction(() => (markHand(sql, 'The record was put back to an earlier time.', actor, clock.now(), recordTz()), lifecycleEvent(kind, actor, note, to)));
       return lifecycleEvent(kind, actor, note, to);
     },
 
     /**
-     * The record's copies as three facts (LCH-C03, `copies.ts`): when the last copy was kept and its size, and when
+     * The record's copies as three facts (`copies.ts`): when the last copy was kept and its size, and when
      * the record was last exported, each `null` before the first. Reads only, from the local `export` events
      * `lifecycle` writes, so the record's `boot` carries them for Settings.
      */
@@ -12277,7 +12277,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }),
 
     /**
-     * The add-ons with parts still held back, and what each part waits for (`when: { holds }`, SHL-A08).
+     * The add-ons with parts still held back, and what each part waits for (`when: { holds }`).
      *
      * WHAT THE RECORD READS AFTER AN INSTALL OR A SWITCH-ON to know which add-ons to plan again, and what an add-on's
      * page reads to say how many parts wait and for what. Only add-ons with something waiting, in id order, so the
@@ -12677,11 +12677,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     madeBy: (id: string): string | null => madeByIn(sql, id),
     scope,
     writeScope,
-    /** Writes held to the row (sharing plan §2.6): whether a scope admits one row, the fields a rule names, and who to ask. */
+    /** Writes held to the row: whether a scope admits one row, the fields a rule names, and who to ask. */
     admits,
     ruleFields,
     ownerName,
-    /** Which of these rows of one list a grant admits for a viewer, one statement per 500 (sharing plan §2.5). */
+    /** Which of these rows of one list a grant admits for a viewer, one statement per 500. */
     admittedIds,
     /** The clause one list's rows meet under a grant for a viewer, for a reader that writes its own count, or `null`. */
     admitClause,
@@ -12699,7 +12699,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     endRun,
     /** A run's words and commits read against its project's open tasks, and the project's next step followed (`run-reads.ts`). */
     readRunWork,
-    /** A token's own run told it is still working, its `last_seen` moved in place with no event (AGT-C03). Never opens one. */
+    /** A token's own run told it is still working, its `last_seen` moved in place with no event. Never opens one. */
     heartbeat,
     /**
      * Every vital sign of the record now, each with its state, its number, its sentence, its facts and its last 14
@@ -12720,7 +12720,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return transaction(() => fileSignReading(sql, id, reading, clock.now(), recordTz()));
     },
     /**
-     * One mark of how a session met the agent door (AGT-B01): it said hello, was given the tools, made calls, waited on a
+     * One mark of how a session met the agent door: it said hello, was given the tools, made calls, waited on a
      * hook. Kept against the caller's run, `S42`, or `token:` and its token when it has none.
      *
      * IT NEVER OPENS A RUN. A mark that opened one would make the very session it counts, and a client that only said
@@ -12754,7 +12754,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return ok(readDoorMarks(sql, sinceMs ?? now - DOOR_WINDOW_DAYS * 86_400_000, now, current));
     },
     /**
-     * What is not working that an operator must fix, open ones only, newest first (AGT-C06): each with its plain
+     * What is not working that an operator must fix, open ones only, newest first: each with its plain
      * sentence, how many times and since when. Reads only. The raw error rides along, and the record decides who reads it.
      */
     faults: (): Result<{ faults: Fault[] }> => {
@@ -12781,14 +12781,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             ? retryFailed(sql, cause.slice('schedule#'.length), clock.now())
             : null;
         if (queued === null) return no<{ cause: string; queued: number }>('VALUE_MALFORMED', 'This one tries again by itself at its next time.', { at: 'cause' });
-        /* A JOB REQUEUED BY A HAND ENDS THE HOLD'S RUN OF GREEN DAYS (`hold.ts`, PRF-A18): a green day an operator helped
+        /* A JOB REQUEUED BY A HAND ENDS THE HOLD'S RUN OF GREEN DAYS (`hold.ts`): a green day an operator helped
            along is not a day the record ran by itself. The system's own retries are not a hand. */
         if (queued > 0 && w.actor !== 'system') markHand(sql, 'A failed job was tried again by hand.', w.actor, clock.now(), recordTz());
         return ok({ cause, queued });
       });
     },
     /**
-     * Take back an open question (AGT-C07). Only the run that opened it, or a later run of the same key, may; govern
+     * Take back an open question. Only the run that opened it, or a later run of the same key, may; govern
      * says who and closes it as `withdrawn`. Signed as `propose` signs, so the opener is the one asking.
      */
     withdraw: (w: WriteContext, args: { id: string }): Result<{ id: string; state: 'withdrawn' }> => {
@@ -12920,7 +12920,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** One instruction by `IN4` or its row id, or null. */
     instruction: (id: string): Instr | null => instructionOf(sql, id),
     /**
-     * A question answered on his order (D8): the answer spent on the instruction, by the run, and the decision said as
+     * A question answered on his order: the answer spent on the instruction, by the run, and the decision said as
      * his order's, by him. The record answered the question as him first; this keeps the two lines, in one go.
      */
     keepOrderAnswer: (k: { instruction: Instr; question: string; run: string; decision: string; by: string; byName: string; batch?: string | undefined }): void =>
@@ -12946,7 +12946,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     stampFor: (runId: string): string => instructionStamp(sql, runId, clock.now()),
     /** What moved for run `runId` since `stamp`: `changedSince(runId, stamp) → Delta`. */
     changedSince: (runId: string, stamp: string): Delta => instructionsChangedSince(sql, runId, typeof stamp === 'string' ? stamp : '', clock.now()),
-    /** The sessions open now, for `presence` (plan §4.4), newest heard from first. */
+    /** The sessions open now, for `presence`, newest heard from first. */
     presentRuns: () => presentRuns(sql, clock.now()),
     /** When each of the runs `ids` last came back to `active` from an end or a rest: `revivedAt(ids) → Map<id, iso>`. */
     revivedAt: (ids: readonly string[]): Map<string, string> => revivedAt(sql, ids),
@@ -13054,7 +13054,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     undoApply: (scope: UndoScope, hash: string, actor: string, opts: UndoOptions = {}, declared?: UndoDeclared): Result<UndoApplied> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
-      /* A MOVE ONLY A DECISION MAKES, put back by undoing that decision, goes through a decision's door (AGT-D15). */
+      /* A MOVE ONLY A DECISION MAKES, put back by undoing that decision, goes through a decision's door. */
       return applyUndo({ ...parts, decidedWrite: (register, ref, patch, w) => write(register, ref, patch, w, { decided: true }) }, scope, hash, actor, opts, declared);
     },
 

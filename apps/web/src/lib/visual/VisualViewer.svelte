@@ -1,5 +1,5 @@
 <!--
-  One visual open over its thing (DIRECTION §45, "Shown where it lives"): its page in the sandbox frame the whole width of
+  One visual open over its thing: its page in the sandbox frame the whole width of
   the window, its versions to step between with the arrows or the list, newest first with who made each and when, and
   Undo on the newest.
 

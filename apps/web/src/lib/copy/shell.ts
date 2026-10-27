@@ -220,7 +220,7 @@ export const shell = {
   /* `04 §3`'s sections, in a person's words. Only the ones that say something render: a
      `CHANGES` heading over nothing is a warning that does not apply, and `06 §1` is that those
      teach people to ignore warnings. Adds, Examples and What you wrote went with the Agents
-     offer's tile (audit C of 25 October, X16), which names what it adds and says the rest as lines. */
+     offer's tile, which names what it adds and says the rest as lines. */
   diffConflicts: 'Conflicts',
   shareSetup: 'Share your starter',
   /* THE FLAT NAV'S OWN ROW (`flatNav` in `lib/nav.ts`): the screen every record opens on. */

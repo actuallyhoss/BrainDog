@@ -294,7 +294,7 @@
     align-content: start;
   }
 
-  /* The database tile's drawing goes under its words at 1200 and under (site F18). */
+  /* The database tile's drawing goes under its words at 1200 and under. */
   @media (width > 1200px) {
     .split {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -409,7 +409,7 @@
     background: var(--tile);
   }
 
-  /* "Yours" in ink, the three "Someone else's" in the muted ink (site F18). */
+  /* "Yours" in ink, the three "Someone else's" in the muted ink. */
   .record-name {
     color: var(--muted);
     font-size: var(--t-site-small);
@@ -487,7 +487,7 @@
 
   /* ── A passkey ───────────────────────────────────────────────────────── */
 
-  /* THE WAYS IN, AS LINES AND NOT BUTTONS (the audit of 22 October, U-C15): a drawn button nobody can press read as one
+  /* THE WAYS IN, AS LINES AND NOT BUTTONS: a drawn button nobody can press read as one
      that does nothing. Each way is its glyph and its words, the way the sealed keys are drawn beside it. */
   .signin {
     display: flex;
@@ -562,7 +562,7 @@
     margin-block-start: auto;
   }
 
-  /* THE FILE, AS A LINE BETWEEN RULES and not a filled box, so it reads as what export gives and not a button (U-C15). */
+  /* THE FILE, AS A LINE BETWEEN RULES and not a filled box, so it reads as what export gives and not a button. */
   .export-row {
     display: flex;
     align-items: center;

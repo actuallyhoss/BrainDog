@@ -154,7 +154,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       empty: 'Nothing is left to pay on {{name}}.',
     },
     {
-      /* THE PARTS PAID, THE LATEST FIRST, with the day each was paid and the payment that paid it (REC-B11). */
+      /* THE PARTS PAID, THE LATEST FIRST, with the day each was paid and the payment that paid it. */
       kind: 'table',
       heading: 'Paid',
       icon: 'receipt',

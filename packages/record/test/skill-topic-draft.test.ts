@@ -1,5 +1,5 @@
 /**
- * A learning with a topic drafts a skill change (scope B32): the path was built (`skillBearings`, `slashSkills`) and never
+ * A learning with a topic drafts a skill change: the path was built (`skillBearings`, `slashSkills`) and never
  * ran on his record, because no learning named a skill. Here a lesson whose topic is "wrangler" meets the skill called
  * wrangler at the daily look, and one `version:skills:` question waits on Decide; a lesson with no topic drafts nothing.
  */

@@ -16,8 +16,7 @@ export const HEADS_UP: Record<string, unknown>[] = [
     heading: 'Heads up',
     icon: 'bell',
     span: 12,
-    /* THE LAST TILE OF MONEY'S HOME, ACROSS THE ROW, SINCE money-core 3.29.0, where it stood in a side column from the UI
-       pass of 20 October: the home is one board with no side column, and a boxed section takes every block after it,
+    /* THE LAST TILE OF MONEY'S HOME, ACROSS THE ROW, SINCE money-core 3.29.0, where it stood in a side column from the redesign: the home is one board with no side column, and a boxed section takes every block after it,
        so it closes the page. Each line ends on its one way to act. */
     box: true,
     /* ONLY ONCE THERE IS AN ACCOUNT, as every line under it reads money there is, so a fresh record reads its line
@@ -30,7 +29,7 @@ export const HEADS_UP: Record<string, unknown>[] = [
        these balances, so an old one is the one thing about them that needs the person. The day is the oldest, the
        one Cash now's own note says. NO HEADING OF ITS OWN SINCE money-core 3.5.0: it is a line of Heads up.
 
-       THE DAY THE BANK LAST SAID IT, SINCE money-core 3.16.0 (REC-B03), and it was the typed "As of", which a bank
+       THE DAY THE BANK LAST SAID IT, SINCE money-core 3.16.0, and it was the typed "As of", which a bank
        message never writes: both figures read the roll's own day now (`read: as_of`, `read: stale`). The tile under it
        says which account, by name, and the box beside that takes what one holds today (`ages.ts`). */
     kind: 'note',
@@ -56,7 +55,7 @@ export const HEADS_UP: Record<string, unknown>[] = [
     when: { metric: 'late-in', gt: 0 },
   },
   {
-    /* A PART OF A PLAN THAT IS LATE IS LATE AS A BILL IS, SINCE money-core 3.18.0 (the audit of 22 October, U4): first
+    /* A PART OF A PLAN THAT IS LATE IS LATE AS A BILL IS, SINCE money-core 3.18.0: first
        in this line, by name, with its amount and its day, and the bills after it. One line and not a second, because
        Money is at the twenty-four blocks a page declares: the sentence said is the first of `says` that holds. */
     kind: 'note',

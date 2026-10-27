@@ -19,7 +19,7 @@
  * The source checks are narrow on purpose: they name the four buttons, the two functions and the one class.
  *
  * THE INVITATION HOLDS ITEM 1 AS WELL. `/invite` is the first screen a colleague meets, it signs them in on
- * Accept exactly as `/signin` does, and an audit found it drawing the sample
+ * Accept exactly as `/signin` does, and testing found it drawing the sample
  * after the repair had been made here, so its "Open BrainDog" and its `accept` are held by the same two checks.
  */
 
@@ -101,7 +101,7 @@ function buttonFor(src: string, key: string): string | null {
   return m ? m[0] : null;
 }
 
-/* THE INVITATION IS THE SAME DOOR FOR THE FIRST COLLEAGUE. An audit drove
+/* THE INVITATION IS THE SAME DOOR FOR THE FIRST COLLEAGUE. Testing drove
    the mechanism through the real `readBoot` for `/app/invite`: the layout kept the sample with nobody signed in,
    Accept set a cookie and nothing more, and "Open BrainDog" was `href="/"` with no reload, so the next move was handed
    `{"from":"sample"}` with one request made in all. The repair of 6959cf06 had been made on `/signin` alone. */

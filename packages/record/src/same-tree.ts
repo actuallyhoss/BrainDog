@@ -1,5 +1,5 @@
 /**
- * WHO ELSE IS IN THIS WORKING TREE, AND WHAT THE LAST SESSION HERE LEFT (AGT-B08): the lines a starting session's card
+ * WHO ELSE IS IN THIS WORKING TREE, AND WHAT THE LAST SESSION HERE LEFT: the lines a starting session's card
  * reads, worked out from runs it is handed and never from the database, so a test reads them without one.
  *
  * "SAME REPO" WAS A FOLDER'S NAME ON ANY MACHINE, and the card printed one warning line for each other run. On the
@@ -97,7 +97,7 @@ export function sameTree(a: TreeRun, b: TreeRun): boolean {
 const agentName = (run: TreeRun): string =>
   agentOf({ agent: textOf(run.fields.agent) ?? undefined, client: textOf(run.fields.client) ?? undefined }).name;
 
-/** A run as a person reads it: its agent's name with its name out loud beside it as a handle, "Claude Code (S42)". */
+/** A run as a person reads it: its agent's name with its name out loud beside it as a handle, "Claude Code". */
 export function runName(run: TreeRun): string {
   const spoken = spokenOf(run);
   return spoken === null ? agentName(run) : `${agentName(run)} (${spoken})`;
@@ -177,7 +177,7 @@ export function alsoHere(runs: readonly TreeRun[], self: TreeRun, nowMs: number)
 /* ── the next step ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /**
- * The step a run left here, as the record's open handoffs answer it (AGT-C05): who left it, what it says, when, what was
+ * The step a run left here, as the record's open handoffs answer it: who left it, what it says, when, what was
  * tried, the commits made in this repository since, and who took it when somebody did.
  */
 export type LeftStep = {
@@ -224,11 +224,11 @@ const sentence = (said: string): string => {
 /**
  * The card's Next slot, one of four shapes, as lines with no label (the card puts "Next" before the first):
  *
- *   1. An open step: "<step> Left by Claude Code (S812) 2h ago, 3 commits since. Check before acting." and, when its
+ *   1. An open step: "<step> Left by Claude Code 2h ago, 3 commits since. Check before acting." and, when its
  *      writer tried things, a second line "Tried: ..." cut at `TRIED_MOST`. "Check before acting" when another run
  *      wrote it or it is a day old.
- *   2. A step somebody took: "Claude Code (S815) took this 3 min ago: <step>".
- *   3. No step: "Nothing was handed over. Last here: Claude Code (S812), 2h ago, at 5a57ba2."
+ *   2. A step somebody took: "Claude Code took this 3 min ago: <step>".
+ *   3. No step: "Nothing was handed over. Last here: Claude Code, 2h ago, at 5a57ba2."
  *   4. Nothing at all, on a record where no run ended here before.
  *
  * A STEP PAST ITS WINDOW IS ABSENT, NEVER STALE: one left more than `STEP_DAYS` ago, or at an instant that cannot be

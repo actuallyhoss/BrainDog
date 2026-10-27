@@ -1,5 +1,5 @@
 /**
- * What falls due is what the record's cash walk moves (the scope of 24 October, B4 and B5).
+ * What falls due is what the record's cash walk moves (the scope of 24 October).
  *
  * His Today said a paused contractor fee was two weeks late, and named one premium twice in Due soon: once as the bill
  * that repeats monthly and once as its repeating line. The walk moves neither the paused line nor the repeating bill, so
@@ -130,7 +130,7 @@ test('A RECORD THAT WALKS NOTHING KEEPS EVERY ROW THAT IS NOT FINISHED, as it di
   ]);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z15 (`loop/proof/looks/audit-2026-10-25/today-390-light-full.png`): his Today drew his
+/* His Today drew his
    insurance premium twice on Sun 25, the bill that repeats monthly and its repeating line, though the walk reads the
    bill's leg with `repeats is not monthly`. His record keeps books, and a book's page walks the same legs held to that
    book, `book is {{name}}`. That hole is filled only on a book's own page, so read here it names no book, and one leg

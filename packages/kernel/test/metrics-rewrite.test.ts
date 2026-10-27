@@ -1,5 +1,5 @@
 /**
- * THE NIGHT CORRECTS THE LAST THREE NIGHTS (REC-B06).
+ * THE NIGHT CORRECTS THE LAST THREE NIGHTS.
  *
  * A bank's text for a Thursday lands on the Saturday. `snapshot` overwrote yesterday and filled every earlier day only,
  * so Thursday's point of cash stayed the cash before that entry for as long as the line lasted. Now yesterday and the

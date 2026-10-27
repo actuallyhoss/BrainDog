@@ -31,7 +31,7 @@ export { PROFILE_KINDS };
 export const CEILINGS = ['read', 'propose', 'write'] as const;
 export type Ceiling = (typeof CEILINGS)[number];
 
-/** The context budgets a row may choose, in tokens. 700 is the default (plan §3.2). */
+/** The context budgets a row may choose, in tokens. 700 is the default. */
 export const CONTEXT_BUDGETS = [400, 700, 1200] as const;
 export type ContextBudget = (typeof CONTEXT_BUDGETS)[number];
 
@@ -109,7 +109,7 @@ export type ProfileRow = {
   retired?: boolean | undefined;
 };
 
-/** Defaults for a new agent (plan §5.2): Suggest, every tool on, a 700-token context, told when it took something. */
+/** Defaults for a new agent: Suggest, every tool on, a 700-token context, told when it took something. */
 export const DEFAULT_NOTIFY: ProfileNotify = { on: 'told', by: 'push' };
 export const DEFAULT_CONTEXT: ProfileContext = { budget: 700, lines: true };
 export const DEFAULT_ENFORCE: ProfileEnforce = { hooks: true, channel: false };

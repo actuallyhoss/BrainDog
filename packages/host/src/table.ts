@@ -143,7 +143,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.',
     takes: { digest: 'text' } },
   { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
-  /* THE PAGES CENSUS AND THE PATHS CHECK (PGS-A01, REC-A12): two reads beside `pages`, writing nothing. `checkPaths` takes a
+  /* THE PAGES CENSUS AND THE PATHS CHECK: two reads beside `pages`, writing nothing. `checkPaths` takes a
      whole document, so a caller sends it as a POST body; a read may arrive either way. `register` is the list the document
      is written into, whose fields a page made for its rows fills. */
   { name: 'pagesCensus', group: 'READ+', writes: false, what: 'Each page you can open, counted: what it holds, what it could not show you, each placeholder that names nothing and each dash where a value goes. It changes nothing.',
@@ -217,7 +217,7 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { url: 'text' } },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
-  /* THE WHOLE FIRST RUN AS ONE CALL (USE-B04). The browser ran it as a script of a dozen calls, so a closed tab left a
+  /* THE WHOLE FIRST RUN AS ONE CALL. The browser ran it as a script of a dozen calls, so a closed tab left a
      record part made. ADMIN as `installPack` is: it installs add-ons, and only the owner in a browser may. */
   { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this record from what its owner accepted, in one call: the add-ons in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. A browser session only.' },

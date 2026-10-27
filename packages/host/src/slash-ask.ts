@@ -838,7 +838,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
      * headlines and a skill draft as on understanding. The refusal names which of the three and never where or what.
      */
     async background(ask: SlashBackgroundAsk = 'skill', payload?: unknown) {
-      /* THE CONSENT RULE BEFORE THE LEDGER (ENG-A09): off, the record reads the refusal as "the rules speak" and no row
+      /* THE CONSENT RULE BEFORE THE LEDGER: off, the record reads the refusal as "the rules speak" and no row
          is written, held or turned away, because nothing was asked and no month was spent. */
       const may = await mayThink(ask in BACKGROUND_PURPOSE ? ask : 'skill', deps.reads);
       if (!may.ok) return { ok: false, refusal: { code: codeOf(may), fix: fixOf(may) } };

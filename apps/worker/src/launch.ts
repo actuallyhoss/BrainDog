@@ -26,7 +26,7 @@ export type BillingMode = 'off' | 'test' | 'live';
 /**
  * The settings this file reads. Each is optional (Rule 2); only whether a secret is set is read, never its value.
  *
- * THE LAST FOUR ARE WHAT `signUp()` NEEDS BEFORE THE SWITCH IS ASKED (audit 34, finding 2). Without a session key of 32
+ * THE LAST FOUR ARE WHAT `signUp()` NEEDS BEFORE THE SWITCH IS ASKED. Without a session key of 32
  * characters and a `PUBLIC_HOST` that gives a cookie, `signUp()` answers 404 to everybody; without a sending address and
  * the mail binding, the Directory offers no letter and a stranger gets a 200 and nothing in the inbox. `/healthz` said
  * `open` through all four. `EMAIL` is the binding, read only for whether it is there.
@@ -142,7 +142,7 @@ export function launchDetail(env: LaunchEnv): LaunchState {
 }
 
 /**
- * The launch as `/healthz` answers it to anybody (audit 36-37, finding 12): whether a stranger can sign up, and when he
+ * The launch as `/healthz` answers it to anybody: whether a stranger can sign up, and when he
  * cannot, or only with a code, why in one sentence. AN EMPTY `why` IS A SIGN-UP THAT IS OPEN AND WORKS; nothing else is.
  * The settings that are missing and the strike limit stay in `launchDetail`, for the owner's signs.
  */

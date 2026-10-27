@@ -1064,7 +1064,7 @@ test('EACH REFUSAL SAYS WHAT TO SEND INSTEAD, at the key that was wrong', async 
   assert.equal(at('pack', { enable: 'work', doc: {} }).at, 'body.doc');
 
   assert.equal(at('settings', { pack: 'usecase-student' }).at, 'body.values');
-  /* A LIST OF TEXT IS A VALUE (REC-A06), and a list of anything else is not. */
+  /* A LIST OF TEXT IS A VALUE, and a list of anything else is not. */
   assert.equal(at('settings', { pack: 'usecase-student', values: { voice_home: [1] } }).at, 'body.values.voice_home');
 
   assert.equal(at('arrange', { packs: { install: ['work'] } }).at, 'body.why');
@@ -1078,7 +1078,7 @@ test('EACH REFUSAL SAYS WHAT TO SEND INSTEAD, at the key that was wrong', async 
 test('AT MOST THREE ARRANGEMENTS WAIT AT ONCE, and the fourth names the three', async () => {
   const { k, sql } = await record();
   const arrange = { question: 'Arrange it?', body_kind: 'arrange' as const, body: { why: ['x'], packs: { enable: ['work'] } } };
-  /* EACH ITS OWN CAUSE, since the same arrangement asked again by one run joins the first (AGT-C07). */
+  /* EACH ITS OWN CAUSE, since the same arrangement asked again by one run joins the first. */
   const ids = [1, 2, 3].map((n) => value<{ id: string }>(k.propose({ ...arrange, cause: `arrange-${n}` }, 'S1')).id);
   const fourth = refusal(k.propose({ ...arrange, cause: 'arrange-4' }, 'S1'));
   assert.equal(fourth.code, 'OUT_OF_BOUNDS');

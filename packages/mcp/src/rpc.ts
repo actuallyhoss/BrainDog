@@ -147,7 +147,7 @@ const render = (said: Said) => ({
  * A refusal at one field of a row, said inside the argument that carries the row: `fields.what` to `create`, `patch.what`
  * to `update`, and `where` to `list`, or `undefined`.
  *
- * THE RECORD NAMES THE FIELD BARE (audit D, W12): "tasks needs what" came back at `what`, which no tool takes, so `atIn`
+ * THE RECORD NAMES THE FIELD BARE: "tasks needs what" came back at `what`, which no tool takes, so `atIn`
  * dropped it and the agent read a refusal that named no place to correct, against the instructions' own rule.
  */
 const ROW_ARG: Readonly<Record<string, string>> = { create: 'fields', triage: 'fields', update: 'patch' };
@@ -281,13 +281,13 @@ const DECIDES_NOT = {
 
 /**
  * One mark `handle` leaves with the surface's `doorHeard`, the record's unrouted twin of `heard` that keeps the door's own
- * marks and moves a key's last tool call (audit 38-39, findings 2 and 5). A surface without it is handed the mark through
+ * marks and moves a key's last tool call. A surface without it is handed the mark through
  * `heard`, as before.
  */
 type Mark = Parameters<NonNullable<McpSurface<unknown>['doorHeard']>>[0];
 
 /**
- * Leave a mark, and never wait on it or let it fail the call (AGT-B01, "the agent door lists its tools").
+ * Leave a mark, and never wait on it or let it fail the call ("the agent door lists its tools").
  *
  * NOT AWAITED, AND EVERY WAY IT CAN GO WRONG IS SWALLOWED: a surface whose `heard` throws, answers a refusal, rejects or
  * never settles costs the answer nothing, because a session that was given its tools must be given them whether or not
@@ -469,7 +469,7 @@ function named<C>(surface: McpSurface<C>): McpSurface<C> {
 /* ── who is asking, and what waits for it ────────────────────────────────── */
 
 /**
- * What his settings let this caller have, as `whoami`'s `effective` says it (plan §5.1, §6.2): its ceiling, the tools he
+ * What his settings let this caller have, as `whoami`'s `effective` says it (§6.2): its ceiling, the tools he
  * switched off, and the settings row by name for the sentence that says so. `null` for a caller who is no agent's key,
  * or a record too old to say, which lists and calls everything as before.
  */
@@ -529,7 +529,7 @@ async function effectiveOf<C>(surface: McpSurface<C>, ctx: C, watch: Watch, fres
 }
 
 /**
- * THE TOOLS THIS CALLER IS LISTED (plan §6.2): a Read agent lists no writes, and a tool he switched off for it is not
+ * THE TOOLS THIS CALLER IS LISTED: a Read agent lists no writes, and a tool he switched off for it is not
  * listed, so a narrower agent also pays fewer tokens every turn. The folded tools are never listed.
  */
 function listedFor(e: Effective | null): readonly Tool[] {
@@ -541,7 +541,7 @@ function listedFor(e: Effective | null): readonly Tool[] {
 const FOLDED_INTO: Readonly<Record<string, string>> = { schema: 'record_index', history: 'get' };
 
 /**
- * A call to a tool he switched off for this agent, refused before it runs (`TOOL_OFF`, plan §6.5): a list cached
+ * A call to a tool he switched off for this agent, refused before it runs (`TOOL_OFF`): a list cached
  * before he did is still met with why. `null` while it is on.
  */
 function offFor(name: string, e: Effective | null): Said | null {
@@ -604,7 +604,7 @@ async function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
   }
 }
 
-/** The most a tool answer's added lines may come to (plan §3.4): two lines and two hundred characters. */
+/** The most a tool answer's added lines may come to: two lines and two hundred characters. */
 const PIGGYBACK_MOST = 200;
 
 /**
@@ -747,7 +747,7 @@ export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
  * result carries `resultType`. `initialize` is answered under the revision it negotiates, whatever is passed.
  *
  * AND IT MARKS HOW THE SESSION MET THE DOOR, through the surface's optional `doorHeard`, or `heard` on a surface without
- * it (AGT-B01): `hello` for an `initialize` it answered, with the client and this server's build; `listed` for a tool list
+ * it: `hello` for an `initialize` it answered, with the client and this server's build; `listed` for a tool list
  * it gave, with how many;
  * `called` on a caller's first tool call and at most once a minute after; `internal` for an answer whose code is
  * INTERNAL. None is waited on and none can fail the call (`hear`). `caller` is the transport's key for who is calling,
@@ -845,7 +845,7 @@ async function dispatch<C>(
     /* THE INSTRUCTIONS ARE NOT SENT AGAIN HERE. They went out in `initialize`, or in `server/discover` for a client of the
        stateless revision, and a session that asked for both carried the whole text twice; Claude Code puts the
        instructions in every session's system prompt on its own. Once a connection is the specification's place for them. */
-    /* CUT TO THE CALLER'S SETTINGS (plan §6.2), read fresh: a Read agent lists no writes, and a tool he switched off is
+    /* CUT TO THE CALLER'S SETTINGS, read fresh: a Read agent lists no writes, and a tool he switched off is
        not listed. A caller who is no agent's key, or a record too old to say, is listed every tool. */
     case 'tools/list': {
       const wrong = paged(params);
@@ -886,7 +886,7 @@ async function dispatch<C>(
       const answered = await mcp.answer(name, args, ctx);
       const out = ownWords(name, args, answered);
       if (refused(out.result) && out.result.refusal.code === 'INTERNAL') hear(surface, ctx, { kind: 'internal' });
-      /* AND ONE READ COUNTED FOR THE AUDIT (sharing plan §2.10), `mcp:<tool>`, for an answered call: never awaited, never failing it. */
+      /* AND ONE READ COUNTED FOR THE AUDIT, `mcp:<tool>`, for an answered call: never awaited, never failing it. */
       if (out.result.ok && typeof surface.toolSeen === 'function') {
         try {
           surface.toolSeen({ tool: params.name }, ctx);
@@ -931,8 +931,7 @@ async function dispatch<C>(
         const added = piggyback(w, watch.shown, refusedFor);
         for (const id of added.shown) watch.shown.add(id);
         if (added.lines.length > 0) content = [{ type: 'text', text: `${body.content[0]?.text ?? ''}\n${added.lines.join('\n')}` }];
-        /* AND IN THE JSON COPY, because an app that hands its model the copy and not the text (Claude Code does, audit of
-           22 Oct, E5) showed it none of this, while the record heard it was seen. */
+        /* AND IN THE JSON COPY, because an app that hands its model the copy and not the text (Claude Code does) showed it none of this, while the record heard it was seen. */
         if (added.lines.length > 0 && isObject(structured)) structured = { ...structured, new_for_you: added.lines };
         /* AND THE RECORD HEARS IT WAS SEEN, in a tool answer, never waited on: the app says "Seen by S883 in a tool answer". */
         if (added.shown.length > 0 && typeof surface.instructionsMine === 'function') {
@@ -946,7 +945,7 @@ async function dispatch<C>(
       return said({ ...body, content, ...(structured === body.structuredContent ? {} : { structuredContent: structured }), _meta: { ...meta, braindog: { stamp: w.stamp, pending: w.pending, stop: w.stop } } });
     }
 
-    /* THE PROMPTS (plan §6.3): start, wrap and ask, which a client shows as commands and which cost the tool list nothing. */
+    /* THE PROMPTS: start, wrap and ask, which a client shows as commands and which cost the tool list nothing. */
     case 'prompts/get': {
       if (typeof params.name !== 'string') return fail(id, RPC.params, 'prompts/get needs the name of a prompt.', { allowed: PROMPTS.map((p) => p.name) });
       const given = isObject(params.arguments) ? params.arguments : {};
@@ -993,7 +992,7 @@ async function dispatch<C>(
       });
     }
 
-    /* THREE, EACH THE CALLS IN ORDER (plan §6.3), held to the tools they name by `prompts.test.ts`. */
+    /* THREE, EACH THE CALLS IN ORDER, held to the tools they name by `prompts.test.ts`. */
     case 'prompts/list':
       return paged(params) ?? said({ prompts: PROMPTS, ttlMs: HOUR, cacheScope: 'private' });
 

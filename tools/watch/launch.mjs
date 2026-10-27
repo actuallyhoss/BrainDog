@@ -1,5 +1,5 @@
 /**
- * `watch`: ask brain.dog from outside Cloudflare, once an hour, whether it is up and as it should be (LCH-C01).
+ * `watch`: ask brain.dog from outside Cloudflare, once an hour, whether it is up and as it should be.
  *
  *   node tools/watch/launch.mjs                      production, from apps/worker/wrangler.jsonc
  *   node tools/watch/launch.mjs --host bad.example   the same questions of another name (a forced miss)
@@ -55,7 +55,7 @@ export const EXPIRES_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * How many sentences `/healthz` may carry beside a sign-up that is not closed: none beside `open`, the one that says a
- * code is needed beside `invite` (`launchState` in `apps/worker/src/launch.ts`, audit 36-37, finding 12).
+ * code is needed beside `invite` (`launchState` in `apps/worker/src/launch.ts`).
  *
  * A COUNT, NOT THE SENTENCES. This used to be a regex copy of the stopping sentences, so a new one it did not match
  * passed. Importing `STOPPING` from `launch.ts` would not run here: the watch runs with no install (`watch.yml`), and

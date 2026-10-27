@@ -405,7 +405,7 @@ export function makeDeliver(transports: Transports): Deliver {
          goes through the same `postable()` as a webhook: a push to the metadata service is still a request to it. */
       const endpoint = postable(address);
       if (!endpoint) throw new Error('a push goes to an https address on a public host');
-      /* NOTHING FROM THE PAYLOAD BUT THE ID, AND NOTHING FROM THE RECORD BUT THE ADDRESS, AND WHERE A TAP OPENS (E44): an
+      /* NOTHING FROM THE PAYLOAD BUT THE ID, AND NOTHING FROM THE RECORD BUT THE ADDRESS, AND WHERE A TAP OPENS: an
          app path the record checked (`pushOpenOf`), encrypted to the phone's keys. A job that names none has no body. */
       const headers = await pushHeaders(vapid, endpoint, subject);
       const open = found.open && found.keys && /^\/app\/[a-z0-9][a-z0-9-]{0,63}\/[A-Za-z0-9_/-]{0,200}$/u.test(found.open) ? found.open : null;

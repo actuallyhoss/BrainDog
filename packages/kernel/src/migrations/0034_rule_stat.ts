@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 34: `rule_stat`, how often each rule has done something and what it last did (SHL-D07).
+ * The kernel schema, migration 34: `rule_stat`, how often each rule has done something and what it last did.
  *
  * ONE ROW A RULE, keyed by the rule's own name (`body.rule`, the same name `rule:<name>` carries as an actor and
  * `automation_run.rule` holds). `fired` is how many times its work landed: an inline rule's patch on one row, or a run

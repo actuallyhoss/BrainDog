@@ -1,5 +1,5 @@
 /**
- * What a session is given, capped and this project first (AGT-B09): the pure rules `context` sends its lists, open
+ * What a session is given, capped and this project first: the pure rules `context` sends its lists, open
  * questions, decisions, rules and people through (`context-caps.ts`). No list over five in the brief answer, this
  * project's rows before the others, the counts and the one call for the rest, `full` keeping twenty and twenty, the last
  * three decided as lines, and a rule older than ten newer learnings still on the card. Every row is made up.

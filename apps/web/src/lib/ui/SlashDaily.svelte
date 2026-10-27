@@ -10,7 +10,7 @@
 
   `daily` is handed in where the page has already read Slash; otherwise it is read here.
 
-  AND THE BRAKE IN ONE LINE UNDER THE SENTENCE (ENG-B17), muted, when his answers have made Slash ask less
+  AND THE BRAKE IN ONE LINE UNDER THE SENTENCE, muted, when his answers have made Slash ask less
   (`slash-brake.ts`); off, or not read, nothing. Read where Slash is, on a live record and never the sample. Words only:
   nothing here lifts it.
 -->

@@ -2,7 +2,7 @@
  * `usage.days`, `usage.actions` and `usage.projects`: this month's use of the record's scheduled actions, by day, by
  * action and by the project each runs for.
  *
- * A USAGE PAGE IS A DECLARATION OVER THESE, not a screen of its own (SHL-C12). Each reads `deps.actions()`, the list the
+ * A USAGE PAGE IS A DECLARATION OVER THESE, not a screen of its own. Each reads `deps.actions()`, the list the
  * `actions` read and a project's "Runs on" read, and each action's counts through `monthOf`, so the four places that
  * count a month cannot disagree: what the days add up to is what the actions add up to, and the projects are the same
  * actions summed by where they run. A held call is in `held` and in no other count, as the meter writes it.

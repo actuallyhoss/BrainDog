@@ -1,5 +1,5 @@
 /**
- * A run's helpers on its card (AGT-C12): `helpersSaid` and the line both renderers draw under the card's sentence,
+ * A run's helpers on its card: `helpersSaid` and the line both renderers draw under the card's sentence,
  * compared as trees the way `parity.test.ts` compares them, with the Svelte drawer compiled and rendered on the server.
  */
 

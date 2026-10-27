@@ -21,7 +21,7 @@
 
   ONLY OVER THE WHOLE LIST, which is the page's to know (`whole`): a total of the rows in hand, printed as the list's,
   is a false count. The split by state also goes while the list is filtered, where it would only restate the filter.
-  ONE COLOUR FOR LATE (the UI pass of 20 October, money F2): an open state's bar in the second ink, a part-paid one in
+  ONE COLOUR FOR LATE (money F2): an open state's bar in the second ink, a part-paid one in
   slate, a finished one in the lightest step of the ink ramp, and at the start of the open bar the part that is late in
   the one red, with "2 late · £10,540" in red at the end of that line. THE TILE IS "Money" ON A LIST OF AMOUNTS, with
   no well (money F7): the page's own icon says what it is.

@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 37: a question already answered is found by its cause (AGT-C08).
+ * The kernel schema, migration 37: a question already answered is found by its cause.
  *
  * A DECLINE WRITES NO DECISION ROW (`govern.ts`, `resolved_as`): the question is resolved as `wont-fix` or `incorrect`
  * and that is all. So migration 31's `decision_cause` finds what he said yes to and never what he said no to, and an

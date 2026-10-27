@@ -1,6 +1,5 @@
 /**
- * What the record found wrong in its own pages and notes, in Settings › Health (Today asks none of it since the audit of
- * 22 October, U3): the record's `textFaults` as lines a person can read (`TextFaults.svelte`). PGS-B15 job d, drawn as
+ * What the record found wrong in its own pages and notes, in Settings › Health (Today asks none of it): the record's `textFaults` as lines a person can read (`TextFaults.svelte`). PGS-B15 job d, drawn as
  * a tile and never as a question: nothing here asks. The record walks its words in its night pass and keeps what it
  * found; before the first night it says so (`computedAt` `null`), and that is said as not checked yet (`notChecked`).
  *
@@ -267,7 +266,7 @@ export function faultLine(found: TextFaults | null): string | null {
 /* ── what the pages print raw: every finding, never six ───────────────── */
 
 /**
- * EVERY THING THE PAGES PRINT RAW, one row each (C39, "never hide a fault"): the page's title, the part and what it
+ * EVERY THING THE PAGES PRINT RAW, one row each ("never hide a fault"): the page's title, the part and what it
  * prints, and a press to the page. The sign beside it carries six, so this list is where the rest are read, and it is
  * never cut: a round reads a few dozen pages, so it is a list a person can read through.
  */

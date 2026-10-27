@@ -57,7 +57,7 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
          type read a key where every other part read a name. Hosting stays what a plan with a provider is; these four are
          the things such a plan is made of, for somebody who keeps them one by one. They join after the eight, so no row
          moves, and a value a record added itself stays where it is (`laidBack` in `packages/declare/src/index.ts`).
-         AND THE THREE A CLOUD ACCOUNT CALLS ITS OWN, STILL IN estate 2.2.0 (PGS-C18): `vm`, `edge` and `object`, which an
+         AND THE THREE A CLOUD ACCOUNT CALLS ITS OWN, STILL IN estate 2.2.0: `vm`, `edge` and `object`, which an
          import added to the list itself with no label, so Each month, by type read "vm" and "edge" where a person reads
          words. Declared here with their labels, they are the same stored values: a record that added them keeps every
          row as it is, and its own copy of the value takes this label as it is laid over the update (`rebased`). */
@@ -371,7 +371,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
    * next ninety days, and what each domain points at and every service folded shut. Every heading wears a glyph, every
    * tile is drawn only while it has something, and a fresh record reads one note of what belongs here.
    *
-   * WHAT AGENTS DID, SINCE estate 2.2.0 (PGS-C18), last and under the fold: the runs that changed a service.
+   * WHAT AGENTS DID, SINCE estate 2.2.0, last and under the fold: the runs that changed a service.
    */
   estate: {
     page: 'estate',
@@ -395,7 +395,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
            share of a month (`estate-month`). A record with nothing to pay for has no sentence to say, and the note is
            not drawn rather than drawn at nought.
 
-           AND IT OPENS ON WHAT WAITS ON YOU, SINCE estate 2.2.0 (PGS-C18): how many open questions are about a service
+           AND IT OPENS ON WHAT WAITS ON YOU, SINCE estate 2.2.0: how many open questions are about a service
            (`questions-open-in:services`), the clause the writer leaves out at nought, so the line and Waiting on you
            under it count the same questions and the page never sounds quiet while one is asked. */
         kind: 'note',
@@ -428,7 +428,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'points-nowhere', gt: 0 },
       },
       {
-        /* WHICH ONES ARE LAPSING, BY NAME, IN PLACE OF AT A GLANCE, SINCE estate 2.4.0 (the audit of 25 October, Z40): At a
+        /* WHICH ONES ARE LAPSING, BY NAME, IN PLACE OF AT A GLANCE, SINCE estate 2.4.0: At a
            glance said "Lapsing 2" and nothing on the page said which two, and its "Renews in 30 days 0" sat over "Next
            ninety days 3", which lists the same renewals by day. Each lapsing one by its name, who it is with and the day
            it was due to renew, the longest gone first, and only while one is. Renews in 30 days is still Home's figure. */
@@ -446,7 +446,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
       {
         /* WHAT `renew-soon` HAS ASKED ABOUT SERVICES, answered where it is shown, three at a time, and the rest are in
            Decide. No `empty:` of its own: with nothing waiting the queue says its own line. Only while something is
-           asked ABOUT A SERVICE, SINCE estate 2.2.0 (PGS-C18): it was gated on every open question on the record, so a
+           asked ABOUT A SERVICE, SINCE estate 2.2.0: it was gated on every open question on the record, so a
            question about a task drew a band here that said nothing matched. */
         kind: 'queue',
         heading: 'Waiting on you',
@@ -535,7 +535,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'services-held', gt: 0 },
       },
       {
-        /* WHAT AGENTS DID HERE, SINCE estate 2.2.0 (PGS-C18): the services a run added, renewed or changed, one group per
+        /* WHAT AGENTS DID HERE, SINCE estate 2.2.0: the services a run added, renewed or changed, one group per
            run, from the record's own log, as the Agents page draws what runs added to the brain. `first:` folds each
            run's rest into one line with its count. No `empty:`: with no agent's change to a service the block is not
            drawn. UNDER THE FOLD, with everything kept, because the page already shows six tiles before it on a founder's
@@ -599,7 +599,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
 };
 
 /**
- * A SERVICE'S NUMBERS, ON RENEWALS, SINCE founder 2.6.0 (REC-C12): how full a server's disk is and what a provider has
+ * A SERVICE'S NUMBERS, ON RENEWALS, SINCE founder 2.6.0: how full a server's disk is and what a provider has
  * billed so far are readings about a service and about no project, and they were on no page. A line for each measure
  * read twice in the ninety days, each one read once as its latest figure, six at most, the example left out.
  *
@@ -611,7 +611,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
  * `SERVICE_NUMBERS_WHERE` IS THE BLOCK'S OWN CLAUSES, for the figure that hides it: the pack counts the same readings
  * over the same ninety days, so the heading is never drawn over nothing.
  *
- * THE NINETY DAYS END TODAY, AND THE CLAUSES SAY SO (`SERVICE_NUMBERS_UNTIL`, audit 61 claim 5). `back:` draws the
+ * THE NINETY DAYS END TODAY, AND THE CLAUSES SAY SO (`SERVICE_NUMBERS_UNTIL`). `back:` draws the
  * ninety days up to today and the figure said only where they start, so a reading dated tomorrow, which an import or a
  * mistyped year writes, was counted and not drawn: the heading stood over nothing, and beside a real reading it was the
  * measure's latest figure. Said once here, it is in the block's clauses and in the figure's, which reads them.

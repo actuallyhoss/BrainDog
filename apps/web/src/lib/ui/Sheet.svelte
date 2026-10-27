@@ -59,7 +59,7 @@
     fit?: boolean | undefined;
     /**
      * Whether the caret goes to the first field as it opens (the default). Off for a sheet that is read first and typed
-     * into second, the run sheet from Today, whose message box opened in a heavy focus ring (Y25).
+     * into second, the run sheet from Today, whose message box opened in a heavy focus ring.
      */
     caret?: boolean | undefined;
     /** For a caller whose open state is derived from something else, a peeked row's number, say. */
@@ -297,7 +297,7 @@
 <style>
   /* THE DRAWER, from 900px up. It floats `--inset` in from the window's end edge on three sides, as the docked panel
      does, rather than hanging off the edge with a rule down its side: a tile's surface at radius 16 over the scrim,
-     which is all the separation it needs. No border and no shadow (the UI pass of 20 October, 1.9). */
+     which is all the separation it needs. No border and no shadow. */
   .sheet {
     /* THE MOTION: in over the panel's step on the sheet curve, out along the same path a step quicker, from wherever
        `--sheet-off` puts it out of sight, as `Panel.svelte` moves. Both opacities are 1, so it slides and does not
@@ -348,7 +348,7 @@
     transition-behavior: allow-discrete;
   }
 
-  /* A SHORT SHEET FITS WHAT IT HOLDS (UI audit of 22 October, 21). A read-only link is a sentence, four days and one
+  /* A SHORT SHEET FITS WHAT IT HOLDS. A read-only link is a sentence, four days and one
      button, and the full-height drawer drew them over 700px of empty tile. It is hung from the top `--inset` in, as the
      drawer is, and grows to the drawer's own height at most, so a sheet that gains a step (the template's facts) still
      scrolls inside the same box. */

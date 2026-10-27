@@ -1,5 +1,5 @@
 /**
- * Writes held to the row (sharing plan §2.6, Slice 4): §4.4's P4 for writes and P5, on the leak matrix's record.
+ * Writes held to the row (Slice 4): §4.4's P4 for writes and P5, on the leak matrix's record.
  *
  * P4: A WRITE ABOUT A ROW OUT OF SIGHT IS REFUSED EXACTLY AS ONE ABOUT A ROW THAT IS NOT THERE, by every caller, on
  * every write that names a row: update (an edit, a delete, a move), log, makePrivate, a proposal's rowset, a comment, and

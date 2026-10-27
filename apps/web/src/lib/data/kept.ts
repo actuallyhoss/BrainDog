@@ -2,7 +2,7 @@
  * Answers a screen opted to keep (`read(key, fn, { kept })`), for the tab, by the record's version.
  *
  * A VISIT AT THE SAME VERSION ASKS NOTHING. Work's list is about half a megabyte on a lived-in record, and it was
- * fetched again on every visit, five times over nine screens (`loop/research-104.md` 2.3). Kept, the screen draws the
+ * fetched again on every visit, five times over nine screens. Kept, the screen draws the
  * answer at once; at a moved version it draws the kept answer and asks again quietly, so it still lands true.
  *
  * WHAT IS NEVER KEPT: a refusal, an answer older than `KEPT_MS`, and one from before the reader's midnight, because a

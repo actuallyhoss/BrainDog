@@ -1,5 +1,5 @@
 /**
- * EACH CARD'S FACTS OVER A FIGURE (REC-C16), laid into the cells its columns draw: the record's `facts` (the kernel's
+ * EACH CARD'S FACTS OVER A FIGURE, laid into the cells its columns draw: the record's `facts` (the kernel's
  * `card-facts.ts` `factsOf`), one entry a card and one fact a figure column in column order, said as words.
  *
  * A COUNT IS ITS NUMBER and money goes through the formatter the page already uses, handed in as `money` so this file

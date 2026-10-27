@@ -20,11 +20,11 @@
  * already has a free record, goes read-only and onto the ladder as before. This is a DEFAULT TAKEN FOR THE OWNER
  * ("Free leads"): he has not ruled on it, and `fitsFree` below is the one place to change it.
  *
- * PACKS OF SLASH CREDITS ARE SOLD BESIDE THE PLANS (LCH-A10, "more is bought as credit packs rather than priced by the
+ * PACKS OF SLASH CREDITS ARE SOLD BESIDE THE PLANS ("more is bought as credit packs rather than priced by the
  * ask"): paid once, for any record its owner is signed in to, Free included. A pack makes no subscription and
  * writes no billing row; the webhook adds its credits to the Directory's ledger once, and a refund takes back the rest.
  *
- * A GIFT (`comp`, LCH-A12) IS A ROW NO STRIPE EVENT MOVES: it has no customer and no subscription, never lapses, is
+ * A GIFT (`comp`) IS A ROW NO STRIPE EVENT MOVES: it has no customer and no subscription, never lapses, is
  * never charged, offers no portal, and can buy packs.
  *
  * NOTHING IS WRITTEN FOR A RECORD NOBODY PAID FOR. A record with no billing row is
@@ -69,7 +69,7 @@ import {
 /**
  * The plans this Worker sells, each with the Directory's plan it meters a record under and the setting that holds its
  * Stripe price. Nothing else: the name and the price a person reads are the one table's (`PLAN_TABLE` in
- * `packages/record/src/plans.ts`, LCH-A08), read by `planName` and `planPrice` below. What a person is charged is the
+ * `packages/record/src/plans.ts`), read by `planName` and `planPrice` below. What a person is charged is the
  * Stripe price the setting names, so a change of price is made in Stripe and in that table, together.
  *
  * `directory` IS THE PLAN THE DIRECTORY METERS THE RECORD UNDER: Cloud is the Directory's `hosted`, the plan every
@@ -207,7 +207,7 @@ async function priceRefused(stripe: Stripe, plan: HostedPlan, price: string): Pr
   const amount = got.body['unit_amount'];
   const currency = typeof got.body['currency'] === 'string' ? got.body['currency'].toUpperCase() : '';
   const cents = PLAN_TABLE[HOSTED_PLANS[plan].directory].cents.month;
-  /* AND HOW OFTEN, AND WHETHER IT IS SOLD AT ALL (audit 43-44 #6): the same amount once a year, every three months or
+  /* AND HOW OFTEN, AND WHETHER IT IS SOLD AT ALL: the same amount once a year, every three months or
      once is not the monthly figure every screen shows, and an archived price makes a session Stripe will not charge. */
   const recurring = got.body['recurring'];
   const every = typeof recurring === 'object' && recurring !== null ? (recurring as Record<string, unknown>) : null;
@@ -310,7 +310,7 @@ async function packPriceRefused(stripe: Stripe, id: PackId, pack: Pack, price: s
   return no('NOT_IN_THIS_BUILD', `${name} are ${centsAsPrice(pack.cents)} here and Stripe's price for them is not that, paid once, so no payment page opens until the two agree.`, { at: 'pack' });
 }
 
-/** A gift's row (`comp`, LCH-A12): the operator's, which no Stripe event moves. */
+/** A gift's row (`comp`): the operator's, which no Stripe event moves. */
 export const isGift = (row: Pick<BillingRow, 'state'>): boolean => row.state === 'comp';
 
 /**

@@ -116,7 +116,7 @@ test('SOMEBODY ALREADY THERE IS MATCHED, and gains the line and nothing else', a
 
   const ada = person(sql);
   assert.equal(ada.fields.name, 'Ada Lovelace', 'what a commit said overwrote the name already held');
-  /* A COMMIT'S KEYS ARE NOT CARRIED ONTO WHOEVER HOLDS ONE (research-audit-21 M9): anybody who can push signs as anyone. */
+  /* A COMMIT'S KEYS ARE NOT CARRIED ONTO WHOEVER HOLDS ONE: anybody who can push signs as anyone. */
   assert.equal(ada.fields.handles, undefined, 'a handle a commit said was carried onto her');
   assert.equal((ada.fields.met as string[]).length, 2);
   sql.close();

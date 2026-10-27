@@ -11,7 +11,7 @@ import { test } from 'node:test';
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
 const controls = read('./SheetControls.svelte');
 const charts = read('./SheetCharts.svelte');
-/* THE DESIGN BOOK'S OWN PAGE, AT `/design` SINCE THE UI PASS OF 20 OCTOBER (agents F29); it was a Settings area. */
+/* THE DESIGN BOOK'S OWN PAGE, AT `/design` (agents F29); it was a Settings area. */
 const look = read('../../routes/design/+page.svelte');
 
 /** A component's own words: its `const words = {` object, without the comments in it. */
@@ -40,7 +40,7 @@ test('the controls sheet draws three weights by two sizes by five states, with a
 test('the controls sheet draws a segmented control at 2, 3 and 5, a switch, the four fields and the count', () => {
   assert.match(controls, /const SEGMENTS = \[2, 3, 5\] as const/u);
   assert.match(controls, /<Segmented role="group"[\s\S]*class="segment"/u);
-  /* THE WHOLE WIDTH, so the five keep one row and "Year" never wraps under the rest (scope E36). */
+  /* THE WHOLE WIDTH, so the five keep one row and "Year" never wraps under the rest. */
   assert.match(controls, /<Tile title=\{words\.segmented\} class="sheet-wide">/u);
   assert.match(controls, /class="switch"[\s\S]*role="switch"[\s\S]*class="switch-track"/u);
   assert.deepEqual(listOf(controls, 'FIELDS'), ['rest', 'focus', 'error', 'empty']);
@@ -100,7 +100,7 @@ test('no word on either sheet or the area is an em dash, an id or a word for a d
     const words = wordsOf(src);
     assert.doesNotMatch(words, /—/u, `${name} holds an em dash`);
     assert.doesNotMatch(words, /\b[0-9A-HJKMNP-TV-Z]{26}\b|[a-z]+#\d+/u, `${name} prints an id`);
-    /* The sheet called "Controls and lists" since the UI pass of 21 October; nothing a person reads says "row". */
+    /* The sheet called "Controls and lists"; nothing a person reads says "row". */
     assert.doesNotMatch(words, /\b(rows?|list items?|entity|entities|records?' rows)\b/iu, `${name} says a word for a database`);
   }
 });
@@ -115,7 +115,7 @@ test('neither sheet draws glass, a gradient or a shadow of its own', () => {
 
 test('the design book is generated from the renderer and the skin, and sits on its own page', () => {
   const book = read('./DesignBook.svelte');
-  /* THE APP'S OWN FRAME, NOT THE SITE'S LOOK, since the UI pass of 20 October. */
+  /* THE APP'S OWN FRAME, NOT THE SITE'S LOOK. */
   for (const name of ['designBook', 'HOUSE_FRAME', 'SCALE_CSS', 'SHEET_NOW']) assert.match(book, new RegExp(`\\b${name}\\b`, 'u'), name);
   assert.doesNotMatch(book.slice(book.indexOf('<style>')), /#[0-9a-f]{3,8}\b|rgb\(|gradient\(|box-shadow:(?! none)/iu, 'the book names no colour of its own');
   assert.match(look, /import DesignBook from '\$lib\/design\/DesignBook\.svelte'/u);

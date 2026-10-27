@@ -1,6 +1,6 @@
 /**
  * The pictures of a look: each screen of the set at each width, light and dark, and one line of `said.json` for each
- * (`loop/scope/area-proof-a.md` 2.4, PRF-A02 job 4).
+ * (PRF-A02 job 4).
  *
  * `run.mjs` serves the built app and the source, then hands this file `{ origin, app, set, out, source }` and closes
  * when it returns. Nothing here starts a server or opens a record: it drives a headless browser at the look's own
@@ -317,17 +317,17 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
       })),
     }))
     .catch(() => ({ overflow: 0, text: '', marked: [] }));
-  /* THE FRAME'S WORDS (U14): the bar, the sidebar and the tab bar, read for words beside the screen's own. */
+  /* THE FRAME'S WORDS: the bar, the sidebar and the tab bar, read for words beside the screen's own. */
   const frame = await page.evaluate(frameTextIn).catch(() => '');
   /* WHAT THE THREE QUICK CHECKS NEED THAT TEXT DOES NOT HOLD (`checks.mjs`): the badge, the More sheet, the key numbers' sentences and the charts' points. */
   const seen = await page.evaluate(pageFactsIn).catch(() => ({ badges: [], more: [], sentences: [], charts: [], decor: [] }));
-  /* WHAT IT DREW AT ALL, which the blank check reads (`blankOf`, Z2). */
+  /* WHAT IT DREW AT ALL, which the blank check reads (`blankOf`). */
   const drew = await page.evaluate(drawnIn).catch(() => null);
   /* TEXT THAT CROSSES TEXT, over the whole page and not only the first screen: a fault the look fails on. */
   const crossed = crossings(await page.evaluate(textBoxesIn).catch(() => []));
   const base = `${screen.key}-${width}-${theme}`;
   await page.screenshot({ path: join(out, `${base}.png`) });
-  /* THE WHOLE PAGE IS THE SCROLL CONTAINER'S, NOT THE DOCUMENT'S (SF11). The shell scrolls `.body` and holds `html` and
+  /* THE WHOLE PAGE IS THE SCROLL CONTAINER'S, NOT THE DOCUMENT'S. The shell scrolls `.body` and holds `html` and
      `body` at the window's height (`app.css`), so a full-page picture of the document was the first screen again. The
      window is made as tall as the container's content plus its top for the picture, and put back after. */
   const viewport = page.viewportSize();
@@ -340,7 +340,7 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
   if (viewport && tall > viewport.height) await page.setViewportSize({ width: viewport.width, height: tall });
   await page.screenshot({ path: join(out, `${base}-full.png`), fullPage: true });
   if (viewport && tall > viewport.height) await page.setViewportSize(viewport);
-  /* ONE PRESSED STATE A SCREEN, THE PALETTE OPEN (U14): its words are read and pictured, and it is closed again. */
+  /* ONE PRESSED STATE A SCREEN, THE PALETTE OPEN: its words are read and pictured, and it is closed again. */
   const pressed = await pressPalette(page, join(out, `${base}-palette.png`));
   /* What went on is not what was refused: `forwarded` is the reads handed to the record, kept apart. */
   const { forwarded = 0, ...blocked } = since(before, source.counts());

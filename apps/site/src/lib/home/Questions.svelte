@@ -3,7 +3,7 @@
   native disclosures on the right, the first open, each a flat tile whose chevron turns in 160ms. A disclosure opens
   and shuts with no script, and every answer is in the HTML.
 
-  THREE, THEN MORE QUESTIONS (the audit of 22 October, U-C10): the rest sit behind one plain disclosure, so a phone reads
+  THREE, THEN MORE QUESTIONS: the rest sit behind one plain disclosure, so a phone reads
   three questions and not five before the footer.
 -->
 <script lang="ts">

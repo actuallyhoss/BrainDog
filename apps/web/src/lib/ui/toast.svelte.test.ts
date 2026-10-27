@@ -50,7 +50,7 @@ registerHooks({
    body runs, so the module would load before the hook that makes it loadable was registered. */
 const { toasts } = await import('./toast.svelte.ts');
 
-/** The life of a toast that offers its Undo (the UI pass of 20 October, 2.A.16): eight seconds. */
+/** The life of a toast that offers its Undo: eight seconds. */
 const LIFE = 8_000;
 /** And of one that only reports: five. */
 const REPORT = 5_000;

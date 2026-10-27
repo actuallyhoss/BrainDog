@@ -114,7 +114,7 @@ test('FLAGS NAME THE HOOKS WITH WORK, and none for a file two minutes old or fro
   const redirect = inbox({ pending: [toldOf(told('IN9', 'redirect', true))!] });
   assert.deepEqual(flagsOf(redirect, { ...NO_STATE, shown: { IN9: 'tool' }, redirected: ['IN9'] }, NOW), ['stop']);
   assert.deepEqual(flagsOf(redirect, { ...NO_STATE, shown: { IN9: 'tool' } }, NOW), ['tool', 'stop']);
-  /* A RUN THAT COMMITTED STARTS NODE AT ITS END ONCE, to be asked for its learnings (scope B31), and never after. */
+  /* A RUN THAT COMMITTED STARTS NODE AT ITS END ONCE, to be asked for its learnings, and never after. */
   assert.deepEqual(flagsOf(inbox({ committed: true }), NO_STATE, NOW), ['stop']);
   assert.deepEqual(flagsOf(inbox({ committed: true }), { ...NO_STATE, learned: true }, NOW), []);
   assert.equal(readInbox(writeAndRead(inbox({ committed: true })))?.committed, true, 'the reader keeps it');
@@ -227,7 +227,7 @@ test('TIMINGS: the shell path with no word, and the Node path with one, each und
   assert.ok(loud < 1_000, `the Node path took ${String(loud)} ms`);
 });
 
-/* ── a hook with something to say, answered by the shell (H23) ─────────── */
+/* ── a hook with something to say, answered by the shell ─────────── */
 
 test('A HOOK WITH SOMETHING TO SAY IS ANSWERED BY THE SHELL, with no Node on the path, once, and under 50 ms', { skip: process.platform === 'win32' }, () => {
   const env = envFor();

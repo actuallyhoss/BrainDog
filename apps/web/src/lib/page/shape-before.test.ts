@@ -1,5 +1,5 @@
 /**
- * A PROJECT'S PAGE ON A RECORD STILL ON AN OLDER USE CASE draws its whole shape (the audit of 25 October, Z1): founder
+ * A PROJECT'S PAGE ON A RECORD STILL ON AN OLDER USE CASE draws its whole shape: founder
  * 3.2.0 and team 2.24.0 declare no `project` block, since the shape became blocks only in founder 3.3.0 and team
  * 2.25.0, and such a page drew no name, no hero and nothing of its work, blank on a phone. The page's own answer still
  * carries the shape, and the page is drawn with the two blocks the newer versions declare (`withShape`).

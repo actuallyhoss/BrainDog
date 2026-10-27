@@ -1,5 +1,5 @@
 /**
- * The leak matrix's record (sharing plan §4.1) and its grant shapes as they can be built today (§4.2, Slice 2).
+ * The leak matrix's record and its grant shapes as they can be built today (§4.2, Slice 2).
  *
  * ONE RECORD, EVERY SHAPE ON IT. Lists `things` (projects), `tasks` (on a project, a stage, a money `rate`, notes and
  * an assignee), `money`, `people`, `credentials` and `notes`; a Kiln page and a Money page with a count and a sum;
@@ -210,7 +210,7 @@ export type Shape = {
   child?: true;
   /** The shares go to a group the person is in, not to the person. */
   group?: true;
-  /** The fields its shares hide, by list, in plain words (sharing plan §2.7): what it must never be answered on a row it sees. */
+  /** The fields its shares hide, by list, in plain words: what it must never be answered on a row it sees. */
   hides?: Record<string, string[]>;
   /** Member rows written straight into the table, for a grant the API refuses to make (one naming a personal list). */
   rows?: Record<string, Level>;
@@ -276,7 +276,7 @@ export const SHAPES: readonly Shape[] = [
   { id: 'named-grant', name: 'Reads the record, and holds Setups by name', person: 'p_nmd', invite: { level: 'read' }, rows: { setups: 'write' }, sees: () => true },
 
   /* THE SAME GRANTS AS SHARES (Slice 7), on guests with no member row. A whole-record share leaves out the lists only
-     named shares reach: Keys and the people `meet` writes (sharing plan §2.3). */
+     named shares reach: Keys and the people `meet` writes. */
   { id: 'sh-whole', name: 'Whole-record view, shared', person: 'p_wsh', shares: () => [{ what: { record: true }, can: 'view' }], sees: (r) => r.list !== 'people' },
   {
     id: 'sh-accountant',

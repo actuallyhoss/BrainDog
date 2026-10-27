@@ -1,7 +1,7 @@
 /**
  * Work's Waiting on you draws when each task falls due and which project it is on, under the reason it waits.
  *
- * THE PROJECT AND NOT WHO CHANGED IT LAST, SINCE the UI pass of 20 October (proj F10): every task on Work says its
+ * THE PROJECT AND NOT WHO CHANGED IT LAST (proj F10): every task on Work says its
  * project in the line under it, "7 Sep · Kiln", and who changed it last is on the task's own page.
  *
  * Commit c6e2a331 widened `todo` to four cells, the last two

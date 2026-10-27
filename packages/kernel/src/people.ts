@@ -14,10 +14,10 @@
  *   3. THE STRONG RULES, written by the record as one undoable batch: the same name of two or more words (a name or an
  *      alias), plus the same personal handle: an email local part or a login of five or more characters, read without
  *      its dots, dashes, underscores and the number on its end (`rohan.meduri`, `rohanmeduri` and `rohanmeduri24` are
- *      one handle). The same organisation or domain alone is never enough: two colleagues share both (M4). The older
+ *      one handle). The same organisation or domain alone is never enough: two colleagues share both. The older
  *      row is kept, the record's own person always, and the newer folded into it, carrying every field the kept row
- *      lacks (H2). A fold he undid is never made again (`foldUndone`): the meeting writes on the one it was about.
- *   4. ONE QUESTION PER CLUSTER for the doubtful rest, worded in names and the evidence for each (M4), never in ids.
+ *      lacks. A fold he undid is never made again (`foldUndone`): the meeting writes on the one it was about.
+ *   4. ONE QUESTION PER CLUSTER for the doubtful rest, worded in names and the evidence for each, never in ids.
  *      Asked once: a pair the owner said no to, or a merge he undid, is never asked about again. A later meeting of
  *      somebody the question names keeps it current (`reask`), and one who may be the same person joins it rather than
  *      opening another, so a question is never left stale by the work it is about.
@@ -26,20 +26,20 @@
  *      on, something else the record holds agreeing (`corroborated`) and no bar against it is that top band a fold,
  *      made as one batch with one Undo. A score alone never folds anybody.
  *
- * TEXT ANYBODY COULD HAVE WRITTEN IS NOT EVIDENCE (H1). A mail, a bank text, an import or any other arrival (`untrusted`,
+ * TEXT ANYBODY COULD HAVE WRITTEN IS NOT EVIDENCE. A mail, a bank text, an import or any other arrival (`untrusted`,
  * or a source that says so) never strong-merges, never carries a key onto somebody already known, and never folds an
  * address into a real person: an exact key match gains its dated line and nothing else, a sender like nobody known is a
  * person of their own, and one who looks like somebody known is kept as a mention with one question for the owner. A row
  * every meeting of which was such text is never folded on the strong rules either, whichever order the two arrived in.
  *
- * AND THAT IS EVERY SOURCE BUT A NAMED FEW (research-audit-19 M1). The owner typing, a note, and an agent session's own
- * run are believed; anything else, however a caller words it, is text anybody could have written. A COMMIT sits between
- * (audit 19 H1): anyone who can push may sign one with any name and address, so a commit by a key somebody already holds
+ * AND THAT IS EVERY SOURCE BUT A NAMED FEW. The owner typing, a note, and an agent session's own
+ * run are believed; anything else, however a caller words it, is text anybody could have written. A COMMIT sits between:
+ * anyone who can push may sign one with any name and address, so a commit by a key somebody already holds
  * is that person's, and one by a key nobody holds is a person of their own. A commit folds somebody met in commits alone
  * only into somebody else met in commits alone; one who looks like a person typed, noted or mailed is asked about.
  *
- * A KEY IS NEVER BELIEVED OUTRIGHT (research-audit-21 H2): what an agent's key or a script says is held to a commit's
- * word, whatever its source says. AND AN ORGANISATION IS HELD TO THE SAME RULES (H1): a mail, a bank text or a commit
+ * A KEY IS NEVER BELIEVED OUTRIGHT: what an agent's key or a script says is held to a commit's
+ * word, whatever its source says. AND AN ORGANISATION IS HELD TO THE SAME RULES: a mail, a bank text or a commit
  * naming one already held writes its line, and a domain or key it would add is one question. Nothing makes an
  * organisation the record was not told of by a key: two people it vouches for at a domain nobody holds are one question
  * ("Add Acme?"), and two organisations whose names fold to the same words are one question per pair.
@@ -50,7 +50,7 @@
  * NEVER: a person merged with an organisation (they live in two lists, and a key belongs to one row of one list); a row
  * another member made merged by anybody but its maker's say; a merge made without asking while money rows point at
  * both. A shared inbox or a machine sender (`info@`, `noreply@`) is an organisation speaking and never makes a person.
- * A full address is never a name, a met line or a word handed to a model (M1, M2).
+ * A full address is never a name, a met line or a word handed to a model.
  *
  * THE LISTS ARE WHICHEVER DECLARE `meets:` AND `org:`, and each field is the one its part names (`roles.ts`). A record
  * older than the keys is met into `people` and `organisations` under the parts' own names. A list may leave out
@@ -194,7 +194,7 @@ export type PeopleDeps = {
    */
   typed?: boolean;
   /**
-   * Whether the caller is a key: an agent's run or a script, never a person at their keyboard (research-audit-21 H2).
+   * Whether the caller is a key: an agent's run or a script, never a person at their keyboard.
    * Nothing a key says is believed outright, whatever its source says: `session in braindog` from a key is held to a
    * commit's word, folding only into somebody met in commits alone and carrying nothing onto anybody known.
    */
@@ -272,7 +272,7 @@ function shortForms(name: string): string[] {
 const ARRIVED = /^\s*(?:(?:e-?)?mail\s*(?::|from\b)|bank\b|import(?:ed)?\b|sms\b|(?:text\s+)?message\s+from\b|text\s+from\b|whatsapp\b|arrival\b|arrived\s+in\b|inbox\b|forwarded\b)/iu;
 
 /**
- * THE SOURCES THAT ARE BELIEVED, and the only ones (audit 19 M1): a note the owner wrote, and an agent session's own run
+ * THE SOURCES THAT ARE BELIEVED, and the only ones: a note the owner wrote, and an agent session's own run
  * (`session in braindog`, `run handoff on Fanline`). Everything else is text anybody could have written, so a caller
  * relaying a Slack message, a calendar invite or a pasted transcript is held to the arrival rules however it words it.
  */
@@ -280,16 +280,16 @@ const TRUSTED = /^\s*(?:(?:a|an|the|this|that|my|his|her|their|our)\s+)?(?:notes
 
 /**
  * Words anywhere in a source that say a believed one is relaying somebody else's text: `a run reading the inbox`, and a
- * run reading a commit's author or a git log, which anybody who can push wrote (research-audit-21 H2).
+ * run reading a commit's author or a git log, which anybody who can push wrote.
  */
 const RELAYED =
   /\b(?:e-?mails?|mail|inbox|forwarded|bank|imports?|imported|sms|texts?|messages?|whatsapp|slack|dms?|discord|telegram|calendar|invites?|issues?|pull\s+requests?|prs?|tickets?|transcripts?|pasted|paste|arrival|arrived|webhook|tweets?|linkedin|commits?|git|authors?|co-authored|logs?)\b/iu;
 
-/** A commit, whose author anybody who can push may write as anyone (audit 19 H1). */
+/** A commit, whose author anybody who can push may write as anyone. */
 const COMMIT = /^\s*commits?\b/iu;
 
 /**
- * How a met line says a key's word, held to a commit's (research-audit-21 H2): `an agent said: session in braindog`.
+ * How a met line says a key's word, held to a commit's: `an agent said: session in braindog`.
  * Read back as a commit's line, so a person a key made is folded later only as somebody met in commits alone.
  */
 const AGENT_SAID = 'an agent said:';
@@ -304,7 +304,7 @@ const COMMIT_WORD = /^\s*(?:commits?\b|an agent said:)/iu;
 export type Trust = 'trusted' | 'commit' | 'untrusted';
 
 /**
- * A KEY IS NEVER `trusted` (research-audit-21 H2): it names its own source, so a suggest-only token that read a forged
+ * A KEY IS NEVER `trusted`: it names its own source, so a suggest-only token that read a forged
  * commit and says `session in braindog` would otherwise fold and carry keys onto a real person. What a key would have
  * been believed on is held to a commit's word instead.
  */
@@ -342,7 +342,7 @@ function nameOnly(raw: string | undefined): string | undefined {
   return name === '' ? undefined : name;
 }
 
-/** The source a met line holds: what follows its day. A line with no day is all source (L3). */
+/** The source a met line holds: what follows its day. A line with no day is all source. */
 const sourceOfLine = (line: string): string => (line.includes(' · ') ? line.slice(line.indexOf(' · ') + 3) : line);
 
 /** What `meet` was told, read and checked. */
@@ -374,7 +374,7 @@ function normalise(args: MeetArgs, typed = false, token = false): Result<Said> {
     if (!got.ok) return got as Result<never>;
     read[at] = got.value;
   }
-  /* THE SOURCE WINS OVER WHERE (M2): a mail rule says `where: 'mail: <subject>'` beside `source: 'mail from <domain>'`,
+  /* THE SOURCE WINS OVER WHERE: a mail rule says `where: 'mail: <subject>'` beside `source: 'mail from <domain>'`,
      and a subject in every met line put the mail's words, and its addresses, in the record and in front of a model.
      Either is clipped to a phrase and says an address only as its domain. */
   const given = read.source ?? read.where;
@@ -403,7 +403,7 @@ function normalise(args: MeetArgs, typed = false, token = false): Result<Said> {
 
   /* A RAW `From` HEADER IS READ INTO ITS TWO HALVES, so a mail rule passing the header whole meets the sender and not a
      refusal. A name in the header is the sender's only when nobody said one. */
-  /* A NAME IS NEVER AN ADDRESS (M1): one written into the name (`ada@x.com <ada@x.com>`, `Ada (ada@x.com)`) is taken out,
+  /* A NAME IS NEVER AN ADDRESS: one written into the name (`ada@x.com <ada@x.com>`, `Ada (ada@x.com)`) is taken out,
      and a name that was only an address is no name. */
   let name = nameOnly(read.name);
   let email: string | undefined;
@@ -549,7 +549,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     noteMention(deps.sql, { name: s.name ?? nameFromKeys(keys), kind: 'person', project, source: s.source, at: instant(deps.nowMs) });
     return ok(mention());
   }
-  /* AN ARRIVAL NOBODY ANSWERS TO THAT LOOKS LIKE SOMEBODY KNOWN (H1): `From: "Teodor Vance" <teodorvance@evil.test>`
+  /* AN ARRIVAL NOBODY ANSWERS TO THAT LOOKS LIKE SOMEBODY KNOWN: `From: "Teodor Vance" <teodorvance@evil.test>`
      made a row the strong rules folded into the real Teodor, and his keys then answered for whoever sent it. */
   if (!hit && s.untrusted) {
     const offered = offerArrival(deps, list, s, keys, project);
@@ -561,7 +561,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   if (hit) {
     const f = hit.fields;
     const patch: Record<string, unknown> = { [at.met]: metLines(listOf(f[at.met]), [line]) };
-    /* AN EXACT KEY MATCH FROM TEXT ANYBODY COULD HAVE WRITTEN ADDS ITS LINE AND NOTHING ELSE (research-audit-21 M10): no
+    /* AN EXACT KEY MATCH FROM TEXT ANYBODY COULD HAVE WRITTEN ADDS ITS LINE AND NOTHING ELSE: no
        project, no day in touch, no key, no name, no organisation, since a spoofed From must not move the real person. */
     if (!s.untrusted) {
       if (at.projects !== undefined) {
@@ -572,7 +572,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
         }
       }
       if (at.in_touch !== undefined && later(day, f[at.in_touch]) === day) patch[at.in_touch] = day;
-      /* AND ONE BY A COMMIT ADDS ITS LINE, ITS PROJECT AND ITS DAY (M9): anybody who can push may sign with this key and
+      /* AND ONE BY A COMMIT ADDS ITS LINE, ITS PROJECT AND ITS DAY: anybody who can push may sign with this key and
          any other, so the keys, the name and the other names it says are not carried onto the person who holds it. The
          organisation their own address is at still is, which the address already says (`orgFor`). */
       if (org !== null && at.org !== undefined && textOf(f[at.org]) === undefined) patch[at.org] = org;
@@ -603,7 +603,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   /* THE MEETING BRIDGED TWO PEOPLE THE RECORD HELD APART: one key was one row's and another key another's. Never
      joined on its own, since one wrong key would fold two people; asked. */
   const bridged = found.slice(1).map((h) => rowById(deps.sql, h.id)).filter((r): r is Row => r !== null);
-  /* A COMMIT FOLDS ONLY SOMEBODY MET IN COMMITS ALONE INTO SOMEBODY MET IN COMMITS ALONE (audit 19 H1): two commits as
+  /* A COMMIT FOLDS ONLY SOMEBODY MET IN COMMITS ALONE INTO SOMEBODY MET IN COMMITS ALONE: two commits as
      `Teodor Vance` are one author's spellings, but one forged as him beside the Teodor the owner typed is asked about.
      A key the other row already holds would have been a key match, never a fold. */
   const folds: Folds = s.untrusted ? 'none' : s.commit ? 'commits' : 'any';
@@ -638,7 +638,7 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
 
 /**
  * The name a person met with no name is added under: their login, or their address's local part, never the whole
- * address (M1). A key that is neither is said by its kind and its last characters, and still names nobody else.
+ * address. A key that is neither is said by its kind and its last characters, and still names nobody else.
  */
 function nameFromKeys(keys: readonly string[]): string {
   const login = keys.find((k) => kindOfKey(k) === 'github');
@@ -724,7 +724,7 @@ function keysPatch(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields
  * The organisation a person is with, as a row id, or `null`: the one named, or the one whose domain their address is
  * at. Only one the record already holds, unless they named a domain, which is a key and may add one.
  *
- * UNDER THE MEETING'S OWN TRUST (research-audit-21 H1): a mail or a commit naming an organisation meets it as `meetOrg`
+ * UNDER THE MEETING'S OWN TRUST: a mail or a commit naming an organisation meets it as `meetOrg`
  * meets any such text, a line on one already held and nothing carried onto it, and puts nobody in it: `pat@evil.test`
  * saying she is with Stripe is one of Stripe's lines, never one of its people. The domain her own address is at says.
  */
@@ -910,9 +910,9 @@ const keysOfOrg = (orgs: DeclaredList<OrgFields>, row: Row): string[] => {
 };
 
 /**
- * What a meeting the record does not believe would have given an organisation it already holds (`fresh`), asked once
- * (research-audit-21 H1, M12): "Is mail from evil.test the Stripe you already know?", the domain said plainly so he sees
- * what a yes files (research-audit-23 M5). Nothing is written until the owner says yes, and an address or a key offered
+ * What a meeting the record does not believe would have given an organisation it already holds (`fresh`), asked once:
+ * "Is mail from evil.test the Stripe you already know?", the domain said plainly so he sees
+ * what a yes files. Nothing is written until the owner says yes, and an address or a key offered
  * before is never offered again.
  *
  * WHAT THE ORGANISATION ALREADY ANSWERS TO IS NOT ASKED ABOUT: a shared inbox at a domain it holds, and the payee key a
@@ -945,7 +945,7 @@ function offerOrg(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, row: Row, s: 
   if (Object.keys(patch).length === 0) return ok(null);
   const known = orgNameOf(deps, orgs, row);
   const said = name === undefined || orgNameKey(name) === orgNameKey(known) ? known : name;
-  /* THE DOMAIN IS THE QUESTION (research-audit-23 M5): the name and the source are whatever the sender wrote, so the
+  /* THE DOMAIN IS THE QUESTION: the name and the source are whatever the sender wrote, so the
      sentence leads with the domain a yes files, and what it called itself comes after, never in its place. */
   /* AN ADDRESS IS NOT ITS DOMAIN: a yes on billing@gmail.com files that one address, never all of gmail.com's mail. */
   const hostOf = (k: string): string => {
@@ -1021,7 +1021,7 @@ const ORG_PAIRS_MOST = 3;
 
 /**
  * A new organisation whose name folds to the words of one already held, by a key the other does not answer to: one
- * question per pair, as people are asked, and never a merge made on its own (research-understanding-judge change 3).
+ * question per pair, as people are asked, and never a merge made on its own.
  */
 function askOrgPairs(deps: PeopleDeps, orgs: DeclaredList<OrgFields>, row: Row): Result<string | null> {
   const merged = orgs.fields.merged_into;
@@ -1160,7 +1160,7 @@ const holdsAt = (list: DeclaredList<MeetsFields>, row: Row, domain: string): boo
 const DOMAIN_PEOPLE_LEAST = 2;
 
 /**
- * ORGANISATIONS FROM MAIL DOMAINS (research-understanding-judge change 3). Two or more people the record vouches for at
+ * ORGANISATIONS FROM MAIL DOMAINS. Two or more people the record vouches for at
  * one domain nobody holds is a company it does not keep yet: one question, "Add Brightloom Infotech?", whose yes makes it
  * and links them (`joinOrganisation`). One already kept under that name is offered the domain instead. Never made on its
  * own, never from people only mail vouches for, never for a public mailbox, and asked once per domain.
@@ -1232,7 +1232,7 @@ function askDomainOrgs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, row: R
 /**
  * After the owner accepts a question that asked about an organisation from its people's domain: the people it named
  * (`join.people`, kept when it was filed) are put in the organisation that now holds the domain, each only while they
- * are with nobody yet, still vouched for, and still hold an address at the domain itself (research-audit-23 M4). Nobody
+ * are with nobody yet, still vouched for, and still hold an address at the domain itself. Nobody
  * who arrived after it was asked, nobody only mail vouches for, and no subdomain's address. For the kernel to run after
  * every decision, in its transaction; a question not accepted, not one of these, or one whose domain nobody holds,
  * links nobody.
@@ -1304,7 +1304,7 @@ function identity(list: DeclaredList<MeetsFields>, row: Row): { emails: { local:
   };
 }
 
-/** A person's name as a sentence says it: an address an older record kept in it is left out (M1). */
+/** A person's name as a sentence says it: an address an older record kept in it is left out. */
 const nameOfRow = (list: DeclaredList<MeetsFields>, row: Row): string => nameOnly(textOf(row.fields[list.fields.name])) ?? '';
 
 /** Every name a person goes by, as two names compare: theirs, then each alias. */
@@ -1324,7 +1324,7 @@ function stemsOf(list: DeclaredList<MeetsFields>, row: Row): Set<string> {
  * Whether somebody was ever met other than in text anybody could have written: one met at least once in a commit, a
  * call or a note, or a row an arrival did not make (one a person typed keeps its word after their mail is read). A row
  * an arrival made and only arrivals met since is never folded on the strong rules, so a forged sender who came first
- * cannot take in the real person who comes after (H1).
+ * cannot take in the real person who comes after.
  */
 function vouched(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row): boolean {
   const lines = listOf(row.fields[list.fields.met]);
@@ -1347,7 +1347,7 @@ function madeLines(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields
 /**
  * Whether somebody was only ever met in commits: made by a meeting, met in one commit at least, and every line that
  * vouches for them, then and since, a commit's. A commit by a key nobody held folds only into such a person, never into
- * one the owner typed or noted (audit 19 H1).
+ * one the owner typed or noted.
  *
  * A LINE ANYBODY COULD HAVE WRITTEN SAYS NOTHING EITHER WAY: a forged author who then mails in from the address he
  * signed with is still only a commit author, and never becomes somebody the next commit may fold into the real person.
@@ -1415,7 +1415,7 @@ function wroteTo(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>,
  * Whether the strong rules say two people are one: a name of two or more words they both go by, and a handle of five
  * or more characters they both hold (`stem`). A login equal to the other's local part is such a handle.
  *
- * THE SAME ORGANISATION IS NOT EVIDENCE OF THE SAME PERSON (M4). Two colleagues called Ahmed Hassan share a domain and a
+ * THE SAME ORGANISATION IS NOT EVIDENCE OF THE SAME PERSON. Two colleagues called Ahmed Hassan share a domain and a
  * linked company and nothing else; that is a question, and `similar` asks it.
  */
 function strong(list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
@@ -1509,8 +1509,8 @@ type Settled = { kept: Row | null; undo: string | null; question: string | null;
  * After a person is met: fold them into the one the strong rules say they are, or ask once about the doubtful rest.
  *
  * `bridged` ARE ROWS THIS MEETING'S OWN KEYS FOUND BESIDE THE ONE IT MATCHED, always asked, never folded. `folds` is
- * `none` for text anybody could have written, which folds nothing (H1), and `commits` for a commit by a key nobody held,
- * which folds only into somebody met in commits alone (audit 19 H1); the rest is asked.
+ * `none` for text anybody could have written, which folds nothing, and `commits` for a commit by a key nobody held,
+ * which folds only into somebody met in commits alone; the rest is asked.
  *
  * A FOLD MAY MAKE THE KEPT ROW ONE ANOTHER ROW'S STRONG MATCH (it now holds the fold's handle), so the rules run again on
  * it, a few times at most, all in one batch, so one Undo takes back everything this meeting folded.
@@ -1570,7 +1570,7 @@ function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, 
 }
 
 /**
- * Whether the strong rules may fold these two as far as where each was met goes (audit 19 H1). Two people met in commits
+ * Whether the strong rules may fold these two as far as where each was met goes. Two people met in commits
  * alone may be one author's spellings, and so may two met anywhere else. Somebody met in commits alone beside somebody
  * met otherwise is a commit author anybody could have signed as: a commit never folds the two, by a key nobody held or
  * by one its own author's row already held (two commits as `Teodor Vance <teodorvance@evil.test>` are the same forger
@@ -1594,7 +1594,7 @@ function order(list: DeclaredList<MeetsFields>, a: Row, b: Row): [Row, Row] {
 }
 
 /**
- * What the kept row gains from the folded ones (H2), and what is only offered (`mentions.ts`'s `foldFill`): every list
+ * What the kept row gains from the folded ones, and what is only offered (`mentions.ts`'s `foldFill`): every list
  * joined, the later day in touch, each fold's address kept as a key, a fold's other name joined to `aliases`, and every
  * empty field the identity floor does not hold filled from the first fold that has it.
  *
@@ -2031,7 +2031,7 @@ function reask(deps: PeopleDeps, list: DeclaredList<MeetsFields>, ids: readonly 
 }
 
 /**
- * Somebody met in text anybody could have written, by a key nobody holds, who looks like somebody known (H1). No row is
+ * Somebody met in text anybody could have written, by a key nobody holds, who looks like somebody known. No row is
  * made and nothing is folded: the sighting is kept as a mention, and when exactly one person is like them, the owner is
  * asked once whether the new address is theirs. `null` when nobody known is like them, and they are a person of their
  * own, touching nobody.
@@ -2189,7 +2189,7 @@ const keysAt = (list: Keyed, row: Row): string[] => {
  * The plain pairs: two live people whose names are equal once folded ("Mariam" and "mariam", "Salma Aziz" and
  * "salma-aziz"), where at most one of them holds any address, handle or key. Oldest first.
  *
- * NEVER a row another member made, never one only an arrival vouches for (a forged sender is nobody's evidence, H1),
+ * NEVER a row another member made, never one only an arrival vouches for (a forged sender is nobody's evidence),
  * never two rows both marked as the record's own person (`askSelf` asks that), and never a pair he answered or undid.
  * `open` true leaves out a pair a question already waits on as well.
  */
@@ -2588,7 +2588,7 @@ function sideOf(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsField
   const work = i.emails.find((e) => !isPublicMail(e.domain));
   const local = i.emails[0]?.local ?? i.logins[0];
   return {
-    /* THE NAME WITHOUT ANY ADDRESS AN OLDER RECORD KEPT IN IT (`nameOfRow`), and the places as their domains (M1). */
+    /* THE NAME WITHOUT ANY ADDRESS AN OLDER RECORD KEPT IN IT (`nameOfRow`), and the places as their domains. */
     name: nameOfRow(list, row),
     kind: 'person',
     ...(work === undefined ? {} : { domain: work.domain }),
@@ -2599,7 +2599,7 @@ function sideOf(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsField
 
 /**
  * Where somebody was seen, in at most three plain phrases: their projects by name, then where they were met, newest
- * first. A line kept before sources were cleaned may hold an address, and it is said as its domain (M1).
+ * first. A line kept before sources were cleaned may hold an address, and it is said as its domain.
  */
 function seenOf(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFields>, row: Row): string[] {
   const at = list.fields;
@@ -2688,7 +2688,7 @@ const firstsOf = (list: DeclaredList<MeetsFields>, row: Row): string[] => namesO
  * for nothing. Three things count, in this order: a project both are on; an address at one organisation's domain
  * together with one first name; and one of them going by the other's name.
  *
- * NONE OF THEM IS ENOUGH ALONE TO FOLD ANYBODY. Two colleagues share a project and a domain (M4), and a first name is
+ * NONE OF THEM IS ENOUGH ALONE TO FOLD ANYBODY. Two colleagues share a project and a domain, and a first name is
  * shared by strangers. Each is only the second signal beside a model that read the two as one.
  */
 function agreement(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFields>, a: Row, b: Row): Agreed | null {
@@ -2742,7 +2742,7 @@ export function corroborated(deps: Pick<PeopleDeps, 'sql' | 'list' | 'titleOf'>,
 /**
  * THE BARS: a pair nothing folds without his answer, however sure a model is and whatever else agrees. The record's
  * own person, since which row is him is his to say; two people money points at; and a row only text anybody could
- * have written vouches for (H1). A row another member made is left out before this, as everywhere here, and a person
+ * have written vouches for. A row another member made is left out before this, as everywhere here, and a person
  * is never paired with an organisation at all.
  */
 function barred(deps: Pick<PeopleDeps, 'sql' | 'moneyAt'>, list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {

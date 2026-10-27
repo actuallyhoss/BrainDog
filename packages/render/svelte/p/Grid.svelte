@@ -77,7 +77,7 @@
   const board = $derived(lanes(block.rows, moved));
 
   /**
-   * ONE LANE AT A TIME ON A PHONE, behind a switch of their names and counts (audit B of 25 October, Y8): stacked, the
+   * ONE LANE AT A TIME ON A PHONE, behind a switch of their names and counts: stacked, the
    * lanes were one list 15,000 px long. Drawn only on a board a host draws, which is a board in the app: the static
    * mirror has nothing to turn a switch with, so it stacks as it always did, and the two stay one tree there. The
    * switch is in the markup at every width and `kinds/board.css` shows it, and hides the other lanes, only where the

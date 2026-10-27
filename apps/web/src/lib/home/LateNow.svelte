@@ -1,5 +1,5 @@
 <!--
-  WHAT IS LATE, AT THE TOP OF THE DESK, EACH WITH ITS BUTTON (the audit of 22 October, U2 and U-A13).
+  WHAT IS LATE, AT THE TOP OF THE DESK, EACH WITH ITS BUTTON.
 
   Today's late list (`home-rows.ts` `lateLines`: every list's deadlines before today, and the late tasks) was folded
   behind More, and on his record a 13 days late salary, a 9 days late instalment and a 14 days late fee stood on no part

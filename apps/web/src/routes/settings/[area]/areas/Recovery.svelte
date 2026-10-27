@@ -36,7 +36,7 @@
   const webauthnHere = support();
   let addingKey = $state(false);
   let addSaid = $state<string | null>(null);
-  /* THE NAME IS ASKED BEFORE THE KEY IS MADE (LCH-A04), with the device's own as the default, so a passkey is not made
+  /* THE NAME IS ASKED BEFORE THE KEY IS MADE, with the device's own as the default, so a passkey is not made
      under one name and renamed in Identity afterwards. Left blank, the device's name is used. */
   let typedName = $state(platformLabel());
   /** Somebody is signed in to a host that offers passkeys, so the list and its button are real. */

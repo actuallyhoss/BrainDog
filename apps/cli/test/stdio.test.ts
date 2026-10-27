@@ -100,7 +100,7 @@ function envFor(extra: Record<string, string>, config = join(scratch, 'empty')):
   return { ...env, ...extra };
 }
 
-/* THE SERVER THIS COMMAND COMPOSES, `--local`, for the seven nights it stays beside the bridge (AGT-A03): signed in,
+/* THE SERVER THIS COMMAND COMPOSES, `--local`, for the seven nights it stays beside the bridge: signed in,
    `braindog mcp` relays to the host's own `POST /mcp`, which `bridge.test.ts` holds against a real self-host. */
 function launch(extra: Record<string, string>, options: { args?: string[]; config?: string } = {}) {
   const child = spawn(process.execPath, ['src/main.ts', ...(options.args ?? ['mcp', '--agent', 'claude', '--local'])], {

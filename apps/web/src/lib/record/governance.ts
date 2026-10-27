@@ -492,7 +492,7 @@ export async function heldBy(client: Governor, bodies: readonly RowsetBody[], op
     }
   }
   /* AND WHAT EACH REF IS CALLED, for one question's page (`readOne`): the queue reads every open question, and a get for
-     every ref of each would be the request count the audit of 20 October counted against it. */
+     every ref of each would be the request count a review counted against it. */
   if (!opts.names) return { registers, rows };
   const names = await refNames(client, refsOf(bodies, registers, rows), registers, read);
   return { registers, rows, names };

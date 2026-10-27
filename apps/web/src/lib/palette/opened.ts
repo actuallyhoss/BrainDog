@@ -1,5 +1,5 @@
 /**
- * The places a person opened last, kept on this device, for the empty palette (E55).
+ * The places a person opened last, kept on this device, for the empty palette.
  *
  * THE EMPTY PALETTE LISTED THE LAST ROWS ANYONE CHANGED, and on his record that was four "Instalment" rows an import
  * touched. What he opened is what he goes back to, and the record holds no visits, so this device keeps the last few:
@@ -19,13 +19,13 @@ const PASSED = /^\/(?:$|signin|signup|start|invite|connect)(?:[/?#]|$)/u;
 
 /**
  * A handle and not a name: a question's `SG240`, a run's `S42`, a row's `tasks#4`. A screen whose tab still says one
- * had not named itself yet (the audit of 25 October, Z24: Recent listed "SG240"), so it is not kept by that name.
+ * had not named itself yet (Recent listed "SG240"), so it is not kept by that name.
  */
 const HANDLE = /^(?:[A-Z]{1,3}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u;
 
 /**
  * THE PLACES WHOSE SCREENS ARE NAMED UNDER THEM, so a screen of one is said with it: "Add-ons: Browse", "Settings:
- * Navigation" (the audit of 25 October, Y30). Recent said "Browse" alone, which names nothing.
+ * Navigation". Recent said "Browse" alone, which names nothing.
  */
 const WITHIN = new Set(['Add-ons', 'Settings']);
 
@@ -94,7 +94,7 @@ export function noteOpened(href: string, product: string, wait = 800): void {
 export type Asked = { title: string; href: string | null; ask: string | null };
 
 /**
- * THE THREE QUESTIONS THE EMPTY PALETTE OPENS ON (E55), for today: what needs him, what the agents did, what changed.
+ * THE THREE QUESTIONS THE EMPTY PALETTE OPENS ON, for today: what needs him, what the agents did, what changed.
  * With a model behind the ask each one is asked. Without one, each opens the screen of the shell that answers it, which
  * every record has whatever it installed: Needs you, Agents and the log. None names an add-on's place.
  */

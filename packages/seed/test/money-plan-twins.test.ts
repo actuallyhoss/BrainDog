@@ -1,5 +1,5 @@
 /**
- * Two plans of one name written two ways, end to end (the audit of 25 October, Y1): the night's run of
+ * Two plans of one name written two ways, end to end: the night's run of
  * `plans_from_names` files one question on Decide, nothing is moved until it is answered, "Make them one" closes the
  * second plan and links it to the first, and the run that answer starts moves its parts to the first.
  *

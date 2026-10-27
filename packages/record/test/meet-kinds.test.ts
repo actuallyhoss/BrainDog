@@ -1,5 +1,5 @@
 /**
- * `meet` through the record for each kind it tells apart (`loop/contract-17.md`): a person, met with the organisation
+ * `meet` through the record for each kind it tells apart: a person, met with the organisation
  * they are with and their role, and an organisation, met by its name, keys and domain. What the record holds is the
  * door: which list each kind is guarded on, which parts each kind takes, and the answer said in names.
  *

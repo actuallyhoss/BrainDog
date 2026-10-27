@@ -1,6 +1,6 @@
 /**
  * WHAT A PAGE MAY SAY CAN BE PRESSED: the verbs a block's `actions` and `row_actions` name, checked when the page is
- * installed and cut to its reader when it is read (PGS-A12, `loop/scope/area-pages-a.md` 2.2, decision 3).
+ * installed and cut to its reader when it is read.
  *
  * Until this file a declared page wrote six things fixed by kind (`apps/web/src/lib/page/page-writes.ts`): a task
  * ticked, a card moved, a bar dropped, a line captured, a field typed and an option pressed. No block could say Install,
@@ -42,7 +42,7 @@ export const ASK_ARGS = ['question', 'why', 'first', 'second'] as const;
  * The answer is `suggestion.answer`, the kernel's own word for what Decide holds (`governanceRow('suggestion')`): the
  * scope wrote `question.answer`, and `question` is a field an add-on declares, which `core-names` keeps out of the core.
  *
- * `question.ask` PUTS A QUESTION TO THE RECORD'S OWNER (PGS-A15), filed as Decide's own "Ask yourself" sheet files one,
+ * `question.ask` PUTS A QUESTION TO THE RECORD'S OWNER, filed as Decide's own "Ask yourself" sheet files one,
  * by whoever pressed, and waits on Decide like any other. Its args (`ASK_ARGS`) are what the record builds that
  * question from, and a form over it names them as its fields. It needs no row, so it is a block's verb, and its way
  * back is the question taken back while it is still open.

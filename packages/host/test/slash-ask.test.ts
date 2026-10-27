@@ -434,7 +434,7 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
      about what is in it. `slashDraft` drafts a page or a list from a description and files nothing. */
   assert.deepEqual(
     ROUTES.filter((r) => r.name.startsWith('slash')).map((r) => r.name),
-    /* AND `slashReads` (ENG-A09), the one switch for Slash reading on its own: a pref kept, and no question answered. */
+    /* AND `slashReads`, the one switch for Slash reading on its own: a pref kept, and no question answered. */
     ['slash', 'slashPropose', 'slashDaily', 'slashForm', 'slashDraft', 'slashReads'],
   );
   assert.equal(servesSlash('/api/slashAsk'), null);
@@ -665,7 +665,7 @@ test("A HOST THAT CAN OPEN A KEY GETS TIER b THROUGH, and propose is handed what
 });
 
 test("A BACKGROUND ASK LEAVES HIS COUNT WHERE IT WAS, and his own press moves it by one, on the real engine's own count", async () => {
-  /* THE COMMENT SAID SO AND THE COUNT DID NOT (ENG-A05). On the included model the engine counted every `pattern` row as
+  /* THE COMMENT SAID SO AND THE COUNT DID NOT. On the included model the engine counted every `pattern` row as
      one of his asks, and the record's headlines, its look and its reading of who is who are all written as `pattern`. So
      each took one of his 80. The row now says whose month it spent, and the engine's `status()` is the judge here, not a
      count this file makes for itself. */

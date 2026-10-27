@@ -1,5 +1,5 @@
 /**
- * The briefing's cards (ENG-B12): what Today opens on, a few lines that say what matters and each open the thing they
+ * The briefing's cards: what Today opens on, a few lines that say what matters and each open the thing they
  * are about.
  *
  * Pure: nothing here reads a table or asks a model. A caller gathers the facts (what is late, what is asked, what a

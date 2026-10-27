@@ -36,7 +36,7 @@ const person = (id: keyof typeof forPages.person.who): Place => ({
 /**
  * Every page a reader may be sent to, home aside. `/legal/*` stays out: those pages are unlinked until their texts arrive.
  *
- * THE HEADER'S ROW (site F12, 20 October): Slash, Agents, Pricing, Security, Docs, then "Sign in" and "Get early
+ * THE HEADER'S ROW (20 October): Slash, Agents, Pricing, Security, Docs, then "Sign in" and "Get early
  * access", which `+layout.svelte` draws because they are not pages of this site. Packs left the row with that design;
  * it and the changelog are held until the site is public (`HELD` in `launch.ts`), and the changelog comes back to
  * the row's end the day `LAUNCH.public` is on (`reachable` below).

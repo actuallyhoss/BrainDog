@@ -88,8 +88,8 @@ test('THE NIGHT PUTS THE UPDATE IN, KEEPS THE PAGE, AND ASKS ONE QUESTION that n
   const body = JSON.parse(open[0]!.body) as { about: string; options: { id: string; label: string; hard?: boolean }[] };
   assert.equal(body.about, `Solo founder ${shippedVersion(PACK)} adds to a page you changed`);
   assert.deepEqual(body.options.map((o) => [o.id, o.label]), [['keep', 'Keep my page'], ['take', "Take the update's page"]]);
-  /* TAKING IS NOT PUT BACK BY UNDO, and the option says so (audit 60, claim 1). IT IS TAKING THAT IS HARD, NOT THE
-     QUESTION (audit 62, claim 6): keeping changes nothing, so the question weighs as a call and each pick by its own. */
+  /* TAKING IS NOT PUT BACK BY UNDO, and the option says so. IT IS TAKING THAT IS HARD, NOT THE
+     QUESTION: keeping changes nothing, so the question weighs as a call and each pick by its own. */
   assert.deepEqual(body.options.map((o) => o.hard === true), [false, true]);
   assert.equal(costOf('options', body), 'call');
   assert.equal(pickCost('options', body, 'take'), 'undo');

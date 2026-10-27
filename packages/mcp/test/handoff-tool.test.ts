@@ -72,7 +72,7 @@ test('TAKE: the step is yours, said with who left it; a second session racing fo
   const took = await call({ take: left }, taker);
   assert.equal(took.refused, false, took.text);
   const tookSaid = `You took the step Claude Code (${left}) left: Kern the lowercase pairs. It is yours now; call handoff with your own next step before you stop.`;
-  /* A WRITE ENDS IN A RECEIPT, which says whether a handle came back; the line above it is not said twice (audit D, W15). */
+  /* A WRITE ENDS IN A RECEIPT, which says whether a handle came back; the line above it is not said twice. */
   assert.equal(took.text.split('\n')[0], tookSaid);
   assert.match(took.text.split('\n')[1] ?? '', /^Receipt: (?:To undo|No undo)/u);
   assert.equal(took.value.left, left);

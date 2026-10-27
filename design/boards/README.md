@@ -42,7 +42,7 @@ drift from the real one and every count on a board is computed.
   "board": "frame",
   "units": ["EXP-A01", "EXP-A02"],
   "said": "the words of the yes, or the decision that takes it",
-  "taken": { "on": "2026-10-08", "from": "DIRECTION 42" },
+  "taken": { "on": "2026-10-08", "from": "the frame decision" },
   "seen": false,
   "images": { "candidate/board-frame-390-light.png": "<sha256>" },
   "widths": [390, 1440, 1512, 1728],
@@ -63,7 +63,7 @@ C, D and E write here, never to a file of their own.
 ```
 node tools/look/board.mjs <board> [--source lived|seed|file:<path>|shape:<path>] [--out <folder>]
 node tools/look/board-sheet.mjs <drawing folder>
-node tools/look/board.mjs <board> --yes "<the words of the yes>" --from <drawing folder> [--taken "DIRECTION 42"] [--seen] [--units EXP-A01,EXP-A02]
+node tools/look/board.mjs <board> --yes "<the words of the yes>" --from <drawing folder> [--taken "the frame decision"] [--seen] [--units EXP-A01,EXP-A02]
 ```
 
 The board is drawn at 390, 1440, 1512 and 1728, light and dark, on a copy of the record; it never draws `live`.

@@ -1,5 +1,5 @@
 /**
- * A use case's Home drawn small, for its card on browse (the UI pass of 20 October, agents F9): four of its Home's
+ * A use case's Home drawn small, for its card on browse (agents F9): four of its Home's
  * tiles, each its heading and a shape for its kind, and the glyph the use case is known by.
  *
  * A PICTURE, NOT AN OUTLINE. The card used to list the Home's headings as lines of text in a grey box, so thirteen cards

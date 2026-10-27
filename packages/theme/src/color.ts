@@ -164,7 +164,7 @@ export function solveL(target: number, C: number, H: number, ground: Rgb, dir: '
   return gamutMap({ L: dir === 'up' ? hi : lo, C, H });
 }
 
-/* ── CIELAB (D65) and Delta-E 2000 ────────────────────────────────────────── */
+/* ── CIELAB and Delta-E 2000 ────────────────────────────────────────── */
 
 const KAPPA = 24389 / 27;
 const EPSILON = 216 / 24389;

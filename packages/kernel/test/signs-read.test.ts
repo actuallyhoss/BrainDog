@@ -88,7 +88,7 @@ test('ARRIVALS: messages that wait after their pattern is gone are still judged,
 });
 
 test('ARRIVALS: one held more than a day is red; a minute short of a day, green', async () => {
-  /* ONE TEXT UNFILED PAST A DAY IS ONE THE PERSON MUST FILE BY HAND (audit 35): two once read green under a limit of three. */
+  /* ONE TEXT UNFILED PAST A DAY IS ONE THE PERSON MUST FILE BY HAND: two once read green under a limit of three. */
   const r = await held(1);
   const red = sign(r.sql, 'arrivals-filed', r.sent + DAY + 60_000);
   assert.equal(red.state, 'red');

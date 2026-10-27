@@ -79,7 +79,7 @@ export const splitListed = (plan: SplitPlan, value: number): boolean => plan.emp
 
 /**
  * WHAT A ROW SAYS WHERE ITS SHARE WOULD BE: its share, or for an amount of money below nought, that it is owed (the audit
- * of 25 October, Z18). "Stripe available −$9.61 USD" stood under three accounts with their shares and said nothing of
+ * of 25 October). "Stripe available −$9.61 USD" stood under three accounts with their shares and said nothing of
  * why it took none. Money below nought on an account is money owed on it. A count below nought says nothing: it is no
  * part, and nothing is owed on it. A figure is money when it carries a currency's sign or code.
  */

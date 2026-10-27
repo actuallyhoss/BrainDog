@@ -142,7 +142,7 @@ export const PERSONAL = {
      3.17.0 so that its own Budgets tile has the count on a record with no use case. Two packs cannot own one
      figure, so this version stops declaring it and Home's budget tile reads Money's. A minor step: the figure is
      handed with its id, where and value as they were, and nothing a record holds goes.
-     2.5.0: a new Home offers something to press (USE-A08). While no account counts as cash, Bring your money in links
+     2.5.0: a new Home offers something to press. While no account counts as cash, Bring your money in links
      to adding an account, forwarding a bank message and the add-ons that bring money in; while no savings goal is
      kept, a line names one; while no project is live, a line names one in the Building lane. Each is drawn on its own
      count, so Home drops it once the thing exists. Three blocks and one count are added and nothing goes, so a minor
@@ -486,7 +486,7 @@ export const PERSONAL = {
             empty: '{{config:voice_nothing_needs_you}}',
           },
           {
-            /* THE FIRST ACTS, SINCE 2.5.0 (USE-A08): a new record opened on a line of zeros and nothing to press. Each is
+            /* THE FIRST ACTS, SINCE 2.5.0: a new record opened on a line of zeros and nothing to press. Each is
                drawn on its own count and goes once the thing it starts exists, so a record with an account, a goal and a
                project never sees them. Nothing is written until the person presses. The way in for money comes first,
                as it does on a founder's Home, while no account counts as cash (money-core `cash-accounts`). */

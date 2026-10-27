@@ -1,6 +1,6 @@
 /**
  * One contact sheet a theme for a look: every screen of the set as a line, its three widths side by side
- * (`loop/scope/area-proof-a.md` 2.4, PRF-A02 job 5).
+ * (PRF-A02 job 5).
  *
  * THE SHEET IS WHAT THE READER OPENS FIRST, and `rubric.md` is what it reads it against. Each screen carries its name,
  * its address, what it settled into and anything raw `said.json` counted in its text, so a fault is named before the

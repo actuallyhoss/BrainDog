@@ -22,7 +22,7 @@
  *
  * EVERY LINE IS BUILT FROM A SCRUBBED COPY. Almost every string these lines print was written by somebody other than the
  * person running the command: a step's answer is what a row's field filled it with, and the row belongs to whoever may
- * append to the list. An audit measured an OSC 52, an OSC 0 and a CR plus CSI 2K reaching the owner's
+ * append to the list. Testing measured an OSC 52, an OSC 0 and a CR plus CSI 2K reaching the owner's
  * terminal byte for byte through `show`. Each verb now passes the record's answer through `printable` once, before any
  * line is built, and a refusal's sentence through it as well; the value `io.answer` hands an agent is the one the record
  * sent, untouched.
@@ -44,7 +44,7 @@ import { connect, type AgentIo } from './skills.ts';
    reached the `--json` envelope. `printable` scrubs a string and passes anything else through, as before the scrub. */
 const refuse = (io: AgentIo, r: Result<unknown>): number => refuseAll(io, r, unknownSaid(r) ?? printable(fixOf(r)));
 
-/* AN AUTOMATION THAT IS NOT THERE IS NAMED AS IT WAS TYPED, WITH THE WAY TO THE LIST (audit D, W5). The record names it
+/* AN AUTOMATION THAT IS NOT THERE IS NAMED AS IT WAS TYPED, WITH THE WAY TO THE LIST. The record names it
    by its declaration id, "There is no automation called rule.nope.", which is a word nobody typed and a dead end. */
 function unknownSaid(r: Result<unknown>): string | null {
   if (r.ok || !('refusal' in r) || r.refusal.code !== 'DECLARATION_UNKNOWN') return null;
@@ -53,7 +53,7 @@ function unknownSaid(r: Result<unknown>): string | null {
   return named === null ? null : `There is no automation called ${named[1]!}. braindog automations list names them.`;
 }
 
-/* A SCRIPT'S CLOCK AS A PERSON SAYS IT: "Every day", "Every 6 hours", not the declaration's `1d` and `6h` (audit D, W6). */
+/* A SCRIPT'S CLOCK AS A PERSON SAYS IT: "Every day", "Every 6 hours", not the declaration's `1d` and `6h`. */
 const UNITS: Readonly<Record<string, [string, string]>> = { s: ['second', 'seconds'], m: ['minute', 'minutes'], h: ['hour', 'hours'], d: ['day', 'days'], w: ['week', 'weeks'] };
 function everyOf(every: string): string {
   const m = /^([1-9][0-9]*)([smhdw])$/u.exec(every.trim());
@@ -72,7 +72,7 @@ const closed = (text: string): string => (/[.!?]$/.test(text.trim()) ? text.trim
 type Named = (id: string) => string;
 const asIs: Named = (id) => id;
 
-/* THE LISTS BY THEIR NAMES (audit D, W7): "When a row of obligations is written" and "Reads installments, plans" said the
+/* THE LISTS BY THEIR NAMES: "When a row of obligations is written" and "Reads installments, plans" said the
    record's ids where a person reads Bills and invoices and Instalments. One read of the record's boot, and its ids where
    that read is refused or missing, so a list is never left out. */
 async function namesOf(client: unknown): Promise<Named> {

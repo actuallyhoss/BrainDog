@@ -142,7 +142,7 @@ test('BRAINDOG TIDY WITHOUT --ask ONLY READS: GETs of stale and the two newer re
   for (const s of h.seen) assert.equal(s.verb, 'GET', `${s.method} was sent as a ${String(s.verb)}`);
   assert.ok(h.seen.every((s) => ['stale', 'scopeProposals', 'learningsTwice'].includes(s.method)));
   assert.equal(h.seen[0]!.headers.authorization, 'Bearer rec_01TESTTESTTESTTESTTESTTEST.tidy');
-  /* THE COMMAND'S BUILD RIDES EVERY CALL (AGT-B01) and names no run, so it is the one `x-braindog-` header a read carries. */
+  /* THE COMMAND'S BUILD RIDES EVERY CALL and names no run, so it is the one `x-braindog-` header a read carries. */
   for (const s of h.seen) for (const name of Object.keys(s.headers)) assert.doesNotMatch(name, /^x-braindog-(?!cli$)/u, `${name} names a run`);
   assert.deepEqual(one.answered, [{ value: { stale: STALE } }]);
   assert.deepEqual(one.lines, [...LINES, '', OLDER_BOTH]);

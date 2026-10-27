@@ -1,5 +1,5 @@
 /**
- * An add-on made from what a person made: `exportPack` (READ+), the pack builder's one read (SHL-B09).
+ * An add-on made from what a person made: `exportPack` (READ+), the pack builder's one read.
  *
  * BEFORE THIS ONLY THE WHOLE SETUP COULD LEAVE. `exportUseCase` shares every module and every page as one use case, and
  * a page shares as a template alone. Nothing made an add-on from a chosen set, so the list, the page and the automation

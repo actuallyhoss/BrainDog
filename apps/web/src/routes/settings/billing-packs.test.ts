@@ -1,5 +1,5 @@
 /**
- * What Settings > Billing says of Slash credit packs (LCH-A10) and of a plan that is a gift (LCH-A12): the credits a
+ * What Settings > Billing says of Slash credit packs and of a plan that is a gift: the credits a
  * record has left, a button a pack on sale with its credits and the Worker's price, the checkout asked for a pack and no
  * plan, the gift's line with nothing to manage at Stripe, and an answer from a host older than packs drawn as before.
  */

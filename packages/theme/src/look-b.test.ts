@@ -78,7 +78,7 @@ const HANDED = [
   '--night-accent', '--shadow-lift', '--shadow-pop',
   /* The solid red under white words, which `--red` cannot be in dark. */
   '--red-fill',
-  /* The UI pass of 20 October: the app's red steps, the bands' grounds and tiles, the desk's app surfaces, and the
+  /* the redesign: the app's red steps, the bands' grounds and tiles, the desk's app surfaces, and the
      category slots the site's tiles and the desk's projects take (SPEC 1.1, 1.3, 4.7). */
   '--red-fill-hover', '--red-fill-press', '--night-lift',
   '--band-who', '--band-ai', '--band-ai-tile', '--band-slash', '--band-slash-tile', '--band-yours', '--band-yours-tile',

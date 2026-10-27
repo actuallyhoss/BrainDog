@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 27: `sign_reading`, a record's vital signs a row a day (PRF-A01).
+ * The kernel schema, migration 27: `sign_reading`, a record's vital signs a row a day.
  *
  * ONE ROW A SIGN A DAY. `sign` is an id from `VITAL_SIGNS` (`signs.ts`), `day` the record's local calendar day the
  * reading is of, `YYYY-MM-DD`. The night's handler writes the day that ended; a sign the record or the host files

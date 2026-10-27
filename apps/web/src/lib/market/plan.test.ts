@@ -111,7 +111,7 @@ test('the skills an add-on gives the agents are named before it installs, by nam
   assert.equal(sheetOf(plain, pack)?.parts[0]?.sections.some((s) => s.key === 'teaches'), false);
 });
 
-/* THE INSTALL SHEET NAMES EACH THING ONCE (audit C of 25 October, X10): its lists and pages by name, and its numbers as
+/* THE INSTALL SHEET NAMES EACH THING ONCE: its lists and pages by name, and its numbers as
    one row, so a list and a number of the same name are not two "Kiln firings" one under the other. */
 
 test('an add-on’s plan names its lists and pages and folds its numbers into one row, counted whole', () => {

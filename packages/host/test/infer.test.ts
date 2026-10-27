@@ -1,5 +1,5 @@
 /**
- * The router (ENG-A06): `routeFor` over a host's facts, and `infer` walking the list over Slash's real ledger.
+ * The router: `routeFor` over a host's facts, and `infer` walking the list over Slash's real ledger.
  *
  * WHY THIS FILE EXISTS. One model answered every ask and nothing tried a second: when it failed the rules spoke, or a job
  * asked the same model eight times. Each case here hands `infer` candidates that fail one way and reads what the ledger

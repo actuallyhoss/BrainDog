@@ -130,7 +130,7 @@ test('OVER HTTP THE HOST BUILD IS serverInfo.version, beside the braindog-build 
   assert.equal(body.result.serverInfo.version, build);
 });
 
-test('ping answers, and the prompts are start, wrap and ask (plan §6.3)', async () => {
+test('ping answers, and the prompts are start, wrap and ask', async () => {
   const { surface, calls } = stub();
   assert.deepEqual(result(await handle(req('ping'), surface, ctx)), { resultType: 'complete' });
   const listed = result<{ prompts: { name: string }[] }>(await handle(req('prompts/list'), surface, ctx));
@@ -257,7 +257,7 @@ test('tools/list is the sixteen, each with its title and every hint said, and no
 const EACH: [tool: string, args: Record<string, unknown>, methods: string[], first?: unknown, agents?: boolean][] = [
   ['record_index', {}, ['boot', 'version']],
   ['context', {}, ['context', 'boot'], {}],
-  /* WHAT HE TOLD THE RUN (plan §2), on a record that knows instructions: its settings first, then the door. */
+  /* WHAT HE TOLD THE RUN, on a record that knows instructions: its settings first, then the door. */
   ['instructions', { take: 'IN4' }, ['whoami', 'instructionsMine'], { take: 'IN4' }, true],
   ['get', { spoken: 'obligations#41' }, ['get'], { register: 'obligations', seq: 41 }],
   ['list', { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }, ['list'], { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }],

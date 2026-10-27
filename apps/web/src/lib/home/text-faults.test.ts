@@ -252,7 +252,7 @@ test('SETTINGS › HEALTH REACHES THE PART BY A DYNAMIC IMPORT ONLY, draws it on
   assert.match(health, /\{#if faults\}<faults\.Part found=\{faults\.found\} lists=\{shell\.lists\} \/>\{\/if\}/u);
 });
 
-test('TODAY NEVER ASKS FOR THE WALK (U3), and Health asks it with the rest, one at a time, each when the tab is idle', () => {
+test('TODAY NEVER ASKS FOR THE WALK, and Health asks it with the rest, one at a time, each when the tab is idle', () => {
   assert.doesNotMatch(home, /textFaultsOnce\(|loadTextFaults\(|readTextFaults\(/u);
   assert.doesNotMatch(health, /loadTextFaults\(/u);
   assert.equal(health.match(/\(\) =>\s*Promise\.all\(\[import\(/gu)?.length, 7, 'every part waits its turn');

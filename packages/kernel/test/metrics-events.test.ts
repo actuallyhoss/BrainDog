@@ -1,5 +1,5 @@
 /**
- * A FIGURE OVER WHO MADE A LIST'S ENTRIES (`events.<list>`, REC-B20). Who wrote each one has always been in the history
+ * A FIGURE OVER WHO MADE A LIST'S ENTRIES (`events.<list>`). Who wrote each one has always been in the history
  * and no figure read it, so Money could not say "the bank add-on filed 6 today". The source counts the entries of one
  * list made in the figure's window, once each, and its groups say who made them: a person, an agent, a door's pattern
  * under its add-on's name, a rule, a script, or the record itself.

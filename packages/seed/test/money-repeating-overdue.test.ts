@@ -6,7 +6,7 @@
  * a line whose day went by with no payment matched kept a day in the past and no screen counted it. `repeating-overdue`
  * counts the live lines whose "Next" is more than three days gone.
  *
- * ONLY A LINE A PAYMENT WAS MATCHED TO BEFORE IS JUDGED (repeating-sign-fix-69, audit 67 claim 1). Nothing links an
+ * ONLY A LINE A PAYMENT WAS MATCHED TO BEFORE IS JUDGED (repeating-sign-fix-69). Nothing links an
  * arriving payment to a repeating line by itself, so on a line nobody has matched a payment to, "Next" stands still
  * whether the money went or not, and the sign was red on a line Money watch had just added. Such a line has no "Last
  * paid" and is left out; one that has it and whose "Next" then went by is the payment the record can say is missing.
@@ -14,12 +14,12 @@
  * RED FIRST: with `last_paid is set` out of the figure's `where`, the first test fails on the sentence and the Money
  * watch test counts 1.
  *
- * AND ITS NAME SAYS SO (repeating-sign-72, audit 69 finding 5). Money watch writes its lines with no "Last paid" and
+ * AND ITS NAME SAYS SO (repeating-sign-72). Money watch writes its lines with no "Last paid" and
  * only `settle` writes one, so on a record nobody runs `settle` on the sign reads 0 whatever stopped. Under the name
  * "Repeating lines past their day" a reader took that 0 as every line watched. The name now says matched lines, and
  * nothing in the seed keeps the old one. RED FIRST: under the old name the two tests of the name fail.
  *
- * AND WITH NONE TO COUNT IT SAYS NOTHING (audit 72 finding 5). The name did not stop the number: a record whose lines
+ * AND WITH NONE TO COUNT IT SAYS NOTHING. The name did not stop the number: a record whose lines
  * were all written by Money watch read 0 and met its mark, a clean answer from a sign that could see none of them. The
  * count is now read per the one state its lines are in, so with no matched line past its day there is nothing to divide
  * by and the reading is no value and no verdict. RED FIRST: as a plain count, every test below that asks for no value

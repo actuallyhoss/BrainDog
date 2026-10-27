@@ -6,7 +6,7 @@
  *   `list` narrowed on an indexed condition     p95 ≤ 5 ms and ≤ 1.5× the owner's; `count` ≤ 3 ms
  *   Version poll, narrowed                      unchanged ≤ 2 ms; after an unseen write ≤ 5 ms
  *   Search, narrowed                            ≤ 1.5× the owner's
- *   The narrowed count uses the list's partial index on the condition's field (R5), as EXPLAIN QUERY PLAN says
+ *   The narrowed count uses the list's partial index on the condition's field, as EXPLAIN QUERY PLAN says
  *
  * (`recentHistory`'s page is `sight-speed.test.ts`'s; the context header's size is the Worker's `ctx-cap.test.ts`.)
  *

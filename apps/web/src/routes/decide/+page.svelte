@@ -20,7 +20,7 @@
   BRAINDOG'S OWN PAGE UPDATES ARE ONE CARD under the questions, for the owner (`Improved.svelte`): "BrainDog improved 4
   of your pages", what changes, and Accept. It reads what waits from the same place Add-ons does (`improved.ts`).
 
-  THE OLD SCREEN IS GONE (C31, 24 October). Its keys are this page's now: a number answers with that option and `x`
+  THE OLD SCREEN IS GONE (24 October). Its keys are this page's now: a number answers with that option and `x`
   chooses a card for one answer to several (the page reader's), `a` gives the suggested answer and `d` defers. `/decide?classic`
   is an address somebody kept, and it opens this page. A host that cannot draw a body says so in the page's own refusal.
 
@@ -385,10 +385,10 @@
   /* ── the page as Decide draws it ─────────────────────────────────────────── */
 
   const live = $derived(got?.from === 'live' ? got : null);
-  /* THE SENTENCE'S COUNTS ARE `boot`'S (`waits`, EXP-E07), the number the rail's badge and Today's header say, and late is
+  /* THE SENTENCE'S COUNTS ARE `boot`'S (`waits`), the number the rail's badge and Today's header say, and late is
      the record's own mark (`lateDays`). An older host sends neither and the queue's counts stand. */
   const shaped = $derived(live ? decideDrawn(blocksMineFirst(live.page.blocks, shell.me?.person ?? null), live.now, askerOf, waitsNow(), shell.lateDays ?? null) : null);
-  /* THE QUESTIONS NAMED FOR THE READER LEAD THE FIRST OPEN QUEUE (USE-A13), under one heading; none, and nothing is drawn. */
+  /* THE QUESTIONS NAMED FOR THE READER LEAD THE FIRST OPEN QUEUE, under one heading; none, and nothing is drawn. */
   const yours = $derived.by(() => {
     const queue = live?.page.blocks.find((b) => b.kind === 'queue' && b.source === 'governance.open')?.queue;
     return queue ? mineFirst(queue, shell.me?.person ?? null).heading : null;
@@ -410,7 +410,7 @@
 
   /* ── the board: Money, Quick and Handled ──────────────────────────────── */
 
-  /* HOW MANY EACH COLUMN HOLDS, as the phone's switch says it: the questions, as the head's sentence counts them (audit Z3), and the lines BrainDog handled. */
+  /* HOW MANY EACH COLUMN HOLDS, as the phone's switch says it: the questions, as the head's sentence counts them, and the lines BrainDog handled. */
   const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
   const counts = $derived<Record<Column, number>>({
     money: Math.max(0, (shaped?.groups.money ?? 0) - (led?.group === GROUP_KEY.money ? 1 : 0)),
@@ -681,7 +681,7 @@
       white-space: nowrap;
     }
 
-    /* THE PAGE'S OWN ⋯ IS NOT DRAWN UNDER THE SWITCH (audit Z27, decide-390-light.png): the rule that raises it to the
+    /* THE PAGE'S OWN ⋯ IS NOT DRAWN UNDER THE SWITCH (decide-390-light.png): the rule that raises it to the
        sentence's row reaches only a body first under the head, so here it stood alone on a line of its own under the
        switch, and later on the tab's edge. The head's ⋯ is the menu, and Edit layout is offered only from 900px. */
     .body[data-switch] :global(.home-page:not([data-arranging]) > .home-tools) {

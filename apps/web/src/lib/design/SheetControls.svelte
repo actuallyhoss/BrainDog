@@ -1,6 +1,6 @@
 <!--
   The look sheet called "Controls and lists": every control the product has, in every state it takes, drawn by the
-  product's own parts (EXP-C01, decision 2 of the experience area).
+  product's own parts (decision 2 of the experience area).
 
   A SHEET IS NOT A MOCK. Each thing here is `Button.svelte`, `controls.css`, `rows.css`, `Count.svelte`, `Toasts.svelte`
   or `BatchBar.svelte` itself, so what is wrong in the code is wrong on the sheet, and a later build is judged beside
@@ -11,14 +11,14 @@
   still a real button that takes the state for real, and carries `data-sheet` naming the cell (`button primary m
   hover`), the handle the photographer reaches it by.
 
-  AND THE PARTS EVERY SCREEN SHARES SINCE THE UI PASS OF 20 OCTOBER: the banner, a command line with its Copy, and the
+  AND THE PARTS EVERY SCREEN SHARES: the banner, a command line with its Copy, and the
   state dot with its word.
 
   THE TOAST AND THE BULK BAR ARE FIXED TO THE WINDOW IN THE PRODUCT, and here each is drawn inside a small picture of
   the work. A frame that is a containing block (`transform`) holds a fixed child, so the same component stands at the
   foot of the frame. The frames are `inert`: they are pictures, and the bar in one answers nothing in the record.
 
-  TWO OPEN CALLS ARE DRAWN TWICE HERE, the default labelled (decision 7): where a toast stands, and whether several
+  TWO OPEN CALLS ARE DRAWN TWICE HERE, the default labelled: where a toast stands, and whether several
   questions can be chosen at once. The third, a failed run, is on the charts sheet.
 
   WHAT IS NOT A SHARED PART YET IS SAID IN A COMMENT WHERE IT IS DRAWN: a field's error and a line another hand
@@ -52,7 +52,7 @@
   const SEVERAL = ['kept', 'none'] as const;
   const DOTS = ['open', 'part', 'done', 'late', 'needs-you', 'warn', 'good', 'live'] as const;
 
-  /* THE DEFAULTS OF THE TWO CALLS (EXP-C01, "Needs him"): toasts at the bottom left of the work, and choosing several kept. */
+  /* THE DEFAULTS OF THE TWO CALLS ("Needs him"): toasts at the bottom left of the work, and choosing several kept. */
   const TOAST_DEFAULT = 'start';
   const SEVERAL_DEFAULT = 'kept';
 
@@ -184,7 +184,7 @@
   </Tile>
 
   <!-- THE WHOLE WIDTH, so five choices keep one row: in a third of the board at 1512 the track wrapped "Year" under the
-       rest (U-B24, scope E36). -->
+       rest. -->
   <Tile title={words.segmented} class="sheet-wide">
     {#each SEGMENTS as n (n)}
       <figure class="cell cell-start">
@@ -552,7 +552,7 @@
     padding: var(--sp-3) var(--sp-4) var(--sp-4);
   }
 
-  /* IN THE PICTURE THE BAR SITS UNDER THE LIST (UI pass of 21 October, P47): held to the frame's foot it covered the
+  /* IN THE PICTURE THE BAR SITS UNDER THE LIST (P47): held to the frame's foot it covered the
      last question's "Asked today". */
   .work-tall :global(.batch) {
     position: static;

@@ -3,7 +3,7 @@
 
   ONE PRESS ANSWERS. Each answer is a button that says what it does, and pressing it is the decision:
   no reason box opens first and no second press commits it. The walk of 2 October found the queue making a round trip
-  and then asking "Why?" before an answer landed (`loop/research-ux-walk.md` #3), and two of the owner's decisions
+  and then asking "Why?" before an answer landed, and two of the owner's decisions
   carried the reasons "f" and "y", which agents later read back as the why. So the reason is offered, never demanded:
   after a decline or an edit the receipt offers a one-line note, kept with the question. Where the record itself still
   keeps a reason for a question (`govern.ts`), it says so on the press and one line opens under the answers, with the
@@ -312,7 +312,7 @@
      without anybody unticking it and comes back on once the key is held. */
   let partsOff = $state<string[]>([]);
   const taking = $derived(story?.takes ? ticksOf(story.takes, new Set(partsOff)) : null);
-  /* A LIVE DOOR THAT GOES WITH NOBODY TO TAKE IT (REC-A16) asks twice: the first press says what stops, the second sends. */
+  /* A LIVE DOOR THAT GOES WITH NOBODY TO TAKE IT asks twice: the first press says what stops, the second sends. */
   let again = $state(false);
   setContext(TICKS_CONTEXT, {
     get unticked() {
@@ -394,7 +394,7 @@
   const pressSaid = (label: string, key: string | null = null): string => (question?.band === 'undo' || hardOption(key) ? queueWords.hard(label) : label);
 
   /**
-   * THE RUN THAT ASKED, read once for its app and kind, so the line says "Claude Code" and never "An agent" (scope E37).
+   * THE RUN THAT ASKED, read once for its app and kind, so the line says "Claude Code" and never "An agent".
    * A run handle only; a refused or missing read leaves the plain word.
    */
   let runBy = $state.raw<RunBy | null>(null);
@@ -1295,7 +1295,7 @@
               </section>
             {/if}
       {/if}
-      <!-- WHAT IT CHANGES, under the answers in their own tile (scope E37: beside them it left half the board empty under
+      <!-- WHAT IT CHANGES, under the answers in their own tile (beside them it left half the board empty under
            two buttons): what an arrangement does, what a proposal puts in place, the rows to tick,
            the rows it changes, what it calls out, and what deciding late costs. Each under its own small heading, open, read
            before the press and never in the way of it. -->
@@ -1712,7 +1712,7 @@
 
   /* ── what accepting does, a plain part of the tile ─────────────────────── */
 
-  /* UNDER THE ANSWERS IN THEIR TILE (scope E37), a hairline over it. */
+  /* UNDER THE ANSWERS IN THEIR TILE, a hairline over it. */
   .does {
     display: flex;
     flex-direction: column;

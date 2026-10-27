@@ -1,5 +1,5 @@
 /**
- * Sharing on (sharing plan §2.1, the manage rung): somebody who manages part of the record shares it on with somebody
+ * Sharing on (the manage rung): somebody who manages part of the record shares it on with somebody
  * else here, at view, comment or edit and never manage, inside their own share and never past it. The record's
  * `shareOnward` keeps it under theirs, so it ends when theirs does. `OnwardSheet.svelte` draws this.
  *

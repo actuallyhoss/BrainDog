@@ -37,7 +37,7 @@
      there are none. */
   /* `others` IS WHETHER SOMETHING ELSE FEEDS THE RECORD, or may, as far as the screen beside this can tell: Settings,
      ingest lists the web addresses that were posted to (`feedsOf`), and a reader who cannot read them is not told that
-     nothing feeds the record. Either way an empty list of scheduled fetches says nothing (the audit of 25 October, Z19). */
+     nothing feeds the record. Either way an empty list of scheduled fetches says nothing. */
   let { project, others = false }: { project: ForProject | null; others?: boolean } = $props();
 
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');

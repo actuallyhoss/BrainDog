@@ -106,7 +106,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
     /* THE TARGET LINE GOES WITH THE TICK, because "never below zero" under a figure no row contributed to is a bound
        every such figure satisfies, printed as though something had been checked against it. */
     /* IN THE CURRENCY THE FIGURE WAS READ IN (`targetSaid`), as a page's tile says it: a bare `money` names none, and
-       Slash's Figures said "720000 over your limit", minor units as they are kept (the audit of 20 October). */
+       Slash's Figures said "720000 over your limit", minor units as they are kept. */
     note: [unsaid ? NO_ROW_SAID : decl ? targetSaid(decl, r) : '', across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(door ? { href: door } : {}),
@@ -148,7 +148,7 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
   if (!out.ok) return { from: 'refused', fix: refusalOf(out).fix };
   const names = new Map<string, string>();
   const events: AuditEvent[] = [];
-  /* THE RECORD'S FOLDED UPDATE PASS (kind `update`, SHL-A21) IS NONE OF THE KERNEL'S KINDS, so it is drawn as the
+  /* THE RECORD'S FOLDED UPDATE PASS (kind `update`) IS NONE OF THE KERNEL'S KINDS, so it is drawn as the
      upgrade it is, with every line it wrote under it; any other kind this build does not know is left out as before. */
   const toLine = (e: EventLine): AuditEvent | null => {
     const kind = e.pass !== undefined ? 'upgrade' : e.kind;

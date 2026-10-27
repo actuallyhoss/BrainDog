@@ -150,7 +150,7 @@ export type TriedStep = {
 export type TryRun = { trigger: string; steps: TriedStep[]; step?: string };
 
 /**
- * One step tried alone (SHL-D14): the path of the step, and the earlier steps' answers by the name each kept them
+ * One step tried alone: the path of the step, and the earlier steps' answers by the name each kept them
  * under, which the record uses rather than taking those steps again.
  */
 export type TryOne = { step: string; given?: Record<string, unknown> };
@@ -400,7 +400,7 @@ export const editWords = {
   notHeld: 'It did not hold, so it took If not.',
   /* THE TRY PANEL. */
   tryFrom: 'Try it on',
-  /* TWO WORDS AT MOST, SINCE the audit of 25 October (Y14): "Something I paste" wrapped under the other two at 390. */
+  /* TWO WORDS AT MOST: "Something I paste" wrapped under the other two at 390. */
   fromLatest: 'The latest',
   fromRow: 'Pick one',
   fromArrival: 'Last arrival',
@@ -425,7 +425,7 @@ export const editWords = {
   } as Record<TryState, string>,
   triedHeading: 'If it ran now',
   triedWrote: 'Trying it changes nothing and sends nothing.',
-  /* ONE STEP TESTED ALONE (SHL-D14): the heading over its result, and the two things folded under it. */
+  /* ONE STEP TESTED ALONE: the heading over its result, and the two things folded under it. */
   testedStep: 'This step, tested alone',
   whatItGave: 'What it gave',
   wouldSend: 'What it would send',
@@ -547,7 +547,7 @@ export type RowsRead = 'reading' | 'read' | 'refused';
 /**
  * The line under "The latest": the newest item's name, or why there is none.
  *
- * A LIST THAT COULD NOT BE READ IS NOT EMPTY (audit B of 25 October, Y14). The two were drawn alike, so "This list is
+ * A LIST THAT COULD NOT BE READ IS NOT EMPTY. The two were drawn alike, so "This list is
  * empty" stood over Bills and invoices while it held two.
  */
 export function rowsNote(rows: readonly Pickable[], read: RowsRead): string {

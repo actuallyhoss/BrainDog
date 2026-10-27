@@ -1,5 +1,5 @@
 /**
- * THE READER'S MARK HAS ONE STAMP RULE, and every screen that draws what is new since the mark uses it (PGS-C02).
+ * THE READER'S MARK HAS ONE STAMP RULE, and every screen that draws what is new since the mark uses it.
  *
  * WHAT WAS MEASURED. Home stamped by hand: a flag set before the send, so a mark that never landed was never tried
  * again, and a shell with no cursor sent a bare mark, which marks lines the screen never held. Activity had the rule in
@@ -148,7 +148,7 @@ test('THE RULE LIVES IN ONE FILE: the copy beside Activity is gone', () => {
 /* ── A line that arrives while Home is open ────────────────────────────── */
 
 /**
- * WHAT WAS MEASURED (audit 74, claim 6). Home stamped the shell's cursor, which `boot` answered when the tab opened. A
+ * WHAT WAS MEASURED. Home stamped the shell's cursor, which `boot` answered when the tab opened. A
  * line that landed while Home was open was drawn there when the page was read again, and the mark was still stamped
  * below it, so the next visit said that line was new a second time.
  *

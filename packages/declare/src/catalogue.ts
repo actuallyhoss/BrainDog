@@ -188,7 +188,7 @@ export type CatalogueEntry = {
   categories?: Category[];
   publisher?: Publisher;
   /**
-   * Its latest file says `unlisted: true`, or the owner's `packs/listed.json` does not name it (listing is opt in, E18):
+   * Its latest file says `unlisted: true`, or the owner's `packs/listed.json` does not name it (listing is opt in):
    * installable by id and updated as any other, and left out of every listing.
    */
   unlisted?: true;
@@ -205,7 +205,7 @@ export type CatalogueEntry = {
   icon?: string;
   /**
    * A use case's: the words its latest file says it is heard in, as the first run listens for them, and the modules it
-   * stands on (USE-A16). Left out by an add-on, by a use case whose file says none, and by an index written before
+   * stands on. Left out by an add-on, by a use case whose file says none, and by an index written before
    * either key existed, which reads as it always did.
    */
   signals?: string[];
@@ -244,7 +244,7 @@ export function readPreview(doc: unknown): Result<Preview> {
 }
 
 /** The entries a marketplace may list: every one but those whose file says `unlisted`. Installing by id reads `entries` whole. */
-/* AND AN ENTRY WITH NO VERSION LEFT TO INSTALL IS NOT LISTED (the scope of 24 October, E17): `feed-example` and
+/* AND AN ENTRY WITH NO VERSION LEFT TO INSTALL IS NOT LISTED (the scope of 24 October): `feed-example` and
    `rates-open-er-api-com` had every version yanked and still stood in the store under their ids, offering nothing. A
    record that holds one still reads it by id, as an unlisted one is read. */
 /* A PRIVATE ENTRY IS NEVER LISTED, even one an older index wrote without `unlisted` beside it. */

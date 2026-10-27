@@ -1,5 +1,5 @@
 /**
- * `keys-unopened` (AGT-D17): the sealed keys nobody has opened in six months.
+ * `keys-unopened`: the sealed keys nobody has opened in six months.
  *
  * WHAT WAS THERE BEFORE. Every opening adds one to its grant's `opened` and stamps `last_opened` (`keychain.ts` `openGrant`,
  * and the lease a connector's run is handed), and nothing read the two but the Keychain's own line for the key. A key

@@ -16,7 +16,7 @@ import { day, shortDay, sinceWords } from 'braindog-render';
 
 /**
  * WHETHER A LIST OF TAGS IS ONLY THE KEYS AN IMPORT LEFT, which say where a row came from to the importer and nothing to
- * a person: "kilnnotes:servicereading:oracle-a1:cpu:2026-09-28" (the audit of 25 October, Z23, `row-390-light.png`).
+ * a person: "kilnnotes:servicereading:oracle-a1:cpu:2026-09-28" (`row-390-light.png`).
  * Such a field is not listed as a fact. A tag a person wrote has a space or fewer than three parts, and keeps its place.
  */
 export function importKeysOnly(v: unknown): boolean {
@@ -80,7 +80,7 @@ export function sentenceOf(p: {
   /** `addedSaid`'s words. */
   added: string;
   /**
-   * A reading said whole, "16.4% on 28 Sep" (`readingSaid`, Y17), which leads the sentence and says when in place of
+   * A reading said whole, "16.4% on 28 Sep" (`readingSaid`), which leads the sentence and says when in place of
    * the day it was added.
    */
   reading?: string | null;
@@ -183,7 +183,7 @@ export function daySaid(iso: string, now: number): string {
  *
  * ON THE ONE LADDER, `since()`'s in `braindog-render`, with its unit in words (`sinceWords`). This counted its own
  * floored weeks, so one day, 28 Sep read from 24 Oct, was "Added 3 weeks ago" and "3 weeks ago" in Activity over "When
- * 4w ago" in the fields and "4 weeks ago" on the list (the audit of 25 October, Z25). Only its first day is its own:
+ * 4w ago" in the fields and "4 weeks ago" on the list. Only its first day is its own:
  * "yesterday", where the ladder says "1 day ago".
  */
 export function agoSaid(at: string, now: number): string {

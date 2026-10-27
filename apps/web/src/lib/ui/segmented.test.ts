@@ -107,12 +107,12 @@ test('many is a prop of the part, and off unless it is asked for', () => {
 test('full is a prop of the part, off unless asked for, and marks the track', () => {
   assert.match(PART, /\bfull = false,/u);
   assert.match(TRACK, /data-full=\{full \? '' : undefined\}/u);
-  /* A STRIP THAT DOES NOT FIT SCROLLS ONLY WHERE IT IS A NAV; ANY OTHER WRAPS, every choice whole at 390 (Y30). */
+  /* A STRIP THAT DOES NOT FIT SCROLLS ONLY WHERE IT IS A NAV; ANY OTHER WRAPS, every choice whole at 390. */
   assert.match(TRACK, /data-scroll=\{full && scroll && tag === 'nav' \? '' : undefined\}/u);
   assert.match(TRACK, /data-wrap=\{full && scroll && tag !== 'nav' \? '' : undefined\}/u);
 });
 
-test('on a phone a full track shares its width by its words, and one that does not fit wraps whole (Y30)', () => {
+test('on a phone a full track shares its width by its words, and one that does not fit wraps whole', () => {
   /* "Roomy" and "Doors" were cut at the edge: equal shares cut the longest word, and the strip ran past the page. */
   const style = /<style>([\s\S]*?)<\/style>/u.exec(SOURCE)?.[1] ?? '';
   const share = /\.segmented\[data-full\] > :global\(\.segment\) \{([^}]*)\}/u.exec(style)?.[1] ?? '';

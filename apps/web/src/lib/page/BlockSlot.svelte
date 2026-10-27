@@ -154,7 +154,7 @@
   } = $props();
 
   /* ── the block's own menu ──────────────────────────────────────────────────
-     MOVE, WIDTH, COLUMN AND HIDE FROM THE BLOCK'S HEAD (PGS-B08), the owner's on a page that writes and is not being
+     MOVE, WIDTH, COLUMN AND HIDE FROM THE BLOCK'S HEAD, the owner's on a page that writes and is not being
      arranged, for a block with a key a look may name. BEHIND `?menu` until the board of a tile's head is agreed, since a
      control in every head changes every declared screen; Edit layout stays the way in until then. LOADED BY `import()`,
      so neither it nor its styles reach the entry chunk. */
@@ -222,7 +222,7 @@
   /* Where each file the block holds is served, record-relative (`page-live.ts` `fileAt`), read by `opts.file` below. */
   const filed = $derived(fileAt(block));
 
-  /* A CARD'S LINE TYPED ON IN PLACE (PGS-C15): by column, the field a box writes (`card-writes.ts` `cardEditsOf`), and
+  /* A CARD'S LINE TYPED ON IN PLACE: by column, the field a box writes (`card-writes.ts` `cardEditsOf`), and
      the page's writer as the card's `write`, only where the page writes and the reader may write the list. The row
      writer loads on the first edit, as `typeInto`'s does, so a page nobody types on never pulls it in. A LIST WHOSE
      DECLARATION THIS TAB HAS NOT LEARNED YET (`REGISTERS` fills as the record answers `schema`) is read off the block's
@@ -461,7 +461,7 @@
   const count = $derived(headCount({ kind: block.kind, total: (block as { counted?: number }).counted ?? block.total, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }));
 
   /* HOME'S OWN LIST, where Home drew the block as one (`home/home-rows.ts`): what is late as one list, what comes up by
-     day. THE HEADING'S WELL IS NEUTRAL on every tile (2.A.5): a heading names a group, and a group is not late or good;
+     day. THE HEADING'S WELL IS NEUTRAL on every tile: a heading names a group, and a group is not late or good;
      the rows that are late say so in their own red. */
   const homeRows = $derived((block as WithRows).homeRows);
   const homeFold = $derived(homeRows && fold ? foldOf('todo', linesIn(homeRows), open) : null);
@@ -519,7 +519,7 @@
   );
   /* ── a wall of charts, folded ──────────────────────────────────────────────
      A BLOCK OF LINES SHOWS ITS FIRST ROW OF CHARTS AND FOLDS THE REST IN PLACE, the measures reported once with them, one
-     press away (the audit of 22 October, U6, U-B4): a project's Numbers was twelve near-identical charts over a list of
+     press away: a project's Numbers was twelve near-identical charts over a list of
      seventeen readings, 4,032px of page, with the news at the top and its money seventeenth. Nothing is cut; the press
      says how many more there are, and once open it stays open. Numbers that stopped arriving are tiles that say their
      age (`staleTilesText`), four of them before the fold. A block with two charts or four tiles or fewer, and a list of
@@ -559,12 +559,12 @@
      name; the block's own rows, order and limit stand, and its line is read off its drawing (`trendsOf`). Not a block in
      groups, which draws its groups' heads. */
   /* ── the desk's own tiles ───────────────────────────────────────────────
-     A BLOCK OF TODAY'S BODY THAT THE DESK DRAWS AS ITS OWN TILE (C27, `home/desk-part.ts`): what is late with a button a
+     A BLOCK OF TODAY'S BODY THAT THE DESK DRAWS AS ITS OWN TILE (`home/desk-part.ts`): what is late with a button a
      line, who is working, and the projects' row of cards, each the desk's component over the block's own answer. The
      block's bar is kept for a screen reader, as a lead question's is, since the tile says its own name. */
   const desk = $derived((block as { desk?: Desk }).desk ?? null);
   /* ── a row of a project's shape ──────────────────────────────────────────
-     A `project` BLOCK IS A ROW OF THE PROJECT'S OWN SHAPE (C28, C29, `ProjectPart.svelte`): its hero, path, money, work,
+     A `project` BLOCK IS A ROW OF THE PROJECT'S OWN SHAPE (`ProjectPart.svelte`): its hero, path, money, work,
      people, what it runs on or its agents, drawn from the one read of the project the page holds (`shape-key.ts`). Its
      bar is kept for a screen reader, as the desk's is, since each part's tile says its own name. */
   const parts = $derived(partsOf(block));

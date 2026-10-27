@@ -247,7 +247,7 @@ test('ON THE SEED, A QUESTION THAT NAMES A ROW BY HANDLE OR BY ID IS READ IN ITS
 /* ── a page of the queue, read once ─────────────────────────────────────── */
 
 test('A PAGE OF THE QUEUE TOO LARGE FOR ONE ANSWER IS READ ONCE AND CUT WHERE IT STANDS, its cursor the last row kept', async () => {
-  /* SIX BACKFILLS OF A SCRIPT'S, as on his record (bench 24 Oct, H1): a page of twenty did not fit, and the door read it
+  /* SIX BACKFILLS OF A SCRIPT'S, as on his record (bench 24 Oct): a page of twenty did not fit, and the door read it
      four times, each working out every card again, and still answered over the budget. */
   const big = (i: number) => ({ id: `SG${String(100 - i)}`, status: 'open', question: `Backfill ${String(i)}?`, money: Array.from({ length: 200 }, () => ({ amount: 1_000_000, currency: 'EGP' })) });
   const small = (i: number) => ({ id: `SG${String(50 - i)}`, status: 'open', question: `Small ${String(i)}?` });

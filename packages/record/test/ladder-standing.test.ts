@@ -1,5 +1,5 @@
 /**
- * Where every agent stands on the ladder, read back (ENG-A12, "a ladder per agent and kind"): `trust`
+ * Where every agent stands on the ladder, read back ("a ladder per agent and kind"): `trust`
  * answers each connected agent by its name with the kinds it has a rung for, in words, the rung, since when, whether the
  * thirty-day lift set it, and when and why it was taken back. The ladder ran on every write and nothing could read it.
  */

@@ -1,5 +1,5 @@
 /**
- * A join is written down, and a shared question is not taken back by one of its askers (AGT-C07, audit-36-37 #4, #5).
+ * A join is written down, and a shared question is not taken back by one of its askers (audit-36-37 #4, #5).
  *
  * WHAT WAS MEASURED BEFORE THIS. Agent B asking what agent A had asked was answered `joined` and nothing was written,
  * so A's `withdraw` closed the one question and B's ask was gone with it. And an options question's cause was its words

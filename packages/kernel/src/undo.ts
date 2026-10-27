@@ -636,7 +636,7 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
 
   /* WHAT THIS UNDO BRINGS BACK, worked out before any row is: a link back to one of them is not a link to a row
      deleted since, since the restore is written first (`rank`). One Undo of a fold puts each link back on the one it
-     named (AGT-C13). The same tests as the loop's own restore below. */
+     named. The same tests as the loop's own restore below. */
   const restoredHere = new Set<string>();
   for (const [id, evs] of byRow) {
     const row = rows.get(id);
@@ -836,7 +836,7 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
           skip(id, title, `${decl.name} does not let it move from ${spoken(held, f, nameOfRow)} back to ${spoken(from, f, nameOfRow)}`);
           continue;
         }
-        /* UNDOING THE DECISION THAT MADE IT IS DECIDING (AGT-D15): the person taking a decision back moves it back too,
+        /* UNDOING THE DECISION THAT MADE IT IS DECIDING: the person taking a decision back moves it back too,
            through the door a decision's own writes use (`decidedWrite`). Any other undo leaves it to a decision. */
         if (way?.by === 'decide' && !('decision' in scope)) {
           skip(id, title, `moving it from ${spoken(held, f, nameOfRow)} needs a decision`);
@@ -1485,7 +1485,7 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
           q.id,
         );
         readAgain(sql, q.id, every);
-        /* A REOPENED "which account" QUESTION HOLDS ITS TEXTS AGAIN at once, not at the next text (REC-A02). */
+        /* A REOPENED "which account" QUESTION HOLDS ITS TEXTS AGAIN at once, not at the next text. */
         reopenedTail(sql, q.id);
       } else sql.exec("UPDATE suggestion SET resolved_as = 'undone' WHERE id = ?", q.id);
       governLine(sql, parts.mint(), at, actor, whole ? 'suggest' : 'resolve', q.id, whole ? 'reopened' : 'undone', batch);
@@ -1521,7 +1521,7 @@ const ASKED_AGAIN = 'Puts the question back in Decide.';
  * undo that puts back what the first left reopens it too.
  */
 function answered(sql: Sql, lines: readonly Line[]): { id: string; as: string }[] {
-  /* AND THE QUESTIONS IT COVERED (scope D13), closed as moot in its batch with `COVERED`'s line: asked again with it. */
+  /* AND THE QUESTIONS IT COVERED, closed as moot in its batch with `COVERED`'s line: asked again with it. */
   const covered = (l: Line): boolean => l.to_v === 'moot' && typeof l.note === 'string' && l.note.startsWith(COVERED);
   const ids = [
     ...new Set(

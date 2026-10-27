@@ -1,5 +1,5 @@
 /**
- * One row per key on People and Organisations (`loop/contract-17.md`): a `create` or `update` that would give a second
+ * One row per key on People and Organisations: a `create` or `update` that would give a second
  * live row a key one row already holds is refused at the record's door, naming that row and sending the caller to `meet`,
  * which adds to the row that has it. Without it an agent that wrote a person with `create` made the duplicate the
  * understanding layer exists to prevent, and the kernel's key table simply left the second row unanswered.

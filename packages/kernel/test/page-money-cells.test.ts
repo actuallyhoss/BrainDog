@@ -1,5 +1,5 @@
 /**
- * A READING THAT IS MONEY ON A PAGE (REC-C03): a `stat` or `lines` block over a list of readings takes a fifth column,
+ * A READING THAT IS MONEY ON A PAGE: a `stat` or `lines` block over a list of readings takes a fifth column,
  * the reading as money, integer minor units with its own currency. "Monthly revenue, Oxbow.gg" was the decimal 4,815 with
  * a unit of text; read through the money field it is USD 48.15, and a reading in another currency is a line of its own,
  * never added to it.
@@ -84,7 +84,7 @@ test('a fifth column that is not money is refused in a sentence, and one the lis
   assert.equal(missing.refusals[0]?.code, 'FIELD_UNKNOWN');
 });
 
-/* ── a card dated by what the bank last said (REC-B03) ───────────────────── */
+/* ── a card dated by what the bank last said ───────────────────── */
 
 const reg = (id: string, name: string, title: string, fields: unknown[]): Declaration =>
   ({ id: `register.${id}`, kind: 'register', body: { id, name, title, fields } }) as never;

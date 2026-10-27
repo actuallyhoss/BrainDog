@@ -28,7 +28,7 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
    * HOW MANY LEDGER ENTRIES WERE FILED FOR A PERSON IN 30 DAYS: by an agent, a bank add-on's pattern or a rule somebody
    * declared. Its parts say which of them, by name.
    *
-   * THE THREE ARE NAMED, NOT "anything but a person" (audit 61, claim 8). The record's own hand and a script are not
+   * THE THREE ARE NAMED, NOT "anything but a person". The record's own hand and a script are not
    * legwork done for anybody, and a record brought in from a file is signed by the record: read as `by is not person`,
    * the day of an import said every line it copied had been filed for you.
    *

@@ -1,5 +1,5 @@
 /**
- * A shape's one pattern question, answered, carried out (ENG-B07, "the one question and its batch").
+ * A shape's one pattern question, answered, carried out ("the one question and its batch").
  *
  * BEFORE: a shape with three alike texts was owed a draft, the draft came back as one question, and saying yes to it
  * installed the pattern and carried nothing out. The texts that waited still waited, and the pattern, drafted at the

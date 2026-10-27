@@ -1,5 +1,5 @@
 <!--
-  A project's mark in its square, drawn by `IconWell` (the UI pass of 20 October, 2.A.5): 40 on its card (`s`), and on
+  A project's mark in its square, drawn by `IconWell`: 40 on its card (`s`), and on
   its page's hero 56, or 48 on a phone (`l` and `xl`).
 
   THE PROJECT'S COLOUR IS ITS SLOT. Its stored hue picks the nearest of the eight category slots (`slotOf` in

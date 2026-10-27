@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Checks that ask a real model, run by themselves (ENG-A03). The engine's included model, asked through Workers AI's
+ * Checks that ask a real model, run by themselves. The engine's included model, asked through Workers AI's
  * own address with a token, so what is measured is what the Worker ships and nothing else.
  *
  *   MODEL_CHECK_ACCOUNT=<account> MODEL_CHECK_TOKEN=<token> node tools/model-checks/run.mjs --small

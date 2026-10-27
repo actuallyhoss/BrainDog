@@ -22,7 +22,7 @@ export const docsWords = {
   /** The link to `/llms.txt`, under the lede. */
   forAgents: 'Plain-text index for AI tools',
 
-  /* "START HERE" IS ITS OWN FULL-WIDTH ROW (site F19): three ways in, rather than a one-link card as tall as the rest. */
+  /* "START HERE" IS ITS OWN FULL-WIDTH ROW: three ways in, rather than a one-link card as tall as the rest. */
   start: [
     { label: 'Welcome to BrainDog', href: '/docs/start/welcome' },
     { label: 'Making your BrainDog', href: '/docs/use/first-run' },

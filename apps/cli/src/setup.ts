@@ -12,7 +12,7 @@
  * would print indented under it, and the run stops at the first step that fails, with that step's sentence.
  *
  * EVERY APP THE TABLE HOLDS (`clients/index.ts`) that is on this machine, or those named with `--only`. THE PROFILES
- * (AGT-A07) are the default one, `~/.claude`, the one `CLAUDE_CONFIG_DIR` names, each `--profile <folder>` given, and
+ * are the default one, `~/.claude`, the one `CLAUDE_CONFIG_DIR` names, each `--profile <folder>` given, and
  * those kept from earlier runs in `~/.braindog/profiles.json`, which a run that writes keeps up to date, so a second
  * machine-wide run reaches a profile named once. A kept profile no longer on this machine is left out and said.
  *
@@ -20,7 +20,7 @@
  * `install.ts`): install's writer keeps one for the settings, and a profile's servers file is copied before
  * `claude mcp add-json` changes it, since that program writes the file and nothing here sees it written.
  *
- * ITS LAST LINES SAY WHAT IS LEFT, IN THE WORDS TO TYPE (AGT-D11): this repository's own tools, which only `tools write
+ * ITS LAST LINES SAY WHAT IS LEFT, IN THE WORDS TO TYPE: this repository's own tools, which only `tools write
  * --scope project` writes, and the tools whose keys need keychain access this machine does not hold.
  *
  * A SECOND RUN CHANGES NOTHING AND SAYS SO. Every step reads before it writes: a login held is not asked for again,
@@ -442,7 +442,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
      * line. Its dry run's closing line names `install --apply` as the way to write it, which is not this command's way,
      * so it is left out.
      *
-     * AND THE PLAN IS SHOWN BEFORE ANYTHING IS WRITTEN (AGT-B10, his "Hooks install shows changes first"). It was
+     * AND THE PLAN IS SHOWN BEFORE ANYTHING IS WRITTEN (his "Hooks install shows changes first"). It was
      * applied first and shown after, so the first a person saw of a hook in every session was the line saying it was
      * already there. On a terminal the step asks; `--yes` is the answer given ahead; off a terminal with no `--yes` it
      * stops after the plan and says how to go on, because a yes nobody typed is not one.

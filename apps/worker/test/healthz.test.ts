@@ -15,7 +15,7 @@
  * minute and fails when one record is sick, which is not the question it asks. The env here throws on every binding a
  * record would need, so a route that reached for one fails the test by name.
  *
- * AND THE DIRECTORY ONCE, FOR THE NIGHT (LCH-C01). Before it, `/healthz` could not say whether last night's copies were
+ * AND THE DIRECTORY ONCE, FOR THE NIGHT. Before it, `/healthz` could not say whether last night's copies were
  * taken, and a night that did not run reached nobody. The Directory here answers `night()` alone; a HEAD never asks, and a
  * Directory that throws is `night: null` beside a 200.
  */
@@ -137,7 +137,7 @@ test('HEALTH CARRIES THE LAUNCH: open, no bot check, and nothing more for a stra
   assert.equal((JSON.parse(text) as { launch: { botCheck: boolean } }).launch.botCheck, true);
 });
 
-/* AUDIT 34, FINDING 2: the answer said `open` while `signUp()` refused everybody or sent no letter. Each thing it needs,
+/* The answer said `open` while `signUp()` refused everybody or sent no letter. Each thing it needs,
    taken away alone through the bundle's own env, is `closed` here with its sentence, and the switch still says open. */
 const STOPPED: [string, unknown, RegExp][] = [
   ['SESSION_SECRET', 'only-thirty-one-characters-long', /session key is missing or shorter than 32 characters/],

@@ -16,7 +16,7 @@
  *
  * A ROW THAT DIFFERS IS NOT OVERWRITTEN. The change is proposed as a rowset update, once per shape of the config.
  *
- * A TOOL IS WHAT IT RUNS (AGT-D02). A server found under a name the record does not hold is the row of its scope that
+ * A TOOL IS WHAT IT RUNS. A server found under a name the record does not hold is the row of its scope that
  * starts the same way, when there is one: that row is stamped as seen and nothing is added. A row is asked about only
  * when how it starts would change, as "Change how <name> starts?".
  *
@@ -247,7 +247,7 @@ function addressOf(url: string): string {
 }
 
 /**
- * A TOOL IS WHAT IT RUNS, NOT WHAT IT IS CALLED (AGT-D02). Two starts with one key are one tool: the same command and
+ * A TOOL IS WHAT IT RUNS, NOT WHAT IT IS CALLED. Two starts with one key are one tool: the same command and
  * arguments, or the same address. His record held four tools twice, as `x` and `x-mcp`, because the match was by name.
  */
 const startKey = (s: Start): string => canonical([s.transport, s.command, s.args, s.endpoint === null ? null : addressOf(s.endpoint)]);
@@ -332,7 +332,7 @@ export type ToolScan = {
   connected?: (() => Promise<ConnectedList>) | undefined;
   /**
    * The host the record is reached at, whose key names it (`target`), so a question the scan files or finds waiting is
-   * printed with the link that opens it on Decide (AGT-C20). Without it the line says the question is on Decide.
+   * printed with the link that opens it on Decide. Without it the line says the question is on Decide.
    */
   to?: Pick<Target, 'key'> | undefined;
 };
@@ -724,7 +724,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
          in ~/.claude.json on Maras-MacBook-Pro.local?", then "Update the fly-copperleaf tool to match this Mac?", which
          still named a machine and not what would change. The id, the path and the network name are the details, beside
          how it starts in the record (`was`) and how it starts here (`now`).
-         ASKED ONCE FOR EVERY MACHINE (AGT-C07): the cause is the row and the start asked for, so a second machine with
+         ASKED ONCE FOR EVERY MACHINE: the cause is the row and the start asked for, so a second machine with
          the same config joins the question already open. */
       const question = f.kind === 'integration' ? asking('Change the address of ', f.name, '?') : asking('Change how ', f.name, ' starts?');
       const out = await s.client.call<{ id: string; joined?: true; said?: string }>('propose', {

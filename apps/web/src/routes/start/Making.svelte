@@ -1,5 +1,5 @@
 <!--
-  The record being made, after the press: "watch the record build" (USE-B04, USE-B07). The same tiles the build was
+  The record being made, after the press: "watch the record build". The same tiles the build was
   drawn in before the press, each now saying where it is: "Making", "Made", or, where the record refused it, "Not made"
   and the record's own sentence for why.
 

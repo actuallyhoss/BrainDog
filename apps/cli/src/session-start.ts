@@ -47,7 +47,7 @@ export const START_WORK_MS = 3_000;
  * THE START HOOK'S WORK RUNS AFTER THE CARD, in a process of its own (`hooks.ts`, `spawnWork`), with this long for the
  * whole and `WORK_STEP_MS` for each step. Inside the hook the sync and the scan held every card for up to six seconds
  * the card never used, and on the owner's record a skills list that took 3.3 s to read never finished inside its 1.5 s,
- * so the same work was owed again at every start (audit of 22 Oct, E2).
+ * so the same work was owed again at every start.
  */
 export const WORK_MS = 120_000;
 export const WORK_STEP_MS = 45_000;

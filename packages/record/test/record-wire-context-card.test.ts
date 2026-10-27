@@ -1,6 +1,6 @@
 /**
- * The record's wiring of batch 41 (record-index-41): the card in `context` (AGT-B07), the same tree (AGT-B08), the
- * handoff that closes (AGT-C05), the door's `behind` (AGT-A02) and the night's copies on `boot` (LCH-C03).
+ * The record's wiring of batch 41 (record-index-41): the card in `context`, the same tree, the
+ * handoff that closes, the door's `behind` and the night's copies on `boot`.
  *
  * Each case is a fresh record with no seed, the runs placed by repository alone, so what is asserted is the wiring in
  * `index.ts` and not a sample row. The composers have their own tests (`card.test.ts`, `same-tree.test.ts`, the

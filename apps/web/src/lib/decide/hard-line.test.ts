@@ -1,5 +1,5 @@
 /**
- * AUDIT Z28 (today-390-light.png, decide-390-light.png): the red button read "Accept, can’t be undone easily" and
+ * The red button read "Accept, can’t be undone easily" and
  * wrapped onto two lines on the phone. The button says Accept, and the care is a line of its own under the row.
  */
 
@@ -26,7 +26,7 @@ const ask = (over: Record<string, unknown> = {}): QueueQuestion =>
     ...over,
   }) as QueueQuestion;
 
-test('a hard answer says its care as a line under the row, and its button says its name (audit Z28)', () => {
+test('a hard answer says its care as a line under the row, and its button says its name', () => {
   const hardSaid = (card as Record<string, unknown>).hardSaid as ((c: unknown, p: string | null) => string) | undefined;
   assert.equal(typeof hardSaid, 'function', 'no line under the row says the care');
   const hard = card.cardOf(ask({ cost: 'undo' }), { now });

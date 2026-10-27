@@ -310,7 +310,7 @@ export type RulesDeps = {
   mint: () => string;
   nowMs: number;
   /**
-   * WHO A RULE ACTS FOR, BY THE RULE (sharing plan §2.12): `null` where it runs as the record does, its maker an owner
+   * WHO A RULE ACTS FOR, BY THE RULE: `null` where it runs as the record does, its maker an owner
    * or nobody; `stop` with the sentence a rule is held by once its maker can no longer reach the record; else the
    * dependencies of its maker's lens (`deps`, writes held to the rows they may change, `bounded` set) and whether a row
    * is one that lens shows them (`sees`). Absent, every rule runs as the record does.
@@ -363,7 +363,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 
   const outer = deps;
   for (const rule of order(outer.rules(fired.register))) {
-    /* A RULE A COLLEAGUE TURNED ON RUNS THROUGH THEIR LENS, NEVER THE OWNER'S (sharing plan §2.12): its writes are held
+    /* A RULE A COLLEAGUE TURNED ON RUNS THROUGH THEIR LENS, NEVER THE OWNER'S: its writes are held
        to the rows they may change, a row they may not see does not start it, and once they can no longer reach the
        record it is held, with an observation saying so. */
     const held = outer.forRule?.(rule.rule) ?? null;

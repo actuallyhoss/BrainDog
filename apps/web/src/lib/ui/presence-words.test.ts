@@ -25,7 +25,7 @@ const SIX: readonly [RunPresence, ReturnType<typeof row>][] = [
   ['before', row('done', null, { seen_before: iso(NOW - 90 * 24 * 60 * MIN) })],
 ];
 
-test('A LINK BESIDE A LIVE KEY SAYS A RUN THAT IS STILL GOING, never Ended or Stopped, which read as the key (audit C, X17)', () => {
+test('A LINK BESIDE A LIVE KEY SAYS A RUN THAT IS STILL GOING, never Ended or Stopped, which read as the key', () => {
   assert.deepEqual(
     (['working', 'quiet', 'left', 'ended', 'stopped', 'before'] as const).map((p) => stillWord(p)),
     ['Working now', 'Gone quiet', 'Left a step', null, null, null],

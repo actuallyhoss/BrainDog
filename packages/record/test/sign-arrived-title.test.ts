@@ -1,5 +1,5 @@
 /**
- * `arrived` names an add-on as Add-ons does (audit 25 October, Y5): an add-on whose manifest carries no title was said
+ * `arrived` names an add-on as Add-ons does: an add-on whose manifest carries no title was said
  * by its id with the dashes as spaces ("Bank hsbc eg"), while Add-ons listed it under the catalogue's title. The
  * manifest's title comes first, then the catalogue's, and only with neither the id said as words.
  */

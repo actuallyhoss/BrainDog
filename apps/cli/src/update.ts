@@ -1,5 +1,5 @@
 /**
- * `braindog update [--check]`: the command keeps itself current (AGT-A04, job 2).
+ * `braindog update [--check]`: the command keeps itself current.
  *
  * WHERE IT READS. The address the install scripts download from, `https://brain.dog/cli`, where the deploy publishes
  * three files side by side: `braindog.mjs`, its `.sha256`, and its `.build`, the one line `bundle.mjs` writes. The

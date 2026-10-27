@@ -4,7 +4,7 @@
  * desk, Slash and the bands always tell one story (launch call 5: an invented founder, never his record).
  *
  * DATA ONLY. No markup and no components: a figure is a `Figure`, which a drawing shows as a button that opens what
- * it came from, or as a plain span. The words are the prototype's (`loop/site-2026-10-17/src/site.html`, its script),
+ * it came from, or as a plain span. The words are the prototype's (its script),
  * with the words rules applied and every claim made true for launch day: BrainDog moves no money and sends nothing to
  * a client on its own, so a payment is planned for her yes and a reminder is drafted for it.
  *
@@ -94,8 +94,8 @@ export type Parts = (string | Figure)[];
  * TODAY'S ONE LINE, as the app's Today says it: the date over the page's name, and one sentence whose first phrase is what needs her, in red. The count is the desk's own (`needs.svelte.ts`), so
  * `NEEDS` here is what it starts at; the other two figures open the Agents place and the cash's evidence.
  *
- * THE DATE IS THE VISITOR'S OWN DAY (`dateSaid`), drawn on their device once the page runs, SINCE THE AUDIT OF 22
- * OCTOBER (U-C15): "Thursday 19 March" was printed into the page in October. With scripting off no date is drawn.
+ * THE DATE IS THE VISITOR'S OWN DAY (`dateSaid`), drawn on their device once the page runs:
+ * "Thursday 19 March" was printed into the page in October. With scripting off no date is drawn.
  */
 export const BRIEF: { agents: Lead; cash: Lead } = {
   agents: { text: '2 agents', go: 'agents' },

@@ -1,5 +1,5 @@
 /**
- * Migration 31, a question has a cause (AGT-C07): the columns, the indexes, the trigger, and the data step that makes
+ * Migration 31, a question has a cause: the columns, the indexes, the trigger, and the data step that makes
  * one question of two.
  *
  * WHAT WAS MEASURED BEFORE THIS. On the owner's record SG89 and SG90 are the same question, filed seven seconds apart by

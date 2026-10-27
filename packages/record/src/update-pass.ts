@@ -1,5 +1,5 @@
 /**
- * One pass of BrainDog's own update, said once and as nobody's work (SHL-A21, `loop/scope/area-shell-a.md`).
+ * One pass of BrainDog's own update, said once and as nobody's work.
  *
  * THE NIGHT'S UPDATE WRITES AS THE RECORD ITSELF (`system`), one install, carry and question at a time, so Activity read
  * "Installed the Agents add-on" and "Installed the Work add-on" as lines of their own, and a headline that counted who

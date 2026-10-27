@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * brain.dog's home page, rebuilt in the UI pass of 20 October (`loop/ui-pass-2026-10-20/site.md` 2a, SPEC 4.7).
+   * brain.dog's home page, rebuilt in the redesign.
    *
    * ONE PRODUCT PICTURE, THEN SIX BANDS THAT EACH SAY ONE NEW THING. The dark hero with the slogan, two buttons, the
    * early access line and the makers, then Maya's desk across the hero's edge (`lib/desk/Desk.svelte`), drawn as the
@@ -14,7 +14,7 @@
    *   yours    It stays yours, and free while in early access: the page's last call to action.
    *   faq      Questions.
    *
-   * No close after them: the free tile is the last ask (site F1, F11).
+   * No close after them: the free tile is the last ask.
    *
    * EVERY PAGE READS WITH SCRIPTING OFF. Every band's content is in the prerendered HTML, and a control that only a
    * script can work is drawn once it runs. `scripts/product.mjs` reads `section.hero`, `#hero-title` and `.sub` here
@@ -104,7 +104,7 @@
     padding-block: 56px 48px;
   }
 
-  /* Two lines at 1440, three at 390 (site F8). */
+  /* Two lines at 1440, three at 390. */
   h1 {
     max-inline-size: 18ch;
     font-size: clamp(48px, 6.4vw, 92px);
@@ -183,7 +183,7 @@
     }
   }
 
-  /* THE PHONE (site F22, F24): full-width buttons stacked, the line under them, the makers as marks only, and the
+  /* THE PHONE: full-width buttons stacked, the line under them, the makers as marks only, and the
      mark's line behind the desk's top edge rather than the buttons. */
   @media (max-width: 760px) {
     .copy {

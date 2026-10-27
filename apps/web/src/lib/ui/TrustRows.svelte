@@ -16,7 +16,7 @@
   A KIND PUT BACK TO ASKING CARRIES THE WORDS, never the colour alone: "Put back" in the deeper red, then why, as the
   record worded it.
 
-  OUTSIDE TEXT SAYS SO (ENG-A13): under an agent whose run read the inbox, or anything else from outside the
+  OUTSIDE TEXT SAYS SO: under an agent whose run read the inbox, or anything else from outside the
   record, one muted line says it asks about everything in that run and why. Under the floors, each import asks whether
   all of it is his (`ImportAsk.svelte`), loaded only when the record holds one, so no other screen carries it. A host
   that sends neither draws exactly what it drew before.

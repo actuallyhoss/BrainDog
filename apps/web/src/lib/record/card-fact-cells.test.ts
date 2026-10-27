@@ -1,5 +1,5 @@
 /**
- * A card's facts over a figure laid into its cells (REC-C16): a count as its number, money formatted once, and a fact the
+ * A card's facts over a figure laid into its cells: a count as its number, money formatted once, and a fact the
  * record read nothing for drawn as nothing, never "0".
  */
 

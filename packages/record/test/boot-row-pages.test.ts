@@ -1,5 +1,5 @@
 /**
- * `boot` lists no run's page (scope 2026-10-24 A8, H17): on his record 908 of 990 pages were runs, 207 KB
+ * `boot` lists no run's page (scope 2026-10-24 A8): on his record 908 of 990 pages were runs, 207 KB
  * of a 278 KB `boot` sent on every open and every move of the record, and by address alone 27 KB. `pagesByRow` names
  * the list, a run opens by its spoken id, and `pages`, the rail's and the palette's, holds none of them.
  * And the holding pen is held between reads, as the pages are, until the record or its use moves.
@@ -59,7 +59,7 @@ test('A PAGE WITH A PLACE IN THE RAIL IS STILL LISTED WHOLE, a project among the
   sql.close();
 });
 
-test('THE PEN IS WEIGHED ONCE WHILE AGENTS READ, and again when a page is opened (bench 24 Oct, H1)', async () => {
+test('THE PEN IS WEIGHED ONCE WHILE AGENTS READ, and again when a page is opened (bench 24 Oct)', async () => {
   const sql = openSqlite();
   /* EVERY READ OF THE USE LOG BY THE DAY, which is the pen weighing it; the key the pen is held by reads it whole. */
   let weighed = 0;

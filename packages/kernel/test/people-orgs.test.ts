@@ -1,6 +1,6 @@
 /**
- * Organisations under the same trust as people (research-audit-21 H1, H2, M9, M10, M12), and the organisations the record
- * asks about on its own (research-understanding-judge change 3).
+ * Organisations under the same trust as people, and the organisations the record
+ * asks about on its own.
  *
  * TEXT ANYBODY COULD HAVE WRITTEN NEVER CARRIES A DOMAIN OR A KEY ONTO AN ORGANISATION ALREADY HELD. A mail, a bank text
  * or a commit naming one writes its dated line, and what it would have added is one question. A key is never believed
@@ -354,7 +354,7 @@ test(
   },
 );
 
-test('THE DOMAIN IS SAID PLAINLY, and what a sender called itself comes after it, never in its place (research-audit-23 M5)', async () => {
+test('THE DOMAIN IS SAID PLAINLY, and what a sender called itself comes after it, never in its place', async () => {
   const { k, sql } = await record();
   value(k.create('organisations', { name: 'Stripe', keys: ['bank:stripe'] }, OWNER));
   /* Found by its payee key, under a name the sender chose and a source that says nothing of the domain. */
@@ -372,7 +372,7 @@ test('THE DOMAIN IS SAID PLAINLY, and what a sender called itself comes after it
 });
 
 test(
-  'A YES ON "Add Acme?" LINKS ONLY WHO IT NAMED: nobody who came later, nobody only mail vouches for, no subdomain address (research-audit-23 M4)',
+  'A YES ON "Add Acme?" LINKS ONLY WHO IT NAMED: nobody who came later, nobody only mail vouches for, no subdomain address',
   async () => {
     const { k, sql } = await record();
     const ada = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@acme.example', where: 'commit 1 in braindog' }, AGENT));

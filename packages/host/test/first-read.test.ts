@@ -166,7 +166,7 @@ test('what she said is never printed and never put in a header', async (t) => {
   assert.ok(printed.every((line) => !line.includes(SAID) && !line.includes(PROJECTS[0])), 'nothing printed carries the sentence');
 });
 
-/* ── the offer: the catalogue's use cases over the build's (USE-A16) ─────────────────────────────────────────── */
+/* ── the offer: the catalogue's use cases over the build's ─────────────────────────────────────────── */
 
 /* Invented use cases, as a build and a catalogue might hold them. */
 const BUILT: FirstReadCase[] = [

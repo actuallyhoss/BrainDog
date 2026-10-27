@@ -1,5 +1,5 @@
 /**
- * A question names the one person who decides it (USE-A13, `docs/20-COLLABORATION.md`: "one named person decides").
+ * A question names the one person who decides it (`docs/20-COLLABORATION.md`: "one named person decides").
  *
  * BEFORE THIS a question held who opened it and who settled it, and any member who may decide answered any of them. Now
  * an owner hands one to Ada, the newest hand wins, a hand is taken back with nobody, an agent's proposal may arrive

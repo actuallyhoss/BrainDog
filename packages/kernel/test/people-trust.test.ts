@@ -1,5 +1,5 @@
 /**
- * Who may say who somebody is (research-audit-17 H1, M1, M2, M4), and asking once per cluster.
+ * Who may say who somebody is, and asking once per cluster.
  *
  * TEXT ANYBODY COULD HAVE WRITTEN IS NOT EVIDENCE. A mail, a bank text or an import never folds two people, never carries
  * a key onto somebody known, and never folds an address into a real person: a key match gains its line, a sender like
@@ -141,10 +141,10 @@ test('AN ARRIVAL MATCHED BY ITS KEY ADDS ITS LINE AND NOTHING ELSE: no handle, n
   /* The handle is still nobody's, so the next meeting by it is not her. */
   assert.equal(sql.one("SELECT 1 AS n FROM entity_key WHERE key = 'github:attacker'"), undefined);
 
-  /* Nor does a project or the day in touch move on a spoofed From (research-audit-21 M10). */
+  /* Nor does a project or the day in touch move on a spoofed From. */
   assert.equal(row.fields.projects, undefined, 'a mail linked her to the run’s project');
 
-  /* A commit by her address is hers, and still carries nothing (M9): anybody can sign one with her address. */
+  /* A commit by her address is hers, and still carries nothing: anybody can sign one with her address. */
   value(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: 'github:ada', where: 'commit 4464966 in braindog' }, AGENT));
   assert.equal(k.get(ada.id)!.fields.handles, undefined);
   assert.equal(k.get(ada.id)!.fields.aliases, undefined);
@@ -193,7 +193,7 @@ test('A PERSON THE OWNER TYPED IS STILL HIS AFTER THEIR MAIL IS READ: the same n
   sql.close();
 });
 
-/* ── audit 19 H1: a commit's author is whoever signed it ──────────────── */
+/* ── A commit's author is whoever signed it ──────────────── */
 
 test('A COMMIT BY AN ADDRESS NOBODY HOLDS NEVER FOLDS INTO A PERSON THE OWNER TYPED: a person of their own, and one question', async () => {
   const { k, sql } = await record();
@@ -249,7 +249,7 @@ test('A FORGED COMMIT AUTHOR WHO THEN MAILS IN FROM THE SAME ADDRESS IS STILL ON
   sql.close();
 });
 
-test('A COMMIT BY A KEY SOMEBODY HOLDS IS THEIRS, and carries no key, name or other name onto them (research-audit-21 M9)', async () => {
+test('A COMMIT BY A KEY SOMEBODY HOLDS IS THEIRS, and carries no key, name or other name onto them', async () => {
   const { k, sql } = await record();
   const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
   const met = value<Met>(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: 'github:ada', keys: ['email:countess@evil.test'], where: 'commit 1 in braindog' }, AGENT));
@@ -266,7 +266,7 @@ test('A COMMIT BY A KEY SOMEBODY HOLDS IS THEIRS, and carries no key, name or ot
   sql.close();
 });
 
-/* ── audit 19 M1: believed only when the source is one that is ────────── */
+/* ── Believed only when the source is one that is ────────── */
 
 test('EVERY SOURCE BUT A NOTE, A SESSION’S OWN RUN AND A COMMIT IS TEXT ANYBODY COULD HAVE WRITTEN, however it is worded', async () => {
   const { k, sql } = await record();
@@ -356,7 +356,7 @@ test('THE SOURCE WINS OVER WHERE, CLIPPED, AND AN ADDRESS IS NEVER A NAME OR A L
   const addressed = value<Met>(k.meet({ name: 'grace@navy.example', email: 'grace@navy.example', source: 'a call with grace@navy.example' }, AGENT));
   const grace = k.get(addressed.row!.id)!;
   assert.equal(grace.fields.name, 'grace');
-  /* A call an agent relays is text anybody could have written (audit 19 M1), and its line says so. */
+  /* A call an agent relays is text anybody could have written, and its line says so. */
   assert.deepEqual(grace.fields.met, [`${DAY} · arrived in a call with navy.example`]);
   sql.close();
 });
@@ -396,7 +396,7 @@ test('ONE WHO MAY BE THE SAME PERSON JOINS THE QUESTION ALREADY ASKED, and Yes f
   assert.equal(k.count('people'), 1);
   const row = k.get(kept.id)!;
   assert.equal(row.fields.email, 'devraj@fanline.example');
-  /* "Devraj B" came only from a commit by a key the row held, which carries no other name (research-audit-21 M9). */
+  /* "Devraj B" came only from a commit by a key the row held, which carries no other name. */
   assert.equal(row.fields.aliases, undefined);
   assert.equal((row.fields.met as string[]).length, 4);
   sql.close();
@@ -431,7 +431,7 @@ test('THE RECORD’S OWN PERSON KEEPS EVERY SPELLING OF THEM: a name their handl
   assert.deepEqual(k.get(self.id)!.fields.aliases, ['Karim Assaf']);
 
   /* Now that the record knows the name, a commit with the same name and handle is still asked about: anybody can sign
-     a commit as the owner (audit 19 H1). The same from a session's own run folds on its own, into the owner's row, and
+     a commit as the owner. The same from a session's own run folds on its own, into the owner's row, and
      never takes the commit author in with it. */
   const committed = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@driftwind.example', where: 'commit 2 in oxbow' }, AGENT));
   assert.equal(committed.matched_by, 'none');
@@ -543,7 +543,7 @@ test('A QUESTION WHOSE PEOPLE BECAME ONE IS TAKEN OFF THE LIST', async () => {
   const asked = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', where: 'commit 1 in fanline' }, AGENT));
   assert.ok(asked.question);
   /* The second row is met again by its own address, in the session's own run, with a handle the first holds too: the
-     strong rules fold it, and the question has nobody left to ask about. A commit never would (audit 19 H1). */
+     strong rules fold it, and the question has nobody left to ask about. A commit never would. */
   const last = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', handle: 'github:ohartley', where: 'session in fanline' }, OWNER));
   assert.equal(last.row?.seq, 1);
   assert.equal(k.count('people'), 1);

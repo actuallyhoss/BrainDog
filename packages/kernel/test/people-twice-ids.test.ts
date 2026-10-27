@@ -1,5 +1,5 @@
 /**
- * WHO the held-twice figure counts, not only how many (audit 69 finding 3: the note says a number and the list could
+ * WHO the held-twice figure counts, not only how many (the note says a number and the list could
  * not be opened on the people behind it).
  *
  * `peopleTwiceIds` answers every person in a group the count draws on: both of a plain pair, all three of one name,

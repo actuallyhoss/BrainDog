@@ -1,5 +1,5 @@
 <!--
-  What every agent is told, as one tile on Agents, under the runs (the UI pass of 20 October, today F19: it left Today,
+  What every agent is told, as one tile on Agents, under the runs (today F19: it left Today,
   where it sat below the fold with no icon, for the page of the agents it is told to). The heading in the tile's own
   head with its icon, then each lesson that stands with its because, in the order a session reads them when it starts,
   and one foot line for what the record left out.

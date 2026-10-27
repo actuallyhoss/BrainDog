@@ -83,7 +83,7 @@ test('the hub: one line that scrolls inside itself, never two', () => {
 
 test('the hub: the tab you are on is scrolled into view, and again when it changes', () => {
   const hub = FILES[0]!.text;
-  /* ON THE BAR'S OWN SCROLL, two frames after it is drawn, once the part has measured whether it scrolls (H29). */
+  /* ON THE BAR'S OWN SCROLL, two frames after it is drawn, once the part has measured whether it scrolls. */
   assert.match(hub, /querySelector<HTMLElement>\('\[aria-current="page"\]'\)/u);
   assert.match(hub, /bar\.scrollLeft \+=/u);
   /* The part does not hand out its element, so the bar is found from the track itself, as it is attached. */

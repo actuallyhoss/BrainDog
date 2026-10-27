@@ -36,17 +36,17 @@ export const INSTALLMENTS_REGISTER: MoneyRegister = {
       index: true,
       required: true,
     },
-    /* THE ACCOUNT'S CURRENCY WHEN NONE IS SAID, SINCE money-core 3.16.0 (REC-B04). A part with no account and no code is
+    /* THE ACCOUNT'S CURRENCY WHEN NONE IS SAID, SINCE money-core 3.16.0. A part with no account and no code is
        refused in one sentence; a part sent with its own code is kept as written. */
     { id: 'amount', type: 'money', required: true, currency_from: 'account.balance' },
     { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
     { id: 'state', label: 'Status', type: 'enum', values: ['open', 'paid', 'cancelled'], default: 'open', index: true, required: true },
     { id: 'settled', label: 'Paid on', type: 'day' },
-    /* THE ONE LEDGER ENTRY THAT PAID IT (REC-B11). A part is paid once, so the link lives here and names one payment,
+    /* THE ONE LEDGER ENTRY THAT PAID IT. A part is paid once, so the link lives here and names one payment,
        where a bill keeps "Settles" on each of its several. Written by Money's `settle` script with the state and the
        day, so paid is what a payment did and not a status somebody remembered to set. Not indexed, as `book` is not. */
     { id: 'paid_by', label: 'Paid by', type: 'ref', to: 'transactions' },
-    /* WHAT IS LEFT OF THE PLAN ONCE THIS PART IS PAID (REC-B12): the plan's open parts due after this one, added up
+    /* WHAT IS LEFT OF THE PLAN ONCE THIS PART IS PAID: the plan's open parts due after this one, added up
        in this part's currency, so the last part reads nought. Written by the same script for every part of a plan
        when any part of it is written, and each night. Never typed, and nothing sums it. */
     { id: 'left_after', label: 'Left after', type: 'money' },

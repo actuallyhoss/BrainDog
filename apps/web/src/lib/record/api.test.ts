@@ -102,7 +102,7 @@ test('an enum reads as words, not as an identifier', () => {
   /* A VALUE WITH NO LABEL LOSES ITS UNDERSCORES. This was `obligations.state`'s `written_off` until money-core 3.0.0
      labelled that list's values, which the next line holds. */
   assert.equal(display('services', 'cycle', 'two_yearly'), 'two yearly');
-  /* `updates.health` WAS THE CASE HERE until the UI pass of 20 October labelled it, as its chips and composer said it. */
+  /* `updates.health` WAS THE CASE HERE until the redesign labelled it, as its chips and composer said it. */
   assert.equal(display('updates', 'health', 'at_risk'), 'At risk');
   assert.equal(display('obligations', 'state', 'written_off'), 'Written off');
   /* AND A DECLARED LABEL WINS, where the value has one: money in and money out, not who owes whom. */
@@ -967,7 +967,7 @@ const rowsOfBlock = (block: BlockResult) =>
   toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
 
 test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out, and where it lands', () => {
-  /* A BRIDGE MADE FOR THE TEST, SINCE money-core 3.17.0: Coming and going opens on the calendar (REC-B23), and the
+  /* A BRIDGE MADE FOR THE TEST, SINCE money-core 3.17.0: Coming and going opens on the calendar, and the
      sample holds no book whose page still draws one. It walks the legs Cash ahead walks on the Forecast page, over thirty days. */
   const ahead = pages()['money-forecast']?.blocks.find((b) => b.kind === 'forecast' && b.source === 'forecast.runway') as { from?: unknown } | undefined;
   assert.ok(ahead?.from, '/p/money-forecast draws no Cash ahead, so this test has no legs to walk');

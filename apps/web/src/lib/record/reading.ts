@@ -1,5 +1,5 @@
 /**
- * A READING SAID WHOLE (the audit of 25 October, Y17): its number with its unit, "16.4%" and "54 GB", and on its row the
+ * A READING SAID WHOLE: its number with its unit, "16.4%" and "54 GB", and on its row the
  * day it was read, "16.4% on 28 Sep". Numbers printed "CPU, kettle 16.4" with the "%" in a field no column drew, and the
  * row split "Value 16.4" from "Unit %" and never said when.
  *

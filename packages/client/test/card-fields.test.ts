@@ -1,7 +1,7 @@
 /**
  * What the client is told by batch 41's record (record-index-41): the card in `context` with its Next line, the build
- * and the Also-here fields (AGT-B07, AGT-B08), the handoff's take and drop as the client's `handoff` sends them (AGT-C05),
- * and the copies on `boot` (LCH-C03), each named by the client's own types so a screen or the CLI reads what the record
+ * and the Also-here fields, the handoff's take and drop as the client's `handoff` sends them,
+ * and the copies on `boot`, each named by the client's own types so a screen or the CLI reads what the record
  * said rather than `undefined`.
  *
  * THROUGH THE REAL WIRING, as `boot-shape.test.ts` drives it: `serveApi` over a real record, and each agent's session

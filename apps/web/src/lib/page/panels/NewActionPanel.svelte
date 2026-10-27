@@ -1,6 +1,6 @@
 <!--
   `panel: new-action`: one button that opens the "New scheduled action" sheet (`NewAction.svelte`), on any page that
-  names it (PGS-A17).
+  names it.
 
   THE SHEET IS MOUNTED AND NOT REWRITTEN. It is handed what the automations hub hands it, `open`, `kind` and `onclose`,
   and asks its own questions; this panel draws only its button, under the heading its section already gives it.

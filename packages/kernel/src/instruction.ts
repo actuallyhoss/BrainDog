@@ -90,7 +90,7 @@ export const INSTRUCTION_KERNEL_WRITTEN: readonly string[] = [
 
 const DAY_MS = 86_400_000;
 
-/** How long an instruction waits for a run to take it: "next start" waits 14 days (a setting, plan §2.2). */
+/** How long an instruction waits for a run to take it: "next start" waits 14 days (a setting). */
 export const WAIT_MS = 14 * DAY_MS;
 
 /** The longest an instruction may be, in characters: one a person reads at a glance and an agent holds whole. */
@@ -149,7 +149,7 @@ export type Instr = {
 };
 
 /**
- * One question an instruction lets the run that takes it answer (D8): the question as the kernel keys it (`SG243`), the
+ * One question an instruction lets the run that takes it answer: the question as the kernel keys it (`SG243`), the
  * answer he gave, and the question's version as he saw it when he sent it, so a question that moved since is not
  * answered with his word on the old one.
  */
@@ -210,7 +210,7 @@ export type InstructInput = {
   replaces?: string | undefined;
   /** How long it waits for a run, in milliseconds; `WAIT_MS` when absent. */
   waits_ms?: number | undefined;
-  /** The questions the run that takes it may answer, each with his answer (D8). Only on a tell. */
+  /** The questions the run that takes it may answer, each with his answer. Only on a tell. */
   answers?: InstrAnswer[] | undefined;
 };
 
@@ -568,7 +568,7 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
   const waits = input.waits_ms ?? WAIT_MS;
   if (!Number.isFinite(waits) || waits < 60_000 || waits > 90 * DAY_MS)
     return no('OUT_OF_BOUNDS', 'An instruction waits between a minute and ninety days for a run.', { at: 'waits_ms' });
-  /* THE QUESTIONS IT NAMES (D8), each once, on a tell alone: a stop, a pause or a redirect asks nothing of a question. */
+  /* THE QUESTIONS IT NAMES, each once, on a tell alone: a stop, a pause or a redirect asks nothing of a question. */
   const answers: InstrAnswer[] = [];
   if (input.answers !== undefined) {
     if (!Array.isArray(input.answers) || input.answers.length > ANSWERS_MOST)
@@ -825,7 +825,7 @@ export function replyInstruction(d: InstructionDeps, ref: string, runRef: string
 }
 
 /**
- * A question answered on his order (D8): the answer is spent on the instruction, signed by the run that gave it, and the
+ * A question answered on his order: the answer is spent on the instruction, signed by the run that gave it, and the
  * decision says whose order it was, signed by him, both in the decision's batch. The record has already answered the
  * question as him (`orderAnswer` in `packages/record/src/methods/instructions.ts`); this keeps the two lines that say
  * so, and that make the answer one the run cannot give twice.

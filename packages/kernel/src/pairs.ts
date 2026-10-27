@@ -1344,7 +1344,7 @@ function onlyOne(p: Pairing, leg: Leg, known: Map<string, string | null>, window
 /**
  * What stands between two rows in two currencies and a pair made in silence, or nothing.
  *
- * WITHIN 2% AT THE DAY'S RATE IS NOT PROOF. Measured by the audit of batch 61: a purchase in dollars and a receipt in
+ * WITHIN 2% AT THE DAY'S RATE IS NOT PROOF. Measured: a purchase in dollars and a receipt in
  * pounds, unrelated, in two accounts inside four days and within the tolerance, paired and both dropped out of Spent
  * and Received with nothing said. One currency agrees to the unit; two agree only nearly, so a near match is taken on
  * its own word only when the rate is the day's (`PAIR_RATE_DAYS`) AND each row is the other's one candidate. A second
@@ -1379,7 +1379,7 @@ function crossOf(p: Pairing, leg: Leg, known: Map<string, string | null>, window
   if (to === null || saidOf(p, to, windows) !== null || sameOf(p, to, known, windows).to !== null) return null;
   if (crossHeld(p, to, windows)?.id !== leg.id) return null;
   /* WITH NOTHING AGAINST IT, IT IS STILL ONLY A NEAR MATCH, and where somebody is asked (`Pairing.asks`) it is theirs to
-     say: the audit of batch 63 found two unrelated rows, each the other's one candidate on the day's rate, paired with
+     say: Testing found two unrelated rows, each the other's one candidate on the day's rate, paired with
      nothing said. Where nobody is asked it pairs, as it did. */
   return crossDoubt(p, leg, to, known, windows).length === 0 && p.asks !== true ? to.id : null;
 }

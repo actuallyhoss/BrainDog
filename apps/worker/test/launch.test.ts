@@ -88,7 +88,7 @@ test('PRODUCTION SAYS invite, as the owner chose, and alpha open so the walk kit
   }
 });
 
-/* AUDIT 34, FINDING 2: `/healthz` said `open` on a host where `signUp()` refused everybody or no letter went. Each of the
+/* `/healthz` said `open` on a host where `signUp()` refused everybody or no letter went. Each of the
    four is taken away alone, on an open switch and on an invite one, and each is `closed`, with its sentence for the owner
    and the one stopped sentence for a stranger. */
 const STOPS: [keyof LaunchEnv, string][] = [
@@ -131,7 +131,7 @@ test('THE EXPORTED STOPPING IS WHAT stops SAYS: the four above, and the bot chec
   assert.deepEqual(Object.values(STOPPING), [...STOPS.map(([, sentence]) => sentence), STOPPING.siteKey]);
 });
 
-/* AUDIT 36-37, FINDING 12: `/healthz` answers anybody, and it carried which setting was missing and the exact strike
+/* `/healthz` answers anybody, and it carried which setting was missing and the exact strike
    limit. A stranger reads whether he can sign up, and when he cannot, or only with a code, one sentence why. */
 test('WHAT /healthz TELLS A STRANGER: open says nothing more, and anything else is one sentence', () => {
   const unkeyed = launchState({ ...READY, SIGNUP: 'open' });

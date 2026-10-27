@@ -1,6 +1,5 @@
 /**
- * Money's built document holds no call out: no poll, no fetch, no key it opens (REC-B01 build 4,
- * `loop/scope/area-record-b.md`).
+ * Money's built document holds no call out: no poll, no fetch, no key it opens.
  *
  * WHY. A first-party module is installed on every record that starts Money, by people who never read its file, and only
  * the owner may approve a call to another server (`packs/rates-poll/fill.ts`). So the call that keeps rates current lives

@@ -7,7 +7,7 @@
  * file does not read is dropped, so the drawer is handed only what its type says.
  *
  * WHY IT IS ON TODAY IS SAID ONLY FOR A PIN OR A NUMBER OFF TARGET. "Money first" and "Up 34%" under a figure that already
- * says its change read as noise (loop/plans/kpis-2026-10-21/NOTES.md, K1-C), and a stale number says itself in the warn
+ * says its change read as noise (K1-C), and a stale number says itself in the warn
  * colour under its figure, so the ranking's other reasons order the rows and are not printed.
  *
  * PURE, AND NO SVELTE, so `node --test` reads it.

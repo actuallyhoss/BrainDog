@@ -161,7 +161,7 @@ test('THE ANSWER SAYS WHAT EACH FILTER CAN TAKE, counting open rows only, named 
   assert.equal(project.chosen, null);
   assert.deepEqual(project.reads, ['tasks', 'notes', 'projects'], 'the lists counted and the list the names come from');
   assert.deepEqual(project.values, [
-    /* A PROJECT THAT HOLDS A HUE IS OFFERED WITH IT, so its chip wears the project's dot (E24); one without has none. */
+    /* A PROJECT THAT HOLDS A HUE IS OFFERED WITH IT, so its chip wears the project's dot; one without has none. */
     { value: '1', label: 'Kiln', count: 3, hue: 24 },
     { value: '2', label: 'Oxbow', count: 1 },
     { value: '', label: 'No project', count: 1 },
@@ -218,7 +218,7 @@ test('A CHOSEN VALUE IS ANDED ONTO EVERY BLOCK WHOSE LIST HAS THE FIELD, and the
   sql.close();
 });
 
-/* A FILTER OF ITS OWN CHOICES (C32): Work's Yours, Agents and All, which no one field of a task answers. */
+/* A FILTER OF ITS OWN CHOICES: Work's Yours, Agents and All, which no one field of a task answers. */
 const WHOSE = { field: 'whose', control: 'segmented', options: [{ value: 'yours', label: 'Yours', where: 'hold is you' }, { value: 'agents', label: 'Agents', where: 'hold is agent' }] };
 
 test('A FILTER MAY BE ITS OWN CHOICES, each a sentence of the rows it keeps, counted on the open rows and anded where it reads', async () => {

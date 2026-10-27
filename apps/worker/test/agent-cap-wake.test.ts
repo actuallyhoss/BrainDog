@@ -1,5 +1,5 @@
 /**
- * The agent cap holds from a wake, not only from a move (audit 40-42 finding 4). The kernel refuses the next key only
+ * The agent cap holds from a wake, not only from a move. The kernel refuses the next key only
  * where `host_meta` holds the plan's count (`plan.agents`), and before this only `planMoved` wrote it, so a record made
  * with no `setPlan`, or one that missed billing's word, minted keys without end on a plan that promises three.
  *

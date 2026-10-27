@@ -85,7 +85,7 @@ export const takenBackFree = (card: Pick<ProjectCard, 'draft' | 'made'>, nowMs: 
 export const OFF_DESK: ReadonlySet<string> = new Set(['retired', 'parked']);
 
 /**
- * How many cards the desk draws; the rest are one link away. EVERY PROJECT IN PLAY, SINCE THE AUDIT OF 22 OCTOBER (U5):
+ * How many cards the desk draws; the rest are one link away. EVERY PROJECT IN PLAY:
  * eight were drawn of thirteen, so the lane bar said "In play 8" over a record, a Projects page and a sidebar that said
  * 13, and the five left off were the ones the order put last. A count is the record's, so the desk draws them all, up to
  * a page of them.
@@ -148,7 +148,7 @@ export function workedSaid(w: { said: string; quiet: boolean }): string {
 export type WorkedAt = { at: string; by: string | null; quiet: boolean };
 
 /**
- * A CARD'S WHO AND WHEN FROM THE RECORD'S ONE FIGURE (the audit of 25 October, Z7): who worked on it last and how long
+ * A CARD'S WHO AND WHEN FROM THE RECORD'S ONE FIGURE: who worked on it last and how long
  * ago where the newest sign of work was a run ("Claude worked on it 20 minutes ago"), else how long since its tasks
  * moved ("Worked on 2 days ago"), and quiet past its thirty days. Projects read the tasks alone and Today the runs alone,
  * so one project said "4 days ago" on one and "20 minutes ago" on the other; both draw this now. `now` is the record's
@@ -182,7 +182,7 @@ export function withWorked<C extends Pick<ProjectCard, 'seq'>>(
 }
 
 /**
- * THE ONE LIVE LINE AT A CARD'S FOOT, SINCE the audit of 22 October (U5): who is on it now, else who worked on it last
+ * THE ONE LIVE LINE AT A CARD'S FOOT: who is on it now, else who worked on it last
  * from the runs ("Claude worked on it 2 hours ago"), else how long since its work moved ("Worked on 2 days ago"), else
  * the day the project itself last changed ("Quiet since 28 Sep"). Six of eight cards said a name and a lane and nothing
  * else, so a card with no number, money or next step now says the newest sign of life the record holds, and every card
@@ -217,7 +217,7 @@ export function drawnRead(decl: Pick<CardDecl, 'id' | 'title' | 'state' | 'ident
 
 /**
  * The row's hue where it holds a number, else the hue its name is drawn in on the rail and in Today's tasks (`hueFor`);
- * an empty field is not hue 0. EVERY PROJECT IN ITS OWN COLOUR, SINCE the audit of 22 October (U5, U-B13): most
+ * an empty field is not hue 0. EVERY PROJECT IN ITS OWN COLOUR: most
  * projects on a record keep no hue, so five of eight cards on Today were grey on grey, and a project's dot in a task
  * was not its card's colour. Only a row with no name is drawn in none.
  */

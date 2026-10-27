@@ -146,7 +146,7 @@
     }
   }
 
-  /* WHEN, AS THE SEGMENTED CONTROL (2.A.9): a track in the quiet fill, the chosen one raised and set in 600. */
+  /* WHEN, AS THE SEGMENTED CONTROL: a track in the quiet fill, the chosen one raised and set in 600. */
   .ins-when {
     display: inline-flex;
     gap: 2px;

@@ -90,7 +90,7 @@ sw.addEventListener('push', (e) => {
   e.waitUntil(sw.registration.showNotification('Something in your BrainDog needs you', { tag: 'braindog', ...(open ? { data: { open } } : {}) }));
 });
 
-/* A TAP OPENS WHAT THE PUSH NAMED (E44), the question in Decide on the record it is about, or else THE RECORD'S HOME,
+/* A TAP OPENS WHAT THE PUSH NAMED, the question in Decide on the record it is about, or else THE RECORD'S HOME,
    the root of the scope, `/app/`, which is the record the session is on. A window already on that address is focused
    rather than opened twice, and a window on another screen is left where it is, because navigating it would throw
    away whatever was being typed there. */

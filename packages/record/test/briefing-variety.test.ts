@@ -1,5 +1,5 @@
 /**
- * The briefing says what matters, not Decide over again (ENG-B12): however many questions are open, they take two of
+ * The briefing says what matters, not Decide over again: however many questions are open, they take two of
  * the cards where anything else is worth saying and three where nothing is. The first is the count of all the card
  * beside it does not say, and the places left go to what is late, what a run left, what is due and what changed.
  */

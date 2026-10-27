@@ -1,5 +1,5 @@
 /**
- * The lane's fourth step: the canary's vital signs, red on a reading older than 26 hours (PRF-A09, PRF-A01).
+ * The lane's fourth step: the canary's vital signs, red on a reading older than 26 hours.
  *
  * WHY. The record files one reading a sign at 00:05 each night, by itself (`packages/kernel/src/signs.ts`). A deploy
  * that stopped the night's work (an alarm not re-armed, a handler that throws) leaves every screen drawing and every

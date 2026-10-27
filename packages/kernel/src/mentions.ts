@@ -65,7 +65,7 @@ export function identityFloor(shape: ListShape | null, at?: MeetsFields): (field
 }
 
 /**
- * What the kept row gains from the folded ones (H2), and what is only offered.
+ * What the kept row gains from the folded ones, and what is only offered.
  *
  * WRITTEN, as before: every list joined (`met` by its day, under its cap); the later day in touch; each fold's address,
  * kept as a key when the kept row holds another; a fold's other name joined to `aliases`, once, and never the kept row's

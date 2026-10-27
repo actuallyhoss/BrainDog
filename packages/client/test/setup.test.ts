@@ -1,5 +1,5 @@
 /**
- * `setup`, the first run as one call (USE-B04): a POST of the body as handed, answered `{ done, failed }`. A host with
+ * `setup`, the first run as one call: a POST of the body as handed, answered `{ done, failed }`. A host with
  * no such call is the one answer that throws, so the page that falls back for a release catches that and nothing else.
  *
  * `fetch` is a stand-in; `packages/host/test/setup-route.test.ts` is where the route meets a record.

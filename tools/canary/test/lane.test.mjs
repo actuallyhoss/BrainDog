@@ -136,7 +136,7 @@ test('without the zone it calls a reading old only when it is old in every zone,
   assert.match(own.line, /waits for the canary/u);
 });
 
-/* THE KEPT LANE ON THE CANARY (`70-kept.mjs`, SHL-A19): skipped on production and without the drill's names, skipped on a
+/* THE KEPT LANE ON THE CANARY (`70-kept.mjs`): skipped on production and without the drill's names, skipped on a
    host whose billing is not test, and red on any FAIL line, with nothing run when it skips. */
 test('the kept step skips on production, without the drill’s names, or where billing is not test, and is red on a FAIL', async () => {
   const names = { SMOKE_SLUG: 'ops', CANARY_MAIL_DOOR: 'door@example.test', CANARY_INVITE_CODE: 'c', CANARY_INBOX_KEY: 'k' };

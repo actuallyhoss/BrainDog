@@ -1,6 +1,6 @@
 <!--
   The one frame every entry screen stands in: sign in, sign up, an invitation, connecting an app, the desktop return,
-  and /start (the UI pass of 20 October, first F5).
+  and /start (first F5).
 
   THE BRAND IS ON THE GROUND, TOP LEFT, ON EVERY ONE OF THEM: the mark at 24 and the word at 17/600 in a 44px row at the
   gutter. A person moves between these screens in one sitting (sign-up, the mail, sign in, /start), so the brand never

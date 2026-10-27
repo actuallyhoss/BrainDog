@@ -1,6 +1,6 @@
 /**
- * The three units of batch 37 as the kernel's own verbs answer them: the door's marks (AGT-B01), a fault in place of a
- * question (AGT-C06), and a question asked once by its cause (AGT-C07).
+ * The three units of batch 37 as the kernel's own verbs answer them: the door's marks, a fault in place of a
+ * question, and a question asked once by its cause.
  *
  * THROUGH THE PUBLIC VERBS ONLY, so a wire that is cut fails here even when each module's own test still passes: a
  * mark that never reaches the table, a dead letter that files a question again, a cause dropped on the way to govern.

@@ -39,7 +39,7 @@ export const PICTURE_NAME = /^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}$/;
 export type VisualPicture = { name: string; sha256: string; mime: string; bytes: number };
 
 /**
- * What a version line holds in `to_v`. `draft` marks one handed in to be kept or thrown away (DIRECTION §45): it waits
+ * What a version line holds in `to_v`. `draft` marks one handed in to be kept or thrown away: it waits
  * beside the version the visual stands at and never replaces it until a person keeps it.
  */
 export type VisualBody = { title: string; page: string; bytes: number; pictures: VisualPicture[]; draft?: true };

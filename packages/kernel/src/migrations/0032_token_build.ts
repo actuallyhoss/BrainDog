@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 32: a key keeps its command's build and its last tool call (AGT-A02).
+ * The kernel schema, migration 32: a key keeps its command's build and its last tool call.
  *
  * `token.last_build` IS THE BUILD OF THE COMMAND BEHIND A KEY, as the command last said it (`x-braindog-cli`, a day and
  * a commit, `2026.10.09+1a2b3c4`, or `dev+` and a commit from a checkout). Written by `verifyToken` in the statement that

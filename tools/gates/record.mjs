@@ -31,7 +31,7 @@
  *
  * AND THE VARIANTS ARE RECORDS NOW, NOT BUILDS. See `VARIANTS`.
  *
- * AND ONE OF THEM IS THE CLOUD ITSELF (PRF-B05). `cloud` is the Worker's own `fetch` over a real Directory and a real
+ * AND ONE OF THEM IS THE CLOUD ITSELF. `cloud` is the Worker's own `fetch` over a real Directory and a real
  * record (`apps/worker/test/cloud-serve.ts`), reached with a signed-in person's cookie where the others are reached
  * with a server key. See `startCloudRecord`.
  */
@@ -46,7 +46,7 @@ import { httpStatus } from '../../packages/host/src/index.ts';
 import { NOW, ORDER, ROWS, declarations, forWrite, ingestDeclarations, installSeed, metricDeclarations, pageDeclarations } from '../../packages/seed/src/index.ts';
 
 import { budget } from './lib.mjs';
-/* THE LIVED RECORD (PRF-A07, `lived.mjs`), the gates' second record, built by living in it rather than seeded. PRF-B06
+/* THE LIVED RECORD (`lived.mjs`), the gates' second record, built by living in it rather than seeded. PRF-B06
    draws it here as a variant; until then it is handed on from this door, so a gate and the look reach both records
    through one module, and the runner reads `lived.mjs` as the library it is rather than a gate nobody registered. */
 export { buildLived, openLived } from './lived.mjs';
@@ -184,7 +184,7 @@ const CLOUD_AGENT_RUNS = ['Send the September invoices', 'Check the licence rene
 const CLOUD_SCRIPT = 'last_day';
 
 /**
- * `cloud`: the Worker itself, with one person a day into it (PRF-B05).
+ * `cloud`: the Worker itself, with one person a day into it.
  *
  * EVERYTHING HERE GOES IN THROUGH THE WORKER'S OWN DOORS, in the order a person meets them. An operator provisions the
  * record and the claim link is spent (`startCloud`'s `provision`), which signs them in. Solo founder is put on Decide
@@ -368,7 +368,7 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
  * doors (`account`), OAuth's (`oauth`), an agent's (`mcp`) and what arrives from outside (`in`). Everything else is the
  * build's.
  *
- * EVERY DOOR A HOST ANSWERS AND THE BUILD DOES NOT (PRF-B05). It was `api`, `auth` and `account/billing`, so the build's
+ * EVERY DOOR A HOST ANSWERS AND THE BUILD DOES NOT. It was `api`, `auth` and `account/billing`, so the build's
  * own fallback answered `/account/usage` and no gate had drawn Usage from a host's answer. The same six names are the
  * Worker's root doors (`apps/worker/src/route.ts`) and the self-host's.
  */
@@ -397,10 +397,10 @@ export const serverKeyFor = (base) => KEYS.get(base);
 /**
  * The record's clock: the instant a record this module started reads as now, or `null` for a base it did not start.
  *
- * ONE CLOCK FOR THE RECORD AND THE PAGE (PRF-B04). The record was pinned at the seed's `NOW` and the page drew at the
+ * ONE CLOCK FOR THE RECORD AND THE PAGE. The record was pinned at the seed's `NOW` and the page drew at the
  * runner's own date, so Today's date line and Usage's "this month" were measured on a day the record never lived. A
  * gate opens every page through `openPage` (`lib.mjs`), which pins the page to this instant. By base, so a record that
- * lives on its own clock (the lived copy, PRF-B06) hands back its own.
+ * lives on its own clock (the lived copy) hands back its own.
  */
 export const clockOf = (base) => CLOCKS.get(base) ?? null;
 
@@ -439,7 +439,7 @@ export async function ask(base, name, args = {}) {
  * Keep one of the person's own settings through the record's `setPref`, with the gate's key. `null` takes it away.
  *
  * A GATE ONCE WROTE THE PREFERENCES INTO `boot` ITSELF, on a comment that said the record refuses `setPref` from a key;
- * that writer is gone (PRF-B04). The record refuses a token (`packages/record/src/index.ts` `setPref`), and
+ * that writer is gone. The record refuses a token (`packages/record/src/index.ts` `setPref`), and
  * the gate's key is the self-host's server key, which speaks as the owner, a person (`apps/selfhost/src/server.ts`
  * `owner`): asked on 9 October, `setPref nav.shape bar` with this key answered `ok: true`. So a page reads what the
  * record keeps, through the door a person's own Settings writes through, and no answer is written by a gate. On the
@@ -484,7 +484,7 @@ const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
  * route outside `MAY_REFUSE`, and never `UNREACHABLE`, which is the one answer that means the gate's port
  * reached nothing at all.
  *
- * NO ANSWER IS WRITTEN OR REWRITTEN FOR THE CLOUD (PRF-B05). `boot` from the `cloud` variant had `host: 'cloud'` put
+ * NO ANSWER IS WRITTEN OR REWRITTEN FOR THE CLOUD. `boot` from the `cloud` variant had `host: 'cloud'` put
  * into it here and Billing was one fixed line, `{ records: [], open: false }`; both are the Worker's own answers now.
  * THE ANSWERS MADE HERE are a self-host's `POST /api/seen` (an empty answer, below) and its `GET /account/records`,
  * for the reason `recordsAnswer` gives, the second only

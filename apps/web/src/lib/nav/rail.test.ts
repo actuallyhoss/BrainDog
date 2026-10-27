@@ -141,7 +141,7 @@ test('a record without a shop keeps its rail, and its bar is the five of 19 Octo
   assert.deepEqual(rail.rest.map((i) => i.label), ['Services', 'Activity']);
 });
 
-/* SAM'S RECORD AFTER SIGN-UP (use case 1, USE-B02): Services is a section whose list holds nothing yet. Which sections a
+/* SAM'S RECORD AFTER SIGN-UP (use case 1): Services is a section whose list holds nothing yet. Which sections a
    record has is the shell's to say (`layoutOf` leaves out a page over a list with nothing in it), and the rail draws
    the sections it is handed and no others: it is told no counts, so it can neither keep an empty place nor drop one. */
 const sam = (services: boolean): [string, Entry[]][] => [

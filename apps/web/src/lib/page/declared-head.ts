@@ -1,5 +1,5 @@
 /**
- * A DECLARED PAGE'S HEAD, AS THE READ SENDS IT (PGS-A14): a kicker over the title, a count beside it, a state in words,
+ * A DECLARED PAGE'S HEAD, AS THE READ SENDS IT: a kicker over the title, a count beside it, a state in words,
  * the page's one primary button, a search and a way back. The kernel checks and resolves it (`packages/kernel/src/
  * page-head.ts` `resolveHead`) and the page read answers it as `head`, beside the blocks, so it reaches the app on the
  * page's answer (`page-live.ts` keeps every key it does not read).

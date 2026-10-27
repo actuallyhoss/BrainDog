@@ -194,7 +194,7 @@ function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean,
   const pointed = new Set(kept.packs.filter((p) => p.why.length > 0).map((p) => p.id));
   /* `toTurnOn` ADDS PEOPLE FOR A NAME, and a declined reading has no packs, so a name alone still keeps People. */
   const heard = toTurnOn(kept, named, offers).filter((id) => pointed.has(id) || (named && !kept.packs.some((p) => p.id === id)));
-  /* AND MONEY SAID IS MONEY KEPT, whoever claims the word (the audit of 22 October, U-C2): "we send invoices in naira"
+  /* AND MONEY SAID IS MONEY KEPT, whoever claims the word: "we send invoices in naira"
      made an agency's record whose use case keeps hours and no money, and Money was nowhere on its first Today. A part
      that keeps money and that the words pointed at comes when nothing the use cases bring keeps money. */
   const chosen = u ? [...modulesFor(u, heard).filter((id) => id !== CORE_PACK), ...beside.flatMap((b) => b.modules)] : heard;
@@ -254,7 +254,7 @@ export function titleOf(bio: string, name: string | null, rows: readonly { regis
   if (!m) return null;
   const kind = (m[3] ?? '').toLowerCase();
   const what = (m[2] ?? '').trim().split(/\s+/u).filter((w) => w !== '' && !PLAIN.has(w.toLowerCase()));
-  /* WITH NO NAME HEARD, THE TRADE AS IT WAS SAID (audit C, X2): "a small ceramics studio" is Ceramics studio, where the
+  /* WITH NO NAME HEARD, THE TRADE AS IT WAS SAID: "a small ceramics studio" is Ceramics studio, where the
      record was named for the email's local part. A kind of place alone ("a shop", "a business") is still anybody's. */
   if (name === null) return what.length === 0 ? null : capital([...what, kind === 'cafe' ? 'café' : kind].join(' '));
   const whose = `${name.split(' ')[0]}'s`;
@@ -854,7 +854,7 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
 }
 
 /*
- * A BARE WORD FOR MONEY IS MONEY, NEVER A USE CASE BESIDE (audit C, X1): "who owes me money", said by a ceramics studio,
+ * A BARE WORD FOR MONEY IS MONEY, NEVER A USE CASE BESIDE: "who owes me money", said by a ceramics studio,
  * took Personal beside the shop and promised it Savings goals, Goals, Log, Put by and Project steps. A use case taken
  * beside the one proposed comes only where it heard more than these words; the money itself is kept (`modulesOf`).
  */
@@ -865,7 +865,7 @@ function moneyAlone(beside: UseCase, arranged: ReturnType<typeof arrangeTurns>):
 }
 
 /*
- * A THING A SHOP DOES ON A DAY (audit C, X1): "kiln firings", "bookings", "deliveries". The orders a shop keeps carry the
+ * A THING A SHOP DOES ON A DAY: "kiln firings", "bookings", "deliveries". The orders a shop keeps carry the
  * day each is due (`ordersOf`), so a dated thing said beside one is said as its orders by day, where it was not heard at all and
  * the one thing she said she loses track of went unsaid. At most one word before it, never a joining word.
  */

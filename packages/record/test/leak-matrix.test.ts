@@ -1,5 +1,5 @@
 /**
- * The leak matrix (sharing plan §4, Slice 2): every grant shape that can be built today, held to what it may see on
+ * The leak matrix (Slice 2): every grant shape that can be built today, held to what it may see on
  * every read path, before any of the sharing work changes a reader.
  *
  * ROWS ARE THE SHAPES (`leak/fixture.ts`): the owner, a whole-record view, the five share templates as today's member
@@ -564,7 +564,7 @@ test('P4 backlinks: a row out of sight answers as a row number nobody holds', as
   assert.deepEqual(unlike.slice(0, 12), [], `${unlike.length} answer(s) told a hidden row from a missing one`);
 });
 
-/* ── P5's first half (G1, closed in Slice 4): a write outside the rule is refused ── */
+/* ── P5's first half (closed in Slice 4): a write outside the rule is refused ── */
 
 test('P5 a narrowed writer cannot edit, delete, note or create a row outside its rule, and nobody writes another person\'s private row', async () => {
   const f = await build();

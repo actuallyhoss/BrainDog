@@ -1,5 +1,5 @@
 /**
- * `context.decided` on a real record (AGT-B09): an agent opening a session on a project is told the last three
+ * `context.decided` on a real record: an agent opening a session on a project is told the last three
  * questions a person decided there, "Decided 2 Oct: <the choice>", so it asks none of them again.
  */
 

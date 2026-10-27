@@ -92,7 +92,7 @@ export function roadmapOf(listings: readonly Listing[], today: string): Roadmap 
 }
 
 /**
- * WHICH LINE UNDER THE ROAD EACH LABEL HANGS ON, so no two run into each other (the audit of 20 October: "Proofing press,
+ * WHICH LINE UNDER THE ROAD EACH LABEL HANGS ON, so no two run into each other ("Proofing press,
  * 5 of 8" over "Settle how Kiln is licensed" on Kiln). Each label is its span across the tile, `left` to `right` in
  * pixels as drawn; it takes the first line whose last label ends `gap` before it starts, else a new line. In the order
  * handed, which is the road's, so the soonest label keeps the top line.
@@ -137,7 +137,7 @@ export const PATH_STOPS = 6;
 const PATH_DONE = 2;
 const PATH_NEXT = 3;
 /**
- * THE FEWEST STOPS A PATH IS DRAWN WITH: three, SINCE the audit of 22 October (U-B12). A path of two was the same two rows
+ * THE FEWEST STOPS A PATH IS DRAWN WITH: three. A path of two was the same two rows
  * the work tile under it lists, a tile of scaffolding on a page that should end under 1,500px.
  */
 const PATH_LEAST = 3;

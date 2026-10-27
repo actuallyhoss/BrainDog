@@ -1,5 +1,5 @@
 /**
- * A door that is off (SHL-C13): 410, an empty body, nothing stored, and the arrival counted once as turned away.
+ * A door that is off: 410, an empty body, nothing stored, and the arrival counted once as turned away.
  *
  * MEASURED BEFORE THIS WAS WRITTEN: `IngestVerify` had no way to say a door was off, so the only door that stopped
  * taking arrivals was one whose declaration was retired, which answered 404 and lost its token. Every name is invented.

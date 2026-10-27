@@ -42,7 +42,7 @@
  *      Each would write an event if it were accepted, and each is refused by `slashMayWrite` at one
  *      of the two guard sites a `Result`-shaped API cannot hide (it throws: no caller can ASK to be
  *      `slash`, so reaching it is a defect here rather than an event in somebody's business).
- *   3. It installs the one declaration `30 §3` lets a model sign (ENG-A16): a look on a page the seed
+ *   3. It installs the one declaration `30 §3` lets a model sign: a look on a page the seed
  *      came with, whose body says it is Slash's. Then it offers an install of a page and of a rule as
  *      `slash`, which the install's own `declare` line must refuse before anything of them lands.
  *   4. Only then does it run `30 §3`'s query, with the one exception the document states. Zero rows,
@@ -272,7 +272,7 @@ export default async function slashActor(
        that the invariant is missing from the document that states it. Whitespace is collapsed first. */
     const flat = section.replace(/\s+/g, ' ');
     const stated = /actor\s*=\s*'([a-z]+)'\s+AND\s+kind\s+NOT\s+IN\s*\(([^)]*)\)/.exec(flat);
-    /* THE ONE EXCEPTION, READ FROM THE SAME SENTENCE (ENG-A16): a `declare` of a look. A document that does not state
+    /* THE ONE EXCEPTION, READ FROM THE SAME SENTENCE: a `declare` of a look. A document that does not state
        it leaves the query as it was, and the look planted below is then a row the query finds, which is the honest
        answer for a tree whose document and write path disagree. */
     const excepted = /AND\s+NOT\s*\(\s*kind\s*=\s*'([a-z]+)'\s+AND\s+target\s+LIKE\s+'([a-z.:%_]+)'\s*\)/.exec(flat);
@@ -393,7 +393,7 @@ export default async function slashActor(
       ]);
 
     /**
-     * AND THE DECLARATIONS (ENG-A16). A model arranges a page with a look of its own, and the install signs that
+     * AND THE DECLARATIONS. A model arranges a page with a look of its own, and the install signs that
      * line `slash`; a page, a list, a rule, a script and an add-on are a person's to install.
      *
      * THE LOOK IS PLANTED FIRST, THROUGH THE INSTALL, on a page the seed came with, for the reason the proposal is

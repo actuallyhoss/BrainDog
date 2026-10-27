@@ -1,6 +1,5 @@
 <!--
-  An agent's run, as a face: the agent's own mark (`AgentMark`) inside a disc, and a dot while the run is working (the UI
-  pass of 20 October, 2.A.5, frame F16).
+  An agent's run, as a face: the agent's own mark (`AgentMark`) inside a disc, and a dot while the run is working.
 
   ONE DISC FOR EVERY AGENT: `--tile-2`, the mark 16px inside it. A named agent wears its maker's mark: Claude's clay
   starburst in `--agent-claude`, Gemini's in `--agent-gemini`, and the marks drawn in black or white (Codex, Cursor) in

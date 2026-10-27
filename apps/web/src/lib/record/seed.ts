@@ -69,7 +69,7 @@ const WANTS: Record<string, Slot[]> = {
   calendar: [{ want: 'title' }, { want: 'date', hard: true }],
   gallery: [{ want: 'title' }, { want: 'file', hard: true }],
   link: [{ want: 'title' }, { want: 'url', hard: true }],
-  /* THE KINDS THE MENU NEVER OFFERED (PGS-A22), each over the field it reads. A heat washes each day by how busy it was,
+  /* THE KINDS THE MENU NEVER OFFERED, each over the field it reads. A heat washes each day by how busy it was,
      so its day is hard and its value is a number or nothing: a row with no value is one of something. A ring and a
      split each SUM a number, so it is hard; the split cuts it by a choice where the list has one. Lanes lay each item
      between its start and its end, and an end left off is a span still going, so the second date is taken or left. */

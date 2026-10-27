@@ -1,6 +1,6 @@
 /**
  * WHAT WAITS AND WHO IS WORKING, AS THE NEWEST `boot` SAID IT, for every screen that says either: the rail's badge and
- * its working row, Today's header and Decide's sentence (EXP-E07).
+ * its working row, Today's header and Decide's sentence.
  *
  * ONE ANSWER, HELD FOR THE TAB. The root layout writes it from the shell it was handed, and again from the poll's
  * re-read of `boot` whenever the record's version moves (`rereadBoot`), so no screen counts what waits a second way.

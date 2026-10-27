@@ -1,5 +1,5 @@
 /**
- * `engine-line.ts` `quietLine`: the one quiet line Today says under its brief (the audit of 22 October, U7). While the
+ * `engine-line.ts` `quietLine`: the one quiet line Today says under its brief. While the
  * model that writes is not answering, its key is closed or the record's own written brief is paused, the line says the
  * rules wrote what is above it; while it writes, nothing; and with the month spent, the month's own sentence.
  */

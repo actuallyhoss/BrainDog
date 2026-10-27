@@ -4,7 +4,7 @@
   FROM `boot`'S ANSWER AT THE FIRST PAINT, so the count is the rail's and the header's and the tile stands at once. THEN
   FROM `presence` (agents and MCP plan §4.4, §7.2), read once it has drawn, again when the record moves, when a stop or a
   tell is sent (`told`), and every fifteen seconds, since "heard 3 min ago" is a clock: as the Agents page says the same
-  runs (`openNow`, the pass of 27 October), each run that did something by its app and where it works, the last thing it
+  runs (`openNow`), each run that did something by its app and where it works, the last thing it
   did ("Asked you: …", "Wrote 3 changes") and when it was last heard; what he told it that it holds, and whether he
   paused or stopped it. Under them one line each for the runs open with nothing written, the machines quiet for an hour,
   and the read-only looks, none of them counted. A read that fails keeps what is drawn.

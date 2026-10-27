@@ -334,7 +334,7 @@ test('A 503 REFUSES THE CALL ONCE, and a cancelled request is never answered', a
 });
 
 /*
- * A WRITE THAT MAY HAVE LANDED SAYS SO (audit 40-42, finding 9). Before this a timed-out `log` answered "could not be
+ * A WRITE THAT MAY HAVE LANDED SAYS SO. Before this a timed-out `log` answered "could not be
  * reached", the agent logged it again, and the record held the line twice. RED FIRST: with `away` given `false` in
  * place of `got.maybe` in `forward`, the timed-out log answers the old sentence and the first test goes red; with
  * `mayHaveLeft` answering true always, the refused log answers the new one and the second goes red.

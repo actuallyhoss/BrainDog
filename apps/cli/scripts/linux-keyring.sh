@@ -1,5 +1,5 @@
 #!/bin/sh
-# Setup sync on a real Linux keyring (G18): apps/cli/test/sync-flow.test.ts run in a throwaway Linux container, with a
+# Setup sync on a real Linux keyring: apps/cli/test/sync-flow.test.ts run in a throwaway Linux container, with a
 # session bus and an unlocked GNOME keyring, through `secret-tool` (`secretService` in apps/cli/src/secret-store.ts).
 #
 #   sh apps/cli/scripts/linux-keyring.sh

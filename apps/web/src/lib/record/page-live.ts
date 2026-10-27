@@ -102,7 +102,7 @@ export const liveWords = {
  */
 export const footWords = {
   /**
-   * `way` IS WHAT THE RECORD ALREADY HAS (audit 74, claim 2). `none`: no action fetches rates, so the new one is offered.
+   * `way` IS WHAT THE RECORD ALREADY HAS. `none`: no action fetches rates, so the new one is offered.
    * `held`: one does, paused or failing or merely late, and the way on is that action; offering the preset again was a
    * second copy to a person who needed the first mended. `unread`: the actions could not be read, so nothing is offered,
    * because a link chosen at a guess is the fault this fixes.
@@ -136,7 +136,7 @@ const RATES_HELD = '/automations?tab=scheduled';
  * keeps its rates in another list, this follows it. Neither moves with the currencies (one address, one action,
  * `ratesSpecFor`), so any two of them ask it.
  *
- * AN ACTION DRAFTED BY HAND IS KNOWN BY WHAT IT DOES (audit 77, claim 6): under a name of its own it read as no rates
+ * AN ACTION DRAFTED BY HAND IS KNOWN BY WHAT IT DOES: under a name of its own it read as no rates
  * action at all, and the foot offered a second copy beside the one already fetching. `writes` is the list an action
  * files what it fetched in, as the record answers it beside the name; an answer without it is found by name alone, as
  * before. The preset's own comes first where both are held, since that is the one the sheet opens again.
@@ -281,7 +281,7 @@ export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & {
 };
 
 /**
- * HOW THE ENGINE ARRANGED THE PAGE (`loop/contract-17.md`, the look overlay), as the record answers it beside the
+ * HOW THE ENGINE ARRANGED THE PAGE (the look overlay), as the record answers it beside the
  * blocks: which block leads, the order of the rest by their keys, what it hid, the line it leads with, the one next
  * action, the blocks pinned in place, and who arranged it (the rules, Slash, or the person). The record answers it as
  * `PageResult.look` (`packages/kernel/src/compose.ts` `LookBody`), already applied to the blocks. `kept` names the
@@ -360,7 +360,7 @@ export type LiveBlock = BlockResult & {
   /** HOW MANY HELPERS EACH RUN HAS WORKING WITH IT, on a block of runs at work (`sessions.working`), aligned with the rows. */
   helpers?: number[];
   /**
-   * WHEN EACH CARD'S PROJECT WAS LAST WORKED ON, from a when column over `project-worked` (the audit of 25 October, Z7),
+   * WHEN EACH CARD'S PROJECT WAS LAST WORKED ON, from a when column over `project-worked`,
    * aligned with the rows, or `null` for a card it said no moment of. Today and Projects draw a card's live line from it.
    */
   lastWorked?: (WorkedAt | null)[];
@@ -583,7 +583,7 @@ function wholeOf(v: unknown, kind: string, sums: boolean): WholeLine[] | null {
   const rows = v !== null && typeof v === 'object' ? (v as { rows?: unknown }).rows : undefined;
   if (!Array.isArray(rows)) return null;
   /* AND THE LABELS PAST THE KERNEL'S CAP ARE PART OF THE WHOLE: two hundred labels drawn and the smallest hundred left
-     out add to less than the list with nothing saying so (audit 53, finding 4), so they are one line more, last. A HEAT
+     out add to less than the list with nothing saying so, so they are one line more, last. A HEAT
      HAS NO REST, every day of its twelve weeks being a line, and a rest has no day to be drawn on; nor has a count of
      what is done, whose rest says how many are done and not out of how many. */
   const past = restOf((v as { rest?: unknown }).rest);
@@ -622,7 +622,7 @@ const WHOLE_SHARE = 'share of whole';
  *
  * IT IS THE MOST ROWS THE RECORD WALKS FOR A WHOLE (`WHOLE_WALK_ROWS` in `kernel/src/pages.ts`), so no count the
  * record answers is refused by it, and a count past it is one no walk arrived at. It was 250,000, five times that,
- * which nothing could reach honestly and which a wrong line could fill on every refresh (audit 53, finding 7).
+ * which nothing could reach honestly and which a wrong line could fill on every refresh.
  */
 const WHOLE_COUNTED_MOST = 50_000;
 
@@ -1296,7 +1296,7 @@ function nextPart(cells: readonly { reading?: { value?: unknown; unit?: unknown;
     const l = left.get(key);
     const a = after.get(key);
     const part = typeof l === 'number' && typeof a === 'number' && l > a && typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit) ? moneyWhole(l - a, unit, homeCurrency()) : null;
-    /* A PART WHOSE DAY HAS GONE IS LATE, in Today's words and the danger colour (the audit of 22 October, U4): "Next EGP
+    /* A PART WHOSE DAY HAS GONE IS LATE, in Today's words and the danger colour: "Next EGP
        467,915 on 13 Oct" stood in grey under a plan nine days after that day. Today is the reader's day at `now`. */
     const today = recordToday(now);
     if (iso < today) return `${part ? `${part.text} ` : ''}{{bad:${lateSaid(iso, today)}}}, due ${on}`;
@@ -1621,7 +1621,7 @@ export function blockOf(
     const done = new Map(first!.map((g) => [String(g.key), typeof g.value === 'number' ? g.value : 0]));
     /* WHAT EACH TRACK SAYS UNDER ITS BAR, from the three figures after the two counts when the tile reads them. */
     const next = nextPart(readings.slice(2), now);
-    /* A PLAN TYPED ALL IN SMALL LETTERS IS NAMED WITH A CAPITAL (the audit of 25 October, Z12): an import wrote each
+    /* A PLAN TYPED ALL IN SMALL LETTERS IS NAMED WITH A CAPITAL: an import wrote each
        plan's name in small letters on its parts, and the tile said it so while Needs you and the plan's own row started
        it with a capital. A name typed with a capital anywhere is kept as typed, "iPad" among them. */
     const named = (key: string): string => (/\p{Lu}/u.test(key) ? key : key.charAt(0).toUpperCase() + key.slice(1));
@@ -1678,7 +1678,7 @@ export function blockOf(
         row.cells[i] = scopes?.[n] ?? EVERYWHERE;
       });
     });
-    /* NAMES, NEVER HANDLES, AND NO WIRE (the audit of 20 October, on a project page): a key or a tool filed as
+    /* NAMES, NEVER HANDLES, AND NO WIRE (on a project page): a key or a tool filed as
        `pinwheel-metrics` is said "Pinwheel metrics" (`thingName`, as the project's shape says it), and how a tool is
        reached, `stdio` or `http`, is how an agent's machine talks to it and nothing a person acts on, so that line is
        left out and the card draws its other facts. */
@@ -1732,7 +1732,7 @@ export function blockOf(
     const runFaces = runFacesOf(b, types, entries, runs, now);
     return { ...shell, register, entries, matched: entries, rows, shown: entries.length, total: Math.max(matched, entries.length), names: namesOf(refs), ...(runFaces ? { runFaces } : {}) };
   }
-  /* THE INSTALLED SCRIPTS (`packages/kernel/src/sources/scripts.ts`), one row a script, which `/scripts` draws (C33).
+  /* THE INSTALLED SCRIPTS (`packages/kernel/src/sources/scripts.ts`), one row a script, which `/scripts` draws.
      `scripts` names no register, so the common path below would draw them as a block this build cannot draw. A row is
      keyed by its script and opens its own page, and two of its cells are said as the old list said them (`scriptOf`):
      `every` is what starts it ("Runs every day and when an automation starts it") and `last_at` where it stands ("Last
@@ -1915,7 +1915,7 @@ export function blockOf(
   }
   /* A register the seed does not declare has no labels to draw with, and says so rather than drawing half an answer.
      WITH NO ROW TO LABEL THERE IS NO HALF ANSWER: a list this record does not hold yet, as a store's preview of an
-     add-on draws it, says its heading and its own empty line (audit C, X11). */
+     add-on draws it, says its heading and its own empty line. */
   if ((!register || !REGISTERS[register]) && sent.length === 0 && matched === 0 && kind === 'table') return shell;
   if (!register || !REGISTERS[register]) return cannot;
   /* THE NUMBERS A PROJECT REPORTED, worked out by the record: one series a measure, drawn as tiles or charts. */
@@ -2008,7 +2008,7 @@ export function blockOf(
   /* AND THE CHIP EACH OF THOSE CELLS WEARS: the project's mark in its hue, or the globe for everywhere. A
      run's project is where it was placed, and a run placed nowhere is not "everywhere": its cell stays empty, so it
      draws nothing. A run that names a project wears its dot as a row of that project does, "on ● Kiln" in the card's
-     meta line (the UI pass of 20 October, agents F7), where it was a fact under a label. */
+     meta line (agents F7), where it was a fact under a label. */
   const scopeCells = scopeCellsOf(b.columns ?? [], rows, scopeMarked);
   /* EACH CARD'S NEXT STEP IS THE RECORD'S ANSWER, `nexts`, written into the cell and never into the row, unlike a ring.
      The column names a field of the STEPS list, and the card's own list may hold a field of the same name: the measured
@@ -2032,7 +2032,7 @@ export function blockOf(
       const run = trends?.[n];
       row.cells[trendAt] = Array.isArray(run) ? run.map((v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : '-')).join(' ') : null;
     });
-  /* AND EACH CARD'S WHEN OVER A FIGURE, `whens` (W096, REC-C16): the days the record read for the card, said in words in
+  /* AND EACH CARD'S WHEN OVER A FIGURE, `whens`: the days the record read for the card, said in words in
      its head, the column's label leading ("Worked on 2 days ago"). A figure past its target says the days as quiet
      ("Quiet for 40 days") and tones the card late, the word beside the colour. A card the record read nothing for draws
      no line. */
@@ -2043,10 +2043,10 @@ export function blockOf(
       row.cells[whenAt] = whenSaid(whens?.[n], typeof b.columns?.[whenAt]?.label === 'string' ? (b.columns[whenAt]!.label as string) : undefined);
       if ((whens?.[n] as { met?: unknown } | null | undefined)?.met === false && !row.tone) Object.assign(row, { tone: 'bad' });
     });
-  /* AND THE MOMENT AND WHOSE RUN IT WAS, where the figure says them (`project-worked`, the audit of 25 October, Z7),
+  /* AND THE MOMENT AND WHOSE RUN IT WAS, where the figure says them (`project-worked`),
      aligned with the rows, so a project's card on any page says the time Today's says. */
   const lastWorked = whens?.some((w) => workedAtOf(w) !== null) ? whens.map(workedAtOf) : null;
-  /* AND EACH CARD'S FACTS OVER A FIGURE, `facts` (REC-C16): a count as its number and money as the page says money, a
+  /* AND EACH CARD'S FACTS OVER A FIGURE, `facts`: a count as its number and money as the page says money, a
      fact the record read nothing for drawn as no fact rather than 0. */
   if (kind === 'cards' && Array.isArray(facted) && facted.length === got.length)
     factCells(b.columns ?? [], facted, money).forEach((cells, n) => {
@@ -2284,10 +2284,10 @@ export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: n
 /**
  * The oldest day a drawn figure was converted at out of date rates, or `null` where the page has no foot to say.
  *
- * EVERY PLACE A PAGE DRAWS A CONVERTED FIGURE ASKS (audit 77, claim 6), where only tiles did: a bar or a split over a
+ * EVERY PLACE A PAGE DRAWS A CONVERTED FIGURE ASKS, where only tiles did: a bar or a split over a
  * figure is that figure in its parts (`parts`), and a sentence with a figure in it says the same amount in words
  * (`staleSaid`). A bar or a split over a list's own money is converted here, on the drawn block, and says its day
- * through `staleOf` (audit 80, claim 5). A block this build could not draw says no figure, so it asks nothing.
+ * through `staleOf`. A block this build could not draw says no figure, so it asks nothing.
  */
 function oldestStale(answered: readonly Answered[], drawn: readonly LiveBlock[]): string | null {
   const days = answered.flatMap((b, i) => {

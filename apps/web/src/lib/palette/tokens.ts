@@ -1,6 +1,6 @@
 /**
  * What a plain line in the palette says besides its words: a day, a project, a priority, who holds it and an amount,
- * each read by the field types of the list the line goes into, and each drawn as a chip under the field (EXP-D13).
+ * each read by the field types of the list the line goes into, and each drawn as a chip under the field.
  *
  * TODAY'S LIGHT SYNTAX, NOT A SECOND ONE. "call the bank tomorrow #kiln !urgent" is read by `captureOf` in
  * `work/capture.ts`, the reader Today's line and a page's capture (`page/capture.ts` `readLine`) already use, so a line

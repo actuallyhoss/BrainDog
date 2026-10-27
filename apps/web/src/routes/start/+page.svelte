@@ -138,7 +138,7 @@
    */
   let made = $state(false);
   let madeModules = $state.raw<string[] | null>(null);
-  /* THE PLACES MADE, by name, which the end says first (audit C, X3). */
+  /* THE PLACES MADE, by name, which the end says first. */
   let madePlaces = $state.raw<string[] | null>(null);
   onMount(() => {
     if (location.hash !== '#made') return;
@@ -850,7 +850,7 @@
 
       <div class="board">
         <!-- ── THE CONVERSATION ──────────────────────────────────────────── -->
-        <!-- IN A TILE, AS ON /signup (the UI pass of 20 October, first F5): its field sits on white, never on the bare ground. -->
+        <!-- IN A TILE, AS ON /signup (first F5): its field sits on white, never on the bare ground. -->
         <section class="talk" aria-label={words.talk} data-dragging={dragging ? '' : undefined}>
           {#if dragging}<p class="drop" aria-hidden="true">{firstRun.exportDrop}</p>{/if}
           {#if proposal === null}
@@ -1296,7 +1296,7 @@
   }
 
   /* THE HINT ONLY ON HOVER OR FOCUS (§35): the control is one quiet word until a person reaches for it. */
-  /* UNDER THE BUTTON, OUT OF THE ROW (UI pass of 21 October, P49): taking room in the row, the hidden hint pushed "Show
+  /* UNDER THE BUTTON, OUT OF THE ROW (P49): taking room in the row, the hidden hint pushed "Show
      my BrainDog" onto a line of its own at 1512, and beside it, it ran under that button. It lies in the tile's foot,
      on the words' start edge. */
   .bring-hint {
@@ -1747,7 +1747,7 @@
     gap: var(--sp-3);
   }
 
-  /* THE "ALREADY MADE" NOTE IS A TILE (UI audit of 22 October, 28): on the bare board its words and its white button
+  /* THE "ALREADY MADE" NOTE IS A TILE: on the bare board its words and its white button
      floated over the question like a stray line of the page. A tile, one row, its button the tile's quiet fill. */
   .made-note {
     padding: var(--sp-4) var(--sp-5);

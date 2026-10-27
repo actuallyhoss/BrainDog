@@ -5,7 +5,7 @@
  * MEASURED ON THE OWNER'S RECORD: Today's "What you have, by book" drew "Book #01M3VMPSHV07AM4S51WDTFM5XG" for every
  * part. Cash now by book groups by `accounts.book`, a ref, so each key is the ULID the row stores, and nothing between
  * the figure and the screen named it; an agent's `get cash-by-book` was handed the same ids
- * (`loop/research-real-record.md`, Today 1). The record names the parts now, once, for every reader.
+ * (Today 1). The record names the parts now, once, for every reader.
  */
 
 import { test } from 'node:test';

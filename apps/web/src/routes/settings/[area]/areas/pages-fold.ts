@@ -1,5 +1,5 @@
 /**
- * Settings > Navigation's fold under Add a page, and the order its pages are listed in (the audit of 25 October, Y20).
+ * Settings > Navigation's fold under Add a page, and the order its pages are listed in.
  *
  * THE FOLD SAYS WHAT IT HOLDS BY KIND. A record with a page for every project, person and agent run read "1047 more
  * pages", as if each were a page to add. The pages a row made are said by their list ("Pages of 30 projects, 8 people

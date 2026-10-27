@@ -1,5 +1,5 @@
 /**
- * The plan's count of agents (LCH-A08): where a key is minted, a record at its plan's count mints no more.
+ * The plan's count of agents: where a key is minted, a record at its plan's count mints no more.
  *
  * The count is one row a host writes, `host_meta` under `plan.agents` (`apps/worker/src/slash.ts`, from `PLAN_TABLE`).
  * Written here the way the Worker writes it, so the kernel's reader and the host's writer meet on the same bytes.

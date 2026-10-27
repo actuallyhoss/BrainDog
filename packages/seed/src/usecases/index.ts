@@ -165,7 +165,7 @@ export function alongside(arranged: Arrangement, proposed: UseCase | null): UseC
 export const MODULE_ORDER = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'] as const;
 
 /**
- * The modules a use case cannot stand without: its `needs`, or all of its `modules` when it says none (USE-B08). What a
+ * The modules a use case cannot stand without: its `needs`, or all of its `modules` when it says none. What a
  * record starts with, before the person's words add to it; the rest of `modules` is what it grows into. Read wherever a
  * use case's modules are INSTALLED, never where they are offered or described, which is still all of `modules`.
  */

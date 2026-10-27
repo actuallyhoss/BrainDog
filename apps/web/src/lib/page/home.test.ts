@@ -344,7 +344,7 @@ test('A HOME DRAWS ITS BLOCKS THROUGH THE EMPTY RULE AND WALKS ROWS, and a page 
 });
 
 test('A HOME FOLDS ITS LONG LISTS AND HANDS THE RENDERER THE ROW CURSOR', () => {
-  /* A HOME ASKED TO DRAW ITS LISTS WHOLE DOES NOT FOLD (Scripts, the pass of 27 October). */
+  /* A HOME ASKED TO DRAW ITS LISTS WHOLE DOES NOT FOLD (Scripts). */
   assert.match(BODY, /fold=\{mode === 'home' && !unfolded\}/);
   assert.match(BODY, /rows=\{mode === 'home' \|\| \(mode === 'page' && host\) \? \{ cursor: cursorIn\(slot\.i\), onrowfocus: rowFocus\(slot\.i\) \} : null\}/);
   assert.match(SLOT, /cursor=\{rows\?\.cursor \?\? null\}/);

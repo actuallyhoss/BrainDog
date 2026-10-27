@@ -3,7 +3,7 @@
   own, counted and named in the list's own word ("6 projects have no colour of their own"), the first names under it,
   and one press, "Give them colours".
 
-  A ROW'S COLOUR IS THE THEME'S (PGS-A06). A row made before its list declared a colour was drawn in a hue the screen
+  A ROW'S COLOUR IS THE THEME'S. A row made before its list declared a colour was drawn in a hue the screen
   hashed, a different one on every build. The press has the record give each its own once (`giveHues`), chosen by the
   theme, and it is never recomputed.
 

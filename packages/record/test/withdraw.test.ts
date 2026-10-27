@@ -1,5 +1,5 @@
 /**
- * `withdraw`: an agent takes back a question it asked (AGT-C07, `src/methods/withdraw.ts`). Only the run that asked it,
+ * `withdraw`: an agent takes back a question it asked (`src/methods/withdraw.ts`). Only the run that asked it,
  * or a later run on the same key, may; anybody else is told so with the fix, and answers it in Decide instead.
  *
  * Through the real record and the kernel's own rule (`govern.ts`'s `withdraw`), with two agent keys and the owner, and

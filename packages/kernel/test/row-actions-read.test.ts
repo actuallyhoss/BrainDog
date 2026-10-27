@@ -1,5 +1,5 @@
 /**
- * Declared actions on a page (PGS-A12): a block says what may be pressed on it and on each of its rows, the install
+ * Declared actions on a page: a block says what may be pressed on it and on each of its rows, the install
  * admits both keys, and the read sends each reader only what that reader may press, each marked hard and undo.
  *
  * WHAT WAS MEASURED BEFORE IT: the verb table, the record's bindings and the drawer all existed, and a page carrying

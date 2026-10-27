@@ -74,7 +74,7 @@
   }
 
   /* THE DOT IS FOR A FIGURE THE PAGE FOUND MISSED, red, and for nothing else: a green dot beside "Open 15" says
-     nothing, and an amber one beside "With what is due" said "watch this" with no word (the UI pass of 20 October: a
+     nothing, and an amber one beside "With what is due" said "watch this" with no word (a
      status always carries its word, and amber is off Money). Any other tone keeps its name for a screen reader and
      draws nothing. */
   .cell:not([data-intent='bad']) > .glyph {

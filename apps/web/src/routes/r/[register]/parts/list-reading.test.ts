@@ -87,7 +87,7 @@ test('a list with neither state nor deadline says how many and how new', () => {
   assert.equal(readingOf(people, rows.slice(0, 1), NOW, WHOLE)?.before, '1 person, newest 3d ago.');
 });
 
-test('a list whose state is a kind and never finished says how many it holds, not how many are open (Z32)', () => {
+test('a list whose state is a kind and never finished says how many it holds, not how many are open', () => {
   /* Projects' lane: Building, Earning, Parked and Finished, none declared finished. "30 open." stood over Parked and
      Finished rows on his record (`things-390-light.png`). */
   const things = {
@@ -293,7 +293,7 @@ test('A LIST WITH A DEADLINE OPENS LATE FIRST: the longest overdue, then what is
   assert.deepEqual(lateFirst(people, undated, NOW), undated);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Y23: Services said "34 to settle, none late" over domains and hosting, which are not settled,
+/* Services said "34 to settle, none late" over domains and hosting, which are not settled,
    they renew; and "Money: Out, In" drew a full bar for each side though each held one state. */
 test('a list of renewals says what renews and which is next, and a side with one part draws no bar', () => {
   const services = {

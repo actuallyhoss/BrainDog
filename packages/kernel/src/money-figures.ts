@@ -112,7 +112,7 @@ export const ROLLED_READS = ['as_of', 'age', 'stale', 'foreign'] as const;
 export type Rolled = { balance: string; as_of: string; checks?: RolledCheck[]; moves: RolledMoves; read?: (typeof ROLLED_READS)[number]; after?: string };
 
 /**
- * `value: { crosscheck: { of } }` (REC-A17): the rolled figure `of` names, less the same money worked out a second way.
+ * `value: { crosscheck: { of } }`: the rolled figure `of` names, less the same money worked out a second way.
  *
  * IT NAMES THE FIGURE AND NOTHING ELSE, so the two cannot be declared apart: the accounts, the lists that restart one
  * and the moves are the checked figure's own, read off its body each time (`readCrosscheck`).
@@ -416,7 +416,7 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
   /* THE WHOLE FIGURE AND ITS GROUPS AS OF ONE CLOCK. A rate is taken as of the day asked about, because a balance held
      in another currency is worth what it converts to on that day, whichever day it was stated on.
 
-     EACH ACCOUNT'S OWN AMOUNT (REC-B23, `loop/scope/area-record-b.md`:1755-1760): a group the grouping names no
+     EACH ACCOUNT'S OWN AMOUNT: a group the grouping names no
      currency for, whose money is all in one currency, is read in that currency, unconverted, so on the Accounts tile
      "Cash (USD)" reads in dollars beside the pound accounts, never turned into pounds. A grouping by a ref is the row's
      to speak for (`groupNames`): a book that says nothing is read in the home currency, as it was. A group holding two
@@ -456,8 +456,7 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     }
     const whole = summed(all, into ?? home.home, home.home, home.rates, on, ctx.point === true);
     if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };
-    /* A GROUP HOLDING TWO CURRENCIES IS EACH CURRENCY APART, never one converted into the other (the audit of 20 October:
-       "What you have, by book" said E£571,340 for a book of E£11,905 and $10,826 beside an Accounts tile that said each
+    /* A GROUP HOLDING TWO CURRENCIES IS EACH CURRENCY APART, never one converted into the other ("What you have, by book" said E£571,340 for a book of E£11,905 and $10,826 beside an Accounts tile that said each
        currency on its own, and nothing on the page reconciled them). Only the whole, Cash now itself, is converted. */
     const sums = [...byKey].map(([key, slot]) => ({
       key,
@@ -1026,9 +1025,9 @@ export function figureLists(
     decl.source === RECORD_PEOPLE ||
     decl.source === RECORD_PATHS ||
     decl.source === RECORD_PLACES ||
-    /* AND THE TIDY (AGT-C18): its finders count runs and questions across the whole record. */
+    /* AND THE TIDY: its finders count runs and questions across the whole record. */
     decl.source === RECORD_TIDY ||
-    /* AND THE LOG (PGS-C24): its counts say what was done on every list, and by whom. */
+    /* AND THE LOG: its counts say what was done on every list, and by whom. */
     decl.source === RECORD_ACTIVITY ||
     /* AND WHEN A PROJECT WAS LAST WORKED ON (Z7 of 25 October): it reads the runs and every list that hands work out. */
     decl.source === RECORD_WORKED ||

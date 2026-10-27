@@ -1,5 +1,5 @@
 /**
- * The engine's health, read from Slash's own ledger (ENG-A02).
+ * The engine's health, read from Slash's own ledger.
  *
  * WHY THIS FILE EXISTS. Settings said "All healthy" on the day a model job died eight times on the owner's record, because
  * nothing read whether a model answered. `health` reads the `slash_call` rows the engine already writes, so each state is
@@ -161,7 +161,7 @@ function DAYS(n: number): number {
   return n * 24 * HOUR;
 }
 
-test('AN ANSWER 20 DAYS OLD AND TWO FRESH FAILURES IS not_answering: a stale answer earns no blip (audit 36-37, 7)', () => {
+test('AN ANSWER 20 DAYS OLD AND TWO FRESH FAILURES IS not_answering: a stale answer earns no blip (7)', () => {
   const { sql, row } = ledger();
   row(NOW - DAYS(20), 'ok', null);
   row(NOW - 3 * HOUR, 'error', 'UNREACHABLE');
@@ -189,7 +189,7 @@ test('AN ANSWER 20 DAYS OLD AND TWO FRESH FAILURES IS not_answering: a stale ans
   assert.equal(engineHealth(recent.sql, fixedClock(NOW), MODEL).state, 'answering');
 });
 
-test('A SPENT MONTH IS ITS OWN CLAUSE (audit 40-42, 5): never an answer, never a failure, and every refusal counted', () => {
+test('A SPENT MONTH IS ITS OWN CLAUSE (5): never an answer, never a failure, and every refusal counted', () => {
   /* What the vital sign reads from these three clauses (`packages/host/src/sign-model.ts`); Settings says the meter. */
   const counts = (sql: ReturnType<typeof ledger>['sql']) =>
     sql.one<{ yes: number; no: number; spent: number }>(
@@ -222,7 +222,7 @@ test('A SPENT MONTH IS ITS OWN CLAUSE (audit 40-42, 5): never an answer, never a
   assert.deepEqual(base(engineHealth(c.sql, clock, MODEL)), { state: 'answering', last_ok: at(NOW - 2 * HOUR), since: null });
 });
 
-/* ── What the ledger says beside the state (ENG-A05, ENG-A06: "health shown") ─────────────────────────────────────── */
+/* ── What the ledger says beside the state ("health shown") ─────────────────────────────────────── */
 
 type Planted = { ms: number; status: string; kind?: string; code?: string | null; model?: string; tier?: string; spends?: string; route?: string | null; candidate?: string | null; raw?: string | null };
 

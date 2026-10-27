@@ -1,5 +1,5 @@
 /**
- * The `kpis` page source (K2-A, `loop/plans/kpis-2026-10-21/PLAN.md` 2.6): each key number with its points, kind,
+ * The `kpis` page source (K2-A): each key number with its points, kind,
  * chart, stale, verdict and change, for one project, for Today and for the cards, read through the record's own wiring.
  *
  * ON A REAL RECORD, declared as Portfolio declares it (`KPI_LIST`): projects with a lane and a colour, the key numbers,

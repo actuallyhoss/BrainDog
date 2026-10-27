@@ -96,7 +96,7 @@ const startsSentence = (line: string): boolean => {
 };
 
 /**
- * The row a plain line offers (EXP-D13): "call the bank tomorrow" is a row in the list the record's capture writes to.
+ * The row a plain line offers: "call the bank tomorrow" is a row in the list the record's capture writes to.
  *
  * TWO WORDS OR MORE, NOT A QUESTION, NOT ANOTHER ROW'S SENTENCE. One word is a search, a question is Slash's
  * (`isQuestion`, the same test Today's ask bar runs), and `Add to Tasks:` is the sentence row's. `into` is the list the

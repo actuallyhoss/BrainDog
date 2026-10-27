@@ -1,7 +1,7 @@
 /**
- * The first screens as drawn (audit 71, finding 8): the markup reader, the two checks that read the shell, one walk as
+ * The first screens as drawn: the markup reader, the two checks that read the shell, one walk as
  * Mariam whose rail and Today are rendered from the web's own parts and judged, and four people's walks held to a rail
- * with no empty place in it (USE-B02). Run it alone:
+ * with no empty place in it. Run it alone:
  * `node --test tools/people/expect/first-screen-drawn.test.mjs`.
  */
 
@@ -147,7 +147,7 @@ test('Mariam: the rail and Today are drawn at both moments, every check that rea
     assert.equal(s.owner, true);
     assert.equal(named(s, 'button', pageWords.newPage), 1, s.moment);
     assert.equal(named(s, 'heading', pageWords.section), 1, s.moment);
-    /* THE RAIL'S ROWS ARE THE PRODUCT'S TO GET RIGHT (USE-B02) and are held to being read, in the test beside this one. */
+    /* THE RAIL'S ROWS ARE THE PRODUCT'S TO GET RIGHT and are held to being read, in the test beside this one. */
     for (const r of checkDrawn(s, MARIAM)) if (r.id !== 'rail-has-rows') assert.notEqual(r.pass, false, `${s.path} ${s.moment}: ${r.id}: ${r.saw}`);
     assert.equal(drawnScreen['pages-line'](s).pass, true);
   }
@@ -165,7 +165,7 @@ test('Mariam: the rail and Today are drawn at both moments, every check that rea
   assert.equal(code, lines.some((l) => /: red\./u.test(l)) ? 1 : 0);
 });
 
-/* ── the rail's rows, read as the shell reads them (USE-B02) ──────────────────────────────────────────── */
+/* ── the rail's rows, read as the shell reads them ──────────────────────────────────────────── */
 
 test('a page stands on the lists the record says it reads, and on none a pack filled', () => {
   const held = new Map([['accounts', {}], ['obligations', {}]]);

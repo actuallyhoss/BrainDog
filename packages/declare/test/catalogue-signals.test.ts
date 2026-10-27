@@ -1,5 +1,5 @@
 /**
- * A use case's entry says the words it is heard in and the modules it stands on (USE-A16): `publishTo` puts them on from
+ * A use case's entry says the words it is heard in and the modules it stands on: `publishTo` puts them on from
  * the file, `readCatalogue` keeps them in their shape, and an index written before either key existed reads as it did.
  */
 

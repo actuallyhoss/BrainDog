@@ -544,7 +544,7 @@ question, with the way back.
 
 ### The first run from your own agent
 
-*(USE-B12: "modelled on PostHog's flow (fetch posthog site/open-source code)". Read on 15 October 2026
+*("modelled on PostHog's flow (fetch posthog site/open-source code)". Read on 15 October 2026
 from posthog.com and from `PostHog/posthog` and `PostHog/wizard` on GitHub, branch `master`; the paths below are
 theirs.)*
 
@@ -595,7 +595,7 @@ theirs.)*
   record's rule, `packages/record/src/arrange.ts`). There is no cloud run and no report dialog: the build drawn is the
   report. The line to paste is a sentence for the agent, not a command for a terminal: "Set up my BrainDog. Ask me who I
   am, then propose it." The page asks the record every 5 seconds at the fastest, never PostHog's 60, because a person is
-  watching for the build to arrive (USE-B12: "within five seconds").
+  watching for the build to arrive ("within five seconds").
 
 **The page, `/start?agent=1`** (`apps/web/src/routes/start/FromAgent.svelte`, its words and rules in `from-agent.ts`).
 

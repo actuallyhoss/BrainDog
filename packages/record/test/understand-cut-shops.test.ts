@@ -1,5 +1,5 @@
 /**
- * Shops already met by a name a card text cut short, as one question in Needs you (the audit of 25 October, Y2): the
+ * Shops already met by a name a card text cut short, as one question in Needs you: the
  * nightly walk files it once, nothing is folded or retired before he answers, and his yes folds the one a whole name
  * begins with into that shop and retires the rest, deleting nothing.
  *

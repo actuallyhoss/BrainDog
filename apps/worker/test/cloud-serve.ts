@@ -4,7 +4,7 @@
  *
  * WHY IT LISTENS. The browser gates drew "the Cloud" as the self-host with two answers rewritten by the gate, the host's
  * word in `boot` and a billing answer that was one fixed line, and handed on no account door at all, so `/usage` was never
- * drawn from an answer the Worker gave (PRF-B05). A gate serves a static build and forwards the record's paths to a
+ * drawn from an answer the Worker gave. A gate serves a static build and forwards the record's paths to a
  * base, so the harness needs a base: this is it, and `tools/gates/record.mjs` starts one for its `cloud` variant.
  *
  * THE WORKER IS ASKED AT ITS OWN NAME. It answers `https://app.example.test` (`HOST`) and refuses a write from any other
@@ -13,7 +13,7 @@
  * direction: the status, the headers and the bytes are the Worker's.
  *
  * ONE CLOCK, AND ONLY FOR THE WORKER. `src/index.ts` reads `Date.now()` in forty places and takes no clock, and a gate
- * pins its record and its page to one instant (PRF-B04). Pinning `Date` for the whole process would also stop the
+ * pins its record and its page to one instant. Pinning `Date` for the whole process would also stop the
  * gate's own stopwatch and whatever else shares the process, so `Date` is pinned for one async context: inside a call
  * that entered through `at`, `Date.now()` and `new Date()` are `now`, and everywhere else they are the wall's. The
  * instant never moves, which is what a gate's self-host does too (`start({ now })`).

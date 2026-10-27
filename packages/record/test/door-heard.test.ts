@@ -1,5 +1,5 @@
 /**
- * `heard` and `doorHeard`: who may leave which of the door's marks (audit 38-39, findings 2 and 5).
+ * `heard` and `doorHeard`: who may leave which of the door's marks.
  *
  * WHAT IS ASSERTED IS THE EDGE EACH FINDING WAS: a key that POSTs `{ kind: 'called' }` to the routed `heard` is refused
  * in one sentence and moves no mark, no last tool call and no sign, so `delivered` reads red for a run that called

@@ -1,5 +1,5 @@
 /**
- * A self-host whose endpoint embeds (`src/slash.ts` `slashModelJobs`'s `embed`, ENG-B18): `infer.embed` is leased on the
+ * A self-host whose endpoint embeds (`src/slash.ts` `slashModelJobs`'s `embed`): `infer.embed` is leased on the
  * same pass and the same background allowance as the Cloud, each call one `slash_call` row of purpose `embed`, and the
  * vectors land in `entry_vec`.
  *

@@ -1,5 +1,5 @@
 /**
- * A shared use case that says what it stands on (`needs`, USE-B08) goes in with those modules alone, and its own pages
+ * A shared use case that says what it stands on (`needs`) goes in with those modules alone, and its own pages
  * cut to the lists they bring (`fitted` in `@braindog/seed`), where it used to bring every module it names. A file that
  * says no `needs` stands on all of them, as it always did.
  */

@@ -1,5 +1,5 @@
 /**
- * Each verb a page may name bound to the record method a press calls, and how it is taken back (PGS-A12). The table
+ * Each verb a page may name bound to the record method a press calls, and how it is taken back. The table
  * here and the kernel's (`ACTION_VERBS`) name the same verbs and the same args. Invented lists and rows throughout.
  */
 

@@ -15,7 +15,7 @@
   const words = { you: 'You', account: 'Account', keys: 'Keyboard keys', signing: 'Signing in' } as const;
   const name = $derived(frame.person || words.you);
 
-  /* SIGN OUT AT EVERY WIDTH (LCH-A04): auth.ts is loaded on the press, and a press that did not end the session leaves
+  /* SIGN OUT AT EVERY WIDTH: auth.ts is loaded on the press, and a press that did not end the session leaves
      the page where it is and says so. */
   function signOut(): void {
     void import('../auth.ts')

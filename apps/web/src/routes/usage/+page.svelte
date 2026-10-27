@@ -85,11 +85,11 @@
   const n = (v: number): string => v.toLocaleString('en-GB');
 
   const fault = $derived(usage.value && 'fault' in usage.value ? usage.value.fault : null);
-  /* ONLY THE CLOUD HOLDS A RECORD TO AN ALLOWANCE (audit 25 October, X21): anywhere else the month is its counts and
+  /* ONLY THE CLOUD HOLDS A RECORD TO AN ALLOWANCE: anywhere else the month is its counts and
      charts, with no rings and no plan, as Billing says there is nothing to bill. */
   const hosted = $derived(hostedHere(page.data as unknown as Shell));
   const view = $derived(usage.value && !('fault' in usage.value) ? (hosted ? usage.value : offCloud(usage.value)) : null);
-  /* NO MONTH FROM BEFORE THE RECORD WAS MADE (X22). */
+  /* NO MONTH FROM BEFORE THE RECORD WAS MADE. */
   const earlier = $derived(view ? earlierOf(beside, view) : beside.earlier);
   /* A SLICE THAT MATCHES NOTHING SHOWS EVERY PROJECT, with the link back, rather than an empty page under a filter. */
   const sliced = $derived(view && project !== null ? view.groups.filter((g) => g.scope === project) : []);
@@ -227,7 +227,7 @@
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's,
      not as a page of its own. -->
-<!-- THE MONTHS UNDER THE SENTENCE (H22), the page's own switch, full width on a phone: on the name's row they pushed it. -->
+<!-- THE MONTHS UNDER THE SENTENCE, the page's own switch, full width on a phone: on the name's row they pushed it. -->
 <PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} below={months} />
 <div class="page">
   {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}

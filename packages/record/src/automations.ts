@@ -434,7 +434,7 @@ export type AutomationRow = {
   /**
    * What its card says: `name`, else the title of the one script it starts, else the id.
    *
-   * THE SCRIPT'S TITLE BEFORE THE ID (audit B of 25 October, Y11): a rule whose one step starts a script is that script
+   * THE SCRIPT'S TITLE BEFORE THE ID: a rule whose one step starts a script is that script
    * to a person, and Automations listed it as "Close follow ups" while Scripts called it "Close the follow-ups of a
    * finished task". A name the rule gives itself still comes first, since several rules may start one script.
    */

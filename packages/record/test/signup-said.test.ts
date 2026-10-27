@@ -1,5 +1,5 @@
 /**
- * What was said survives the link (LCH-A04, the onboarding target's step 4): a sign-up typed on a desk and opened on a
+ * What was said survives the link (the onboarding target's step 4): a sign-up typed on a desk and opened on a
  * phone builds from the same sentence.
  *
  * THE SENTENCE RIDES IN THE MAILED LINK'S FRAGMENT AND NOWHERE ELSE: not in a table, not in a log. A start without one

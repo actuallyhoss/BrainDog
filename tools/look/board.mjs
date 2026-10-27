@@ -1,5 +1,5 @@
 /**
- * A board, drawn by the product's own renderer from a record (EXP-A01; the folder contract is `design/boards/README.md`).
+ * A board, drawn by the product's own renderer from a record (the folder contract is `design/boards/README.md`).
  *
  *   node tools/look/board.mjs <board> [--source lived|seed|file:<path>|shape:<path>] [--out <folder>]
  *   node tools/look/board.mjs <board> --yes "<the words of the yes>" --from <drawing folder> [--taken <where>] [--seen] [--units A,B]

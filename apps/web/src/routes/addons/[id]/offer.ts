@@ -303,7 +303,7 @@ export async function askOnDecide(client: OfferClient, entry: CatalogueEntry, fr
 }
 
 /**
- * THE PAGE ONE PRESS OPENS ONCE IT IS IN (audit C of 25 October, X9): the first page it adds that opens on its own, by
+ * THE PAGE ONE PRESS OPENS ONCE IT IS IN: the first page it adds that opens on its own, by
  * the title it is drawn with, or `null`. A page for each row needs a row chosen, and a title still reading a setting
  * (`{{config:…}}`) is no name to put on a button. Installed with nothing to open said only a grey "Installed".
  */

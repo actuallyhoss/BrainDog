@@ -1,5 +1,5 @@
 /**
- * Read-only links to one page (USE-A06): who may open one, for how long, closing for good, the one refusal a link that
+ * Read-only links to one page: who may open one, for how long, closing for good, the one refusal a link that
  * does not open reads as, and `shareable`, the host's yes or no the Share sheet asks before it draws the press.
  *
  * TWO DOORS INTO THE SAME FOUR METHODS. `createRecordApi` holds the real guards, so the refusals are asked of it. The

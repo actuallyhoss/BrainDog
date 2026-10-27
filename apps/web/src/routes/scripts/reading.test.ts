@@ -62,7 +62,7 @@ test('each outcome has one tone, red only for a refusal or a failure', () => {
   assert.equal(toneOf('dropped'), 'quiet');
 });
 
-/* ── the declared page's rows (C33) ── */
+/* ── the declared page's rows ── */
 
 test('a row of the page’s scripts block says what starts it and where it stands, as the old list did', async () => {
   const { scriptOf } = await import('../../lib/record/scripts.ts');
@@ -94,7 +94,7 @@ test('the screen draws the declared page through the one reader, and says its ow
   assert.doesNotMatch(screen, /HubRows/u, 'the list is the page’s table now, not rows built by hand');
 });
 
-/* SAY WHAT THE MONTH COUNTS (audit B of 25 October, Y11): Scripts said 64 runs where Automations said 42, and both read as
+/* SAY WHAT THE MONTH COUNTS: Scripts said 64 runs where Automations said 42, and both read as
    the same count. A script runs on its own clock, on a door's arrival and when an automation starts it, and Automations
    counts only the last, so the sentence names what started the runs it counts. */
 test('the month says what started the runs it counts, from what starts each script that ran', () => {
@@ -111,7 +111,7 @@ test('the month says what started the runs it counts, from what starts each scri
   assert.equal(plain(sentenceOf([row({ runs: rule, month: { runs: 0, ok: 0, refused: 0 } })]) ?? []), '1 script, no runs this month.');
 });
 
-/* ONE SCRIPTS LIST (audit B of 25 October, Y11): `/p/scripts` drew the same scripts again, so the page's address goes to
+/* ONE SCRIPTS LIST: `/p/scripts` drew the same scripts again, so the page's address goes to
    the screen, as `/p/activity` goes to `/audit`. Read as text: the route's load imports `$lib`, which node cannot. */
 test('the Scripts page is the Scripts screen: its address goes there', async () => {
   const { readFileSync } = await import('node:fs');

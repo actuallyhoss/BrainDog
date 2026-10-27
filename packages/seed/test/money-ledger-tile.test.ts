@@ -4,7 +4,7 @@
  *
  * WHAT IS HELD HERE: the tile is on Money's page under the accounts and above the fold, it draws the six newest
  * entries of the Ledger newest first, every line is an entry of the Ledger a host can open, and a record whose Ledger
- * holds nothing draws no tile. The tile is gated by its own entries (audit 59, claim 5): one that has not cleared
+ * holds nothing draws no tile. The tile is gated by its own entries: one that has not cleared
  * draws it, a void one alone does not, and it carries its own empty line. The add is declared beside it and is NOT on
  * the page yet, for the two reasons `parts/ledger.ts` gives; the last test fails the day either reason is gone, so the
  * box is not forgotten.

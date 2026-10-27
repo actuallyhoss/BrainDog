@@ -1,5 +1,5 @@
 /**
- * A run question with one guess is asked, not dropped (`loop/research-understanding-judge.md`, change 2): "Is that
+ * A run question with one guess is asked, not dropped: "Is that
  * Lantern?" with Yes and No, and a yes places the quiet runs in the places asked about and lists the remote on the
  * project, in one batch of the walk. Undo can then be held to one row of that batch (`undo({ row })`), and anything
  * else at `row` is refused there.

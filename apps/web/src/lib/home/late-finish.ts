@@ -1,5 +1,5 @@
 /**
- * THE ONE PRESS ON A LATE ROW OF TODAY (U2): finish it where it is shown. "Mark paid" on a bill or a salary, "Mark done"
+ * THE ONE PRESS ON A LATE ROW OF TODAY: finish it where it is shown. "Mark paid" on a bill or a salary, "Mark done"
  * on a task, in the words the row's own page leads with (`finishOf`), through the same write and with the same way back.
  *
  * READ FIRST, THEN WRITTEN AT THAT VERSION. The late list is a read across every list (`deadlines`), which carries no

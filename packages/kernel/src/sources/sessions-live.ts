@@ -13,7 +13,7 @@ import type { Presence, presenceOf } from '../presence.ts';
 import type { Also, Source } from './index.ts';
 import { DOING_SAID, saidRefusal, withSaid } from './sessions-working.ts';
 
-/** A `sessions.live` answer: a block's, with the one word each run reads as beside its rows (AGT-C04, AGT-C10), as `presence` on `BlockResult`. */
+/** A `sessions.live` answer: a block's, with the one word each run reads as beside its rows, as `presence` on `BlockResult`. */
 export type LiveResult = BlockResult;
 
 /** `presenceOf` in `presence.ts`, read off the kit when the kit carries it, since a source imports no kernel file. */

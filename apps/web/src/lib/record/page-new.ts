@@ -1,5 +1,5 @@
 /**
- * A person makes a new page (PGS-C30): a title in, an empty page out, with a place on the rail.
+ * A person makes a new page: a title in, an empty page out, with a place on the rail.
  *
  * ONE BODY, TWO WAYS IN. Whoever owns the record sets the page through `setDeclaration`, as "Save as a view" does
  * (`rows-write.ts`). Anybody else files the very same body as a change on Decide, and nothing is written until it is

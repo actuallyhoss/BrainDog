@@ -1,13 +1,12 @@
 <script lang="ts">
   /**
    * /slash: Slash on a page of its own, for a reader who wants to know more ("have a separate page for
-   * Slash ... make it super readable and neat"). The prototype's `#slash` (loop/site-2026-10-17/src/site.html
-   * ~:679-756):
+   * Slash ... make it super readable and neat"). The prototype's `#slash`:
    *
    *   head       the / key on the night ground, the page's one h1 and its lead.
    *   modes      Ask, Find and Make: plain words beside one drawn answer each, with the questions to try.
    *   facts      how asks are counted (one paragraph, no plan table), Slash beside your AI tools, and four questions.
-   *   strip      the early access strip (site F11).
+   *   strip      the early access strip.
    *
    * THE WORDS ARE `copy/slash.ts`; the questions and every name and figure in a drawing are the made-up record's
    * (`demo/maya.ts`), and every count of asks is `PLAN_TABLE`'s. Nothing here types a figure.

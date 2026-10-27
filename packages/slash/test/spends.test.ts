@@ -1,5 +1,5 @@
 /**
- * Whose allowance an ask spends is what its ledger row says, and the two counts read nothing else (ENG-A05).
+ * Whose allowance an ask spends is what its ledger row says, and the two counts read nothing else.
  *
  * RED BEFORE STORE VERSION 3, CASE 1. `asksUsed` counted rows of kind `read` or `pattern`, and the record's own draft of
  * a pattern is written as kind `pattern`, so on the included model a background ask spent one of his 80: `asks.used`

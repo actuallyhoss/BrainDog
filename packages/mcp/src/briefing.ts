@@ -172,7 +172,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
       rows: Array.isArray(r.rows) ? r.rows.filter(isObject) : [],
       inherited: Array.isArray(r.inherited) ? r.inherited.filter(isObject) : [],
       truncated: r.truncated === true,
-      /* THE RECORD'S OWN COUNT OF WHAT APPLIES EVERYWHERE when it sends one (`capRegister`, AGT-B09): it sends five rows
+      /* THE RECORD'S OWN COUNT OF WHAT APPLIES EVERYWHERE when it sends one (`capRegister`): it sends five rows
          a list, so the rows it sent are not how many there are. */
       everywhere: typeof r.everywhere === 'number' && Number.isInteger(r.everywhere) && r.everywhere >= 0 ? r.everywhere : null,
     };
@@ -255,7 +255,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
 
   const runner = Object.keys(mine).length > 0 ? runnerOf(mine) : null;
   const people = (Array.isArray(c.people) ? c.people : []).filter(isObject);
-  /* THE RECORD'S CARD, PRINTED AS IT CAME (`card.ts`, AGT-B07), so the start hook, `context` and `braindog context` say
+  /* THE RECORD'S CARD, PRINTED AS IT CAME (`card.ts`), so the start hook, `context` and `braindog context` say
      one text made by one set of rules. It already says the runs in this tree, the red signs and the Home page. A host
      that sends none is told the one line, and nothing is drawn in the card's place. */
   const told = text(c.card);
@@ -291,7 +291,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     const where = g.rows.length > 0 ? 'here' : 'everywhere';
     lines.push(`Open ${where} · ${g.name} · ${rows.length > WORK_SHOWN ? `${String(WORK_SHOWN)} of ${grouped(rows.length)}${g.truncated ? '+' : ''}` : grouped(rows.length)}`);
     /* A TASK'S WORDS CAN BE AN ADDRESS ("Reply to jo@kiln.example"), and the briefing is read, never a field to copy, so
-       it goes here as it does from a step (audit 19, M11). `get` still answers a person's email field as written. */
+       it goes here as it does from a step. `get` still answers a person's email field as written. */
     for (const r of rows.slice(0, WORK_SHOWN)) lines.push(unaddressed(rowLine(shapedOf(r), g.id, look)));
     if (rows.length > WORK_SHOWN) lines.push(`More: ${callOf('list', { register: g.id, where: openHere(g.decl, g.rows.length > 0 && project ? String(project.spoken) : null) })}`);
   }

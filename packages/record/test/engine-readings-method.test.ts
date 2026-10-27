@@ -35,7 +35,7 @@ const LEDGER: EngineLedger = {
   questions: [{ cause: 'understand.fold#3' }, { cause: 'understand.fold#9' }, { cause: null }],
 };
 
-/** The brake over a record Slash never asked anything on (`slashBrake`, ENG-B17): too few answers to brake. */
+/** The brake over a record Slash never asked anything on (`slashBrake`): too few answers to brake. */
 const UNBRAKED = { on: false, share: 0, of: 0 };
 
 /** The method file over a guard that lets `who` through and turns everybody else away, as `scoped` does. */

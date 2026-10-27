@@ -1,5 +1,5 @@
 /**
- * A colleague who joins is a person on the record (USE-A18): accepting an invitation meets them by the address the host
+ * A colleague who joins is a person on the record: accepting an invitation meets them by the address the host
  * verified, into the list that plays `meets`.
  *
  * WHAT MUST HOLD. A join makes one entry under the name they gave, with their address, and it is not marked as the

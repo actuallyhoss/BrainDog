@@ -1,6 +1,6 @@
 /**
  * Pin an answer: what Slash answered in the palette, kept on a page the person picks, so it is still there after the
- * palette closes (PGS-B12, "answers you can pin").
+ * palette closes ("answers you can pin").
  *
  * A LIST'S ANSWER PINS AS A TABLE, AND PROSE AS A NOTE. An answer drawn from one list by a filter is that list and that filter, so it
  * pins as a table the page reads again every time it opens: the rows are the record's on the day it is read, not a copy
@@ -110,8 +110,8 @@ export type PinSheet = { from: 'live'; name: string | null; pages: PinPage[]; de
  * list to a page that lacks it. A page drawn once per row is left out by `pagesReader`, as for "Put this on a page".
  *
  * TODAY IS THE PAGE HOME DRAWS, by Home's own rule (`homeSlugOf` with no use case, as `Home.svelte` reads it): the
- * record's `home` where a person kept one, and nothing else. A use case's own Home page never stands in for the desk
- * since the audit of 22 October (U1), so it is offered as the page it is, under its own name, and Pin to Today no longer
+ * record's `home` where a person kept one, and nothing else. A use case's own Home page never stands in for the desk,
+ * so it is offered as the page it is, under its own name, and Pin to Today no longer
  * writes onto the Solo founder's page. A record whose Today is the desk, which it does not store, has no Today to offer.
  */
 export async function pinSheet(base: string, register: string | null, io?: Fetch): Promise<PinSheet> {

@@ -13,7 +13,7 @@
   has settled again (`settled()` in `screen.svelte.ts`), or `LONGEST` at most, so a read that never answers cannot leave
   it running. It is `aria-hidden` for the layout's hairline's reason: the screen's own states say what it read.
 
-  THE OFFLINE LINE is the one banner (`Banner.svelte`, the UI pass of 20 October 2.A.17), in the warn tint, drawn while the poll says offline and something on screen came from the copy: "Offline · from
+  THE OFFLINE LINE is the one banner (`Banner.svelte`), in the warn tint, drawn while the poll says offline and something on screen came from the copy: "Offline · from
   14:02", and that nothing changed here is sent until he is back online.
 -->
 <script lang="ts">

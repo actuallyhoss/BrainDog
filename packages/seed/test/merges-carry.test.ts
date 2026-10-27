@@ -1,6 +1,5 @@
 /**
- * ROADMAP, SLASH ON YOUR MACHINE AND THE DATED TASKS ARE PART OF WORK AND JOBS ON YOUR MACHINE NOW (the add-ons pass of
- * 27 October, row 7). A record that holds the old add-on is carried over by the night's own update, asks nothing, and
+ * ROADMAP, SLASH ON YOUR MACHINE AND THE DATED TASKS ARE PART OF WORK AND JOBS ON YOUR MACHINE NOW. A record that holds the old add-on is carried over by the night's own update, asks nothing, and
  * keeps its tasks, its page and its approved job.
  *
  * Every name here is invented.

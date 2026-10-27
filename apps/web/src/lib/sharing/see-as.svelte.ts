@@ -1,5 +1,5 @@
 /**
- * See as (sharing plan §3.3): an owner or an Admin reads the record as one person would, from the Share sheet's
+ * See as: an owner or an Admin reads the record as one person would, from the Share sheet's
  * "See as Priya".
  *
  * THE HOST DOES THE SEEING. The app sends `x-braindog-as: <person>` on every call to the record (`SEE_AS_HEADER` in

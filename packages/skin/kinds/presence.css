@@ -31,7 +31,7 @@
     padding-block-start: 0;
   }
 
-  /* THE FACE (2.A.5): a 28px disc in the step-under fill, the maker's mark 16px in it, and the live dot at its end
+  /* THE FACE: a 28px disc in the step-under fill, the maker's mark 16px in it, and the live dot at its end
      corner with a cut-out in the tile's colour. No ring round the face. */
   .pres-face {
     position: relative;

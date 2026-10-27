@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The seventeen descriptions asked through a host's own door on a fresh record, as the Slash page asks, so what is measured
- * is what ships (ENG-B11): how many draw a clean page on the first ask, counted apart from those clean only after a repair.
+ * is what ships: how many draw a clean page on the first ask, counted apart from those clean only after a repair.
  *
  *   DRAFT_EVAL_MODEL=<model> DRAFT_EVAL_KEY=<key> node tools/model-checks/describe-live.mjs --bar 13
  *   MODEL_CHECK_ACCOUNT=<account> MODEL_CHECK_TOKEN=<token> node tools/model-checks/describe-live.mjs --bar 13

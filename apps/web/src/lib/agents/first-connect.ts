@@ -16,7 +16,7 @@ export type AppLine = { id: string; name: string; mark: MarkedAgent | AppMark; w
 
 export const firstWords = {
   title: 'Connect your agent',
-  /* WHAT WAS JUST MADE, first, by its places (audit C, X3): the screen opened on a terminal command and never said. */
+  /* WHAT WAS JUST MADE, first, by its places: the screen opened on a terminal command and never said. */
   made: (places: readonly string[]) => (places.length === 0 ? 'Your BrainDog is made.' : `Your BrainDog is made, with ${firstRun.and(places)}.`),
   sub: 'Pick the app you use and paste its line. Your agent then reads this BrainDog and writes back to it.',
   waiting: 'Waiting for your agent…',
@@ -29,7 +29,7 @@ export const firstWords = {
  * The five apps, in the order a person is likeliest to have them. VS Code takes its own command for an HTTP server;
  * the others take what `connectLines` already hands the connect sheet.
  *
- * ON A PHONE (`phone`) THE APPS WITH NO TERMINAL COME FIRST, Claude then ChatGPT (audit C, X3): the phone's first screen
+ * ON A PHONE (`phone`) THE APPS WITH NO TERMINAL COME FIRST, Claude then ChatGPT: the phone's first screen
  * after sign-up was a `curl` command, which nobody runs on a phone.
  */
 export function appLines(lines: ConnectLines, install: string = lines.install, phone = false): AppLine[] {

@@ -1,9 +1,9 @@
 /**
- * The one sentence under Settings' title: the worst thing, or nothing (U-C7). "BrainDog could not send a mail.", "Last
+ * The one sentence under Settings' title: the worst thing, or nothing. "BrainDog could not send a mail.", "Last
  * night's copy did not run. Backups", "No copy last night." or "Runs are at 91%, 2 days to go.", marked. A record with
  * nothing wrong has no line at all, and Slash's model is said in Settings > Agents, never here.
  *
- * WHAT IS BROKEN LEADS (AGT-C06, ENG-A02, PRF-A05). It said "All healthy" on his record the day a model job died in
+ * WHAT IS BROKEN LEADS. It said "All healthy" on his record the day a model job died in
  * Decide, because it read the copies and the meters only. Open faults come first, then a red check, and only then the
  * copy and the month. Since 24 October only the first is said, and a good state is said by no line at all.
  *
@@ -29,7 +29,7 @@ export type Fault = { cause: string; said: string; count: number; since: string;
 
 /**
  * The engine as `engineHealth()` answers it, the part this sentence and `engineLines` read. The four fields beside the
- * state are `@braindog/slash`'s (ENG-A05, ENG-A06), each absent where the ledger had nothing to say or the host is older.
+ * state are `@braindog/slash`'s, each absent where the ledger had nothing to say or the host is older.
  */
 export type Engine = {
   health: {
@@ -75,8 +75,8 @@ export type More = {
   /** Where the copies are, so a line about a copy links there and says so; absent, it links where the signs are. */
   backupsAt?: string | null;
   /**
-   * Where what came in waits, for a reader who may open it: a line about messages waiting to be filed opens them
-   * (audit 25 October, Y6), rather than the signs page saying the same line again. Absent, it links where the signs are.
+   * Where what came in waits, for a reader who may open it: a line about messages waiting to be filed opens them,
+   * rather than the signs page saying the same line again. Absent, it links where the signs are.
    */
   inboxAt?: string | null;
 };
@@ -180,7 +180,7 @@ const firstSentence = (said: string): string => {
 };
 
 /**
- * THE ONE SENTENCE, IN ITS PARTS: THE WORST THING, OR NOTHING (U-C7). An open fault, the one broken longest; then a red
+ * THE ONE SENTENCE, IN ITS PARTS: THE WORST THING, OR NOTHING. An open fault, the one broken longest; then a red
  * check, by its own sentence; then a night with no copy; then a meter near its limit. Only the first that holds is said,
  * as one plain sentence, marked, with the one link to where it is shown. "and 9 more" and the model's status are gone:
  * the rest is on the Health page, and the model is Settings > Agents' (`SlashAsks`). With nothing wrong, `null`.
@@ -283,7 +283,7 @@ export function nightFailed(faults: readonly Fault[] | null | undefined, now: nu
 export const modelName = (model: string): string => model.split('/').filter((p) => p !== '').at(-1)?.replace(/^@/, '') ?? '';
 
 /**
- * The lines under Slash's sentence in Settings (ENG-A05, ENG-A06, "health shown"): which model answered last and when,
+ * The lines under Slash's sentence in Settings ("health shown"): which model answered last and when,
  * the provider's own words under a failure, and how often an ask needed a second model. "Rules are the fallback, not
  * the engine.", so a fallback that is doubling the bill is said, and only once it has happened.
  *

@@ -178,7 +178,7 @@ test("A FOUNDER'S EXAMPLES ARE LINKED INTO ONE PICTURE, and still clear together
   assert.deepEqual(k.examples(), { untouched: 0, touched: 0, registers: {}, others: 0 });
 });
 
-test('A ROW FORMED FROM WHAT THE PERSON SAID CARRIES formed AND NEVER example, and Clear the examples leaves it (USE-B07)', async () => {
+test('A ROW FORMED FROM WHAT THE PERSON SAID CARRIES formed AND NEVER example, and Clear the examples leaves it', async () => {
   const guide = useCase('guide')!;
   const plan = plantedRows(guide, TODAY, 'a podcast about local history');
   assert.ok(plan.rows.length > 0, 'the plan was formed');

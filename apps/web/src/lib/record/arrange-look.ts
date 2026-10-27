@@ -1,5 +1,5 @@
 /**
- * Edit layout's Done as the person's own look over the page (PGS-B07): the order, widths and columns they arranged, kept
+ * Edit layout's Done as the person's own look over the page: the order, widths and columns they arranged, kept
  * by block key, and laid by the record over the page as read, an add-on's blocks among them.
  *
  * WHY A LOOK AND NOT THE PAGE. Done used to set the page body whole, rebuilt by block index (`arrangedBody`). A page an

@@ -1,6 +1,6 @@
 /**
  * What a `kpis` block decides, as functions the drawer calls: each KPI's figure, its change on the period before, its
- * target, whether it has stopped arriving, and the chart its shape picks (loop/plans/kpis-2026-10-21, 2.4 and 2.8).
+ * target, whether it has stopped arriving, and the chart its shape picks (2.4 and 2.8).
  *
  * A KPI arrives as the page source answers it (2.1's field names): a name, a unit, a shape (`kind`), which way is good,
  * a target and its day, a cadence, and its readings. Everything printed comes back from here, so a test reads the
@@ -153,7 +153,7 @@ export const KPI_LATE_PERIODS = 2;
 /** With no cadence, stale after this many days. */
 export const KPI_QUIET_DAYS = 14;
 /**
- * A reading older than this many days says its day, stale or not (the audit of 22 October, U6: "a number older than a
+ * A reading older than this many days says its day, stale or not ("a number older than a
  * week says how old it is"). Stale is the rhythm's verdict, with a fix; this is only the age, said once beside the figure.
  */
 export const KPI_AGED_DAYS = 7;

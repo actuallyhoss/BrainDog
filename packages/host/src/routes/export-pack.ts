@@ -1,5 +1,5 @@
 /**
- * The route row for an add-on made from what a person made (`packages/record/src/methods/export-pack.ts`, SHL-B09).
+ * The route row for an add-on made from what a person made (`packages/record/src/methods/export-pack.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

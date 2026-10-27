@@ -14,7 +14,7 @@
   the email field's autofill is asked for on arrival and shows nothing until the field is touched (`offerPasskey`).
 
   ONE SHEET UNDER THE BRAND (`Entry.svelte`): "Sign in to BrainDog", one line on what the ways do, then every way in
-  straight under it, the email first and filled, Google and a passkey quiet under it (the UI pass of 20 October, first
+  straight under it, the email first and filled, Google and a passkey quiet under it (first
   F7). A state screen is its own heading. No figure, so no chart and no tile inside the sheet.
 -->
 <script lang="ts">
@@ -95,7 +95,7 @@
   let origin = $state('');
 
   /**
-   * THE PASSKEY IN THE EMAIL FIELD'S AUTOFILL (LCH-A04). Where the browser offers it (`canAutofill`), the email field is
+   * THE PASSKEY IN THE EMAIL FIELD'S AUTOFILL. Where the browser offers it (`canAutofill`), the email field is
    * drawn whenever a link can be sent, marked `username webauthn`, and this site's passkeys are offered in its autofill,
    * so a returning phone signs in with one touch while the link stays for a device with none.
    *
@@ -599,7 +599,7 @@
           <!-- THE SELF-HOST'S DOOR, and only a self-host offers it. Open on first run, when no passkey
                exists yet and this is the only way the first person can get in. -->
           {#if doors.key}
-            <!-- THE ONLY DOOR IS NOT FOLDED (UI pass of 21 October, P48): where the server key is the one way in, it is the
+            <!-- THE ONLY DOOR IS NOT FOLDED (P48): where the server key is the one way in, it is the
                  form itself, not an open disclosure that reads as a second choice. -->
             {#snippet keyForm()}
               <form class="form" onsubmit={withKey}>

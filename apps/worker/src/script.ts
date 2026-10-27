@@ -718,7 +718,7 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     if (typeof handed.threw === 'string') return { refused: { code: null, why: `${script} threw: ${handed.threw}` }, log, usage: spent };
     const writes = checkWrites(full, limits, handed.writes);
     if (!Array.isArray(writes)) return { refused: writes, log, usage: spent };
-    /* AND THE ONE QUESTION IT MAY END BY ASKING (N6), carried as it came and checked by `finishScript`, which files it. */
+    /* AND THE ONE QUESTION IT MAY END BY ASKING, carried as it came and checked by `finishScript`, which files it. */
     const ask = askOf(handed.ask);
     /* AND WHAT IT PROPOSED, queued in this object as it asked (`scriptProposals`), for `finishScript` to file. */
     const queued = turn?.propose?.queued() ?? [];

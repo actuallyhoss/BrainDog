@@ -7,11 +7,11 @@
   every top-level folder is a word no record may be named (`APP_WORDS` in `lib/at.ts`), and a record somebody already
   called "overview" must still open.
 
-  TODAY AS IT WAS IS GONE (C30, 24 October): the declared page does all it did, with who is working, for how long, as a
+  TODAY AS IT WAS IS GONE (24 October): the declared page does all it did, with who is working, for how long, as a
   tile of its own. `/?classic` is an address somebody kept, and it opens Today; nothing reads the word.
 
   THE WORK PAGE IS HERE TOO, at `/?work`, for the same reason: `lib/work/Work.svelte` draws the declared Work page
-  (`page.work`); the screen as it was is gone (C32), and `/?work&classic` opens the page. The nav's Work row opens it on
+  (`page.work`); the screen as it was is gone, and `/?work&classic` opens the page. The nav's Work row opens it on
   a record that holds tasks (`WORK` in `lib/nav.ts`).
 
   AN ADDRESS NAMING A RECORD THAT DID NOT ANSWER IS A PAGE THAT IS NOT HERE. `/nowhere` has the shape of a record's name,

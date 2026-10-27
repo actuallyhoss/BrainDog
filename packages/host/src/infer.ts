@@ -1,5 +1,5 @@
 /**
- * The router (ENG-A06): every ask names a purpose, and the host tries its models in order.
+ * The router: every ask names a purpose, and the host tries its models in order.
  *
  * WHY THIS FILE EXISTS. Each template named one model and nothing tried a second: when the one model failed the rules
  * spoke, or a job asked the same model eight times. "Rules are the fallback, not the engine." So a caller says what the
@@ -27,7 +27,7 @@ export type InferSpends = 'person' | 'background' | 'none';
 export type ModelClass = 'answer' | 'compose' | 'small' | 'embed';
 
 /**
- * Every purpose an ask may name, who pays for it and the class of model it needs (`loop/scope/area-engine-a.md` 2.4).
+ * Every purpose an ask may name, who pays for it and the class of model it needs.
  *
  * SAID ONCE, HERE, so no caller works out from a row's kind or its question what the row was for.
  */
@@ -48,7 +48,7 @@ export const PURPOSES = {
 
 export type InferPurpose = keyof typeof PURPOSES;
 
-/* ── The consent rule (ENG-A09) ───────────────────────────────────────────────────────────────── */
+/* ── The consent rule ───────────────────────────────────────────────────────────────── */
 
 /**
  * The one switch for all background reading, as the host hands it in: his own pref, `slash.reads`, read when it is asked
@@ -68,7 +68,7 @@ const READS_UNREAD = 'Whether Slash may read on its own could not be read, so no
  *
  * HIS OWN ASK IS HIS OWN ACT. A purpose that spends `person`, or nobody's month, is answered yes without the switch being
  * read, so no fault in reading it can hold a question he pressed Enter on. Every purpose that spends `background` is his
- * to switch off, all of them by the one switch (RQ-ENG-168: a switch per job is this switch, listed).
+ * to switch off, all of them by the one switch (a switch per job is this switch, listed).
  *
  * A SWITCH THAT CANNOT BE READ SENDS NOTHING. Consent that is not known is not consent, and the rules do the work until
  * the read mends.
@@ -164,7 +164,7 @@ export type RouteFacts = {
     large?: Candidate | undefined;
     /** The operator's second provider, set only when its variables and its secret are. */
     provider?: Candidate | undefined;
-    /** His own machine, where a runner is enrolled (ENG-A15). */
+    /** His own machine, where a runner is enrolled. */
     machine?: Candidate | undefined;
     embed?: Candidate | undefined;
     key?: Candidate | undefined;
@@ -413,7 +413,7 @@ export const infer = async <T extends Reply>(purpose: InferPurpose, call: InferC
     tries,
     whose,
   });
-  /* THE CONSENT RULE FIRST (ENG-A09): off, no candidate is asked and no row is held, and nobody has anything to fix. */
+  /* THE CONSENT RULE FIRST: off, no candidate is asked and no row is held, and nobody has anything to fix. */
   const may = await mayThink(purpose, deps.reads);
   if (!may.ok) return end(may as Result<never>, null, null, null);
   if (route.candidates.length === 0)

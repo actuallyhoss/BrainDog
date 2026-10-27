@@ -1,5 +1,5 @@
 /**
- * The rename door, `POST /auth/passkey/rename` (LCH-A04, RQ-LCH-200), over HTTP against a real Directory.
+ * The rename door, `POST /auth/passkey/rename`, over HTTP against a real Directory.
  *
  * A PERSON RENAMES THEIR OWN PASSKEY AND NOBODY ELSE'S, on both hosts, with every check a session route has: the
  * cookie, the origin, a JSON body. A refusal names the fix and never carries the key's id. Sign-up is open, so

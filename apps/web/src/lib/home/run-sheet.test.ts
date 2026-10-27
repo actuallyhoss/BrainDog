@@ -1,5 +1,5 @@
 /**
- * The run sheet from Today opens on the run, not in its message box (the audit of 25 October, Y25): it opened with a
+ * The run sheet from Today opens on the run, not in its message box: it opened with a
  * heavy ring on the box, because the sheet put the caret in its first field. A text test over markup, as the rest of
  * this tree's component checks are.
  */

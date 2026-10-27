@@ -1,5 +1,5 @@
 /**
- * What waits on a person, counted once (`waiting()`, EXP-E07), on a record shaped like the owner's on 7 October: 25
+ * What waits on a person, counted once (`waiting()`), on a record shaped like the owner's on 7 October: 25
  * open questions, some of them past two weeks, and 32 arrivals in the inbox.
  *
  * That day Today said "Nothing needs you" beside a rail badge of 25. So `boot`'s `waits`, its rail counts and Home's

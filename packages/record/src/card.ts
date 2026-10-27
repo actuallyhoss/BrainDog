@@ -1,8 +1,8 @@
 /**
- * THE CARD AN AGENT STARTS FROM, composed in the record (AGT-B07), so the start hook, `context` and `braindog context`
+ * THE CARD AN AGENT STARTS FROM, composed in the record, so the start hook, `context` and `braindog context`
  * print one text made by one set of rules, whatever build of the command sits on the machine.
  *
- * THE BRIEF COMES FIRST AND IS FIVE SHORT TRUE LINES, NAMES FIRST (LAUNCH 108), each under about 100
+ * THE BRIEF COMES FIRST AND IS FIVE SHORT TRUE LINES, NAMES FIRST, each under about 100
  * characters and none of them an id:
  *
  *   Claude Code on MacBook, working on BrainDog
@@ -380,7 +380,7 @@ function nextSlot(c: Context, at: CardAt, own: string | null): { slot: Slot | nu
   return { slot: { label: 'Next', lead: '', items, tail: none, least: 1, stays: step.length, kept: true }, handedLeft: handed.length - shown.length };
 }
 
-/** A run's id as a step's words carry it, "(S729)" or "(S729, " ahead of more notes: a name stands in its place. */
+/** A run's id as a step's words carry it, "" or "(" ahead of more notes: a name stands in its place. */
 const tidy = (said: string): string => said.replace(/\(([A-Z]{1,3}\d+),\s*/gu, '(').replace(/\s*\([A-Z]{1,3}\d+\)/gu, '');
 
 /** Room for the words of a brief line once its label is on. */
@@ -465,7 +465,7 @@ function waitingBrief(c: Context, at: CardAt): string | null {
   const total = asks.length + Math.max(0, (at.waiting ?? 0) - c.waiting.length);
   const n = typeof c.waiting_here === 'number' && c.waiting_here > 0 ? c.waiting_here : total;
   const who = at.decider && oneLine(at.decider) ? words(at.decider, 24) : 'the owner';
-  /* BOTH NUMBERS WHEN THEY DIFFER (scope D9): "1 on the owner" beside a badge of 8 read as a count that disagreed. */
+  /* BOTH NUMBERS WHEN THEY DIFFER: "1 on the owner" beside a badge of 8 read as a count that disagreed. */
   const lead = n < total ? `${String(n)} here of ${String(total)} on ${who}, first: ` : `${String(n)} on ${who}, first: `;
   return `${lead}${words(questionOf(tidy(plainly(asks[0]!.question, c, true, at))), ROOM - lead.length)}`;
 }

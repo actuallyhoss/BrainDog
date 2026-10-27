@@ -3,7 +3,7 @@
   change. Work and Decide draw it.
 
   FROM 1,280 UP IT IS DOCKED (`DOCKS` in `panel.ts`) at the window's end edge: 440 wide (380 below 1,360), inset `--inset` from the
-  window, radius 16, on the tile with a 1px `--rule-strong` edge and no shadow (the UI pass of 20 October, 1.9). Its
+  window, radius 16, on the tile with a 1px `--rule-strong` edge and no shadow. Its
   head is a close circle, the title at 17/600 and the caller's verbs over a hairline; its body scrolls. It is a NON-MODAL `<dialog>` opened with `show()`, so the list beside it keeps its pointer
   and its keyboard, and focus stays where it was: `j` and `k` go on walking the list and the panel follows.
 
@@ -296,7 +296,7 @@
   /* `:not(:modal)`: the sheet form covers the list over a scrim and takes no width from it.
      `--dock-col` IS THE SAME WIDTH FOR THE SHELL'S COLUMN, registered as a length (`app.css`) so it can move: opening,
      it opens with the slide, over the panel's step on the sheet curve, so the work makes room as the panel's edge comes
-     (scope E40; given after the slide, the whole list jumped 360px in one frame, CLS 0.11); closing, it goes at once,
+     (given after the slide, the whole list jumped 360px in one frame, CLS 0.11); closing, it goes at once,
      as the rule after this one says, so the work widens under a panel already leaving. */
   :global(:root) {
     transition-property: --dock-col;
@@ -341,7 +341,7 @@
     padding: 0;
     overflow: hidden;
     background: var(--tile);
-    /* IT FLOATS WITH NO SCRIM, SO IT TAKES THE ONE EDGE a floating layer has (the UI pass of 20 October, 1.9): 1px of
+    /* IT FLOATS WITH NO SCRIM, SO IT TAKES THE ONE EDGE a floating layer has: 1px of
        `--rule-strong`, and no shadow. */
     border: 1px solid var(--rule-strong);
     border-radius: var(--r-tile);

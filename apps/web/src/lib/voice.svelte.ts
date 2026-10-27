@@ -55,7 +55,7 @@ function sentVoice(boot: object): { pack: string | null; values: Record<string, 
 /**
  * Ask the record for its voice, once per `boot` answer. `null` for the sample or a refused boot.
  *
- * `boot` SAYS IT NOW (`voice`, EXP-D03): the use case that speaks, its settings and their labels, worked out by the record
+ * `boot` SAYS IT NOW (`voice`): the use case that speaks, its settings and their labels, worked out by the record
  * while it answered. It was the add-ons list and one or more add-on settings reads, one after another, before the first
  * screen. A host older than the field is asked the old way, which is what the fallback below still does.
  */

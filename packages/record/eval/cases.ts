@@ -14,9 +14,9 @@
  * answers with it, so the record is shown to draw that much clean from one ask; `mends` there leaves out what each table
  * says when it is empty on the first ask, as `stub.ts` does, so the repair is walked at this level too.
  *
- * THE SEVENTEENTH IS THE LAUNCH BAR BY DESCRIBING IT (C36, DIRECTION §28): three sentences that ask for the six things a
+ * THE SEVENTEENTH IS THE LAUNCH BAR BY DESCRIBING IT: three sentences that ask for the six things a
  * person must be able to make, each read off the draft by its block (`TRUNK_PARTS`), and clean only with five of them.
- * Its good answer is three pages in one draft (C37), the desk, a page for each part and the price check, and each page
+ * Its good answer is three pages in one draft, the desk, a page for each part and the price check, and each page
  * opens on its own sentence with a figure, which the record asks of every page it keeps.
  */
 
@@ -24,7 +24,7 @@ type Decl = { id: string; kind: string; body: Record<string, unknown> };
 export type Built = { declarations: Decl[]; rows: Record<string, Record<string, unknown>[]> };
 
 /**
- * ONE PART OF A PAGE A DESCRIPTION ASKS FOR, read off the blocks the draft declares (C36): its name as a person says it,
+ * ONE PART OF A PAGE A DESCRIPTION ASKS FOR, read off the blocks the draft declares: its name as a person says it,
  * and whether a block is it. A case that names its parts is clean only with `need` of them drawn.
  */
 export type CasePart = { name: string; is: (block: Record<string, unknown>) => boolean };
@@ -62,7 +62,7 @@ const fitted = (lead: string, chart: Record<string, unknown>, form: Record<strin
   { kind: 'table', span: 12, limit: 20, ...table },
 ];
 
-/* ── the launch bar, by describing it (C36, DIRECTION §28) ─────────────── */
+/* ── the launch bar, by describing it ─────────────── */
 
 const columnsAs = (b: Record<string, unknown>): string[] =>
   (Array.isArray(b['columns']) ? (b['columns'] as Record<string, unknown>[]) : []).map((c) => String(c['as'] ?? ''));
@@ -374,7 +374,7 @@ export const CASES: readonly Case[] = [
           ]),
           figure('steps-left', 'Steps left', 'steps', { count: 'id' }, 'int', 'done is not true'),
           figure('priced', 'Price check filled in', 'prices', { count: 'id' }, 'int', 'price is set, cost is set'),
-          /* THREE PAGES FROM ONE ASK (C37): the desk, a page for each part, and the price check, as the launch desk is. */
+          /* THREE PAGES FROM ONE ASK: the desk, a page for each part, and the price check, as the launch desk is. */
           pageOf('launch', 'Launch', 'board', ['parts', 'steps', 'thoughts'], [
             { kind: 'note', lead: true, span: 12, body: '{{steps-left}} steps are left before the launch.' },
             { kind: 'queue', span: 12, heading: 'Calls waiting on you', source: 'governance.open', tiles: true, empty: 'No call is waiting on you.' },

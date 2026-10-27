@@ -1,5 +1,5 @@
 <!--
-  REMOVED, AND THE WAY BACK (SHL-A12): under the installed add-ons, each one uninstalled inside the record's thirty
+  REMOVED, AND THE WAY BACK: under the installed add-ons, each one uninstalled inside the record's thirty
   days, when it went, what of it stays and in which lists, and one "Put back".
 
   LOADED ONLY WHEN THERE IS SOMETHING TO SAY: the page imports this file once `packsRemoved` has answered rows, so a

@@ -80,7 +80,7 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
   const k = await seeded();
   for (const slug of ['work', 'work-board']) for (const b of opened(k, slug).blocks) assert.deepEqual(b.refusals, [], `${slug} ${b.heading}`);
 
-  /* NO AT A GLANCE, SINCE the UI pass of 20 October (proj F10): Open is the head's count, and what is late and what
+  /* NO AT A GLANCE (proj F10): Open is the head's count, and what is late and what
      waits on you are the line's. THE FIGURES THE HEAD, THE LINE AND THE BANDS ARE DRAWN ON still count the sample. */
   assert.ok(!opened(k, 'work').blocks.some((b) => b.heading === 'At a glance'), 'At a glance is drawn again');
   const read = (id: string) => {
@@ -88,7 +88,7 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
     assert.ok(out.ok, sayOf(out));
     return out.value.value;
   };
-  /* THE HEAD COUNTS EVERY TASK NOT FINISHED, Later among them, as the project chips do (E24). */
+  /* THE HEAD COUNTS EVERY TASK NOT FINISHED, Later among them, as the project chips do. */
   assert.equal((opened(k, 'work').head as { count?: { value?: number } } | undefined)?.count?.value, TASKS.filter(live).length, 'the head does not count what the chips count');
   const chips = (opened(k, 'work') as { filters?: { values: { count: number }[] }[] }).filters?.[0]?.values ?? [];
   if (chips.length > 0) assert.equal(chips.reduce((n, v) => n + v.count, 0), TASKS.filter(live).length, 'the chips do not add up to the head');
@@ -112,7 +112,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   /* THE PAGE'S LINE, THEN THE CAPTURE LINE, so a task is written down before anything else is read, then the Work
      screen's bands of what is still to do top to bottom, and what is further off and what was finished folded shut. The
      line has no heading: it is the sentence in the page's title, two of them on one figure since work 1.13.0, of which one
-     is drawn, and a third since work 1.14.0 for a list with nothing open. SINCE the screens scope of 24 October (E24) the
+     is drawn, and a third since work 1.14.0 for a list with nothing open. SINCE the screens scope of 24 October the
      bands are four, half the row each, in his order: Late, Waiting on you, This week, With an agent. */
   assert.deepEqual(
     headings,
@@ -154,7 +154,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   assert.ok(soon.rows.every((r) => String(r.fields.by) >= TODAY), 'a late task is drawn under This week');
   const week = soon.rows.map((r) => String(r.fields.by));
   assert.deepEqual(week, [...week].sort(), 'This week is not by the day first');
-  /* EVERY TASK SAYS ITS PROJECT, SINCE the UI pass of 20 October (proj F10), in the line under it after its day. */
+  /* EVERY TASK SAYS ITS PROJECT (proj F10), in the line under it after its day. */
   for (const b of [late, soon]) assert.deepEqual((b.columns ?? []).map((c) => String(c.field)), ['what', 'by', 'thing']);
 
   /* DONE RECENTLY IS THE LAST SEVEN DAYS, NEWEST FIRST. */
@@ -162,7 +162,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   assert.ok(done.length > 0 && done.every((d) => d > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)), done.join(', '));
   assert.deepEqual(done, [...done].sort().reverse(), 'not newest first');
 
-  /* BUT WITH NO PROJECT, SINCE work 1.19.0 (AGT-D14): a table under its own fold of tasks drawn and ticked in a list
+  /* BUT WITH NO PROJECT, SINCE work 1.19.0: a table under its own fold of tasks drawn and ticked in a list
      above, there to be given a project. As a list that ticks it would draw each of them twice
      (work-overview-twice.test.ts). AND UNTOUCHED FOR 90 DAYS, SINCE C32 (the old Work screen retired), for the same
      reason: a table of tasks drawn and ticked in their band above, there to be done, dated or dropped. */
@@ -380,7 +380,7 @@ test('WORK OPENS ON ONE LINE SAID FROM ITS FIGURES, and every tile with a headin
     assert.ok(!headings.includes(gone), `${gone} is still drawn`);
 });
 
-/* NO STRIP ON WORK DRAWS DONE THIS WEEK SINCE the UI pass of 20 October (proj F10), so the nights it remembers are read
+/* NO STRIP ON WORK DRAWS DONE THIS WEEK (proj F10), so the nights it remembers are read
    where they are kept, for the tiles a person or a use case puts it on, as Open's are. */
 test('DONE THIS WEEK IS REMEMBERED EACH NIGHT, so a tile that draws it has its last seven days', async () => {
   let now = NOW;
@@ -412,7 +412,7 @@ test('A PROJECT’S FINISHED WORK IS COUNTED BY THE WEEK, one project at a time,
  */
 test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is what is late in Late', async () => {
   const k = await seeded();
-  /* EACH BAND IS DRAWN ON THE FIGURE THAT COUNTS IT (E24), and holds what it counts. */
+  /* EACH BAND IS DRAWN ON THE FIGURE THAT COUNTS IT, and holds what it counts. */
   const gates: Record<string, string[]> = { Late: ['tasks-late-yours'], 'This week': ['tasks-this-week-yours'], 'With an agent': ['tasks-with-agents'] };
   const check = () => {
     const page = opened(k, 'work');
@@ -444,7 +444,7 @@ test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is what is late in L
   check();
 });
 
-/* ── whose work, and what has not moved (C32, the old Work screen retired) ── */
+/* ── whose work, and what has not moved (the old Work screen retired) ── */
 
 test('WORK NARROWS TO YOURS OR THE AGENTS’, AND FOLDS WHAT HAS NOT MOVED IN THREE MONTHS, as the old screen did', async () => {
   let now = NOW - 120 * 86_400_000;
@@ -470,7 +470,7 @@ test('WORK NARROWS TO YOURS OR THE AGENTS’, AND FOLDS WHAT HAS NOT MOVED IN TH
 });
 
 /**
- * THE BOARD'S LINE ADDS UP TO ITS COLUMNS, AND THE BOARD IS ITS ONE LIST (audit B of 25 October, Y8). The board read its
+ * THE BOARD'S LINE ADDS UP TO ITS COLUMNS, AND THE BOARD IS ITS ONE LIST. The board read its
  * rows by tier and day with done work among them, fifty at most, so on a record with many urgent tasks finished the
  * read ran out inside Open: the line said 36 open while the columns held 34 of them. And the page drew every open task
  * a second time under the board, as Everything open.

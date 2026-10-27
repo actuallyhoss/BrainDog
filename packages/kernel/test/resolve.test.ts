@@ -1,5 +1,5 @@
 /**
- * The other pairs (ENG-B04, job 2): two organisations or two projects that may be one, and a name seen with nothing
+ * The other pairs: two organisations or two projects that may be one, and a name seen with nothing
  * that identifies it beside the one row it reads as. Read from the tables as they are, writing nothing. A name
  * proposes and never decides, so a pair is something to show or to ask, ranked, and never a fold.
  */

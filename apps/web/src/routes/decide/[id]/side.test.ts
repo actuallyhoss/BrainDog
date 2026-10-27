@@ -1,7 +1,7 @@
 /**
  * THE SIDE OF ONE QUESTION'S PAGE (`side.ts`): what it says, and when there is none.
  *
- * EACH TEST FAILS ON A REVERT OF AUDIT 31-32 FINDING 5: put "What it changes" back in the side and the first fails;
+ * EACH TEST FAILS ON A REVERT OF THE FIX: put "What it changes" back in the side and the first fails;
  * read a share out of a reason's words again and the last one does.
  */
 

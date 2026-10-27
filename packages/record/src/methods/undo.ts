@@ -15,16 +15,16 @@
  *
  * AND THE LADDER IS TOLD (`ladder.ts`), IN THE UNDO'S OWN TRANSACTION. Every batch put back that an agent or Slash made
  * takes that agent back to Ask on the kinds it was, so a kind the owner had to undo is asked about again before it is
- * done again, and an undo that lands never leaves the ladder where it was (research-audit-20 L3). Which agent it was is
+ * done again, and an undo that lands never leaves the ladder where it was. Which agent it was is
  * the ladder's, and the answer never carries it: no grant's id leaves the record.
  *
- * AND A CHANGE THE NIGHTLY WALK MADE IS PUT BACK AS THE WALK PUTS IT BACK (research-audit-20 H1). A batch every line of
+ * AND A CHANGE THE NIGHTLY WALK MADE IS PUT BACK AS THE WALK PUTS IT BACK. A batch every line of
  * which is signed `rule:backfill` (a slice of the walk, or the runs placed by answering its question) goes to the
  * kernel's `undoBackfill`, which unplaces a run, unlinks a payment and removes an organisation nothing else links to,
  * none of which the general undo reads. Its plan is said here in the same names and with the same hash a press needs,
  * so a row's byline and Undo on a walk's line work as on any other change.
  *
- * AND A MATCH THE RECORD MADE IS PUT BACK AS A MERGE IS PUT BACK (ENG-B04). A batch the kernel says is a fold (`isFold`)
+ * AND A MATCH THE RECORD MADE IS PUT BACK AS A MERGE IS PUT BACK. A batch the kernel says is a fold (`isFold`)
  * is planned by `foldPlan` and put back by `undoMerge`, whole: the general undo read it line by line and gave back the
  * one carried key. The look, the hash and the answer are the same, so the tile that lists matches presses this.
  * `isFold` IS ASKED FIRST, since `foldPlan` answers a plan for a batch that holds a decision too, and that one goes back
@@ -83,7 +83,7 @@ export function methods(deps: RecordDeps) {
    * Why this caller may not put a declaration back, or `null` when they may: the one who decides what the record is, an
    * owner signed in, and no token whoever holds it.
    *
-   * ASKED AT THE STEP AND NOT ONLY AT THE DOOR (audit 62, claim 8). Both methods below are behind `admin`, which refuses
+   * ASKED AT THE STEP AND NOT ONLY AT THE DOOR. Both methods below are behind `admin`, which refuses
    * the same callers today, so this is asked twice for them. It is asked here as well because a put back that installs
    * an earlier page, rule or list is a decision about the record, and the day a door is opened to somebody else (an
    * agent taking back its own run, say) the rows may go back and this still may not. It reads the caller itself and
@@ -418,7 +418,7 @@ export function methods(deps: RecordDeps) {
     const plan = walkPlan(batch, reads, only);
     if (plan.hash !== hash) return no('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
     if (plan.already) return ok({ batch, put: 0, say: 'Nothing was put back: it was undone already.', lines: [], skipped: [] });
-    /* ONLY THE LINES THE PLAN LISTED (research-audit-22 L1): a batch that also wrote to a list the caller does not read
+    /* ONLY THE LINES THE PLAN LISTED: a batch that also wrote to a list the caller does not read
        is put back row by row, those rows alone, and `undoBackfill`, which reads every list, is not asked. */
     const hidden = only === null && walkLines(batch, null).some((l) => {
       const r = kernel.get(l.target.slice('entry:'.length));
@@ -486,7 +486,7 @@ export function methods(deps: RecordDeps) {
       const actors = sql.all<{ actor: string | null }>('SELECT DISTINCT actor FROM event WHERE batch = ? OR (batch IS NULL AND id = ?)', batch, batch).map((e) => e.actor);
       const nothing = () => no<UndoPlan | Undone>('ROW_UNKNOWN', 'No write was made under that batch, so there is nothing to take back.', { at: 'batch' });
       if (actors.length === 0) return nothing();
-      /* EVERY ROW IT WOULD PUT BACK IS ONE THE CALLER MAY STILL WRITE (sharing plan §2.6). A row since moved out of her
+      /* EVERY ROW IT WOULD PUT BACK IS ONE THE CALLER MAY STILL WRITE. A row since moved out of her
          rule, or kept private by its maker, is answered as a batch that wrote nothing, so the undo proves nothing. */
       for (const { target } of sql.all<{ target: string }>(
         "SELECT DISTINCT target FROM event WHERE (batch = ? OR (batch IS NULL AND id = ?)) AND target LIKE 'entry:%'",

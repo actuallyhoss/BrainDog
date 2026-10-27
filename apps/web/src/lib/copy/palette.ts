@@ -33,7 +33,7 @@ export const palette = {
      surface, which would have it waiting on a socket it has nothing to do with. */
   stopped: 'Stopped.',
   noMatches: 'Nothing matches',
-  /* WHILE THE RECORD IS STILL ANSWERING (E54), where the first row will be: the panel sat white for 2 s on "late". */
+  /* WHILE THE RECORD IS STILL ANSWERING, where the first row will be: the panel sat white for 2 s on "late". */
   looking: 'Looking…',
   commands: 'Actions',
   destinations: 'Go to',

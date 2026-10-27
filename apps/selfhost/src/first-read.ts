@@ -10,7 +10,7 @@
  * THE COUNT IS IN MEMORY AND STARTS OVER WITH THE PROCESS, which can only give strangers more of a day than it should
  * after a restart, never fewer; a self-host is one process, so one count holds every request it serves.
  *
- * WHAT IS ON OFFER IS THE CATALOGUE THIS HOST SERVES (USE-A16): the use cases in the folder it answers `/app/catalogue/`
+ * WHAT IS ON OFFER IS THE CATALOGUE THIS HOST SERVES: the use cases in the folder it answers `/app/catalogue/`
  * from, read once and merged over the ones compiled in (`catalogueOffer`). No folder, or an index that does not read,
  * is the compiled list, said once in the log.
  */
@@ -159,7 +159,7 @@ const entriesIn = (dir: string) => async (): Promise<readonly FirstReadEntry[] |
 };
 
 /**
- * WHAT A STRANGER'S SENTENCE MAY BE READ INTO (USE-A16): the use cases of the catalogue this host serves, merged over the
+ * WHAT A STRANGER'S SENTENCE MAY BE READ INTO: the use cases of the catalogue this host serves, merged over the
  * build's (`firstReadOfferFrom`), so a front the operator publishes into the folder is offered at sign-up with no code
  * change. The modules are the build's. No folder, or one whose index does not read, is the build's list and one log line.
  */

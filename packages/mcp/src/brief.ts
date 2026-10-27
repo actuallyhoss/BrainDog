@@ -16,7 +16,7 @@
  * record and nothing here can say what the caller was not shown.
  *
  * AND NEVER AN ID ON ITS OWN. A row id, a person's id, a token's id and a null are what `answer-hygiene.test.ts` fails
- * a brief answer for. A handle travels only beside a name: `Kiln (things#1)`, `Claude Code (S42)`.
+ * a brief answer for. A handle travels only beside a name: `Kiln (things#1)`, `Claude Code`.
  */
 
 import { callOf, clip, counted, day, deviceOf, gist, grouped, isCurrency, money, moneyIn, oneLine, runnerOf, ULID, when } from './words.ts';
@@ -198,7 +198,7 @@ const DOT = String.raw`(?:\.|\s*[\[(]\s*[dD][oO][tT]\s*[\])]\s*)`;
 /**
  * A mail address, bare or behind `mailto:`: `jo@kiln.example`, and GitHub's `101+jo@users.noreply.github.com`; one
  * written out so a scraper misses it, `jo [at] kiln [dot] example`; and one at a machine rather than a domain,
- * `jo@localhost` and `jo@10.0.0.1` (audit 21, item 15), which name a person and a machine both.
+ * `jo@localhost` and `jo@10.0.0.1`, which name a person and a machine both.
  *
  * A DOMAIN'S LAST PART IS LETTERS, as every mail domain's is, because a step an agent left reads "Pin node@24.13.0" and
  * `@braindog/mcp@0.3.1`, and both were said "Pin someone" and "@braindog/someone". A machine's number is four parts, so a
@@ -213,7 +213,7 @@ const ADDRESS = new RegExp(
 const BRACKETED = new RegExp(String.raw`\s*[<(\[]\s*${ADDRESS.source}\s*[>)\]]`, 'gu');
 
 /**
- * A sentence with its mail addresses taken out (audit 19, M11: names, never addresses). One in brackets beside a name
+ * A sentence with its mail addresses taken out (names, never addresses). One in brackets beside a name
  * goes, and the name stays; one standing where a name would is said `someone`, since the sentence still reads with a
  * person there and the address is theirs, never the reader's to pass on.
  */
@@ -642,7 +642,7 @@ function bodyOf(body: unknown, title?: (spoken: string) => string | undefined, d
  *
  * NEVER TWO QUESTIONS BY DIFFERENT HANDS OR ABOUT DIFFERENT THINGS. By text alone, a merge question about two people and
  * one about two others read alike, and "3 like it" hid decisions the person had to make one by one
- * (`loop/research-audit-14-15a-38.md`, H1). A question with no text keeps a key of its own.
+ * A question with no text keeps a key of its own.
  */
 export function alikeKey(row: { question?: unknown; opened_by?: unknown; body_kind?: unknown; body?: unknown }, title?: (spoken: string) => string | undefined): string {
   const words = typeof row.question === 'string' ? gist(row.question, title) : '';
@@ -798,7 +798,7 @@ export function indexBrief(value: Record<string, unknown>): string {
 const HERE_SHOWN = 3;
 
 /**
- * `record_index`'s `live` as one line (AGT-C20): "2 agents working, one of them here: Claude Code (S47)", or `null` when
+ * `record_index`'s `live` as one line: "2 agents working, one of them here: Claude Code", or `null` when
  * none is working, so a record nobody works on says nothing of it. "Here" is the caller's own tree, the same machine and
  * repository: the one place two runs overwrite each other.
  */
@@ -913,7 +913,7 @@ export function ruledOf(value: unknown): Ruled | null {
  * The line a write ends with when its rung decided it:
  *
  *     Done, as you may on Tasks · Mara can undo it
- *     Filed for Mara to decide: Mark the invoice to Acme paid? (Q12)
+ *     Filed for Mara to decide: Mark the invoice to Acme paid?
  *
  * IN NAMES: the lists by the names their declarations give, and the person by the name the record has for them, so the
  * agent can say it on as it is. A filed write tells the agent nothing was written, which is the one thing it must not
@@ -956,7 +956,7 @@ export function handoffBrief(run: Shaped): string {
 }
 
 /**
- * One instruction as every answer and `_meta.braindog` hand it on (plan §8.3, the inbox file's shape): its id, kind,
+ * One instruction as every answer and `_meta.braindog` hand it on (the inbox file's shape): its id, kind,
  * his words, when, to whom, who said it by name, who took it, and the line in his voice. Nothing else of the row.
  */
 export type Pending = { id: string; kind: string; said: string; at: string; to: string; by: string | null; taken_by: string | null; line: string };
@@ -999,7 +999,7 @@ export function instructionsBrief(v: Record<string, unknown>, did: 'read' | 'tak
   const id = one !== null && typeof one.id === 'string' ? one.id : null;
   /* THE REST OF WHAT WAITS, without the one this call took or answered, and without "Nothing new" after a take or reply. */
   const rest = lines.filter((l) => (id === null || !l.includes(`(${id})`)) && !(did !== 'read' && /^Nothing new/u.test(l)));
-  /* A QUESTION ANSWERED ON HIS ORDER (D8): the record's own line, then what still waits. */
+  /* A QUESTION ANSWERED ON HIS ORDER: the record's own line, then what still waits. */
   if (did === 'answer' && isObject(v.answered) && typeof v.answered.said === 'string') return [v.answered.said, ...rest.filter((l) => !/^Nothing new/u.test(l))].join('\n');
   if (did === 'take' && one !== null && id !== null) {
     const said = typeof one.said === 'string' ? clip(oneLine(one.said), 200) : '';
@@ -1057,11 +1057,11 @@ export type MetSaid = {
  *     Added Wren (Quietcart) · P12
  *     Noted Joaquin on Lanternfish; add an email or handle to add them
  *     Maybe Teodor Vance (Lanternfish): asked Mara on Decide: Are Teodor Vance and teodorvance one person? · P6 · SG7
- *     Matched Joaquin Herrera by email; Joaquin H. (P9) was merged into them · P6
+ *     Matched Joaquin Herrera by email; Joaquin H. was merged into them · P6
  *     Merged into Teodor Vance (Lanternfish) by name and address or organisation; Mara can undo it in BrainDog · P7
  *
  * THE FIRST WORD SAYS WHAT HAPPENED, because the three outcomes ask three different things of the agent: nothing, to
- * carry on, or to find an address. A name with no address is never a person in the record (`loop/contract-17.md`), so
+ * carry on, or to find an address. A name with no address is never a person in the record, so
  * the answer says what would make one. A doubtful match waits on the person, and is said as theirs to answer. A merge
  * the record's strong rules made on their own is said as a merge, with whose Undo it is, since the agent did not ask
  * for one and the person may not want it.
@@ -1109,7 +1109,7 @@ export function triagedBrief(settled: Record<string, unknown>, entry: Shaped | n
  * THE PERSON DECIDES IN BRAINDOG, and the answer says so in the words an agent can pass on, with the link to the
  * question itself when the host serves the app somewhere.
  *
- * THE QUESTION IN NAMES (`plainOf`, audit 19 M11): it is the agent's own sentence, and an agent writes the ids and
+ * THE QUESTION IN NAMES (`plainOf`): it is the agent's own sentence, and an agent writes the ids and
  * addresses it was handed ("Merge 01M3… into teo@lanternfish.example?"). Said back as written, the agent reads its own
  * ids as the way to name things and passes them on. Its handle stays beside it, the one thing to act on.
  */

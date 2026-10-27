@@ -1,5 +1,5 @@
 /**
- * Money is drawn one way (EXP-B06): a job's cost, the Tell screen's amounts and a file read in at the first run spell an
+ * Money is drawn one way: a job's cost, the Tell screen's amounts and a file read in at the first run spell an
  * amount exactly as `Money` does, which is `drawn` over the stored form, against the record's home currency.
  *
  * THE REFERENCE IS `Money`'S OWN PATH, not the helper the three call, so a screen that took a second road to the

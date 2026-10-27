@@ -1,5 +1,5 @@
 /**
- * The picks page of the frame (EXP-A02): the slots read, the defaults that stand for a blank answer, dark.md as the
+ * The picks page of the frame: the slots read, the defaults that stand for a blank answer, dark.md as the
  * theme makes it now, the kit's sizes beside ours, the page, and a yes that carries every pick. No browser: the
  * drawing is `board.mjs`'s and `capture.mjs`'s, tested there.
  */
@@ -35,7 +35,7 @@ test('every pick of the frame reads, with its default one of its options and eve
   const drawn = Object.fromEntries(slots.flatMap((s) => s.options.filter((o) => o.drawn && o.css !== null).map((o) => [`${s.pick}/${o.id}`, o.css])));
   assert.deepEqual(Object.keys(drawn).sort(), ['size-12/thirteen', 'status/fill', 'tile-heading/seventeen']);
   assert.deepEqual(slots.filter((s) => s.shown).map((s) => s.pick), ['frame', 'red', 'size-12', 'status', 'tile-heading']);
-  assert.equal(slots.find((s) => s.pick === 'frame').taken, 'DIRECTION 42');
+  assert.equal(slots.find((s) => s.pick === 'frame').taken, 'the frame decision');
   assert.ok(!slots.some((s) => s.pick === 'blue' || s.pick === 'site-accent'), 'red was taken, so no blue pick is asked');
 });
 
@@ -76,12 +76,12 @@ test('a pick left blank takes its default and says so; a choice is the owner\'s;
   const slots = [
     { pick: 'status', default: 'dot', options: [{ id: 'dot' }, { id: 'fill' }], taken: null },
     { pick: 'red', default: 'late-over-error', options: [{ id: 'late-over-error' }, { id: 'late-only' }], taken: null },
-    { pick: 'frame', default: 'yes', options: [{ id: 'yes' }, { id: 'no' }], taken: 'DIRECTION 42' },
+    { pick: 'frame', default: 'yes', options: [{ id: 'yes' }, { id: 'no' }], taken: 'the frame decision' },
   ];
   assert.deepEqual(answersOf(slots, chosenOf(['status=fill'])), {
     status: { option: 'fill', how: CHOSEN },
     red: { option: 'late-over-error', how: DEFAULTED },
-    frame: { option: 'yes', how: 'taken in DIRECTION 42' },
+    frame: { option: 'yes', how: 'taken in the frame decision' },
   });
   assert.equal(DEFAULTED, 'default, not chosen');
   assert.throws(() => answersOf(slots, { status: 'glow' }), /offers dot and fill, and not glow/u);
@@ -130,7 +130,7 @@ test('the page shows each option dark first, marks one recommendation a pick, an
   assert.ok(html.indexOf('status/fill/p-390-dark.png') < html.indexOf('status/fill/p-390-light.png'), 'dark first');
   assert.match(html, /Said in words: it is about a screen/u);
   assert.match(html, /Said in words: nothing draws this one/u, 'an option of a shown pick with no sheet is not said to be off the page');
-  assert.match(html, /Taken for you in DIRECTION 42/u);
+  assert.match(html, /Taken for you in the frame decision/u);
   assert.match(html, /drawn on a sample record/u);
   assert.match(html, /<td class="num">240px<\/td><td class="num">188px<\/td>/u);
   assert.match(html, /prefers-color-scheme: dark/u);
@@ -187,15 +187,15 @@ test('the yes carries every pick beside the hashes, and is refused for a drawing
     put(root, 'design/boards/frame/checks.json', JSON.stringify({ board: 'frame', screens: [], checks: [] }));
     put(root, 'design/boards/frame/paths.json', JSON.stringify(['packages/skin/**']));
     put(root, `${PICKS}/status/slot.json`, slot('status'));
-    put(root, `${PICKS}/frame/slot.json`, slot('frame', { taken: 'DIRECTION 42' }));
+    put(root, `${PICKS}/frame/slot.json`, slot('frame', { taken: 'the frame decision' }));
     const { paths, drawn } = standing(root, 'frame');
     const images = { 'candidate/board-frame-390-dark.png': 'a'.repeat(64) };
     const drawing = { board: 'frame', source: 'seed', widths: [390], themes: ['dark'], commit: 'abc', paths, drawn, drawings: [{ id: 'candidate', images }] };
-    const yes = await yesWithPicks(root, drawing, { said: 'The frame on the four boards drawn on 8 October is yes, in red.', taken: 'DIRECTION 42', chosen: { status: 'b' }, at: new Date('2026-10-09T10:00:00Z') });
+    const yes = await yesWithPicks(root, drawing, { said: 'The frame on the four boards drawn on 8 October is yes, in red.', taken: 'the frame decision', chosen: { status: 'b' }, at: new Date('2026-10-09T10:00:00Z') });
     assert.deepEqual(yes.units, ['EXP-A01', 'EXP-A02']);
     assert.equal(yes.seen, false);
-    assert.deepEqual(yes.taken, { on: '2026-10-09', from: 'DIRECTION 42' });
-    assert.deepEqual(yes.picks, { frame: { option: 'a', how: 'taken in DIRECTION 42' }, status: { option: 'b', how: CHOSEN } });
+    assert.deepEqual(yes.taken, { on: '2026-10-09', from: 'the frame decision' });
+    assert.deepEqual(yes.picks, { frame: { option: 'a', how: 'taken in the frame decision' }, status: { option: 'b', how: CHOSEN } });
     assert.deepEqual(yes.images, images);
     put(root, 'packages/skin/house.css', ':root { --x: 1; }\n');
     await assert.rejects(yesWithPicks(root, drawing, { said: 'yes' }), /changed since this drawing/u);

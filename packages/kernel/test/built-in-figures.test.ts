@@ -176,7 +176,7 @@ test('A PAGE PER THING GATES ON ITS OWN QUESTIONS, `questions-open:{{spoken}}` f
   sql.close();
 });
 
-/* ── the signs of a living record (REC-A01) ──────────────────────────────── */
+/* ── the signs of a living record ──────────────────────────────── */
 
 const signs = ['arrivals-waiting', 'arrivals-oldest-days', 'arrivals-newest-hours', 'feeds-behind', 'rules-fired-7d'] as const;
 const read = (k: Awaited<ReturnType<typeof openRecord>>, id: string): Reading => value<Reading>(k.metric(BUILT_IN_FIGURES[id.split(':')[0]!]!));
@@ -262,7 +262,7 @@ function figureListsOf(id: string): string[] {
   return figureListsSync(BUILT_IN_FIGURES[id]!);
 }
 
-/* ── the agents working now (AGT-C02) ────────────────────────────────────── */
+/* ── the agents working now ────────────────────────────────────── */
 
 test('RUNS-WORKING COUNTS THE AGENTS AT WORK BY THE ONE CLOCK: 14 minutes is working, 16 is not, and a helper is not one more', async () => {
   const { workingRuns } = await import('../src/presence.ts');
@@ -315,7 +315,7 @@ test('MACHINES-WORKING AND RUNS-WAITING COUNT BY THE SAME CLOCK AS RUNS-WORKING'
   sql.close();
 });
 
-/* THE AGENTS PAGE SAYS WHO IS AT WORK ON WHAT (the audit of 22 October, U12): `{{runs-working.names}}`, each agent and
+/* THE AGENTS PAGE SAYS WHO IS AT WORK ON WHAT: `{{runs-working.names}}`, each agent and
    project once, by the project's name, every agent on one project before it, and the agent alone where its run is in no
    project. */
 test('RUNS-WORKING NAMES WHO IS AT WORK ON WHAT, each once, by the project\'s name', async () => {
@@ -339,7 +339,7 @@ test('RUNS-WORKING NAMES WHO IS AT WORK ON WHAT, each once, by the project\'s na
   sql.close();
 });
 
-/* ── where things apply (AGT-D01) ─────────────────────────────────────────── */
+/* ── where things apply ─────────────────────────────────────────── */
 
 const PROJECTS: Declaration = {
   id: 'register.things',

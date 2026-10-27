@@ -1,5 +1,5 @@
 /**
- * Going back, proven on a real record (LCH-C05).
+ * Going back, proven on a real record.
  *
  *   node apps/worker/scripts/go-back.mjs <record>
  *

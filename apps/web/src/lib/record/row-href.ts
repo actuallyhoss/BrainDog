@@ -85,7 +85,7 @@ export const ROWS = 'rows';
 export const listScreen = (register: string): string => `/r/${register}?${ROWS}=1`;
 
 /**
- * Where a list's address sends a reader instead (E26): the page that says it is the list's page, or `null` to stay. Only
+ * Where a list's address sends a reader instead: the page that says it is the list's page, or `null` to stay. Only
  * the bare address goes: one that asks for anything (a row open, a view, a filter, `?rows=1`) is the list's own screen.
  */
 export function listPageIn(register: string, search: URLSearchParams, pages: ReadonlyMap<string, string>): string | null {

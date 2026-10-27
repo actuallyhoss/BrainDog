@@ -1,5 +1,5 @@
 /**
- * An agent's `propose` answer and its briefing say names, never an id or an address (audit 19, M11: "the
+ * An agent's `propose` answer and its briefing say names, never an id or an address ("the
  * MCP answers in those names, so an agent never meets a raw id or a duplicate person").
  *
  * THE SENTENCES COME FROM ELSEWHERE: a question is the agent's own words or the record's, a step is what the last run
@@ -117,7 +117,7 @@ test('OPEN WORK IN THE BRIEFING SAYS NO ADDRESS, though a task is worded with on
   clean(text, 'the open work');
 });
 
-test('AN ADDRESS AT A MACHINE, OR WRITTEN OUT TO DODGE A SCRAPER, IS STILL AN ADDRESS (audit 21, item 15)', () => {
+test('AN ADDRESS AT A MACHINE, OR WRITTEN OUT TO DODGE A SCRAPER, IS STILL AN ADDRESS', () => {
   assert.equal(unaddressed('Ask jo@localhost about the build'), 'Ask someone about the build');
   assert.equal(unaddressed('Mail jo@10.0.0.1.'), 'Mail someone.');
   assert.equal(unaddressed('Write to jo [at] x.io first'), 'Write to someone first');

@@ -1,6 +1,5 @@
 /**
- * `kpis`: a project's key numbers, read with their points, for one project's tile, for Today, or for the cards
- * (`loop/plans/kpis-2026-10-21/PLAN.md` 2.2 to 2.6).
+ * `kpis`: a project's key numbers, read with their points, for one project's tile, for Today, or for the cards.
  *
  * A KEY NUMBER IS A ROW, AND ITS VALUES ARE READINGS IT ALREADY HAS. The row says where they come from (`source`): a
  * measure in the record's readings, matched whole or as "measure, project" (the rule Revenue bands reads by), or a

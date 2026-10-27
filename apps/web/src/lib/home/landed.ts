@@ -78,7 +78,7 @@ export function landedOf(
   own: ReadonlySet<string> = new Set(),
 ): Landed[] {
   const out: Landed[] = [];
-  /* THE READER FILED UNDER HER OWN NAME IS HER, NOT NEWS (audit C of 25 October, X5): sign-up files the owner as a
+  /* THE READER FILED UNDER HER OWN NAME IS HER, NOT NEWS: sign-up files the owner as a
      person of her own record, and "Arrivals 1, Mariam, You, People" was the only thing on her first Today. */
   const mine = me === null ? '' : (names.get(me) ?? '').trim();
   for (const l of lines) {

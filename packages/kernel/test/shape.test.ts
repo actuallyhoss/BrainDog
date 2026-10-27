@@ -1,5 +1,5 @@
 /**
- * The shape copy, job 1: words, numbers and dates (PRF-A13, `area-proof-a.md` 2.5).
+ * The shape copy, job 1: words, numbers and dates (`area-proof-a.md` 2.5).
  *
  * What is asserted is what a gate drawing the copy needs to be true: a word keeps its length, case and script, and
  * stays the word it was everywhere it appears; a number keeps its sign and its digits, and a series keeps its order;

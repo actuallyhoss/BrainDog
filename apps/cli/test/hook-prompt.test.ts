@@ -96,7 +96,7 @@ test('A TURN THAT OWES A REPLY IS HELD ONCE, per instruction, and let go when a 
   assert.equal(stopFor(fresh({ pending: [taken], stop: { kind: 'pause', id: 'IN8', said: '' } }), NO_STATE, turn()), null);
 });
 
-test('A RUN THAT COMMITTED IS ASKED FOR ITS LEARNINGS ONCE BEFORE IT ENDS, and never loops (scope B31)', () => {
+test('A RUN THAT COMMITTED IS ASKED FOR ITS LEARNINGS ONCE BEFORE IT ENDS, and never loops', () => {
   assert.equal(stopFor(fresh(), NO_STATE, turn()), null, 'no commit, nothing asked');
   const committed = fresh({ committed: true });
   const asked = stopFor(committed, NO_STATE, turn())!;

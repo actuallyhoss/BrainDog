@@ -225,7 +225,7 @@ export function jobLines(rows: readonly { id: string; title: string | null; kind
  * WHETHER A REFUSED SOURCE IS ONE THIS READER CANNOT HAVE, which is not a list cut short: a host with no such read
  * (`ROUTE_UNKNOWN`), and a read that is not theirs, jobs above all, which are an owner's in a browser (`listJobs`, ADMIN)
  * and so refused to every key and every member (`NEEDS_BROWSER_SESSION`, `FORBIDDEN`). Said as "Some runs could not be
- * read", the Agents page told the live look, which reads with a key, that its list might be short (24 Oct, H26).
+ * read", the Agents page told the live look, which reads with a key, that its list might be short (24 Oct).
  */
 export const notTheirs = (code: string): boolean => code === 'ROUTE_UNKNOWN' || code === 'NEEDS_BROWSER_SESSION' || code === 'FORBIDDEN';
 

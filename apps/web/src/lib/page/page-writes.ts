@@ -31,7 +31,7 @@ import { isQuestion } from '../work/capture.ts';
 import { words } from './words.ts';
 import type { ActAction, OpenSheet } from './act-sheet.ts';
 
-/* TODAY'S LIGHT SYNTAX, handed on so the palette's reader reaches `lib/work` through this one held file (SHL-A18). */
+/* TODAY'S LIGHT SYNTAX, handed on so the palette's reader reaches `lib/work` through this one held file. */
 export { captureOf, contextOf, isQuestion, projectNamed } from '../work/capture.ts';
 export { dayOf, daySaid, shapeOf } from '../work/board.ts';
 
@@ -116,7 +116,7 @@ export type Pressed = { block: LiveBlock; at: number; before: readonly Row[] };
 export type Acted = { ok: boolean; fix?: string; at?: string };
 
 /**
- * THE ONE TABLE OF VERBS A PRESS SENDS TO THE RECORD BY THEIR OWN CLIENT METHOD (PGS-A12). The row verbs are the six
+ * THE ONE TABLE OF VERBS A PRESS SENDS TO THE RECORD BY THEIR OWN CLIENT METHOD. The row verbs are the six
  * writes above said as verbs (`row.tick` is the tick write, `row.move` a card moved, `row.create` a captured line or a
  * new row), and `suggestion.answer` is the option write a question's card makes (`decide-write.ts`); every other verb a
  * page may name goes to the record through the method named here. `null` is a verb this host has no single change for
@@ -784,7 +784,7 @@ export function pageWrites(deps: WritesDeps) {
       await deps.reread();
       return out.ok ? { ok: true, value: out.value } : { ok: false };
     }
-    /* A FORM THAT ASKS (PGS-A15): an options question filed through propose, signed by whoever pressed, as Decide's own
+    /* A FORM THAT ASKS: an options question filed through propose, signed by whoever pressed, as Decide's own
        "Ask yourself" sheet files one; its Undo takes it back while it is open. */
     if (a.verb === 'question.ask') {
       const said = value && typeof value === 'object' ? (value as Record<string, unknown>) : args.fields && typeof args.fields === 'object' ? (args.fields as Record<string, unknown>) : {};

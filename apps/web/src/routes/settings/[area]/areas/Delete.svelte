@@ -33,7 +33,7 @@
   let deleting = $state(false);
   let deletedSaid = $state('');
   /* SAID ONLY AFTER A PRESS OR AN ENTER WITH THE WRONG NAME, never while typing and never before anything is typed:
-     "Type The Studio exactly." under the button before a key was pressed read as an error (audit 25 October, X23). */
+     "Type The Studio exactly." under the button before a key was pressed read as an error. */
   let wrong = $state(false);
   let field = $state<HTMLInputElement | null>(null);
 
@@ -49,7 +49,7 @@
     if (deleting) return;
     /* OFF IS NOT DISABLED: the press says why and puts the person in the field (first F16). */
     if (!matches) {
-      /* A PRESS WITH NOTHING TYPED SAYS WHAT TO TYPE, and a wrong name says it is not this one (X23). */
+      /* A PRESS WITH NOTHING TYPED SAYS WHAT TO TYPE, and a wrong name says it is not this one. */
       wrong = true;
       field?.focus();
       return;
@@ -113,7 +113,7 @@
 {:else}
 <!-- ON THE GROUND AND UNBOXED: the sentence, what it costs, the typed name and the verb. The box this
      sat in was a red-edged panel, and red is what needs him, not what is dangerous; the words carry the weight here. -->
-<!-- THE CARD IS THE RECORD IT DELETES (audit 25 October, X23): "Delete this record" stood over a card of the same name,
+<!-- THE CARD IS THE RECORD IT DELETES: "Delete this record" stood over a card of the same name,
      so the card is named by what it holds. -->
 <Tile icon="trash" class="section" data-surface="tile" title={RECORD}>
   <div class="section-body">
@@ -127,7 +127,7 @@
       <p class="danger-why">{copy.deleteCosts}</p>
       <!-- THE ONE WAY BACK, BEFORE THE FIELD: a copy taken now is the only thing that answers a change of mind. -->
       <div><Button href="/settings/export" size="sm"><Icon name="download" size="s" />{words.exportFirst}</Button></div>
-      <!-- `field-row` PUTS THE LABEL ABOVE THE FIELD. ARMED, the button is the primary with its bin (2.A.1); OFF it is
+      <!-- `field-row` PUTS THE LABEL ABOVE THE FIELD. ARMED, the button is the primary with its bin; OFF it is
            quiet and `aria-disabled`, and a press says why. -->
       <div class="field-row">
         <label class="field-row-label" for="delete-slug">{copy.typeSlug(RECORD)}</label>
@@ -148,7 +148,7 @@
               onkeydown={onkey}
             />
           </div>
-          <!-- DANGEROUS BEFORE IT IS ARMED TOO (UI audit of 22 October, 18): the bin and the words in red on the quiet
+          <!-- DANGEROUS BEFORE IT IS ARMED TOO: the bin and the words in red on the quiet
                fill, so the grey button no longer reads as one more setting. Armed, it is the red fill. -->
           <span class="go" data-armed={matches ? '' : undefined}>
             <Button

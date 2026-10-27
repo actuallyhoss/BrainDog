@@ -1,6 +1,6 @@
 /**
- * The drill's ends: the lock, the delete and the close, then the sweep (LCH-A03 job 2,
- * `loop/scope/area-launch-a.md:365-418`). Each step is `{ name, pass, said }` as in `steps.mjs`, and takes the drill
+ * The drill's ends: the lock, the delete and the close, then the sweep.
+ * Each step is `{ name, pass, said }` as in `steps.mjs`, and takes the drill
  * those steps left: the session the link opened and the record it made.
  *
  * ONLY ITS OWN. `file-delete` deletes the record this drill made, by the name it was made under, and nothing it did not

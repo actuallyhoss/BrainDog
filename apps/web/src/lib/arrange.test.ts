@@ -47,7 +47,7 @@ test('EACH REASON IS A PHRASE OF THE SENTENCE IT IS SAID AGAINST, which is turn 
   assert.equal(quiet.from, "I'm a student");
   for (const r of quiet.ranked) for (const w of r.why) assert.equal(quiet.from.slice(w.at, w.at + w.text.length), w.text);
 
-  /* WITH NO TURN ONE, THE READING IS `arrange`'S, less the words the Agents add-on hears (U-C3): the same pick. */
+  /* WITH NO TURN ONE, THE READING IS `arrange`'S, less the words the Agents add-on hears: the same pick. */
   const alone = arrangeTurns('', ABOUT);
   assert.equal(alone.from, ABOUT);
   assert.equal(alone.pick, arrange(ABOUT).pick, 'with no turn one, the reading is the one it always was');
@@ -90,7 +90,7 @@ test('THE TABLE IS EVERY CHIP, and each is what that chip alone proposes', () =>
   for (const [chip, id] of Object.entries(CHIPS)) assert.equal(arrange(chip).pick?.usecase, id, chip);
 });
 
-/* A CATALOGUE USE CASE IS HEARD BY ITS OWN WORDS (USE-A16). No list compiled into the app holds "flats" or "tenants", so
+/* A CATALOGUE USE CASE IS HEARD BY ITS OWN WORDS. No list compiled into the app holds "flats" or "tenants", so
    the landlord's sentence was Personal on "rent" twice: measured before `heard`, Personal 2 and nothing else above 0. The
    catalogue use case here is invented, and so are its words; it stands on Money, which this build ships. */
 const FLATS = 'I rent out six flats to tenants and need to keep track of the rent';

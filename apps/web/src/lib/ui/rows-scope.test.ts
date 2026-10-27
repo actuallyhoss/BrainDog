@@ -1,5 +1,5 @@
 /**
- * NO NEW SCREEN TAKES THE GLOBAL ROW (SF5).
+ * NO NEW SCREEN TAKES THE GLOBAL ROW.
  *
  * `rows.css` draws `.row` and `.line` for every page, so a screen that names a box of its own `row` or `line` gets the
  * ledger's row laid over it: the three leaks first-run measured (the made list on /start, the email row on sign-up,

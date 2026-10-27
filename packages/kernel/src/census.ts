@@ -1,5 +1,5 @@
 /**
- * THE PAGES CENSUS (PGS-A01): what one page's answer says about itself, counted the same way for every page, so a daily
+ * THE PAGES CENSUS: what one page's answer says about itself, counted the same way for every page, so a daily
  * read can say how many pages draw a refused block, print a path that named nothing, or show a dash.
  *
  * READ OFF THE ANSWER, NEVER OFF A SECOND SCANNER. `refused` is each block's own refusals, `unresolved` each block's

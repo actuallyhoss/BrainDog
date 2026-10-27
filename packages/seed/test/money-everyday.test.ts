@@ -1,5 +1,5 @@
 /**
- * Everyday spending in Money's cash walk (audit 68 finding 4): the leg in `CASH_LEGS` over the moves, read through the
+ * Everyday spending in Money's cash walk: the leg in `CASH_LEGS` over the moves, read through the
  * figures a person sees, on a record installed the way a record is.
  *
  * WHY. The kernel could walk everyday spending since batch 68 (`packages/kernel/test/forecast-everyday.test.ts`) and no

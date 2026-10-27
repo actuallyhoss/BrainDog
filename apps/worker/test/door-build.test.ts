@@ -1,5 +1,5 @@
 /**
- * The door and the command's build (AGT-A02): the command says its build on every call, the bearer path hands it to the
+ * The door and the command's build: the command says its build on every call, the bearer path hands it to the
  * record to keep on the key, and the build address says the oldest command this door still works with.
  *
  * WHY EACH HALF. A Mac five commits behind showed nowhere on his record, and a week of sessions with no tools showed

@@ -1,5 +1,5 @@
 /**
- * SETTINGS › HEALTH SAYS WHAT IT FOUND WITHOUT WAITING ON THE LONG WALK (the audit of 25 October, Z36).
+ * SETTINGS › HEALTH SAYS WHAT IT FOUND WITHOUT WAITING ON THE LONG WALK.
  *
  * WHAT WAS WRONG. Captured on his record at both widths and themes, Health still said "Reading the record for anything
  * to tidy." after the screen said it was drawn (`settings-health-390-light.png`). Its seven reads run one after another,
@@ -27,7 +27,7 @@ test('the walk of every page and note is asked last, after the six quick parts',
 test('the screen is drawn only once a part has answered, and says nothing to tidy while the walk reads on', () => {
   assert.match(health, /let first: number \| null = opened\(\);/u, 'the screen claims it is drawn on the shell alone');
   assert.match(health, /closed\(true, first\);/u);
-  /* AND NEVER PAST EIGHT SECONDS (the pass of 27 October): the quick parts still out, it says the record is slow. */
+  /* AND NEVER PAST EIGHT SECONDS: the quick parts still out, it says the record is slow. */
   assert.match(health, /\{#if !heard && !quick && !late\}/u, 'the reading line stays up until the walk ends');
   assert.match(health, /\{:else if !any && !heard && !quick\}\s*<Empty kind="error" title=\{words\.slow\} body=\{words\.lateBody\} \/>/u, 'a late read stays on Reading');
   assert.match(health, /late = true;\s*\}, 8_000\)/u);

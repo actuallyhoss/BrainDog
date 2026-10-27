@@ -1,5 +1,5 @@
 /**
- * A passkey's name, and the passkey domain a Directory refuses (LCH-A04, RQ-LCH-200 and RQ-LCH-203).
+ * A passkey's name, and the passkey domain a Directory refuses.
  *
  * `passkey.rename` RENAMES THE PERSON'S OWN KEY AND NOBODY ELSE'S: one line, 64 characters at most, never empty, and
  * a refusal that says what to do and carries no id. `rp.id` ON A SHARED SUFFIX STOPS THE DIRECTORY AT ITS START with

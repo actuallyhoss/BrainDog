@@ -13,9 +13,9 @@
   reads the record's own sentence for that (`shareable` is ADMIN, as `openShare` is), rather than this guessing at a
   level it does not read. "Share as a template" is offered either way.
 
-  "SHARE WITH PEOPLE" IS THE SAME CONTROL'S FIRST CHOICE when the page can be shared with somebody (sharing plan §3.1):
+  "SHARE WITH PEOPLE" IS THE SAME CONTROL'S FIRST CHOICE when the page can be shared with somebody:
   the button becomes a menu of three, With people, A read-only link and As a template, so the page head stays Share and
-  "⋯" (2.A.20) and never grows a third control. `people` is the page's way to the Share sheet; absent, it is the button.
+  "⋯" and never grows a third control. `people` is the page's way to the Share sheet; absent, it is the button.
 
   "SHARE AS A TEMPLATE" LIVES IN THE SAME SHEET, so the page head keeps its one line. It reads the page as the
   record stores it, makes a pack of that page alone (`lib/market/template.ts`), and says what the pack adds, what it

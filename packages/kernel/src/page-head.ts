@@ -1,6 +1,6 @@
 /**
  * THE PAGE'S HEAD: what a declared page may say above its tiles, beside its title and its one sentence (PGS-A14,
- * `loop/scope/area-pages-a.md` "The page's head").
+ *  "The page's head").
  *
  * Until this file `header` was in the spec and refused (`block-keys.ts` `PAGE_UNBUILT`), so every screen that wanted a
  * kicker, a count, a state in words, one primary button, a search or a way back built its own head by hand, and that

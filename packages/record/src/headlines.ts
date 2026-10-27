@@ -11,7 +11,7 @@
  * late one" rather than restate a count. Home is one more page in the same ask (`HOME_PAGE`), read from Today inside the
  * record: how many things need the person, the titles of what is late, and how many runs are working.
  *
- * NOTHING THE MODEL SAYS IS TRUSTED AS IT CAME, AND IT TYPES NO NUMBER (ENG-B09, decision 3). Each figure is handed with
+ * NOTHING THE MODEL SAYS IS TRUSTED AS IT CAME, AND IT TYPES NO NUMBER. Each figure is handed with
  * its id and the model writes `{{id}}` where the number goes; the record fills the hole from what it handed
  * (`filledHeadline`). `headlineFault` keeps a line only when it is one short sentence, every hole in it names a figure
  * the page was handed, it holds no digit and no number in words, and it names none of the system's words, so the line on
@@ -195,7 +195,7 @@ export const HEADLINE_ROW_FIGURES = 6;
 
 /**
  * WHAT A PAGE PER ROW'S TILES SAY, by the figure each names, in the order drawn, as the page read answered them (the
- * thinking scope of 24 October, C4). A project's lead is its next step, which the template fills in as words, so it
+ * thinking scope of 24 October). A project's lead is its next step, which the template fills in as words, so it
  * names no figure and no line was ever asked of it: what its tiles count (open work, done this week, last worked) is
  * what the model's line is written from, and what moves it. Read off the blocks as the caller is shown them, never
  * asked of the record again, so a reader whose tiles are held reads other values and no line. At most
@@ -581,7 +581,7 @@ const countOf = (word: string): number => {
  * equals `inbox`; one that names agents equals `working`. And a header may say nothing needs the reader only when no
  * question and nothing in the inbox waits (`nothingWaits`). An inbox the reader is not told about is not checked.
  *
- * A FUNCTION FIRST, and the page lint's rule later (PRF-A04): the record holds Home's model line to it before it keeps
+ * A FUNCTION FIRST, and the page lint's rule later: the record holds Home's model line to it before it keeps
  * one (`headlineFault`), and the lint will hold every header to it, whoever wrote the header.
  */
 export function headlineAgrees(header: string, w: WaitingNow): Disagrees[] {

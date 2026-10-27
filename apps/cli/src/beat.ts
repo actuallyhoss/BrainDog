@@ -2,7 +2,7 @@
  * `braindog hook beat`, which Claude Code runs after every tool call (AGT-B10 job 5, AGT-C03 step 5).
  *
  * LAST SEEN MOVED ONLY WHEN A RUN WROTE, so a session that read, thought or edited files for forty minutes read Quiet
- * on the Agents page while it worked. The record now takes a beat (`beat`, AGT-C03): one statement that moves the run's
+ * on the Agents page while it worked. The record now takes a beat (`beat`): one statement that moves the run's
  * last seen, opens nothing, revives nothing and adds no line to its history. This sends it, for the session this hook
  * runs in, the way the end hook sends `end` (`hookEnd`).
  *

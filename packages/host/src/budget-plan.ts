@@ -1,6 +1,6 @@
 /**
  * The budget's plan: how a month's background allowance is shared between the purposes that spend it
- * (`loop/scope/area-engine-a.md` 2.4, "The budget's plan", ENG-A10).
+ * ("The budget's plan").
  *
  * ONE POOL WITH A FLOOR EACH, AND NO WALLS. The month was once cut by walls: so many for the page headlines and no
  * more, so many for reading who is who inside the rest. A wall stops a purpose while the month still has asks nobody

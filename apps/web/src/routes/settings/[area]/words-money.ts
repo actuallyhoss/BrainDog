@@ -29,7 +29,7 @@ export const TAB_MOST = 12;
 
 /**
  * WHAT A TAB'S WORD IS TITLED where the use case gives it no title (`@braindog/declare` `VOICE_TITLES`): the box was
- * titled by its own default word, so "Your things" stood under the heading "Your lists" (Y21).
+ * titled by its own default word, so "Your things" stood under the heading "Your lists".
  */
 const TAB_TITLES: Partial<Record<VoiceKey, string>> = {
   home: 'What Home is called',
@@ -120,7 +120,7 @@ export const undoOf = (words: readonly Word[], sent: Readonly<Record<string, unk
 export const oneFor = (name: string): string | null => oneOf(name);
 
 /**
- * THE LIMITS A NEW HOME CURRENCY MOVES, by the names their add-ons give them (the audit's finding 13).
+ * THE LIMITS A NEW HOME CURRENCY MOVES, by the names their add-ons give them.
  *
  * A limit typed as money is held in the currency it was typed in. The record counts it against a figure in that figure's
  * own currency or the home one, and one typed in the home currency as it was is converted at the day's rate where there

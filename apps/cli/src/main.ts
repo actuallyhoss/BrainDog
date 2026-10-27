@@ -82,7 +82,7 @@ import { verify } from './verify.ts';
    `process.exit` does not wait for it. */
 const say = (line: string) => writeFileSync(2, `${line}\n`);
 
-/* NODE'S "SQLite is an experimental feature" IS NOT SAID TO A PERSON (audit D, W3). `usecase`, `pack`, `kennel` and
+/* NODE'S "SQLite is an experimental feature" IS NOT SAID TO A PERSON. `usecase`, `pack`, `kennel` and
    `import` load `node:sqlite` for a scratch record and printed two lines of it, with a process id, above their answer.
    Every other warning is still printed as Node prints it. Set here, before any command loads the module by import(). */
 {
@@ -468,7 +468,7 @@ const fullUsage = () =>
  * One command's own lines of the usage: each `braindog <command> ...` line and the lines under it, or `[]` for a word the
  * usage does not name. `init` and `serve` share one description, so lines that follow each other are kept together.
  *
- * `<command> --help` ANSWERS THIS AND EXITS 0 (audit D, W1). It was refused by each command's own parser, exit 1, with a
+ * `<command> --help` ANSWERS THIS AND EXITS 0. It was refused by each command's own parser, exit 1, with a
  * sentence of what it takes ("braindog runner has no such command", "--help is not a record"), so the one place a person
  * looks for a command's help was a refusal.
  */
@@ -620,7 +620,7 @@ async function mcp(args: string[]): Promise<void> {
   /* A closed stdout means nobody is left to read the answers. */
   process.stdout.on('error', () => process.exit(0));
 
-  /* SIGNED IN, THE SERVER IS THE HOST'S (`bridge.ts`, AGT-A03): each line goes to its `POST /mcp` with the same session
+  /* SIGNED IN, THE SERVER IS THE HOST'S (`bridge.ts`): each line goes to its `POST /mcp` with the same session
      headers, read per request, so a deploy reaches an open session. `--local` keeps the server this command composes
      for seven nights after the bridge ships, and then goes. A sign-in that ends mid-session is the bridge's to say. */
   if (values.local !== true) {
@@ -960,7 +960,7 @@ async function hook(args: string[]): Promise<void> {
     setTimeout(() => process.exit(0), 1_000).unref();
     return;
   }
-  /* NINE SECONDS AT MOST, whatever the network does (AGT-B10): the hook ends at HOOK_MS counted from the process's own
+  /* NINE SECONDS AT MOST, whatever the network does: the hook ends at HOOK_MS counted from the process's own
      start (`performance.now()`), inside Claude Code's ten-second timeout. The start hook's own deadline starts later,
      so on a hung network this fires first and says the one line itself, or the card it holds, unless one was written. */
   let said = false;

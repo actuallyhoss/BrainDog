@@ -1,5 +1,5 @@
 /**
- * The engine's health on a host (ENG-A02): `engineHealthRead` over Slash's real ledger, and `GET /api/slash/health`.
+ * The engine's health on a host: `engineHealthRead` over Slash's real ledger, and `GET /api/slash/health`.
  *
  * WHY THIS FILE EXISTS. The version door said `slash: true` when a model was configured, not when one answered, and Settings
  * said "All healthy" on the day a model job died. The read built here is what the door and the record both answer, so each

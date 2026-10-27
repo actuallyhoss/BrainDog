@@ -158,7 +158,7 @@ const MODELS: Record<string, Rate> = {
 };
 
 /**
- * The table above as the model checks read it (ENG-A03): each routed name with the id it is spelled by, its shape and its
+ * The table above as the model checks read it: each routed name with the id it is spelled by, its shape and its
  * rates. `tools/model-checks/run.mjs --routes` asks every row once, so what it measures is the table this Worker ships,
  * never a copy that could drift from it. Read only; the adapter still reads `MODELS`.
  */

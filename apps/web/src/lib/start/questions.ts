@@ -1,5 +1,5 @@
 /**
- * THE FIRST RUN ASKS BACK (USE-B06): at most two short questions, only where the answer changes what is built, and the
+ * THE FIRST RUN ASKS BACK: at most two short questions, only where the answer changes what is built, and the
  * answer added to what was said as a sentence of its own, so the build is read again with it.
  *
  * THE RULES FIRST, IN CODE, in this order: no name heard, then "What should I call you?"; money kept with no currency,

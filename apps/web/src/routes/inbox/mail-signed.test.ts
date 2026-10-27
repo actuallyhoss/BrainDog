@@ -1,5 +1,5 @@
 /**
- * Whether the newest mail was signed, said on the Inbox's Mail well (REC-A15). The kernel stores mail it could not
+ * Whether the newest mail was signed, said on the Inbox's Mail well. The kernel stores mail it could not
  * check with its `UNVERIFIED` reason and never matches it, so that reason is the whole of the answer.
  */
 

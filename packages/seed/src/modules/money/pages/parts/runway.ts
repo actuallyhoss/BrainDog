@@ -4,7 +4,7 @@
 export const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' };
 
 /**
- * HOW LONG IT LASTS IF NOTHING COMES IN, the one tile's since the UI pass of 20 October (money F3): the line over the
+ * HOW LONG IT LASTS IF NOTHING COMES IN, the one tile's (money F3): the line over the
  * page said "19 days with no income" while this tile said "30 Oct, in 57 days", two answers to one question a screen
  * apart. The line says what there is, and this tile how long it lasts.
  *
@@ -55,7 +55,7 @@ export const LASTS: Record<string, unknown>[] = [
  * block's tone where it declares one. THE HEADING IS THE ONE IT HAD, so the block keeps its key (`defaultBlockKey`)
  * and a look that placed it still finds it.
  *
- * PLACED BESIDE LASTS SINCE THE UI PASS OF 20 OCTOBER, when the box that took today's balance under Heads up went (its
+ * PLACED BESIDE LASTS, when the box that took today's balance under Heads up went (its
  * old balance line says Update balances, which opens the same form) and made room on a page of twenty-four blocks, the
  * most a page may (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`). `money-lasts-tile.test.ts` holds the pair.
  */

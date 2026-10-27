@@ -1,5 +1,5 @@
 /**
- * A LONG LIST OF OPTIONS THAT SAY THE SAME THING (audit P2): thirteen accounts, twelve of which "hold nothing yet" and each
+ * A LONG LIST OF OPTIONS THAT SAY THE SAME THING: thirteen accounts, twelve of which "hold nothing yet" and each
  * of which moves the same figure. The words are said once, over the list, with how many they cover, and each row keeps
  * only its name. PURE, AND NODE LOADS IT.
  */

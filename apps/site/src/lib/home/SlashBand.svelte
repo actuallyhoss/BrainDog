@@ -1,5 +1,5 @@
 <!--
-  The Slash band (site 2a section 5, F9): two columns and no drawn app behind them. On the left the "/ Slash" name,
+  The Slash band (site 2a section 5): two columns and no drawn app behind them. On the left the "/ Slash" name,
   the title, the line and three questions to try; on the right Slash's bar, ringed in red, with the answer attached
   under it at the same width.
 

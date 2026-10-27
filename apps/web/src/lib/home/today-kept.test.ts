@@ -36,11 +36,11 @@ test('A TILE IS ASKED ONCE A VERSION, again when the version moves, and a throw 
 test('HOME DRAWS ITS BODY FROM WHAT IT KEPT, and asks each tile through `tileOnce`', () => {
   const home = readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8');
   assert.match(home, /keptPart<KeptBody>\('body', key\)/u);
-  /* THE DESK'S TILES ARE BLOCKS OF THE BODY (C27), so they are kept with it and Home keeps no desk of its own. */
+  /* THE DESK'S TILES ARE BLOCKS OF THE BODY, so they are kept with it and Home keeps no desk of its own. */
   assert.doesNotMatch(home, /keptPart<[^>]*>\('desk'/u);
   for (const tile of ['handled'])
     assert.match(home, new RegExp(`tileOnce\\('${tile}', base, ver,`, 'u'), `${tile} is asked again at the same version`);
-  /* THE RECORD'S HOUSEKEEPING IS SETTINGS › HEALTH'S (U3), and Today asks none of it at any version, nor the briefing
+  /* THE RECORD'S HOUSEKEEPING IS SETTINGS › HEALTH'S, and Today asks none of it at any version, nor the briefing
      its More fold held (frame A). */
   for (const tile of ['briefing', 'matched', 'stale', 'learned', 'named', 'hues', 'imported'])
     assert.doesNotMatch(home, new RegExp(`tileOnce\\('${tile}'`, 'u'), `Today still asks ${tile}`);

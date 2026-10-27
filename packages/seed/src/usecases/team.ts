@@ -216,34 +216,34 @@ export const TEAM = {
      or taken away, so a minor step. 2.20.0 IS LIVE. Still unreleased (commit 63423720 holds 2.20.0), it takes batch
      88's block with no version of its own: Home draws Gone quiet, what stopped reporting, straight under its line
      (founder-home-quiet-88), a sixth tile on a page held to six. A block added, nothing taken away. And batch 100's
-     burn-down that fills itself (USE-A10): `TEAM_AUTOMATIONS`, three rules and two scripts added, so finishing a
+     burn-down that fills itself: `TEAM_AUTOMATIONS`, three rules and two scripts added, so finishing a
      ticket ticks its planned line, reopening it unticks it, and each morning the record writes the cycle day; the
      standup skill stops saying it does either; Bring the team in loses Invite your team, which ended in a refusal on
      a free record. A row and two words changed, declarations added, so still the minor step 2.21.0 is. And the KPI
      plan's K3-C: the project page it embeds draws Key numbers, the project's own key numbers (`kpis`, `for: project`),
      the whole width under Waiting on you. A block added, nothing taken away.
      2.22.0: Bring the team in says only that a team of agents works on any record, and no longer that a team of people
-     needs Cloud, which brain.dog does not sell and where inviting people is held (the audit of 22 October, U-C4). One
+     needs Cloud, which brain.dog does not sell and where inviting people is held. One
      line's words, so a patch would do; a minor step, since 2.21.0 is live on brain.dog.
      2.23.0 (things, not rows, 24 October): the project page it embeds is drawn for every project, parked and finished
      ones too, so a parked project's row opens its page. One `for:` widened; a minor step, since 2.22.0 is released.
 
-     2.24.0, PORTFOLIO 1.23.0 (the thinking scope of 24 October, C18 and C19): the project page it embeds draws the
+     2.24.0, PORTFOLIO 1.23.0 (the thinking scope of 24 October): the project page it embeds draws the
      project's stages as its road in the rail, keeps its plan as its road or its roadmap alone once a shape is kept,
      and opens on one note of two sentences where it was two notes. A block added, nothing taken away, and 2.23.0 is
      published, so a minor step of its own.
 
-     2.25.0, THE PROJECT'S SHAPE AS BLOCKS (the thinking scope of 24 October, C28 and C29): the project page it embeds
+     2.25.0, THE PROJECT'S SHAPE AS BLOCKS (the thinking scope of 24 October): the project page it embeds
      declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two
      `project` blocks where they were drawn by hand over the page; Handed back or blocked, which the page drew only
      where the shape was not, went for them, and More about is declared folded, as it was drawn. No id added or taken
      away, and 2.24.0 is live, so a minor step of its own.
 
-     2.26.0, THE AUDIT OF 25 OCTOBER (Z7): the project page's Where it stands says Last worked from the record's own
+     2.26.0: the project page's Where it stands says Last worked from the record's own
      `project-worked`, its tasks and its runs together, the figure its card on Projects and Today reads. No id added or
      taken away, and 2.25.0 is master's, so a minor step of its own.
 
-     2.27.0, AUDIT C OF 25 OCTOBER (X7): Projects, which this use case brings, opens a record with no project in play on
+     2.27.0, AUDIT C OF 25 OCTOBER: Projects, which this use case brings, opens a record with no project in play on
      a box to add one under one line (portfolio 1.27.0). Nothing of its own changed, and 2.26.0 is master's, so a minor
      step of its own.
 

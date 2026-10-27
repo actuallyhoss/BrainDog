@@ -1,5 +1,5 @@
 /**
- * Which installed look a person is drawn in, and the looks Appearance lists (`src/theme-pick.ts`, PGS-A21).
+ * Which installed look a person is drawn in, and the looks Appearance lists (`src/theme-pick.ts`).
  *
  * WHAT WAS TRUE BEFORE IT: with several themes installed the record drew its own, else the first by id, and nobody could
  * choose. These pin the pick: `house` is the house look, an installed id is that theme, and anything else is the old

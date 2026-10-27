@@ -1,5 +1,5 @@
 /**
- * A block that adds up reads the whole list (PGS-B05).
+ * A block that adds up reads the whole list.
  *
  * `bar`, `chips`, `gauge`, `heat`, `progress` and `split` read 200 rows and were refused past that, so the Ledger's
  * "Where it went, 12 months" was dead from the day the Ledger held 201 rows. Each now answers `wholeRead`: its parts by

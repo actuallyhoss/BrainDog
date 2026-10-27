@@ -1,5 +1,5 @@
 /**
- * No agent read can crash on size (AGT-B03, the record's job).
+ * No agent read can crash on size (the record's job).
  *
  * `readFrom` asks whether a read handed an agent text another person wrote, over the rows it read, and it bound one
  * parameter a row. The Durable Object refuses a statement of more than a hundred bound values, so on production an

@@ -1,5 +1,5 @@
 /**
- * Health says what the screens it watches say (audit 25 October, Y5): a green sign over a month that held failures says
+ * Health says what the screens it watches say: a green sign over a month that held failures says
  * how many, so "Every script that ran finished its last run" never stands under "four runs failed this month".
  *
  * WHAT IS JUDGED DOES NOT MOVE. A sign still reads red on the last run (a script) and on the last seven days (an

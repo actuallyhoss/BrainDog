@@ -75,7 +75,7 @@ test('a host with no catalogue, or one answering the app shell, lists nothing an
   assert.equal(bad.ok, false);
 });
 
-test('a catalogue that is there and refuses, fails or cannot be reached says so, and is not a host with none (Y9)', async () => {
+test('a catalogue that is there and refuses, fails or cannot be reached says so, and is not a host with none', async () => {
   const json = { 'content-type': 'application/json' };
   for (const answer of [
     async () => new Response('{"ok":false}', { status: 403, headers: json }),
@@ -253,10 +253,10 @@ test('browse is Add-ons, starters first, and /packs names a catalogue entry by i
   const { words: market } = await import('../../lib/market/words.ts');
   const { readFileSync } = await import('node:fs');
   const at = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-  /* ONE PLACE, ONE NAME (the UI pass of 20 October, agents F9): browse is the other half of Add-ons, and its sections
+  /* ONE PLACE, ONE NAME (agents F9): browse is the other half of Add-ons, and its sections
      name the kinds. */
   assert.equal(copy.packs, 'Add-ons');
-  /* STARTERS FIRST, THEN SHELVES BY PURPOSE (the add-ons pass of 27 October), and never where a thing came from. */
+  /* STARTERS FIRST, THEN SHELVES BY PURPOSE, and never where a thing came from. */
   assert.equal(market.store.starters, 'Starters');
   assert.doesNotMatch(JSON.stringify(market), /From others|"Doors"/u);
   assert.match(copy.browseAll, /starters/iu);
@@ -404,7 +404,7 @@ test('the catalogue this app ships lists every pack in packs/, at its version, b
   assert.ok(packs.some((p) => p.folder === 'project-brief'), 'packs/project-brief is gone, so this test proves nothing');
   for (const { folder, text } of packs) {
     const { pack, version } = JSON.parse(text) as { pack: string; version: string };
-    /* A MODULE'S OWN FILE WAITS FOR THE MODULE TO GO (SHL-A13): the catalogue tool passes it over until then, and it is
+    /* A MODULE'S OWN FILE WAITS FOR THE MODULE TO GO: the catalogue tool passes it over until then, and it is
        published when the module is taken out, so it is not looked for here. */
     if ((MODULES as readonly string[]).includes(pack)) continue;
     const entry: CatalogueEntry | undefined = index.value.entries.find((e) => e.kind === 'pack' && e.id === pack);
@@ -584,14 +584,14 @@ test('the line under an add-on\'s name names its publisher, never a key, in one 
   const { readFileSync } = await import('node:fs');
   const detail = readFileSync(new URL('./[id]/Listing.svelte', import.meta.url), 'utf8');
   assert.match(detail, /recordKeys\(/u);
-  /* THROUGH `trustSaid`, which is `trustLine` but for BrainDog's own unsigned add-ons (X12). */
+  /* THROUGH `trustSaid`, which is `trustLine` but for BrainDog's own unsigned add-ons. */
   assert.match(detail, /trustSaid\(/u);
   assert.match(detail, /trustThisKey\(/u);
   assert.match(detail, /Trust this key/u);
   assert.doesNotMatch(detail, /trustForEntry\(browserStore\(\)/u);
 });
 
-/* A STORE PAGE SAYS WHAT AN ADD-ON CALLS IN A PERSON'S WORDS, never the kernel's line (audit C of 25 October, X12). */
+/* A STORE PAGE SAYS WHAT AN ADD-ON CALLS IN A PERSON'S WORDS, never the kernel's line. */
 
 test('what an add-on calls out to is a sentence: the host, how often, and the key by its name', () => {
   assert.equal(callSaid({ host: 'api.kiln.example', key: 'kiln', line: 'CALLS OUT api.kiln.example · every 1h · key "kiln" to the host its Keychain entry opens' }), 'Calls api.kiln.example every hour with your Kiln key');

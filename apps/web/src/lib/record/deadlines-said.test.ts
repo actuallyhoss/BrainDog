@@ -2,7 +2,7 @@
  * WHAT A PERSON READS IS SAID, NEVER PRINTED: a due day as a day, a signed amount as money, a figure in its format, and
  * a block this build cannot draw left out of the page rather than drawn as an apology.
  *
- * Three things the visual review found on screen (`loop/research-visual-review.md` #1, #3 and #11), each driven here
+ * Three things the visual review found on screen (#3 and #11), each driven here
  * through the path that drew it: Today's Overdue and Coming up read `2026-07-01` over `[object Object]`; Money's "Out of
  * date" note read "from 20,690"; and Today's "Working now" was a tile saying it could not be drawn.
  */

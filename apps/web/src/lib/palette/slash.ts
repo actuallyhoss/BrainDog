@@ -52,7 +52,7 @@ export function offersSlash(a: { slash: boolean; prefix: string | null; text: st
 }
 
 /**
- * Whether the row is the FIRST row rather than the last: a question mark, or three words or more (E53). A sentence that
+ * Whether the row is the FIRST row rather than the last: a question mark, or three words or more. A sentence that
  * long is somebody asking, whatever else it happens to match, so "what needs me today" leads with the ask and not with six
  * rows that share a word with it. A shorter line is a name being looked for, and the ask stays the fallback under it.
  */

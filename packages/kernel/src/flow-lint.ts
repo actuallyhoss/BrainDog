@@ -996,7 +996,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
         else if (through) carried.set(spec.name, through.from);
         else carried.delete(spec.name);
       }
-      /* A STEP THAT WRITES THE ROW MAY NOT COPY A SECRET INTO IT (`writeFault` says why, and what the audits measured).
+      /* A STEP THAT WRITES THE ROW MAY NOT COPY A SECRET INTO IT (`writeFault` says why, and what testing measured).
          This is the one place the row is followed: with the copy refused, a question, `about:` or a call later in this
          list or in another rule reads a field no step filled from a secret, which is why the checks here that followed
          a written field to a question and to a call are gone. `note` and `create` write no field of this row, and

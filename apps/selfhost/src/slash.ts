@@ -58,7 +58,7 @@ import type { KeyStore } from './keys.ts';
 
 export { SLASH_KEY_LABEL };
 
-/** A second endpoint the operator named, asked when this host's own model does not answer (ENG-A06, ENG-A07). */
+/** A second endpoint the operator named, asked when this host's own model does not answer. */
 export type SlashFallback = { url: string; model: string; key: string };
 
 export type SlashConfig = SlashHostConfig & {
@@ -152,7 +152,7 @@ const wireOf = (config: SlashConfig, api: () => RecordApi, store: KeyStore | und
 });
 
 /**
- * The model name the owner typed under Included on this host, kept on tier a (ENG-A07), or `null` where none is kept, so
+ * The model name the owner typed under Included on this host, kept on tier a, or `null` where none is kept, so
  * the record names the model it is asked by and not the endpoint's default. Read on each ask, as the own key is.
  */
 const typedModelOf = (sql: Sql): string | null => {
@@ -240,7 +240,7 @@ export type SlashEngineDeps = {
 };
 
 /**
- * The route `createSlash` walks on this host (ENG-A06): `routeFor` over `selfhostFacts`, as the package's candidates.
+ * The route `createSlash` walks on this host: `routeFor` over `selfhostFacts`, as the package's candidates.
  *
  * "RULES ARE THE FALLBACK, NOT THE ENGINE". When this host's endpoint does not answer, the ask goes to the second
  * endpoint before Slash's rules speak. The first candidate carries no `inference`, so it is asked on the adapter the caller
@@ -279,7 +279,7 @@ function fallbackInference(config: SlashConfig, wire: SlashHostDeps): SlashInfer
 }
 
 /**
- * The wire for each candidate the engine's probe asks (ENG-A08, `@braindog/host` `engineProbeOf`): the second endpoint for
+ * The wire for each candidate the engine's probe asks (`@braindog/host` `engineProbeOf`): the second endpoint for
  * its own candidate, this host's endpoint for the rest, the same adapters the route above hands the asks.
  */
 export function selfhostProbeWire(

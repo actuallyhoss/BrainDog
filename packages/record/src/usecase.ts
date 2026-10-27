@@ -333,7 +333,7 @@ export function useCases(d: UseCaseDeps) {
       };
     };
 
-    /* WHAT IT STANDS ON, AND NOT ALL IT NAMES (USE-B08): a file that says `needs` goes in with those and grows into the
+    /* WHAT IT STANDS ON, AND NOT ALL IT NAMES: a file that says `needs` goes in with those and grows into the
        rest of `modules` when its moment comes. A file that says none stands on every module it names, as it always did. */
     for (const m of u.needs ?? u.modules) {
       const s = states.find((p) => p.id === m);

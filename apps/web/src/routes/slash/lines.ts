@@ -41,7 +41,7 @@ export const words = {
   /* Who drafted a suggestion: Slash's own rules, or the model it names. */
   byRules: 'From how you use BrainDog',
   byModel: (name: string) => `Drafted by ${name}`,
-  /* HOW LONG ONE ON DECIDE WAITS (ENG-B14), beside who drafted it, and why one he did not answer was taken back. */
+  /* HOW LONG ONE ON DECIDE WAITS, beside who drafted it, and why one he did not answer was taken back. */
   waits: (day: string) => `Waits until ${day}`,
   waitsToday: 'Waits until today',
   takenStronger: 'Taken back: a stronger suggestion took its place.',
@@ -139,7 +139,7 @@ export type Drafted = Suggestion & { by: string | null; waits: string | null; ta
 const got = (o: unknown, key: string): unknown => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[key] : undefined);
 
 /**
- * THE LAST DAY IT WAITS, IN WORDS (ENG-B14): the record's `lapses`, a real `YYYY-MM-DD`, said as the app says a day
+ * THE LAST DAY IT WAITS, IN WORDS: the record's `lapses`, a real `YYYY-MM-DD`, said as the app says a day
  * (`shortDay`, the year only when it is another), and today once that day has come. Never an ISO day; `null` without one.
  */
 export function waitsOf(lapses: unknown, now: number): string | null {

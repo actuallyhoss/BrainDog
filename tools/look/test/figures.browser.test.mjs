@@ -120,7 +120,7 @@ test('A PAGE WITH NONE OF THESE READS NOTHING, which is not the same as passing'
   assert.deepEqual(agesOf(facts, NOW), { read: 0, unread: 0, old: [] });
 });
 
-test("A BLANK PROJECT PAGE IS READ AS ONE IN THE PAGE (Z2): no name, no hero; and one with its hero is drawn", async (t) => {
+test("A BLANK PROJECT PAGE IS READ AS ONE IN THE PAGE: no name, no hero; and one with its hero is drawn", async (t) => {
   if (browser === null) return t.skip('there is no browser to open');
   const tab = await browser.newPage();
   try {

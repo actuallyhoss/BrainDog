@@ -1,5 +1,5 @@
 /**
- * The lived record: a record built by living in it, for the gates to read (PRF-A07, `loop/scope/area-proof-a.md` 2.5).
+ * The lived record: a record built by living in it, for the gates to read.
  *
  *   node tools/gates/lived.mjs [default|lived-well]    builds the profile (or finds it cached) and prints its signs
  *

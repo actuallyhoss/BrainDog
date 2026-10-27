@@ -1,5 +1,5 @@
 /**
- * `signs`: the record's vital signs read through the record (PRF-A01), the door `braindog signs`, the Health page and an
+ * `signs`: the record's vital signs read through the record, the door `braindog signs`, the Health page and an
  * agent all read them by.
  *
  * What is asserted is the door, not the readers, which are the kernel's (`kernel/test/signs-read.test.ts`): every

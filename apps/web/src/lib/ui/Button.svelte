@@ -1,5 +1,5 @@
 <!--
-  One control, three weights, and every one of them a rectangle (the UI pass of 20 October 2.A.1).
+  One control, three weights, and every one of them a rectangle.
 
   PRIMARY is the red fill with white words, one per screen: `--red-fill` at rest, `--red-fill-hover` under the pointer,
   `--red-fill-press` while it is held, and `--on-red` (white) on all three, in light and in dark. QUIET, the default, is

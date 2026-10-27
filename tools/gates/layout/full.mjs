@@ -27,7 +27,7 @@ import { mark, openFor, reach, SHAPES } from './shared.mjs';
  * THE ROOM IS THE COLUMN THE SHELL GIVES THE WORK, read off the shell's own grid: the track `#main` stands in, so the
  * rail card's column, folded or not, and the docked panel's column are both outside it. It was the viewport less
  * `.rail-slot`'s width, which is only drawn on the rail: on the top bar and the menu it read 0 and the room was the
- * whole window, right with the panel shut and 400 too wide with it open (research-audit-16 L12). The track is what
+ * whole window, right with the panel shut and 400 too wide with it open. The track is what
  * the shell gave and not what the page took, so a page capping itself is still the short one.
  *
  * ON ALL THREE SHAPES, because each lays the work out on its own grid and only one of them was ever drawn. A shape

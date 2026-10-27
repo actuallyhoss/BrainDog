@@ -1,6 +1,6 @@
 /**
  * The record's copies as three facts: when the last copy was kept and how large it was, and when the record was last
- * exported (LCH-C03). And the two writes that make them true each night: a copy kept, or a copy that failed.
+ * exported. And the two writes that make them true each night: a copy kept, or a copy that failed.
  *
  * READ FROM THE `export` EVENTS, AND NOTHING NEW IS STORED. Every copy already writes one (`lifecycle`, with the note
  * `snapshot <id> <bytes> bytes`), every export writes one (`export`, with the note `sections ...`), and those events are
@@ -48,7 +48,7 @@ export const keptNote = (id: string, bytes: number): string => `snapshot ${id} $
 export const failedNote = (): string => 'failed: the copy could not be saved';
 
 /**
- * WHY A NIGHT FAILED, IN WORDS A PERSON READS (A22, audit E10). The fault keeps the raw reason, which only an operator
+ * WHY A NIGHT FAILED, IN WORDS A PERSON READS. The fault keeps the raw reason, which only an operator
  * is shown, since a thrown error can name a bucket, a key or a host. Everybody who reads the fault is told this instead:
  * the reason as one plain sentence, read from the raw one by what it is about and never quoting it. A reason none of
  * these fit is said as stopping partway, never left out.

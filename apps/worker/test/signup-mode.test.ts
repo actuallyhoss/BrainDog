@@ -1,5 +1,5 @@
 /**
- * The sign-up switch through the Worker as it ships (LCH-A01, a switch of its own since `SIGNUP` was split from the host): `src/index.ts` bundled, a
+ * The sign-up switch through the Worker as it ships (a switch of its own since `SIGNUP` was split from the host): `src/index.ts` bundled, a
  * real Directory (`cloud-harness.ts`), and `POST /auth/signup/start` asked the way a stranger's browser asks it.
  *
  * MEASURED BEFORE THIS FILE: `start` made a person for anybody wherever `PUBLIC_HOST` was set, and nothing could make it

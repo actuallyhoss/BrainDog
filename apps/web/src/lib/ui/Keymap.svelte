@@ -25,7 +25,7 @@
      under the control, where the reader is pressing On and Off: reading the cookie there would show
      the previous answer until the page reloaded. The sheet in `?` has no such control beside it, so
      the cookie is the right default. */
-  /* `only` NARROWS THE SHEET TO THE KEYS NAMED, and `query` TO THE KEYS WHOSE WORDS, KEY, PLACE OR ID HOLD IT (U-C7): the
+  /* `only` NARROWS THE SHEET TO THE KEYS NAMED, and `query` TO THE KEYS WHOSE WORDS, KEY, PLACE OR ID HOLD IT: the
      Keyboard area draws the twenty used most and finds the rest by typing. A query wins over `only`. */
   let { silenced = pref.read().chars === false, only, query = '' }: { silenced?: boolean; only?: readonly string[] | undefined; query?: string } = $props();
 

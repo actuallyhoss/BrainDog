@@ -9,7 +9,7 @@
  * only for one that reached its line. The tile is read through the kernel on a page of these two blocks and nothing
  * else, because placing them on Money's page is money-wire-70's.
  *
- * THE COUNT THE TILE IS DRAWN ON IS MONEY'S OWN (audit 70 finding 1, budgets-set-73). `budgets-set` was the Personal use
+ * THE COUNT THE TILE IS DRAWN ON IS MONEY'S OWN (budgets-set-73). `budgets-set` was the Personal use
  * case's figure and Money declared none, so a record with Money and no Personal drew no tile and was told nothing. Every
  * record here installs Money and no use case, and the page declares the two blocks and no figure.
  *

@@ -1,6 +1,5 @@
 /**
- * STUDIES, TEAM TASK LIST AND STARTING A PROJECT ARE PART OF STUDENT, TEAM BOARD AND THE NEW PROJECT GUIDE NOW (the add-ons
- * pass of 27 October, row 6). A record that holds the starter as it stood before is updated on its own, asks nothing, and
+ * STUDIES, TEAM TASK LIST AND STARTING A PROJECT ARE PART OF STUDENT, TEAM BOARD AND THE NEW PROJECT GUIDE NOW. A record that holds the starter as it stood before is updated on its own, asks nothing, and
  * keeps every row and page it had. "Before" is this build's document with exactly what the fold added taken out.
  *
  * Every name here is invented.

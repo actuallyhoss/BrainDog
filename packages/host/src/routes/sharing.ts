@@ -8,7 +8,7 @@
  *
  * DECIDING WHO SEES WHAT IS AN OWNER'S OR AN ADMIN'S, IN A BROWSER: ADMIN, guarded by `team`. A grantee's own two are
  * DATA, because whoever holds a share may read what they hold and share on what they manage; both refuse every token
- * `NEEDS_BROWSER_SESSION` before anything else, because agents never share (T3). `sharing` lists shares, since
+ * `NEEDS_BROWSER_SESSION` before anything else, because agents never share. `sharing` lists shares, since
  * `shares` already lists the links to one page.
  */
 

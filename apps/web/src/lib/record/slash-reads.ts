@@ -1,5 +1,5 @@
 /**
- * Whether Slash reads on its own, and what a model is sent when it does (`slashReads`, ENG-A09).
+ * Whether Slash reads on its own, and what a model is sent when it does (`slashReads`).
  *
  * PURE, SO `node --test` CAN IMPORT IT: the client is handed in, as `slash.ts` takes it.
  *

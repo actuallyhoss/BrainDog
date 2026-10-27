@@ -1,5 +1,5 @@
 /**
- * One clock (SF3), held where two screens say the same thing: on the seed, a bill's own page and the list's Due cell
+ * One clock, held where two screens say the same thing: on the seed, a bill's own page and the list's Due cell
  * say the same days late, and Kiln's hero says the same late count as Work does for Kiln.
  *
  * WHY THESE TWO. They are where the review saw the two clocks disagree on screen: "64 days late" in the list over

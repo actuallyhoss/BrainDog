@@ -1,5 +1,5 @@
 <!--
-  A thing's state as an 8px dot (the UI pass of 20 October, 2.A.6). The dot is the second channel; the word beside it is
+  A thing's state as an 8px dot. The dot is the second channel; the word beside it is
   the first, and a dot that means something is never drawn without its word.
 
   RED ONLY FOR LATE AND NEEDS YOU. An open thing that is not late is a NEUTRAL RING, never a colour: most of a list is

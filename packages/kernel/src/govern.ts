@@ -196,7 +196,7 @@ const APPLIED =
   "(SELECT a.to_v FROM event a WHERE a.kind = 'note' AND a.target = 'decision:' || decision.id AND a.target_kind = 'decision' AND a.field IS NULL AND a.to_v IS NOT NULL ORDER BY a.rowid DESC LIMIT 1) AS applied";
 
 /**
- * WHO A QUESTION IS HANDED TO (USE-A13), the newest hand on it (`handQuestion`), or `null` when nobody is named or it was
+ * WHO A QUESTION IS HANDED TO, the newest hand on it (`handQuestion`), or `null` when nobody is named or it was
  * taken back. An event and no column, so it needs no migration: a `note` on the question whose `field` is `decider`,
  * the person in `to_v`.
  */
@@ -221,7 +221,7 @@ const ORDER: Record<GovernRegister, string> = {
 const WHEN: Record<GovernRegister, string> = { suggestion: 'opened_at', decision: 'ts', prediction: 'score_at' };
 
 /**
- * THE ORDER AN AGENT READS THE QUESTIONS IN when it asks for `order: 'wait'` (AGT-C08): what costs most to leave
+ * THE ORDER AN AGENT READS THE QUESTIONS IN when it asks for `order: 'wait'`: what costs most to leave
  * waiting first, by the very rank Decide's queue orders by (`weigh.ts` `WAIT_RANK_SQL`, never a second formula), then
  * newest first. Newest first alone handed an agent the question opened a minute ago while the one moving money since
  * yesterday waited under it, so the agent and the person looked at different top questions. A closed question has
@@ -399,18 +399,18 @@ export type Proposal = {
   body: Record<string, unknown>;
   cause?: string;
   /**
-   * WHAT CHANGED SINCE IT WAS ANSWERED, one sentence (AGT-C08). A question with this cause that the person declined, or
+   * WHAT CHANGED SINCE IT WAS ANSWERED, one sentence. A question with this cause that the person declined, or
    * answered with an option, is answered from memory and nothing is filed; with `again` it is filed, and the sentence
    * is kept under the question so the person reads why it is back.
    */
   again?: string;
   /**
-   * WHO DECIDES IT (USE-A13), a person's id, so the question arrives already handed to them. They must hold Decides on
+   * WHO DECIDES IT, a person's id, so the question arrives already handed to them. They must hold Decides on
    * the record or own it. Left out, any member who may decide may answer it, as before.
    */
   decider?: string;
   /**
-   * THE OPEN QUESTIONS THIS ONE ANSWERS TOO (scope D13), by their SG: "Covers SG242 too" said in words left SG242 open
+   * THE OPEN QUESTIONS THIS ONE ANSWERS TOO, by their SG: "Covers SG242 too" said in words left SG242 open
    * after its twin was accepted. Accepting this one closes each still open as moot, in the decision's batch, so its
    * Undo asks them again. Declining it leaves them as they are.
    */
@@ -502,7 +502,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
 
   const wrong = checkBody(deps, p.body_kind, p.body ?? {}, p.cause ?? null);
   if (wrong) return { ok: false, refusal: wrong };
-  /* A DAY IT LAPSES IS ONE STILL TO COME, in the record's own zone (ENG-B14). */
+  /* A DAY IT LAPSES IS ONE STILL TO COME, in the record's own zone. */
   const past = p.body_kind === 'arrange' || (p.body_kind === 'rowset' && p.body?.lapses !== undefined) ? offerFault(p.body ?? {}, todayIn(deps)) : null;
   if (past) return { ok: false, refusal: past };
 
@@ -604,7 +604,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   if (p.decider !== undefined && by === SLASH)
     return no<Filed>('FORBIDDEN', 'A question Slash drafts names nobody to decide it. The owner hands it to somebody.', { at: 'decider' });
   const cause = p.cause ?? (RUN_ID.test(by) ? causeOf(p.body_kind, body, p.question) : null);
-  /* ANSWERED ALREADY (AGT-C08). The person said no to this cause, or picked an option of it, and the proposer is told
+  /* ANSWERED ALREADY. The person said no to this cause, or picked an option of it, and the proposer is told
      what they said, when and why, and nothing is filed. With `again` it is asked anyway, and that sentence goes under
      it. An open question holding the cause is newer than any answer, so it is joined below instead. */
   const memory = cause !== null && !openWith(deps.sql, cause) ? remembered(deps, cause, p.body_kind, body) : null;
@@ -612,7 +612,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   const asked = askedAlready(deps, by, p, body, cause);
   if (!asked.ok) return asked;
   if (asked.value !== null) return ok(asked.value);
-  /* AT THE CAP A STRONGER ONE TAKES THE PLACE OF THE ASKER'S OWN WEAKEST, in this write (ENG-B14), or is refused. */
+  /* AT THE CAP A STRONGER ONE TAKES THE PLACE OF THE ASKER'S OWN WEAKEST, in this write, or is refused. */
   if (p.body_kind === 'arrange') {
     const full = makeRoom(deps, by, body, cause);
     if (full) return { ok: false, refusal: full };
@@ -786,7 +786,7 @@ function heldFields(deps: GovernDeps, register: string, at: string): Record<stri
 }
 
 /**
- * The open question this proposal already is, or `null` when it is new (AGT-C07).
+ * The open question this proposal already is, or `null` when it is new.
  *
  * THE SAME CAUSE IS THE SAME QUESTION, whoever asks: an open one holding it is answered with `joined` and nothing is
  * filed, so two agents proposing one change make one card. A deferred question is still open, and is joined.
@@ -931,7 +931,7 @@ const rowAsk = (r: Record<string, unknown>): string => (typeof r.at === 'string'
 const RUN_ID = /^S([1-9]\d*)$/u;
 
 /**
- * Take back a question its opener no longer asks (AGT-C07).
+ * Take back a question its opener no longer asks.
  *
  * ONLY THE OPENER'S, AND ONLY WHILE IT IS OPEN. The run that filed it may, and so may a later run of the same key: a
  * session that ends and starts again is the same agent asking, and the question it left is still its own. Another
@@ -966,7 +966,7 @@ function takeBack(deps: Pick<GovernDeps, 'sql' | 'mint'>, id: string, by: string
   event(deps, at, by, 'resolve', `suggestion:${id}`, 'suggestion', 'withdrawn', note);
 }
 
-/* ── an asker takes back its own suggestion (ENG-B14) ─────────────────────── */
+/* ── an asker takes back its own suggestion ─────────────────────── */
 
 /** The most an arrangement's `rank` says: the recommender's strength for it, a whole number from 0. */
 const RANK_MOST = 1000;
@@ -1788,11 +1788,11 @@ const LADDER_REASON =
  * down to Suggest since stops here. The rung is the ladder's for the agent the question was filed by, and every kind
  * must stand at Do and tell or Do quietly, none on the floor.
  *
- * THE FLOOR READ HERE IS THE WHOLE OF IT (`change-kind.ts`), and two parts of it were missing until research-audit-19:
+ * THE FLOOR READ HERE IS THE WHOLE OF IT (`change-kind.ts`), and two parts of it were missing at first:
  * a merge or an identity key (`merged_into`, `email`, `handles`, `keys` or `self` on the people or organisations
  * `meet` writes) was a plain edit, so a rowset setting only `merged_into` was let through at Do and tell; and a field
  * sent empty was an edit and not a delete. Both are on the floor now, and a filer that acts for nobody (Slash, a run no token opened)
- * meets every row a person made as somebody else's. research-audit-21 closed the rest of who someone is: a row filed
+ * meets every row a person made as somebody else's. A later change closed the rest of who someone is: a row filed
  * without `at`, which is a new person or organisation, asks when it is made merged, as the record's own person, or
  * with addresses, handles, keys or a domain, and a rename of one, or a change to its domain, aliases or organisation,
  * asks as an edit. A new row with only a name still climbs as an add.
@@ -2446,7 +2446,7 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
       at: 'body',
     };
 
-  /* HOW STRONG IT IS AND THE DAY IT LAPSES (ENG-B14), in shape here; a day already past is `propose`'s to refuse. */
+  /* HOW STRONG IT IS AND THE DAY IT LAPSES, in shape here; a day already past is `propose`'s to refuse. */
   if (kind === 'arrange') {
     const bad = offerFault(body, null);
     if (bad) return bad;
@@ -2736,7 +2736,7 @@ function mergeArrangement(rest: Record<string, unknown>, taken: Record<string, u
   return out;
 }
 
-/* ── what an option writes (F61) ─────────────────────────────────────────── */
+/* ── what an option writes ─────────────────────────────────────────── */
 
 /** An entry by its spoken id, `recurring#5`, whose list is the part before the `#`. */
 const SPOKEN_AT = /^([a-z][a-z0-9_-]{0,31})#[1-9]\d*$/u;
@@ -2861,7 +2861,7 @@ function skippedSaid(p: Patched): string {
 
 /**
  * The keys a `rowset` row that updates carries, and nothing beside them. `register` is a live list the row is in when it
- * is not the rowset's own, so one question can fold a list and move the links another list holds to it (AGT-C13).
+ * is not the rowset's own, so one question can fold a list and move the links another list holds to it.
  */
 const UPDATE_KEYS = ['at', 'version', 'patch', 'register'];
 
@@ -3571,11 +3571,11 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       const wrote_ = writePrediction(deps, id, body.prediction as Prediction, String(body.declaration_id ?? id), at);
       if (!wrote_.ok) return wrote_ as Result<Decided>;
     }
-    /* AN ACCEPTED ARRANGEMENT IS GRADED WHERE IT CAN BE (ENG-B17): one the record already meets, or that reads nothing today, is accepted ungraded, never refused. */
+    /* AN ACCEPTED ARRANGEMENT IS GRADED WHERE IT CAN BE: one the record already meets, or that reads nothing today, is accepted ungraded, never refused. */
     if (row.body_kind === 'arrange' && isMap(body.prediction)) writePrediction(deps, id, body.prediction as Prediction, id, at);
   }
 
-  /* AN OPTION THAT CHANGES ENTRIES (F61), such as a script asking which day a payment falls on: the one picked is
+  /* AN OPTION THAT CHANGES ENTRIES, such as a script asking which day a payment falls on: the one picked is
      written here, in the decision's batch and signed by the person deciding, all of it or none, so undoing the decision
      undoes what the pick wrote. The options not picked write nothing. */
   /* ENTRIES THAT CHANGED SINCE ARE LEFT AND COUNTED (`applyPatches`), and the rest are written. A pick that finds every
@@ -3602,7 +3602,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   const question = questionOf(deps.sql, id) ?? id;
   const decision = `D${deps.allocate('decision')}`;
   deps.sql.exec(
-    /* AND THE QUESTION'S CAUSE, so the same ask filed again finds the answer it was given (`decision_cause`, AGT-C08). */
+    /* AND THE QUESTION'S CAUSE, so the same ask filed again finds the answer it was given (`decision_cause`). */
     "INSERT INTO decision (id, question, answer, reason, decided_by, ts, supersedes, cause) VALUES (?, ?, ?, ?, ?, ?, NULL, (SELECT cause FROM suggestion WHERE id = ?))",
     decision,
     question,
@@ -3630,7 +3630,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
   /* AND WHAT THE PICK LEFT, IN ITS BATCH, so the question's history says how many were not written and why. */
   if (skipped) event(deps, at, 'system', 'note', `suggestion:${id}`, 'suggestion', `skipped:${skipped.count}`, skipped.said, batch);
 
-  /* THE QUESTIONS IT COVERS GO WITH IT (scope D13): accepted whole, each one it named that still waits is closed as moot
+  /* THE QUESTIONS IT COVERS GO WITH IT: accepted whole, each one it named that still waits is closed as moot
      with a line saying which answer settled it (any answer but no), in this batch, so the decision's Undo asks them again. */
   const covered: string[] = [];
   if (option !== 'reject' && !taking)
@@ -3865,7 +3865,7 @@ export function questionOf(sql: Sql, id: string): string | null {
 /* ── who decides ─────────────────────────────────────────────────────────── */
 
 /**
- * The `field` of the note that hands a question to somebody (USE-A13).
+ * The `field` of the note that hands a question to somebody.
  *
  * A NOTE AND NOT AN EVENT KIND OF ITS OWN, because `event.kind` is a closed list and a new kind is a migration
  * (`0001_kernel.ts`). The question is the target, `to_v` holds the person's id, and an empty `to_v` is the question taken
@@ -3956,7 +3956,7 @@ export function deciderOf(sql: Sql, id: string): string | null {
 }
 
 /**
- * Hand one open question to the person who decides it, or take it back with `to: null` (USE-A13).
+ * Hand one open question to the person who decides it, or take it back with `to: null`.
  *
  * WHO MAY HAND ONE IS THE CALLER'S TO ASK (`packages/record/src/methods/decider.ts`, the owner's in a browser). This holds
  * the rest: the question is there and still open, and the person holds Decides or owns the record. Handed to whoever

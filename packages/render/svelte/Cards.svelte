@@ -48,7 +48,7 @@
   type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
 
   /**
-   * A LINE TYPED ON IN PLACE (PGS-C15) IS HANDED IN `opts` TOO, for the reason a scope is: `edits` is, by the header's
+   * A LINE TYPED ON IN PLACE IS HANDED IN `opts` TOO, for the reason a scope is: `edits` is, by the header's
    * columns, the field a box writes and its own max (`cardEdit`, `src/card-edit.ts`), and `write` is the page's writer,
    * which answers the record's sentence when it refuses and nothing when the line was kept. With no `write`, a reader who
    * cannot write and the mirror alike, every line is text, as `toHTML` draws it.
@@ -281,7 +281,7 @@
     onkeydown={(ev) => keyed(ev, r, n, i, e)}
   />{/snippet}
 
-<!-- WHERE A ROW APPLIES, IN THE CARD'S META LINE (agents F7, S8): "on ● Kiln", the project's dot in its hue and its
+<!-- WHERE A ROW APPLIES, IN THE CARD'S META LINE (agents F7): "on ● Kiln", the project's dot in its hue and its
      name, as words and not a fact in the label column, where "on" sat 96px from "Kiln". A row for every project says
      "Everywhere". The dot is hidden from a screen reader, which reads "on Kiln". -->
 {#snippet scopeLine(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<p class="cards-scope">{#if everywhere}<span class="scope-name">{said}</span>{:else}{CARDS_ON}{' '}<span class="cards-scope-dot" style={m?.hue === null || m?.hue === undefined ? undefined : `--hue:${m.hue}`} aria-hidden="true"></span><span class="scope-name">{said}</span>{/if}</p>{/snippet}

@@ -1,6 +1,5 @@
 /**
- * A list's own name, changed from Settings > Words and money where no use case gives a word for it (the audit of 25
- * October, Y21: the area drew 13 of a record's 29 lists, the ones the speaking use case declares).
+ * A list's own name, changed from Settings > Words and money where no use case gives a word for it (the area drew 13 of a record's 29 lists, the ones the speaking use case declares).
  *
  * THE DECLARATION'S NAME, FILED AS A CHANGE TO THE WHOLE LIST, the way a field's rename is (`field-write.ts`
  * `renameField`): read fresh from the record, the name swapped, and the owner's accepted at once. A colleague's waits

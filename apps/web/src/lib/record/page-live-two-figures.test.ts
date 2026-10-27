@@ -80,7 +80,7 @@ test('a plan named with a bar is one cell, and six tracks at most are drawn', ()
   assert.equal(block.total, 7, 'the count of every plan is kept beside the six drawn');
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z12 (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`, Instalments): his plans
+/* His plans
    read in small letters, the text the import wrote on each part, where Needs you and the plan's own row start each
    with a capital. A plan is a name, and a name starts with a capital; a name typed with one keeps every letter as typed. */
 test('A PLAN TYPED ALL IN SMALL LETTERS IS NAMED WITH A CAPITAL, as its own row and Needs you name it', () => {

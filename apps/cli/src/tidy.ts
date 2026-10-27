@@ -1,16 +1,16 @@
 /**
- * `braindog tidy [--ask] [--json]`: what went stale on the record, read now, and the call that clears each (AGT-D03, over
+ * `braindog tidy [--ask] [--json]`: what went stale on the record, read now, and the call that clears each (over
  * AGT-C18's registry). Steps left earlier that nobody took, questions that waited, and a line for each finder that
  * found something, each as the record says it. Under them, how many things with no place look like they belong to a
- * project (`scopeProposals`, AGT-D04 job 6) and how many lessons two projects learned twice (`learningsTwice`, AGT-D15).
+ * project (`scopeProposals`, AGT-D04 job 6) and how many lessons two projects learned twice (`learningsTwice`).
  *
  * WITHOUT `--ask` IT READS AND NOTHING ELSE: `stale`, `scopeProposals` and `learningsTwice`, three GETs, and no session
  * headers, so it names no run, opens none and fires no hook. It files nothing and answers nothing: the line under each
  * kind says the call that clears it, and making that call is the reader's.
  *
  * WITH `--ask` IT FILES, AND ONLY THEN: `proposeScopes` and `promoteLearnings`, each a person's write, put each clean-up
- * on Decide as one question, and a line a question says where to answer it. And the fold of what is held twice
- * (AGT-D03): for each list whose declaration says what makes two of its things the same (`same:`), `heldTwice` reads
+ * on Decide as one question, and a line a question says where to answer it. And the fold of what is held twice:
+ * for each list whose declaration says what makes two of its things the same (`same:`), `heldTwice` reads
  * which may be here twice, and when it names any, `askFoldTwice` files one question for that list to keep one of each.
  * Nothing is moved, kept once or folded until he answers there. Only a person typing the flag asks: no hook and no
  * schedule passes it, so nothing asks by itself.

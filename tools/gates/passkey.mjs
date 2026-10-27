@@ -205,7 +205,7 @@ export default async function passkey(root = join(import.meta.dirname, '..', '..
     }
 
     browser = await chromium.launch();
-    /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04): the record's clock and the page's ready mark. No `record` and
+    /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE: the record's clock and the page's ready mark. No `record` and
        no prefs, because the drive stays signed out: `record.setPref` would use the server key and sign the page in. */
     const ready = readiness('passkey', budget('ready').settleTimeoutMs, ROOT, { quietMs: budget('ready').quietMs });
     const opened = await openPage(browser, `${ORIGIN}${APP_BASE}/signin`, { width: Math.max(...budget('a11y').widths), clock: record.now, ready, waitUntil: 'networkidle' });

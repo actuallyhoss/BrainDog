@@ -291,7 +291,7 @@ export async function proposeFile(text: string, file: { usecase: string; title: 
   const u = printable({ title: file.title, version: file.version });
   const at = await connect(host, io);
   if (typeof at === 'number') return at;
-  /* ASKED ONCE (AGT-C07), keyed as its pack is (`usecase-<id>`), so the file and the use case on offer by its id join. */
+  /* ASKED ONCE, keyed as its pack is (`usecase-<id>`), so the file and the use case on offer by its id join. */
   const answer = await at.client.call<{ id: string; joined?: true; said?: string }>('propose', {
     question: question ?? `Install ${u.title} ${u.version}?`,
     body_kind: 'pack',

@@ -1,5 +1,5 @@
 /**
- * What the Kennel never does, held in one file (SHL-B06): no rating, no price, no remote asset, no listing before review.
+ * What the Kennel never does, held in one file: no rating, no price, no remote asset, no listing before review.
  *
  * A CONFORMANCE FILE, so each rule is one test named for the rule, and a change that lets one through fails by that
  * name. The Kennel is in memory, as `kennel.test.ts` holds it: an index, a review file and a map of files.

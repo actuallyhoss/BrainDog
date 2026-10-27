@@ -25,7 +25,7 @@
   } = $props();
 </script>
 
-<!-- READ FIRST, TYPED INTO SECOND (Y25): the caret does not jump to the message box as it opens. -->
+<!-- READ FIRST, TYPED INTO SECOND: the caret does not jump to the message box as it opens. -->
 <Sheet bind:open {title} caret={false}>
   {#if open}
     <div class="run-sheet" data-run-sheet>

@@ -49,7 +49,7 @@ test('AN AMOUNT OF NOTHING IS NOT SAID on a timeline, and on rows only where it 
   assert.equal(rowsCell('1 Jul 2026', now), '1 Jul');
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z13 (`loop/proof/looks/audit-2026-10-25/money-1512-light.png`): the Ledger tile drew the bank's
+/* The Ledger tile drew the bank's
    own codes as names, "22OCT26 Phone Banking Transfer" and a shop's name ending in a till number. The day column says
    the day, and a till number run onto a shouted name is no part of the name. */
 test('A BANK LINE READS AS A NAME: its own date stamp and a till number run onto a shouted name are left off', () => {

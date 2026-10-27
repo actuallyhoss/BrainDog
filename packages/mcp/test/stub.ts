@@ -11,7 +11,7 @@ export type Ctx = { who: string };
 export type Call = { method: string; args: unknown; ctx: unknown };
 
 /**
- * `agents` IS A RECORD THAT KNOWS WHAT HE TELLS AGENTS (`instructionsMine`, plan §2): the door then reads the caller's
+ * `agents` IS A RECORD THAT KNOWS WHAT HE TELLS AGENTS (`instructionsMine`): the door then reads the caller's
  * settings and what waits for its run beside each call, which a stub without it is never asked.
  */
 export function stub(over: Partial<McpSurface<Ctx>> = {}, opts: { agents?: boolean } = {}) {

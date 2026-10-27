@@ -1,5 +1,5 @@
 <!--
-  The toast stack (the UI pass of 20 October, 2.A.16): an inverted bar, the sentence, and Undo with its key.
+  The toast stack: an inverted bar, the sentence, and Undo with its key.
 
   AN INVERTED BAR, because with no shadows a white card on a white tile is not there: `--toast` (near ink in light, a
   lifted slate in dark) with the words in `--on-toast` at 14/500, radius 8, 48 tall at least, 12 by 16 in, 480 wide at

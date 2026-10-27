@@ -649,7 +649,7 @@
      first series is `--chart-1` (ink outside a project), the next ones the category hues; money out hangs under zero
      in the second series' hue, and the net is a line of `--ink-2` with a dot a month. A month to come is the same bars
      at half strength. Red is only a 2px cap on a month whose net is below zero, keyed "More out than in" (the money
-     review, F2). A bucket says its figures on hover, in a small card over the column. Too few buckets are the totals. */
+     review). A bucket says its figures on hover, in a small card over the column. Too few buckets are the totals. */
   .block[data-kind='series'] {
     container-type: inline-size;
   }
@@ -989,7 +989,7 @@
     gap: var(--sp-2);
   }
 
-  /* ONE FACT ONCE (the money review, F5): the name at the start, "4 of 8" at the end, the track under them, and nothing
+  /* ONE FACT ONCE (the money review): the name at the start, "4 of 8" at the end, the track under them, and nothing
      else. The share and what is left said the figure twice more; they stay in the track's name for a screen reader, and
      what is left comes back only where the row carries an intent (a budget close to or past its limit). */
   .progress-row {
@@ -1607,7 +1607,7 @@
   }
 
   /* THE PART OF THE WASH UNDER ZERO IS THE LATE RED AT 14%, the one place the walk is a thing the person must act on
-     (the money review, F2). The renderer draws it as its own path (`data-below`), so the wash above stays the ink's. */
+     (the money review). The renderer draws it as its own path (`data-below`), so the wash above stays the ink's. */
   .forecast-area[data-below] {
     fill: var(--chart-late);
     fill-opacity: 0.14;
@@ -1751,7 +1751,7 @@
   }
 
   /* THE CORNER THE LINE DOES NOT RUN THROUGH (`data-place`, from `src/forecast.ts` `nowPlace`): at 390 a walk that
-     stepped up the day after today drew "Today" and the balance across the line (the audit of 25 October, Z16). Under
+     stepped up the day after today drew "Today" and the balance across the line. Under
      the dot to the end side, or to the start side over or under it, the words ending at the dot. */
   .forecast-now-label[data-place='under'] {
     translate: var(--sp-2) var(--sp-1);
@@ -2323,7 +2323,7 @@
   }
 
   /* ADJUST AND FULL SCREEN, a row of quiet buttons under the chart; in a tile with a head they stand at the head's
-     end as 32px ghost buttons (below), so the chart is not followed by 40px of controls (the money review, F17). */
+     end as 32px ghost buttons (below), so the chart is not followed by 40px of controls (the money review). */
   .forecast-tools {
     display: flex;
     flex-wrap: wrap;
@@ -2657,7 +2657,7 @@
        years or years (`src/forecast.ts` `TICKS_MOST`), so from seven names every other one is kept. Every third was
        the rule for any walk once, and a walk that crossed two or three month starts kept only the first. FROM FIVE,
        since a phone's plot is about 280px: five names or more leave under 56px a name, and at 390 "Jun" and "Jul" met
-       (the money review, F17). */
+       (the money review). */
     .forecast-ticks:has(> .forecast-tick:nth-child(5)) > .forecast-tick:nth-child(even) {
       display: none;
     }

@@ -310,7 +310,7 @@ function usesWritten(uses: TokenUses, ids: readonly string[], now: number, surfa
 }
 
 /**
- * Where a host keeps the plan's count of agents (LCH-A08): one row of a small table the host makes, `host_meta`, under
+ * Where a host keeps the plan's count of agents: one row of a small table the host makes, `host_meta`, under
  * `plan.agents`. Not a kernel table, so no `dog_section` row names it and no `.brain` carries it: a record exported from
  * Cloud and opened on a self-host brings no cap with it.
  *

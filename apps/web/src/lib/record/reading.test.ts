@@ -1,5 +1,5 @@
 /**
- * A reading says its number with its unit and the day it was read (the audit of 25 October, Y17): Numbers printed
+ * A reading says its number with its unit and the day it was read: Numbers printed
  * "CPU, kettle 16.4" with the "%" in a field nobody drew, and the row split "Value 16.4" from "Unit %" and never said
  * when.
  */

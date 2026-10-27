@@ -1,5 +1,5 @@
 /**
- * What leaves with an add-on's calls, said on Decide's arranged sheet (audit 53, finding 8).
+ * What leaves with an add-on's calls, said on Decide's arranged sheet.
  *
  * The sheet drew its calls from the body's `approve` strings alone, which never say the key in the call's own line, so an
  * add-on that sends a key out had no sentence of what leaves. An arrangement files `calls_out` beside `approve` now

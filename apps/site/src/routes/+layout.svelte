@@ -4,10 +4,10 @@
   THE HEADER IS ON THE NIGHT GROUND AND SCROLLS AWAY WITH THE PAGE, 64px tall. Every page opens on the night ground
   too (its own head, `lib/site/PageHead.svelte`, or the home page's hero), so the band runs on from the header
   unbroken. It holds the brand, Slash, Agents, Pricing, Security and Docs (`nav.ts`), "Sign in", and "Get early
-  access" in red (site F12). Signed in, the last two become "Open BrainDog" (`lib/site/Start.svelte`, `signed-in.ts`).
+  access" in red. Signed in, the last two become "Open BrainDog" (`lib/site/Start.svelte`, `signed-in.ts`).
   At 760 and under the links go and the button stays at the right, small, with a 44px menu beside it holding the links.
 
-  THE FOOTER IS PLAIN TEXT COLUMNS (site F10): the brand with nothing under it, Product, Who it's for and Help.
+  THE FOOTER IS PLAIN TEXT COLUMNS: the brand with nothing under it, Product, Who it's for and Help.
 
   NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the theme follows the operating system, and every page is
   finished HTML. Scripting adds one thing: closing the phone menu after a tap, on a press of Escape or on a tap outside
@@ -71,7 +71,7 @@
 <svelte:window onclick={outside} onkeydown={escape} />
 
 <!-- THE TWO FACES EVERY PAGE OPENS IN, asked for beside the stylesheets rather than after them, so the text is drawn in
-     them the first time and nothing moves when they land (F17: the founders' page shifted 0.06 on a phone). The same
+     them the first time and nothing moves when they land (the founders' page shifted 0.06 on a phone). The same
      addresses as `tokens.css`, version and all, or the browser fetches each twice; `crossorigin` because fonts are
      always fetched that way. Geist Mono and Plex are left to load when a page uses them. -->
 <svelte:head>

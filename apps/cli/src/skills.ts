@@ -158,7 +158,7 @@ export const fixOf = (r: Result<unknown>): string => (refused(r) ? r.refusal.fix
  */
 const CAUSE = /^[\p{L}\p{N}][\p{L}\p{N}#@._:/-]{0,199}$/u;
 
-/** `{ cause }` for a `propose` (AGT-C07), so a question the command line asks is asked once; nothing for a key out of shape. */
+/** `{ cause }` for a `propose`, so a question the command line asks is asked once; nothing for a key out of shape. */
 export const causeOf = (key: string): { cause?: string } => (CAUSE.test(key) ? { cause: key } : {});
 
 /**
@@ -407,7 +407,7 @@ export type SkillSync = {
   clock?: () => number;
   /**
    * The host the record is reached at, whose key names it (`target`), so a question the sync files is printed with the
-   * link that opens it on Decide (AGT-C20). Without it, or for a host that names no record, the line says its handle.
+   * link that opens it on Decide. Without it, or for a host that names no record, the line says its handle.
    */
   to?: Pick<Target, 'key'> | undefined;
   /**
@@ -454,7 +454,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
   const synced = (path: string) => folders.some((f) => resolve(path).startsWith(f + sep));
   const where = (path: string) => (projectBase !== null && inside(path, projectBase) ? `${path} (in the repository, not committed)` : path);
   const tell = (done: string, would: string) => lines.push(s.dryRun ? would : done);
-  /* THE LINK TO THE QUESTION, NOT ITS HANDLE ALONE (AGT-C20): what the person opens to answer it, as an add-on install
+  /* THE LINK TO THE QUESTION, NOT ITS HANDLE ALONE: what the person opens to answer it, as an add-on install
      prints (`untilAccepted`), wherever the host names the record. */
   const link = (id: string): string | null => (s.to === undefined ? null : decideLink(s.to, id));
   /* A PROPOSAL THE RECORD REFUSED HAS NO QUESTION TO LINK TO, and says the record's fix as it always did. A host that
@@ -479,7 +479,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
 
   /* THE QUESTION NAMES THE SKILL AND "THIS MAC", AND THE DETAILS SAY WHERE. It read "Take the edit to kiln-release made
      on Maras-MacBook-Pro.local as version 2?"; the file and the machine's own name are kept in the body's details. */
-  /* ASKED ONCE (AGT-C07): the cause is the skill, where it lives, its row and a hash of the edit, so the same edit synced
+  /* ASKED ONCE: the cause is the skill, where it lives, its row and a hash of the edit, so the same edit synced
      on a second machine joins the question already open instead of opening another, and the line says the record's own
      sentence, not a new id. THE ROW AND THE HASH KEEP IT EXACT: two projects each hold a `review-pr` at `project`, and a
      second machine's different edit is its own question, never "Already waiting" for text it did not send. No machine

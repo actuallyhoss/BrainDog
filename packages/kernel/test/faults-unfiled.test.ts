@@ -1,5 +1,5 @@
 /**
- * Dead jobs with no line in `fault` are faults at once (audit 36-37, finding 2).
+ * Dead jobs with no line in `fault` are faults at once.
  *
  * Migration 30 closed the old dead-job questions on his record and raised no fault for the jobs behind them, so they
  * were in no list until the next full eight-rung death. What is asserted: a dead outbox kind and a failed schedule kind

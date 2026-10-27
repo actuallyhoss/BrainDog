@@ -1,5 +1,5 @@
 <!--
-  The jobs for one project, under a section that says `panel: job` on the project's page (PGS-C16).
+  The jobs for one project, under a section that says `panel: job` on the project's page.
 
   THE LAST THREE RUNS THAT NAME THE PROJECT, each by its title with where it stands in words and Open, which goes to the
   run's own screen; a running one says its newest line under it. Then one line to type what to do, the kind of job when

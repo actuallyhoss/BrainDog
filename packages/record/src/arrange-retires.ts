@@ -1,5 +1,5 @@
 /**
- * An update that takes away a door or pattern the record is using says so, and installs what takes it over (REC-A16).
+ * An update that takes away a door or pattern the record is using says so, and installs what takes it over.
  *
  * THE PLAN CALLED IT A RETIRE AND SAID NOTHING OF TEXTS. money-core 3.0.0 drops the card wordings and their text twins
  * to `card-alerts`, and with no `hands` since 2.4.0 a record updating retires them, so the owner's Shortcut posted to a

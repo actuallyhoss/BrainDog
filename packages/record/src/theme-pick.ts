@@ -1,5 +1,5 @@
 /**
- * Which installed look a person is drawn in, and the looks Appearance offers them (PGS-A21).
+ * Which installed look a person is drawn in, and the looks Appearance offers them.
  *
  * A RECORD MAY HOLD SEVERAL `theme` DECLARATIONS AND NOBODY CHOSE. With more than one installed, `boot` drew the
  * record's own (the one set from Appearance, with no pack behind it) and otherwise the first by id, so an add-on that

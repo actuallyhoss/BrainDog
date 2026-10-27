@@ -3,7 +3,7 @@
  *
  *   node tools/gates/no-shape-files.mjs [root]
  *
- * A SHAPE COPY IS A RECORD'S STRUCTURE WITH EVERY VALUE SCRAMBLED (PRF-A13, `packages/kernel/src/shape.ts`). It holds no
+ * A SHAPE COPY IS A RECORD'S STRUCTURE WITH EVERY VALUE SCRAMBLED (`packages/kernel/src/shape.ts`). It holds no
  * word of the record, and it still holds the record's shape: how many lists, how many things in each, how long each
  * name is, which ones repeat. That is his to share with an agent on his own machine, and never the repository's.
  * `.gitignore` keeps `*.brainl` out, and a copy renamed to anything else walks past it; this reads the file's own mark.

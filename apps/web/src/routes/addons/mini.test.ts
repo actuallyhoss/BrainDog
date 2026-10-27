@@ -41,7 +41,7 @@ test('a figure is a chart, a board is columns, and anything with rows is a list'
   assert.equal(shapeOf(undefined), 'list');
 });
 
-test('ONE WORD FOR A STARTER EVERYWHERE, and the menu is never "Rail" (audit C of 25 October, X10)', () => {
+test('ONE WORD FOR A STARTER EVERYWHERE, and the menu is never "Rail"', () => {
   assert.equal(words.kinds.usecase, 'Starter');
   assert.equal(words.store.starters, 'Starters');
   assert.equal(words.categories['ways-of-working'], 'Starters');

@@ -1,5 +1,5 @@
 /**
- * A session saying it is still working (AGT-C03, `kernel.heartbeat`): its own run's clock moves, and nothing else does.
+ * A session saying it is still working (`kernel.heartbeat`): its own run's clock moves, and nothing else does.
  *
  * MEASURED BEFORE: `last_seen` moved only when a run wrote, so a session that read and thought for twenty minutes read
  * as Quiet on the Agents page beside one that had died. What is asserted is what the page and the history read after a

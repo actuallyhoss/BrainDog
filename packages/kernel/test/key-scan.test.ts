@@ -1,5 +1,5 @@
 /**
- * The nightly walk for a key written in plain text (`key-scan.ts`, AGT-D01).
+ * The nightly walk for a key written in plain text (`key-scan.ts`).
  *
  * The keys are planted straight into the tables, because the write path refuses them, which is the point: the walk
  * is for what a record already holds. Each planted key is built at run time from its issuer's shape, and no assertion

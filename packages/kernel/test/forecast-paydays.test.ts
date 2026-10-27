@@ -1,5 +1,5 @@
 /**
- * Paydays: the days a repeating line names, and what happens to one that falls on a rest day (REC-B13).
+ * Paydays: the days a repeating line names, and what happens to one that falls on a rest day.
  *
  * A SALARY PAID TWICE A MONTH HAS DAYS, and every twice-a-month line of every record walked on the 1st and the 15th. A
  * line on the 30th typed in September read as "the end of the month" and walked to 31 October. And nothing moved a

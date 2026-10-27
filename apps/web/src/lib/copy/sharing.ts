@@ -1,5 +1,5 @@
 /**
- * The sharing words: Settings > Sharing, and what the person a share let in reads (sharing plan §3.2, §3.4, §3.5).
+ * The sharing words: Settings > Sharing, and what the person a share let in reads.
  *
  * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a key here
  * as `copy.<key>`. Every key starts `sharing`, so a key the Share sheet adds beside these cannot meet one of another

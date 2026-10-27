@@ -8,8 +8,8 @@
   Three rules the copy obeys: be specific about what WILL be here; a CTA is Verb + Noun, never
   "Get Started"; and the CTA is a real button or link, so it joins the tab order.
 
-  THE WHOLE SCREEN'S FORM IS ONE TILE ON THE BOARD (the UI pass of 20 October, 2.A.18): 24 in (20 on a phone), at most
-  640 wide, centred on the page (U-A6). In it, the glyph in a 40px NEUTRAL well, the title at 17/600 in
+  THE WHOLE SCREEN'S FORM IS ONE TILE ON THE BOARD: 24 in (20 on a phone), at most
+  640 wide, centred on the page. In it, the glyph in a 40px NEUTRAL well, the title at 17/600 in
   ink, the one line at 15/22 in `--ink-2`, and 12 under it the ONE action, which the caller passes as
   `Button weight="primary"`; a second action is quiet. Then the agent prompt in a `CodeLine` with its Copy. Inside a
   tile, a sheet or a panel the same column is drawn on that surface, because a tile never holds a tile.
@@ -233,7 +233,7 @@
     min-inline-size: 0;
   }
 
-  /* THE WHOLE SCREEN'S FORM: one tile at most 640 wide, CENTRED, its words and its one action centred in it (U-A6): a
+  /* THE WHOLE SCREEN'S FORM: one tile at most 640 wide, CENTRED, its words and its one action centred in it: a
      refusal or an empty screen is the only thing on the page, so it sits where the eye lands, not at the start edge. */
   .empty:not(.compact) {
     align-items: center;

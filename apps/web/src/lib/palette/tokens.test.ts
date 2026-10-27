@@ -1,5 +1,5 @@
 /**
- * What a plain line in the palette says besides its words (EXP-D13): a day, a project, a priority, who holds it and an
+ * What a plain line in the palette says besides its words: a day, a project, a priority, who holds it and an
  * amount, each read only where the list it goes into has the field, and each given back as words by `untoken`.
  *
  * THE LISTS ARE WRITTEN HERE, invented, so each rule is driven by the field types alone and nothing leans on a pack.

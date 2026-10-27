@@ -160,7 +160,7 @@ test('A NUMBER WITH A SERVICE SET IS DRAWN ON RENEWALS under Server and provider
   assert.equal(blocks[after + 1]?.heading, HEADING, 'it stands under what renews, above everything folded shut');
 });
 
-test('A NUMBER TYPED BY HAND, WITH NO SOURCE SAID, IS DRAWN: only the example is left out (audit 61, claim 5)', async () => {
+test('A NUMBER TYPED BY HAND, WITH NO SOURCE SAID, IS DRAWN: only the example is left out', async () => {
   const k = await founder();
   const box = server(k, 'Build box');
   /* `source is not example` over a reading that says no source at all, which is what a typed or imported one is. */
@@ -170,7 +170,7 @@ test('A NUMBER TYPED BY HAND, WITH NO SOURCE SAID, IS DRAWN: only the example is
   assert.deepEqual(block.latest?.map((l) => [l.measure, l.value]), [['Disk used', 60]]);
 });
 
-test('A NUMBER WITH NO SOURCE COUNTS AS WELL AS DRAWS: the figure and the block read the same readings (audit 61, claim 5)', async () => {
+test('A NUMBER WITH NO SOURCE COUNTS AS WELL AS DRAWS: the figure and the block read the same readings', async () => {
   const k = await founder();
   const box = server(k, 'Build box');
   assert.equal(counted(k), 0, 'a record with no reading counts some');
@@ -179,7 +179,7 @@ test('A NUMBER WITH NO SOURCE COUNTS AS WELL AS DRAWS: the figure and the block 
   assert.deepEqual(shown(k), ['Disk used']);
 });
 
-test('A NUMBER DATED AFTER TODAY NEITHER COUNTS NOR DRAWS THE HEADING: nothing is headed over no reading (audit 61, claim 5)', async () => {
+test('A NUMBER DATED AFTER TODAY NEITHER COUNTS NOR DRAWS THE HEADING: nothing is headed over no reading', async () => {
   const k = await founder();
   const box = server(k, 'Build box');
   /* What an import or a mistyped year writes: a reading the block's ninety days never reach, tomorrow's and next year's. */

@@ -1,5 +1,5 @@
 <!--
-  The one menu (the UI pass of 20 October, 2.A.13): a list of verbs that opens beside the thing it acts on with a mouse,
+  The one menu: a list of verbs that opens beside the thing it acts on with a mouse,
   and rises from the bottom of the screen as THE sheet (`Sheet kind="menu"`) under a thumb.
 
   TWO WAYS TO OPEN IT. With a `trigger`, the menu is a button and a list that hangs from it. With `at`, a rect, there is

@@ -1,5 +1,5 @@
 /**
- * What a person at "Adds only" is told when they ask to read (USE-A11, `docs/20-COLLABORATION.md` §2, tier 0).
+ * What a person at "Adds only" is told when they ask to read (`docs/20-COLLABORATION.md` §2, tier 0).
  *
  * THE SENTENCE EVERY LEVEL GETS IS A DEAD END AT THIS ONE. "This needs read, and you have append access. Ask an owner
  * to raise your access." is right for somebody at `read` asking to write: a higher rung exists and the owner can hand it

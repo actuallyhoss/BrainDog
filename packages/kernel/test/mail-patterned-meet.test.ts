@@ -1,5 +1,5 @@
 /**
- * Senders of patterned mail are met (scope B36): before, only mail no pattern took met anybody, so the people his
+ * Senders of patterned mail are met: before, only mail no pattern took met anybody, so the people his
  * patterns read every day were nobody in People. Now verified mail a pattern took meets its sender once, untrusted,
  * with where it was seen; unverified mail, a skip and a redelivery meet nobody.
  */

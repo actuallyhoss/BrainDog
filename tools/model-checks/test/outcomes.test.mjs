@@ -1,5 +1,5 @@
 /**
- * The model checks' three outcomes held without a model (ENG-A03): a provider that times out is `not-measured` and never
+ * The model checks' three outcomes held without a model: a provider that times out is `not-measured` and never
  * red; a failing case passes on two of three; a real fall below the bar is red. The rules are tested in `lib.mjs`, and the
  * runner end to end against a provider stood up on localhost, so no test spends a neuron or needs a token.
  *

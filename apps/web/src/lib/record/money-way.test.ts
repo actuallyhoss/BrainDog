@@ -1,5 +1,5 @@
 /**
- * Money out reads as out (the audit of 25 October, Y19): on a phone the ledger's amounts carried no sign, so a bill, a
+ * Money out reads as out: on a phone the ledger's amounts carried no sign, so a bill, a
  * shop and a salary paid in read alike. A list's amount says which way it went as Money's page says it, "−EGP 279.03"
  * and "+EGP 600.00", from the field that says which way.
  */

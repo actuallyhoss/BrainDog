@@ -16,7 +16,7 @@
 
   ON A HOME (Today, Decide) THE SAME MENU, with what that home can take: Edit layout and Change this page always, and How
   this is built once the record holds the page, at the page's own address since a home draws no source. CHANGE THIS
-  PAGE ON A HOME THE RECORD HOLDS NONE OF YET (C25, C26) drafts from the body the screen built (`built`), and keeping a
+  PAGE ON A HOME THE RECORD HOLDS NONE OF YET drafts from the body the screen built (`built`), and keeping a
   draft is the page's first write, with an Undo that retires it so the built one is drawn again.
   A menu with nothing to offer is not drawn.
 
@@ -127,7 +127,7 @@
     });
   }
 
-  /* A PAGE JUST MADE OPENS ON ITS DESCRIBE FIELD (ENG-B11): the palette opens it at `?describe=1`, and this reads the
+  /* A PAGE JUST MADE OPENS ON ITS DESCRIBE FIELD: the palette opens it at `?describe=1`, and this reads the
      mark once. The sheet opens when this reader may change the page and the host has a model; with none the page opens
      as it always did. Either way the mark leaves the address, replaced and not pushed, so Back and a reload do not open
      the sheet again. `answered` is the address already dealt with, so nothing here runs twice while the address turns. */
@@ -200,10 +200,10 @@
   }
 
   /* ── put back and hidden ───────────────────────────────────────────────────
-     PUT BACK IS ONE STEP BACK WHOEVER WROTE THE LOOK, any day after its toast has gone (PGS-B12): named by whose look it
+     PUT BACK IS ONE STEP BACK WHOEVER WROTE THE LOOK, any day after its toast has gone: named by whose look it
      takes off and the day it was written, when the record says (`look.at`). The owner's, as the pin is. */
   const backLine = $derived(putBackWords(look, look?.at));
-  /* WHAT THE LOOK HIDES, read again as the menu opens, offered back one by one (PGS-B08). */
+  /* WHAT THE LOOK HIDES, read again as the menu opens, offered back one by one. */
   const hidden = $derived((void menu, hiddenOf(look, heads())));
   let hiddenOpen = $state(false);
   let writing = false;

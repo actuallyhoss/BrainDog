@@ -1,5 +1,5 @@
 /**
- * The seven signs of scripts and automations (SHL-D01), each read on a record that should be red and one that should be
+ * The seven signs of scripts and automations, each read on a record that should be red and one that should be
  * green, and `automations-idle` never red however many sit idle.
  *
  * THE RECORDS ARE BUILT THROUGH THE KERNEL'S OWN VERBS: scripts and rules installed, rows created, runs drained, and a

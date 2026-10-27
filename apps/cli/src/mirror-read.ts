@@ -1,10 +1,10 @@
 /**
- * `braindog export --mirror <folder> [--host <host>]` (AGT-A13): the whole record, read as an agent reads it and
+ * `braindog export --mirror <folder> [--host <host>]`: the whole record, read as an agent reads it and
  * written as the mirror's plain files (`mirror.ts`).
  *
  * THE LISTS ARE THE RECORD'S OWN INDEX, never a list of lists here: `boot` names every list this sign-in may read,
  * `schema` gives each one's fields in declared order, and `list` pages through its rows fifty at a time to the end,
- * the size `keys list` reads at because a read of a hundred has answered INTERNAL on the Cloud (RQ-AGT-243). A list
+ * the size `keys list` reads at because a read of a hundred has answered INTERNAL on the Cloud. A list
  * added to the record tomorrow is in tomorrow's mirror without a line changed here.
  *
  * THE MACHINE'S OWN SIGN-IN, AND NO APPROVAL. It reads, so it needs no operation grant and asks for no six digits:

@@ -1,5 +1,5 @@
 /**
- * The read paths of the leak matrix (sharing plan §4.3): every READ+ and DATA route in `ROUTES` that changes nothing,
+ * The read paths of the leak matrix: every READ+ and DATA route in `ROUTES` that changes nothing,
  * called through the host's own handler table (`handlersFor`), so a route is asked exactly as `/api/<name>` asks it.
  *
  * THE ARGUMENTS ARE GENERATED FROM THE FIXTURE: every list; every row number, hidden ones included, and every spoken id;
@@ -13,7 +13,7 @@ import { firewall } from '../../src/sight.ts';
 import { PAGES, type Fixture } from './fixture.ts';
 
 /**
- * Every answer the doors' firewall would have taken a hidden field off (`firewall`, sharing plan §2.5 item 6), by
+ * Every answer the doors' firewall would have taken a hidden field off (`firewall`), by
  * method: the matrix asks the handlers as `serveApi` does and the MCP server through `serveMcp`, and holds this empty.
  */
 export const FIREWALLED: string[] = [];

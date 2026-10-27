@@ -1,5 +1,5 @@
 /**
- * The team's burn-down fills itself (USE-A10, team 2.21.0): on a fresh team record with no agent at all, finishing a
+ * The team's burn-down fills itself (team 2.21.0): on a fresh team record with no agent at all, finishing a
  * ticket ticks the line that plans it, reopening it unticks the line, and each morning the record writes one cycle day
  * with how many planned lines are not ticked, and a second run that day writes none.
  *

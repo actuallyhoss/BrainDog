@@ -1,6 +1,5 @@
 /**
- * Who the record's own person is, on a record made before sign-up marked them (`loop/research-understanding-judge.md`,
- * change 1): once People has the `self` part, the tick marks the person holding the owner's sign-in address, as one
+ * Who the record's own person is, on a record made before sign-up marked them: once People has the `self` part, the tick marks the person holding the owner's sign-in address, as one
  * decision Decide shows as done with Undo; with nobody holding it, one question "Which of these is you?" names at most
  * five people; and a name alone never marks anybody.
  */

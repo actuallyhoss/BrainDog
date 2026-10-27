@@ -256,7 +256,7 @@ test('THE DECLARATION IS CHECKED: money, rolled, a walk, home and sellable insta
   sql.close();
 });
 
-/* ── at least, a kept point, and a check past its bound (REC-B05) ──────────── */
+/* ── at least, a kept point, and a check past its bound ──────────── */
 
 const FX = register('fx', 'Rates', 'currency', [
   { id: 'currency', type: 'text', required: true },

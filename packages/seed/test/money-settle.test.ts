@@ -227,7 +227,7 @@ test('money that has not cleared marks nothing paid, whichever list it is handed
   assert.equal((back as { said: string }).said, 'Studio rent is open again, since its payment has not cleared.');
 });
 
-/* AUDIT 62, CLAIM 1, measured red before the guard: a bill part paid at 500 of 1,000 by hand, and a new pending payment
+/* Measured red before the guard: a bill part paid at 500 of 1,000 by hand, and a new pending payment
    naming it, came back `{ state: open, paid_so_far: null }` and "is open again". */
 test('a Paid so far somebody typed is not wiped by a pending or void payment that paid none of it', () => {
   const half = bill({ amount: gbp(100_000), state: 'part', paid_so_far: gbp(50_000) });
@@ -311,7 +311,7 @@ test('run on a void payment, the script counts the bill\'s other cleared payment
   assert.deepEqual([byHand.writes, byHand.log], [[], ['Studio rent was marked paid by hand, so the payment that was made void changed nothing.']]);
 });
 
-/* AUDIT 62, CLAIM 1, AS THE RULE RUNS IT: the count comes from the Ledger here, not from the test. A bill of 1,000 with
+/* AS THE RULE RUNS IT: the count comes from the Ledger here, not from the test. A bill of 1,000 with
    500 typed in "Paid so far" and no payment behind it, then a payment logged against it that has not moved. */
 test('run on a new pending or void payment, the script leaves a Paid so far somebody typed and says so', async () => {
   const half = bill({ amount: gbp(100_000), state: 'part', paid_so_far: gbp(50_000) });

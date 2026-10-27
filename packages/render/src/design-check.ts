@@ -1,5 +1,5 @@
 /**
- * THE DESIGN CHECK ("The design check" in DIRECTION §45): one check every draft passes before it is shown, the way the
+ * THE DESIGN CHECK: one check every draft passes before it is shown, the way the
  * prototypes were checked. A draft that fails is mended by the model or it is not shown, so a person is never the
  * tester of what BrainDog drew.
  *

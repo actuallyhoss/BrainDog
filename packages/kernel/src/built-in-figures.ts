@@ -13,7 +13,7 @@
  * the way it reaches every figure (`fill` in `fill.ts`): the figure holds `about: '{{it}}'`, and the reader fills the
  * hole. Read with no parameter the hole is still there, and the count is the whole record's.
  *
- * AND ONE LIST'S QUESTIONS, `questions-open-in:<list>` (PGS-C18): the open questions whose `body.about` names a row of
+ * AND ONE LIST'S QUESTIONS, `questions-open-in:<list>`: the open questions whose `body.about` names a row of
  * that list by its spoken id (`tasks#4` is on `tasks`), the rule a queue's `where: list is <list>` keeps
  * (`QueueQuestion.list`, `listOf` in `pages.ts`). So Work says "2 wait on you" of the questions about its own tasks, and
  * gates its 'Waiting on you' on the same count, while a question about a person waits on People's page instead. Read
@@ -28,46 +28,46 @@
  * `metrics.ts`. The count is `govern.ts`'s `countOpenQuestions` predicate written once more, and
  * `test/built-in-figures.test.ts` holds the two to one answer.
  *
- * AND FIVE SIGNS OF A LIVING RECORD (REC-A01), each of which names no list: how many messages wait on a person, how long
+ * AND FIVE SIGNS OF A LIVING RECORD, each of which names no list: how many messages wait on a person, how long
  * the oldest has waited, how long since anything came in, how many feeds are behind, and how many rules ran this week.
  * His record stood still for nine days after the move and no check saw it, because nothing could say so.
  *
- * AND `runs-working`, HOW MANY AGENTS ARE AT WORK NOW (AGT-C02): the runs working with no working parent, by the one
+ * AND `runs-working`, HOW MANY AGENTS ARE AT WORK NOW: the runs working with no working parent, by the one
  * clock in `presence.ts`, so a lead note that says "{{runs-working}} agents working" and the cards under it count the
  * same runs. One agent with four helpers is one.
  *
- * AND THE RECORD'S HEALTH IN TWO NUMBERS (PRF-A05): `signs-red`, how many vital signs (`signs.ts`) read red now, and
+ * AND THE RECORD'S HEALTH IN TWO NUMBERS: `signs-red`, how many vital signs (`signs.ts`) read red now, and
  * `green-days`, how many days in a row, in the record's zone, the kept readings held none red. A Health page and a Today
- * line read these by name. AND `rates-age-days` (REC-B02): how old the newest exchange rate is, so a page can say the
+ * line read these by name. AND `rates-age-days`: how old the newest exchange rate is, so a page can say the
  * rates stopped before a converted figure quietly goes stale. All three say nothing, never nought, with nothing to read.
  *
- * AND `handoffs-open`, HOW MANY NEXT STEPS WAIT TO BE TAKEN (AGT-C05): the runs waiting in `handoff` with a step left,
+ * AND `handoffs-open`, HOW MANY NEXT STEPS WAIT TO BE TAKEN: the runs waiting in `handoff` with a step left,
  * read by `handoff.ts`'s `openHandoffs`, the read the briefing hands a new session its step from, so the Agents page
  * and the card count the same steps. With `about` filled, one project's.
  *
- * AND THE TIDY AS NUMBERS (AGT-C18): `gone-stale`, how many things every finder in `tidy.ts` counts stale now, one
+ * AND THE TIDY AS NUMBERS: `gone-stale`, how many things every finder in `tidy.ts` counts stale now, one
  * figure a finder beside it (`stale-runs-empty` and the rest, built from the registry when asked for), and `tidied-week`,
  * how many the record cleared in seven days, from the lines the hourly pass keeps. Both are reads and write nothing.
  * One finder's week is `tidied-runs-empty` and the rest, built when asked for as the stale ones are, and both totals
  * carry `names`, their count said finder by finder ("41 empty runs hidden and 3 steps nobody took closed").
  *
- * AND WHERE THINGS APPLY (AGT-D01): `projects-unplaced`, the projects that name no repository and no folder, so no run
- * can land in them, `keys-unopenable`, the keys whose sealed value names a grant revoked or gone, and `keys-unopened`
- * (AGT-D17), the sealed keys nobody has opened in six months, the tidy's finder of that name as a number. The agents add-on
+ * AND WHERE THINGS APPLY: `projects-unplaced`, the projects that name no repository and no folder, so no run
+ * can land in them, `keys-unopenable`, the keys whose sealed value names a grant revoked or gone, and `keys-unopened`,
+ * the sealed keys nobody has opened in six months, the tidy's finder of that name as a number. The agents add-on
  * cannot declare either, since it does not know another list's field names. AND `record.door`, the reader the add-on's
- * figures over the agent door's signs read (AGT-B01).
+ * figures over the agent door's signs read.
  *
- * AND `marks-unknown`, THE ROWS WEARING A WORD THAT DRAWS NOTHING (REC-C17): on every list that declares an identity, the
+ * AND `marks-unknown`, THE ROWS WEARING A WORD THAT DRAWS NOTHING: on every list that declares an identity, the
  * rows whose mark names no glyph, so an import that carried another system's icon names is a number a page can show and
  * a tidy can bring to nought. `marks.ts` says what names a glyph, and imports nothing, so it adds no load ring.
  *
- * AND `held-twice`, THE PEOPLE HELD MORE THAN ONCE (AGT-D05): how many would go if every plain pair he has not answered
+ * AND `held-twice`, THE PEOPLE HELD MORE THAN ONCE: how many would go if every plain pair he has not answered
  * were one person, and each one marked as the record's own person beyond the first. His own record held him twice and
  * nothing could say so. `people.ts` counts, by the rules its nightly questions ask by, so the two never disagree.
  * AND `held-twice-shown`, THE PEOPLE THAT COUNT IS ABOUT: two of one name are 1 too many and 2 people to look at, so a note
  * can say both ("3 people, 2 too many"). Read from the same pass, and nothing at all where nobody is held twice.
  *
- * AND THE LOG AS THREE NUMBERS (PGS-C24, AGT-C17): `activity-by-who`, `activity-by-kind` and `activity-by-hour`, the
+ * AND THE LOG AS THREE NUMBERS: `activity-by-who`, `activity-by-kind` and `activity-by-hour`, the
  * record's own log over thirty days cut by who wrote each line, by the kind of write and by the hour of the day, each a
  * figure in parts. Activity's three side tiles were worked out inside one screen, from the page of the log the browser
  * had read; now any page draws them and any agent reads them. A feed's own lines only (`readActivity`).
@@ -172,7 +172,7 @@ const MACHINES_WORKING: RunsDecl = { ...RUNS_WORKING, metric: 'machines-working'
  */
 const RUNS_WAITING: RunsDecl = { ...RUNS_WORKING, metric: 'runs-waiting', name: 'Agents waiting on you', part: 'waiting' };
 
-/* ── the steps left for the next run (AGT-C05) ─────────────────────────── */
+/* ── the steps left for the next run ─────────────────────────── */
 
 /** The source the open steps are read from, the same word the page source over the same steps is. */
 export const HANDOFFS_OPEN = 'handoffs.open';
@@ -265,7 +265,7 @@ export function openSteps(sql: Sql, nowMs: number, project?: string | null, view
   return clientsOf(sql, out.sort((a, b) => Date.parse(b.left_at) - Date.parse(a.left_at) || (a.spoken < b.spoken ? 1 : -1)));
 }
 
-/** Each step with its run's client, in one read over the runs that left them, their ids bound as one array (AGT-B03). */
+/** Each step with its run's client, in one read over the runs that left them, their ids bound as one array. */
 function clientsOf(sql: Sql, steps: Omit<OpenStep, 'client' | 'next_said'>[]): OpenStep[] {
   if (steps.length === 0) return [];
   const rows = sql.all<{ id: string; client: string | null }>(
@@ -284,7 +284,7 @@ export function readHandoffsOpen(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'vie
   return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] });
 }
 
-/* ── the tidy as numbers (AGT-C18) ─────────────────────────────────────── */
+/* ── the tidy as numbers ─────────────────────────────────────── */
 
 /** The source the tidy's figures read: what the finders count now, and what the hourly pass kept. No list holds either. */
 export const RECORD_TIDY = 'record.tidy';
@@ -457,7 +457,7 @@ export function readTidy(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: Metric
   return judged(decl, one, 'stale now');
 }
 
-/* ── the log as numbers (PGS-C24, AGT-C17) ─────────────────────────────── */
+/* ── the log as numbers ─────────────────────────────── */
 
 /** The source the three figures over the record's own log read. No list holds a line of it. */
 export const RECORD_ACTIVITY = 'record.activity';
@@ -697,7 +697,7 @@ export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'
   return ok({ value: total, unit: null, rows: total, held: total, delta: null, why, met: null, refusals: [], groups });
 }
 
-/* ── the signs of a living record (REC-A01) ────────────────────────────── */
+/* ── the signs of a living record ────────────────────────────── */
 
 /**
  * The source the record's own signs read: facts about what arrives and what runs, which no list holds. Each figure names
@@ -725,7 +725,7 @@ const sign = (id: Sign, name: string, target: { lte: number } | { gte: number },
   ...more,
 });
 
-/* ── the record's health, over the vital signs (PRF-A05) and the rates (REC-B02) ── */
+/* ── the record's health, over the vital signs and the rates ── */
 
 /** The source the two figures over the vital signs read: the signs now, and the readings kept a row a day. */
 export const RECORD_VITALS = 'record.vitals';
@@ -747,7 +747,7 @@ const SIGNS_RED: VitalsDecl = {
 
 /* HOW MANY SIGNS HAVE NOTHING TO JUDGE BY YET (health-words-43): Health says nought red as "No vital sign needs a look",
    and this is the count that says how much of the record that line has not seen. NO TARGET: a sign with nothing to
-   judge by yet is nothing wrong, and a fresh record told it missed a mark is audit 38-39 #11 again. */
+   judge by yet is nothing wrong, and a fresh record told it missed a mark is the same fault again. */
 const SIGNS_UNREAD: VitalsDecl = {
   metric: 'signs-unread',
   name: 'Vital signs not read yet',
@@ -790,7 +790,7 @@ const RATES_AGE_DAYS: MetricDecl = {
   format: 'days',
 };
 
-/* ── the agent door's signs (AGT-B01), and where things apply (AGT-D01) ─── */
+/* ── the agent door's signs, and where things apply ─── */
 
 /**
  * The source a figure over the agent door's own signs reads: what its marks add up to over the figure's window
@@ -840,7 +840,7 @@ const KEYS_UNOPENABLE: MetricDecl = {
 };
 
 /**
- * Keys nobody has opened in six months (AGT-D17): sealed more than 180 days ago and never opened since, or last opened
+ * Keys nobody has opened in six months: sealed more than 180 days ago and never opened since, or last opened
  * before that. Read by the same count as the tidy's `keys-unopened` finder, so the figure and the finder never disagree.
  */
 const KEYS_UNOPENED: MetricDecl = {
@@ -950,7 +950,7 @@ const DOCUMENTS_DEAD_PATHS: MetricDecl = {
   format: 'int',
 };
 
-/* ── when a project was last worked on (the audit of 25 October, Z7) ─────── */
+/* ── when a project was last worked on ─────── */
 
 /** The source of `project-worked`: a project's work list and its runs, read together. */
 export const RECORD_WORKED = 'record.worked';
@@ -965,7 +965,7 @@ export type WorkedDecl = MetricDecl & { about?: string | undefined };
 export type WorkedReading = Reading & { at?: string; by?: string | null };
 
 /**
- * HOW LONG SINCE ANYBODY WORKED ON A PROJECT, ITS TASKS AND ITS RUNS TOGETHER (the audit of 25 October, Z7): Projects
+ * HOW LONG SINCE ANYBODY WORKED ON A PROJECT, ITS TASKS AND ITS RUNS TOGETHER: Projects
  * said "Worked on 4 days ago" from the tasks alone while Today said "Claude worked on it 20 minutes ago" from the runs,
  * of the same project in the same minute. One figure now reads both, the newest stamp on a task of the project and the
  * newest a run in it was heard from, so every screen says one time. Quiet past thirty days, as Work's tasks-only
@@ -1053,8 +1053,7 @@ const SPOKEN_ROW = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
  * PATTERN OF ITS OWN: `about` is a spoken id and its list is the part before the `#` (`QueueQuestion.list`), so a word
  * such as `Box`, a body this record cannot parse, and an `about` that is not text are on no list.
  *
- * AND A QUESTION THAT ADDS OR CHANGES ROWS OF A LIST IS ON IT, where it names no row of its own (`ROWSET_LIST_SQL`, the pass
- * of 27 October): "Add Priya to People?" and "Link Priya Raman to Lumen?" are rowsets on People with no `about`,
+ * AND A QUESTION THAT ADDS OR CHANGES ROWS OF A LIST IS ON IT, where it names no row of its own (`ROWSET_LIST_SQL`): "Add Priya to People?" and "Link Priya Raman to Lumen?" are rowsets on People with no `about`,
  * and People's page said "no questions open" while both waited in Needs you.
  */
 function openOnList(sql: Sql, at: string, list: string | null): number {
@@ -1118,8 +1117,7 @@ function spokenTitle(sql: Sql, spoken: string): string | null {
 
 /**
  * WHO IS AT WORK ON WHAT, IN WORDS, for `{{runs-working.names}}`: "Claude Code on BrainDog and Codex on Kiln", each agent
- * and project once, the agent alone where its run is in no project, and past three "and 2 more". SINCE the audit of 22
- * October (U12): the Agents page's line counted machines ("1 at work on one machine") and never said who or on what.
+ * and project once, the agent alone where its run is in no project, and past three "and 2 more".: the Agents page's line counted machines ("1 at work on one machine") and never said who or on what.
  */
 function workingSaid(sql: Sql, runs: readonly { fields: Readonly<Record<string, Json>> }[]): string | undefined {
   const said = (v: Json | undefined): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined);
@@ -1209,7 +1207,7 @@ export function readSign(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'>, d
 function judged(decl: MetricDecl, value: number | null, why: string): Result<Reading> {
   const t = decl.target;
   const met = value === null || t === undefined ? null : 'lte' in t ? value <= t.lte : value >= t.gte;
-  /* HELD IS WHETHER THERE WAS ANYTHING TO READ, NEVER THE VALUE (audit 38-39 #4): a tile hides a figure that held
+  /* HELD IS WHETHER THERE WAS ANYTHING TO READ, NEVER THE VALUE: a tile hides a figure that held
      nothing, so `held: value` hid `signs-red` at 0, the one reading Health exists to show. */
   return ok({ value, unit: null, rows: value ?? 0, held: value === null ? 0 : 1, delta: null, why, met, refusals: [] });
 }
@@ -1244,7 +1242,7 @@ export function readVitals(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
   if ((decl as VitalsDecl).vitals === 'green-days') {
     const judgedOnce = sql.one<{ x: number }>("SELECT 1 AS x FROM sign_reading WHERE day < ? AND state IN ('red', 'green') LIMIT 1", today);
     if (judgedOnce === undefined) return judged(decl, null, 'no kept day has a sign that read green or red yet');
-    /* THE HOLD'S RULES, NOT A LOOSER COUNT OF ITS OWN (PRF-A18): a day counts only when every hold sign read green under
+    /* THE HOLD'S RULES, NOT A LOOSER COUNT OF ITS OWN: a day counts only when every hold sign read green under
        the rule of the day after and no hand touched the record (`hold.ts`), so the run Health says and the seven-day
        hold the scorecard reads are one number. Its sentence says why the run ended. */
     const hold = holdDays(sql, today);
@@ -1452,7 +1450,7 @@ export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
  * grant that was revoked or is gone. An empty sealed field is not counted here: a key that holds no value says so in
  * its own figure. NOTHING, NEVER NOUGHT, on a record where no list seals a value.
  *
- * AND `keys-unopened` (AGT-D17), the same lists read for the keys nobody has opened in six months, counted by
+ * AND `keys-unopened`, the same lists read for the keys nobody has opened in six months, counted by
  * `tidy-keys.ts` `countKeysUnopened`, the count the tidy's finder of that name answers.
  */
 export function readKeysUnopenable(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: MetricDecl): Result<Reading> {

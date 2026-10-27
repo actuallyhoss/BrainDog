@@ -1,5 +1,5 @@
 /**
- * A FIGURE THAT ADDS OTHER FIGURES (REC-B06): `{ sum_of: [{ metric }, { metric, minus: true }] }`.
+ * A FIGURE THAT ADDS OTHER FIGURES: `{ sum_of: [{ metric }, { metric, minus: true }] }`.
  *
  * Money's net position is cash less what is owed out, and Every month's difference is what comes in less what goes out:
  * each is a sum of figures the record already has. The parts are read as any page reads them and added as any sum is,

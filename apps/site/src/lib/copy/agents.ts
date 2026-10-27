@@ -1,7 +1,7 @@
 /**
  * The page that connects an AI tool, `/agents`: the head, what an AI tool gets and what it can't do, the brief it
- * starts with, the row for developers, and the early access strip. Rewritten in the UI pass of 20 October
- * (`loop/ui-pass-2026-10-20/site.md` 2b) so a reader who is not a developer reads it too, with the developer's detail
+ * starts with, the row for developers, and the early access strip. Rewritten
+ * so a reader who is not a developer reads it too, with the developer's detail
  * one row away.
  *
  * The connect steps themselves are data in `lib/connect/apps.ts`, beside the box that draws them, so the home page and

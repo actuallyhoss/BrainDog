@@ -321,7 +321,7 @@ function keepShape(file: string, key: string, shape: Held | null): void {
 /**
  * `braindog export --shape`, and the exit code: 0 written, 1 refused or not a shape, 3 the host did not answer.
  *
- * A SHAPE COPY IS THE RECORD WITH EVERY VALUE SCRAMBLED (PRF-A13): the same lists, the same count of entries, the same
+ * A SHAPE COPY IS THE RECORD WITH EVERY VALUE SCRAMBLED: the same lists, the same count of entries, the same
  * length in every value, and not a word anybody typed. The look and the gates open it on a scratch record and see what
  * a lived record looks like.
  *
@@ -421,7 +421,7 @@ export async function importFile(args: string[], io: BrainfileIo): Promise<numbe
     io.say(IMPORT_USAGE);
     return 1;
   }
-  /* A SHAPE COPY NEVER LEAVES THIS MACHINE AS A RECORD (PRF-A13). It reads like any export, and put back it would replace
+  /* A SHAPE COPY NEVER LEAVES THIS MACHINE AS A RECORD. It reads like any export, and put back it would replace
      every name and amount with scrambled words that look like his. So it is refused here, off the file's own mark and
      before the check, a host or an approval, in one sentence that says where it does open. An unreadable file falls
      through to the check, which says so. */

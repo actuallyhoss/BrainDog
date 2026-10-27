@@ -1,7 +1,7 @@
 /**
  * Keeping a key an arrangement needs, from Decide (`key-needed.ts`), with the Keychain behind a passphrase.
  *
- * AUDIT 40-42 FINDING 8: the typed key was emptied before the request, so a locked Keychain's first refusal, the one that
+ * The typed key was emptied before the request, so a locked Keychain's first refusal, the one that
  * asks for the passphrase, threw the key away and left the person a passphrase field and nothing to send with it. These
  * hold the order the Keys screen keeps: the passphrase is emptied before the request leaves, the key only after the
  * record kept it.

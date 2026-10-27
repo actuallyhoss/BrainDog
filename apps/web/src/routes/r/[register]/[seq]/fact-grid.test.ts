@@ -1,5 +1,5 @@
 /**
- * A fact's label touches its value (the audit of 25 October, Y28): in the two-column facts a cell beside a long note was
+ * A fact's label touches its value: in the two-column facts a cell beside a long note was
  * stretched to the note's height, and its label floated to the middle with its value at the foot, six lines apart.
  */
 

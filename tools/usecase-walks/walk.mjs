@@ -1,6 +1,6 @@
 /**
  * The walk: one made-up person signs up the way a stranger does, uses the record, and the walk says in `verdict.json`
- * whether what they were shown is what their file expects (`loop/scope/area-usecases-a.md`, USE-A01).
+ * whether what they were shown is what their file expects.
  *
  *   node tools/usecase-walks/walk.mjs <person> --base https://<the host> --address <a test mailbox> --link-file <path>
  *

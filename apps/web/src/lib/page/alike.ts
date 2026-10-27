@@ -8,7 +8,7 @@
  * drawn as four cards. So questions an ingest filed are also one family when they ask the same words for the same
  * reason, and a cause's overflow (`cause#2`, `freeCause`) is the cause it overflowed.
  *
- * AND ONE RUN'S ROWSETS ARE ONE FAMILY once it filed three or more (scope D1): a cleanup run filed 24, each with its own
+ * AND ONE RUN'S ROWSETS ARE ONE FAMILY once it filed three or more: a cleanup run filed 24, each with its own
  * cause, and Needs you drew 24 cards. A run's `options` questions stay single, since each asks something of its own.
  *
  * PURE, AND NODE LOADS IT. An arrangement and a merge are never folded: each is read on its own, as a batch leaves them.

@@ -1,5 +1,5 @@
 /**
- * A task's title as a short name and the rest quiet (E23): Work drew whole paragraphs as titles, six lines a task.
+ * A task's title as a short name and the rest quiet: Work drew whole paragraphs as titles, six lines a task.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

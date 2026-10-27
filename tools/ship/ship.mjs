@@ -3,7 +3,7 @@
  * Ship in one go: the full CI, then push, the deploy (its own dry run, parity and smoke included) and a look at the
  * live pages. Stops at the first red and prints only what matters, so one run needs one read.
  *
- *   node tools/ship/ship.mjs            run it all (deploy only on the owner's word: `loop/tools/state.mjs hear "deploy"`)
+ *   node tools/ship/ship.mjs            run it all (deploy only on the owner's word)
  *   node tools/ship/ship.mjs --no-deploy    CI and push only
  */
 import { spawnSync } from 'node:child_process';
@@ -40,7 +40,7 @@ if (!deploy.ok) done(false, 'the deploy went red and rolled back (lines above)')
 const health = step('live', 'curl', ['-s', 'https://app.brain.dog/healthz']);
 const app = /"app":"([^"]+)"/.exec(health.out)?.[1] ?? 'unknown';
 const head = readFileSync(join(ROOT, '.ship', 'pass.json'), 'utf8').match(/"sha": "(\w{7})/)?.[1] ?? '';
-/* THE OLD HOST STILL SENDS A BROWSER ON (the scope of 24 October, E47): brain.dog/app/ answers a page with 308 to
+/* THE OLD HOST STILL SENDS A BROWSER ON (the scope of 24 October): brain.dog/app/ answers a page with 308 to
    app.brain.dog/app/ while `LEGACY_HOSTS` keeps it, and a deploy that broke that would leave a saved tab on nothing. */
 const legacy = step('legacy', 'curl', ['-s', '-o', '/dev/null', '-w', '%{http_code} %{redirect_url}', '-H', 'Accept: text/html', 'https://brain.dog/app/']);
 const moved = /^308 https:\/\/app\.brain\.dog\/app\/?$/u.test(legacy.out.trim());

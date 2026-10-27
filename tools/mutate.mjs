@@ -136,7 +136,7 @@ const GUARDS = [
     mutant: '',
     tests: ['packages/kernel/src/api/keys.test.ts'],
   },
-  /* THE VITAL SIGNS' THRESHOLDS (`packages/kernel/src/signs.ts`, PRF-A01), each moved by one step to the side its
+  /* THE VITAL SIGNS' THRESHOLDS (`packages/kernel/src/signs.ts`), each moved by one step to the side its
      test sits on. A sign whose line drifts reads green on the record it was meant to call red, which is how his record
      stood still for nine days with every check passing. */
   {
@@ -294,7 +294,7 @@ const GUARDS = [
     anchor: `last.from_v === '"idle"'`,
     mutant: `last.from_v === '"active"'`,
     tests: ['packages/kernel/test/migrate-runs.test.ts'],
-  },  /* THE AUTOMATION SIGNS' THRESHOLDS (`packages/kernel/src/signs-flow.ts`, SHL-D01), each moved by one step. */
+  },  /* THE AUTOMATION SIGNS' THRESHOLDS (`packages/kernel/src/signs-flow.ts`), each moved by one step. */
   {
     id: 'sign-flow-scripts-paused',
     file: 'packages/kernel/src/signs-flow.ts',

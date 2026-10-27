@@ -1,5 +1,5 @@
 /**
- * A bar or a split over a figure with a parameter (PGS-A04): `metric.project-cost:Kiln` reads the figure with `Kiln`
+ * A bar or a split over a figure with a parameter: `metric.project-cost:Kiln` reads the figure with `Kiln`
  * filled in, as a figure cell always has.
  *
  * WHAT WAS MEASURED BEFORE IT: `metricBlock` asked for the whole id, `project-cost:Kiln`, which no figure is called, so a

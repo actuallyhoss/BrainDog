@@ -1,5 +1,5 @@
 /**
- * The nightly walk for a key written in plain text (AGT-D01): `keys-in-text`, target nought.
+ * The nightly walk for a key written in plain text: `keys-in-text`, target nought.
  *
  * THE WRITE PATH CHECKS A VALUE ONLY AS IT IS WRITTEN (`coerce`), so nothing looked at what a record already held: a
  * row written before a shape was added to the check, a note, a question's body, a step a run left. This walk reads
@@ -192,7 +192,7 @@ export function keysInText(sql: Sql): KeyFinding[] | null {
   return [...s.findings].sort((a, b) => ORDER.indexOf(a.in) - ORDER.indexOf(b.in) || a.at - b.at).map(({ in: place, list, number }) => ({ in: place, list, number }));
 }
 
-/** Where a finding is, in words a person reads, and never what it holds: "an entry", never "a row" (audit 43-44 #4). */
+/** Where a finding is, in words a person reads, and never what it holds: "an entry", never "a row". */
 export function placeOf(f: KeyFinding): string {
   const entry = f.list === null ? 'an entry' : f.number === null ? `an entry of ${f.list}` : `${f.list} number ${f.number}`;
   if (f.in === 'question') return f.number === null ? 'a question' : `question ${f.number}`;

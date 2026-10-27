@@ -1,5 +1,5 @@
 /**
- * The Kennel's scratch install (`src/kennel-scratch.ts`, SHL-B06): a submitted add-on is installed into an empty record
+ * The Kennel's scratch install (`src/kennel-scratch.ts`): a submitted add-on is installed into an empty record
  * with the modules it requires and every page it brings is read, before the Kennel lists it.
  *
  * THE RECORD IS A REAL ONE, `createRecordApi` over an in-memory SQLite, so a refusal here is the record's own sentence and

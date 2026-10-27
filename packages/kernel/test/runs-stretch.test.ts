@@ -1,5 +1,5 @@
 /**
- * A run keeps how its work went (AGT-C04, the write path): how many writes it signed, when its current stretch began,
+ * A run keeps how its work went (the write path): how many writes it signed, when its current stretch began,
  * when its step was written, and the run that started it.
  *
  * All four are written in place, as the heartbeat is: no version, no `updated_at` and no line of their own, because the

@@ -1,6 +1,6 @@
 /**
  * The start hook's card, as text: the record's own printed as it came, held to the cap, and one line from a host that
- * sends none. This command composes no card (AGT-B07): the slots, their order and their caps are the record's, held in
+ * sends none. This command composes no card: the slots, their order and their caps are the record's, held in
  * `packages/record/test/card.test.ts`, where the cases that held this command's composer went with it.
  *
  * PURE, SO NO HOST. The hooks test sends a card through a real socket; here every shape `context` can take is built
@@ -60,7 +60,7 @@ const attached = (context: Context | undefined, o: { resumed?: boolean; agent?: 
 
 const AT: Where = { repo: 'braindog', host: 'STUDIO-PC', device: 'MacBook', agent: 'Claude Code' };
 
-/* WHAT MOVED TO THE RECORD WITH THE COMPOSER (AGT-B07): the five slots in order, two sessions said word for word, the
+/* WHAT MOVED TO THE RECORD WITH THE COMPOSER: the five slots in order, two sessions said word for word, the
    questions by name and in words, a file named .local, a question said whole, the step's age and author, rows handed to
    this agent, questions alike counted once, three items a slot under the cap, and a tie between projects. Each is a case
    of `packages/record/test/card.test.ts` now. What still holds here is below. */

@@ -1,6 +1,6 @@
 /**
  * `braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]`: the Keys index, one line a key
- * (AGT-D08, RQ-AGT-434). Its name, what it opens, where it applies, "sealed" or where it is kept, and the day it expires.
+ * Its name, what it opens, where it applies, "sealed" or where it is kept, and the day it expires.
  *
  * WHETHER THAT DAY IS PAST IS THE RECORD'S TO SAY. Today is a day in the record's zone, and this machine's UTC date is
  * another day for some hours of every night, so the record is asked which keys are past theirs (`pastOf`).
@@ -13,7 +13,7 @@
  *
  * READS ONLY, UNDER THE LOGIN, IN PAGES OF FIFTY. It opens no key, so it needs no keychain access, and it sends no session
  * headers, so it names no run and starts no work (as `signs` does). Fifty a read because a read of a hundred keys has
- * answered INTERNAL on the Cloud (RQ-AGT-243), and the pages are followed to the end so a record with 166 keys says 166.
+ * answered INTERNAL on the Cloud, and the pages are followed to the end so a record with 166 keys says 166.
  *
  * THE LIST IS READ BY ITS DECLARATION, the field that is a secret, the one that scopes, the one that is a deadline,
  * with the Agents add-on's own names as the fallback for a record too old to say.
@@ -290,7 +290,7 @@ async function answered(client: Reader, said: { ids: ReadonlySet<string>; near: 
 const refusalLine = (r: Result<unknown>, to: Target): string =>
   refused(r) && r.refusal.code === 'UNREACHABLE'
     ? `${to.key} did not answer.`
-    : /* A RECORD WITH NO KEYS LIST SAYS SO, not "There is no register called credentials" (audit D, W10). */
+    : /* A RECORD WITH NO KEYS LIST SAYS SO, not "There is no register called credentials". */
       refused(r) && r.refusal.code === 'REGISTER_UNKNOWN'
       ? 'This record keeps no keys yet. Deposit one with braindog keys put <label>.'
       : printable(fixOf(r));

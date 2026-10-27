@@ -83,7 +83,7 @@ const SAME_AS_NUMBERS = { limit: 2, most: 40 };
 const NUMBERS_FRESH_DAYS = 7;
 
 /**
- * THE NUMBERS UNDER A HEADING THAT SAYS THEIR REAL AGE, SINCE 3.4.0 (the audit of 25 October, Z20): every number on a
+ * THE NUMBERS UNDER A HEADING THAT SAYS THEIR REAL AGE, SINCE 3.4.0: every number on a
  * record was a month-old import drawn under "Numbers, 30 days". While the newest is from this week the heading is as
  * it was; past a week the same lines say how long since the last one came in ("Numbers, last reported 27 days ago"),
  * the age read off the readings themselves (`age`, by the figure named), so nothing is guessed. Two blocks and never
@@ -187,7 +187,7 @@ const BROWSE_LIVE = '/packs/browse?q=polls';
  * figure over two books adds a company's money to a person's own. A LINE AND NOT A TILE SINCE 1.11.0, as Money's is
  * since money-core 3.4.0: the tile beside it said the same figures again.
  *
- * TWO LINES, AND ONE OF THEM IS DRAWN (REC-B07, batch 74). `runway-days` has no value when the walk looked its whole
+ * TWO LINES, AND ONE OF THEM IS DRAWN (batch 74). `runway-days` has no value when the walk looked its whole
  * year and never went under, and none either over two currencies with no rate or with no account, so "it lasts the
  * year" is chosen by the reading carrying `beyond` and never by the figure being empty. The line with the days stands
  * on every other record with one book, where a lead note drops the days when there are none; it steps aside for the
@@ -264,7 +264,7 @@ const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
 ];
 
 /**
- * WHAT WENT QUIET (ENG-B13), SINCE 2.6.0: the things this record was taking and has stopped taking, one line each, with
+ * WHAT WENT QUIET, SINCE 2.6.0: the things this record was taking and has stopped taking, one line each, with
  * what a person calls it, the day it was last there and what it was before ("Written to on 5 of 14 days"). The browser
  * draws this tile on the Today it builds for a record with no Home of its own (`quietTile` in
  * `apps/web/src/lib/home/default-home.ts`), and a founder's record has its own, so numbers that stopped a fortnight
@@ -290,7 +290,7 @@ const GONE_QUIET: Record<string, unknown> = {
 };
 
 /**
- * WHERE IT WAS SEEN (ENG-B03), SINCE 2.6.0: the notes, runs and rows that name the project, the person or the
+ * WHERE IT WAS SEEN, SINCE 2.6.0: the notes, runs and rows that name the project, the person or the
  * organisation a page is for, newest first, which the record's `about` read answers and the app draws under this heading
  * (`panel: seen`). LAST ON EACH PAGE, holding only its panel, so nothing before the fold moves. The same block on the
  * three, so a person renaming the heading on one keeps what it draws.
@@ -377,7 +377,7 @@ export const FOUNDER = {
      of the Ledger list"), not by its id ("Label: transactions"), and every list's name is declared before any
      singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
 
-     2.0.0 BECAUSE THE ORGANISATIONS ARE PEOPLE'S (People 3.0.0, `loop/contract-17.md`). The list keeps its id and its
+     2.0.0 BECAUSE THE ORGANISATIONS ARE PEOPLE'S (People 3.0.0). The list keeps its id and its
      rows and is handed to People, which declares it as the list `meet` writes a company into. People's list has no
      `country`, `currency` or `accounts`, so What you have, by organisation and the organisation's Balance go (books keep
      a company's money apart, and What you have, by book stays), the Dashboard lists each organisation by kind and
@@ -417,7 +417,7 @@ export const FOUNDER = {
      late was listed as due this week. Lapsing loses its Cost column, which was a dash on every line. A figure and a
      block added, a window narrowed, a column and two words changed, so a minor step. 2.5.0 is live.
 
-     FOLDED INTO THE UNRELEASED 2.6.0, A SERVICE'S NUMBERS (REC-C12, batch 61; a builder wrote it as 2.7.0, and 2.6.0
+     FOLDED INTO THE UNRELEASED 2.6.0, A SERVICE'S NUMBERS (batch 61; a builder wrote it as 2.7.0, and 2.6.0
      was never deployed, so it is one version). Numbers gains `about_service`, a link to Services and never required, after its
      organisation: a reading about a server had no project and nothing tying it to the service it was about. Those
      readings are counted (`service-numbers`) and drawn on Estate's Renewals in a block this pack lays there, "Server
@@ -432,7 +432,7 @@ export const FOUNDER = {
      the table, by the same clause. A reading dated after today was counted, and listed first, newest first. A clause on
      a figure and one on a block, nothing added.
 
-     AND WHAT HOME SAYS WHEN THE MONEY LASTS (REC-B07, left out in batch 68, in since batch 74). `runway-days` has no
+     AND WHAT HOME SAYS WHEN THE MONEY LASTS (left out in batch 68, in since batch 74). `runway-days` has no
      value when the walk stays above zero, and none either when cash is in two currencies with no rate or when there is
      no account, so a line chosen by `when: { metric: 'runway-days', empty: true }` would have said the money lasts over
      a bill nobody can say is covered. A `when:` now takes two tests and reads the walk reaching its last day
@@ -440,14 +440,14 @@ export const FOUNDER = {
      line with the days stands everywhere else (`packages/seed/test/founder-runway-words.test.ts` holds the three
      records it must stay silent on). A block added and a condition narrowed on the one before it, nothing taken away.
 
-     AND HOME SAYS WHAT STOPPED REPORTING (ENG-B13, batch 88). Gone quiet, the table the browser draws on the Today it
+     AND HOME SAYS WHAT STOPPED REPORTING (batch 88). Gone quiet, the table the browser draws on the Today it
      builds, is declared on `page.home-founder` straight under what the money is, over the record's own read of what went
      quiet, six lines at most and not drawn while nothing is. A record with its own Home never drew the browser's. It
      is a seventh tile on a page held to six, so Working now is folded shut under Agents at work, beneath the line that
      says how many agents work. Two blocks added, nothing taken away, and no list or figure asked for, so it stays
      inside the unreleased 2.6.0.
 
-     AND EACH PAGE SAYS WHERE ITS THING WAS SEEN (ENG-B03, batch 91). A project's page, and People's pages for an
+     AND EACH PAGE SAYS WHERE ITS THING WAS SEEN (batch 91). A project's page, and People's pages for an
      organisation and a person, end with "Where it was seen", a section naming `panel: seen`, under which the app draws
      the notes, runs and rows that name it, newest first, from the record's `about` read. Three blocks added, nothing
      taken away, so still inside the unreleased 2.6.0.
@@ -472,30 +472,30 @@ export const FOUNDER = {
      too, where it was drawn for those building or earning, so a parked project's row opens its page. One declaration's
      `for:` widened, nothing added or taken away; a minor step, since 3.0.0 is on origin/master.
 
-     3.2.0, PORTFOLIO 1.23.0 (the thinking scope of 24 October, C18 and C19): the project page it embeds draws the
+     3.2.0, PORTFOLIO 1.23.0 (the thinking scope of 24 October): the project page it embeds draws the
      project's stages as its road in the rail, keeps its plan as its road or its roadmap alone once a shape is kept,
      and opens on one note of two sentences where it was two notes. A block added, nothing taken away, and 3.1.0 is
      published, so a minor step of its own.
 
-     3.3.0, THE PROJECT'S SHAPE AS BLOCKS (the thinking scope of 24 October, C28 and C29): the project page it embeds
+     3.3.0, THE PROJECT'S SHAPE AS BLOCKS (the thinking scope of 24 October): the project page it embeds
      declares the hero with Path and Money, and Work and Who is on it with Runs on and the agents on it, as two
      `project` blocks where they were drawn by hand over the page; Handed back or blocked and Money by month, which the
      page drew only where the shape was not, went for them, and More about is declared folded, as it was drawn. No id
      added or taken away, and 3.2.0 is live, so a minor step of its own.
 
-     3.4.0, THE AUDIT OF 25 OCTOBER (Z7 and Z20): the project page's Where it stands says Last worked from the record's
+     3.4.0: the project page's Where it stands says Last worked from the record's
      own `project-worked`, its tasks and its runs together, the figure its card on Projects and Today reads; Numbers on
      the Dashboard says how long ago the newest came in once that is past a week (`datapoints-age`), where it said thirty
      days over a month-old import; and a project page's Numbers is headed Numbers, since that page is at its ceiling of
      blocks and has no room for the second heading. A figure and a block added and none taken away, and 3.3.0 is
      master's, so a minor step of its own.
 
-     3.5.0, THE AUDIT OF 25 OCTOBER (Y16 and Y2): the Dashboard's numbers draw the two that moved most and list up to forty,
+     3.5.0: the Dashboard's numbers draw the two that moved most and list up to forty,
      as Numbers' own page does, where they drew twelve charts, so the two pages count the same; and its Organisations table
      leaves out one People retired (`retired_on`, People 3.8.0). Two blocks reworded in their shape and none added or taken
      away, and 3.4.0 is master's, so a minor step of its own.
 
-     3.6.0, AUDIT C OF 25 OCTOBER (X7): Projects, which this use case brings, opens a record with no project in play on
+     3.6.0, AUDIT C OF 25 OCTOBER: Projects, which this use case brings, opens a record with no project in play on
      a box to add one under one line (portfolio 1.27.0). Nothing of its own changed, and 3.5.0 is master's, so a minor
      step of its own.
 
@@ -585,13 +585,13 @@ export const FOUNDER = {
          project page's Where it stands says while nobody has said, beside what changed and when it was last worked.
          The week ends today, as above. */
       counted('project-numbers-7d', 'Numbers this week', 'register.datapoints', `thing is {{it}}, at after -7d, source is not example, ${SERVICE_NUMBERS_UNTIL}`),
-      /* HOW OLD THE NEWEST NUMBER IS, SINCE 3.4.0 (the audit of 25 October, Z20), which the Dashboard's heading over the
+      /* HOW OLD THE NEWEST NUMBER IS, SINCE 3.4.0, which the Dashboard's heading over the
          numbers says once it is past a week (`numbersAged`). */
       numbersAge('datapoints-age', 'Days since a number was reported'),
-      /* THE NUMBERS ABOUT A SERVICE, SINCE 2.6.0 (REC-C12), over the clauses and the ninety days of the block Renewals
+      /* THE NUMBERS ABOUT A SERVICE, SINCE 2.6.0, over the clauses and the ninety days of the block Renewals
          draws them in (`SERVICE_NUMBERS` in `modules/estate.ts`), so that block is drawn only while it has one. The
          clauses end the ninety days today (`SERVICE_NUMBERS_UNTIL`), and this says where they start: a reading dated
-         after today is neither counted nor drawn (audit 61, claim 5). */
+         after today is neither counted nor drawn. */
       counted(SERVICE_NUMBERS_SHOWN, 'Server and provider numbers', 'register.datapoints', `${SERVICE_NUMBERS_WHERE}, at after -${SERVICE_NUMBERS_BACK}d`),
       SILENT,
       {
@@ -821,7 +821,7 @@ export const FOUNDER = {
       'register.datapoints': {
         fields: [
           { id: 'organisation', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
-          /* THE SERVICE A READING IS ABOUT (REC-C12): how full a server's disk is has no project. `about_service`, NOT
+          /* THE SERVICE A READING IS ABOUT: how full a server's disk is has no project. `about_service`, NOT
              `service`: a field id one add-on alone declares is a name the core may not spell (`tools/gates/core-names.mjs`),
              and that word is in two dozen places of it already. */
           { id: 'about_service', label: 'Service', type: 'ref', to: 'services', index: true },
@@ -871,7 +871,7 @@ export const FOUNDER = {
           body: '{{projects-earning-silent.names}}: marked Earning, but no money in and no number sent in 90 days',
         },
       },
-      /* A SERVICE'S NUMBERS, ON RENEWALS, SINCE 2.6.0 (REC-C12): Estate's page, and this pack's list, so the block is
+      /* A SERVICE'S NUMBERS, ON RENEWALS, SINCE 2.6.0: Estate's page, and this pack's list, so the block is
          laid from here and said beside the page (`SERVICE_NUMBERS`). After the others, so they keep their places. */
       SERVICE_NUMBERS,
       /* WHERE AN ORGANISATION AND A PERSON WERE SEEN, SINCE 2.6.0 (`WHERE_SEEN`). After Notes, the last of People's own

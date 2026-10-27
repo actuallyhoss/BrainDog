@@ -35,7 +35,7 @@ export const PLANS_REGISTER: MoneyRegister = {
     { id: 'note', type: 'text' },
     /* PAID IS WRITTEN BY THE SCRIPT once no part is open. A plan that reads paid or cancelled is never opened by it. */
     { id: 'state', label: 'Status', type: 'enum', values: ['open', 'paid', 'cancelled'], default: 'open', index: true, required: true },
-    /* THE PLAN THIS ONE WAS MADE ONE WITH, SINCE money-core 3.22.0 (the audit of 25 October, Y1): two plans of one name
+    /* THE PLAN THIS ONE WAS MADE ONE WITH, SINCE money-core 3.22.0: two plans of one name
        written two ways ("Harbourview" and "harbourview") are asked about once, and his yes closes the second and links it here, so
        it is kept and never deleted, and the script moves its parts to the first. */
     { id: 'one_with', label: 'Made one with', type: 'ref', to: 'plans' },

@@ -1,5 +1,5 @@
 /**
- * ONE DESCRIPTION OF AN ADD-ON, said the same on the three screens that name one (E21): its row on Installed, its own
+ * ONE DESCRIPTION OF AN ADD-ON, said the same on the three screens that name one: its row on Installed, its own
  * page, and its row in the store. Each counted on its own: Installed counted the record's lists and the rules, the store
  * the catalogue's lists and pages, and the add-on's page summed lists and pages into one number. Now each asks this.
  *

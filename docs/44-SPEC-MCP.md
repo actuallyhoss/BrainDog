@@ -374,7 +374,7 @@ of `src/index.ts`):
   sentence, relayed unchanged. The row it files comes back compact, as `create`'s would. It could not be paid for by
   cutting descriptions, so it is the one tool §7's ceiling was raised for, once, to 2,760. The command line routes it
   (`apps/cli/src/surface.ts`), so it answers over stdio as over `POST /mcp`.
-- **`understand`** joined on 6 October as a seventeenth and left the list again in AGT-B05, on his "Tools: keep the
+- **`understand`** joined on 6 October as a seventeenth and left the list again, on his "Tools: keep the
   16": what the record would link and ask next, in names, is the address `braindog:understand` (§4.7), answered by the
   same method with the same text. What it freed pays for `op_id` on `create` and `update`.
 
@@ -1113,7 +1113,7 @@ until then.
 | `48ac43a1` | the `money` tool leaves the core, and `MONEY_FIGURES` with it: fifteen tools again (§4.4) |
 | not a commit of its own | `triage` and `braindog:inbox`, `inbox/{state}`: sixteen tools |
 | not a commit of its own | `understand`: seventeen tools |
-| AGT-B05 | `understand` becomes `braindog:understand`, and `op_id` on `create` and `update`: sixteen tools again |
+| — | `understand` becomes `braindog:understand`, and `op_id` on `create` and `update`: sixteen tools again |
 | `d7fb19bf` | the sentences `context` teaches |
 | `837b01c7`, `6ec8011d` | `braindog:automations`, `automation/{id}` and `grammar/automations`, and the dry run on a rule change |
 | `eafe8c20` | `braindog:grammar/script` |

@@ -260,7 +260,7 @@ export type SlashPurpose = 'ask' | 'plan' | 'automation' | 'pattern' | 'prose';
 export type SlashCandidate = { id?: string | undefined; model: string; inference?: Inference | undefined };
 
 /**
- * The host's router, handed to the core (ENG-A06): the candidates for one purpose, in the order they are tried.
+ * The host's router, handed to the core: the candidates for one purpose, in the order they are tried.
  *
  * "RULES ARE THE FALLBACK, NOT THE ENGINE". When the first candidate is not served, `core.run` asks the next
  * before its caller's rules speak. THE HOST DECIDES WHAT IS ON IT: his own key is a route of one, and the larger model is
@@ -283,7 +283,7 @@ export type Spends = 'person' | 'background' | 'none';
  * host's own endpoint with a model name typed for it, and nothing of the owner's is sent. `tier` stays readable beside it
  * for one release.
  *
- * A SAVE OF `included` NEVER WRITES `byo` (ENG-A07), whatever `tier` it carries. On a self-host it keeps the model name
+ * A SAVE OF `included` NEVER WRITES `byo`, whatever `tier` it carries. On a self-host it keeps the model name
  * typed for the host's own endpoint on tier `a`, so the two forms are the same two on every host; a row stored on `byo`
  * before is read, never rewritten, and keeps the count its host gives that tier.
  */
@@ -407,7 +407,7 @@ export interface Slash {
   read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
   propose(question: string, ctx: CallContext, byok?: Inference, askId?: string, inference?: Inference): Promise<Result<Proposal>>;
   proposePattern(samples: readonly RawPayload[], ctx: CallContext, inference?: Inference): Promise<Result<Proposal>>;
-  /** A pattern for the samples, drafted and not filed: the record's `infer.draft` job, which the host's pass acks with it (`jobs.ts`). The three oldest are sent, and `waiting` is how many of the shape wait (ENG-B07). */
+  /** A pattern for the samples, drafted and not filed: the record's `infer.draft` job, which the host's pass acks with it (`jobs.ts`). The three oldest are sent, and `waiting` is how many of the shape wait. */
   draftPattern(samples: readonly RawPayload[], waiting?: number): Promise<Result<PatternDraft>>;
   /** Two sentences above a digest about to be sent, or `{ text: '' }` for none: the record's `infer.prose` job (`jobs.ts`). */
   digestProse(digest: unknown): Promise<Result<{ text: string }>>;

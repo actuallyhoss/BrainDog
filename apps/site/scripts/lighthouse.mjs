@@ -36,7 +36,7 @@ import { brotliCompress } from 'node:zlib';
 const ROOT = join(import.meta.dirname, '..', 'build');
 
 /**
- * THE ELEVEN PAGES (loop/research-103b.md, the checks): every address the site has for a visitor, less the 404 and the
+ * THE ELEVEN PAGES (the checks): every address the site has for a visitor, less the 404 and the
  * held ones (`HELD` in `src/lib/launch.ts`), with one page standing for each template. The five `for/*` pages are one
  * layout over different examples, and so are the docs' articles and the legal texts.
  */

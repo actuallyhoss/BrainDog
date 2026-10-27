@@ -582,10 +582,10 @@ test('A RUN IS SAID BY WHAT IT DID: the page draws no card of one, a finished ru
   const WEEK = 7 * 24 * HOUR;
   /* PLANTED AS THE SEED PLANTS A RUN, the fields only the record writes stamped (`openRun` in `src/index.ts`). */
   const run = (fields: Record<string, unknown>, stamp: Record<string, unknown>) => value(k.create('session', fields as never, { actor: 'p_seed', stamp } as never));
-  const PATHS = '/Users/x/loop/batch.workflow.js wf_01ABC';
+  const PATHS = '/Users/x/work/batch.workflow.js wf_01ABC';
   run({ doing: 'Claude run', agent: 'claude', state: 'active' }, { last_seen: ago(3), wrote: 1 });
   run({ doing: 'Fixing the invoice totals', agent: 'codex', state: 'active' }, { last_seen: ago(5), wrote: 4 });
-  run({ doing: PATHS, agent: 'claude', state: 'active', next: 'Run loop/batch.workflow.js again for wf_01ABC' }, { last_seen: ago(7), wrote: 2 });
+  run({ doing: PATHS, agent: 'claude', state: 'active', next: 'Run work/batch.workflow.js again for wf_01ABC' }, { last_seen: ago(7), wrote: 2 });
   run({ doing: 'Closing the books', agent: 'claude', state: 'done' }, { last_seen: ago(2 * HOUR), wrote: 3 });
   run({ doing: 'Ended today and wrote nothing', agent: 'claude', state: 'done' }, { last_seen: ago(2 * HOUR), wrote: 0 });
   run({ doing: 'A helper that ended today', agent: 'claude', state: 'done' }, { last_seen: ago(2 * HOUR), wrote: 2, parent: 'S1' });
@@ -654,7 +654,7 @@ const FIGURES_11: Record<string, unknown> = {
 /**
  * WHAT 1.13.0 PUT IN (AGT-C17 jobs b and c): the page How the brain changed, the four figures it is said and drawn on
  * (the learnings that arrived, and the skills that changed over the record's log), and the line under What the brain
- * learned that opens it, and Needs a look's line of what is here twice (AGT-C18, `stale-rows-same`). Taken out again
+ * learned that opens it, and Needs a look's line of what is here twice (`stale-rows-same`). Taken out again
  * here, so the marks 1.12.0 and the versions under it were cut with are still read off what the add-on declares today.
  */
 const FIGURES_13 = ['learnings-arrived', 'learnings-charted', 'skills-changed', 'skills-changed-by-week'];
@@ -698,7 +698,7 @@ const staleBefore13 = (blocks: { key?: string; when?: { metric?: string } }[]): 
 type Loose = Record<string, unknown>;
 
 /**
- * AND THE PAGE AS IT STOOD BEFORE THE UI PASS OF 20 OCTOBER (agents F7, SF12): the lanes over the last 24 hours with no
+ * AND THE PAGE AS IT STOOD BEFORE THE UI PASS OF 20 OCTOBER (agents F7): the lanes over the last 24 hours with no
  * `where`, the cards of the runs that stopped today under them, "on" as the scope's label, and the key lines as one
  * note each with "(s)". Put back first, so `batch6Back` reads the page batch 6 left.
  */
@@ -978,7 +978,7 @@ test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figu
   const figures12 = Object.fromEntries(
     Object.entries(AGENTS_MODULE.AGENTS_METRICS)
       .filter(([id]) => !FIGURES_13.includes(id))
-      /* THE UI PASS OF 21 OCTOBER (H25) COUNTS EVERY KEY NOT RETIRED, as the Vault does; put the live-only clause back. */
+      /* THE UI PASS OF 21 OCTOBER COUNTS EVERY KEY NOT RETIRED, as the Vault does; put the live-only clause back. */
       .map(([id, f]) => [id, id === 'keys-nowhere' ? { ...f, where: 'state is live, value is empty, where is empty' } : id === 'keys-sealed' ? { ...f, name: 'Keys sealed in the vault' } : f]),
   );
   assert.equal(mark({ ...figures12, ...FIGURES_11 }), 'f59d74ab2bdc01ce', 'a figure went or is changed');
@@ -1033,7 +1033,7 @@ test('NOTHING IS FOLDED SINCE 1.17.0, and the foot is one line of doors, How the
    (places-and-computed-101; it was a9f073bfd65c161a), which `before13` takes off as it does the rest, and again for the
    look of Agents (batch 6; it was c8e4bf508d3d4bfa): Today’s runs as one tile over the day's lanes and the runs that
    stopped today, the agent as the card's mark and the project said "on", and keys with no value said plainly, which
-   `batch6Back` puts back, and again for the UI pass of 20 October (agents F7, SF12; it was 37af65a2925448e1): the lanes
+   `batch6Back` puts back, and again for the redesign (agents F7, SF12; it was 37af65a2925448e1): the lanes
    today's alone with no cards under them, the scope with no label, and the key lines one for one and one for many,
    which `uiPassBack` puts back, and again for the control room (agents and MCP plan §7.1; it was c616a819e2f84bb8): the
    box to tell an agent in and Working as the host's live runs, which `controlRoomBack` puts back, and again for the
@@ -1108,8 +1108,7 @@ test('AGENTS 1.19.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and changed the Agents
   assert.deepEqual(doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page), ['agents'], '1.19.0 changed more than the Agents page');
 });
 
-/* WHAT 1.20.0 DECLARES, AS ONE MARK: 1.19.0 with the runs open now headed Open now (`doc19` puts At work back). The
-   audit of 25 October (Z6, `agents-390-light.png`): "Nobody working right now." over a tile called At work holding
+/* WHAT 1.20.0 DECLARES, AS ONE MARK: 1.19.0 with the runs open now headed Open now (`doc19` puts At work back). a review (`agents-390-light.png`): "Nobody working right now." over a tile called At work holding
    three quiet runs. */
 const MARK_20 = 'cdd44094356440d8';
 test('AGENTS 1.20.0 HEADS THE RUNS OPEN NOW OPEN NOW, and changed that heading only', () => {
@@ -1124,7 +1123,7 @@ test('AGENTS 1.20.0 HEADS THE RUNS OPEN NOW OPEN NOW, and changed that heading o
 });
 
 /* WHAT 1.21.0 DECLARES, AS ONE MARK: 1.20.0 with a learning arriving this month by its own day too, and How the brain
-   changed's cards each a learning's one line (`doc20` puts both back). The audit of 25 October (Y29,
+   changed's cards each a learning's one line (`doc20` puts both back). a review (Y29,
    `brain-390-light-full.png`): "4 learnings arrived this month" over four learnings dated 28 and 29 August, their
    bodies printing code. */
 const MARK_21 = '68aebe4d4dbf3368';
@@ -1298,7 +1297,7 @@ test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, and n
   assert.ok(skills.includes('review-pr @ Kiln') && !skills.includes('review-pr @ everywhere'), skills.join(', '));
   assert.ok(!skills.some((s) => s.startsWith('chase-invoice')), 'a retired skill is listed');
   /* THREE OF EACH ON THE PAGE SINCE work 1.15.0, a part of More about Kiln, AND THE PROJECT'S OWN ALONE SINCE BATCH 72
-     (project-own-cards-72, PGS-C31): the ones from everywhere followed them here until then, the same three under
+     (project-own-cards-72): the ones from everywhere followed them here until then, the same three under
      every project. Read again with room for all of them, none from everywhere comes. */
   const keys = said('Keys', 'name');
   const everywhere = (key: string): boolean => key.endsWith('@ everywhere');
@@ -1418,7 +1417,7 @@ test('THE KEYS AND TOOLS TO PUT RIGHT ARE LINES AT THE FOOT, each drawn only whi
      lines of what the record tidies on its own (tidied, stale, here twice) are off the page. */
   assert.equal(declared.filter((b) => b.heading === 'Needs a look').length, 0, 'Needs a look is still a tile');
   const foot = declared.findIndex((b) => b.key === 'brain-link');
-  /* THE KEY LINES ARE A PAIR EACH SINCE THE UI PASS OF 20 OCTOBER (SF12): one for one and one for many. */
+  /* THE KEY LINES ARE A PAIR EACH: one for one and one for many. */
   const LINES = NOTES.flatMap((m) => (m === 'keys-nowhere' || m === 'keys-in-text' ? [m, m] : [m]));
   assert.deepEqual(declared.slice(foot + 1).map((b) => b.when?.metric), LINES, 'the lines are not at the foot, or not in order');
   for (const gone of ['tidied-week', 'gone-stale', 'stale-rows-same']) assert.equal(noteOn(declared as Drawn[], gone), undefined, `${gone} still nags on the page`);
@@ -1477,7 +1476,7 @@ test('THE KEYS AND TOOLS TO PUT RIGHT ARE LINES AT THE FOOT, each drawn only whi
 });
 
 /**
- * THE STALE LINE, SINCE 1.11.0 (AGT-C18), TWO LINES IN WORDS SINCE 1.13.0 (item 5): Needs a look says what the record
+ * THE STALE LINE, SINCE 1.11.0, TWO LINES IN WORDS SINCE 1.13.0: Needs a look says what the record
  * cleared this week and what is still stale, each finder by finder (`.names`), over the record's own `tidied-week` and
  * `gone-stale`, and each line is drawn only while its own figure is above nought.
  */

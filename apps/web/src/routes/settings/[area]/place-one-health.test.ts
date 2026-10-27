@@ -1,5 +1,5 @@
 /**
- * One Health (audit 25 October, Y4). Settings had an area called Health that said "32 things went stale" while the
+ * One Health. Settings had an area called Health that said "32 things went stale" while the
  * Health page said 9 things needed a look, and the Settings tile opened the first. Now the index's Health opens the
  * Health page, the record's housekeeping is its own area under its own name, and an old link to it still lands.
  */

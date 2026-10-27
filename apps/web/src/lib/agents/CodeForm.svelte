@@ -1,5 +1,5 @@
 <!--
-  THE SIX-DIGIT FIELD (AGT-A07), one component, drawn by the page the terminal prints (`routes/connect/approve`, at its
+  THE SIX-DIGIT FIELD, one component, drawn by the page the terminal prints (`routes/connect/approve`, at its
   `lead` size), by Settings, Agents (first on the screen while a machine waits, and under the connect sheet's setup line
   otherwise) and by Home's connect sheet, so a first run from Home connects a machine start to finish without leaving
   it. The owner's only: approving is `owner` (`deviceApprove`), and each page that draws this draws it on its owner's

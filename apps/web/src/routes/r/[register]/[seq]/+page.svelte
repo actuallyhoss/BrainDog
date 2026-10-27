@@ -623,7 +623,7 @@
      it reads the row; a write's answer carries neither, so what a press settled is remembered here by the row it was for. */
   let privacy = $state<{ key: string; mine: boolean; on: boolean | null }>({ key: '', mine: false, on: null });
   const rowKey = $derived(`${id}#${seq}`);
-  /* WRITTEN ONLY WHEN IT CHANGES, AND READ UNTRACKED (the scope of 24 October, E41): the effect read `privacy` and wrote a
+  /* WRITTEN ONLY WHEN IT CHANGES, AND READ UNTRACKED (the scope of 24 October): the effect read `privacy` and wrote a
      new object into it every time, so on a row the reader made it ran itself until Svelte stopped it
      (`effect_update_depth_exceeded` on /r/datapoints/522, at every width). */
   $effect(() => {
@@ -653,7 +653,7 @@
   }
 
   /* WHAT HAPPENED TO THE ROW, newest first, which the timeline merges with what was said about it. Worded again with
-     the names the row's read handed the page, so a list of links says the rows it gained, never their ids (Y3). */
+     the names the row's read handed the page, so a list of links says the rows it gained, never their ids. */
   const history = $derived(told && told.from !== 'refused' ? namedLines(id, told.lines, names) : []);
 
   /* WHO, BY NAME: the reader is You, and the record's members are asked for once, only when somebody else is in the
@@ -667,7 +667,7 @@
   /* "MERGE WITH ANOTHER PERSON", in the menu of a row of the list that keeps people: the other one is picked in a sheet and
      the record puts the question to Decide. Only where the caller may change the row, as Archive is. */
   let mergeOpen = $state(false);
-  /* SHARING THIS ROW, an owner's or an Admin's, and never while the record is seen as somebody (sharing plan §3.1). */
+  /* SHARING THIS ROW, an owner's or an Admin's, and never while the record is seen as somebody. */
   let sharingOpen = $state(false);
   /* "HAND TO", from the head's "…": a teammate or an agent, on a list that says who holds its rows. */
   let handOpen = $state(false);
@@ -708,7 +708,7 @@
   const done = $derived(tone === 'good');
   /* WHAT FINISHES IT, where it is still open and the reader may change it: the head's one primary (`finishOf`). */
   const finish = $derived(changes && !archived ? finishOf(decl, stateValue) : null);
-  /* WHERE ITS LIST DRAWS IT, on a list with a page of its own (E26): that page, searched for the row's name. */
+  /* WHERE ITS LIST DRAWS IT, on a list with a page of its own: that page, searched for the row's name. */
   const chartTo = $derived(row && decl ? chartOf(id, String(row.fields[decl.title] ?? '')) : null);
 
   /* A `document` is an argument, not a figure, so it never sits in the field list beside a date and
@@ -764,7 +764,7 @@
   const scopeField = $derived.by(() => (void got, scopeFieldOf(id)));
   /* THE FIELDS THE HEAD SAYS: the figure the tile leads with, the finished day the sentence says after the state, and
      where the row applies, which is the toolbar's chip. */
-  /* A READING SAID WHOLE IN THE HEAD (Y17), "16.4% on 28 Sep", so its number, unit and moment are not facts as well. */
+  /* A READING SAID WHOLE IN THE HEAD, "16.4% on 28 Sep", so its number, unit and moment are not facts as well. */
   const readings = $derived.by(() => (void got, readingOf(decl)));
   const readingLine = $derived(readings && row ? readingSaid(row.fields, readings, row.created, clock) : null);
   /* WHERE A LINE'S PARTS ARE, on a list that splits its lines across categories (`split.ts`). */
@@ -1009,7 +1009,7 @@
   /* A CHART'S VALUES, BY THE FIGURE'S RULE: a bar and a sparkline's point say what they are, where the tile's figure is a headline. */
   const figureSaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), 'figure');
 
-  /* WHAT EACH DOCUMENT'S `{{path}}`s READ, the record's answer with the row as the entry they sit on (PGS-B03), so a
+  /* WHAT EACH DOCUMENT'S `{{path}}`s READ, the record's answer with the row as the entry they sit on, so a
      project's note prints its stage and how many things are in its way, as the project page does. A read hands them with
      the row; a write answers the row alone, and a changed field changes what a note says, so they are asked again, and
      the ones in hand stay drawn until the new ones land rather than flash a dash. */
@@ -1155,7 +1155,7 @@
     {:else if f.type === 'enum'}
       <span class="enum-word">{copy.valueWord(display(id, f.id, value, clock, names) ?? '')}</span>
     {:else if f.type === 'text' && typeof value === 'string' && isMemo(value)}
-      <!-- A MEMO DRAWS AS A NOTE (Y13): its headings, bold and tables, folded past eight lines with Show all. -->
+      <!-- A MEMO DRAWS AS A NOTE: its headings, bold and tables, folded past eight lines with Show all. -->
       <NoteText text={value} />
     {:else}
       {display(id, f.id, value, clock, names)}
@@ -1310,7 +1310,7 @@
       {#if finish}
         <Button weight="primary" disabled={saving} data-finish data-head-primary onclick={() => void finishRow(finish)}>{finish.said}</Button>
       {/if}
-      <!-- A ROW OF A LIST WITH A PAGE OF ITS OWN SAYS WHERE IT IS DRAWN (E26): a reading opens its chart, the list's page
+      <!-- A ROW OF A LIST WITH A PAGE OF ITS OWN SAYS WHERE IT IS DRAWN: a reading opens its chart, the list's page
            searched for its name, so "CPU, bake" is one press from the line it is a point on. -->
       {#if chartTo}
         <Button href={chartTo} data-row-chart>{copy.rowSeeChart}</Button>
@@ -1326,8 +1326,8 @@
       {#if live && !archived}
         <HandSheet bind:open={handOpen} register={id} {row} {decl} onhanded={() => void rowMoved(id, seq)} />
       {/if}
-      <!-- "SHARE": this row with somebody here, a group or an email, for an owner or an Admin (sharing plan §3.1), from the
-           head's "⋯", so the head keeps its primary and its "⋯" (2.A.20). -->
+      <!-- "SHARE": this row with somebody here, a group or an email, for an owner or an Admin, from the
+           head's "⋯", so the head keeps its primary and its "⋯". -->
       {#if live && !archived}
         <ShareLazy bind:open={sharingOpen} subject={{ kind: 'row', list: id, seq: row.seq, id: row.id ?? null, name: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }} />
       {/if}
@@ -1928,7 +1928,7 @@
       'value pencil';
     column-gap: var(--sp-2);
     align-items: center;
-    /* A FACT STARTS AT ITS TOP (Y28): beside a long note in the two-column facts, a stretched fact spread its label to
+    /* A FACT STARTS AT ITS TOP: beside a long note in the two-column facts, a stretched fact spread its label to
        the middle and its value to the foot, six lines apart. */
     align-self: start;
     align-content: start;

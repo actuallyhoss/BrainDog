@@ -1,5 +1,5 @@
 /**
- * An options question whose options carry the changes they make (F61, the gate's half).
+ * An options question whose options carry the changes they make (the gate's half).
  *
  * WHAT WAS MEASURED BEFORE THIS. A scheduled script could find that a monthly payment falls on the 29th and ask "the last
  * day, or the 29th?", but an option was words only: picking one wrote nothing, so the script had to run again to read

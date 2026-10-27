@@ -1,5 +1,5 @@
 /**
- * A CARD'S FACT OVER A FIGURE (REC-C16, where a project stands is said): `{ metric: 'project-open:{{name}}', as: 'fact',
+ * A CARD'S FACT OVER A FIGURE (where a project stands is said): `{ metric: 'project-open:{{name}}', as: 'fact',
  * label: 'Open' }` on a cards block, read once a card with `{{field}}` filled from the card's own row, so a list of
  * projects says how many things each has open without anybody typing it.
  *

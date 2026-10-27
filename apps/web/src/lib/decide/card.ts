@@ -7,11 +7,11 @@
  * what it moves: the money accepting writes and what changes from what to what, where the record says. The ways to
  * answer come last, the suggested one marked with the small dot on every card. Where the choice is hard to
  * undo or money moves, the dot stays and only Enter is taken away (`press.ts` `acceptKey`): hiding the suggestion
- * there hid the agent's advice exactly where it matters most (audit 19 M10).
+ * there hid the agent's advice exactly where it matters most.
  *
  * NO ADDRESS AND NO ID IN THE WORDS. The question, its why, what accepting does, each answer and why it is offered,
  * what a change was and becomes, and why a question was put off were written by whoever asked, and an agent writes
- * `alex@acme.com`, `tasks#8` or a file path into them as readily as a name (audit 19 M11, audit 21 #4). Each is read
+ * `alex@acme.com`, `tasks#8` or a file path into them as readily as a name. Each is read
  * through `spoken` (`spoken.ts`) before it is drawn, and a signer that is an address is Someone.
  *
  * PURE, AND NODE LOADS IT (relative `.ts` imports, no runes), so `card.test.ts` reads every rule here without a DOM.
@@ -80,7 +80,7 @@ export const cardWords = {
   /** The same heading where the changes are drawn as lines and the record's sentence, which named the list, is not. */
   changesIn: (list: string) => `What it changes in ${list}`,
   /**
-   * HOW LONG AN OFFER WAITS (ENG-B14, "every proposal states a deadline"): the last day it waits, as the Slash page says
+   * HOW LONG AN OFFER WAITS ("every proposal states a deadline"): the last day it waits, as the Slash page says
    * it. It promises no taking back, because nothing takes an offer back by itself yet. `day` is already a day in words.
    */
   lapses: (day: string) => `Waits until ${day}`,
@@ -279,7 +279,7 @@ function valueSaid(v: unknown, home: string | null | undefined): string | null {
     if (day !== null) return day;
     /* A TEXT A PATH WAS TAKEN OUT OF IS NOT THE VALUE: `spoken` cuts "docs/review.md" from a note and leaves the rest
        reading whole, and a line drawn from that says the field holds what it does not. It is left to its page. A
-       STROKE ALONE IS NO PATH (audit 81, claim 3): "Q3/Q4", "N/A" and "Paid 50/50" come through `spoken` as they went
+       STROKE ALONE IS NO PATH: "Q3/Q4", "N/A" and "Paid 50/50" come through `spoken` as they went
        in and are said, as the record's own sentence says them; only a text `spoken` changed is held back. */
     const words = saidOf(v.trim());
     const said = spoken(words);
@@ -388,7 +388,7 @@ export function askerOf(q: QueueQuestion, me: string | null = null, names: Reado
   const runName = r ? (named(r.name) ?? named(r.title)) : named(run);
   const app = nameOrNull(field(q, 'app')) ?? (r ? (nameOrNull(r.app) ?? nameOrNull(r.client)) : null);
   /* A SIGNER THE READER HOLDS NO NAME FOR IS NAMED BY THE RUN THAT FILED IT where there is one, an agent or script by its
-     title, and not "Someone on this record" over a question a named run asked (audit P21). */
+     title, and not "Someone on this record" over a question a named run asked. */
   /* A RUN'S OWN LABEL ("Kpi backfill script", "Bank from out sms") IS THE SCRIPT'S, NOT A NAME: with no app to name, it is
      said as an agent, and the run is read on the question's own page. */
   if (who.name === copy.feedSomeone && runName !== null) return { name: app ?? nameWords.agent, kind: 'agent', app: null, run: app === null ? null : runName };
@@ -454,7 +454,7 @@ export function todayOf(now: number): string {
 }
 
 /**
- * HOW LONG AN ARRANGEMENT WAITS (ENG-B14), from the `lapses` its body holds: the last day it waits, in words, the same
+ * HOW LONG AN ARRANGEMENT WAITS, from the `lapses` its body holds: the last day it waits, in words, the same
  * line the Slash page draws ("Waits until 27 Oct"). A day already come is said as today, never as a day past. It names
  * nobody and promises no taking back: nothing takes an offer back by itself yet. `null` for anything that is not an
  * arrangement or whose body holds no real day.
@@ -482,7 +482,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
   const plain = waysOf(q, ctx.file);
   const keyed = { options: plain.map((w) => ({ key: w.key, recommended: w.recommended, hard: w.hard })) };
   const said = moves.length === 0 ? '' : ctx.home === undefined ? amountSaid(moves) : amountSaid(moves, ctx.home);
-  /* ACCEPT SAYS ACCEPT, AND THE AMOUNT IS THE LINE OVER IT (`money`, the scope of 24 October, E10): a button naming two
+  /* ACCEPT SAYS ACCEPT, AND THE AMOUNT IS THE LINE OVER IT (`money`, the scope of 24 October): a button naming two
      currencies and the care it asks for wrapped to five lines at 390. */
   const labelled = (w: Way): string => labelOf({ key: w.key, title: w.label }, keyed, []);
   /* THE SUGGESTED OPTION LEADS (§45); every key and number follows `ways`, so they follow what is drawn. */
@@ -506,7 +506,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
      a field's own name ("Changes Due on.") lost its last word to `spoken`, which reads it as a word left hanging. */
   const line = says && typeof q.does === 'string' ? saidOf(q.does) : '';
   const does = arranged !== '' ? arranged : spoken(`${line} ·`) === line ? line : spoken(line);
-  /* THE LIST'S NAME STAYS ON THE CARD (audit 81, claims 3 and 4): the sentence left out above was the one place that
+  /* THE LIST'S NAME STAYS ON THE CARD: the sentence left out above was the one place that
      said "in Projects", and the lines under the heading say only fields. The heading says it in the sentence's place. */
   const list = drawn && arranged === '' && typeof q.does === 'string' ? listSaid(saidOf(q.does)) : '';
   const cost = typeof q.cost === 'string' ? q.cost : '';
@@ -568,7 +568,7 @@ export const wayTail = (card: Pick<Card, 'cost'>, way: Pick<Way, 'key' | 'hard'>
   way.hard || (way.key === primary && hardOf(card)) ? queueWords.hardTail : '';
 
 /**
- * THE CARE A ROW OF ANSWERS ASKS FOR, AS A LINE UNDER IT (audit Z28): "Accept, can’t be undone easily" on the red
+ * THE CARE A ROW OF ANSWERS ASKS FOR, AS A LINE UNDER IT: "Accept, can’t be undone easily" on the red
  * button wrapped to two lines at 390, so the button says its name and the line under the row says the care. Said of
  * the answers `wayTail` marks: bare where the filled one is the only hard one, else naming them. `''` for none.
  */
@@ -615,7 +615,7 @@ export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge' | 'cost'>
   if (card.decline !== null) return true;
   if (card.ways.length < 2 || card.ways.length > INLINE_MOST) return false;
   if (compact || suggestsOf(card) || card.ways.every((w) => w.because === '' && w.shows === null)) return true;
-  /* ONE ANSWER GRAMMAR (the audit of 22 October, U-A9): two or three answers that each say what they do, none hard to
+  /* ONE ANSWER GRAMMAR: two or three answers that each say what they do, none hard to
      undo and none a picture, are a row of buttons too, the first filled, with what it does said under the row. They
      were two bordered boxes that pressed like text and moved 200 entries on one press. */
   return pressOf(card) && card.ways.every((w) => w.shows === null);

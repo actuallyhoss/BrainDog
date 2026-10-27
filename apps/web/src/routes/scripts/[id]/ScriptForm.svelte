@@ -14,7 +14,7 @@
   sentence is drawn as it said it. The form's own faults show after the first press, beside the field they are about.
 -->
 <script lang="ts">
-  /* THE FORM LAYOUT EVERY EDITOR SHARES (2.A.26): two columns from 1100, checkbox groups in 180px columns. */
+  /* THE FORM LAYOUT EVERY EDITOR SHARES: two columns from 1100, checkbox groups in 180px columns. */
   import '$lib/ui/forms.css';
   import { tick } from 'svelte';
   import { page } from '$app/state';
@@ -291,8 +291,7 @@
           </p>
         {/if}
 
-        <!-- THE SUBMIT ROW, ON THE START EDGE, THE PRIMARY FIRST (2.A.26), AT THE FOOT OF THE TILE IT SENDS (UI pass of
-             21 October, H38): under the code it saves and tries, never loose on the board under the tiles. -->
+        <!-- THE SUBMIT ROW, ON THE START EDGE, THE PRIMARY FIRST, AT THE FOOT OF THE TILE IT SENDS: under the code it saves and tries, never loose on the board under the tiles. -->
         <div class="do form-submit">
           <Button weight="primary" disabled={!canSave(draft, { sending, waiting: filed !== null && filed.why === null })} onclick={() => void send()}>{sending ? words.sending : owner ? words.install : words.propose}</Button>
           <Button weight="quiet" disabled={trying} onclick={() => void tryIt()}>{trying ? words.trying : words.tryIt}</Button>

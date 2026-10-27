@@ -1,7 +1,7 @@
 /**
  * The site says money in the plans' own currency, and says only the figures the table of plans holds.
  *
- * WHY THIS TEST (LCH-A08). The drawn app on the home page showed pounds beside dollar prices, and Cloud Plus was one
+ * WHY THIS TEST. The drawn app on the home page showed pounds beside dollar prices, and Cloud Plus was one
  * figure in the code and another in the roadmap. Every price and every plan figure is `PLAN_TABLE`'s
  * (`packages/record/src/plans.ts`), whose money is whole cents of `CURRENCY`. So two checks:
  *

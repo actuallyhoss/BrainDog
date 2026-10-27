@@ -1,5 +1,5 @@
 /**
- * A waiting rung offer is withdrawn when the ladder drops the kind it offers (research-audit-20 M2): "you kept them all"
+ * A waiting rung offer is withdrawn when the ladder drops the kind it offers: "you kept them all"
  * stops being true at the drop, and a yes to it afterwards would set the rung the drop took away.
  */
 

@@ -51,7 +51,7 @@ const ACROSS = 'deadlines';
  * due. `row` is the row's spoken id and `list` its list, so a page narrows with `list is <id>` here exactly as a table
  * over the source does.
  *
- * AND ITS MONEY, SINCE THE AUDIT OF 25 OCTOBER (Z14): the amount and the way it goes, read as the source reads them
+ * AND ITS MONEY: the amount and the way it goes, read as the source reads them
  * (`moneyWayOf`), so Money's calendar of the next thirty days says `amount is set` and draws what Today's Due soon draws.
  */
 const DUE: Schema = {
@@ -159,7 +159,7 @@ function readAcross(deps: PageDeps, block: PageBlock, base: BlockResult, window:
     /* NOT FINISHED IS THE LIST'S OWN `done` STATES, as the source reads it. A row with no state yet is open. */
     const open: Predicate[] = schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
     for (const field of dated) {
-      /* WHAT THE WALK DOES NOT MOVE DOES NOT FALL DUE, as on Due soon (the audit of 25 October, Z14): a bill that repeats
+      /* WHAT THE WALK DOES NOT MOVE DOES NOT FALL DUE, as on Due soon: a bill that repeats
          is drawn once, on its line, and a paused line not at all. */
       const walked = walkedOf(schema, field, legs, deps, kit);
       const got = deps.list({

@@ -1,5 +1,5 @@
 /**
- * THE THREE OLDEST OF HOW MANY WAIT (ENG-B07): a pattern draft reaches the engine with the count of its shape still
+ * THE THREE OLDEST OF HOW MANY WAIT: a pattern draft reaches the engine with the count of its shape still
  * waiting. A draft whose payload says `waiting` hands that number on; a draft over a shape counts its own and hands the
  * oldest arrivals, oldest first. Over a real record's outbox, with the inbox read answered here, newest first, as the
  * record's own inbox pages are.

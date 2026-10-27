@@ -1,5 +1,5 @@
 /**
- * Day 0, as a screen shows it: the first-screen checks of USE-B01 (`loop/scope/area-usecases-b.md`, job 2), pure
+ * Day 0, as a screen shows it: the first-screen checks of USE-B01, pure
  * functions over one snapshot the proof area's rig hands in. Nothing here opens a page, reads a host or waits.
  *
  * THE SNAPSHOT is what the rig saw on one screen, at one width, as one person:
@@ -142,7 +142,7 @@ const some = (names, most = 3) => (names.length > most ? `${names.slice(0, most)
  * be empty. A link that is no place (New list, the account, an agent at work) is known by where it goes and is left
  * alone, so a rail of only the three is read and green.
  *
- * A PLACE THE RECORD DECLARES (`snap.places`) MAY STAND EMPTY, since the audit of 22 October (U-C2): a person who asked
+ * A PLACE THE RECORD DECLARES (`snap.places`) MAY STAND EMPTY: a person who asked
  * for Money, Projects and Agents found none of them on their first Today, because each waited for its first row. Such
  * a place opens on its first entry, so it is no red; a side page over nothing (Board, Cycle plan) still is.
  */
@@ -283,7 +283,7 @@ export const firstScreen = {
 /* ── the checks that read the shell as drawn ──────────────────────────────────────────────────────────── */
 
 /**
- * Three checks over the app's shell once it is drawn (audit 71, finding 8): the rail's line that makes a page,
+ * Three checks over the app's shell once it is drawn: the rail's line that makes a page,
  * Today's line on the vital signs, and what Today calls the reader in her own lines. Kept beside the seven and not
  * among them, since they read a rail's buttons and headings and Today's links and feed, which a snapshot of the first
  * run's words alone never holds.
@@ -317,9 +317,9 @@ export const drawnScreen = {
 
   /**
    * Today says how many vital signs need a look at most once, as words that open the page they are shown on, and only
-   * to whoever owns the record (audit 71, finding 5).
+   * to whoever owns the record.
    *
-   * AND IT SAYS SO WHEN ONE DOES (audit 73, finding 7): a Today with no line is held against how many read red
+   * AND IT SAYS SO WHEN ONE DOES: a Today with no line is held against how many read red
    * (`snap.signs`), so taking the line out is red for whoever owns a record with a red sign. Silence is right for
    * anybody else, on a record with no page to open, and when none is red; with the number not read, silence proves
    * nothing and is said as not seen.
@@ -403,7 +403,7 @@ export function lineOf(r, colour = false) {
 /**
  * Everything the command prints and the code it leaves with, from the screens it was handed (`null` for none) and the
  * person: a heading a screen, a line a check, and a last line that counts them and says the exit code. 1 when any
- * check is red, and 1 when a check that was a screen's to judge read nothing (audit 73, finding 7: twelve unread and a
+ * check is red, and 1 when a check that was a screen's to judge read nothing (twelve unread and a
  * code of 0 was a pass nobody had earned), said as UNCHECKED on that line. A check that does not apply to a screen is
  * counted apart and leaves the code alone. 0 only when every check that applies read something and none is red.
  *

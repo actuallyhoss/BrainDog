@@ -1,5 +1,5 @@
 /**
- * `meet` answers in a name, never an address (research-audit-21 item 11): a person kept with only an address as their
+ * `meet` answers in a name, never an address: a person kept with only an address as their
  * name comes back as the part before its `@`, as the kernel names one it met by an address alone, and a name with an
  * address beside it comes back as the name.
  */

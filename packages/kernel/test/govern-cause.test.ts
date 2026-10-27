@@ -1,5 +1,5 @@
 /**
- * `propose` asks once, and its opener may take it back (AGT-C07).
+ * `propose` asks once, and its opener may take it back.
  *
  * WHAT WAS MEASURED BEFORE THIS. A proposal was inserted as it came, with no look at what was open: "Needs you 7" on the
  * owner's record showed one question twice, word for word, and SG69 asked to set values its rows already held. An

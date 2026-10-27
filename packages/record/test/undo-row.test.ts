@@ -1,5 +1,5 @@
 /**
- * "Only this one" end to end (research-audit-22 M3, L1): a plan's every step says its row as `undo({ row })` takes it
+ * "Only this one" end to end: a plan's every step says its row as `undo({ row })` takes it
  * back, on the kernel's undo and on the walk's alike, and handing that back puts back that row alone; and a walk's batch
  * is put back only as far as its plan listed, so a list the caller does not read is left as it is.
  */

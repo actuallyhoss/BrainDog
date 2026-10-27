@@ -1,7 +1,7 @@
 <!--
   Settings > Navigation, for the one frame (§52, nav A): what the app opens on, one list of what is in the sidebar and
   the bar with its order and Hide, then Add a page with a search, and the suggestions with the switch that stops them.
-  The phone bar, its switches and the shape picker went with the frame of 23 October (U-C8).
+  The phone bar, its switches and the shape picker went with the frame of 23 October.
 
   EVERY SETTING HERE IS THE PERSON'S OWN ON A RECORD (`nav-prefs.svelte.ts`): the shape is `nav.shape`, the switch is
   `pen.suggest`, and every "Not this one" is appended to `pen.dismissed`, so a choice made on the laptop holds on the
@@ -58,7 +58,7 @@
     }
   }
 
-  /* NO SHAPE IS OFFERED (C11): one sidebar and one bar are drawn for everyone since nav A, so the pen holds the record's
+  /* NO SHAPE IS OFFERED: one sidebar and one bar are drawn for everyone since nav A, so the pen holds the record's
      offers alone. */
 
   /* KEPT IN THIS VISIT, each with the one call that puts it back. The record stops offering a kept item on the next
@@ -68,7 +68,7 @@
   /* ONE KEEP AT A TIME, so a double press writes once. */
   let keeping = $state<string | null>(null);
 
-  /* ONE COUNT (ENG-B14): the list and its number read the same three inputs, so they cannot say two things. */
+  /* ONE COUNT: the list and its number read the same three inputs, so they cannot say two things. */
   const gone = (id: string): boolean => navPrefs.isDismissed(id) || kept.some((k) => k.item.id === id);
   const offers = $derived(navPrefs.suggest ? waiting(shell.pen, gone) : []);
   const waitingCount = $derived(navPrefs.suggest ? penCount(shell.pen, gone) : 0);
@@ -193,7 +193,7 @@
   THE HOLDING PEN. Every offer, whatever its kind, is one row: what it is, one sentence of why, and three presses, "Show
   it", "Keep it" and "Not this one". Nothing in it is ever applied without the second (`19 §3`).
 -->
-<!-- NO COUNT OVER NOTHING (the pass of 27 October): "Suggestions 0" sat over "Nothing waiting". The number is the
+<!-- NO COUNT OVER NOTHING: "Suggestions 0" sat over "Nothing waiting". The number is the
      sidebar's own (`penCount`), so where one is drawn the two agree. -->
 <Tile icon="inbox" title={words.offers} count={waitingCount || undefined}>
   <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />

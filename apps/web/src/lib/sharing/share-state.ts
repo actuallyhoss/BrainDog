@@ -1,5 +1,5 @@
 /**
- * The Share sheet as data (sharing plan §3.1): what it is opened on, what somebody has chosen in it, the share JSON
+ * The Share sheet as data: what it is opened on, what somebody has chosen in it, the share JSON
  * that turns into (§2.3), the sentence it is said in before the record answers, and the line counting what they will
  * see. `ShareSheet.svelte` draws this and sends what `sharesOf` makes; nothing here reads or writes the record.
  *

@@ -1,5 +1,5 @@
 /**
- * A row's mark, picked in its panel (PGS-A06): the field a list declares, the one write a pick makes, and the names it
+ * A row's mark, picked in its panel: the field a list declares, the one write a pick makes, and the names it
  * refuses. Invented lists and names only.
  */
 import { test } from 'node:test';

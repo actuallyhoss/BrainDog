@@ -105,7 +105,7 @@ test('THE FILTER BUTTON, THE SHEET AND THE CELL EDITOR DRAW THROUGH `valueSaid`'
   /* `assert.ok` and not `assert.match`, which prints all four thousand lines of the page when it fails. */
   assert.ok(/import \{[^}]*\bvalueSaid\b[^}]*\} from '\$lib\/voice\.ts'/u.test(PAGE), 'the page does not import `valueSaid`');
   /* The Filter button's summary, the sheet's values, and the cell editor's options. The bar's menus and segments went
-     into the sheet (the UI pass of 20 October, money F7). */
+     into the sheet (money F7). */
   assert.equal(PAGE.match(/valueSaid\(f, (value|v)\)/gu)?.length, 3);
 });
 

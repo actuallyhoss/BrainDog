@@ -1,5 +1,5 @@
 /**
- * The Mac app's release pieces that read no keychain and build nothing (E50, E51): which identity signs, what
+ * The Mac app's release pieces that read no keychain and build nothing: which identity signs, what
  * `signing.env` says, the update feed, and the public key written into the config.
  *
  *   pnpm --filter @braindog/desktop test

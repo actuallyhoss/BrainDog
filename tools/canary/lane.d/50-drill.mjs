@@ -1,5 +1,5 @@
 /**
- * The lane's fifth step: the hold's fire drill (PRF-A18, `loop/scope/area-proof-a.md:1234-1269`).
+ * The lane's fifth step: the hold's fire drill.
  *
  * WHY. The seven-day hold counts days on which every watched sign read green (`holdDays`, `packages/kernel/src/hold.ts`).
  * A counter nobody ever sees go back to 0 may simply be broken, so it is tested the way a fire drill tests an alarm:
@@ -14,8 +14,8 @@
  * past midnight); the hold is read through `metric green-days` and the arrivals are cleared through `archiveArrival`,
  * each over HTTP with the self-host's key, as an owner would.
  *
- * ON THE CANARY IT WAITS on the owner's sitting (PRF-A09, a drill door on the canary and its address kept as the secret
- * `CANARY_DRILL_DOOR`) and on a decision for a weekly production run (B25). Until the weekly run sets `CANARY_DRILL=weekly`,
+ * ON THE CANARY IT WAITS on the owner's sitting (a drill door on the canary and its address kept as the secret
+ * `CANARY_DRILL_DOOR`) and on a decision for a weekly production run. Until the weekly run sets `CANARY_DRILL=weekly`,
  * a deploy drills a fresh self-host and says so. Once it does: on a Monday (UTC) the three arrivals go to the canary's
  * drill door; on a Tuesday the hold is read with the smoke's key and must be 0, and the lane signs in by itself (the look
  * ended the session it kept, `30-look.mjs`) to clear the three, then signs out. Any other day it has nothing to do.

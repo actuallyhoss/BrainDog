@@ -16,7 +16,7 @@ import type { SeedMetric } from '../modules/base.ts';
 export type PackManifest = { id: string; version: string; requires: readonly string[] };
 
 /**
- * WHAT MAKES TWO ROWS OF A LIST ONE THING, SINCE 1.13.0 (AGT-C13, with the half of AGT-D03 that declares it on tools
+ * WHAT MAKES TWO ROWS OF A LIST ONE THING, SINCE 1.13.0 (with the half of AGT-D03 that declares it on tools
  * and keys): the fields that say it, the scope field they are compared within, and how they are folded first. `text`
  * folds case, accents, spaces, a last word in brackets and a file ending; `exact` only trims. `keep` says which of two
  * alike stays, and `sealed` keeps the one holding a sealed value whatever its age. The kernel reads it
@@ -229,7 +229,7 @@ const CHANGED = { value: { count: 'changed', field: 'rev' }, format: 'int', targ
 const FIX = { ...COUNT, target: { lte: 0 } } as const;
 
 /**
- * THE AGENT DOOR'S OWN SIGNS, SINCE 1.10.0 (AGT-B01): what the door's marks add up to over the last week, read by the
+ * THE AGENT DOOR'S OWN SIGNS, SINCE 1.10.0: what the door's marks add up to over the last week, read by the
  * kernel's `record.door` (`readDoor` in `packages/kernel/src/built-in-figures.ts`), each naming the one sign it is.
  * Declared here so a page and the vital signs draw them with no new code. Nothing is read over a week nobody reached
  * the door, never nought. `value` is a count only because every figure carries one; the reader reads the sign.
@@ -339,13 +339,13 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
   'skills-active': { metric: 'skills-active', name: 'Skills in use', source: 'register.skills', where: 'state is active', ...COUNT },
   /* ONE SKILL'S LESSONS, `{{it}}` filled from the skill page's own `{{name}}`, the clauses of the tile drawn on it. */
   'skill-learnings': { metric: 'skill-learnings', name: 'Learnings that bear on a skill', source: 'register.learnings', where: 'topic is {{it}}, state is active', ...COUNT },
-  /* THE KEYS, SINCE 1.10.0 (AGT-D01): how many keys not retired the Keychain holds a value for, a number with no verdict
+  /* THE KEYS, SINCE 1.10.0: how many keys not retired the Keychain holds a value for, a number with no verdict
      to read beside the Keychain's own "sealed here", which counts every key but the retired ones (`keysOf` in
      `apps/web/src/lib/record/vault.ts`), so a key gone stale still counts as sealed; how many live keys hold no value
      and do not say where they are kept, so nobody could find them again; and how many are past their day. A sealed
      field answers only `is set` and `is empty` (`packages/where/src/sentence.ts`), never what it holds. */
   'keys-sealed': { metric: 'keys-sealed', name: 'Keys sealed in the Keychain', source: 'register.credentials', where: 'state is not retired, value is set', ...COUNT },
-  /* EVERY KEY NOT RETIRED SINCE THE UI PASS OF 21 OCTOBER (H25), as the Keychain's "have no value yet" counts (`missing`
+  /* EVERY KEY NOT RETIRED, as the Keychain's "have no value yet" counts (`missing`
      in `apps/web/src/routes/vault/tiles.ts`): a stale or broken key with no value is as lost as a live one. */
   'keys-nowhere': { metric: 'keys-nowhere', name: 'Keys with no value and nowhere they are kept', source: 'register.credentials', where: 'state is not retired, value is empty, where is empty', ...FIX },
   'keys-expired': { metric: 'keys-expired', name: 'Keys past their day', source: 'register.credentials', where: 'state is live, expires before today', ...FIX },
@@ -382,7 +382,7 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
      the owner's press moves (`by: 'decide'`), and every move is a line of the record's log. So these read the log over
      `events.skills`, `{ count: changed, field: rev }`: how many skills took a version in thirty days, for the line, and
      in each week of six months, for the chart's second series. A skill that took two in one week is one that changed. */
-  /* AND BY THE LEARNING'S OWN DAY TOO, SINCE 1.21.0 (the audit of 25 October, Y29): four learnings last confirmed on 28
+  /* AND BY THE LEARNING'S OWN DAY TOO, SINCE 1.21.0: four learnings last confirmed on 28
      and 29 August came in by an import this month, and the line said "4 learnings arrived this month" over their own
      August dates. One the record wrote this month and that says no day of its own still counts. */
   'learnings-arrived': {
@@ -439,7 +439,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
   agents: {
     page: 'agents',
     title: 'Agents',
-    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101): the lead pages sit Work, Orders, Projects,
        Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
     nav: { section: 'Agents', order: 10, place: 60 },
     icon: 'session',
@@ -451,7 +451,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          rows name who and what. A clause whose figure is nought is left out by the writer, so a record where nothing is
          working and nothing was left says "Nobody working right now." and stops.
 
-         "NOBODY WORKING RIGHT NOW", WHERE IT SAID "Nobody at work." (H26, the look on his record of 24 October): At work
+         "NOBODY WORKING RIGHT NOW", WHERE IT SAID "Nobody at work." (the look on his record of 24 October): At work
          also lists the runs waiting on him that called inside three hours, each saying how long it has been quiet, so
          the page opened on "Nobody at work." over a tile called At work with two runs in it. Nobody is working; those
          runs are open and quiet, and their rows say so.
@@ -498,7 +498,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          no page can count working its own way again. It was seven twelfths beside Left for the next run, which wrapped
          each step to six lines and left a hole under the runs.
 
-         HEADED OPEN NOW SINCE 1.20.0 (the audit of 25 October, Z6): it holds the runs at work and, under Quiet, the ones
+         HEADED OPEN NOW SINCE 1.20.0: it holds the runs at work and, under Quiet, the ones
          open and quiet, so "Nobody working right now." sat over a tile called At work with three runs in it. The panel
          draws the two parts apart, each with its count. */
       {
@@ -544,7 +544,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         span: 12,
         body: '[How the brain changed](/p/brain) · [Learnings](/r/learnings) · [Skills](/r/skills) · [Tools](/r/tools) · [Keys](/r/credentials)',
       },
-      /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS (AGT-D01, SF12), each line drawn only while its figure is above nought, so
+      /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, each line drawn only while its figure is above nought, so
          a record with nothing wrong draws none. Loose at the foot since 1.17.0 and no longer a tile headed Needs a look,
          which on his record held only what the record tidies on its own: things here twice, runs written off and steps
          nobody took. Those are the lists' own (`?twice=1` on each), and the page no longer nags with them. */
@@ -678,7 +678,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         icon: 'history',
         span: 12,
         source: 'register.learnings',
-        /* EACH LEARNING AS ITS ONE LINE, SINCE 1.21.0 (the audit of 25 October, Y29): the failure that taught it was its
+        /* EACH LEARNING AS ITS ONE LINE, SINCE 1.21.0: the failure that taught it was its
            body, and printed code (`waitForFunction(...)`, `SQLITE_ERROR`) nobody asked to see. It is on the learning's
            own page, which the card opens. */
         columns: [
@@ -760,14 +760,14 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      clause of active and heard from today. `agents-working` goes, the one figure taken away, because the record answers
      the same question once for every page; no list or field goes. 1.8.0 is live.
      1.10.0 ONLY ADDS, SO IT IS MINOR: the figures `keys-sealed`, `keys-nowhere`, `keys-expired`, `tools-unseen` and
-     `runs-unplaced` (AGT-D01); Needs a look on the agents home under the runs, one tile of four lines each drawn only
+     `runs-unplaced`; Needs a look on the agents home under the runs, one tile of four lines each drawn only
      while a key or tool needs putting right, the fourth over the kernel's `keys-in-text`; What the brain learned
-     folded shut under its own section; and five figures over the agent door's own signs (`record.door`, AGT-B01). No
+     folded shut under its own section; and five figures over the agent door's own signs (`record.door`). No
      list, field or figure goes. 1.10.0 is live.
      1.11.0 TAKES NOTHING AWAY, SO IT IS MINOR (AGT-C12 job c): Left for the next run on the agents home, cards over the record's
      `handoffs.open` between Working and Today, and the line counts the same steps by the built-in `handoffs-open`
      where it read `runs-left-next`. That figure stays declared, read by no block. Needs a look gains a fifth line, over
-     the record's `gone-stale` and `tidied-week` (AGT-C18). Earlier goes under a fold of its own below Needs a look,
+     the record's `gone-stale` and `tidied-week`. Earlier goes under a fold of its own below Needs a look,
      with its count on the heading, so the page still shows six tiles before its fold. No list, field or figure goes,
      and every other block 1.10.0 drew is as it was.
      1.12.0 TAKES NOTHING AWAY, SO IT IS MINOR (AGT-C12 job c): a Working card is titled by the agent, with what it said
@@ -781,9 +781,9 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      `learnings-charted` it is said and drawn on, with `skills-changed` and `skills-changed-by-week` over the record's
      log for the skills that took a version (AGT-C17 job c). `learnings-faded` reads the rule it read, now written once. No list,
      field or figure goes, and every block 1.12.0 drew is as it was. Learnings, skills, keys and tools each say what
-     makes two of them one (`same:`, AGT-C13), a learning's kind gains `rule`, and the learnings' own words say when to
-     record one (AGT-D15); no row changes. Needs a look gains a sixth line, over the record's `stale-rows-same`, with the
-     way to fold what is here twice on each of those four lists (AGT-C18). And with 1.13.0 the skill After an import
+     makes two of them one (`same:`), a learning's kind gains `rule`, and the learnings' own words say when to
+     record one; no row changes. Needs a look gains a sixth line, over the record's `stale-rows-same`, with the
+     way to fold what is here twice on each of those four lists. And with 1.13.0 the skill After an import
      ships its second text (REC-C17 step 3, `agents-skills.ts`): a mark that names no glyph is given the nearest one a
      host draws, in the same arrangement, and cleared only where none is near. A skill travels beside this document, not
      in it, and takes its own `rev`, so the document and its fingerprint are as they were.
@@ -794,23 +794,23 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      Drop; Today's runs draws the day as lanes a kind of agent and titles each run by what it did, and the declared
      lanes, one a run, went; and Machines and profiles is a quiet tile at the foot (`panel: machines`). No list, field
      or figure goes.
-     1.15.0 IS WORDS, SO IT IS MINOR (the audit of 22 October, U5): the queue of what runs asked is headed Your agents
+     1.15.0 IS WORDS, SO IT IS MINOR: the queue of what runs asked is headed Your agents
      asked, where it said Needs you over a count of the questions runs opened, which is not what needs you.
-     1.16.0 IS WORDS, SO IT IS MINOR (the audit of 22 October, U12): the page's line names who is at work on what, from
+     1.16.0 IS WORDS, SO IT IS MINOR: the page's line names who is at work on what, from
      the record's `runs-working`, where it counted the machines they were on.
      1.17.0 TAKES BLOCKS AWAY AND RENAMES, SO IT IS MINOR (the Agents page of 23 October): the line is two numbers, how
      many at work and how many steps up next; At work, Up next (Left for the next run until now) and Recent runs (Today's
      runs) are each the whole row; Your agents asked, Needs a look's heading and its three tidying lines, Earlier and its
      cards, What the brain learned and its log, and Machines and profiles go; a foot line holds the doors. No list, field
      or figure goes.
-     1.18.0 IS WORDS, SO IT IS MINOR (the screens scope of 24 October, U-C7): a key's value is headed Locked value, where
+     1.18.0 IS WORDS, SO IT IS MINOR (the screens scope of 24 October): a key's value is headed Locked value, where
      it said Sealed value. No list, field or figure goes.
-     1.19.0 IS WORDS, SO IT IS MINOR (the agents scope of 24 October, H26): with nobody working the line says Nobody
+     1.19.0 IS WORDS, SO IT IS MINOR (the agents scope of 24 October): with nobody working the line says Nobody
      working right now, where it said Nobody at work over a tile called At work holding quiet runs. No list, field or
      figure goes.
-     1.20.0 IS WORDS, SO IT IS MINOR (the audit of 25 October, Z6): the runs open now are headed Open now, where they
+     1.20.0 IS WORDS, SO IT IS MINOR: the runs open now are headed Open now, where they
      were headed At work over runs open and quiet. No list, field or figure goes.
-     1.21.0 IS MINOR (the audit of 25 October, Y29): How the brain changed counts a learning as arrived this month by its
+     1.21.0 IS MINOR: How the brain changed counts a learning as arrived this month by its
      own day as well as the day the record wrote it, and its cards say each learning's line without the failure under
      it. No list, field or figure goes.
      1.22.0 IS WORDS, SO IT IS MINOR (Vault is now Keychain): the Keys list, its count and the notes about a key with no

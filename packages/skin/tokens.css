@@ -117,7 +117,7 @@
      THE OLD NAMES ARE GONE (SPEC 1.10, frame 3.9). They aliased to these for three waves and the last one moved every
      screen onto the new names and deleted them; `apps/web/src/lib/old-names.test.ts` keeps them gone. */
   :root {
-    /* A CHART IS INK, OR THE PROJECT'S HUE INSIDE A PROJECT (SPEC 1.3, SF8), and red only where something is late or
+    /* A CHART IS INK, OR THE PROJECT'S HUE INSIDE A PROJECT (SPEC 1.3), and red only where something is late or
        below zero, always with its word (and its hatch, `--chart-late-hatch` in `blocks-charts.css`). Series that are
        projects, agents or people take their slot (`--cat-*`); any other series takes this ramp. A project's scope
        sets `--chart-1: var(--ph)` and the two mixes of it over the tile. */
@@ -389,7 +389,7 @@
     --d-state: var(--d-exit);
     /* The panel, a sheet and an action sheet going back the way they came: a step quicker than they arrived (180). */
     --d-panel-out: var(--d-rows);
-    /* TILES ARRIVING ON A PLACE'S FIRST DRAW, one after another (scope E39): this far apart, six at most, so the last is
+    /* TILES ARRIVING ON A PLACE'S FIRST DRAW, one after another: this far apart, six at most, so the last is
        still by 450ms (five gaps and a page's 200). */
     --d-stagger: 40ms;
 

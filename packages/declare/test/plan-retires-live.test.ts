@@ -1,5 +1,5 @@
 /**
- * An update that takes a door or pattern away says when the record is still using it (REC-A16, step 1).
+ * An update that takes a door or pattern away says when the record is still using it (step 1).
  *
  * THE PLAN CALLED IT A RETIRE AND SAID NOTHING OF TEXTS. money-core 3.0.0 drops the card wordings and their text twins;
  * a record whose Shortcut still posts there was planned four retires, and the texts stopped filing the day the owner said

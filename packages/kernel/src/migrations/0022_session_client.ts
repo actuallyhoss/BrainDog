@@ -7,7 +7,7 @@
  * `session.ts`). Migration 2's had none, so every run opened without its app. `client` is the app's name, labelled App
  * because that is the word a person reads; `client_version` is its version, kept beside it.
  *
- * `gemini`, `copilot` AND `windsurf` JOIN THE `agent` FIELD, the three DIRECTION §34 draws with their makers' marks
+ * `gemini`, `copilot` AND `windsurf` JOIN THE `agent` FIELD, the three the app draws with their makers' marks
  * beside Claude, Codex and Cursor. A kind the register has no value for stays `other`, so until now a Gemini run wore the
  * app's glyph. `other` stays last, and stays the default.
  *

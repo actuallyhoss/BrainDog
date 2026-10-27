@@ -1,5 +1,5 @@
 <!--
-  THE TOOLBAR'S START (the UI pass of 20 October, money F7): the search box, 240 to 360 wide and 36 tall; the quick
+  THE TOOLBAR'S START (money F7): the search box, 240 to 360 wide and 36 tall; the quick
   filter, one segmented control of the slices a list is looked at by, with their counts ("All 38 · Late 4 · Due soon 2 ·
   Paid 10"); one Filter button that opens every field and the query builder in the sheet; and each filter that is on,
   as a rectangle (radius 8, never a pill) that a press takes off. On a phone: the search box and the Filter square, and

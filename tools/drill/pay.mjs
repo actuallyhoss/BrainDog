@@ -1,6 +1,5 @@
 /**
- * The paid half of the drill: one stranger's paid life on a host in test mode (LCH-A13 jobs 1 and 2,
- * `loop/scope/area-launch-a.md:834-879`; "runs one test checkout end to end", H.17).
+ * The paid half of the drill: one stranger's paid life on a host in test mode.
  *
  *   node tools/drill/pay.mjs --host <origin> [--steps a,b]
  *
@@ -295,7 +294,7 @@ async function change(p) {
   return ok(p.d, 'switch', `confirmed on Stripe’s portal; the record is on ${PLAN_TABLE.plus.name} at ${r.price}, with ${PLAN_TABLE.plus.credits} Slash credits.`);
 }
 
-/** `pack`: 100 Slash credits bought with the test Visa (LCH-A10); the record says them. */
+/** `pack`: 100 Slash credits bought with the test Visa; the record says them. */
 async function pack(p) {
   const why = wants(p, { buyer: true });
   if (why) return skip(p.d, 'pack', why);

@@ -18,7 +18,7 @@
  * - `rec`: the record's own time for each call, from its `Server-Timing` (`rec;dur=`), when the host says it.
  *
  * `--check` judges the warm Today against `speed.todaySettleMs` and exits 1 when it is over, so a launchd job can say a
- * slow night without anyone reading the file. The file is `loop/proof/speed/<date>.json` unless `--out` names another.
+ * slow night without anyone reading the file. The file is  unless `--out` names another.
  *
  * THE LAUNCHD JOB, at 04:30 on the Mac's own clock (Cairo), as the hourly watch is kept (`tools/watch/mac.mjs`):
  *

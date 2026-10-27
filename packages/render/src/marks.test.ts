@@ -1,5 +1,5 @@
 /**
- * A row's mark is a picture or a letter, never a letter of a picture's name (PGS-A06).
+ * A row's mark is a picture or a letter, never a letter of a picture's name.
  *
  * `markOf` is the one answer the string drawer, `Cards.svelte` and the app's `IdentityMark` all read, so it is held
  * here directly, and then through both drawers, compiled the way `parity.test.ts` compiles them, so a card's mark is

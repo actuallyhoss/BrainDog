@@ -1,5 +1,5 @@
 <!--
-  A block's declared actions (PGS-A12), drawn from `actionsPlan` in `../src/actions.ts`: a button, a switch, a choice of
+  A block's declared actions, drawn from `actionsPlan` in `../src/actions.ts`: a button, a switch, a choice of
   a few, a copy and a link, at most three of them shown in the order the page declared and the rest in one menu; on a
   phone, one shown and the rest in a sheet.
 

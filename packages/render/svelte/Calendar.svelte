@@ -122,7 +122,7 @@
 {:else}
   <div class="calendar" data-few={few ? '' : undefined} data-view={view ?? undefined} bind:this={root}>
     {#if opts.scenario}
-      <!-- MONTH OR LIST, a choice in the tile's head where the host can act (the money review, F5). -->
+      <!-- MONTH OR LIST, a choice in the tile's head where the host can act (the money review). -->
       <div class="segmented calendar-views" role="group" aria-label={CALENDAR_VIEWS}>
         <button type="button" class="segment" data-on={listed ? undefined : ''} aria-pressed={!listed} onclick={() => (view = 'month')}>{CALENDAR_VIEW_MONTH}</button>
         <button type="button" class="segment" data-on={listed ? '' : undefined} aria-pressed={listed} onclick={() => (view = 'list')}>{CALENDAR_VIEW_LIST}</button>

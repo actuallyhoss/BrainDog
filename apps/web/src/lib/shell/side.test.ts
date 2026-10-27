@@ -152,7 +152,7 @@ test('the crumb says the place, then where you are, each step a link back but th
   assert.deepEqual(crumbOf('/p/projects', m, '/p/projects', 'Projects'), [{ label: 'Projects' }]);
 });
 
-test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT (audit C, X6): "Projects 0 in play" headed a new shop', () => {
+test('THE PROJECTS PART IS DRAWN ONCE THERE IS A PROJECT: "Projects 0 in play" headed a new shop', () => {
   assert.equal(holdsProjects(null), false);
   assert.equal(holdsProjects({ rows: [] }), false);
   assert.equal(holdsProjects({ rows: [{ key: 'things#1' }] }), true);
@@ -241,13 +241,13 @@ test('what the device keeps is read safely', () => {
   assert.deepEqual(pinsKept('{'), []);
 });
 
-test('a name typed as a slug is said in words, and any other name is kept as written (E2)', () => {
+test('a name typed as a slug is said in words, and any other name is kept as written', () => {
   assert.equal(shownName('kiln-site'), 'Kiln site');
   assert.equal(shownName('money_core'), 'Money core');
   for (const kept of ['Glaze shop', 'Clay.co', 'PotBoard', 'iOS app', 'glaze', 'kiln.gg', 'Kiln-site']) assert.equal(shownName(kept), kept);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z32 (`projects-390-light.png` against `projects-1512-light.png`): on the phone Projects was a
+/* On the phone Projects was a
    bare list of names, while the laptop's cards said each one's lane and next step. */
 test('A PROJECT ON THE PHONE SAYS ITS LANE AND ITS NEXT STEP under its name, either alone, or nothing', () => {
   const label = (lane: string): string => ({ building: 'Building', earning: 'Earning' })[lane] ?? lane;

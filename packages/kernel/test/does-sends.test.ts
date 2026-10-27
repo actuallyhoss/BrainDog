@@ -1,5 +1,5 @@
 /**
- * WHAT LEAVES WITH A CALL A RULE RUNS (audit 53, finding 8): the sentence after "Sends your key ... to ...".
+ * WHAT LEAVES WITH A CALL A RULE RUNS: the sentence after "Sends your key ... to ...".
  *
  * The plan's `calls_out` carries `sends`, the fields of the rule's entry that go out with the call, each
  * `<list>.<field>` (`@braindog/declare`'s `Diff`). The approval named the key, the host and how often, and never said

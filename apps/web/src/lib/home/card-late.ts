@@ -2,11 +2,11 @@
  * HOW MUCH OF EACH PROJECT'S WORK IS LATE, for its card's red flag (proj section 4, Row A: "1 late").
  *
  * Counted as the project's own page counts it (`shape-hold.svelte.ts`): the open rows of the work list that points at the
- * projects list (the one that says who holds its rows), past their day on the record's clock ("before today", SF3), so
+ * projects list (the one that says who holds its rows), past their day on the record's clock ("before today"), so
  * a card, its page's hero and Work say one number. One read of the late rows for every card at once (`rowLates`); a read
  * that fails says nothing, and a card with nothing late draws no flag.
  *
- * AND THE MONEY THAT IS LATE WITH IT (the audit of 22 October, on the sidebar): a bill or a part of a plan that points at
+ * AND THE MONEY THAT IS LATE WITH IT (on the sidebar): a bill or a part of a plan that points at
  * the project, open past its day, is late as a task is, so a project whose salary is a fortnight late says so. Read from
  * every list the record keeps that points at the projects list, holds money and declares a day it falls due, one read a
  * list for every project at once, never a list by name.
@@ -48,7 +48,7 @@ const moneyFor = (projects: string, work: string | undefined): string[] =>
  * row counted for the project it points at, for the work list and every money list at once. A link is held as the
  * project's row id, so the projects are read once for their ids, and only when something is late at all.
  *
- * ONE READ A LIST, NOT ONE A CARD (the audit of 22 October, E3): the work list was read once for each project card, eight
+ * ONE READ A LIST, NOT ONE A CARD: the work list was read once for each project card, eight
  * reads on the owner's Today for what one read of the late rows says.
  */
 async function rowLates(client: ReturnType<typeof createClient>, projects: string, work: string | undefined): Promise<Map<number, number>> {

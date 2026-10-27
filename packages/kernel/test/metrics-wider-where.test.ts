@@ -1,5 +1,5 @@
 /**
- * `past`, THE LINES WHOSE DAY IS GONE COUNTED INSIDE A WIDER `where` (signs-metric-75-76, audit 74 claim 7).
+ * `past`, THE LINES WHOSE DAY IS GONE COUNTED INSIDE A WIDER `where` (signs-metric-75-76).
  *
  * A ratio's two halves share the one `where`. With the day in it, "every matched line is on time" and "no line was ever
  * matched" were both no row, so a sign that says nothing of a blind record said nothing of a clean one either. With the

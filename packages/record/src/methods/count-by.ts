@@ -83,7 +83,7 @@ export function methods(deps: RecordDeps, limits: Limits = {}) {
       const decl = kernel.register(args.register);
       if (!decl) return no('REGISTER_UNKNOWN', `There is no list called ${args.register}.`, { at: 'register' });
 
-      /* A FIELD HIDDEN FROM HER IS ONE THE LIST DOES NOT HAVE (sharing plan §2.7): not counted by, and not in her filter,
+      /* A FIELD HIDDEN FROM HER IS ONE THE LIST DOES NOT HAVE: not counted by, and not in her filter,
          which the walk reads without it (`kernel.list`'s `hide`), so no count tells her what it holds. */
       const hidden = hiddenOf(ctx, args.register);
       const live = decl.fields.filter((f) => f.retired !== true && !hidden.has(f.id));

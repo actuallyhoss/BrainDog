@@ -1,5 +1,5 @@
 <!--
-  "Only tasks where...": the condition a share is narrowed by (sharing plan §2.3), one field and its value a line, every
+  "Only tasks where...": the condition a share is narrowed by, one field and its value a line, every
   line together.
 
   THE PEOPLE EXCEPTION BUILDER'S PIECES. The fields offered are the ones a person can say one value of, and a typed

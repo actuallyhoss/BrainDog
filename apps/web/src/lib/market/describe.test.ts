@@ -6,7 +6,7 @@ import { firstPartyModules } from '@braindog/seed/packs/modules';
 import { describe, listingHolds, moduleHolds } from './describe.ts';
 import { listingsOf } from './listing.ts';
 
-test('ONE DESCRIPTION OF AN ADD-ON (E21): "N lists and N pages", the same whichever screen asks', () => {
+test('ONE DESCRIPTION OF AN ADD-ON: "N lists and N pages", the same whichever screen asks', () => {
   assert.equal(describe({ lists: 3, pages: 2 }), '3 lists and 2 pages');
   assert.equal(describe({ lists: 1, pages: 1 }), '1 list and 1 page');
   assert.equal(describe({ lists: 4, pages: 0 }), '4 lists');

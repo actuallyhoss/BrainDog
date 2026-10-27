@@ -27,7 +27,7 @@
  * IT READS AND WRITES NOTHING. No question is filed by asking: where a finder has one to put, the call it names is
  * `propose`, so the choice still goes to the person and nothing is asked by the record itself.
  *
- * BESIDE IT, THE TIDY OF WHERE THINGS APPLY (AGT-D04): `scopeProposals` reads, and `proposeScopes` is the one write in
+ * BESIDE IT, THE TIDY OF WHERE THINGS APPLY: `scopeProposals` reads, and `proposeScopes` is the one write in
  * this file, a person's press that files questions and moves nothing. Both are further down.
  */
 

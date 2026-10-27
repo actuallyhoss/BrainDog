@@ -25,7 +25,7 @@
     found: 'Keys that match',
   };
 
-  /* THE TWENTY USED MOST, BY ID (U-C7): getting about, opening, undoing and closing, then answering and ticking where
+  /* THE TWENTY USED MOST, BY ID: getting about, opening, undoing and closing, then answering and ticking where
      he works. Every other key is one search away, so the sheet is a page and not a manual. */
   const MOST = [
     'palette',

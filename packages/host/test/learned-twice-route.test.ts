@@ -1,5 +1,5 @@
 /**
- * One lesson learned twice through the host (AGT-D15): `learningsTwice` and `promoteLearnings`, the two rows of
+ * One lesson learned twice through the host: `learningsTwice` and `promoteLearnings`, the two rows of
  * `routes/learnings.ts`, built in batch 90.
  *
  * THE ROWS FIRST: the read is READ+ and writes nothing, the press is DATA and writes, both take nothing, and each says

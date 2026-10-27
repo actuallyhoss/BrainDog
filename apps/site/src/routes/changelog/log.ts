@@ -76,7 +76,7 @@ export const LATEST: Day | undefined = DAYS[0];
 /**
  * Every day by month, newest month first, the newest day included.
  *
- * ONE COUNT FOR A MONTH AND ITS DAYS (site F17). The page once drew the newest day on its own above the months and
+ * ONE COUNT FOR A MONTH AND ITS DAYS. The page once drew the newest day on its own above the months and
  * left it out of them, so "October 2026 · 1 entry" sat beside "Latest · 20 October 2026 · 16 entries". Now the newest
  * day is the first day of its month, open and marked, and a month's tally is every entry in it.
  */

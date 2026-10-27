@@ -243,8 +243,8 @@ const MECHANISMS: Readonly<Record<string, readonly [named: (name: string) => str
  * spent a call per id finding a name or repeated the id to the person. The web's Activity screen already says these
  * words for the same lines (`apps/web/src/routes/audit/who.ts`); this is the same rule for an agent, which has no "you".
  *
- * `runs` IS EACH RUN'S APP AS A PERSON NAMES IT, by handle, where the answer read them: `S42` is `Claude Code (S42)`,
- * and `An agent (S42)` where the caller cannot read the runs.
+ * `runs` IS EACH RUN'S APP AS A PERSON NAMES IT, by handle, where the answer read them: `S42` is `Claude Code`,
+ * and `An agent` where the caller cannot read the runs.
  */
 export function actorWords(by: string, names: ReadonlyMap<string, string>, runs: ReadonlyMap<string, string> = new Map()): string {
   const who = by.trim();
@@ -402,7 +402,7 @@ const HYPHENED_NAME = /^\p{Lu}\p{Ll}+(?:-\p{Lu}\p{Ll}+)+$/u;
  * id, a row id, a path, a number and a name made of three or more hyphenated parts (a door's or a pattern's) are taken
  * out before two are compared, so the queue says it once with how many it stands for.
  *
- * AND NOTHING THAT TELLS TWO REAL QUESTIONS APART IS TAKEN OUT WITH THEM (`loop/research-audit-14-15a-38.md`, H1). This
+ * AND NOTHING THAT TELLS TWO REAL QUESTIONS APART IS TAKEN OUT WITH THEM. This
  * kept only a to z, so two merge questions about different people named in Arabic both read "are and the same person",
  * "Pay GBP 12 to Acme?" read as "Pay GBP 1,200 to Acme?", and "Jean-Luc-Marie" went as a door's name would. So every
  * letter of every script is kept with its marks (a Devanagari vowel sign, an Arabic vowel), an amount beside its

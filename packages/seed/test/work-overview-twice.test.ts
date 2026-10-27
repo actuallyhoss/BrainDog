@@ -90,7 +90,7 @@ const block = (page: PageResult, heading: string) => {
 
 /* WHAT IS IN PLAY, BAND BY BAND, since work 1.10.0 drew the Work screen's bands; and Done recently, which ticks too. */
 /* TODAY IS THE TOP OF THIS WEEK SINCE work 1.15.0, AND LATE IS A BAND OF ITS OWN AGAIN SINCE the screens scope of 24
-   October (E24): Late, Waiting on you, This week and With an agent, half the row each. */
+   October: Late, Waiting on you, This week and With an agent, half the row each. */
 const GROUPS = ['Late', 'This week', 'After this week', 'No due day', 'Waiting on you', 'With an agent', 'Later'];
 const TICKS = [...GROUPS, 'Done recently'];
 

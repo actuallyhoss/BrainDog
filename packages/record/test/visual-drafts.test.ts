@@ -1,5 +1,5 @@
 /**
- * A visual's drafts at the record (DIRECTION §45, scope C15 to C17): a version handed in as a draft waits beside the kept
+ * A visual's drafts at the record: a version handed in as a draft waits beside the kept
  * one and never replaces it in `visuals`; a person keeps it, throws it away, or asks the run that drew it to try again,
  * which that run's next `context` carries; and an undo puts a draft back as it was.
  */

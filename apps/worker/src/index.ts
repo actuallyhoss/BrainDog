@@ -31,7 +31,7 @@ import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
 import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
 import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
-/* The oldest command this door still works with (AGT-A02), one day for both hosts, answered at the build address. */
+/* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
 import { INVITE_GONE, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
@@ -515,7 +515,7 @@ function loggingAcks(api: RecordApi, sql: Sql): void {
  * over them, key by key. The headers' hints are already on `ctx`: `inward` put them there.
  */
 /* `origin` IS WHERE THIS HOST SERVES THE APP, the start of a filed question's `decide` link: the configured `PUBLIC_HOST` and never the request's own URL. Unset, it is left out, and so is the link. */
-/* `build` IS THIS DEPLOY'S BUILD (`BRAINDOG_BUILD`), sent on every answer as `braindog-build` so the bridge sees a deploy mid-session (AGT-A02). */
+/* `build` IS THIS DEPLOY'S BUILD (`BRAINDOG_BUILD`), sent on every answer as `braindog-build` so the bridge sees a deploy mid-session. */
 /* `caller` IS THE KEY'S OWN ID, because the bearer is taken off the request before the record's object sees it: without
    it every key on a record read as one caller, and a second machine's first call in a minute went uncounted. */
 const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: string, build?: string): Promise<Response> =>
@@ -644,7 +644,7 @@ export class Record$ extends DurableObject<Env> {
   /** This object's Slash storage, where who is who keeps the verdicts it was given and the notes it read (`understand.ts`). */
   #jobsStore: Sql | undefined;
   /**
-   * Whether Slash's model answers, read from this object's Slash ledger (ENG-A02): the record's `engineHealth` and the
+   * Whether Slash's model answers, read from this object's Slash ledger: the record's `engineHealth` and the
    * door's `GET /api/slash/health` both answer it. Set in `#open` beside `#answers`, from the same `slashModel`.
    */
   #engineHealth: (() => Promise<EngineHealthRead>) | undefined;
@@ -674,7 +674,7 @@ export class Record$ extends DurableObject<Env> {
   /**
    * The plan, asked of the Directory once a wake, or `null` where it could not be asked. Not cached when it fails.
    *
-   * AND THE PLAN'S COUNT OF AGENTS IS WRITTEN FROM IT (`planAgents`, audit 40-42 #4), so a record that missed billing's
+   * AND THE PLAN'S COUNT OF AGENTS IS WRITTEN FROM IT (`planAgents`), so a record that missed billing's
    * word, or was made with no `setPlan` at all, holds the cap the pricing page promises from its next wake and not only
    * from its next move. A row that could not be written is the next wake's to write; the plan read still stands.
    */
@@ -800,7 +800,7 @@ export class Record$ extends DurableObject<Env> {
     let api!: RecordApi;
     /* SLASH'S MODEL: his own key where he chose it in Settings, read from Slash's store on each press, or the
        included model (`slash.ts`). */
-    /* A MODEL THAT DID NOT ANSWER IS THE OPERATOR'S (ENG-A01), told by every one of the three below: the record's own
+    /* A MODEL THAT DID NOT ANSWER IS THE OPERATOR'S, told by every one of the three below: the record's own
        model, its automations' answers and its model jobs. `api` is read when a call fails, by which time it is made. */
     const onFail = (fail: ModelFail) => this.#modelFailed(api, fail);
     const slashModel = workerSlashModel(this.env, () => api, { store: () => sql, onFail });
@@ -815,7 +815,7 @@ export class Record$ extends DurableObject<Env> {
     this.#jobs = workerModelJobs(this.env, () => api, { sql, clock: { now: () => Date.now() }, onFail });
     this.#jobsMeter = backgroundMeter(sql);
     this.#jobsStore = sql;
-    /* THE ENGINE'S HEALTH, FROM ITS OWN LEDGER AND NOT FROM THE SETTINGS (ENG-A02): `/api/version`'s `slash` below says a
+    /* THE ENGINE'S HEALTH, FROM ITS OWN LEDGER AND NOT FROM THE SETTINGS: `/api/version`'s `slash` below says a
        model is configured, and this says whether it answers. The same storage the asks, the answers and the jobs settle
        in, so every model call is in what it reads; the package is loaded only where there is a model. */
     const engineHealth = engineHealthRead({
@@ -826,7 +826,7 @@ export class Record$ extends DurableObject<Env> {
       grants: () => api.kernel.grants(),
     });
     this.#engineHealth = engineHealth;
-    /* AND THE PROBE (ENG-A08): one press asks each model of the answer route whether it answers now, through the wires
+    /* AND THE PROBE: one press asks each model of the answer route whether it answers now, through the wires
        the asks already use (the included model, the operator's provider), settling in the same ledger, loaded on the
        press only. Held to his switch for Slash reading, as a background ask is. */
     const engineProbe = engineProbeOf({
@@ -841,7 +841,7 @@ export class Record$ extends DurableObject<Env> {
       complete: probeWireOf((c) => (c.id === 'provider' ? fallbackWire(this.env) : includedInference(this.env))),
       reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
     });
-    /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01): the same storage again, so the calls it
+    /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings`: the same storage again, so the calls it
        counts are the ones the health above was read from, beside the questions still open, each by its cause. Handed
        whether or not a model is set, since the open questions are the record's own. The mentions are the record's own,
        each attached or not. */
@@ -896,7 +896,7 @@ export class Record$ extends DurableObject<Env> {
              `/api/inbound/mint` answered 404. This Worker is
              the Cloud and nothing else, so it is a constant and not a binding. */
           host: 'cloud',
-          /* The oldest command this door still works with, which `doorHealth` reads `behind` against (AGT-A02). */
+          /* The oldest command this door still works with, which `doorHealth` reads `behind` against. */
           min_cli: MIN_CLI,
         },
         slashModel,
@@ -904,7 +904,7 @@ export class Record$ extends DurableObject<Env> {
            are, under the owner's `ask_cap` and the operator's ceiling alike (`slash-meter.ts`). Without it the record asks
            `slashModel` unmetered: 5 presses and the daily look were 6 binding calls under a ceiling of three, and no row. */
         slashMeter: workerSlashMeter(this.env, () => api, { sql, clock: { now: () => Date.now() } }),
-        /* A SEARCH'S OWN WORDS AS A VECTOR (ENG-B18), only while his switch for Slash reading is on and the month's background
+        /* A SEARCH'S OWN WORDS AS A VECTOR, only while his switch for Slash reading is on and the month's background
            allowance has room, and never on the ask ceiling (`workerMeaning`). Absent where this Worker cannot embed. */
         meaning: workerMeaning(this.#jobs, sql, () => api.kernel.prefsOf('slash')['slash.reads'] !== false),
         /* AND WHETHER THAT MODEL ANSWERS, for a read token, the command line and the daily vital sign (`engineHealth`). */
@@ -966,7 +966,7 @@ export class Record$ extends DurableObject<Env> {
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         /* WHETHER THIS WORKER MAKES READ-ONLY LINKS (`sharesOf`): `KEK` bound and `SHARE_LINKS` on, and the owner's sentence when not. */
         shares: () => sharesOf(this.env),
-        /* THE PLUS GATE ON A SHARE TO SOMEBODY NOT ON THE RECORD YET (sharing plan §2.15), the same rule and the same
+        /* THE PLUS GATE ON A SHARE TO SOMEBODY NOT ON THE RECORD YET, the same rule and the same
            sentence as `#oneOnly`'s on `invite` beside it: off while this host sells nothing, and on Free or Cloud a
            share to an outsider is a second person, which is Cloud Plus's. A share to somebody already here passes. */
         plus: () => this.#outsiders(api),
@@ -1044,7 +1044,7 @@ export class Record$ extends DurableObject<Env> {
       this.#oneOnly(api);
       /* AN ERASURE REACHES SLASH'S LEDGER TOO, in this same storage (`slashErasing`). */
       slashErasing(api, sql);
-      /* THE PLAN'S COUNT OF AGENTS, ON WAKE (audit 40-42 #4): a record with no `plan.agents` row asks its plan once
+      /* THE PLAN'S COUNT OF AGENTS, ON WAKE: a record with no `plan.agents` row asks its plan once
          (`#planOf`), which writes it, so the fourth key on Free is refused though no `setPlan` ever reached this object.
          Inside the block, so no mint is answered before the row is there. A plan with no count leaves no row and is
          asked once a wake, which is one Directory read; a Directory that does not answer is asked again next wake. */
@@ -1117,7 +1117,7 @@ export class Record$ extends DurableObject<Env> {
     const asked = await this.#step(api, 'ask', () => this.#ask(api));
     const modelled = await this.#step(api, 'model', () => this.#model(api));
     await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore }));
-    /* AND THE RECORD LINTS ITS OWN PAGES (PRF-A04), at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
+    /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
     await this.#step(api, 'lint', () => api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e))));
     /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
        replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
@@ -1200,7 +1200,7 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * One model call that did not answer (ENG-A01): an `op: 'model'` line at error level with the provider's own words, and
+   * One model call that did not answer: an `op: 'model'` line at error level with the provider's own words, and
    * the operator mailed "BrainDog model" through the Directory's window, as a crash is, one a quarter hour for the fleet.
    *
    * NOT MAILED: a call on the owner's own key (`whose: 'owner'`), which is his provider's to mend, and a reply that broke
@@ -1252,9 +1252,9 @@ export class Record$ extends DurableObject<Env> {
         store: this.#jobsStore,
         /* WHETHER SLASH'S MODEL ANSWERS: while it does not, the jobs wait with their attempts kept (`model-jobs.ts`). */
         health: this.#engineHealth,
-        /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09): off, nothing is leased and no model is asked or tested. */
+        /* HIS SWITCH FOR SLASH READING ON ITS OWN: off, nothing is leased and no model is asked or tested. */
         reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
-        /* THE KERNEL'S GOVERNOR (ENG-B17): a pattern draft is held, never filed, while the floor or the brake says no. */
+        /* THE KERNEL'S GOVERNOR: a pattern draft is held, never filed, while the floor or the brake says no. */
         mayPropose: this.#jobsStore ? (at) => mayPropose(this.#jobsStore!, at) : undefined,
         log: (line) => op({ op: 'slash.jobs', rec, ok: false, error: line }),
       });
@@ -1545,7 +1545,7 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * The nightly walk telling this record what its copy came to (LCH-C03): kept, with the copy's name and size, or failed,
+   * The nightly walk telling this record what its copy came to: kept, with the copy's name and size, or failed,
    * with the reason (`copyKept` and `copyFailed` in the kernel). Both write a local `export` event, which no copy carries,
    * so telling after the dump leaves tomorrow's bytes as they were. A failure is one fault, counted again on the next
    * failed night rather than opened twice, and never a question. A LAPSED RECORD IS TOLD AS ANY OTHER: its copy is kept.
@@ -1562,7 +1562,7 @@ export class Record$ extends DurableObject<Env> {
   }
 
   /**
-   * A deploy's restore point, for this record (LCH-C06, `restore-point.ts`): whether somebody wrote here since `since`,
+   * A deploy's restore point, for this record (`restore-point.ts`): whether somebody wrote here since `since`,
    * and in a real run a copy under `label`, through the same port the record's own copies go through (`copies.ts`).
    * `check` opens the record with this build and copies nothing. AN RPC AND NEVER A ROUTE: the operator's door is its
    * one caller.
@@ -1777,7 +1777,7 @@ export class Record$ extends DurableObject<Env> {
    * THE ANSWER IS THE KERNEL'S `Verified`, `reach` INCLUDED, so the inbox reach `session.ts` puts on the principal is
    * named by the type it crosses the RPC in, not only by the row it came from. And the operator's `TOKENS_VALID_FROM`
    * goes down with the bearer: a token made before it answers `null`, which is the 401 every unknown bearer gets.
-   * `build` is the command's `x-braindog-cli` (`bearerOf`), kept on the key as its `last_build` (AGT-A02).
+   * `build` is the command's `x-braindog-cli` (`bearerOf`), kept on the key as its `last_build`.
    */
   async verify(bearer: string, surface: string, build?: string): Promise<Verified | null> {
     if (this.#gone) return null;
@@ -1845,7 +1845,7 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.memberStopped(person);
   }
 
-  /** Whether this person's access here ended, and whose record it is, so a door can tell them so (sharing plan §2.8). */
+  /** Whether this person's access here ended, and whose record it is, so a door can tell them so. */
   async accessEnded(person: string): Promise<{ owner: string | null } | null> {
     if (this.#gone) return null;
     const api = await this.#record();
@@ -1961,7 +1961,7 @@ export class Record$ extends DurableObject<Env> {
     return api.ingestVerify(args, this.#openKey(api) ?? undefined);
   }
 
-  /** Count one arrival a door switched off turned away (SHL-C13). AN RPC AND NEVER A ROUTE, as `ingestVerify` is. */
+  /** Count one arrival a door switched off turned away. AN RPC AND NEVER A ROUTE, as `ingestVerify` is. */
   async doorTurnedAway(args: { ingest: string }): Promise<void> {
     (await this.#record()).doorTurnedAway(args);
   }
@@ -2089,7 +2089,7 @@ export class Record$ extends DurableObject<Env> {
     const broken = api.kernel.refused();
     if (broken) return { ok: false, refusal: broken };
     const out = api.kernel.pushTarget(args);
-    /* WHERE A TAP OPENS IS UNDER THIS RECORD'S NAME (E44): `/app/<slug>` before the record's own path. A record whose
+    /* WHERE A TAP OPENS IS UNDER THIS RECORD'S NAME: `/app/<slug>` before the record's own path. A record whose
        name cannot be read rings with no body, as every push did before. */
     if (!out.ok || out.value === null || out.value.open === undefined) return out;
     const { open, keys, ...bare } = out.value;
@@ -2159,7 +2159,7 @@ export class Record$ extends DurableObject<Env> {
     /* The context arrives from the Worker, which did the authentication. The record does the
        AUTHORISATION — every permission check is inside `createRecordApi`, one place, so the CLI and
        the MCP server answer to the same ladder as the browser. */
-    /* A CONTEXT PAST THE CAP IS REFUSED IN ITS OWN SENTENCE BEFORE ANYTHING PARSES IT (`ctxOversize`, T13). */
+    /* A CONTEXT PAST THE CAP IS REFUSED IN ITS OWN SENTENCE BEFORE ANYTHING PARSES IT (`ctxOversize`). */
     const over = ctxOversize(request.headers);
     if (over) {
       const out = { ok: false as const, refusal: over };
@@ -2217,7 +2217,7 @@ export class Record$ extends DurableObject<Env> {
        (`apps/web/src/lib/data/live.ts`), and the poll is the one call that must stay one `MAX(rowid)`: a daily look
        woken by it would put Slash's model calls behind a question that only asks whether anything changed. The alarm
        and every other read still start it. NOR FOR `boot`, the first call of every open: the look's first run of the day
-       landed on it, and every call after waited (`loop/research-104.md` 2.1). */
+       landed on it, and every call after waited. */
     const path = new URL(request.url).pathname;
     if (!pollAsked(request.method, path) && !/^\/+api\/+boot\/*$/u.test(path) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api, { sql: this.#jobsStore }));
     /* THE METHOD ROUTER'S HANDLERS, WITH THE KEYCHAIN PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
@@ -2707,7 +2707,7 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
-   * The night's tally, kept by `nightly()` after the walk (LCH-C01), for `/healthz` to say. One key, beside the alert
+   * The night's tally, kept by `nightly()` after the walk, for `/healthz` to say. One key, beside the alert
    * windows and outside the tables the Directory's copy is made of: a restore must not bring back an old night.
    */
   async nightDone(night: Night): Promise<void> {
@@ -2720,7 +2720,7 @@ export class Directory$ extends DurableObject<Env> {
   }
 
   /**
-   * One sign-in letter's send, counted (LCH-A04): `true` went, `false` met a fault of this host's. The last
+   * One sign-in letter's send, counted: `true` went, `false` met a fault of this host's. The last
    * `LETTERS_KEPT` are kept, newest last. An address's own fault never arrives here (`mailOutcome`), so the count says
    * nothing about who has an account.
    */
@@ -3303,7 +3303,7 @@ async function nightly(env: Env): Promise<void> {
     records: async (cursor) => directory.listRecords(cursor),
     snapshot: async (record) => stub(record).snapshot(record, at),
     /* AND THE RECORD TOLD WHAT ITS COPY CAME TO, so its Settings can say when and how large, and a failed night reaches
-       the person whose copy it was as one fault (LCH-C03). */
+       the person whose copy it was as one fault. */
     kept: async (record, copy) => stub(record).nightCopy({ kept: copy }),
     failed: async (record, why) => stub(record).nightCopy({ failed: why }),
     /* THE KEYS BEFORE THE COPY, so tonight's copy holds them under tonight's root key (`rewrap.ts`). */
@@ -3358,7 +3358,7 @@ async function nightly(env: Env): Promise<void> {
     now: () => Date.now(),
   }).catch(async (e: unknown) => {
     /* A WALK THAT THREW IS A NIGHT THAT DID NOT RUN, kept as one so last night's `ran` does not stand for a day more
-       (audit-35, finding 5), and mailed before the throw makes the invocation red. */
+       (audit-35), and mailed before the throw makes the invocation red. */
     await keepNight(directory, stoppedNight(directoryFailed));
     await opsAlert(env, { op: 'night', why: 'the walk stopped' }, alertClaim(env));
     throw e;
@@ -3367,7 +3367,7 @@ async function nightly(env: Env): Promise<void> {
      already in the tail, but a tail is read by somebody who is already worried; a failed cron run
      is what tells them to be. */
   const red = [fleetFailure(walked), directoryFailed].filter((line): line is string => line !== null);
-  /* AND THE NIGHT IS KEPT FOR `/healthz` (LCH-C01), so a watch from outside can say a night did not run, and a night with
+  /* AND THE NIGHT IS KEPT FOR `/healthz`, so a watch from outside can say a night did not run, and a night with
      a failure in it mails the operator before the invocation goes red, because a red cron row is read by somebody
      already looking. Counts only: which record failed is in the walk's own lines. */
   const night: Night = {
@@ -3377,7 +3377,7 @@ async function nightly(env: Env): Promise<void> {
     backups_failed: walked.failed,
     directory: directoryFailed === null ? 'ok' : 'failed',
     /* AND EVERY OTHER JOB OF THE NIGHT BY ITS FAILURES, so `ran` is not said over expiries, re-wraps, erasures or counts
-       that did not finish (audit-35, finding 5). */
+       that did not finish (audit-35). */
     expiry_failed: walked.expiryFailed,
     stragglers: walked.stragglers,
     erase_open: walked.eraseOpen,
@@ -3588,7 +3588,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       access: (record, person) => held(env, record, (object) => object.access(person)),
       stopped: (record, person) => held(env, record, (object) => object.memberStopped(person)),
       ended: (record, person) => held(env, record, (object) => object.accessEnded(person)),
-      /* SEE AS (sharing plan §3.3) is this door's alone; the record counts each read made so as `preview:<person>` (`previewBy`). */
+      /* SEE AS is this door's alone; the record counts each read made so as `preview:<person>` (`previewBy`). */
       seeAs: true,
     }, slug);
 
@@ -3819,7 +3819,7 @@ async function forward(inner: Request, env: Env, record: string, ctx: CallContex
   const renaming = renameAsked(inner.method, new URL(inner.url).pathname);
   const leaving = leavesAsked(inner.method, new URL(inner.url).pathname);
   const t0 = Date.now();
-  /* A RESET UNDER A READ OR A PULSE IS ASKED ONCE MORE through a new stub (`reset-retry.ts`, the audit's Z38). */
+  /* A RESET UNDER A READ OR A PULSE IS ASKED ONCE MORE through a new stub (`reset-retry.ts`). */
   const out = await fetchThroughReset(stub, inner);
   const spent = Date.now() - t0;
   if (removal !== null && out.status === 200) await leftDirectory(removal, env, record);
@@ -4358,7 +4358,7 @@ async function opsAlertDoor(request: Request, env: Env): Promise<Response> {
 const OPS_RESTORE_POINT = /^\/+account\/+ops\/+restore-point\/*$/;
 
 /**
- * `/account/ops/restore-point`: the deploy workflow's restore point (LCH-C06, `restore-point.ts`). `POST { commit?,
+ * `/account/ops/restore-point`: the deploy workflow's restore point (`restore-point.ts`). `POST { commit?,
  * check?, cursor?, open? }`. With `check: true` it opens every record written in the last seven days once and copies nothing,
  * which is what the workflow asks on every deploy; without it each of those records takes a `before-deploy-<commit>`
  * copy, which the workflow asks only when a migration changed. It answers counts, never a record's name, and `cursor`
@@ -4544,7 +4544,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     origin,
     google,
     /* WHETHER SIGN-IN MAIL IS DOWN: the last five letters all failed, the newest inside the quarter hour
-       (`Directory$.lettersDown`), so `/auth/methods` answers `magic: 'down'` and the page says so (LCH-A04). */
+       (`Directory$.lettersDown`), so `/auth/methods` answers `magic: 'down'` and the page says so. */
     mailDown: () => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).lettersDown(),
     auth: ((call: AuthCall) => directory.auth(call)) as unknown as Auth,
     ip: request.headers.get('cf-connecting-ip') ?? '',
@@ -4582,7 +4582,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
 const signinCheckOn = (env: Env): boolean => botCheckKeyed(env) && (env.TURNSTILE_SITE_KEY ?? '').trim() !== '';
 
 /**
- * A letter a person waits on at sign-in or sign-up, sent, and whether it went told to the Directory (LCH-A04), so
+ * A letter a person waits on at sign-in or sign-up, sent, and whether it went told to the Directory, so
  * sign-in can say "mail is not going out" when the last five did not (`Directory$.lettersDown`).
  *
  * STILL INSIDE `waitUntil`, AFTER THE ANSWER: a known and an unknown address answer in the same time, as they always did.

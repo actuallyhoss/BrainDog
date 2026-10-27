@@ -57,7 +57,7 @@ export type LiveRun = {
   /** Seconds since its last call; absent from a host older than the Agents page of 23 October, `null` before any call. */
   quiet_s?: number | null;
   reach: 'hooks' | 'next_call';
-  /** Its key proves the app it says it is (H19); absent from a host older than 24 October. */
+  /** Its key proves the app it says it is; absent from a host older than 24 October. */
   verified?: boolean;
   /**
    * The app its client says it is ("Claude Code"), the folder it opened in, how many writes it made, the question it
@@ -370,7 +370,7 @@ export const wroteNothing = (r: LiveRun): boolean => r.wrote === 0 && !r.asked?.
 export type QuietMachine = { machine: string | null; said: string; runs: LiveRun[] };
 
 /**
- * WHO IS OPEN NOW, IN FOUR PARTS (the pass of 27 October), each lead run in exactly one:
+ * WHO IS OPEN NOW, IN FOUR PARTS, each lead run in exactly one:
  *
  *   - `shown`: the runs that wrote, asked or said what they do, heard inside the hour, the ones at work first. These are
  *     what "Working now" and "Open now" count.
@@ -562,7 +562,7 @@ export const scopedThreads = (threads: readonly Thread[], scope: { run?: string 
       (scope.run == null || t.to_run === scope.run || t.taken_by === scope.run || t.seen_by === scope.run || (t.seen ?? []).some((s) => s.run === scope.run)),
   );
 
-/** One question his words name for the run to answer, with the answer he gave it (D8). */
+/** One question his words name for the run to answer, with the answer he gave it. */
 export type NamedAnswer = { question: string; option: string };
 
 /* "ACCEPT SG243", "DECLINE SG12", "ANSWER SG7 WITH SHIP": a verb right before the question, or `answer ... with`. */
@@ -571,7 +571,7 @@ const ANSWER_SAID = /\b(accept|approve|decline|reject)\s+(SG[1-9][0-9]*)\b|\bans
 const NOT_SAID = /\b(?:don'?t|do\s+not|never|not)\s*$/iu;
 
 /**
- * The questions his words name for the run that takes it to answer, each once, the first answer kept (D8). The record
+ * The questions his words name for the run that takes it to answer, each once, the first answer kept. The record
  * checks each against the question as it stands and refuses one it does not take, in words the box shows him.
  */
 export function answersSaid(said: string): NamedAnswer[] {
@@ -624,8 +624,8 @@ export function presenceOf(
     doing: doing === name ? null : doing,
     project: project ? { name: project.name, slot: slotOf(project.hue) } : null,
     /* THE PROFILE IT RUNS UNDER, BY NAME, where it is one of his own and not the default one (migration 44). */
-    /* "verified" FIRST WHERE ITS KEY PROVES ITS APP (H19): "Claude Code · verified · as studio · main". */
-    /* `bare`, ONE RUN ON TODAY'S SHEET (Y25): no profile and no branch, which are where it runs and not what it does. */
+    /* "verified" FIRST WHERE ITS KEY PROVES ITS APP: "Claude Code · verified · as studio · main". */
+    /* `bare`, ONE RUN ON TODAY'S SHEET: no profile and no branch, which are where it runs and not what it does. */
     meta: [r.verified === true ? 'verified' : null, !bare && r.seat && r.seat !== 'default' ? `as ${r.seat}` : null, bare ? null : r.branch, `running ${spanSaid(r.for_s * 1000)}`, `heard ${agoSaid(r.heard_s)}`]
       .filter((x): x is string => !!x)
       .join(' · '),
@@ -636,7 +636,7 @@ export function presenceOf(
         ? null
         : `+${plural(helpers.length, 'helper')}${branches.length > 0 ? `, on ${branches.slice(0, 3).join(', ')}${branches.length > 3 ? ` and ${String(branches.length - 3)} more` : ''}` : ''}`,
     stopped: r.stopped,
-    /* WHEN, NOT HOW (Y25): "its next tool call, through its hooks" was plumbing on the run's own sheet. */
+    /* WHEN, NOT HOW: "its next tool call, through its hooks" was plumbing on the run's own sheet. */
     reach: hooks ? 'Pause and Stop take effect at its next step.' : `${name} keeps working until it next checks in with BrainDog. Pause and Stop take effect then.`,
     confirm: {
       stop: hooks
@@ -706,7 +706,7 @@ export function threadOf(
     trail.push(`Seen by ${runSaid(t.seen_by, runs, projects)} at ${hm(t.seen_at)}, ${controlWords.how[t.seen_how]}`);
   }
   if (t.taken_by !== null && t.taken_at !== null && !seenRuns.some((s) => s.run === t.taken_by && s.at === t.taken_at)) trail.push(`Taken by ${runSaid(t.taken_by, runs, projects)} at ${hm(t.taken_at)}`);
-  /* WHAT IT LETS THE RUN ANSWER, by name, and which it has (D8). */
+  /* WHAT IT LETS THE RUN ANSWER, by name, and which it has. */
   const named = (t.answers ?? []).map((a) => a.question);
   if (named.length > 0) {
     const done = named.filter((q) => (t.answered ?? []).includes(q));

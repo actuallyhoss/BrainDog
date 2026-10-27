@@ -1,5 +1,5 @@
 /**
- * The one address check (`src/address.ts`, SHL-B06): an address stands only where the record says what it does with
+ * The one address check (`src/address.ts`): an address stands only where the record says what it does with
  * one, a `data:` address stands nowhere, and the plan and the install both say so before anything is staged.
  *
  * EVERY FIRST-PARTY FILE IS WALKED HERE TOO, so an add-on in `packs/` that holds an address the walker refuses fails
@@ -72,7 +72,7 @@ test('the same address is refused in every other place, each named', () => {
   const note = (body: string) => doc({}, [BOOKS, page({ kind: 'note', body })]);
   assert.equal(at(note('See http://plain.example/a')), 'page.shelf.blocks[0].body');
   assert.equal(at(note('![](//cdn.example/p.png)')), 'page.shelf.blocks[0].body', 'an address with no scheme');
-  /* AND THE TWO OTHER PLACES A PAGE LOADS ONE WITH NO SCHEME (audit of batch 51, finding 4). */
+  /* AND THE TWO OTHER PLACES A PAGE LOADS ONE WITH NO SCHEME. */
   assert.equal(at(note('<i style="background: url(//cdn.example/p.png)">x</i>')), 'page.shelf.blocks[0].body', 'a stylesheet url()');
   assert.equal(at(note('![a][r]\n\n[r]: //cdn.example/p.png')), 'page.shelf.blocks[0].body', 'a reference a note defines');
   assert.deepEqual(addressFaults(note('Two slashes // in a sentence, and a path like a//b, load nothing.')), []);

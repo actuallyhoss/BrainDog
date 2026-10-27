@@ -1,5 +1,5 @@
 /**
- * `settings`: read the repository's settings on GitHub once a day and hold them to what was decided (LCH-C12).
+ * `settings`: read the repository's settings on GitHub once a day and hold them to what was decided.
  *
  *   node tools/watch/settings.mjs                     the repository GITHUB_REPOSITORY names, with WATCH_TOKEN
  *   node tools/watch/settings.mjs --repo owner/name   another repository, the same questions
@@ -9,7 +9,7 @@
  * description the README's first heading, the production environment's reviewers, and no open high or critical
  * alert. One line a setting, every miss printed under its line, never the first only.
  *
- * `at: public` IS A SETTING FREE ONLY ONCE THE REPOSITORY IS PUBLIC (LCH-C16). While it is private and the setting is
+ * `at: public` IS A SETTING FREE ONLY ONCE THE REPOSITORY IS PUBLIC. While it is private and the setting is
  * off, the line reads `waits on going public` and is not red. The day it is public, the same line off is a miss.
  *
  * A READ-ONLY FINE-GRAINED TOKEN, `WATCH_TOKEN`, because the workflow's own token cannot read alerts or the security

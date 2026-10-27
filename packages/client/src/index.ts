@@ -182,7 +182,7 @@ export type Boot = {
   /** The looks the record holds, its own and those an add-on brought, which the theme chooser offers; absent from an older host. */
   looks?: { id: string; name: string; from: 'own' | 'pack'; pack?: string }[];
   /*
-   * THE SHELL'S ONE ROUND TRIP (EXP-D03), each absent from a host older than shape 2, which a reader then asks the way it
+   * THE SHELL'S ONE ROUND TRIP, each absent from a host older than shape 2, which a reader then asks the way it
    * asked before: `waits` from `counts`, `working` from `sessions`, the voice from the add-ons, and Slash from `version`.
    */
   /** Which shape the answer is: 2 since the five fields below joined it, 3 since `copies`. Absent from an older host. */
@@ -202,7 +202,7 @@ export type Boot = {
   /** Whether a model is behind Slash on this host, as `version` says it. */
   slash?: boolean;
   /**
-   * The record's copies as three facts (LCH-C03, shape 3): when the last nightly copy was kept and its size in bytes, and
+   * The record's copies as three facts (shape 3): when the last nightly copy was kept and its size in bytes, and
    * when a person last exported it, each `null` until there is one. Sent only to a caller who may take a copy, so absent
    * for anybody else and from an older host.
    */
@@ -268,7 +268,7 @@ export type EventLine = {
   run_by?: { run: string; agent: string; client: string | null; parent: string | null } | null;
   /** On a `decide` line, the question it settled (`SG4`): the `resolve` beside it targets `suggestion:<settles>`. */
   settles?: string;
-  /** On the one line a pass of BrainDog's own update is said as (kind `update`, SHL-A21): its sentence and counts. */
+  /** On the one line a pass of BrainDog's own update is said as (kind `update`): its sentence and counts. */
   pass?: { said: string; updated: number; asked: number; steps: number; at: string };
   /** Every line that pass wrote, newest first. */
   steps?: EventLine[];
@@ -438,7 +438,7 @@ export type Context = {
   session: { spoken: string; state: string | null } | null;
   project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' | 'asked' } | null;
   ambiguous: string[];
-  /** What stops this run, with the line in his words, or `null`. Absent from a host older than instructions (plan §2.4). */
+  /** What stops this run, with the line in his words, or `null`. Absent from a host older than instructions. */
   stop?: (Answer<'pulse'>['stop'] & { line: string }) | null;
   /** What he told this run that is still open, a stop or pause first, each with the line in his voice. Absent from an older host. */
   told?: Answer<'instructionsMine'>['pending'];
@@ -457,7 +457,7 @@ export type Context = {
   /**
    * The step another run left open here (`openHandoffs`, marked `next`). `agent` is the kind of agent that left it,
    * `left_at` when, and `earlier` how many more steps are open here besides. Those three are absent from a host older
-   * than the briefing that sends them (AGT-C05).
+   * than the briefing that sends them.
    */
   handoff: {
     from: string;
@@ -573,7 +573,7 @@ export type Attached = {
 };
 
 /**
- * What `meet` is told (`loop/contract-17.md`): a name and whatever identifies them, an email, a handle or `kind:value`
+ * What `meet` is told: a name and whatever identifies them, an email, a handle or `kind:value`
  * keys, whether it is a person or an organisation, and where they were met, as a short plain phrase.
  */
 export type Meet = {
@@ -919,7 +919,7 @@ export type TokenRow = {
   person_name?: string | null;
   /** The app and machine that signed in for it (the sign-in stamp); absent on a host older than the stamp. */
   client?: { id: string; kind: 'cimd' | 'dcr' | 'device' | 'key'; host: string | null } | null;
-  /** The build of the command behind the key, as its last call said it (`x-braindog-cli`, AGT-A02). Absent on an older host. */
+  /** The build of the command behind the key, as its last call said it (`x-braindog-cli`). Absent on an older host. */
   last_build?: string | null;
   /** When the key last made a tool call through the door (`noteTool`). Absent on an older host. */
   last_tool_at?: string | null;
@@ -1002,7 +1002,7 @@ export type Understood = {
 };
 
 /**
- * What `setup` takes (USE-B04): an arrangement, as Decide's proposals carry one, and the three things the first run adds.
+ * What `setup` takes: an arrangement, as Decide's proposals carry one, and the three things the first run adds.
  * The record checks every part; this names them so a caller sees what there is to send.
  */
 export type SetupBody = {
@@ -1239,7 +1239,7 @@ export type SlashProposal = {
 };
 
 /**
- * One mark the agent door leaves about a session (AGT-B01): `hello`, `listed` (with `n`, the tools sent), `called`
+ * One mark the agent door leaves about a session: `hello`, `listed` (with `n`, the tools sent), `called`
  * (with `n`, the calls since the last mark), `hook` (with `ms`, how long the start hook took), `resource` (with `ms`),
  * `card` (with `n`, its words), or `internal`. `build` is the caller's own build, `client` the app's name and version.
  * The record keeps one row for each run and kind and adds to `n`; it refuses any other key.
@@ -1248,7 +1248,7 @@ export type HeardKind = 'hello' | 'listed' | 'called' | 'hook' | 'resource' | 'c
 export type Heard = { kind: HeardKind; n?: number | undefined; ms?: number | undefined; build?: string | undefined; client?: string | undefined };
 
 /**
- * `engineHealth`'s answer (ENG-A02), `packages/slash/src/health.ts` read through the record: whether the engine's model
+ * `engineHealth`'s answer, `packages/slash/src/health.ts` read through the record: whether the engine's model
  * answers, from its own ledger, and the one sentence a person reads about it.
  *
  * `last_ok` is when a model last answered, `since` when the failing began, both instants or `null`. `said.whose` is
@@ -1264,7 +1264,7 @@ export type EngineHealth = {
 };
 
 /**
- * `engineReadings`'s answer (ENG-B01), `packages/record/src/engine-readings.ts` read through the record: what the
+ * `engineReadings`'s answer, `packages/record/src/engine-readings.ts` read through the record: what the
  * model was asked, purpose by purpose, and what the record still does not understand.
  *
  * `asked` counts the asks that reached a model in the last day, week and month. `answered`, `kept` and `refused` are
@@ -1295,7 +1295,7 @@ export type EngineReadings = {
 };
 
 /**
- * `trust`'s answer (ENG-A12): each connected agent by name, and for each kind of change the rung it stands on (Ask, Do
+ * `trust`'s answer: each connected agent by name, and for each kind of change the rung it stands on (Ask, Do
  * and tell, Do quietly), since when, whether it was lifted there, and when and why it was put back to Ask. See
  * `Standing` in `packages/record/src/ladder.ts`.
  */
@@ -1304,13 +1304,13 @@ export type TrustStanding = {
 };
 
 /**
- * `slashReads`'s answer (ENG-A09): whether Slash reads in the background. On unless the owner turned it off. See
+ * `slashReads`'s answer: whether Slash reads in the background. On unless the owner turned it off. See
  * `SlashReads` in `packages/record/src/methods/engine.ts`.
  */
 export type SlashReads = { on: boolean };
 
 /**
- * `doorHealth`'s answer (AGT-A02), the owner's: every connection that can act on the record and the agent door's seven
+ * `doorHealth`'s answer, the owner's: every connection that can act on the record and the agent door's seven
  * signs. `id` is a handle, never shown alone: a screen names a connection by `app` and `where`. Each sign is a count, 0
  * green, or `null` where there is nothing yet to judge. See `DoorHealth` in `packages/record/src/methods/door.ts`.
  */
@@ -1372,7 +1372,7 @@ type SchemaStore = {
 /**
  * SCHEMAS ASKED IN ONE TURN GO AS ONE READ, for an app that turns it on (`batchSchemas`). Today learns every list's
  * declaration before it asks its page, and a desk and a page reader ask theirs beside it: twenty-five `schema` asks on
- * the seed, which a browser sends six at a time, five round trips before the page could be asked (`loop/perf`). Each
+ * the seed, which a browser sends six at a time, five round trips before the page could be asked. Each
  * `schema` asked while one is waiting to go joins it, and the wave goes as `schemas` (`packages/record/src/methods/
  * schemas.ts`), which holds each list to the reader exactly as `schema` holds it.
  *
@@ -1509,7 +1509,7 @@ let FLYING = new WeakMap<object, Map<string, Promise<Result<unknown>>>>();
  * Every client's kept schemas, by the fetch it sends through, then its host and its token.
  *
  * ONE STORE FOR THE TAB AND NOT ONE A CLIENT. The app builds a client wherever it reads (196 places), so a store per
- * client kept nothing: nine screens asked `schema` 48 times (`loop/research-104.md` 2.3). The fetch is in the key so a
+ * client kept nothing: nine screens asked `schema` 48 times. The fetch is in the key so a
  * test's stub never shares with another's, and the token so two people on one host never do.
  */
 let SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
@@ -1534,7 +1534,7 @@ export function forgetSchemas(): void {
  * READS KEPT BY THE RECORD'S VERSION, for an app that follows it (`keepReads`): a read asked again while the version
  * this tab last heard has not moved, and this tab has sent no write since, is answered from what it was answered, at
  * once, and asks nothing. Going back to a page, or opening it again, read every block of it again at the same version:
- * twenty requests for a project page that had not changed (`loop/perf/round2.mjs`).
+ * twenty requests for a project page that had not changed.
  *
  * OFF UNLESS AN APP TURNS IT ON, and the web turns it on only while its poll follows the record's version, since the
  * poll is what tells a kept answer from a stale one. A command, a test and an agent's client ask every time, as before.
@@ -1740,7 +1740,7 @@ export function keepReads(on: boolean): void {
  *
  * THE FIRST NAMING KEEPS EVERY LIST'S DECLARATION ASKED BESIDE `boot` (`EVERY`): it was asked with the same sign-in as
  * the `boot` that named the reader, so it is theirs. Dropped there, every cold open asked all of them a second time,
- * 32 KB on a lived-in record and 38.6 KB on the owner's, the same answer twice (audit of 22 Oct, E3 and E20).
+ * 32 KB on a lived-in record and 38.6 KB on the owner's, the same answer twice.
  */
 export function readAs(reader: string): void {
   if (reader === READER) return;
@@ -2351,7 +2351,7 @@ export function createClient(options: ClientOptions) {
     slashSetup: <T = unknown>(ask: Record<string, unknown>) => hostDoor<T>('slash/setup', ask),
     slashMapping: <T = unknown>(ask: Record<string, unknown>) => hostDoor<T>('slash/mapping', ask),
     /**
-     * Make the record from what its owner accepted, in one call (USE-B04). The answer is a value like any other, a
+     * Make the record from what its owner accepted, in one call. The answer is a value like any other, a
      * refusal included, except from a host with no such call: that throws `NoSuchCall`.
      */
     setup: async (body: SetupBody) => {
@@ -2513,7 +2513,7 @@ export function createClient(options: ClientOptions) {
     /** Which runs used a key or a tool, the one that used it last first, by the row's spoken name. READ+. */
     usedBy: (args: { spoken: string }) => call<Answer<'usedBy'>>('usedBy', args as Record<string, unknown>),
     /**
-     * Tell an agent something from the app (agents and MCP plan §2.1): `to` a run (`to_run`, S883), a kind of agent
+     * Tell an agent something from the app (agents and MCP plan §2.1): `to` a run (`to_run`), a kind of agent
      * (`to_agent`), whoever is next, or a task; `when` now or at the next start; or stop, pause, resume or redirect a run
      * (`kind`). `machine` and `seat` narrow any but a named run to the runs on that machine and under that Claude Code
      * profile, each by name. A person only: every key is refused `NEEDS_BROWSER_SESSION`. DATA.
@@ -2533,7 +2533,7 @@ export function createClient(options: ClientOptions) {
       replaces?: string;
       waits_ms?: number;
     }) => call<Answer<'instruct'>>('instruct', args as Record<string, unknown>),
-    /** Take back an instruction no run has taken yet (IN4). A person only. DATA. */
+    /** Take back an instruction no run has taken yet. A person only. DATA. */
     withdrawInstruction: (args: { id: string }) => call<Answer<'withdrawInstruction'>>('withdrawInstruction', args as Record<string, unknown>),
     /**
      * What he told agents, newest first, each with who saw it and how and the receipts: in one state (`open` is Sent,
@@ -2568,7 +2568,7 @@ export function createClient(options: ClientOptions) {
     /** Drafts Slash makes from a description, each with the rows it is drawn over; it spends the month's asks. ADMIN. */
     slashDraft: (asked: string, page?: string) =>
       call<Answer<'slashDraft'>>('slashDraft', page === undefined ? { asked } : { asked, page }),
-    /* `op_id` IS THE CALLER'S KEY FOR ONE WRITE (AGT-B05): the same create or update sent again with it, after an answer
+    /* `op_id` IS THE CALLER'S KEY FOR ONE WRITE: the same create or update sent again with it, after an answer
        that never arrived, lands once, and the record answers the first answer. */
     create: (args: { register: string; fields: Record<string, unknown>; note?: string; op_id?: string }) =>
       call<unknown>('create', args as Record<string, unknown>),
@@ -2660,7 +2660,7 @@ export function createClient(options: ClientOptions) {
       call<unknown>('exportUseCase', args as Record<string, unknown>),
     /**
      * What a person made on this record that can be shared as an add-on, or, with ticks, the add-on file made from them
-     * (SHL-B09). Reads, and changes nothing.
+     * Reads, and changes nothing.
      */
     exportPack: (args: { declarations?: string[]; rows?: Record<string, number[]>; title?: string; id?: string; version?: string; summary?: string } = {}) =>
       call<unknown>('exportPack', args as Record<string, unknown>),
@@ -2810,7 +2810,7 @@ export function createClient(options: ClientOptions) {
       head?: string;
     }) => call<Attached>('attach', args as Record<string, unknown>),
     /**
-     * Hand the run's step on, or TAKE OR DROP ANOTHER RUN'S STEP (AGT-C05), each of those a call of its own naming the run
+     * Hand the run's step on, or TAKE OR DROP ANOTHER RUN'S STEP, each of those a call of its own naming the run
      * that left the step (`S12`). `take` is an agent's: its run picks the step up and the run that left it is done; the
      * second of two takers is refused with who took it and when. `drop` closes a step that is no longer true, and `why`
      * says why in words (a drop with none is refused), by an agent or by a person from the app.
@@ -2972,7 +2972,7 @@ export function createClient(options: ClientOptions) {
        the account's: a link mailed to the new one, then pressed from a sign-in in the last fifteen minutes. */
     renamePerson: (name: string) => call<Answer<'renamePerson'>>('renamePerson', { name }),
 
-    /* THE AGENT DOOR'S OWN SIGNS (AGT-B01). DATA, from a token or a session: the mark lands against the caller's run, or
+    /* THE AGENT DOOR'S OWN SIGNS. DATA, from a token or a session: the mark lands against the caller's run, or
        the token when there is none, and never opens a run. Only the keys a mark has are sent, because the record
        refuses any other, and an absent one is absent rather than `null`. */
     heard: (mark: Heard) =>
@@ -2980,26 +2980,26 @@ export function createClient(options: ClientOptions) {
         'heard',
         Object.fromEntries(Object.entries(mark).filter(([key, value]) => value !== undefined && ['kind', 'n', 'ms', 'build', 'client'].includes(key))),
       ),
-    /* WHETHER THE ENGINE'S MODEL ANSWERS (ENG-A02), at read level, so a read token, the command line and the daily
+    /* WHETHER THE ENGINE'S MODEL ANSWERS, at read level, so a read token, the command line and the daily
        vital-sign read can ask. `null` from a host that hands the record no engine. */
     engineHealth: () => call<AnswerOr<'engineHealth', EngineHealth | null>>('engineHealth'),
-    /* WHAT THE MODEL WAS ASKED AND WHAT THE RECORD STILL DOES NOT UNDERSTAND (ENG-B01), at read level as `engineHealth`
+    /* WHAT THE MODEL WAS ASKED AND WHAT THE RECORD STILL DOES NOT UNDERSTAND, at read level as `engineHealth`
        is, so the command line and an agent can read the counts. `null` from a host that hands the record no ledger. */
     engineReadings: () => call<AnswerOr<'engineReadings', EngineReadings | null>>('engineReadings'),
     /** The one switch for Slash's background reading: with nothing, the state as it stands. An owner's in a browser. */
     slashReads: (on?: boolean) => call<SlashReads>('slashReads', on === undefined ? {} : { on }),
     /** Ask each model Slash would use whether it answers now: which answered and how fast, or why not. One every ten minutes. ADMIN. */
     engineProbe: () => call<EngineProbed>('engineProbe', {}),
-    /* THE DOOR'S HEALTH (AGT-A02). ADMIN, so a browser session at owner: every connection, its app, build and last tool
+    /* THE DOOR'S HEALTH. ADMIN, so a browser session at owner: every connection, its app, build and last tool
        call, and the seven signs. It takes nothing and changes nothing. */
     doorHealth: () => call<AnswerOr<'doorHealth', DoorHealth>>('doorHealth'),
-    /** How far each connected agent is trusted with each kind of change, by name (ENG-A12). It writes nothing. */
+    /** How far each connected agent is trusted with each kind of change, by name. It writes nothing. */
     trust: () => call<AnswerOr<'trust', TrustStanding>>('trust'),
-    /** Put an agent back to asking on one kind it does on its own, or on every such kind with none named (ENG-A12). An owner's in a browser. */
+    /** Put an agent back to asking on one kind it does on its own, or on every such kind with none named. An owner's in a browser. */
     trustTakeBack: (args: { agent: string; kind?: string }) => call<TrustStanding>('trustTakeBack', args),
-    /** Every import made into the record, newest first, and whether the owner said it is his own (ENG-A13). It writes nothing. */
+    /** Every import made into the record, newest first, and whether the owner said it is his own. It writes nothing. */
     imports: () => call<unknown>('imports', {}),
-    /** The owner's press saying an import is his own or outside text (ENG-A13). An owner's in a browser; it files no question. */
+    /** The owner's press saying an import is his own or outside text. An owner's in a browser; it files no question. */
     importAdopt: (args: { run: string; yes: boolean }) => call<unknown>('importAdopt', args),
     /** What may be here twice: pairs of rows that may be one (named-twice). It writes nothing. */
     namedTwice: (args?: { limit?: number }) => call<unknown>('namedTwice', args ?? {}),

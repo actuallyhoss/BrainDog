@@ -179,7 +179,7 @@ export type McpSurface<C> = {
   page(args: { slug: string }, ctx: C): Answer;
   metric(args: { metric: string }, ctx: C): Answer;
   digestToday(args: { digest?: string }, ctx: C): Answer;
-  /** Where an agent stands; `task`, `project`, `depth` and `since` as the record's `context` takes them (plan §3.1). */
+  /** Where an agent stands; `task`, `project`, `depth` and `since` as the record's `context` takes them. */
   context?(args: never, ctx: C): Answer;
   /**
    * What he told the caller's own run, and its take or reply (the record's `instructionsMine`, DATA, plan §2, §8.2). It
@@ -257,7 +257,7 @@ export type McpSurface<C> = {
   inbox?(args: { state?: string; limit?: number; digest?: boolean; id?: string }, ctx: C): Answer;
   /**
    * What each pattern did with the last 14 days of arrivals, door by door: filed, skipped with its reason, waiting, and
-   * how many no pattern read (the record's `inboxPatterns`, REC-A03). READ+ on the inbox's own reach, so who may read it is
+   * how many no pattern read (the record's `inboxPatterns`). READ+ on the inbox's own reach, so who may read it is
    * the record's to say, and optional for the command line's reason above.
    */
   inboxPatterns?(args: { days?: number }, ctx: C): Answer;
@@ -280,7 +280,7 @@ export type McpSurface<C> = {
   figures?(ctx: C): Answer<{ id: string; name?: string; param?: boolean }[]>;
   /**
    * Everything this caller may read, in one read: `{ fixed, lists, pages, figures, skills }` (the record's `offered`,
-   * READ+, AGT-B04). A fixed address is decided by the check its own reader asks, never by running it, and a skill is its
+   * READ+). A fixed address is decided by the check its own reader asks, never by running it, and a skill is its
    * name and when to use it. It backs `resources/list`, which with it reads no resource and draws no page: on a record
    * of 54 pages the old way took 8 seconds at every session start.
    *
@@ -296,16 +296,16 @@ export type McpSurface<C> = {
   understandPlan?(args: Record<string, never>, ctx: C): Answer;
   /**
    * What one thing on the record is, asked by its name: its kind, what else it goes by and where it was seen, or the
-   * things the name may mean (the record's `about`, READ+, ENG-B02). It backs `braindog:about/<name>`. Optional as the
+   * things the name may mean (the record's `about`, READ+). It backs `braindog:about/<name>`. Optional as the
    * read above is: a surface without it answers `NOT_IN_THIS_BUILD`.
    */
   about?(args: { name: string }, ctx: C): Answer;
   /**
-   * What matters on the record now, a card a line (the record's `briefing`, READ+, ENG-B12). It backs
+   * What matters on the record now, a card a line (the record's `briefing`, READ+). It backs
    * `braindog:briefing`. Optional as the reads above are: a surface without it answers `NOT_IN_THIS_BUILD`.
    */
   briefing?(args: Record<string, never>, ctx: C): Answer;
-  /** What stopped on the record now, the longest quiet first (the record's `exceptions`, READ+, ENG-B13). It backs `braindog:exceptions`. */
+  /** What stopped on the record now, the longest quiet first (the record's `exceptions`, READ+). It backs `braindog:exceptions`. */
   exceptions?(args: Record<string, never>, ctx: C): Answer;
   /**
    * What went stale where the caller stands, each with the one call that clears it (the record's `stale`, READ+,
@@ -314,22 +314,22 @@ export type McpSurface<C> = {
   stale?(args: Record<string, never>, ctx: C): Answer;
   /**
    * The lessons that stand where the caller is, in the order to read them: method before fact, here before everywhere,
-   * newest first, forty unless `limit` says otherwise (the record's `learnings`, READ+, AGT-C14). It backs
+   * newest first, forty unless `limit` says otherwise (the record's `learnings`, READ+). It backs
    * `braindog:learnings`. Optional as the reads above are.
    */
   learnings?(args: { limit?: number }, ctx: C): Answer;
   /**
-   * Take back a question this run asked, while it is still open (the record's `withdraw`, DATA, AGT-C07). It backs
+   * Take back a question this run asked, while it is still open (the record's `withdraw`, DATA). It backs
    * `propose`'s `withdraw`. Optional for the command line's reason above, and a surface without it answers that
    * `NOT_IN_THIS_BUILD`. Who may is the record's to say, and its refusal is said as it came.
    */
   withdraw?(args: { id: string }, ctx: C): Answer;
   /**
-   * How long the start hook took (the record's `heard`, DATA, AGT-B01), the one mark a caller posts itself. The door's
+   * How long the start hook took (the record's `heard`, DATA), the one mark a caller posts itself. The door's
    * own marks go through `doorHeard`; `rpc.ts` falls back to this only on a surface without `doorHeard`.
    */
   heard?(args: { kind: 'hello' | 'listed' | 'called' | 'internal'; n?: number; build?: string; client?: string }, ctx: C): Answer;
-  /** The door's own mark (the record's `doorHeard`, unrouted, audit 38-39): hello, listed, called, internal; a key's called also moves its last tool call. `rpc.ts` prefers it to `heard`. */
+  /** The door's own mark (the record's `doorHeard`, unrouted): hello, listed, called, internal; a key's called also moves its last tool call. `rpc.ts` prefers it to `heard`. */
   doorHeard?(args: { kind: 'hello' | 'listed' | 'called' | 'internal'; n?: number; build?: string; client?: string }, ctx: C): Answer;
   /** Fault `lens.firewall`, raised when the door's firewall took a field hidden from the caller off an answer (`http.ts`). */
   firewalled?(method: string, stripped: readonly string[]): void;
@@ -337,10 +337,10 @@ export type McpSurface<C> = {
   listOf?(spoken: string): string | null;
   /** Whether amounts are hidden from this caller, so the firewall takes the ones written in an answer's text out too. */
   moneyHidden?(ctx: C): boolean;
-  /** One tool call answered, counted for the audit as `mcp:<tool>` for a caller who is not an owner (sharing plan §2.10). */
+  /** One tool call answered, counted for the audit as `mcp:<tool>` for a caller who is not an owner. */
   toolSeen?(args: { tool: string }, ctx: C): void;
   /**
-   * The caller's run is still working (the record's `beat`, DATA, AGT-C03): last seen moved in place, at most once a
+   * The caller's run is still working (the record's `beat`, DATA): last seen moved in place, at most once a
    * minute, no version and no event. The door beats once for every tool call it admits (`beatOn`), so any client on it
    * reads Working while it calls tools, hook or none. Optional: both HTTP hosts hand `serveMcp` the whole record, so it
    * arrives with them; the command line routes a fixed list, and a surface without it answers every call as before.
@@ -384,7 +384,7 @@ const WITHHELD: ReadonlySet<string> = new Set(WITHHELD_CODES);
 
 /**
  * Whether a page's blocks are every one withheld from their reader: at least one block, each with a refusal in
- * `WITHHELD_CODES`. THE KERNEL'S `whollyWithheld` TO THE LETTER (PGS-A01), the rule the record's `pages()` drops a page
+ * `WITHHELD_CODES`. THE KERNEL'S `whollyWithheld` TO THE LETTER, the rule the record's `pages()` drops a page
  * by, so an agent's list of resources and the record's list of pages never disagree on whether a page is there.
  *
  * SPELT HERE AND NOT IMPORTED, because this package imports the record's types and nothing else of it (`31 §2`: "`mcp`
@@ -474,8 +474,8 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'context',
     title: 'Get your briefing',
-    /* THAT IT IS THE FIRST CALL IS THE INSTRUCTIONS' FIRST RULE. What comes back is said in the order it is ranked
-       (plan §3.2): what he told you first, then where you are, your rules, who else is here and your lane. The four
+    /* THAT IT IS THE FIRST CALL IS THE INSTRUCTIONS' FIRST RULE. What comes back is said in the order it is ranked:
+      what he told you first, then where you are, your rules, who else is here and your lane. The four
        arguments are what saves a second call: a task whole with its version, a project by name, how much, and since a
        stamp, which answers only what moved. */
     description: 'Start here: what you were told, where you are, who is here, your lane.',
@@ -492,12 +492,12 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'instructions',
     title: 'Answer what you were told',
-    /* WHAT HE TELLS AN AGENT FROM THE APP (plan §2, §6.1), the one new tool, paid for by folding `history` and `schema`.
+    /* WHAT HE TELLS AN AGENT FROM THE APP (§6.1), the one new tool, paid for by folding `history` and `schema`.
        The three calls are the examples, because an agent copies an example before it reads a sentence. */
     /* AND AN SG HE TOLD YOU TO ANSWER, with `option` and his words in `said` (`wordAnswer`, the owner's decision of 27
        October): the one example that says it, paid for out of the budget's last tokens. */
     description: '{} reads what the person told you, {take:"IN4"} takes, {reply:"IN4",said,state} answers, {answer:"SG9",option,said} decides on their word.',
-    /* AND `answer` ALONE, A QUESTION HIS ORDER NAMED (D8), given as he said: the line he sent says the call. */
+    /* AND `answer` ALONE, A QUESTION HIS ORDER NAMED, given as he said: the line he sent says the call. */
     input: obj({
       take: { type: 'string' },
       reply: { type: 'string' },
@@ -521,12 +521,12 @@ export const TOOLS: readonly Tool[] = [
        the list measured 2,528 before and 2,544 after. A figure's id is a bare lowercase name, which no row form is. */
     /* AND "NEVER ADD TWO CURRENCIES" MOVED HERE FROM THE INSTRUCTIONS, beside the one read that answers a figure, when
        the instructions were cut to the three rules every call needs. */
-    /* AND BY ITS NAME, AND WITH ITS HISTORY (plan §4.3, §6.1): "Kiln" answers the one thing called that, and several are
+    /* AND BY ITS NAME, AND WITH ITS HISTORY (§6.1): "Kiln" answers the one thing called that, and several are
        refused `NAME_AMBIGUOUS` with their handles; `history: true` folds in what was `history`, still callable by its old
        name until `FOLDED_UNTIL`. */
     description: 'One entry or figure. Two currencies are never added.',
     input: obj(
-      /* SHORTER BY TEN TOKENS FOR `handoff`'s take and drop (AGT-C05): "from record_index" is what that tool's own
+      /* SHORTER BY TEN TOKENS FOR `handoff`'s take and drop: "from record_index" is what that tool's own
          description says of its figures, and a ref field's value is a row id by what it is. */
       { spoken: str('tasks#41, S42, a name, or a figure.'), history: { type: 'boolean' } },
       ['spoken'],
@@ -588,7 +588,7 @@ export const TOOLS: readonly Tool[] = [
        the default read on the owner's record was 13 KB with 70 row ids in it, and a session that wanted the page below
        had no way to ask. Paged as `list` is, the closing line says what is left and the call that reads it. */
     /* ITS LIMIT IS `list`'s, 1 to 100 and 20 by default, and no longer said here: the eight tokens went to `handoff`'s take
-       and drop (AGT-C05), and an answer at the cap still says what is left and the call that reads it. */
+       and drop, and an answer at the cap still says what is left and the call that reads it. */
     /* `everything` ASKS FOR THE RECORD'S OWN BOOKKEEPING BACK (the sweep, a run's seen stamps), which no agent picks a
        call for: taken and not listed (`quiet`), and its tokens went to `instructions`. */
     input: obj({ limit: { type: 'integer' }, cursor: { type: 'string' } }),
@@ -619,7 +619,7 @@ export const TOOLS: readonly Tool[] = [
        options with propose" and "to change something you may not change yourself, propose it" were the two clauses
        this description carried, in the same payload, a line apart. Where the person decides is said once, here. */
     description: 'Ask the person, with what you would do. Nothing changes until they decide in BrainDog.',
-    /* `cause` AND `withdraw` (AGT-C07). A key is asked once: a second proposal with an open question's cause files
+    /* `cause` AND `withdraw`. A key is asked once: a second proposal with an open question's cause files
        nothing and is answered "Already waiting as SG90.". `withdraw` takes one back, a branch and not an eighteenth tool
        for `script_try`'s reason: the list was at its ceiling to the token, and a tool measured 76 where this is 21.
        `required` went, since a withdrawal sends none of the three, and a proposal missing one is refused by the record
@@ -646,7 +646,7 @@ export const TOOLS: readonly Tool[] = [
         },
         cause: str('A short key, so it is asked once.'),
         again: str('What changed since they answered.'),
-        /* `covers` (scope D13): the open SGs this one answers too, closed as moot when it is accepted. */
+        /* `covers`: the open SGs this one answers too, closed as moot when it is accepted. */
         covers: { type: 'array', items: { type: 'string' }, description: 'Open SGs this answers too.' },
         withdraw: str('Alone, takes back an SG you asked.'),
       },
@@ -662,14 +662,14 @@ export const TOOLS: readonly Tool[] = [
     input: obj(
       {
         register: { type: 'string' },
-        /* AND WHERE A CURRENCY COMES FROM (REC-B04): an amount on a field that names its account may leave the code out
+        /* AND WHERE A CURRENCY COMES FROM: an amount on a field that names its account may leave the code out
            and takes the account's, and a row's code is kept for good, refused as CURRENCY_FIXED when a write changes it. */
         fields: {
           type: 'object',
           description: "Field ids to values. Money is minor units and a currency: GBP 2 decimals, JPY 0, KWD 3.",
         },
         note: { type: 'string' },
-        /* A WRITE THAT CAN BE SENT AGAIN (AGT-B05): the record replays a write by its operation id, so a call sent once
+        /* A WRITE THAT CAN BE SENT AGAIN: the record replays a write by its operation id, so a call sent once
            more after a lost answer lands once. A bare type: what it is for is a client's to know, and costs no words. */
         op_id: { type: 'string' },
         /* HIS WORDS, WHEN HE TOLD YOU TO (the owner's decision of 27 October): a write that would have asked lands, said
@@ -707,7 +707,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     title: 'Add a note',
-    /* AND A PAGE DRAWN ON IT (DIRECTION §45): a visual changes no value, as a note changes none, so it rides on `log`
+    /* AND A PAGE DRAWN ON IT: a visual changes no value, as a note changes none, so it rides on `log`
        rather than an eighteenth tool the list has no tokens for. `note` is then its title, and a page sent again under
        the same title is its next version. */
     description: 'Note an entry; page: HTML drawn on it.',
@@ -730,7 +730,7 @@ export const TOOLS: readonly Tool[] = [
     title: 'Leave the next step',
     /* THE HANDOFF MANNERS ARE SAID HERE, once, beside the tool they are about: they were the instructions' sixth rule,
        read on every call of every tool. Each field's own rule stays beside the field. */
-    /* TAKE AND DROP ARE A CALL OF THEIR OWN (AGT-C05), on a step another run left: `take` picks it up, and the second of
+    /* TAKE AND DROP ARE A CALL OF THEIR OWN, on a step another run left: `take` picks it up, and the second of
        two sessions racing for it is told in the record's words who has it; `drop` closes one that is no longer true. */
     description: "Keep your run's step true: doing once you know it, next before you stop, dead ends in tried. task starts one, done closes it. take or drop a run's step alone, drop with why.",
     input: obj({
@@ -748,14 +748,14 @@ export const TOOLS: readonly Tool[] = [
       take: { type: 'string' },
       drop: { type: 'string' },
       why: { type: 'string' },
-      /* ONE CALL WHERE A FINISHED TASK TOOK THREE (plan §4.3): `task` puts it in hand and sets it doing, `done` closes it
+      /* ONE CALL WHERE A FINISHED TASK TOOK THREE: `task` puts it in hand and sets it doing, `done` closes it
          with `note` and moves the next step. The record's `handoff` takes both and says what the task is now. */
       task: { type: 'string' },
       done: { type: 'string' },
     }),
     writes: true,
   },
-  /* `understand` WAS THE SEVENTEENTH TOOL, and is the resource `braindog:understand` now (AGT-B05): "Tools: keep the
+  /* `understand` WAS THE SEVENTEENTH TOOL, and is the resource `braindog:understand` now: "Tools: keep the
      16". It takes nothing and writes nothing, which is a resource's shape, and its tokens paid for
      `op_id` on `create` and `update`. */
   {
@@ -763,8 +763,8 @@ export const TOOLS: readonly Tool[] = [
     title: 'Note a person',
     /* WHEN TO CALL IT IS THE INSTRUCTIONS' LINE AGAIN, "meet everyone you work with or are told about", and the
        description says what a call does with what it is given: a key (an address, a handle, a bank payee, a domain)
-       matches or adds, and a name alone is only noted, because the record never makes a person out of a name
-       (`loop/contract-17.md`). `kind`, `org`, `domain`, `role` and `keys` are the contract's input, paid for out of the
+       matches or adds, and a name alone is only noted, because the record never makes a person out of a name.
+      `kind`, `org`, `domain`, `role` and `keys` are the contract's input, paid for out of the
        description's examples and `handle`'s sentence, which `keys` now says for every kind of key. */
     /* AND WHERE IS SAID HONESTLY, because the record believes it accordingly (`kernel/src/people.ts` `trustOf`): what an
        agent read in mail, a commit or on the web is text anybody could have written, so it never folds two people into
@@ -803,7 +803,7 @@ export const TOOLS: readonly Tool[] = [
       {
         arrival: str('Its id in braindog:inbox.'),
         register: { type: 'string' },
-        /* "OMIT TO TITLE IT FROM THE ARRIVAL" WENT, for `instructions` (plan §6.1): the record titles it so, and says it. */
+        /* "OMIT TO TITLE IT FROM THE ARRIVAL" WENT, for `instructions`: the record titles it so, and says it. */
         fields: { type: 'object' },
         ignore: { type: 'boolean' },
         note: { type: 'string' },
@@ -829,7 +829,7 @@ export const TOOLS: readonly Tool[] = [
 ];
 
 /**
- * The last day a folded tool answers by its old name: sixty days after it was folded (plan §6.6, 12a).
+ * The last day a folded tool answers by its old name: sixty days after it was folded (12a).
  */
 export const FOLDED_UNTIL = '2026-12-20';
 
@@ -1094,8 +1094,8 @@ const GOVERNANCE_MOST = 100;
 /**
  * The most characters one answer carries, its text and its JSON each: about ten thousand tokens at four characters a
  * token. Claude Code holds a tool result to 25,000 tokens by default and claude.ai to about 150,000 characters, and the
- * agent research measured retrieval falling as answers grew past ten thousand (`loop/reports/BrainDog agent and MCP
- * experience.md`). Past it a page is read again with fewer rows, a page resource is one line a block, and a text is cut
+ * agent research measured retrieval falling as answers grew past ten thousand.
+ * Past it a page is read again with fewer rows, a page resource is one line a block, and a text is cut
  * at a line with a sentence saying so.
  */
 export const ANSWER_MOST = 40_000;
@@ -1286,7 +1286,7 @@ const FIXED: readonly Resource[] = [
   resource('briefing', 'What matters here now: what is late, what is due, what stopped and what waits, a line each.'),
   resource('exceptions', 'What stopped: what went quiet or has not run, the longest first, each in a sentence.'),
   resource('stale', 'What went stale where you stand, each with the one call that clears it.'),
-  /* THE DESCRIPTION IS THE TEST FOR RECORDING ONE (AGT-C14, `docs/32-PARITY.md`), said where a session looks before it
+  /* THE DESCRIPTION IS THE TEST FOR RECORDING ONE (`docs/32-PARITY.md`), said where a session looks before it
      adds to them. All four hold, or it is not a lesson. */
   resource(
     'learnings',
@@ -1459,8 +1459,8 @@ function beatOn<C>(surface: McpSurface<C>, ctx: C): void {
 const WORKING_S = 15 * 60;
 
 /**
- * Who is working, for `record_index` (AGT-C20): how many runs were heard from in the last fifteen minutes, and the ones
- * in the caller's own tree by name with their handle beside it, "Claude Code (S47)". `null` when none is working.
+ * Who is working, for `record_index`: how many runs were heard from in the last fifteen minutes, and the ones
+ * in the caller's own tree by name with their handle beside it, "Claude Code". `null` when none is working.
  *
  * FROM `boot`'S `sessions`, WHICH ARE `sessionsLive`'S OWN RUNS held to the caller, `same_repo` worked out from the
  * caller's own hints (`sameTree`: the same machine and repository, never the caller's own run or its helpers). So the
@@ -1663,7 +1663,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    *
    * A FOLDED ROW IS STILL READ AS IT WAS. A merge left the fold behind with `merged_into` set, and `get` of its handle
    * answered the fold, so an agent holding `P9` from an older answer wrote a note on a person who was no longer kept
-   * (`loop/contract-17.md`: "get and meet follow merged_into to the kept row"). `MERGE_HOPS` bounds a chain, and a row
+   * ("get and meet follow merged_into to the kept row"). `MERGE_HOPS` bounds a chain, and a row
    * that points at itself or cannot be read stops it where it is.
    */
   const keptOf = async (entry: Entry, ctx: C): Promise<{ entry: Entry; from: Entry | null }> => {
@@ -1868,7 +1868,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * before anything runs, and refuses in its own words. A page change is handed to `preview` above before any of this.
    */
   /**
-   * An installed rule run again over what it would fill now, dry (SHL-D07): `propose` with `"try": {"again": true}` and
+   * An installed rule run again over what it would fill now, dry: `propose` with `"try": {"again": true}` and
    * `to` naming the rule by its id alone. The record's own `dryRun` over the body as installed, read through
    * `automations` so a rule the caller may not read is answered as one that is not there, in the record's words.
    *
@@ -1932,7 +1932,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * `propose` with `withdraw`: a question this run asked, taken back while it is open (the record's `withdraw`, AGT-C07).
+   * `propose` with `withdraw`: a question this run asked, taken back while it is open (the record's `withdraw`).
    *
    * IT GOES ALONE. A withdrawal beside a question would be two acts in one call, and an agent that meant "replace it"
    * should read that the old one went before it asks again. WHO MAY IS THE RECORD'S: another run's question is refused
@@ -2336,7 +2336,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * A limit as this package holds it: the default when none was sent, a whole number past `most` cut to `most`, and
    * anything else as sent, for the record to refuse in its own words.
    *
-   * A LIMIT UNDER 1 GOES ON AS SENT (AGT-B03, "List limit below 1 refused"): it was made 1 here without a word, so an
+   * A LIMIT UNDER 1 GOES ON AS SENT ("List limit below 1 refused"): it was made 1 here without a word, so an
    * agent that asked for none read one and never learnt its call was wrong. The record refuses it at `limit`, and the
    * refusal's `try` is the call with a limit it takes (`tryFor`).
    */
@@ -2347,7 +2347,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * A page's words when the call asked past this door's ceiling, which answers `most` (AGT-B03): the tool's own lines
+   * A page's words when the call asked past this door's ceiling, which answers `most`: the tool's own lines
    * without its closing call, and a last line that says how many of how many, and that the rest is the same call with
    * the cursor beside it. The ceiling stays a hundred an answer here, where the HTTP and command line doors keep 500.
    */
@@ -2379,7 +2379,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * `get` BY A NAME (plan §4.3, §6.1): "Oxbow.gg" or "Send Wren the Oxbow Pass refund email" was refused, because `get`
+   * `get` BY A NAME (§6.1): "Oxbow.gg" or "Send Wren the Oxbow Pass refund email" was refused, because `get`
    * took a handle alone, and an agent searched and read again. Now the one thing whose title is that name, case and
    * spacing aside, answers as its handle does; a search with one hit answers too. Several are refused `NAME_AMBIGUOUS`
    * with each by its handle and list, and the call for the first as `try`. `null` when nothing is called that, so the
@@ -2419,7 +2419,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * `get` WITH ITS HISTORY (`history: true`), which was the tool `history` (plan §6.1, 12a): the row as `get` answers it,
+   * `get` WITH ITS HISTORY (`history: true`), which was the tool `history` (12a): the row as `get` answers it,
    * then every write to it as `history` answers them, in one call and one answer.
    */
   const withHistory = async (args: Args, ctx: C, turn: Turn): Promise<Done> => {
@@ -2466,7 +2466,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * where the rest is for an agent.
      */
     record_index: async (args, ctx, turn) => {
-      /* ONE LIST'S FIELDS, AS `schema` ANSWERED THEM, which it now is (plan §6.1). */
+      /* ONE LIST'S FIELDS, AS `schema` ANSWERED THEM, which it now is. */
       if (args.register !== undefined && args.register !== null) return run.schema!(args, ctx, turn);
       const boot = await bootOf(ctx, turn);
       if (!boot.ok) return { result: boot };
@@ -2498,11 +2498,11 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * THE CARD, AND THE BRIEFING CUT TO WHAT BEARS ON THIS CALLER (`briefing.ts`). The record's own answer measured
      * 16.6 KB on the owner's record, three quarters of it keys and skills that apply everywhere.
      *
-     * THE CARD IS THE RECORD'S (`c.card`, AGT-B07), printed as it came, then the open work and the habits: the start hook
+     * THE CARD IS THE RECORD'S (`c.card`), printed as it came, then the open work and the habits: the start hook
      * and `braindog context` print the same card, so a session is never told two things by two builds.
      */
     /**
-     * AND WHAT IT ASKED FOR (plan §3.1): `task` whole with its version, `project` by name, `depth`, and `since` a stamp,
+     * AND WHAT IT ASKED FOR: `task` whole with its version, `project` by name, `depth`, and `since` a stamp,
      * which answers only what moved for its run, "Nothing new." when nothing did. A full answer asks the full depth.
      * `topic` is what an agent with no folder says the person is working on, which the record places its run by.
      */
@@ -2526,7 +2526,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     },
 
     /**
-     * WHAT HE TOLD THIS RUN, AND ITS ANSWER (plan §2, §6.1), the record's `instructionsMine`: nothing reads what waits and
+     * WHAT HE TOLD THIS RUN, AND ITS ANSWER (§6.1), the record's `instructionsMine`: nothing reads what waits and
      * marks it seen; `take` takes one, the first of two runs winning and the second told who has it; `reply` answers one
      * with `said` and Done, Needs you or Declined, and is answered with the receipts. A stopped run still reaches it.
      */
@@ -2659,7 +2659,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           ctx,
         );
       /**
-       * A SMALL LIST IS ANSWERED WHOLE (AGT-B11, "about 700 tokens for his whole portfolio"). With no limit named, a list
+       * A SMALL LIST IS ANSWERED WHOLE ("about 700 tokens for his whole portfolio"). With no limit named, a list
        * of 27 projects was twenty rows and a cursor, so reading a portfolio took two calls. The first read asks for
        * sixty: an answer with no cursor is the whole list, and one with a cursor is a longer list, read as a page of
        * twenty as before. A call that names a limit or carries a cursor is a page, as it asked.
@@ -2833,7 +2833,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         return { result: { ok: true, value }, say: (look) => governanceBrief(args, value, look), names: { people: true, runs: actorsIn([value]) } };
       }
       const limit = limitOf(args.limit, GOVERNANCE_PAGE, GOVERNANCE_MOST);
-      /* ONE READ, CUT HERE TO FIT (bench 24 Oct, H1). `fitted` asked the record again with fewer rows, and every read
+      /* ONE READ, CUT HERE TO FIT (bench 24 Oct). `fitted` asked the record again with fewer rows, and every read
          worked out every question's card again, a script's backfill of two hundred rows among them: on his record a page
          of the queue was read twice and three times to answer two questions, which made `governance` twice `record_index`.
          The cursor is the last row kept, so the rows a smaller read would have answered are exactly these. */
@@ -2934,7 +2934,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const lists = isObject(body) && typeof body.register === 'string' ? [body.register] : [];
       for (const list of ruled === null ? [] : lists) if (!prefixes.has(list)) await learnPrefix(list, ctx);
       /* THE ROWS THE QUESTION NAMES ARE READ BEFORE IT IS SAID, so a handle or an id in it is said by its words with the
-         handle beside them, never alone (audit 19, M11). */
+         handle beside them, never alone. */
       const dry = out.dry_run === undefined ? null : clip(JSON.stringify(out.dry_run), 1_500);
       /* AND A CHANGE'S HANDLES BEFORE AND AFTER, so `changesSaid` says a ref field moved by its words rather than leave it
          to the page. Only handles: a row id there is never said, so it is not worth a read. */
@@ -2980,7 +2980,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     update: async (args, ctx, turn) => {
       const at = await locate(args.spoken, ctx);
       if (!at.ok) return { result: at };
-      /* AN EMPTY PATCH IS REFUSED BEFORE THE LADDER (plan §1.4, §6.1): on the seed it wrote a version and a receipt for a
+      /* AN EMPTY PATCH IS REFUSED BEFORE THE LADDER (§6.1): on the seed it wrote a version and a receipt for a
          change of nothing, and on his record the ladder filed it as a question and refused it in the question's terms. A
          note with nothing to change is `log`, which is what this sends it to. */
       if (isObject(args.patch) && Object.keys(args.patch).length === 0) {
@@ -3077,7 +3077,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         return { result: await failed({ ...out, refusal: { ...out.refusal, at: args.take !== undefined ? 'take' : 'drop' } }, ctx, turn) };
       if (!out.ok) return { result: await failed(out, ctx, turn) };
       turn.batch = batchIn(out.value);
-      /* A STEP TAKEN OR DROPPED (AGT-C05) answers the run that left it and its words, not a run's row: said as what now
+      /* A STEP TAKEN OR DROPPED answers the run that left it and its words, not a run's row: said as what now
          happens to it. The second of two sessions racing for one step was refused above, in the record's sentence. */
       if (isObject(out.value) && typeof out.value.left === 'string' && typeof out.value.next === 'string' && !isEntry(out.value)) {
         const step = out.value as { left: string; next: string; agent?: string | null };
@@ -3085,7 +3085,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         return { result: { ok: true, value }, say: () => stepSaid(step, args.take !== undefined) };
       }
       if (!isEntry(out.value)) return { result: { ok: true, value: bare(out.value) } };
-      /* THE TASK IT STARTED OR CLOSED (plan §4.3), said after the run's line, so a finished task is one call. */
+      /* THE TASK IT STARTED OR CLOSED, said after the run's line, so a finished task is one call. */
       const task = isObject((out.value as { task?: unknown }).task) ? ((out.value as { task?: unknown }).task as Record<string, unknown>) : null;
       const row = await entryOut(out.value, ctx, turn);
       const value = task === null ? row : { ...row, task: bare(task) };
@@ -3100,7 +3100,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * which organisation and projects they are with and never a duplicate that was folded away.
      *
      * BOTH ANSWERS THE RECORD GIVES ARE READ: the contract's `{ row, created, matched_by, question, mention }`
-     * (`loop/contract-17.md`) and the older `{ person, created, linked, merge }`, because this server is deployed
+     * and the older `{ person, created, linked, merge }`, because this server is deployed
      * apart from the record it talks to. The row id the newer one carries is not passed on; the handle is.
      *
      * A ROW FOLDED INTO ANOTHER IS FOLLOWED TO THE ONE KEPT (`keptOf`), as `get` follows it, so an agent never meets a
@@ -3241,7 +3241,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     }
     const entry = r.value;
     turn.batch = batchIn(entry);
-    /* A REPLAY ANSWERS THE FIRST ANSWER AND SAYS SO (AGT-B05): a call sent again with an `op_id` already used for that
+    /* A REPLAY ANSWERS THE FIRST ANSWER AND SAYS SO: a call sent again with an `op_id` already used for that
        write is the write that landed, not a second one, and the agent is told it wrote nothing new. The record marks it. */
     const again = (entry as { replayed?: unknown }).replayed === true;
     const out = await entryOut(entry, ctx, turn);
@@ -3355,7 +3355,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
          this caller may read or a figure one typo from one it may. A word that is neither has no corrected call. */
       if (QUALIFIED.test(said.toLowerCase())) return callOf(name, { ...args, spoken: said.toLowerCase() });
       if (PREFIXED.test(said.toUpperCase())) return callOf(name, { ...args, spoken: said.toUpperCase() });
-      /* A NAME NOTHING IS CALLED IS LOOKED FOR BY ITS WORDS (audit D, W14): the sentence said "search finds it" and the
+      /* A NAME NOTHING IS CALLED IS LOOKED FOR BY ITS WORDS: the sentence said "search finds it" and the
          refusal carried no call, so an agent wrote the search itself or resent the get. */
       if (!NAMED.test(said)) return name === 'get' && said !== '' && !FIGURE.test(said) ? callOf('search', { q: said.slice(0, 100) }) : undefined;
       if ((await listsOf()).some((r) => r.id === said)) return callOf('list', { register: said });
@@ -3364,7 +3364,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const best = closest(said, figures.filter((f) => !f.param).map((f) => ({ id: f.id, name: f.name })));
       return best === null ? undefined : callOf('get', { spoken: best });
     }
-    /* A LIMIT OUT OF BOUNDS IS THE RECORD'S REFUSAL NOW (AGT-B03): `limitOf` passes one under 1 on as sent. */
+    /* A LIMIT OUT OF BOUNDS IS THE RECORD'S REFUSAL NOW: `limitOf` passes one under 1 on as sent. */
     if ((refusal.code === 'VALUE_MALFORMED' || refusal.code === 'OUT_OF_BOUNDS') && refusal.at === 'limit' && typeof args.limit === 'number' && Number.isFinite(args.limit))
       return callOf(name, { ...args, limit: Math.min(Math.max(1, Math.round(args.limit)), name === 'activity' ? ACTIVITY_MOST : LIST_MOST) });
     return undefined;
@@ -3437,14 +3437,14 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const stray = strayIn(name, sent);
     if (stray !== null) return said(stray, full ? JSON.stringify(stray.refusal) : refusalBrief(stray.refusal as Record<string, unknown>));
     /* EXCEPT THAT A FULL context ASKS THE RECORD FOR THE FULL ANSWER TOO, twenty rows of each list where the brief one
-       sends five (AGT-B09): as a hint on the session, which is where the record reads it, never as an argument. */
+       sends five: as a hint on the session, which is where the record reads it, never as an argument. */
     const asked = name === 'context' && full ? ({ ...ctx, session: { ...((ctx as { session?: object }).session ?? {}), format: 'full' } } as typeof ctx) : ctx;
     /* ADMITTED, SO IT BEATS: a name and keys this door took go on to the record, and a call refused above never got
        there. With the caller's own context, never `asked`'s hint, and never waited on. */
     beatOn(surface, ctx);
     const done = await tool(sent, asked, turn);
     let result = done.result;
-    /* THE FIREWALL BEFORE A WORD IS WRITTEN (sharing plan §2.5 item 6): a field hidden from the caller still on a row of
+    /* THE FIREWALL BEFORE A WORD IS WRITTEN: a field hidden from the caller still on a row of
        the answer is taken off here and raised as fault `lens.firewall`, and then BOTH HALVES ARE DRAWN FROM WHAT IS LEFT.
        The words the tool had ready (`done.say`) are past any key to take off, so an answer the firewall touched is written
        from the masked answer itself, as JSON, and never in those words. */
@@ -3503,7 +3503,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * slice of its nightly walk looked at and nothing kept, said in names. Who may read it is the record's to say, so a
    * refusal passes through in its words.
    *
-   * THE RESOURCE `braindog:understand`, AND NO LONGER A TOOL (AGT-B05): it takes nothing and writes nothing. The answer
+   * THE RESOURCE `braindog:understand`, AND NO LONGER A TOOL: it takes nothing and writes nothing. The answer
    * is the plan and nothing that acts: the counts by kind, the first changes and questions in names and how many in all,
    * and whether this slice reads to the end. An `undo` or a filed question's id is a dry slice's never, and would be a
    * handle no tool takes, so neither is passed on. `said` is the plan in a person's words, the rows its sentences name
@@ -3879,7 +3879,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * page is withheld when every block on it was withheld, and a register comes from `boot`, which
    * lists only what the caller may read.
    *
-   * ONE READ WHEN THE HOST ANSWERS `offered` (AGT-B04). The record says in one read what each reader would let this
+   * ONE READ WHEN THE HOST ANSWERS `offered`. The record says in one read what each reader would let this
    * caller see, so nothing is run to find out: no fixed address it decides is read, no page is drawn, no figure read.
    * The order and the words are today's, so a client sees the same list sooner. A host without it, or one that refuses
    * it, is listed the way below, exactly as before.
@@ -4018,7 +4018,7 @@ const RECEIPTED: ReadonlySet<string> = new Set(['create', 'update', 'log', 'tria
  * NO CREDENTIAL CAN BE IN IT, because it quotes only the answer's own line, which says names and never a stored value,
  * and the batch, an opaque handle. A write with no batch says so rather than offering an undo that would fail.
  *
- * `inText` LEAVES THE FIRST LINE OUT (audit D, W15): in the text the receipt sits under that very line, so every write
+ * `inText` LEAVES THE FIRST LINE OUT: in the text the receipt sits under that very line, so every write
  * answered it twice. `structuredContent.receipt` keeps it whole, for a client that shows the receipt alone.
  */
 function receiptOf(name: string, said: string, turn: Turn, value: unknown, inText = false): string {
@@ -4097,7 +4097,7 @@ function trialSaid(tried: Result<unknown>): string {
 
 /**
  * A rule run again, dry, in words: what it would fill and leave, how many it would win and lose, and which rules took the
- * ones it loses, by name. "Would fill 7, 3 already set by hand" is the sheet's line (SHL-D07); this is the agent's.
+ * ones it loses, by name. "Would fill 7, 3 already set by hand" is the sheet's line; this is the agent's.
  */
 function againSaid(v: Record<string, unknown>): string {
   const n = (k: string): number => (typeof v[k] === 'number' ? v[k] : 0);
@@ -4139,7 +4139,7 @@ const JSON_TEXT_MOST = 2_000;
  * them. An answer that still does not fit, one object with thousands of keys, is answered as its keys and the sentence.
  *
  * ANY `rows`, AT ANY DEPTH, TAKES THE CURSOR BESIDE IT AND THE ANSWER'S OWN: only `rows` at the top was asked of, so a
- * page's `x.rows` cut under its own cursor kept one that skipped what was dropped (`loop/research-audit-16.md`, L11).
+ * page's `x.rows` cut under its own cursor kept one that skipped what was dropped.
  * AND A CUT LIST THAT CARRIED MONEY SAYS ITS TOTALS STILL COUNT WHAT WENT: a total beside it was summed by the record over
  * every entry, and read against the entries left it no longer adds up.
  */

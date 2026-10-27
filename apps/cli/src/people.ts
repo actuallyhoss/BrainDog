@@ -75,7 +75,7 @@ export function isAgent(name: string, address: string): boolean {
 /**
  * The `git log` format every reader here asks for: name, address, full commit, author date, and the commit's
  * `Co-authored-by:` trailers, one record separator apart, so a pair's second author is somebody in the work too
- * (scope B35). The first four fields stay where they were, so a reader of them alone reads as before.
+ * The first four fields stay where they were, so a reader of them alone reads as before.
  */
 export const COAUTHORS = '%(trailers:key=Co-authored-by,valueonly,unfold,separator=%x1e)';
 export const LOG_FORMAT = `--format=%an%x1f%ae%x1f%H%x1f%aI%x1f${COAUTHORS}`;
@@ -220,7 +220,7 @@ export async function readLayout(reader: Reader): Promise<Layout> {
     return { projects: [], self: null, why: 'unread' };
   }
   /* EVERY LIST'S DECLARATION IN ONE READ, so each `schema` below is answered from it: the end hook sent one read per
-     list, 27 of its 32 requests on the owner's record (audit of 22 Oct, E18). A record that cannot answer it is asked
+     list, 27 of its 32 requests on the owner's record. A record that cannot answer it is asked
      list by list, as before. */
   if (reader.schemas !== undefined) await reader.schemas().catch(() => false);
   const decls = (await Promise.all(boot.value.registers.map((r) => reader.schema(r.id)))).flatMap((d) => (d.ok && isObject(d.value) && typeof d.value.id === 'string' ? [d.value] : []));

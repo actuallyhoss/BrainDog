@@ -1,6 +1,6 @@
 <!--
-  The design book, at `/design` (the UI pass of 20 October, agents F29): the two sheets the product's look is judged by
-  (EXP-C01), and the design book beside them. "Controls and lists" and "Charts and marks", each drawn by
+  The design book, at `/design` (agents F29): the two sheets the product's look is judged by,
+  and the design book beside them. "Controls and lists" and "Charts and marks", each drawn by
   the product's own parts from the record this is opened on. It was a Settings area; it is a reference for designers and
   agents, not a choice, so it is reached from Settings' "⋯ › Design book" and `/settings/look` comes here.
 

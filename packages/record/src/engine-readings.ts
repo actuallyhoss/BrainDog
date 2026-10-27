@@ -1,16 +1,16 @@
 /**
- * The engine's own readings (ENG-B01): what Slash's model was asked, by purpose, and what came of it, as figures.
+ * The engine's own readings: what Slash's model was asked, by purpose, and what came of it, as figures.
  *
  * `engineHealth` says whether the model answers. This says what the engine did with the answers: for each purpose, how
  * many asks reached a model in the last day, week and month, and of the last day's how many were answered, how many
  * answers were kept and how many asks were refused; what still waits for a read and since when; and the newest failure.
  * Then the understanding: mentions that point at nothing, and the open questions by the kind of their cause. Then the
- * brake on Slash's questions (ENG-B17), echoed from the kernel's reading with the share it was worked out from.
+ * brake on Slash's questions, echoed from the kernel's reading with the share it was worked out from.
  *
  * PURE. The caller reads the ledger, the queue of what is owed, the mentions and the open questions, and hands them in
  * with the time. Nothing here opens a store or reads a clock, so the counts are held by a test over a ledger it writes.
  *
- * COUNTED BY THE `purpose` COLUMN (ENG-A05), never by the kind of an outbox row, and ONE WAY WITH THE HEALTH READ: which
+ * COUNTED BY THE `purpose` COLUMN, never by the kind of an outbox row, and ONE WAY WITH THE HEALTH READ: which
  * row is a model that answered, which is one that did not and which says nothing are `@braindog/slash`'s three clauses
  * (`LEDGER_ANSWERED`, `LEDGER_FAILED`, `LEDGER_BUDGET` in its `health.ts`), restated here because this package never
  * imports that one.
@@ -64,7 +64,7 @@ export type ReadingsOf = {
   mentions: readonly MentionSeen[];
   questions: readonly OpenQuestion[];
   /**
-   * The brake on Slash's questions, as the kernel's `slashBrake` reads it (ENG-B17): on or off, the share of his last
+   * The brake on Slash's questions, as the kernel's `slashBrake` reads it: on or off, the share of his last
    * answers he took up, and how many it was worked out from. Absent where the caller read none, and the reading says
    * `null` then, never a brake that is off: an unread brake and a free one are not the same answer.
    */

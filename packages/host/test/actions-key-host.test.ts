@@ -1,5 +1,5 @@
 /**
- * A key goes only to the host its keychain entry opens (SHL-C05, job 1).
+ * A key goes only to the host its keychain entry opens.
  *
  * TWO ORIGINS, BOTH DECLARED, so the origin check passes for each and the only thing that can refuse is the key's own
  * host. The refusal comes before the key is opened and before anything is fetched: `openKey` and `send` count their

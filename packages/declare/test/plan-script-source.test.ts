@@ -1,5 +1,5 @@
 /**
- * The plan answers each script's source, its size, and on an update the lines that changed (SHL-D09, "source shown in
+ * The plan answers each script's source, its size, and on an update the lines that changed ("source shown in
  * review", HD.361).
  *
  * WHAT A STRANGER INSTALLING A STRANGER'S ADD-ON READS BEFORE APPROVING. The plan said where a script calls and with

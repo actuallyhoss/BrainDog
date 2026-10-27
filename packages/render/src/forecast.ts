@@ -769,8 +769,8 @@ export function largest(model: ForecastModel, most = 5): { label: string; amount
  * reach, an overdue one among them, since it is walked today.
  *
  * NOT THE WHOLE WALK. The host walks past the length the chart opens on, so a longer one is a press away, and "What
- * counts" totalled every step it sent: on Money that was five years of salary beside a chart of three months (research
- * audit 11-13). A stream is offered and weighed by what moves on the chart and in its table. By the day each movement
+ * counts" totalled every step it sent: on Money that was five years of salary beside a chart of three months.
+ * A stream is offered and weighed by what moves on the chart and in its table. By the day each movement
  * is dated, before the late knob moves money in: a salary paid late is still one a reader may count, and the switches do
  * not come and go as the knob is dragged.
  */
@@ -1156,8 +1156,7 @@ const NOW_SHIFT = 0.14;
 const NOW_WIDE_FAR = 0.2;
 
 /**
- * THE CORNER OF TODAY'S DOT THAT THE LINE DOES NOT RUN THROUGH, AND THAT STAYS INSIDE THE PLOT (the audit of 25
- * October, Z16): over the dot to the end side, where the label always sat, drew "Today" and "EGP 752,841.68" across a
+ * THE CORNER OF TODAY'S DOT THAT THE LINE DOES NOT RUN THROUGH, AND THAT STAYS INSIDE THE PLOT: over the dot to the end side, where the label always sat, drew "Today" and "EGP 752,841.68" across a
  * walk that steps up the day after, at 390. `points` are the line's own, as shares across and down. With the crossing's
  * flag near, the corners over the dot are the flag's. A dot with no free corner keeps the first, as it always did.
  */
@@ -1359,7 +1358,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     said,
     warn: c !== null,
     /* NO SENTENCE WHILE THE PAGE'S HEADLINE SAYS HOW LONG THE MONEY LASTS, whether this walk goes under or not (the scope
-       of 24 October, B7). Over Money's Lasts saying "Lasts past 23 Oct 2027" from its year's walk, this chart said
+       of 24 October). Over Money's Lasts saying "Lasts past 23 Oct 2027" from its year's walk, this chart said
        "Stays above zero to 1 Jan 2027, as far as the chart goes": true, and a second day for one question. The page
        names one horizon, the tile's, and the chart's own end is on its axis. A knob that moves the walk brings it back. */
     legend: !(model.headline && base === null),
@@ -1375,7 +1374,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       label: forecastFigure(model, model.opening, 'read'),
       place,
       /* TODAY IS A HAIRLINE DOWN THE WHOLE CHART as well as a dot, named "Today" with the balance under the word, so the
-         eye finds where the remembered line ends and the walk begins (the money review, F2). */
+         eye finds where the remembered line ends and the walk begins (the money review). */
       rule: `M${x(model.today)} 0V100`,
     },
     base: base ? line(base.days) : '',
@@ -1509,7 +1508,7 @@ export const FORECAST_NO_LONGER = 'No longer goes under';
 export const FORECAST_STILL = 'Still stays above zero';
 export const forecastUnder = (day: string): string => `Goes under on ${day}`;
 /**
- * A WALK THAT STAYS ABOVE SAYS HOW FAR THE CHART LOOKS, since the audit of 22 October (U-B5): Money's Lasts walks a year
+ * A WALK THAT STAYS ABOVE SAYS HOW FAR THE CHART LOOKS: Money's Lasts walks a year
  * and said "Lasts past 23 Oct 2027" over this chart's ten weeks saying "Stays above zero to 1 Jan 2027", one walk read
  * as two answers. The day is where the chart stops, not where the money does.
  */

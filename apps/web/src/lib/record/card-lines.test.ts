@@ -1,5 +1,5 @@
 /**
- * A VALUE OF MORE THAN ONE LINE STAYS IN ITS CELL (the audit of 25 October, Z21).
+ * A VALUE OF MORE THAN ONE LINE STAYS IN ITS CELL.
  *
  * WHAT WAS WRONG. Crumb.gg's page drew three cards under Keeping it alive for its two services: the domain's note is
  * "The earner." then a blank line then "Registrar notes: …", and the line break inside the cell broke the row, so the

@@ -129,7 +129,7 @@ export const decide = {
     const word = { m: 'minute', h: 'hour', d: 'day', w: 'week' }[unit];
     return n === 1 ? `every ${word}` : `every ${n.toLocaleString('en')} ${word}s`;
   },
-  /* THE SITTING (REC-A07): what an arrangement needs from you, what it changes, what it starts and your choices, each
+  /* THE SITTING: what an arrangement needs from you, what it changes, what it starts and your choices, each
      under its own heading, in that order after Why. */
   arrangeNeeds: 'What it needs from you',
   arrangeNeedOpens: (opens: string) => `Opens ${opens}`,
@@ -145,7 +145,7 @@ export const decide = {
   arrangeNeedSaving: 'Keeping it',
   arrangeNeedKept: (label: string) => `Kept “${label}” for scheduled runs`,
   /* TRUE OF THE RECORD TODAY: `govern.ts` refuses an approval whose key is missing, and `actions.ts` one held only for a
-     person. When an accept can take some parts and leave the rest (REC-A06), this says that instead. */
+     person. When an accept can take some parts and leave the rest, this says that instead. */
   arrangeNeedsNote: 'A part that needs a key stays open until its key is held. Add the key here and it is taken with the rest; without it, Accept takes the rest and that part waits here.',
   /* WHAT ACCEPT TAKES (REC-A07 step 2): a tick per part, and why one is off. */
   arrangeTakesH: 'What Accept takes',
@@ -156,7 +156,7 @@ export const decide = {
   arrangeTakeSome: (n: number, of: number) => `Accept takes ${n} of ${of} parts. The rest stay open here.`,
   arrangeTakeNone: 'Nothing is ticked. Tick a part to accept it, or decline the whole question.',
   arrangeTookSome: (n: number) => `Accepted ${n === 1 ? 'one part' : `${n} parts`}. The rest still waits here.`,
-  /* WHAT STOPS (REC-A16): a door an update takes away while messages still come to it, and no add-on takes it over. */
+  /* WHAT STOPS: a door an update takes away while messages still come to it, and no add-on takes it over. */
   arrangeStopsH: 'What stops',
   arrangeStopsFiling: (name: string) => `${name} goes. Messages to this address will stop being filed.`,
   arrangeStopsNote: 'No add-on you can install takes it over. Accept asks a second time.',
@@ -270,10 +270,10 @@ export const decide = {
   arrangeCountOther: (n: number) => `${n} more ${n === 1 ? 'change' : 'changes'}`,
   arrangeCountWords: (n: number) => `${n} ${n === 1 ? 'word changes' : 'words change'}`,
   arrangeLeadSummary: (lead: string, summary: string) => `${lead}: ${summary}`,
-  /** What an arrangement changes, as one sentence on its own page (scope E37): "Adds Profiles, with 1 new page and 2 new lists." */
+  /** What an arrangement changes, as one sentence on its own page: "Adds Profiles, with 1 new page and 2 new lists." */
   arrangeSaid: (lead: string, bits: readonly string[]) =>
     bits.length === 0 ? `${lead}.` : `${lead}, with ${bits.length === 1 ? bits[0] : `${bits.slice(0, -1).join(', ')} and ${bits.at(-1)}`}.`,
-  /* EACH GROUP OF WHAT APPEARS AS ONE SENTENCE (scope E37), "Adds 2 lists, Profiles and Places.", where it was a heading
+  /* EACH GROUP OF WHAT APPEARS AS ONE SENTENCE, "Adds 2 lists, Profiles and Places.", where it was a heading
      over a grid of labels. The names first, so `access.test.ts` can render it with the argument shapes it tries. */
   arrangeGroupSaid: (names: readonly string[], verb: string, one: string, many: string) =>
     names.length === 1 ? `${verb} ${one}, ${names[0]}.` : `${verb} ${names.length} ${many}, ${list([...names])}.`,

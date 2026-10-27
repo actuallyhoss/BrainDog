@@ -119,7 +119,7 @@ export function dropTarget(columns: readonly string[], from: string, to: string)
 /**
  * The lane a narrow board shows, where it draws one lane at a time behind a switch of their names.
  *
- * STACKED ON A PHONE, A BOARD WAS ONE LIST 15,000 PX LONG (audit B of 25 October, Y8): every lane's cards one under
+ * STACKED ON A PHONE, A BOARD WAS ONE LIST 15,000 PX LONG: every lane's cards one under
  * another, so the lane you wanted was a long scroll past the ones you did not. One lane at a time is the board read the
  * way a phone reads it, and the switch above says how many each lane holds, which is what comparing heights told you.
  *

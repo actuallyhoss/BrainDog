@@ -180,7 +180,7 @@ export type Door = {
    */
   home?: () => Promise<Result<{ pack: string; currency: string | null } | null>>;
   /**
-   * Each placeholder a document holds and whether the record has anything by that name (`checkPaths`, REC-A12), so a
+   * Each placeholder a document holds and whether the record has anything by that name (`checkPaths`), so a
    * note's `{{...}}` that names nothing can be said before it is written. OPTIONAL like `packs`: a door without it
    * checks nothing.
    */
@@ -881,7 +881,7 @@ export async function applyPlan(
   }
 
   /**
-   * A PICTURE THE SET DOES NOT DRAW IS LEFT OUT, AND COUNTED (REC-C17).
+   * A PICTURE THE SET DOES NOT DRAW IS LEFT OUT, AND COUNTED.
    *
    * Measured on a real record: the old tool's word for each project's picture was carried across as it stood, nothing
    * here drew it, and the Projects page showed the first letter of that word where the picture should be, H, I and P
@@ -1462,7 +1462,7 @@ export async function applyPlan(
      * the old tool had one, and so an end the old tool later took away stayed on the row and stopped the forecast early. A
      * planned `null` over a field the row does hold still differs, and is the patch that clears it.
      */
-    /* A RUN CARRIED IN (AGT-C10, `run-carried.ts`): never heard from here and not handed over. Its step is the kernel's to
+    /* A RUN CARRIED IN (`run-carried.ts`): never heard from here and not handed over. Its step is the kernel's to
        drop, so the step it carried is never patched back, and the day it was last seen is held as `seen_before`. */
     const carriedRun = row.register === 'session' && typeof found.fields.last_seen !== 'string' && (fields.state ?? found.fields.state) !== 'handoff';
     const differs = (field: string): boolean =>
@@ -2589,7 +2589,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
     ...(folder['x-braindog-host'] === undefined ? {} : { 'x-braindog-host': folder['x-braindog-host'] }),
     'x-braindog-client': `braindog-import-${crypto.randomUUID()}`,
     'x-braindog-agent': 'other',
-    /* THE COMMAND'S BUILD, which every call says (AGT-B01). */
+    /* THE COMMAND'S BUILD, which every call says. */
     'x-braindog-cli': cliBuild(),
   };
   const ms = budgetOf(io.env);

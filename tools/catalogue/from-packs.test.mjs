@@ -1,5 +1,5 @@
 /**
- * `from-packs` publishes use case files beside add-ons (USE-A16): a `<id>.usecase.json` under a folder in `packs/`, and
+ * `from-packs` publishes use case files beside add-ons: a `<id>.usecase.json` under a folder in `packs/`, and
  * every use case this build ships, each an entry of kind `usecase` carrying the `signals` and `modules` its file says.
  * A second run writes nothing, a refused file stops the build before anything is written, and the three fronts in
  * `packs/` read through the use case door as they ship.
@@ -186,7 +186,7 @@ test('the three fronts publish as usecase entries with their signals', () => {
   }
 });
 
-test('LISTING IS OPT IN: a new pack is in the index and in no listing until packs/listed.json names it (E18)', () => {
+test('LISTING IS OPT IN: a new pack is in the index and in no listing until packs/listed.json names it', () => {
   const packs = packsFolder();
   const to = scratch();
   const first = run(packs, to);

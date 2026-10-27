@@ -1,5 +1,5 @@
 /**
- * A key keeps its command's build and its last tool call (AGT-A02).
+ * A key keeps its command's build and its last tool call.
  *
  * WHAT WAS MEASURED BEFORE THIS. The record knew when a key was last used and through which door, and nothing else: a
  * Mac five commits behind and a week of sessions that called no tool both read as a key used today. `verifyToken` now

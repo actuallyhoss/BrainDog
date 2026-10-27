@@ -1,5 +1,5 @@
 /**
- * A list's `same:` (AGT-C13): what makes two of its rows the same thing, checked whole at install. Each fault is one
+ * A list's `same:`: what makes two of its rows the same thing, checked whole at install. Each fault is one
  * sentence naming the part, at the part; a good rule installs beside the list of projects it is within.
  */
 

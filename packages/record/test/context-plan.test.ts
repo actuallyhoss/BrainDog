@@ -59,7 +59,7 @@ function his(over: Partial<ContextFacts> = {}): ContextFacts {
       { said: 'No glass, gradients or pills in the UI.', here: false },
       ...Array.from({ length: 12 }, (_, i) => ({ said: `Rule ${String(i)} for the BrainDog repo: keep the gates green.`, here: true })),
     ],
-    brief: 'You build BrainDog. Keep to the plan in loop/plans, one builder per worktree.',
+    brief: 'You build BrainDog. Keep to the plan in docs/plans, one builder per worktree.',
     others: [
       { spoken: 'S884', agent: 'claude', doing: 'W2-A record methods and guard', branch: 'worktree-agent-a613', worktree: 'agent-a613', for_s: 32 * 60 },
       { spoken: 'S885', agent: 'claude', doing: 'W2-C MCP tools', branch: 'worktree-agent-ab33', worktree: 'agent-ab33', for_s: 20 * 60 },

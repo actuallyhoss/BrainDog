@@ -376,7 +376,7 @@ trigger and step to the capability table, and installs each example. MCP serves 
 A description to Slash carries the page, register, metric and rule grammars in its input as `grammar`
 ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.10).
 
-### 2.6 · `when: { holds }`: a part that waits on what the record holds *(SHL-A08, October 2026)*
+### 2.6 · `when: { holds }`: a part that waits on what the record holds *(October 2026)*
 
 A part of an add-on may say it is there only while the record holds certain lists:
 

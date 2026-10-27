@@ -1,5 +1,5 @@
 /**
- * The words a person must never read (`words.mjs`): each kind finds the example the audit of 22 October found on his
+ * The words a person must never read (`words.mjs`): each kind finds the example a review found on his
  * screens, none fires on the text the sample record's own screens print, and `rawIn(text)` still counts only the five
  * kinds the people's walks have always been held to.
  */

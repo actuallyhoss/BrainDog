@@ -1,5 +1,5 @@
 /**
- * The page's head (PGS-A14): each part a `header` may say, checked as the install checks it, and resolved as the read
+ * The page's head: each part a `header` may say, checked as the install checks it, and resolved as the read
  * resolves it, leaving out a part with nothing to say. Invented figures, pages and lists throughout.
  */
 

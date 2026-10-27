@@ -55,7 +55,7 @@ export const noDoorYet = (it: Methods, ways: Ways | null, note: Note): boolean =
 
 /**
  * Whether the record's way in is a letter and the letter cannot go: a first run with no passkey, on a host whose mail is
- * down (audit 36-37, finding 8).
+ * down.
  *
  * NOT `noDoorYet`, AND THAT WAS THE DEAD END. `waysOf` counts `magic: 'down'` as no way, so a stranger who had just
  * signed up got the same empty `Ways` as a record nobody has claimed, and read "Open the link you were given when the

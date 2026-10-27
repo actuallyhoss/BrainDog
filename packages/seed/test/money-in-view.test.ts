@@ -5,7 +5,7 @@
  *
  * Agents do the legwork in view: who wrote a row has always been in the history and no figure read
  * it. `filed-for-you-30d` counts what an agent, a bank add-on or a rule made in 30 days, and `filed-today` says today's
- * by who. An import files nothing for anybody: it copies what another tool already held (audit 61, claim 8).
+ * by who. An import files nothing for anybody: it copies what another tool already held.
  *
  * THE FIGURES ARE READ FROM `FILING_FIGURES`, NOT FROM `METRICS`: the group is declared in its own file and joins Money
  * with the version that spreads it into `figures/index.ts`.

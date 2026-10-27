@@ -1,5 +1,5 @@
 /**
- * A late part's paint survives a pattern it cannot reach (audit 35, finding 9).
+ * A late part's paint survives a pattern it cannot reach.
  *
  * `lateId` counts within one `toHTML` call, and the same input draws the same page, so two calls that draw the same
  * late chart hand out one id twice. `url(#id)` paints from the first element with that id in the document: where that

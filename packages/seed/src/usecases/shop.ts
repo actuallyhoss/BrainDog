@@ -1,7 +1,7 @@
 /**
  * Shop: the orders a small shop takes and the things it sells.
  *
- * WRITTEN FOR USE CASE 6 OF THE VISION (9 October, `loop/STATUS.md`): a person who says "I run a small
+ * WRITTEN FOR USE CASE 6 OF THE VISION (9 October): a person who says "I run a small
  * candle shop" sees her words mapped to Orders and Products, and neither existed anywhere. Small business carried no
  * list, so a shop was proposed a page of every list the record held and nowhere to write an order down.
  *
@@ -9,7 +9,7 @@
  * the person's own entry anyway. Nothing here points at a project, an account or an invoice: what was paid is on the
  * order, in its own currency, and Money is offered when a shop asks for its books.
  *
- * NO EXAMPLES. A shop's record holds only the orders and products she wrote, or formed from what she said (USE-B07),
+ * NO EXAMPLES. A shop's record holds only the orders and products she wrote, or formed from what she said,
  * and the Orders page draws a tile only while something is in it.
  */
 
@@ -49,12 +49,12 @@ export const SHOP = {
      oldest order nothing was paid on, and counts the ones it cannot name.
      1.2.0: the line counts every other order nothing was paid on beside the one it names, where it said only the
      oldest and left the rest out.
-     FOLDED INTO THE UNRELEASED 1.2.0 (owed-words-70-71, audit 69 finding 4): the tile of what is not paid in full is
+     FOLDED INTO THE UNRELEASED 1.2.0 (owed-words-70-71): the tile of what is not paid in full is
      headed Still to come in, the words Today's money tile opens it with, where it said Owed to you. Commit 63423720,
      the deployed build, holds 1.0.0, so no version is cut for it.
-     1.3.0: the Orders page says its place on the rail, second after Work (places-and-computed-101, SHL-A18). 1.2.0 IS IN
+     1.3.0: the Orders page says its place on the rail, second after Work (places-and-computed-101). 1.2.0 IS IN
      THE CATALOGUE (published by batch 99), so this is a version of its own.
-     1.4.0: the Orders page opens on a box to add an order (audit C of 25 October, X7), where a new shop's first tab said
+     1.4.0: the Orders page opens on a box to add an order, where a new shop's first tab said
      "Nothing here yet" over nothing to press. A block added to a page that is already there, so a minor step. 1.3.0 is
      master's. */
   version: '1.4.0',
@@ -151,7 +151,7 @@ export const SHOP = {
       {
         page: 'orders',
         title: 'Orders',
-        /* ITS PLACE ON THE RAIL, SINCE 1.3.0 (places-and-computed-101, SHL-A18): second, after Work. */
+        /* ITS PLACE ON THE RAIL, SINCE 1.3.0 (places-and-computed-101): second, after Work. */
         nav: { section: 'Orders', order: 10, place: 20 },
         icon: 'board',
         requires: ['register.orders'],
@@ -172,7 +172,7 @@ export const SHOP = {
             body: '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}, with {{orders-owed-named.more}} more order(s) not paid at all',
           },
           {
-            /* ONE BOX TO ADD AN ORDER, SINCE 1.4.0 (audit C of 25 October, X7): a new shop's first tab said "Nothing here
+            /* ONE BOX TO ADD AN ORDER, SINCE 1.4.0: a new shop's first tab said "Nothing here
                yet" with no way to write an order down. Under the line, as Work's box is under its own. */
             kind: 'capture',
             heading: 'Add an order',
@@ -220,7 +220,7 @@ export const SHOP = {
           },
           {
             /* WHO HAS NOT PAID IN FULL, the oldest due first, with what came in beside what it comes to.
-               HEADED AS TODAY'S MONEY TILE SAYS IT (`OWED_TO_YOU` in the web's `default-home.ts`, audit 69 finding 4):
+               HEADED AS TODAY'S MONEY TILE SAYS IT (`OWED_TO_YOU` in the web's `default-home.ts`):
                she taps Still to come in and lands on a tile of the same name. The two are held equal by hand, a
                seed file cannot read the web's constant. */
             kind: 'table',

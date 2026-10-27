@@ -1,5 +1,5 @@
 /**
- * The first run from a person's own agent (USE-B12), what `/start?agent=1` decides with no runes: how to plug an agent
+ * The first run from a person's own agent, what `/start?agent=1` decides with no runes: how to plug an agent
  * in, the one line to paste into it, the build that agent proposes once it is filed, and the press that makes it.
  *
  * MODELLED ON POSTHOG'S INSTALL STEP (`docs/19-INTERFACE.md`, "The first run from your own agent"): one line the same
@@ -42,7 +42,7 @@ export const words = {
   headline: 'Your agent asks who you are and proposes a BrainDog. You see it here, and nothing is made until you say so.',
   plugIn: 'Plug in your agent',
   paste: 'Then paste this into it',
-  /** THE ONE LINE, word for word as the unit has it (USE-B12). */
+  /** THE ONE LINE, word for word as the unit has it. */
   line: 'Set up my BrainDog. Ask me who I am, then propose it.',
   copyLine: 'Copy the line',
   lineCopied: copy.lineCopied,
@@ -168,7 +168,7 @@ export async function askBuild(base: string, io: Io = {}): Promise<Waiting | nul
 export const makeItMine = (base: string, id: string, io: Io = {}): Promise<Sent> =>
   answer(clientFor(base, io) as Governor, id, 'accept', words.reason).catch(() => ({ ok: false as const, fix: copy.recordNotReached }));
 
-/** Never asked faster than this: the build is watched for, and five seconds is what the unit allows (USE-B12). */
+/** Never asked faster than this: the build is watched for, and five seconds is what the unit allows. */
 export const ASK_EVERY = 5_000;
 
 /**

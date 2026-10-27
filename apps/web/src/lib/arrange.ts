@@ -29,7 +29,7 @@ import type { CatalogueUsecase } from './start/offer.ts';
 export type Arranged = Arrangement & { from: string };
 
 /**
- * A CATALOGUE USE CASE IS HEARD AS A SHIPPED ONE IS (USE-A16): its own signals, counted by the same `arrange`, and the
+ * A CATALOGUE USE CASE IS HEARD AS A SHIPPED ONE IS: its own signals, counted by the same `arrange`, and the
  * modules it stands on carried on what it proposes. `heard` is what the first run read from the host's catalogue
  * (`start/offer.ts`, `heardOf` or the whole entry); its title and summary are said where it gives them, its id as words
  * where not.
@@ -70,7 +70,7 @@ const frontOf = (h: Heard): UseCase => ({
 });
 
 /**
- * AN AGENT IS THE AGENTS ADD-ON'S WORD, NEVER A USE CASE'S (the audit of 22 October, U-C3): "what my agents did" made a
+ * AN AGENT IS THE AGENTS ADD-ON'S WORD, NEVER A USE CASE'S: "what my agents did" made a
  * one-person record a team's, with Cycles, a Cycle plan and Cycle days. The add-on hears the words its own signals say
  * (`AGENTS_SIGNALS`), so a use case is ranked on the rest of what it heard, by the same order `arrange` keeps.
  */

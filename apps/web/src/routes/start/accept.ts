@@ -1,7 +1,7 @@
 /**
  * "Make it mine": the one press that writes a first run's proposal into the record.
  *
- * ONE CALL, AND THE RECORD OWNS IT (USE-B04). The press is `bodyOf(asked)` handed to the record's `setup`: the lists
+ * ONE CALL, AND THE RECORD OWNS IT. The press is `bodyOf(asked)` handed to the record's `setup`: the lists
  * in order, then the person, their words for things, the currency, and the entries all or none, signed by the owner as
  * one change. The page used to run that as a script of a dozen calls of its own, so a closed tab left a record part
  * made. Now a tab closed in the same second leaves a record that holds every part.
@@ -77,7 +77,7 @@ export type Accepting = {
   /**
    * THE BUILD'S OWN HANDLE, set once by the page that built it and sent again with every press of the same build, so the
    * record writes its entries once. A press whose answer never came back and is pressed again with `again` must carry the
-   * key the first one carried, or the record takes it for a new press and writes every entry twice (audit 53, finding
+   * key the first one carried, or the record takes it for a new press and writes every entry twice (finding
    * 2). Left out, `accept` makes one for this call alone.
    */
   key?: string;
@@ -132,7 +132,7 @@ export type Accepted = {
  * said which entries it did not write, and may have kept the first key for the ones it did, so the same key again
  * would pass over the very entries that are still missing. THAT NEW KEY CARRIES ONLY WHAT IS STILL TO MAKE: the
  * sentence's entries it handed back (`left`) and the plan's (`plan`), which may be none at all. Sent whole, the plan
- * would be written a second time, since the record passes over only a key it holds (audit 55, claim 8). A draft that
+ * would be written a second time, since the record passes over only a key it holds. A draft that
  * went onto Decide is not filed again.
  */
 export function pressAgain(asked: Accepting, out: Accepted | null): Accepting {
@@ -735,7 +735,7 @@ function oldScript(client: Client): {
     /* ── the person, first ─────────────────────────────────────────────────── */
     /* ONLY WITH PEOPLE ON, and People is on only where the person left it on: `introduce` reads the record, and a name heard
        with People off was said back on the preview and is stored nowhere.
-       EVERY PERSON WHO SETS UP IS THE FIRST ENTRY IN THEIR PEOPLE (USE-B06): the name they typed, else the one they
+       EVERY PERSON WHO SETS UP IS THE FIRST ENTRY IN THEIR PEOPLE: the name they typed, else the one they
        answered, else the name in the address they kept the record with. Before any client the sentence named. */
     const met = introduce(who, asked.email, states, { answered: asked.proposal.answers?.name ?? null, address: true });
     if (met) {
@@ -744,7 +744,7 @@ function oldScript(client: Client): {
       if (row && row.seq !== null) {
         /* THE WORDS AFTER THE NAME ARE THE PERSON'S NOTE, which is where a sentence these rules could not read is kept. */
         if (out.ok && out.value.created && who.bio !== '') await client.update({ register: row.register, seq: row.seq, patch: { note: who.bio } }).catch(() => null);
-        /* THIS IS THEM, SO THE ROW SAYS SO (People's `self`, `loop/contract-17.md`): their own commits and mail are never
+        /* THIS IS THEM, SO THE ROW SAYS SO (People's `self`): their own commits and mail are never
            met as somebody new, and an imported copy of them folds into this row. A People list older than the part refuses
            it, and the row stays an ordinary person.
            ONLY A ROW THAT IS SURELY THEM: one this press added, or one already known by the address they signed in with.

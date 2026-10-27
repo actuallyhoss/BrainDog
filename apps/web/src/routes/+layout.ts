@@ -6,7 +6,7 @@
  * carries the client's route table, and in the entry chunk it pushes it over its budget, which the
  * bundle gate would be right to report.
  *
- * ONE REQUEST BEFORE THE FIRST PAINT, AND IT IS `boot` (EXP-D03). It carries the voice, who is working, what waits and
+ * ONE REQUEST BEFORE THE FIRST PAINT, AND IT IS `boot`. It carries the voice, who is working, what waits and
  * whether a model is behind Slash, which were four more calls in turn, and `app.html` asked for it before this ran. The
  * account's list of records and an older host's model check start here and are never waited on, but by the screens that
  * list the records (Settings and the connect screen), and each is kept for the tab once it has answered.

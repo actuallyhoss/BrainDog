@@ -1,5 +1,5 @@
 /**
- * The engine's health, built over a host's own engine and its facts (ENG-A02): the read `GET /api/slash/health` answers a
+ * The engine's health, built over a host's own engine and its facts: the read `GET /api/slash/health` answers a
  * signed-in person, and the one the record's `engineHealth` hands a read token, the command line and the daily vital sign.
  *
  * ONE BUILDER FOR BOTH, so the door and the record say the same sentence about the same ledger. Each host hands it Slash's

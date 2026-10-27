@@ -41,7 +41,7 @@ test('WHY COMES FIRST, with who asked, and the suggestion is marked where it can
   assert.equal(card.href, '/decide/SG7');
 });
 
-test('THE SUGGESTION STAYS, AND NO KEY ANSWERS, WHERE IT IS HARD TO UNDO OR MONEY MOVES (audit 19 M10)', () => {
+test('THE SUGGESTION STAYS, AND NO KEY ANSWERS, WHERE IT IS HARD TO UNDO OR MONEY MOVES', () => {
   const hard = cardOf(ask({ cost: 'undo' }), { now, home: 'GBP' });
   assert.equal(hard.ways.find((w) => w.recommended)?.key, 'seat', 'the dot stays on a hard card');
   assert.equal(hard.enter, null);
@@ -84,7 +84,7 @@ test('WHO ASKED IS THE AGENT, THE APP AND THE RUN, and never an id', () => {
   for (const name of ['Claude Code', 'claude.ai', 'MacBook']) assert.equal(nameOrNull(name), name);
 });
 
-test('THE RECORD\'S OWN FACTS DRAW: money from each row, the run by what it was doing, the app as the name (audit 19 H3)', () => {
+test('THE RECORD\'S OWN FACTS DRAW: money from each row, the run by what it was doing, the app as the name', () => {
   const card = cardOf(
     ask({
       who: 'S42',
@@ -110,7 +110,7 @@ test('THE RECORD\'S OWN FACTS DRAW: money from each row, the run by what it was 
   assert.equal(doing.run, 'Fix the sign-in', 'a path the agent wrote is taken out, not the whole line');
 });
 
-test('AN ADDRESS SIGNS AS SOMEONE, and no address or id reaches the words (audit 19 M11)', () => {
+test('AN ADDRESS SIGNS AS SOMEONE, and no address or id reaches the words', () => {
   assert.match(askerOf(ask({ who: 'alex@acme.com' })).name, /^Someone\b/u);
   assert.equal(nameOrNull('alex@acme.com'), null);
   const card = cardOf(
@@ -159,7 +159,7 @@ test('WHAT CHANGES IS SAID FROM WHAT TO WHAT, and an id is never a value', () =>
   assert.deepEqual(shiftsOf(ask(), 'GBP'), [], 'an older record sends none');
 });
 
-test('NO ADDRESS OR ID IN AN ANSWER, ITS REASON OR WHAT A CHANGE WAS AND BECOMES (audit 21 #4)', () => {
+test('NO ADDRESS OR ID IN AN ANSWER, ITS REASON OR WHAT A CHANGE WAS AND BECOMES', () => {
   const card = cardOf(
     ask({
       options: [
@@ -300,7 +300,7 @@ test('ONE HARD ANSWER BESIDE A SAFE ONE: the question is a call, and only the ha
   assert.deepEqual(classic.options.map((o) => o.hard ?? false), [false, true]);
 
   /* AND THE CARD DRAWS IT THROUGH THOSE: each button by its own way points at the line under the row that says the care
-     (audit Z28: said inside the button it wrapped to two lines at 390). */
+     (said inside the button it wrapped to two lines at 390). */
   assert.match(src('./DecisionCard.svelte'), /aria-describedby=\{wayTail\(card, way, primary\) !== '' \? `\$\{uid\}-hard` : undefined\}/u);
 });
 
@@ -310,7 +310,7 @@ test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the s
   assert.equal(inlineOf(cardOf(named(2), { now })), true, 'Chase it and Not yet are two buttons');
   assert.equal(inlineOf(cardOf(named(3), { now })), true);
   assert.equal(inlineOf(cardOf(named(4), { now })), false, 'a fourth answer keeps the form');
-  /* ONE ANSWER GRAMMAR (U-A9): answers that each say what they do are a row too, the first filled, its line under the row. */
+  /* ONE ANSWER GRAMMAR: answers that each say what they do are a row too, the first filled, its line under the row. */
   assert.equal(inlineOf(cardOf(ask({ options: ask().options.map((o) => ({ ...o, recommended: false })) }), { now })), true, 'an answer with a line of what it does is a button, not a box that reads like text');
   assert.equal(inlineOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), true, 'Accept and Decline were always buttons');
   /* COMPACT, OUTSIDE DECIDE, the line of what each does waits on the question's page, and only a fourth answer does not fit. */

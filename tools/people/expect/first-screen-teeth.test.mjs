@@ -1,5 +1,5 @@
 /**
- * The first-screen checks with teeth (audit 73, finding 7): the rail read row by row from what was drawn, on the first
+ * The first-screen checks with teeth: the rail read row by row from what was drawn, on the first
  * minute too; Today's line on the vital signs held to being there; a check that read nothing leaving the command with
  * 1; and the phone drawn beside the rail. Run it alone: `node --test tools/people/expect/first-screen-teeth.test.mjs`.
  */

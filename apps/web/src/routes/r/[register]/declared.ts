@@ -1,5 +1,5 @@
 /**
- * A LIST AS A PAGE THE RECORD COMPOSES (PGS-A23), and which of the two a visit draws.
+ * A LIST AS A PAGE THE RECORD COMPOSES, and which of the two a visit draws.
  *
  * THE SCREEN AS IT WAS STAYS WHERE IT IS UNTIL THE LIST BOARD IS SIGNED OFF. Until then the composed page is reached
  * by its address and by nothing else: `/r/<list>?declared`. One key, beside whatever else the address holds, so a row

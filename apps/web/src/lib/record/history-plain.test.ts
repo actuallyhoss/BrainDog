@@ -1,5 +1,5 @@
 /**
- * A person's Activity in plain words (the audit of 25 October, Y3): a list of links said by the names it gained and
+ * A person's Activity in plain words: a list of links said by the names it gained and
  * lost, never as the ids it is held as; a list of lines said by what was added; a date said as a day; an edit with no
  * field said as a change.
  */

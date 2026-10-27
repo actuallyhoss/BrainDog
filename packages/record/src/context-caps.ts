@@ -1,5 +1,5 @@
 /**
- * WHAT A SESSION IS GIVEN, CAPPED AND THIS PROJECT FIRST (AGT-B09). Pure: `context` hands in what it read and gets back
+ * WHAT A SESSION IS GIVEN, CAPPED AND THIS PROJECT FIRST. Pure: `context` hands in what it read and gets back
  * what it sends, so the caps, the order and the counts are one set of rules a test can hold without a record.
  *
  * ON HIS RECORD THE ANSWER CAME TO 16.6 KB, three quarters of it keys and skills that apply everywhere, twenty and twenty
@@ -107,7 +107,7 @@ export type Placed = { project?: string | null | undefined; projects?: readonly 
 export const isHere = (p: Placed, project: string | null): boolean => project !== null && (p.project === project || (p.projects ?? []).includes(project));
 
 /**
- * What a question carries for its wait to be read (AGT-C08): the `waits` the record's read said (`listGovernance` with
+ * What a question carries for its wait to be read: the `waits` the record's read said (`listGovernance` with
  * `order: 'wait'`, which reads the rows too), or what `waitOf` reads of a question (`WaitingQuestion`) with the instant.
  */
 export type Weighed = { waits?: string | undefined; body_kind?: unknown; body?: unknown; opened_at?: unknown };
@@ -181,7 +181,7 @@ export function decidedHere(decisions: readonly Decision[], project: string | nu
     .map(({ day, said }) => `Decided ${day!}: ${said}`);
 }
 
-/** How far back "decided lately" looks (plan §3.2, section 7). */
+/** How far back "decided lately" looks (section 7). */
 export const DECIDED_DAYS = 14;
 
 /** A decision as the context plan reads it: its words, when, and whether it answered a question this run asked. */
@@ -203,7 +203,7 @@ export function decidedLately(decisions: readonly Lately[], nowMs: number, n = D
 
 /* ── the lessons that held ─────────────────────────────────────────────── */
 
-/** A lesson never confirmed and older than this is left out of `context` and suggested for retiring (plan §3.2, 8). */
+/** A lesson never confirmed and older than this is left out of `context` and suggested for retiring (8). */
 export const UNCONFIRMED_DAYS = 60;
 /** A lesson confirmed within this many days leads. */
 export const CONFIRMED_DAYS = 30;

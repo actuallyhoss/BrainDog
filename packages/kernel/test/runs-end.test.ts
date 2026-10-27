@@ -1,5 +1,5 @@
 /**
- * A run ends once (AGT-C04, `endRun`): the kernel's half of the end hook's call, which the record's `end` passes on.
+ * A run ends once (`endRun`): the kernel's half of the end hook's call, which the record's `end` passes on.
  *
  * MEASURED BEFORE: the end hook wrote idle, and twelve hours later the sweep wrote off every session that had closed
  * normally. About 740 of the 752 runs on the owner's record read abandoned. What is asserted is what the Agents page

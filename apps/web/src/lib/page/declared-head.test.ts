@@ -1,5 +1,5 @@
 /**
- * A declared page's head as the read sends it (PGS-A14), narrowed: a full head kept whole, none and a malformed one
+ * A declared page's head as the read sends it, narrowed: a full head kept whole, none and a malformed one
  * answered `null` so the page draws as it did, and a part this build cannot read left out alone. Invented names inline.
  */
 

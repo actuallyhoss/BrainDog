@@ -5,7 +5,7 @@
  * record already says: `capture` adds a note, and `cards` draws the notes with the `reply` role under each title. So a
  * launch desk, a study plan and a founder's page install the same pad instead of three people drawing three.
  *
- * NO MODEL EITHER, SINCE 1.2.0 (SHL-A11, "it sohuld be a facade. a display layer"). 1.1.0 held its own rule that put
+ * NO MODEL EITHER, SINCE 1.2.0 ("it sohuld be a facade. a display layer"). 1.1.0 held its own rule that put
  * each note to Slash, so a record with no model could not keep a pad at all: a pack is installed whole, and the step
  * that asks was refused. The second opinion is `packs/pad-second-opinion` now, an add-on that needs this one, and the
  * `reply` field stays here so a pad written under 1.1.0 keeps every reply it was given.

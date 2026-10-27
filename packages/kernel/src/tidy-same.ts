@@ -1,5 +1,5 @@
 /**
- * `rows-same` (AGT-C18, "C13's clashes"): the things held twice in every list that says what makes two of its rows one.
+ * `rows-same` ("C13's clashes"): the things held twice in every list that says what makes two of its rows one.
  *
  * WHAT WAS THERE BEFORE. A list declaring `same:` had its rows here twice read by `same.ts` `clashes`, and the list
  * itself said "3 skills are here twice" while `?twice=1` narrowed it. The tidy counted none of it, so "Things gone

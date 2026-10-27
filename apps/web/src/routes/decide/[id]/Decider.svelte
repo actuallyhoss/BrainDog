@@ -1,5 +1,5 @@
 <!--
-  Who decides this question, in one line, and for an owner a way to name somebody (USE-A13).
+  Who decides this question, in one line, and for an owner a way to name somebody.
 
   LOADED ONLY BY THE QUESTION'S PAGE, through `import()`, so nothing here reaches what every screen loads. Its words and
   its write are `decider.ts`, where a test reads them.

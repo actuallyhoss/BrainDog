@@ -8,7 +8,7 @@
  * and who asked is the quiet line over the answers.
  *
  * WHAT ANSWERING CHANGES IS NOT HERE. It is drawn whole under the answers, and a headline of it beside them said it a
- * second time on every wide screen (audit 31-32, finding 5). So it never keeps a side open either: a question whose
+ * second time on every wide screen. So it never keeps a side open either: a question whose
  * only news is what it changes has no side.
  *
  * EVERY LINE HERE IS READ, NEVER MADE. The evidence is a pair the asker put on the question's body (`lead.ts`

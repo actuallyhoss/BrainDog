@@ -1,9 +1,9 @@
 /**
  * Every `{{name}}` in a sentence, note or heading of Money's pages is a figure Money declares or a built-in one (REC-B01
- * build 4, `loop/scope/area-record-b.md`).
+ * build 4).
  *
  * WHY. A sentence that names a figure nobody declared prints its braces: "Cash is {{cash-nwo}} across 2 accounts" on the
- * first screen a person reads (`loop/scope/batch33.md`, the braces his pages printed). The record fills a name only where
+ * first screen a person reads (the braces his pages printed). The record fills a name only where
  * it can read one, and says nothing when it cannot, so the only place the mistake can be caught is here, before a pack
  * ships. Figures added later (the signs, `rates-age-days`) are covered the day they are declared, since the names are read
  * from the built document and the built-in list, never from a list kept in this file.

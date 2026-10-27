@@ -1,5 +1,5 @@
 /**
- * THE KEY SENTENCE ON DECIDE (SHL-A11): a proposed install that would send a key out says so as one line of what
+ * THE KEY SENTENCE ON DECIDE: a proposed install that would send a key out says so as one line of what
  * accepting does, by the key's label and the host, the way the plan sheet says it before an install.
  *
  * The kernel's `doesOf` already writes the sentence from a plan's `calls_out` or a proposal's `egress`, and the plan

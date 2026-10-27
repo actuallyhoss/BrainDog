@@ -1,6 +1,6 @@
 /**
  * Whether a person could still sign in if one device were lost: one line, said over the passkeys Settings already
- * lists (REC-A15, step 1, the half the record already holds).
+ * lists (step 1, the half the record already holds).
  *
  * THE KIND OF DEVICE IS READ OFF THE LABEL, because that is all the record keeps of it. A new passkey is named by
  * `platformLabel` (`apps/web/src/lib/auth.ts`): iPhone, iPad, Android, Windows Hello, Chromebook, Mac, or Passkey when

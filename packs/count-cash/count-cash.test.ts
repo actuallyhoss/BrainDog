@@ -96,7 +96,7 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
      1.3.1 BESIDE THE PUBLISHED 1.3.0: the same sentence, now naming the way out. Words only, so a patch.
      1.3.2 BESIDE THE PUBLISHED 1.3.1: the way out now says which balance to type. Words only again.
      1.3.3 BESIDE THE PUBLISHED 1.3.2: a count in another currency than its account says so on the count, where only
-     the run's log did (audit 73 finding 3). A sentence written on two paths, no field added, so a patch.
+     the run's log did. A sentence written on two paths, no field added, so a patch.
      1.4.0 BESIDE THE PUBLISHED 1.3.3: Money gains a box to count the cash in and the newest count, by adds, and a count
      that files says so. A block and a sentence added, so a minor.
      1.4.1 BESIDE THE PUBLISHED 1.4.0: the two blocks follow Heads up, in the main column, where they followed What it

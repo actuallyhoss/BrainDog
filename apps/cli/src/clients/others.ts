@@ -1,6 +1,6 @@
 /**
  * Claude Desktop and VS Code, as the clients table holds them: where each keeps servers, the reader, and the writer
- * (AGT-A07, AGT-D10, AGT-D11). Both keep one JSON object of servers, as Cursor does, so both are written as `cursor.ts`
+ * Both keep one JSON object of servers, as Cursor does, so both are written as `cursor.ts`
  * writes: by position, every other byte as it was.
  *
  * CLAUDE DESKTOP, FROM ITS OWN DOCUMENT (modelcontextprotocol.io/docs/develop/connect-local-servers, read 2026-10-14):

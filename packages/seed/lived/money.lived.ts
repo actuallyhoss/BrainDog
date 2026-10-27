@@ -1,6 +1,5 @@
 /**
- * Money, lived: the steps a person takes on a fresh record, each with the figures that must be read after it (REC-B01
- * build 5, and D2 of `loop/scope/area-record-b.md`).
+ * Money, lived: the steps a person takes on a fresh record, each with the figures that must be read after it.
  *
  * WHY A SCRIPT AND NOT ANOTHER TEST. Every gate read a record somebody wrote by hand, and his own stood still for ten
  * days while all of them stayed green. This is the other way round: a record made by signing up, then used one verb at a
@@ -78,7 +77,7 @@ export const OWNER: As = { principal: { kind: 'person', id: PERSON, level: 'owne
 
 /** The record the steps were first written for, in London. */
 export const LONDON: Place = { id: 'rec_01J9MNYM1VEDMNEY0000000000', slug: 'money-lived', name: 'Money, lived', tz: 'Europe/London', locale: 'en-GB' };
-/** A second record, in Cairo, whose week rests on Friday and Saturday (F62). */
+/** A second record, in Cairo, whose week rests on Friday and Saturday. */
 export const CAIRO: Place = { id: 'rec_01J9MNYM1VEDMNEYCA1R000000', slug: 'money-lived-cairo', name: 'Money, lived in Cairo', tz: 'Africa/Cairo', locale: 'en-EG' };
 
 /** Sign-up as it provisions a record, in this process: named, then BrainDog's modules with none of their example rows. */
@@ -120,7 +119,7 @@ const accountOf = (lived: Lived): string => {
 type Kept = { id: string; seq: number; fields: Record<string, unknown> };
 
 /**
- * A BALANCE'S AGE IS THE BANK'S LAST WORD, AND A ROW'S CURRENCY IS ITS ACCOUNT'S (REC-B03, REC-B04, money-core 3.16.0).
+ * A BALANCE'S AGE IS THE BANK'S LAST WORD, AND A ROW'S CURRENCY IS ITS ACCOUNT'S (money-core 3.16.0).
  * An account typed thirty days ago is named old; a bank message that prints its balance after a movement makes it
  * today's without touching the typed day. A Ledger amount written with no code takes the account's, and a row's code
  * never changes once kept.
@@ -202,7 +201,7 @@ export const MONEY_LIVED: Step[] = [
 ];
 
 /**
- * PAYDAYS IN CAIRO (F62, REC-B13, money-core 3.16.0): a repeating line's days of the month and its rule for a rest day,
+ * PAYDAYS IN CAIRO (money-core 3.16.0): a repeating line's days of the month and its rule for a rest day,
  * walked on a record whose week rests on Friday and Saturday. "15, last" steps on the 15th and on each month's own last
  * day, so 31 October and 30 November; a line on the 30th stays on the 30th; and one set to the working day before
  * moves off Friday 30 October to Thursday 29, which on a week resting on Saturday and Sunday it would not.

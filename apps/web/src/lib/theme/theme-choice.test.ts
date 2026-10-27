@@ -1,5 +1,5 @@
 /**
- * The looks Appearance offers and the other scheme's preview (`theme-choice.ts`, PGS-A21).
+ * The looks Appearance offers and the other scheme's preview (`theme-choice.ts`).
  *
  * Every look is listed with one press, the one drawn now is marked by the record's own rule, and the preview is the
  * other scheme's solved tokens, never a colour the record would not draw. The names are invented here.

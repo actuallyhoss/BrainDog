@@ -183,7 +183,7 @@ test('AT THE 600 CAP THE ANSWERS ARE SETTINGS\' COUNT: a build without the model
   ask(sql, 1, 'error', 'SLASH_PENDING');
   const r = readModelSign(k, sql, NOW);
   const h = slashHealth.health(sql, clock, { model: true });
-  /* THE NEWEST ASK WAS TURNED AWAY (audit 40-42, 5): red, with the day the asks come back. Settings says the meter beside
+  /* THE NEWEST ASK WAS TURNED AWAY (5): red, with the day the asks come back. Settings says the meter beside
      its own sentence, so its health still reads the last answer, and both count the same six. */
   assert.equal(r.state, 'red', r.said);
   assert.equal(r.value, 6);
@@ -223,7 +223,7 @@ test('THE OTHER DEAD WORK, by its kind in words: in the facts of a green week an
   assert.doesNotMatch((r.facts ?? []).join(' '), /hunter2|smtp|550|R2/u);
 });
 
-test('A SPENT MONTH IS RED, NEVER "answered all" (audit 40-42, 5): five answers and then fifty refusals', async () => {
+test('A SPENT MONTH IS RED, NEVER "answered all" (5): five answers and then fifty refusals', async () => {
   const { sql, k } = await fresh();
   for (const h of [100, 110, 120, 130, 140]) ask(sql, h, 'ok');
   for (let i = 0; i < 50; i++) ask(sql, 1 + i, 'refused', 'SLASH_BUDGET_SPENT', '-');

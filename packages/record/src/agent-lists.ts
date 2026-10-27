@@ -1,6 +1,6 @@
 /**
  * Which list plays a part the record reads for its agents: the skills, the tools, the learnings, the index of keys
- * by name, the profiles its agents run under and what carries between machines (SHL-A16, "with nothing in the core
+ * by name, the profiles its agents run under and what carries between machines ("with nothing in the core
  * that a module could own").
  *
  * BEFORE THIS THE RECORD READ THEM BY THEIR IDS. The card, `skillsBehind`, `offered` and `toolsSeen` each spelled

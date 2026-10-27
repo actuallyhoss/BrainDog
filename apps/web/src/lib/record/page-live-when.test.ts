@@ -1,5 +1,5 @@
 /**
- * A card's when over a figure (REC-C16): the days since its project was worked on, said in words in the card's head.
+ * A card's when over a figure: the days since its project was worked on, said in words in the card's head.
  */
 
 import { test } from 'node:test';

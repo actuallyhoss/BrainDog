@@ -1,5 +1,5 @@
 /**
- * `sessions.live` answers the one word each run reads as (AGT-C04, AGT-C10): beside `quiet`, in the order of its rows.
+ * `sessions.live` answers the one word each run reads as: beside `quiet`, in the order of its rows.
  *
  * MEASURED BEFORE: the kernel told six presences apart (`presenceOf`), but the source answered only `quiet`, so every
  * screen folded a run into working, quiet or stopped, and a run that handed on a step, one that finished and one carried

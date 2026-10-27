@@ -87,7 +87,7 @@
   /* WHAT THE ADDRESS ASKED FOR (`?q=`, a service's page links here with its name), and the keys grouped by project and
      then by who they are with (`groupsOf`), the asked-for ones alone while it asks. */
   const asked = $derived(page.url.searchParams.get('q')?.trim() || null);
-  /* AND WHAT IS TYPED IN THE BOX (Y26): 176 keys in one list were found by scrolling 22,900 px on a phone. */
+  /* AND WHAT IS TYPED IN THE BOX: 176 keys in one list were found by scrolling 22,900 px on a phone. */
   let findText = $state('');
   const finding = $derived(findText.trim() || asked || '');
   /* HOW THE KEYS ARE ORDERED: this screen's own choice, kept out of the address. */
@@ -95,7 +95,7 @@
   const shownKeys = $derived(sortKeys(keysFor(keys, finding), sortBy));
   /* WHAT NAMES A KEY (actions, tools, scripts), read once after the keys drew, for each key's details. */
   let useFrom = $state.raw<UseSources>({});
-  /* WHEN THE KEYS WERE READ, so the counts say how old they are (audit 25 October, P24). */
+  /* WHEN THE KEYS WERE READ, so the counts say how old they are (P24). */
   let readAt = $state(Date.now());
   const groups = $derived(groupsOf(shownKeys));
   const severalGroups = $derived(groups.length > 1 || (groups[0]?.services.length ?? 0) > 1);
@@ -229,7 +229,7 @@
       accessTick++;
       void readLockAfter();
       void scopeNote();
-      /* THE PASSPHRASE IS NOT ASKED ABOUT ON OPEN (audit 25 October, X24): the only question that says is a write,
+      /* THE PASSPHRASE IS NOT ASKED ABOUT ON OPEN: the only question that says is a write,
          `clearKeychainPassphrase` with none, and opening a page writes nothing. A key door that wants one says so
          (`wantsPassphrase`), and the switch asks when it is pressed (`Passphrase.svelte`, `onask`). */
       reconnect();
@@ -1215,7 +1215,7 @@
     line-height: 20px;
   }
 
-  /* FOLDED PROJECTS SIT AS ONE LIST (audit 25 October, X24): rows a hairline apart, not islands 60px apart with nothing
+  /* FOLDED PROJECTS SIT AS ONE LIST: rows a hairline apart, not islands 60px apart with nothing
      between them. An open one keeps its room above and below. */
   details.key-group:not([open]) + details.key-group {
     margin-block-start: 0;

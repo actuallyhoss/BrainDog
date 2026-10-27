@@ -1,5 +1,5 @@
 /**
- * One rule for whether a page is there for its reader (PGS-A01, H.366): the agent door's list of resources and the
+ * One rule for whether a page is there for its reader (H.366): the agent door's list of resources and the
  * record's `pages()` both drop a page whose every block is withheld from the caller, by the kernel's `whollyWithheld`.
  *
  * THE CODES ARE HELD TO THE KERNEL'S, and the answer to one caller on a real record: a member who may only add entries

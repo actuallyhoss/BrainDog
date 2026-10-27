@@ -1,5 +1,5 @@
 /**
- * Exceptions (ENG-B13): what a record says by itself has stopped.
+ * Exceptions: what a record says by itself has stopped.
  *
  * A LIST THAT TOOK ROWS MOST DAYS AND THEN TOOK NONE, a door that went quiet, a feed whose clock passed with no run, a
  * row older than the window its page declares. Each was being said only as a sentence on its own page; here they are

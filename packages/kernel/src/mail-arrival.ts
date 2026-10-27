@@ -298,7 +298,7 @@ function shippingPlan(deps: MailDeps, f: Facts): Plan | { skipped: string } | nu
 /* ── the whole reading ──────────────────────────────────────────────────── */
 
 /**
- * THE SENDER OF MAIL A PATTERN TOOK IS MET TOO (scope B36), untrusted and with where it was seen, as the reading below
+ * THE SENDER OF MAIL A PATTERN TOOK IS MET TOO, untrusted and with where it was seen, as the reading below
  * meets the sender of mail no pattern took: before this, only unpatterned mail met anybody, so the people his
  * patterns read from every day were nobody in People. Only the verified `From`, never a name the body prints.
  */

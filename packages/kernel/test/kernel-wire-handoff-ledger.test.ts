@@ -1,7 +1,7 @@
 /**
  * Batch 41's kernel wiring, through `openRecord` as a host reaches it: a handoff closes by the hourly sweep and is taken
- * once through the api (AGT-C05), a ledger amount sent with no code takes its account's and keeps it (REC-B04), a money
- * reading reaches a `stat` with its amount (REC-C03), and the record's copies answer as three facts (LCH-C03).
+ * once through the api, a ledger amount sent with no code takes its account's and keeps it, a money
+ * reading reaches a `stat` with its amount, and the record's copies answer as three facts.
  */
 
 import { test } from 'node:test';

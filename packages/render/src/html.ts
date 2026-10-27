@@ -358,7 +358,7 @@ const boardDetail = (cells: readonly string[], opts: RenderOptions): string => {
 /* AND A TOOLTIP, because a dot is not self-explaining to somebody looking at it. A screen reader has
    been told since this shipped; a sighted reader was left with a mark and no way to ask what it means.
    `aria-label` still names it — `title` is only the hover. */
-/** A task's title: its short name, and the rest of it quiet after it when there is more (`todoTitle`, E23). */
+/** A task's title: its short name, and the rest of it quiet after it when there is more (`todoTitle`). */
 const todoTitleHTML = (value: string | undefined, opts: RenderOptions): string => {
   const { text, working } = takeWorking(value ?? null);
   const { head, rest } = todoTitle(text ?? '');
@@ -402,7 +402,7 @@ const toneGlyph = (tone?: string): string => {
  *
  * TWO CALLS STILL SHARE ONE, since the same input draws the same page (a host caches it), and the count starts again
  * with each call. So the paint names the late red after the pattern (`lateFill`): where the first pattern with that id
- * sits in a closed fold, or is gone, the part is painted flat in `--chart-late` instead of not at all (audit 35, 9).
+ * sits in a closed fold, or is gone, the part is painted flat in `--chart-late` instead of not at all (9).
  * With no stylesheet the fallback is the ink, as the pattern's is: an undefined variable would void the whole paint.
  */
 const LATE = 'bad';

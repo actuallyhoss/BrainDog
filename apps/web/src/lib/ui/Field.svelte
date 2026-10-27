@@ -1,5 +1,5 @@
 <!--
-  ONE FIELD: its label, the control, and one line under it (EXP-C06).
+  ONE FIELD: its label, the control, and one line under it.
 
   The line is the field's help, or, when the record refused what was typed, the record's own sentence in the danger
   words with a mark beside it, and the control's edge in the danger colour while it is wrong. An error replaces the

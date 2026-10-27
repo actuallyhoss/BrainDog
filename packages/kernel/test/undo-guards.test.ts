@@ -1,5 +1,5 @@
 /**
- * Undo's guards (`undo.ts`), the holes batch 20's audit found: a run the overnight walk placed can be unplaced, a tag a
+ * Undo's guards (`undo.ts`), the holes testing found: a run the overnight walk placed can be unplaced, a tag a
  * person put back and a value a person set away and back again are theirs, a key from inside a batch is read as the
  * batch, an undone decision's question goes back to Decide, and a second undo of the same batch adds to its mark.
  */

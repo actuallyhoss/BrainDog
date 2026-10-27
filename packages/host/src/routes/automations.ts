@@ -9,7 +9,7 @@
  * a rule body is no query string, and a try runs the steps inside a rehearsal that rolls them back. `checkAutomation` and
  * `automationSentence` keep and run nothing at all, so each is marked a read sent as a POST (`postRead`), as
  * `previewPage` is: opening an automation checks its body, and a reader seeing as somebody, or the live look, was refused
- * that as a write (the audit of 25 October, Z37: "checkAutomation" blocked three times on `automations-id`). A try still
+ * that as a write ("checkAutomation" blocked three times on `automations-id`). A try still
  * writes inside its rehearsal, and stays a write. `setAutomation` and
  * `retryRun` are an owner's in a browser, as `automationRun` is, because each starts or stops what a rule does.
  */

@@ -1,5 +1,5 @@
 <!--
-  Run a rule again over what is already there (SHL-D07). A rule fires on a write, so one written today never saw what
+  Run a rule again over what is already there. A rule fires on a write, so one written today never saw what
   was there before it; this fills the gaps it would have filled.
 
   THE OWNER'S PRESS, NOTHING BY ITSELF. The page mounts this only for the owner (`ruleApply` is ADMIN) and only for an

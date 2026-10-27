@@ -1,5 +1,5 @@
 /**
- * A failed night's reason as one plain sentence (`nightWhy`, A22): read from the raw reason the fault keeps by what it is
+ * A failed night's reason as one plain sentence (`nightWhy`): read from the raw reason the fault keeps by what it is
  * about, never quoting it, and a reason none of the known ones fit is still said.
  */
 

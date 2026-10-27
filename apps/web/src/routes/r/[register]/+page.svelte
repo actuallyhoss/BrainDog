@@ -156,7 +156,7 @@
   const decl = $derived(declared?.register === id ? declared.decl : undefined);
 
   /**
-   * WHETHER THIS VISIT DRAWS THE LIST AS A PAGE THE RECORD COMPOSES (PGS-A23, `DeclaredList.svelte`), which the address
+   * WHETHER THIS VISIT DRAWS THE LIST AS A PAGE THE RECORD COMPOSES (`DeclaredList.svelte`), which the address
    * asks for by one key and nothing on this screen links to until the list board is signed off. While it does, nothing
    * below is drawn, and this screen's keys and its panel's host stand down: its rows are not on screen to act on.
    */
@@ -273,7 +273,7 @@
   const shell = $derived(page.data as unknown as Shell);
 
   /**
-   * THE ONE OFFER FOR THIS LIST (USE-B03), drawn above its entries: the page the record would make of it, most often the
+   * THE ONE OFFER FOR THIS LIST, drawn above its entries: the page the record would make of it, most often the
    * week Slash saw her read it by (offer-pattern-45). The pen's switch and her dismissals are hers on every device
    * (`navPrefs`), and what she made or put away in this visit is gone at once, before `boot` is read again.
    *
@@ -310,7 +310,7 @@
    * of the list, and a change or an archive is an `update`, which asks `write`. `proposes` is the Fields sheet's rung,
    * which files a proposal for anyone but the owner, and a `propose` names no list.
    */
-  /* SHARING IS AN OWNER'S OR AN ADMIN'S (sharing plan §3.1): the view's and a row's ways in are offered to nobody else. */
+  /* SHARING IS AN OWNER'S OR AN ADMIN'S: the view's and a row's ways in are offered to nobody else. */
   const shares = $derived(seeingAs() === null && canShare(shell.me));
   let sharing = $state<Subject | null>(null);
   let sharingOpen = $state(false);
@@ -1208,7 +1208,7 @@
   /* THE MONEY COLUMNS WHERE EVERY AMOUNT IN HAND IS WHOLE, which the table draws without their ".00" (`wholeMoney`). */
   const wholeColumns = $derived(wholeMoney(decl, result.entries));
 
-  /* THE PICKER LEADS THE ROW, in a 32px column of its own (the UI pass of 20 October, money F7): a box at the far end,
+  /* THE PICKER LEADS THE ROW, in a 32px column of its own (money F7): a box at the far end,
      drawn only under the pointer, was found by nobody, and the select-all box has nowhere to stand but over it. The box
      shows under the pointer and stays on every row once one is ticked (`ListTable`). Only on a list long enough to
      pick from. */
@@ -1260,7 +1260,7 @@
    */
   const drawn = $derived(Math.min(loaded, DOM_CAP));
 
-  /* THE HEAD SAYS THE LIST'S COUNT (Y18), which the record answered with the first page, and never "200+ of 2,527": what
+  /* THE HEAD SAYS THE LIST'S COUNT, which the record answered with the first page, and never "200+ of 2,527": what
      is drawn so far is the foot's to say (`shownSaid`). */
   const head = $derived(headCount({ matched: result.matched, drawn }));
 
@@ -1459,8 +1459,8 @@
   });
   /* NAMED BY THE RECORD THAT DREW THEM. `result.names` is the record's own title for every row a
      ref on this list points at, and `null` only before the first answer has landed. */
-  /* AND A READING'S VALUE CARRIES ITS UNIT (Y17): "16.4%", where the "%" sat in a field no column drew. AND AN AMOUNT
-     SAYS WHICH WAY IT WENT (Y19), "−EGP 279.03" and "+EGP 600.00", as Money's page says it. */
+  /* AND A READING'S VALUE CARRIES ITS UNIT: "16.4%", where the "%" sat in a field no column drew. AND AN AMOUNT
+     SAYS WHICH WAY IT WENT, "−EGP 279.03" and "+EGP 600.00", as Money's page says it. */
   const readings = $derived(readingsOf(decl));
   const amountAt = $derived.by(() => {
     const f = wayField(decl) ? amountField(decl) : undefined;
@@ -2513,7 +2513,7 @@
         toggleSelect(row.seq, e.shiftKey);
       }
     } else if (e.key === 'Escape' && host.opened !== null) {
-      /* ESC IN THE LIST CLOSES AN OPEN PEEK FIRST (scope E40), as the key that opened it does in Linear and Quick Look;
+      /* ESC IN THE LIST CLOSES AN OPEN PEEK FIRST, as the key that opened it does in Linear and Quick Look;
          the next Esc clears a selection. */
       e.preventDefault();
       host.close();
@@ -3021,7 +3021,7 @@
           {#if rowsAsCards()}<button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" />{copy.display}</button>{/if}
           {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}>{headWords.whole}</button>{/if}
           {#if handedToMe}<a role="menuitem" href={at(handedToMe)}>{copy.handedToMe}</a>{/if}
-          <!-- SHARE THE LIST, with somebody here, a group or an email (sharing plan §3.1), an owner's or an Admin's. -->
+          <!-- SHARE THE LIST, with somebody here, a group or an email, an owner's or an Admin's. -->
           {#if shares}<button type="button" role="menuitem" data-share-list onclick={shareList}><Icon name="user-plus" size="s" />{copy.shareSheetTitle(decl.name)}</button>{/if}
           {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}>{sheetWords.open}</button>{/if}
         </Menu>
@@ -3142,7 +3142,7 @@
             {#if (q !== '' || filters.length > 0) && twice === null}
               <button type="button" role="menuitem" onclick={() => void saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</button>
             {/if}
-            <!-- "SHARE THIS VIEW" (sharing plan §3.1): the rows the filters pick, shared as their condition. -->
+            <!-- "SHARE THIS VIEW": the rows the filters pick, shared as their condition. -->
             {#if shares && filters.length > 0}
               <button type="button" role="menuitem" data-share-view onclick={shareView}><Icon name="user-plus" size="s" />{copy.shareThisView}</button>
             {/if}

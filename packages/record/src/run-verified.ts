@@ -1,6 +1,5 @@
 /**
- * WHETHER A RUN IS THE APP IT SAYS IT IS (H19 of the 24 October scope; DIRECTION §37's names, "Claude Code · MacBook",
- * "Claude · claude.ai · verified"). A run names its own app (`agent`, `client`), and nothing checked it, so any key could
+ * WHETHER A RUN IS THE APP IT SAYS IT IS. A run names its own app (`agent`, `client`), and nothing checked it, so any key could
  * call itself Claude Code. Two things prove it, and only they mark a run verified:
  *
  *   - ITS KEY CAME BY A CLIENT ID DOCUMENT (`cimd`): the app served the document naming it from its own host, which the

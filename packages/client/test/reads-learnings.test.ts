@@ -1,5 +1,5 @@
 /**
- * What batch 87 added, through the client: the read `learnings` (AGT-C14), what the record's agents learned and still
+ * What batch 87 added, through the client: the read `learnings`, what the record's agents learned and still
  * stands, in the order a session should read it.
  *
  * NOT A STAND-IN FETCH AND NOT A STAND-IN GUARD, as `reads-stale.test.ts` is not: `serveApi` over a real record, so what

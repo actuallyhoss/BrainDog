@@ -1,5 +1,5 @@
 /**
- * The first run's preview draws only what the person gave it (`preview.ts`, USE-B07): the record is asked for no
+ * The first run's preview draws only what the person gave it (`preview.ts`): the record is asked for no
  * examples, the rows laid over a page are the person's name, the entries their sentence filled and their file's first
  * entries, and a page none of those reaches is its name and one line of what it will hold.
  */

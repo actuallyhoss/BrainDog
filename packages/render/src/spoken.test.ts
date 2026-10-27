@@ -1,5 +1,5 @@
 /**
- * `spoken`, and the one place this package reads through it: an option's figure (audit 72 #3).
+ * `spoken`, and the one place this package reads through it: an option's figure.
  *
  * THE SAME CASES THE APP HOLDS IT TO (`apps/web/src/lib/decide/card.test.ts`), word for word, because the function
  * here is the one the app's was copied from and the two must not drift while both exist.
@@ -53,7 +53,7 @@ test('A SHORT PATH GOES TOO, when its last part is a file by its extension, and 
     'Due 10/06.',
     'Split it 50/50.Then send it.',
     'Either/or.',
-    /* Two words that hold a stop are no file in a folder (audit 81, claim 2): each lost words before. */
+    /* Two words that hold a stop are no file in a folder: each lost words before. */
     'Use e.g./i.e. forms',
     'Fix a/b.test please',
     'try v1/v2.beta',

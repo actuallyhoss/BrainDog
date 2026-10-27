@@ -357,7 +357,7 @@
   >
     <svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={p.sentence}>
       <!-- THE LINE IS INK ABOVE £0 AND RED UNDER IT, one stroke cut at the zero rule by a hard stop, so the part a person
-           must act on is the only red on the chart (the money review, F2). Drawn only where the walk goes under. -->
+           must act on is the only red on the chart (the money review). Drawn only where the walk goes under. -->
       {#if p.below}<defs
           ><linearGradient class="forecast-split" id="{uid}-under" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100"
             ><stop class="forecast-above" offset="{p.zero}%"></stop><stop class="forecast-under" offset="{p.zero}%"></stop></linearGradient
@@ -630,7 +630,7 @@
             aria-controls="{uid}-knobs"
             onclick={() => (knobsOpen = !knobsOpen)}>{FORECAST_ADJUST}</button
           >{/if}
-        <!-- FULL SCREEN IS AN ICON, named for a screen reader, beside Adjust in the tile's head (the money review, F17). -->
+        <!-- FULL SCREEN IS AN ICON, named for a screen reader, beside Adjust in the tile's head (the money review). -->
         <button type="button" class="forecast-tool" data-full="" aria-label={FORECAST_FULL} onclick={openFull}
           ><svg class="forecast-tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
             ><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg

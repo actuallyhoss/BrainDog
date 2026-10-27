@@ -6,7 +6,7 @@
  * record imported from one holds them on nearly every project, written into `note` as markdown, so an agent asking
  * "what is in the way on marrow" read the whole note to find one line. 1.x gave them three fields of text.
  *
- * 2.0.0 (REC-C09): THE ONE LINE IS PORTFOLIO'S ABOUT, which it has had since 1.6.0, so `summary` is retired and two
+ * 2.0.0: THE ONE LINE IS PORTFOLIO'S ABOUT, which it has had since 1.6.0, so `summary` is retired and two
  * fields no longer mean the same. THE PLAN IS STEPS ("the ordered queue, position is priority"), a list declaring
  * `steps: { of: thing, done: done, order: rank }`, so the project's ring counts them and a step linked to a task or a
  * thread is ticked when that is done. THE STAGE IS AN ENUM, because "an enum makes drift a refusal". A brief written on
@@ -423,7 +423,7 @@ test('a step added through the record\'s own create, the door an agent\'s create
   close();
 });
 
-/* ── 2.1.0: what runs by itself and has stopped, on the project's page (SHL-C01) ─────────────────────────────────── */
+/* ── 2.1.0: what runs by itself and has stopped, on the project's page ─────────────────────────────────── */
 
 const STOPPED = 'Stopped working for this project';
 

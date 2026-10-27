@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The Mac app's updater key (E50): makes the pair once, keeps the private half and its password in this Mac's
+ * The Mac app's updater key: makes the pair once, keeps the private half and its password in this Mac's
  * keychain, and writes the public half into `apps/desktop/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
  *
  *   node tools/desktop/updater-key.mjs            make it, unless the keychain and the config already hold one

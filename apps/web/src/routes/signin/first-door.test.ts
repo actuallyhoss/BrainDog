@@ -140,7 +140,7 @@ test('the screen draws no way into a demo, since there is none to open', () => {
   assert.doesNotMatch(PAGE, /class="demo"/);
 });
 
-/* MAIL THAT IS NOT GOING OUT (LCH-A04): the host answers `magic: 'down'`, the screen reads it rather than losing the whole
+/* MAIL THAT IS NOT GOING OUT: the host answers `magic: 'down'`, the screen reads it rather than losing the whole
    answer, offers no link, and says why in one line. */
 test("a host whose mail is down offers no link and the screen says so", () => {
   const down: Methods = { ...LIVE, firstRun: false, magic: 'down' };
@@ -151,7 +151,7 @@ test("a host whose mail is down offers no link and the screen says so", () => {
 });
 
 /**
- * AUDIT 36-37, FINDING 8: A STRANGER WHO JUST SIGNED UP, ON A HOST WHOSE MAIL IS DOWN. `waysOf` counts `magic: 'down'`
+ * A STRANGER WHO JUST SIGNED UP, ON A HOST WHOSE MAIL IS DOWN. `waysOf` counts `magic: 'down'`
  * as no way, so the first run hands the screen the same empty `Ways` as a record nobody has claimed, and `noDoorYet`
  * said "Open the link you were given when the record was set up" to somebody nobody gave a link. His way in is the
  * letter. Measured red first: with the `magic !== 'down'` taken out of `noDoorYet`, the first assertion below fails.

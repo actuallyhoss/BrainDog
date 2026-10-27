@@ -12,7 +12,7 @@
  * document with (record `methods/pages-census.ts`): `pathsOf` finds the paths, a field of the row's own list is named,
  * and the record's own read (`unnamed`) says which of the rest name nothing.
  *
- * `accessNight`: the audit's night (sharing plan §2.8, §2.10). The read counters in `access_seen` past 400 days are
+ * `accessNight`: the audit's night. The read counters in `access_seen` past 400 days are
  * pruned, as the daily counters are, and every share whose date passed is said once in the ledger, "Ended on its date".
  *
  * BOTH COUNTS ARE THE RECORD WRITING OF ITSELF, so the points carry the source `night.counts` or `night.paths`, and an arrival's

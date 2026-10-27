@@ -1,5 +1,5 @@
 <!--
-  The one offer for the list being read, on that list's own screen (USE-B03: an offer is shown where the person is).
+  The one offer for the list being read, on that list's own screen (an offer is shown where the person is).
 
   WHAT IT SAYS: who noticed, with Slash's mark; the record's own sentence saying why, which is the card's line; and a
   small drawing of the page keeping it would make, its blocks by name and in order. The drawing reads nothing, so it
@@ -140,7 +140,7 @@
     color: var(--ink);
   }
 
-  /* TWO LINES AT MOST (the audit of 25 October, Z18): one line at 390 cut the question itself, "30 transactions this
+  /* TWO LINES AT MOST: one line at 390 cut the question itself, "30 transactions this
      week. Want a pag…". It wraps, and only past a second line is it cut. */
   .offer-line-why {
     flex: 1;

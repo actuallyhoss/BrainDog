@@ -1,5 +1,5 @@
 /**
- * `one-clock`: a run's `last_seen` is compared with the clock in one file, `packages/kernel/src/presence.ts` (AGT-C02).
+ * `one-clock`: a run's `last_seen` is compared with the clock in one file, `packages/kernel/src/presence.ts`.
  *
  *   node tools/gates/one-clock.mjs [root]
  *

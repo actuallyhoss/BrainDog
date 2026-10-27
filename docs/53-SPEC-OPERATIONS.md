@@ -456,7 +456,7 @@ where `age` is installed; the drill itself deletes the plaintext it makes.
    never written.
 2. The record replaces its rows with the file's and rebuilds `entry_fts`. The `export` events the record kept are put
    back beside the file's rows, and the kernel then writes one `import` event, on a replace as on a merge
-   (RQ-LCH-191, `index.ts`, `import`), so the next export carries that one event past the file it came from. It refuses a file without `vault_key` rows or sealed
+   (`index.ts`, `import`), so the next export carries that one event past the file it came from. It refuses a file without `vault_key` rows or sealed
    grants when it holds some, because that import would throw every key away.
 3. Tokens, device grants, observations and jobs did not travel (`local`). The owner re-mints agent tokens and re-enrols
    runners. The Keychain opens if `vault_key('record')` is wrapped under a key `KEK` still holds (§5.6), or

@@ -70,7 +70,7 @@ export type IngestChannel = 'webhook' | 'email';
  * meant a route that exists in one host and not the other, which is the fault this package exists to
  * prevent, so both are parsed here and each host declines what it does not resolve.
  *
- * AND THE CLOUD SHAPE WITHOUT ITS TOKEN, `/in/webhook/<rec_id>/<ingest-id>`, for a signed door (DOR-3).
+ * AND THE CLOUD SHAPE WITHOUT ITS TOKEN, `/in/webhook/<rec_id>/<ingest-id>`, for a signed door.
  * A Stripe or GitHub door is verified by the signature over its body, so a token segment there would be
  * a second secret nothing reads. At a path-token door the same shape is a missing token, stored
  * `untriaged` exactly as a wrong one is.
@@ -114,7 +114,7 @@ export type IngestVerify = (
   | { kind: 'none' }
 ) &
   /**
-   * THE DOOR IS SWITCHED OFF (SHL-C13), and whatever verifies it is kept, because on again is the same address. An
+   * THE DOOR IS SWITCHED OFF, and whatever verifies it is kept, because on again is the same address. An
    * arrival at it is answered 410 with no body, counted through `turnedAway`, and stored nowhere.
    */
   { off?: true };
@@ -632,7 +632,7 @@ async function pathToken(segment: string, v: Extract<IngestVerify, { kind: 'path
 }
 
 /**
- * Whether Stripe signed this body, within the declared window of this host's clock (DOR-3).
+ * Whether Stripe signed this body, within the declared window of this host's clock.
  *
  * `verifyStripe` AND NOTHING OF THIS FILE'S OWN: the billing webhook calls the same
  * function, so the repository has one Stripe check and not two that could disagree. The text handed in is the body
@@ -1213,7 +1213,7 @@ async function keepAll(door: IngestDoor, rec: string, files: MailFile[]): Promis
  *
  * 410 AND NOT 404, because a sender's own retries need a clear stop: 404 is retried by some senders as a hiccup, and
  * 410 says the address is gone on purpose. It tells a stranger that the address was once real, which a guessed id
- * already learns from 202; the token is not checked here, so it says nothing about the token (SHL-C13, "Risk").
+ * already learns from 202; the token is not checked here, so it says nothing about the token ("Risk").
  * THE COUNT IS BEST EFFORT. A record that cannot count still turned the arrival away, and a 503 would ask for a retry.
  */
 async function away(door: IngestDoor, ask: IngestTurnedAway): Promise<Response> {

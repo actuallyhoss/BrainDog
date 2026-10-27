@@ -1,5 +1,5 @@
 /**
- * A project's shape as blocks of its page (C28, C29): which parts are drawn once the project is read, and how wide each
+ * A project's shape as blocks of its page: which parts are drawn once the project is read, and how wide each
  * is in its row, as the shape drawn by hand laid them (`project-parts.ts`).
  */
 

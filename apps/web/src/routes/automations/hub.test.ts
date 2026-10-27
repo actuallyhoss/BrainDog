@@ -241,7 +241,7 @@ test('THE BARS ARE THE BUSIEST SIX, THE TOP ONE INK, AND ONE WITH A FAILURE RED 
   const bars = monthBars(rows);
   assert.equal(bars.length, 6);
   assert.deepEqual(bars[0], { label: 'Standup', value: 30, part: undefined, note: undefined });
-  /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR, never the whole bar red (the pass of 27 October). */
+  /* THE FAILED RUNS ARE THEIR SHARE OF THE BAR, never the whole bar red. */
   assert.deepEqual(bars[1], { label: 'Chase invoices', value: 12, part: 3, note: '3 failed' });
   assert.equal(bars.some((b) => b.label === 'Quiet'), false, 'an automation that did not run is not a bar');
   assert.equal(monthReading(rows), 'Standup ran 30 times, the most this month; Chase invoices failed three of 12.');
@@ -287,7 +287,7 @@ test('THE HEAT GRID IS FOURTEEN DAYS, OLDEST FIRST, AND THE SIX THAT RAN MOST', 
   assert.equal(heat.values[1]?.at(-2), 1);
   assert.equal(heatReading(lines, heat), 'Standup ran most, twice in the last 14 days; one failed, on Chase.');
   assert.equal(runHeat([run('Too old', at(2026, 9, 1))], NOW), null, 'nothing in the window, no chart');
-  /* A TIE NAMES NONE AS RUNNING MOST (UI pass of 21 October, H28). */
+  /* A TIE NAMES NONE AS RUNNING MOST. */
   const tie = [run('Standup', at(2026, 9, 29, 8)), run('Chase', at(2026, 9, 29, 9))];
   assert.equal(heatReading(tie, runHeat(tie, NOW)!), 'Two automations ran today, and none failed.');
 });

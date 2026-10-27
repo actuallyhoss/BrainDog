@@ -1,5 +1,5 @@
 /**
- * A picture the export names that nothing here draws is left out, and the report says how many (REC-C17, job 1).
+ * A picture the export names that nothing here draws is left out, and the report says how many.
  *
  * WHAT WAS ON HIS RECORD. The old tool kept its own word for each project's picture, the importer carried the word
  * across as it stood, and the Projects page drew the first letter of that word where the picture should be: H, I and P
@@ -127,7 +127,7 @@ test('A LIST THAT NAMES NO PICTURE FIELD keeps a field called mark as it came', 
 });
 
 /**
- * A PROJECT ALREADY HERE THAT WEARS A WORD NOTHING DRAWS IS REPAIRED BY THE NEXT IMPORT (REC-C17).
+ * A PROJECT ALREADY HERE THAT WEARS A WORD NOTHING DRAWS IS REPAIRED BY THE NEXT IMPORT.
  *
  * The eleven projects were written before the import asked the question, so each holds the old tool's word, and
  * leaving the word out of the patch left it on the project. The import now clears it, and says how many it cleared.

@@ -1,5 +1,5 @@
 /**
- * The signs of scripts and automations (SHL-D01): seven readings in the shape `signs.ts` sets (PRF-A01), joined to its
+ * The signs of scripts and automations: seven readings in the shape `signs.ts` sets, joined to its
  * closed list with one import and one spread.
  *
  * WHY THIS EXISTS. A paused script showed on `/scripts` only, and on the owner's record the hub read "76 automations
@@ -14,7 +14,7 @@
  * arrive yet is not a fault of the rule. It reads green with its count in its sentence and facts, so the number is
  * there to read without the sign going red for good on a record whose arrivals are broken elsewhere. THE SENTENCE LEADS
  * WITH THAT COUNT, "70 of 76 automations have never run", because a green sign is read as "all fine" past its first
- * words, and on the owner's record the first words were "Of 76 automations switched on" (audit 36-37, finding 9).
+ * words, and on the owner's record the first words were "Of 76 automations switched on".
  *
  * ONLY TYPES COME FROM `signs.ts`. It spreads `SIGNS_FLOW` into `VITAL_SIGNS` at load, so a value imported back from it
  * would be read before it exists whenever this file is the one loaded first.
@@ -128,7 +128,7 @@ function readPaused(sql: Sql): SignReading {
 
 /**
  * THE FIRST OF THIS CALENDAR MONTH, UTC, as Automations counts its month (`record/src/automations.ts`), so a green sign
- * and the screen it watches count the same runs (audit 25 October, Y5).
+ * and the screen it watches count the same runs.
  */
 const monthFrom = (nowMs: number): string => `${new Date(nowMs).toISOString().slice(0, 7)}-01T00:00:00.000Z`;
 

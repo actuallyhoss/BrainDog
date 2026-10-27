@@ -3,7 +3,7 @@
 
   A SECTION, NOT AN AREA. It is not an `AREAS` id and has no address of its own.
 
-  INSIDE THE SHARED CARD (audit 25 October, X19): "Links: No page is shared" and "Shared: Nothing is shared" were two
+  INSIDE THE SHARED CARD: "Links: No page is shared" and "Shared: Nothing is shared" were two
   cards for one idea, so `Sharing.svelte` draws the links in its Shared card (`inside`), under a small heading and only
   once there is one, and tells the card how many there are (`count`) so its empty state is said once. Drawn alone, as a
   tile, it is a host with no sharing's, where People & sharing has no Shared card.

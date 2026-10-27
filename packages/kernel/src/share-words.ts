@@ -1,5 +1,5 @@
 /**
- * A share said as one plain sentence, sized for a phone (sharing plan §3.5): "Priya can edit tasks in Kiln until 1 Dec."
+ * A share said as one plain sentence, sized for a phone: "Priya can edit tasks in Kiln until 1 Dec."
  *
  * NAMES, NEVER IDS. Every person, group, list, project and row is said through `names`, and one the namer does not know
  * is said as "someone" or "a list" rather than as its id. A bundle (a template's rows, written together) is one

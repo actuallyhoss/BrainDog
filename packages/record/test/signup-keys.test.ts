@@ -1,5 +1,5 @@
 /**
- * The keys sign-up's brakes count by (audit 34 finding 3): one /64 is one place, and one mailbox is one address
+ * The keys sign-up's brakes count by: one /64 is one place, and one mailbox is one address
  * however it is spelt.
  */
 

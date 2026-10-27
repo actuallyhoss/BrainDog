@@ -1,6 +1,6 @@
 /**
  * The route row for keeping one sentence as several entries at once (`packages/record/src/methods/capture.ts`, use case 6
- * step 5, EXP-D10).
+ * step 5).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

@@ -21,7 +21,7 @@
  * the record is not sent at all (`HEADING_ONLY`, `ACROSS`): its heading alone would say "Nothing is waiting on you"
  * about a record where things are.
  *
- * AND IT TELLS THE TRUTH (USE-A07). Every cell carries its type and its value, money whole as minor units and its own
+ * AND IT TELLS THE TRUTH. Every cell carries its type and its value, money whole as minor units and its own
  * currency; every column and figure carries the label the owner reads; a `{{path}}` in the owner's words is filled here
  * in the record's language, and one with nothing to fill prints nothing; and the answer says the record's language and
  * zone, so a stranger's device does not decide how a number or a day reads.

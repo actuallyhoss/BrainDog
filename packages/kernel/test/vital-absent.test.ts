@@ -1,5 +1,5 @@
 /**
- * A declared vital sign over a list it could not read is `none` and says so, never green (audit 36-37, finding 9).
+ * A declared vital sign over a list it could not read is `none` and says so, never green.
  *
  * `lte: 0` is the shape of "none of these may happen", and a reading that could not be taken answered 0 or nothing,
  * which was one step from passing. What is asserted: a count of none over a list that exists is judged, and green; a

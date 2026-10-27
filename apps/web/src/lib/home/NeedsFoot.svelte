@@ -1,5 +1,5 @@
 <!--
-  THE FOOT OF TODAY'S NEEDS YOU TILE (today F3, F6, F13): what the questions over it leave out, in one or two plain lines.
+  THE FOOT OF TODAY'S NEEDS YOU TILE (today F3): what the questions over it leave out, in one or two plain lines.
 
   - The late bills with no question about them, as one line in red with its money: "4 payments are late, £10,540 in all",
     opening the late work (`/?work&late`). The questions about money owed to you lead the tile above it.
@@ -7,7 +7,7 @@
   - What an agent asked him back, of what he told it (agents and MCP plan §7.2): "Claude needs you on “Merge wave 1”",
     its question under it, and Answer, which opens the agents and the run's thread; these count in Needs you's number.
   - What agents finished of what he told them today: "Claude finished what you told it. Review", opening Handled.
-  - What he has shared out, as one quiet line opening People & sharing (sharing plan §3.5, T12): a share made today
+  - What he has shared out, as one quiet line opening People & sharing: a share made today
     by its own words, "You shared Kiln with priya@studio.co. Not you? Stop it", and otherwise how many it is with,
     "Shared with Priya and Accountants. See who". In red only when it needs him: a wide share made today on an account with no
     passkey to have confirmed it (`Boot.shared.needs`).

@@ -1,6 +1,5 @@
 /**
- * The lists Export names, in its own words: the three that hold the most, then how many more (the audit of 25
- * October, Y22). The shell's own order put "Exchange rates, Books, Updates" first on his record, two of them nearly
+ * The lists Export names, in its own words: the three that hold the most, then how many more. The shell's own order put "Exchange rates, Books, Updates" first on his record, two of them nearly
  * empty, while Ledger, Numbers and Agent runs hold nearly everything a copy carries.
  *
  * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE.

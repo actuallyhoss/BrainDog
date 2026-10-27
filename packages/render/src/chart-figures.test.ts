@@ -55,7 +55,7 @@ test('TEXT THAT IS NOT ONE FIGURE COMES BACK AS IT WAS WRITTEN', () => {
   }
 });
 
-/* ---- The one writer, once the host says the record's home currency (REC-C05) -------------------------------- */
+/* ---- The one writer, once the host says the record's home currency -------------------------------- */
 
 const NB = ' ';
 const SERIES_HEAD = ['Month', 'in: Money in', 'out: Money out'];

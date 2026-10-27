@@ -1,5 +1,5 @@
 <!--
-  An amount (2.A.7).
+  An amount.
 
   THE HOME CURRENCY NEVER PRINTS ITS CODE: `£28,320`. Any other currency keeps its symbol and puts its ISO code after
   the figure, 13px and quiet, `$4,800 USD`, so two currencies never read alike in one column; a currency with no symbol of

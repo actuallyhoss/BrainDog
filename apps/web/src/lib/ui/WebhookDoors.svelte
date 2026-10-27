@@ -14,7 +14,7 @@
   whether an address is in use, then its one press. No tile over it, because the doors read carries no count to draw:
   a number with no chart under it is the one thing a tile may not hold.
 
-  A SWITCH ON EACH ROW TURNS THE DOOR OFF AND ON (SHL-C13). Off keeps the token and the address, so it asks nothing
+  A SWITCH ON EACH ROW TURNS THE DOOR OFF AND ON. Off keeps the token and the address, so it asks nothing
   first; the row then says since when and how many were turned away, and every row says its last arrival. A host whose
   `doors` predates the switch answers no `on`, and that row draws no switch.
 
@@ -74,7 +74,7 @@
   }
   /* THE PRESS A SIGN-IN INTERRUPTED, so signing in again finishes it rather than leaving a press to find. */
   let resume = $state<string | null>(null);
-  /* THE SWITCH ON EACH ROW (SHL-C13): what its last press answered, keyed by door, and the door being switched. */
+  /* THE SWITCH ON EACH ROW: what its last press answered, keyed by door, and the door being switched. */
   let flips = $state<Record<string, Switched>>({});
   let flipping = $state<string | null>(null);
   let resumeFlip = $state<{ id: string; on: boolean } | null>(null);
@@ -163,7 +163,7 @@
   }
 </script>
 
-<!-- THE LINE FIRST, THEN ITS BUTTON (audit 25 October, X26): "New web address" in the heading's corner wrapped to a row of
+<!-- THE LINE FIRST, THEN ITS BUTTON: "New web address" in the heading's corner wrapped to a row of
      its own on a phone, above the sentence that says what it makes. -->
 <Tile class="section" data-surface="tile" title={copy.doorsTitle}>
   <div class="section-body">

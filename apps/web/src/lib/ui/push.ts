@@ -250,7 +250,7 @@ export const testWords = {
 } as const;
 
 /**
- * Ring each of this person's own devices once (`pushTest`, REC-A15), and say how many.
+ * Ring each of this person's own devices once (`pushTest`), and say how many.
  *
  * THE COUNT IS THE RECORD'S, worded here. A press inside a minute is the record's `RATE_LIMITED`, and its `fix` already
  * says when the next may go, so it is said as it came. Through `call` until the client names `pushTest` itself.

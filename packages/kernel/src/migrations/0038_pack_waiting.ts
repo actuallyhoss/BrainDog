@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 38: `pack.waiting` (SHL-A08).
+ * The kernel schema, migration 38: `pack.waiting`.
  *
  * A PART OF AN ADD-ON CAN WAIT FOR WHAT THE RECORD HOLDS (`when: { holds }`): a plan takes it out until the record has
  * the thing it names, and says so in `waiting`, one `{ at, holds }` per part. The plan is gone the moment the install

@@ -62,7 +62,7 @@ export type TriedStep = {
 export type Tried = { trigger: Omit<RunTrigger, 'chain'>; steps: TriedStep[] };
 
 /**
- * One step tried alone (SHL-D14). `upTo` is the step's path as `TriedStep.path` writes it (`steps[2]`,
+ * One step tried alone. `upTo` is the step's path as `TriedStep.path` writes it (`steps[2]`,
  * `steps[1].then[0]`): the try stops after it, and the steps after it are not reached. `given` is the answers of earlier
  * steps by the name each was kept under, as an earlier try's `out` gave them: a step before `upTo` whose name is here is
  * not taken again, and its answer is the run's from the start. A step whose name is not here is taken for real inside

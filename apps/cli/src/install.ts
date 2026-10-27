@@ -75,7 +75,7 @@ type Hook = { type: 'command'; command: string; timeout: number; statusMessage?:
 type Entry = { hooks: Hook[] };
 
 /**
- * WHAT CLAUDE CODE SHOWS WHILE A BRAINDOG HOOK RUNS (AGT-B10). Before it, a session start sat silent for as long as the
+ * WHAT CLAUDE CODE SHOWS WHILE A BRAINDOG HOOK RUNS. Before it, a session start sat silent for as long as the
  * attach took, which on his Mac read as Claude Code hanging. `statusMessage` is the field Claude Code's hook settings
  * name for the line it shows beside its spinner while the command runs.
  */
@@ -85,7 +85,7 @@ export const HOOK_STATUS = 'Connecting to BrainDog...';
  * TEN SECONDS EACH, two more than the hook's own eight (`HOOK_MS`), so the hook ends itself before Claude Code has to.
  * They were twenty and fifteen, and a start with the network cut held the session for all twenty.
  *
- * AND THE BEAT (AGT-C03), after every tool call, so a session that edits files for an hour and writes nothing to the
+ * AND THE BEAT, after every tool call, so a session that edits files for an hour and writes nothing to the
  * record still reads Working. Its script reads one file's age and stops there unless five minutes have passed
  * (`beat.ts`), so a tool call pays for a node start at most once in five minutes. IT SAYS NOTHING WHILE IT RUNS: a
  * status line after every tool call would flash under the agent's own work, mostly for a hook that read one file's age
@@ -332,7 +332,7 @@ export function hookCommand(which: Which, scripts: string, platform: string = pr
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-/** The suffix of the first copy BrainDog keeps of a file it changes, the scope's word for it (AGT-A07: "`*.pre-braindog` backups"). */
+/** The suffix of the first copy BrainDog keeps of a file it changes, the scope's word for it ("`*.pre-braindog` backups"). */
 export const FIRST_COPY = '.pre-braindog';
 
 /**

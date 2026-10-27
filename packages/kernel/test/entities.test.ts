@@ -153,14 +153,14 @@ test('THE NIGHT’S DOUBTFUL PAIRS GO TO A MODEL AS NAMES, and its answer opens 
   sql.close();
 });
 
-test('A RUN IS NAMED BY THE TITLE ITS AGENT GIVES A QUESTION, never by the question’s own words (M7)', async () => {
+test('A RUN IS NAMED BY THE TITLE ITS AGENT GIVES A QUESTION, never by the question’s own words', async () => {
   const { k, sql } = await record();
   const as = (client_id: string): WriteContext => ({ actor: 'p_owner', principal: { kind: 'token', token: 't_1' }, session: { client_id, host: 'h', repo: 'braindog' } });
   const options = { body_kind: 'options' as const, body: { options: [{ id: 'merge', label: 'Merge them', because: 'One person.' }, { id: 'keep', label: 'Keep both', because: 'Two people.' }] } };
   value(k.propose({ ...options, question: 'Merge Sara into Sarah?' }, as('cc-1')));
   const run = () => sql.one<{ doing: string | null }>("SELECT json_extract(fields, '$.doing') AS doing FROM entry WHERE register = 'session' ORDER BY seq LIMIT 1")?.doing;
   assert.doesNotMatch(run() ?? '', /Sara/, 'the question named the run');
-  /* ANOTHER QUESTION, since the same one asked again joins the first and names nothing (AGT-C07). */
+  /* ANOTHER QUESTION, since the same one asked again joins the first and names nothing. */
   value(k.propose({ ...options, question: 'Merge Sam into Samuel?', title: 'Tidying the contacts' }, as('cc-1')));
   assert.equal(run(), 'Tidying the contacts');
   sql.close();

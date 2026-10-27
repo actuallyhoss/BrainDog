@@ -18,7 +18,7 @@
   enough, under it where it is not. ON A PHONE THE LINE IS A PRESS THAT OPENS THE SHEET with the whole composer in it,
   so the page opens on a line and the form takes the screen only while he writes. A run row's Tell opens it too.
 
-  SCOPED WHERE ANOTHER SCREEN HOLDS IT (plan §7.2). `run` opens the composer aimed at that run and lists what went to it
+  SCOPED WHERE ANOTHER SCREEN HOLDS IT. `run` opens the composer aimed at that run and lists what went to it
   (Today's run sheet); `project` fixes "On" to that project, offers only the runs working there and lists what he told
   agents on it (a project's page). `projectName` names the project before the projects are read, so the composer is
   whole at its first paint.
@@ -104,8 +104,7 @@
 
   const mark = (agent: string): ControlMark | null => (isMarked(agent) ? AGENT_MARKS[agent] : null);
 
-  /* THE AGENTS PAGE'S OWN FORM: one line, what he told beside it, and the sheet on a phone. A PROJECT'S PAGE TOO, SINCE the
-     audit of 22 October (U-B12): the whole form, its To, On and When and a full-width Send, stood on every project's page
+  /* THE AGENTS PAGE'S OWN FORM: one line, what he told beside it, and the sheet on a phone. A PROJECT'S PAGE TOO: the whole form, its To, On and When and a full-width Send, stood on every project's page
      and was the biggest thing on a phone after the name. Only a run's own sheet keeps the box. */
   const line = $derived(run === null);
   /* A PHONE, by the width the app's sheets turn at (`PHONE_WIDTH` in `panel.ts`), read and followed while mounted. */

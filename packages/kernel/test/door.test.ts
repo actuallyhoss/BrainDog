@@ -1,5 +1,5 @@
 /**
- * The agent door's marks (AGT-B01): one row a run a kind, what adds and what keeps the most, the signs they add up to,
+ * The agent door's marks: one row a run a kind, what adds and what keeps the most, the signs they add up to,
  * and the 30-day sweep.
  *
  * THE DATABASE IS MIGRATION 1'S TEXT AND THEN 29'S, applied as SQLite applies a script. 29 leans on nothing after 1

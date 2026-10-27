@@ -1,5 +1,5 @@
 /**
- * The repository's settings check (`tools/watch/settings.mjs`, LCH-C12) over a fake fetch: a repository as decided is
+ * The repository's settings check (`tools/watch/settings.mjs`) over a fake fetch: a repository as decided is
  * green, each drift is red with its own line, a setting free only once public waits while private, and the token's
  * value is in no printed line and is sent nowhere but api.github.com.
  */

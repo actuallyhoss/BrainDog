@@ -189,7 +189,7 @@ test('THE DIRECTORY IS COPIED WITH THE NIGHTLY COPY, into <data>/directory-snaps
 });
 
 test('A NIGHT THAT FAILED IS TOLD AS THE CLOUD TELLS IT: one failed note and one fault a night, and a copy kept clears it', async () => {
-  // RQ-LCH-273: the self-host writes the same `export` event and reads the same three facts as the Cloud (LCH-C03).
+  // RQ-LCH-273: the self-host writes the same `export` event and reads the same three facts as the Cloud.
   const dir = mkdtempSync(join(tmpdir(), 'braindog-nightly-told-'));
   const file = join(dir, 'record.sqlite');
   let now = Date.parse('2026-09-17T08:00:00Z');

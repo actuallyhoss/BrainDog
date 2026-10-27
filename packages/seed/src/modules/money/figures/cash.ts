@@ -5,7 +5,7 @@ import { ROLLED } from '../legs.ts';
 import { MONEY } from './shared.ts';
 
 /**
- * THE ACCOUNTS CASH NOW IS A SUM OF: the ones that count as cash and are not closed (REC-B15).
+ * THE ACCOUNTS CASH NOW IS A SUM OF: the ones that count as cash and are not closed.
  *
  * A CLOSED ACCOUNT IS OUT OF EVERY FIGURE OF TODAY'S CASH, AND OF NOTHING ELSE. It holds no money anybody can spend,
  * and nobody confirms its balance again, so left in it sat in the count and the bars and read out of date for good.
@@ -41,7 +41,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
-   * CASH NOW WORKED OUT A SECOND WAY, LESS CASH NOW (REC-A17): nought, or the figure on the Money page is wrong.
+   * CASH NOW WORKED OUT A SECOND WAY, LESS CASH NOW: nought, or the figure on the Money page is wrong.
    *
    * "Wrong money on a screen is the worst class of defect in this repo", and nothing compared a money figure with its
    * entries on a lived record. This walks each account entry by entry from its newest statement in plain code, apart
@@ -193,7 +193,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
-   * THE OLDEST DAY A BALANCE IN CASH NOW WAS LAST CONFIRMED, SINCE money-core 3.16.0 (REC-B03), AND IT WAS THE OLDEST
+   * THE OLDEST DAY A BALANCE IN CASH NOW WAS LAST CONFIRMED, SINCE money-core 3.16.0, AND IT WAS THE OLDEST
    * TYPED "As of" (`min: as_of`). A bank message writes a balance after on a Ledger row and never the account's typed
    * day, so on the owner's record every account read out of date and went on reading it after messages filed. Now the
    * day is read off the same statements Cash now restarts from (`rolled.read: as_of`): the account's own, a balance
@@ -230,7 +230,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
-   * EACH ACCOUNT'S LAST CONFIRMED DAY, SINCE money-core 3.16.0 (REC-B03): the same roll grouped by the name the account
+   * EACH ACCOUNT'S LAST CONFIRMED DAY, SINCE money-core 3.16.0: the same roll grouped by the name the account
    * is called, one day a group. It is what an account card's `stale: { figure }` reads (`staleDaysOf` in
    * `packages/kernel/src/pages.ts`), so a card is dated by the bank's last word on it and not by the day somebody typed.
    * Every account and not only cash: a book's cards and Money's Last confirmed tile both find their day here.

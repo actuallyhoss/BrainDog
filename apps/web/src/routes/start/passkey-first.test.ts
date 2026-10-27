@@ -1,6 +1,6 @@
 /**
  * The passkey, offered straight after the link (use case 6, step 4; `PasskeyFirst.svelte`): in the device's own name,
- * to the person who has none yet, and made in one press named for that device (LCH-A04).
+ * to the person who has none yet, and made in one press named for that device.
  *
  * The component draws `passkeyAsk` and asks `passkeyOffered`; the press is `passkeyRegister` with the device's label,
  * held here against a fake host and authenticator so a passkey made unnamed, or offered to the wrong person, goes red.

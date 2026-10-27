@@ -75,7 +75,7 @@
     grid-template-columns: var(--well) minmax(0, 1fr) auto;
   }
 
-  /* A ROW OF ONE LINE IS CENTRED ON ITS HEIGHT (UI pass of 21 October, P42): its title, well and switch on the row's
+  /* A ROW OF ONE LINE IS CENTRED ON ITS HEIGHT (P42): its title, well and switch on the row's
      middle, not its words at the top of a 56px row with the space under them. */
   .state-row:not(:has(.state-line)) {
     align-items: center;

@@ -125,7 +125,7 @@ test('A CHANGE THE LINES SAY WHOLE IS NOT SAID AGAIN AS A SENTENCE, on the lead 
 });
 
 test('A STROKE ALONE IS NO PATH: a value with one is said, and a text a path was cut from is still held back', () => {
-  /* Audit 81, claim 3: the record's sentence says "Q3/Q4", and the card dropped every value that held a stroke. */
+  /* The record's sentence says "Q3/Q4", and the card dropped every value that held a stroke. */
   const said = cardOf(ask([{ field: 'status', label: 'Status', before: 'N/A', after: 'Q3/Q4' }]), { now });
   assert.deepEqual(said.lines[0], { what: 'Status', before: 'N/A', after: 'Q3/Q4', said: null });
   for (const text of ['Paid 50/50', 'Open 24/7 from May', 'Either and/or both']) {
@@ -176,7 +176,7 @@ test('ANOTHER KIND OF QUESTION KEEPS ITS LINE ON THE LEAD: it may say what the l
   assert.equal(cardOf(page, { now }).does, '');
 });
 
-test('THE LIST KEEPS ITS NAME ON THE CARD where the sentence that said it is left out (audit 81, claims 3 and 4)', () => {
+test('THE LIST KEEPS ITS NAME ON THE CARD where the sentence that said it is left out', () => {
   for (const lead of [true, false]) {
     const card = cardOf(ask([STAGE, DUE]), { now, lead });
     assert.equal(card.does, '');

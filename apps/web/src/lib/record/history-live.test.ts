@@ -161,7 +161,7 @@ test('A MEMBER WHO MAY READ PEOPLE IS TOLD THE NAMES BY boot, and members, which
   forget();
 });
 
-/* ── who suggested and who settled (ENG-B16) ───────────────────────────── */
+/* ── who suggested and who settled ───────────────────────────── */
 
 const MARA = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
 const NAMES = new Map([[MARA, 'Mara']]);

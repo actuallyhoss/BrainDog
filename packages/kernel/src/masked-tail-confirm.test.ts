@@ -219,7 +219,7 @@ const credit = (k: Kernel, printed: string, pounds: string): Arrived => {
   return r.value;
 };
 
-test('ONE CONFIRMATION SERVES EVERY PATTERN: the account and its digits are confirmed, whichever wording asked (REC-A02)', async () => {
+test('ONE CONFIRMATION SERVES EVERY PATTERN: the account and its digits are confirmed, whichever wording asked', async () => {
   const { k, sql, savings } = await record();
   accept(k, debit(k, '518', '75.00').suggestion);
 

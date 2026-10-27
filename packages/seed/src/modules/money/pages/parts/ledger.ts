@@ -14,7 +14,7 @@ export const LEDGER_COLUMNS = LEDGER_LINE_COLUMNS;
 
 export const LEDGER: Record<string, unknown>[] = [
   {
-    /* THE LEDGER, OPEN, WHERE THE MONEY IS READ (REC-B15). "Ledger, add, edit, delete" and "I hate this tabs" (the
+    /* THE LEDGER, OPEN, WHERE THE MONEY IS READ. "Ledger, add, edit, delete" and "I hate this tabs" (the
        owner): what moved was twelve lines folded shut under History, and he went looking for his transactions. Now
        the six newest stand in a tile of their own, newest first, as a calm list (`LEDGER_COLUMNS`): the day, who was
        paid and the amount signed by its own direction. Every line is its entry, which the app opens to be
@@ -22,7 +22,7 @@ export const LEDGER: Record<string, unknown>[] = [
 
        HEADED BY THE LIST'S OWN NAME, so the word a person looks for is the word on the page and on the rail.
 
-       GATED BY WHAT IT HOLDS, AND BY NO FIGURE (audit 59, claim 5). It waited on `ledger-newest-days`, a figure that
+       GATED BY WHAT IT HOLDS, AND BY NO FIGURE. It waited on `ledger-newest-days`, a figure that
        reads cleared entries alone, so a card payment typed this morning and not yet cleared was on the Ledger and not
        on the page. Now the tile's own entries decide: any entry that is not void draws it, and a void one is left
        out, as it is from every figure of the Ledger. A Ledger holding nothing is still not drawn, because a page

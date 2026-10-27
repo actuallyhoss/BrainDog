@@ -1,5 +1,5 @@
 /**
- * The caller's context on the hop to the record is capped (sharing plan §2.13, T13): at most 32 KB, and past it the
+ * The caller's context on the hop to the record is capped: at most 32 KB, and past it the
  * record answers one plain sentence and parses nothing. A caller's own copy of either header is never what arrives.
  */
 

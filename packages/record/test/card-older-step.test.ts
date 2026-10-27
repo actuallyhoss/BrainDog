@@ -1,5 +1,5 @@
 /**
- * A STALE STEP IS NEVER NEXT (scope H7). On the owner's record a step "Run full CI on master" left 39 hours earlier, with
+ * A STALE STEP IS NEVER NEXT. On the owner's record a step "Run full CI on master" left 39 hours earlier, with
  * master a hundred commits past the head it was left at, led every card and the Agents page. A step older than a day,
  * or one HEAD has moved `FAR_BEHIND` commits past, is an older step: still open to take, never the one thing to do.
  *

@@ -1,5 +1,5 @@
 /**
- * The MCP read paths of the leak matrix (sharing plan §4.3): every tool a model can call and the resources, through
+ * The MCP read paths of the leak matrix: every tool a model can call and the resources, through
  * `serveMcp` in process, so what is checked is the JSON-RPC reply a model is handed, its text and its structured half
  * both. EVERY ONE IT CAN CALL: the listed tools and the folded ones still answered by their old names until
  * `FOLDED_UNTIL` (`schema`, `history`), since a tool nobody lists still reads rows.

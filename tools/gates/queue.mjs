@@ -206,7 +206,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
 
     browser = await chromium.launch();
 
-    /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (`openPage`, PRF-B04): on the record's clock, at the widest width the
+    /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (`openPage`): on the record's clock, at the widest width the
        product is judged at, and waited for. It opened in a bare context on the runner's own date, so a card's "due in"
        was measured against a day the record never lived. The first address opens the page, inside the drive's `try`, so
        a load that throws is a finding as it always was; the context belongs to the browser the `finally` closes. */

@@ -67,7 +67,7 @@ import { routesFor, routesOf } from './routes.mjs';
 export const needs = ['builds'];
 
 /**
- * EVERY RULE THIS GATE HOLDS, EACH WITH THE FAULT THAT PROVES IT CAN GO RED (PRF-B02). "Every gate must
+ * EVERY RULE THIS GATE HOLDS, EACH WITH THE FAULT THAT PROVES IT CAN GO RED. "Every gate must
  * prove it can fail (self-test with seeded violations)." One planted fault for all of axe proved that
  * axe ran, and nothing about the three things this gate exists to see: a word on the board nobody can
  * read, a state that opens with no name, and the marketing site, which is a surface of its own.
@@ -173,7 +173,7 @@ export const stray = (apps, derived) =>
  */
 export async function surfaces(root = join(import.meta.dirname, '..', '..'), record = null) {
   const derived = {
-    /* AT THE RECORD'S OWN IDS once a record is given (PRF-B04, `routesFor`), and at the samples it had before without one,
+    /* AT THE RECORD'S OWN IDS once a record is given (`routesFor`), and at the samples it had before without one,
        which is how the coverage test and the early unsampled check read it. */
     web: await routesFor(join(root, 'apps', 'web'), record, { extra: [
       '/p/kiln',
@@ -363,7 +363,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
        refuses. So the step opens the menu, then picks the item (`ChangePage.svelte` names both for this gate). */
     { name: 'page: arrange mode', route: '/p/kiln', click: ['.page-more .menu-trigger', '[role="menuitem"][data-arrange]'], expect: '[role="listitem"]', desktop: true },
     /* THE EMPTY STATES, WHICH NO ROUTE AT REST EVER REACHES. `19 §6` designs five and says collapsing
-       them is the failure; an audit measured `no-results`, `cleared`, `no-permission` and `error`
+       them is the failure; testing measured `no-results`, `cleared`, `no-permission` and `error`
        rendering zero times across forty-two routes, so four fifths of that section had never been in
        front of this gate. Two of them are reachable from an address, and these are those two. The
        other three need a record shaped differently from the seed: `no-data-yet` needs an empty list,
@@ -444,7 +444,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port, and its variants under the same
        handle, so the one `record.close()` below gives all of them back. See `record.mjs`. */
     record = await startRecord(0, { variants: true });
-    /* THE ROUTES AGAIN, NOW AT THE RECORD'S OWN IDS (PRF-B04): an address is one the record holds, and one it has nothing
+    /* THE ROUTES AGAIN, NOW AT THE RECORD'S OWN IDS: an address is one the record holds, and one it has nothing
        for is counted as unseen. */
     ({ apps: APPS, unseen } = await surfaces(root, record));
     current = APPS[0];
@@ -583,7 +583,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
 
         for (const scheme of SCHEMES) {
           for (const width of widthsOf(engine)) {
-            /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): on the record's clock, the variant's own for
+            /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (`openPage`): on the record's clock, the variant's own for
                a variant pass, with motion off (axe reads a mid-animation opacity as the real one) and the CSP bypassed
                (axe goes in as an inline script; that changes what the audit can run, not what the page is). */
             const pass = app.record !== undefined && record.variants[app.record] ? recordAt(record.variants[app.record]) : record;

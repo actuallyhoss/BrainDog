@@ -1,5 +1,5 @@
 /**
- * Paths that reach further (PGS-B13): one step into a row's field, and a module's figure over the whole record.
+ * Paths that reach further: one step into a row's field, and a module's figure over the whole record.
  *
  * WHAT WAS MEASURED BEFORE IT: a path of three parts answered nothing, so `{{tasks#1.project.name}}` drew as words
  * nobody knows, and `{{portfolio.revenue}}` was read as a count of a list called portfolio in a state called revenue,

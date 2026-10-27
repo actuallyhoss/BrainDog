@@ -1,5 +1,5 @@
 /**
- * `meet` at the agent's rung (research-audit-20 H4): what a meeting does on its own stays automatic, a
+ * `meet` at the agent's rung: what a meeting does on its own stays automatic, a
  * person added and the line of where they were met; what an agent asserts on somebody already known (an address a fold
  * by the strong rules would carry onto them) is held to the ladder, and where it would ask it is a mention and one question instead of a write. An
  * agent on a Suggest grant only ever leaves mentions.
@@ -79,9 +79,9 @@ test('WHAT AN AGENT CARRIES ONTO SOMEBODY KNOWN BY A STRONG FOLD ASKS AT ITS RUN
   const claude = agent('t_claude', 'write');
   value(await api.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmi.vadlamudi@brightloom.example', source: 'commit 1 in braindog' }, claude));
   const before = people(sql)[0]!;
-  /* AN AGENT'S KEY IS HELD TO A COMMIT'S WORD (research-audit-21 H2), so a key match carries nothing onto her. A second
+  /* AN AGENT'S KEY IS HELD TO A COMMIT'S WORD, so a key match carries nothing onto her. A second
      address under her name is a fold by the strong rules, which would carry it onto her: that is an assertion about
-     somebody the record already holds, and it goes through the ladder as a key match would (research-audit-22 M1). */
+     somebody the record already holds, and it goes through the ladder as a key match would. */
   const said = { name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi@gmail.com', source: 'commit 2 in braindog' };
   const asked = value<Meeting>(await api.meet(said, claude));
   assert.equal(asked.mention, true);

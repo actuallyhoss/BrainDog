@@ -1,5 +1,5 @@
 /**
- * A fold he undid is never made again (ENG-B04: "Undo gives two back, and that pair is never folded again").
+ * A fold he undid is never made again ("Undo gives two back, and that pair is never folded again").
  *
  * The strong rules fold two people with the same full name and the same handle, as one batch. Whichever undo takes
  * that batch back, the next meeting of either of them folds nobody and asks nothing: it writes its line on the person
@@ -8,7 +8,7 @@
  * THE PAIR IS FOUND IN THE LOG'S OWN LINES (`foldUndone` in `people.ts`): the merge field set and put back, or the
  * fold's batch in `undone`. Nothing here adds a column or a table.
  *
- * A COMMIT AND A NOTE ARE NEVER FOLDED BY ONE MEETING (audit 19 H1: somebody met in commits alone beside somebody
+ * A COMMIT AND A NOTE ARE NEVER FOLDED BY ONE MEETING (somebody met in commits alone beside somebody
  * noted is asked about), so the pairs here are two notes, and two commits.
  */
 

@@ -33,7 +33,7 @@ export type Got =
   | { from: 'refused'; fix: string };
 
 /**
- * `docs` IS WHAT EACH OF THE ROW'S DOCUMENTS READS, by field (PGS-B03): the values its `{{path}}`s hold with the row as
+ * `docs` IS WHAT EACH OF THE ROW'S DOCUMENTS READS, by field: the values its `{{path}}`s hold with the row as
  * the entry they sit on, and the paths that name nothing. The record answers it when `get` is asked `values: true`, and
  * the screen draws each document with `resolverOf` over its own (`row-values.ts`). On every read of a row that is there,
  * empty where no document holds a path, so a `Got` without it is a write's answer, which carries the row alone.

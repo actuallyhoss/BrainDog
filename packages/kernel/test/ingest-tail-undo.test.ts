@@ -1,5 +1,5 @@
 /**
- * An answered tail question carried out once, and an Undo that lets it be answered again (REC-A02).
+ * An answered tail question carried out once, and an Undo that lets it be answered again.
  *
  * EVERY VALUE IS INVENTED.
  */

@@ -167,7 +167,7 @@ test('NO EM DASH in anything this screen adds', () => {
 /* Noon, so the reader's day is the same in any zone the suite runs in. */
 const NOON = Date.parse('2026-10-14T12:00:00Z');
 
-test('EACH SUGGESTION ON DECIDE SAYS HOW LONG IT WAITS (ENG-B14), from the day the record hands, in words', () => {
+test('EACH SUGGESTION ON DECIDE SAYS HOW LONG IT WAITS, from the day the record hands, in words', () => {
   const dated: Reading = {
     ...READING,
     drafts: [READING.drafts[0]!, { ...READING.drafts[1]!, asked: { id: 'SG3', status: 'open', lapses: '2026-10-28' } } as Reading['drafts'][number], READING.drafts[2]!],

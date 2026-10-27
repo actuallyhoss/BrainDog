@@ -1,6 +1,6 @@
 /**
  * A page's look on screen: the order the engine put its blocks in, the one next action under its headline, a person's
- * pin, and the Undo on what Slash arranged (`loop/contract-17.md`'s look overlay).
+ * pin, and the Undo on what Slash arranged.
  *
  * THE RECORD APPLIES THE LOOK AND THE PAGE APPLIES IT AGAIN, AS A VIEW. `readPage` answers the blocks in the look's
  * order (`applyLook` in `packages/kernel/src/compose.ts`), and `lookOrder` is the same rule, so it puts them in that order
@@ -154,7 +154,7 @@ const dayOf = (at: string | null | undefined): string | null => {
 };
 
 /**
- * PUT BACK, NAMED BY WHOSE LOOK IT TAKES OFF (PGS-B12): "Put back: Slash's arrangement of 7 October", or "your
+ * PUT BACK, NAMED BY WHOSE LOOK IT TAKES OFF: "Put back: Slash's arrangement of 7 October", or "your
  * arrangement" for the person's own pin or arrangement, any day after. `at` is when the look was written, when the record
  * says; without it the line names no day. `null` where the rules arranged the page and there is nothing to put back.
  */
@@ -264,7 +264,7 @@ export type Headed = { readonly key: string; readonly heading?: string | null | 
 const keyWords = (key: string): string => key.replace(/[-_]+/gu, ' ').trim().replace(/^./u, (c) => c.toUpperCase());
 
 /**
- * WHAT THE LOOK HIDES, so the page menu can say "Hidden (2)" and offer Show beside each (PGS-B08). The person's own look
+ * WHAT THE LOOK HIDES, so the page menu can say "Hidden (2)" and offer Show beside each. The person's own look
  * hid what it hides, and any other look is the engine's (Slash's or the rules'). A pinned block is never hidden
  * (`mergeLook`), so none is listed. Each by its heading, else its key in words, never the key itself.
  */

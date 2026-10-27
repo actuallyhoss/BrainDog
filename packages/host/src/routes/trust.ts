@@ -1,5 +1,5 @@
 /**
- * The route row for each agent's standing on the ladder (`packages/record/src/methods/trust.ts`, ENG-A12).
+ * The route row for each agent's standing on the ladder (`packages/record/src/methods/trust.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

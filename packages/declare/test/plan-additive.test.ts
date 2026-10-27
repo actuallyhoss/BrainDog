@@ -50,7 +50,7 @@ const portfolio = (n: number, fields: Field[]): Doc => {
 };
 
 const DOMAINS: Field = { id: 'domains', label: 'Domains', type: 'list', of: 'text' };
-/* ON THE SHIPPED PORTFOLIO, WHICH DECLARES `domains` ITSELF SINCE PROJECTS LEARNED THEIR DOMAINS (`loop/contract-17.md`),
+/* ON THE SHIPPED PORTFOLIO, WHICH DECLARES `domains` ITSELF SINCE PROJECTS LEARNED THEIR DOMAINS,
    the owner's own field is another one. */
 const HOSTING: Field = { id: 'hosting', label: 'Hosting', type: 'list', of: 'text' };
 const LAUNCHED: Field = { id: 'launched', label: 'Launched', type: 'day' };

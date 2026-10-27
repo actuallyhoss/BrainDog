@@ -9,7 +9,7 @@
  * that ends at the binding: the press, the daily look it wakes, the first plan, a read and a propose at the palette.
  * `grep -rn "aiInference\|includedInference\|includedModel\|env.AI" apps/worker/src` finds no other caller: the embeddings
  * go through the engine's `embedTexts` (`slash.ts` `embedOver`) on the background allowance and outside this ceiling's
- * counts (ENG-B18), a script's sandbox is handed `RECORD` alone (`script.ts`), and an automation's question
+ * counts, a script's sandbox is handed `RECORD` alone (`script.ts`), and an automation's question
  * and `proposePattern` go through the engine `operatorCeiling` wraps (`slash-operator-cap.test.ts` case 3 holds the first).
  * RED WITHOUT THE METER, measured by taking the `slashMeter` line out of `Record$.#open`: 7 binding calls
  * at a ceiling of 0 (5 presses, the look, the plan), and the two palette doors refused.

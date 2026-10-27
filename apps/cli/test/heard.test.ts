@@ -3,7 +3,7 @@
  * sent as a `hook` mark by the next hook of the same session (`owedMark`), and the command's build on every call.
  *
  * WHY. His Mac ran the command of 1 October for a week, and the hook's speed was never measured on a real machine
- * (RQ-AGT-424). A mark that is sent twice, sent for another run, or sent with a time no hook could take would make the
+ * A mark that is sent twice, sent for another run, or sent with a time no hook could take would make the
  * signs say something false, which is worse than saying nothing; these hold each of those out.
  *
  * IN PROCESS, over a stub on node:http, for the one function. `hooks.test.ts` drives the same mark through the real

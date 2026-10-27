@@ -7,7 +7,7 @@
  *   node apps/cli/scripts/migration-rehearsal.mjs --record <night> --record <night> --identity-cmd "<command>" --deployed <sha>
  *   node apps/cli/scripts/migration-rehearsal.mjs <record.brain>
  *
- * `--record` AND `--identity-cmd` ARE THE RESTORE DRILL'S FLAGS (LCH-C04), so one line of a runbook names a copy for
+ * `--record` AND `--identity-cmd` ARE THE RESTORE DRILL'S FLAGS, so one line of a runbook names a copy for
  * either. `--record` names one record's copy and may be given once per record: each is rehearsed on its own throwaway
  * copy, restored by the same live build, and the run is PASS only when every one is. `--identity-cmd` reads the age
  * identity from a command's output (the keychain, or a password manager's command line), so no key file is ever

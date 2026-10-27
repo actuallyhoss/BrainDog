@@ -5,7 +5,7 @@
  *
  * FORTY-FOUR RULES WERE TRUE ONLY IN UNIT TESTS. A ring's scope, a stat's cap of six, a tab strip of twelve and a More:
  * each is held by a test over hand-made input, and every browser gate draws one invented record (`README.md` section 7).
- * None had been true on a record a person uses or seen at a phone's width (PGS-B01). The Rule sheet add-on
+ * None had been true on a record a person uses or seen at a phone's width. The Rule sheet add-on
  * (`packs/rule-sheet`) writes every rule onto pages of a real record; `packs/rule-sheet/expect.json` says, per rule,
  * the page, the selector (`packages/render/src/contract.ts`) and what is read there; this opens each page at both
  * widths and prints each rule with what it read, so a pass is a sentence somebody can check against the screen:

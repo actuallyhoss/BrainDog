@@ -1,5 +1,5 @@
 /**
- * A block whose `where:` hops into another list is held by that list too (audit 49-50, finding 5).
+ * A block whose `where:` hops into another list is held by that list too.
  *
  * `where: { pointed: { register, by } }` keeps the rows something in another list points at. A figure that hops was
  * already named by every list it reads (`money-figures.ts` `figureLists`), and a page block was not: `registersOf`

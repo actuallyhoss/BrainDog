@@ -117,7 +117,7 @@ test('A TOKEN SAYS WHICH APP HOLDS IT, when its host said so, and a bad one is r
   sql.close();
 });
 
-/* ── research-audit-19: H2, M3 and M4 ──────────────────────────────────── */
+/* ── H2, M3 and M4 ──────────────────────────────────── */
 
 import { kindOfEvent, kindsOfWrite, shapeIn, type ListShape } from '../src/change-kind.ts';
 import { SLASH } from '../src/slash.ts';
@@ -297,7 +297,7 @@ test('M4. A FIELD SENT EMPTY IS THE DELETE FLOOR, and one sent back empty as it 
   sql.close();
 });
 
-/* ── research-audit-21, item 3: the identity floor on a new row, and on the names a merge reads ─────────────────── */
+/* ── The identity floor on a new row, and on the names a merge reads ─────────────────── */
 
 test('A NEW PERSON OR ORGANISATION MADE WITH MORE THAN A NAME IS WHO SOMEBODY IS, and asks; a name alone climbs', async () => {
   const { k, sql } = await people();

@@ -1,5 +1,5 @@
 /**
- * WHAT ONE PRESS ON A DECLARED ACTION DOES FIRST (PGS-A12 jobs 7 and 8, `loop/scope/area-pages-a.md` build item 6), and
+ * WHAT ONE PRESS ON A DECLARED ACTION DOES FIRST (PGS-A12 jobs 7 and 8,  build item 6), and
  * the words it says while it does.
  *
  * A page names an action (`packages/kernel/src/row-actions.ts`), the read cuts it to what this reader may press and marks

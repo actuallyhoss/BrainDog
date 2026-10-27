@@ -73,7 +73,7 @@ export function nightlyBackups(o: {
   if (minutes === null) throw new Error(`${String(o.at)} is not a time of day. Write it as HH:MM in UTC, such as 03:20, or off.`);
   const copies = fileSnapshots(o.sql, o.file, o.now);
   let busy = false;
-  /* THE SAME EVENT AND THE SAME FACTS AS THE CLOUD'S (LCH-C03, RQ-LCH-273): a copy kept is `snapshot <id> <bytes> bytes`,
+  /* THE SAME EVENT AND THE SAME FACTS AS THE CLOUD'S: a copy kept is `snapshot <id> <bytes> bytes`,
      a copy that failed is `failed: the copy could not be saved` and one fault holding the reason, through the kernel's `copyKept` and `copyFailed`, so Settings
      reads a self-host's copies with the same `copyFacts`. */
   const lifecycle = (_kind: 'export', _actor: string, note: string): void => o.logged?.(note);

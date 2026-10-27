@@ -1,5 +1,5 @@
 /**
- * "SEND NUMBERS HERE" IS NEVER AN EMPTY CARD THE SCREEN CALLS DRAWN (the audit of 25 October, Z21).
+ * "SEND NUMBERS HERE" IS NEVER AN EMPTY CARD THE SCREEN CALLS DRAWN.
  *
  * WHAT WAS WRONG. A look of his record caught the section empty on every project (`project-1512-light.png`,
  * `-more/p-braindog-1512-light.png`), and again on BrainDog's phone page after the hero came back: the panel's reads

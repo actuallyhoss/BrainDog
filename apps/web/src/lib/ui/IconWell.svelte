@@ -1,5 +1,5 @@
 <!--
-  A WHAT, as a square: an icon (or a project's letter) in its well (the UI pass of 20 October, 2.A.5). Round is a who
+  A WHAT, as a square: an icon (or a project's letter) in its well. Round is a who
   (`Face`); square is a what, and this is the one square.
 
   FIVE SIZES, each with its one icon size: `m` 28 (a tile's heading, icon 18), `l` 32 (a row, icon 16), `card` 40 (a

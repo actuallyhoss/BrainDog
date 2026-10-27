@@ -1,5 +1,5 @@
 /**
- * The engine's health, the record's half: `engineHealth`, READ+ (ENG-A02).
+ * The engine's health, the record's half: `engineHealth`, READ+.
  *
  * WHETHER SLASH'S MODEL ANSWERS, AND THE ONE SENTENCE A PERSON READS ABOUT IT. The ledger it is read from is Slash's own
  * (`packages/slash/src/health.ts`), which this package may not import, so the host builds the read and hands it in as
@@ -10,7 +10,7 @@
  * READ LEVEL, SO A READ TOKEN, THE COMMAND LINE AND THE DAILY VITAL-SIGN READ CAN ALL CALL IT. It holds no row of the
  * record and no person's words: a state, two instants and a sentence with no model id, job name or code in it.
  *
- * AND THE ONE SWITCH FOR SLASH'S BACKGROUND READING: `slashReads`, ADMIN (ENG-A09). The consent rule: his own ask is his
+ * AND THE ONE SWITCH FOR SLASH'S BACKGROUND READING: `slashReads`, ADMIN. The consent rule: his own ask is his
  * own act, and what Slash reads on its own is on until the owner says otherwise. Kept as Slash's own pref beside the
  * daily look's (`slash.daily` in `index.ts`), for the reason that one is: local to this copy, no event, no migration.
  */

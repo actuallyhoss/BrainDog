@@ -1,5 +1,5 @@
 /**
- * A run carried in keeps the day it was last seen where it came from (AGT-C10, `run-carried.ts`).
+ * A run carried in keeps the day it was last seen where it came from (`run-carried.ts`).
  *
  * MEASURED BEFORE: the kernel refused `last_seen` from every caller (`IMMUTABLE_FIELD`), so an adapter that sent the
  * old system's time lost the run, and one that left it out gave all 295 of the owner's imported runs the import's day,

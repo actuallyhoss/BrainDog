@@ -1,5 +1,5 @@
 /**
- * What each pattern did with the last fortnight's messages, as lines a person reads (REC-A03): per pattern, how many it
+ * What each pattern did with the last fortnight's messages, as lines a person reads: per pattern, how many it
  * filed and how many it held, each held reason in plain words, and per door the messages no pattern read. The Inbox
  * draws it as one tile under "What comes in".
  *

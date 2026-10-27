@@ -56,7 +56,7 @@ export const passedNote = (by: string): string => `${PASSED_HEAD} ${by} worked h
 
 /**
  * Whether run `l` passed over the step on run `h`, as SQL: it works for no other run, wrote, began its stretch once the
- * step was there, and has ended since or, still at work, kept at it for twelve hours without taking it (scope D11). The
+ * step was there, and has ended since or, still at work, kept at it for twelve hours without taking it. The
  * place is the caller's to add.
  */
 export function passedSql(h: string, l: string): string {

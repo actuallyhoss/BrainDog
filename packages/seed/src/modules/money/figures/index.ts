@@ -1,6 +1,6 @@
 /**
  * Money's figures, in the order a record has always held them. Each group is its own file, cut out of `money.ts` with no
- * change (REC-B01 job 1), the signs of life added after them (job 3), and the order of the spreads here is the order of
+ * change (REC-B01 job 1), the signs of life added after them, and the order of the spreads here is the order of
  * the document, which the pinned fingerprint holds.
  */
 
@@ -63,7 +63,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      total with a stop. After the spend figures, so every figure above keeps its place in the document. */
   ...BUDGET_FIGURES,
 
-  /* A PLAN'S OWN FIGURES AND THE TWO BY PLAN, SINCE money-core 3.17.0 (REC-B12, plan-page-68): what the page of one plan
+  /* A PLAN'S OWN FIGURES AND THE TWO BY PLAN, SINCE money-core 3.17.0 (plan-page-68): what the page of one plan
      reads. LAST, so every figure above keeps its place in the document. */
   ...PLAN_FIGURES,
   ...PLANS_FIGURES,
@@ -73,12 +73,12 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      the document. */
   ...BOOK_FIGURES,
 
-  /* THE NEXT UNPAID PART OF EACH PLAN, SINCE money-core 3.17.0 (the UI pass of 20 October, money F5): the day, what is left
+  /* THE NEXT UNPAID PART OF EACH PLAN, SINCE money-core 3.17.0 (money F5): the day, what is left
      and what is left once that part is paid, which Instalments says under each bar. LAST, so every figure above keeps its
      place in the document. */
   ...NEXT_PART_FIGURES,
 
-  /* THE PARTS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4): what Money's first line and Heads up name when
+  /* THE PARTS LATE, SINCE money-core 3.18.0: what Money's first line and Heads up name when
      a part's day has gone. LAST, so every figure above keeps its place in the document. */
   ...LATE_PART_FIGURES,
 

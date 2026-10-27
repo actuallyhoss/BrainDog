@@ -1,9 +1,9 @@
 /**
- * The leak matrix on a real record (sharing plan §4.5, §6 step 4), run on a copy and never on the file itself.
+ * The leak matrix on a real record (§6 step 4), run on a copy and never on the file itself.
  *
  *   node tools/drill/leak-on-copy.mjs <record.brain | export.brainl>
  *
- * ON HIS RECORD (G2): `braindog export -o ~/Desktop/record.brainl` (he approves the export in the browser, the one
+ * ON HIS RECORD: `braindog export -o ~/Desktop/record.brainl` (he approves the export in the browser, the one
  * step only he can take), then `node tools/drill/leak-on-copy.mjs ~/Desktop/record.brainl`. A `.brainl` is restored
  * first by this checkout's own `braindog init --from` into a throwaway data folder (`restoreCopy`), with none of his
  * shell's BRAINDOG_ variables, so it opens no root key of his and reaches no host. Nothing is sent anywhere, and the
@@ -164,7 +164,7 @@ export function hiddenAmounts(visible, registers) {
 }
 
 /**
- * The line `boot` fails with when it counts an agent working for a guest who may not open the runs (LENS-3: the bar's
+ * The line `boot` fails with when it counts an agent working for a guest who may not open the runs (the bar's
  * Agents count reads `waits.working`), or `null`.
  */
 export function countsWorking(booted, held) {
@@ -362,7 +362,7 @@ export async function drill(file) {
           if (said.length) lines.push(`${route.name} ${JSON.stringify(args).slice(0, 80)}: ${said.length} hidden amount(s), such as ${said[0]}`);
           for (const line of lines) (KNOWN[route.name] ? known : found).push(KNOWN[route.name] ? `${KNOWN[route.name]} ${line}` : line);
         }
-      /* NOBODY WHO MAY NOT OPEN THE RUNS IS COUNTED ONE (LENS-3): a guest's bar says no agent is working. */
+      /* NOBODY WHO MAY NOT OPEN THE RUNS IS COUNTED ONE: a guest's bar says no agent is working. */
       const counted = countsWorking(await handlers.boot({}, ctx), held);
       if (counted) found.push(counted);
       const timed = async (name, args) => {

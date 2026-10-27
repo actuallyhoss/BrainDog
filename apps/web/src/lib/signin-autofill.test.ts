@@ -1,5 +1,5 @@
 /**
- * The passkey in the email field's autofill (LCH-A04, job 4): a returning phone signs in with one touch, and the link
+ * The passkey in the email field's autofill: a returning phone signs in with one touch, and the link
  * stays for a device with none.
  *
  * WHAT BREAKS IT IS A SECOND REQUEST. The offer holds the browser's one pending request and one challenge, so a press
@@ -193,7 +193,7 @@ test('the offer is made only where the field is drawn, and the field is drawn wh
 /* ── the words ──────────────────────────────────────────────────────────── */
 
 /**
- * WHAT THE SIGN-IN SCREEN SAYS NEVER NAMES THE MACHINERY (LCH-A04, "Words"): every sentence the page reads from the
+ * WHAT THE SIGN-IN SCREEN SAYS NEVER NAMES THE MACHINERY ("Words"): every sentence the page reads from the
  * copy, and the entry screens' own words, with no "token", no em dash, and none of the words a schema uses about itself.
  * A sentence that takes arguments is said with ordinary ones, so its template is read as a person would read it.
  */

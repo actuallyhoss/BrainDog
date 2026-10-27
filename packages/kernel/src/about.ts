@@ -1,6 +1,6 @@
 /**
  * The about read: what a person, an organisation or a project is and where it was seen, and the candidates a text is
- * handed to a model with (ENG-B02, job 3; the area's decision 2).
+ * handed to a model with (the area's decision 2).
  *
  * `candidatesFor` IS THE RETRIEVAL, run before a model sees anything. It finds the rows a text may be about, in the
  * order that says how sure the finding is, and cuts them to `CANDIDATES`:

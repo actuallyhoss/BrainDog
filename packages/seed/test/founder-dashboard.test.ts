@@ -113,7 +113,7 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   assert.equal(own[3]!.rows?.length, 10, 'its latest numbers are its own');
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z20: every number on the record was a four-week-old import, drawn under "Numbers, 30 days"
+/* Every number on the record was a four-week-old import, drawn under "Numbers, 30 days"
    with a sentence over it counting the last thirty days. Past a week the chart's heading says how long ago the newest
    came in. */
 test('NUMBERS FOUR WEEKS OLD ARE HEADED WITH HOW LONG AGO THE LAST ONE CAME IN, not thirty days', async () => {
@@ -134,7 +134,7 @@ test('NUMBERS FOUR WEEKS OLD ARE HEADED WITH HOW LONG AGO THE LAST ONE CAME IN, 
   for (const b of charts) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Y16 AND Y2. The Dashboard counted 52 kinds of number (twelve charts and forty listed) where
+/* Y16 AND Y2. The Dashboard counted 52 kinds of number (twelve charts and forty listed) where
    Numbers counted 42 (two charts and forty listed), so the two pages said different counts of the same readings. Both
    draw two charts and list the rest now. And People's list leaves out a shop put away (`retired_on`) and the Dashboard's
    Organisations table still listed it. */
@@ -216,7 +216,7 @@ test('LAPSING IS WHAT LAPSES WITHIN THIRTY DAYS OF TODAY, and not a name somebod
   assert.equal(counted.value.value, 2, 'what the block is drawn on counts what it lists');
 });
 
-test('SERVICES NAMES WHAT IS LAPSING, where it said only how many (the audit of 25 October, Z40)', async () => {
+test('SERVICES NAMES WHAT IS LAPSING, where it said only how many', async () => {
   const k = await founder();
   const day = (n: number) => new Date(NOW + n * DAY).toISOString().slice(0, 10);
   const blocksNow = () => value<{ blocks: Drawn[] }>(k.page('estate')).blocks;
@@ -240,7 +240,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   assert.ok(page, 'a project has its own page');
   const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
   assert.deepEqual(blocks.map((b) => b.heading), [
-    /* THE PROJECT'S SHAPE FIRST, SINCE founder 3.3.0 (C28, C29): the hero with Path and Money, then Work and Who is on
+    /* THE PROJECT'S SHAPE FIRST, SINCE founder 3.3.0: the hero with Path and Money, then Work and Who is on
        it with Runs on and the agents on it, two blocks the app draws from its read of the project. */
     'Overview',
     /* AND SINCE founder 3.7.0 (the project page of 27 October) THREE BLOCKS OF ITS PARTS: the hero beside its lane's

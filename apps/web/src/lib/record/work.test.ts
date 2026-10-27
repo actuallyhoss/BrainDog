@@ -163,8 +163,7 @@ test('OPEN DRAWS A LINE ON THE SAMPLE, worked back from the days tasks were fini
 
 test('A TASK COLUMN IS HEADED BY WHAT ONE ROW IS CALLED, in both engines, and a team whose tasks are Tickets reads Ticket', async () => {
   const k = await kernel;
-  /* WORK'S PAGE, whose Not moved in three months is a tasks table: the Board draws no table since the audit of 25
-     October (Y8), where Everything open listed its tasks a second time. */
+  /* WORK'S PAGE, whose Not moved in three months is a tasks table: the Board draws no table, where Everything open listed its tasks a second time. */
   const record = k.page('work');
   assert.ok(record.ok);
   const heads = () => ({

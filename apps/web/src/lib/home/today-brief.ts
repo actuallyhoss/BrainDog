@@ -1,5 +1,5 @@
 /**
- * TODAY SPEAKS FIRST (the audit of 22 October, U2): a greeting by the time of day and his name, then two or three plain
+ * TODAY SPEAKS FIRST: a greeting by the time of day and his name, then two or three plain
  * sentences that name what is late and what needs him, written by rules from what the page holds. Never a count alone
  * ("3 need you."): the late salary, the late instalment and the late bills by name, each name opening its own row, and
  * each with its button on the Late tile under it (`LateNow.svelte`).
@@ -8,7 +8,7 @@
  * (`home-rows.ts` `lateLines`, every list's deadlines before today and the late tasks), so the sentence and the tile under
  * it cannot disagree; what waits and who works are `boot`'s, as the badge says them.
  *
- * WORDS A PERSON SAYS: counts in digits (SF14), "by 13 days", names as the record wrote them, no id, no dash. The one red
+ * WORDS A PERSON SAYS: counts in digits, "by 13 days", names as the record wrote them, no id, no dash. The one red
  * phrase is the first thing that needs him: what is late, else the questions waiting.
  *
  * PURE, AND NODE LOADS IT, so `today-brief.test.ts` reads every sentence without mounting Home.

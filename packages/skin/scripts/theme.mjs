@@ -69,7 +69,7 @@ const favicon = (hex) =>
   `  </g>\n</svg>\n`;
 
 /**
- * THE TAB'S SVG, from `MARK_SMALL`: a tab draws its icon at 16 or 32 pixels, and the whole mark at 16 was a blob (E46).
+ * THE TAB'S SVG, from `MARK_SMALL`: a tab draws its icon at 16 or 32 pixels, and the whole mark at 16 was a blob.
  * Its edges lie on the pixel grid, and `crispEdges` keeps them there, so at 16 each square is one pixel and at 32 four.
  * `mark.svg` stays the whole mark, for the install prompt and anything drawn larger.
  */

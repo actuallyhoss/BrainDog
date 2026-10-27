@@ -1,5 +1,5 @@
 /**
- * The picker's reading of the glyph set (PGS-A19), and the kernel's copy of the names held to the renderer's, so the
+ * The picker's reading of the glyph set, and the kernel's copy of the names held to the renderer's, so the
  * install and the drawer cannot drift: a glyph the picker offers is one the kernel installs.
  *
  * THE KERNEL'S LEAF IS READ BY ITS ADDRESS, as `marks-unknown.test.ts` reads the renderer's: the kernel's package entry

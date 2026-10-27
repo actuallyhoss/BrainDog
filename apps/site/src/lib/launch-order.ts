@@ -1,5 +1,5 @@
 /**
- * The order of launch, as a rule (LCH-A02, H.14: LAUNCH.legal is flipped so /legal/<name> goes live before sign-up
+ * The order of launch, as a rule (H.14: LAUNCH.legal is flipped so /legal/<name> goes live before sign-up
  * opens). One function over a Worker environment's vars and the site's launch flags, answering every rule the
  * pair breaks, one plain line each, and nothing when the order holds.
  *

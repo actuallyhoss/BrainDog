@@ -1,5 +1,5 @@
 /**
- * A row's own values inside its own page (PGS-B03): on a page about a row, one word is that row's field when its list
+ * A row's own values inside its own page: on a page about a row, one word is that row's field when its list
  * declares one, else a figure, and `<field>.count` counts a list field of the row. A long field stays unavailable.
  *
  * WHAT WAS MEASURED BEFORE IT: on the owner's record `{{blockers.count}}` printed as a hole on every project page,

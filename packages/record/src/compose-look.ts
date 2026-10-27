@@ -2,7 +2,7 @@
  * The model's half of a page's look: what leads after the lead note, the headline, and the one thing to do next.
  *
  * THE SHELL IS FIXED AND WHAT FILLS IT IS COMPOSED. The kernel lays a `look.<page>` declaration over a
- * page at read time (`loop/contract-17.md`, "Look overlay"), and its rules answer one when none is stored. This file is
+ * page at read time ("Look overlay"), and its rules answer one when none is stored. This file is
  * what the model adds to that, and it rides inside the night's headline ask (`headlines.ts`), so it costs Free no ask
  * beyond the line it already had: each page is handed its blocks by `key` and a few of the rows it draws by handle and
  * title, and may answer `{ headline, lead, order, hide, next }` in place of the bare line.
@@ -86,7 +86,7 @@ export type LookBy = 'rule' | 'slash' | 'owner';
 export type LookNext = { row: string; text: string };
 
 /**
- * A look as `look.<page>` declares it (`loop/contract-17.md`, the kernel's `compose.ts`). `look` is the page it is laid
+ * A look as `look.<page>` declares it (the kernel's `compose.ts`). `look` is the page it is laid
  * over, which the kernel reads the declaration's id from; every key but `look`, `basis` and `by` is optional.
  */
 export type LookBody = {

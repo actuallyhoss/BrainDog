@@ -2,7 +2,7 @@
  * BRAINDOG'S OWN UPDATES GO IN ON THEIR OWN WHEN NOTHING THE PERSON CHANGED WOULD BE LOST, and ask once otherwise
  * (`packs/quiet.ts`).
  *
- * THE RECORD HERE IS SHAPED AS THE OWNER'S WAS ON OCTOBER 6TH (`loop/STATUS.md`): People 2.x with no organisations and no
+ * THE RECORD HERE IS SHAPED AS THE OWNER'S WAS ON OCTOBER 6TH: People 2.x with no organisations and no
  * `self`, six people with him twice, Projects, Money and Work beside it. Nothing in it is his by name; any record in that
  * shape takes the same road.
  */
@@ -237,7 +237,7 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
         const { layout: _layout, ...page } = d;
         const blocks = (page.blocks as Body[])
           .filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'tasks-this-week-yours')
-          /* AND THE LIST DRAWN ON IT AND ON WHAT IS LATE (Late and this week, the UI pass of 20 October). */
+          /* AND THE LIST DRAWN ON IT AND ON WHAT IS LATE (Late and this week). */
           .filter((b) => !((b.when as { any?: { metric?: string }[] } | undefined)?.any ?? []).some((w) => w.metric === 'tasks-this-week-yours'))
           /* AND RUNS OUT AS IT WAS BEFORE money-core 3.12.0: the count of days, with no day to draw and no line under it. */
           .map((b) => (Array.isArray(b.cells) ? { ...b, cells: (b.cells as Body[]).map((c) => (c.metric === 'runs-out-on' ? { metric: 'runway-days', label: c.label } : c)) } : b))
@@ -268,7 +268,7 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   /* NO SIDE COLUMN SINCE money-core 3.29.0: the home is one column of tiles, and its pages carry what the rail held. */
   assert.equal(page.layout, undefined);
   const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
-  /* THIS WEEK IS ITS OWN BAND AGAIN, SINCE the screens scope of 24 October (E24). */
+  /* THIS WEEK IS ITS OWN BAND AGAIN, SINCE the screens scope of 24 October. */
   assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
   /* AND LASTS SAYS THE DAY, over the figure the update brought with it (money-core 3.12.0): in the sentence under how long
      the money lasts with nothing coming in since 3.27.0, where it was a figure of its own, and since 3.29.0 a cell of the
@@ -364,7 +364,7 @@ const WEEK_IN = new Set(['received-7d', 'settled-in-7d']);
 const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d', 'statement-oldest-days', 'nights-missed-30d', 'repeating-overdue']);
 
 /**
- * AND 3.16.0'S PAYDAYS (REC-B13), folded into the same unreleased step: Repeating's `day_of_month` and `weekend` and
+ * AND 3.16.0'S PAYDAYS, folded into the same unreleased step: Repeating's `day_of_month` and `weekend` and
  * the sentence its `holds` gained, the leg's `days` and `weekend` that name them (on the figures and on the pages' blocks),
  * and Money's `rest_days` setting.
  */
@@ -394,7 +394,7 @@ const withoutPaydays = (doc: Body): Body => {
   };
 };
 /**
- * AND 3.16.0'S AGES AND CURRENCIES (REC-B03, REC-B04), folded into the same unreleased step: `account-ages` goes,
+ * AND 3.16.0'S AGES AND CURRENCIES, folded into the same unreleased step: `account-ages` goes,
  * `cash-as-of` and `balances-stale` read the typed day again, the money fields lose `currency_from` and
  * `currency_fixed`, Money loses Last confirmed and its box, a book's account cards read the typed day, and
  * `rule.cash-stale` comes back after `invoice-late`.
@@ -506,7 +506,7 @@ const withoutFiling = (doc: Body): Body => ({
     }),
 });
 /**
- * AND 3.17.0'S PAYMENT LINKS (pay-links-57, REC-B11), folded into the same unreleased step: a bill loses Paid so far,
+ * AND 3.17.0'S PAYMENT LINKS (pay-links-57), folded into the same unreleased step: a bill loses Paid so far,
  * an instalment Paid by, a repeating line Last paid and Last amount, and the Ledger its delete rule, which is there
  * for Paid by alone.
  */
@@ -574,7 +574,7 @@ const withoutPayee = (doc: Body): Body => ({
       : d,
   ),
 });
-/** AND BATCH 70'S (everyday-leg-69-70, audit 68 finding 4), folded into the same unreleased step: 3.17.0's leg of everyday spending comes off the cash walk, on the figures over it and on Money's Cash ahead and bridge. */
+/** AND BATCH 70'S (everyday-leg-69-70), folded into the same unreleased step: 3.17.0's leg of everyday spending comes off the cash walk, on the figures over it and on Money's Cash ahead and bridge. */
 const withoutEveryday = (doc: Body): Body => {
   const dated = (legs: unknown): Body[] => (legs as Body[]).filter((leg) => leg.everyday === undefined);
   return {
@@ -619,7 +619,7 @@ const WORK_1_18 = JSON.parse(readFileSync(new URL('./fixtures/released/work-1.18
 
 /**
  * PROJECTS' AND WORK'S PAGES AS THEY WERE THE MORNING OF 20 OCTOBER, before the UI pass changed them inside the unreleased
- * portfolio 1.18.0 and work 1.19.0 (proj F5, F10, F11): the Overview with its open and folded headings, Work with Late,
+ * portfolio 1.18.0 and work 1.19.0 (proj F5): the Overview with its open and folded headings, Work with Late,
  * At a glance, This week and its search word, and a thread's health with no labels. Frozen from that morning's build, so
  * the steps below undo the pass first and then the ones before it, as each version was released.
  */
@@ -629,8 +629,8 @@ const BEFORE_UI_PASS = JSON.parse(readFileSync(new URL('./fixtures/before-ui-pas
 };
 
 /**
- * A document with the UI pass of 20 October taken off its pages, as the morning's build declared them. AND THE SCREENS
- * SCOPE OF 24 OCTOBER WITH IT (E24), in the same unreleased 1.19.0: the page is the morning's whole, and the figure its
+ * A document with the redesign taken off its pages, as the morning's build declared them. AND THE SCREENS
+ * SCOPE OF 24 OCTOBER WITH IT, in the same unreleased 1.19.0: the page is the morning's whole, and the figure its
  * head counts now, `tasks-in-play`, goes.
  */
 const beforeUiPass = (doc: Body, id: 'portfolio' | 'work'): Body => ({
@@ -724,7 +724,7 @@ const withoutBatch76 = (doc: Body): Body =>
 /**
  * AND BATCH 77'S, folded into the same unreleased step and undone first: the rule that answers Chase it holds one draft
  * step again, batch 75's, written wherever Draft to send is empty. The step for an invoice paid in part goes, and the
- * other loses the half of its condition that left such an invoice to it (chase-part-paid-77, REC-B22).
+ * other loses the half of its condition that left such an invoice to it (chase-part-paid-77).
  */
 const DRAFT_EMPTY = (c: unknown): boolean => (c as Body | undefined)?.field === 'chase_draft' && (c as Body).empty === true;
 const withoutBatch77 = (doc: Body): Body => ({
@@ -746,7 +746,7 @@ const withoutBatch77 = (doc: Body): Body => ({
 });
 /**
  * AND BATCH 78'S, folded into the same unreleased step and undone first. Money's line of what there is draws again on
- * one book alone, and the same line ending on the year goes (money-lasts-line-78, REC-B07); the Heads up line on
+ * one book alone, and the same line ending on the year goes (money-lasts-line-78); the Heads up line on
  * categories that Money gave up for it was never in a released version and is taken off by `withoutDirection`, so it
  * is not put back. A book's line that its money lasts the year goes (book-lasts-year-78, REC-A09 step 2). And the
  * search for what a payment paid goes whole: its script, the rule that starts it and the rule that marks an
@@ -814,7 +814,7 @@ const RUNS_OUT_99: Body = {
   when: { metric: 'runway-days', gte: 0 },
 };
 /**
- * AND THE UI PASS OF 20 OCTOBER'S, folded into the same unreleased 3.17.0 and undone first (money F3, F5): Heads up's two
+ * AND THE UI PASS OF 20 OCTOBER'S, folded into the same unreleased 3.17.0 and undone first (money F3): Heads up's two
  * late lines say "late", where they said "past their due date" and "still". The Lasts tile's second cell and its new
  * label go with the tile itself (`withoutBatch100` puts Runs out back), and the lead lines lost only the clause batch
  * 95 had added, which `withoutBatch95` finds nothing of.
@@ -840,7 +840,7 @@ const withoutUiPass = (doc: Body): Body => {
   return { ...page, declarations: (page.declarations as Body[]).filter((d) => !NEXT_PART.has(String(d.metric))) };
 };
 /**
- * AND THE SAME PASS'S LAST ROUND (H18, H19, P20), undone before it: Heads up stands in the side column with each line
+ * AND THE SAME PASS'S LAST ROUND (P20), undone before it: Heads up stands in the side column with each line
  * ending on its one way to act, and the box that took today's balance is off Money, so Runs out stands beside Lasts in
  * the room it left. The line says how far the cash moved in words (`.moved`), where it said a signed percent.
  */
@@ -849,7 +849,7 @@ const ACTS = / \[(?:See them|Update balances)\]\([^)]*\)$/u;
 /* And Bills and invoices said one of it as `item`, before P25 named it `bill or invoice`. */
 const itemAgain = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).map((d) => (d.one === 'bill or invoice' ? { ...d, one: 'item' } : d)) });
 /**
- * MONEY 3.18.0 COMES OFF FIRST (the audit of 22 October, U4): no figure of the parts late, the lines with no sentence of
+ * MONEY 3.18.0 COMES OFF FIRST: no figure of the parts late, the lines with no sentence of
  * the part after the money and the line for two books its two counts again, and Heads up's line of bills late alone.
  */
 const LATE_PART_18 = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
@@ -868,7 +868,7 @@ const withoutLatePart = (doc: Body): Body =>
     (d) => d.metric !== 'installments-late',
   );
 /**
- * PEOPLE 3.9.0 COMES OFF BEFORE IT (the pass of 27 October): no figure for the shops a card text named nor
+ * PEOPLE 3.9.0 COMES OFF BEFORE IT: no figure for the shops a card text named nor
  * the line that says them, organisations of every kind counted and listed, and Everyone's role and organisation.
  */
 const withoutCardTexts39 = (doc: Body): Body => ({
@@ -903,7 +903,7 @@ const withoutCardTexts39 = (doc: Body): Body => ({
     }),
 });
 /**
- * PEOPLE 3.8.0 COMES OFF FIRST (the audit of 25 October, Y2): no Retired on for an organisation, nor a `retired` part in
+ * PEOPLE 3.8.0 COMES OFF FIRST: no Retired on for an organisation, nor a `retired` part in
  * its `org:`, and its list and count read every organisation not folded into another.
  */
 const withoutRetired38 = (raw: Body): Body => ((doc: Body): Body => ({
@@ -920,7 +920,7 @@ const withoutRetired38 = (raw: Body): Body => ((doc: Body): Body => ({
   }),
 }))(withoutCardTexts39(raw));
 /**
- * MONEY 3.22.0 COMES OFF FIRST (the audit of 25 October, Y1): no "Made one with" on Plans, no rule that moves a plan's
+ * MONEY 3.22.0 COMES OFF FIRST: no "Made one with" on Plans, no rule that moves a plan's
  * parts once it is made one with another, and the plans script as 3.21.0 released it, matching names letter for letter.
  */
 /**
@@ -1014,7 +1014,7 @@ const withoutSection29 = (doc: Body): Body => {
       ),
   };
 };
-/** MONEY 3.24.0 COMES OFF FIRST (the look of 26 October, R4): the Accounts split read six accounts at most. */
+/** MONEY 3.24.0 COMES OFF FIRST (the look of 26 October): the Accounts split read six accounts at most. */
 const withoutLimit24 = (doc: Body): Body =>
   withPage(doc, 'money', (now) => now.map((x) => (x.heading === 'Accounts' && x.limit === 12 ? { ...x, limit: 6 } : x)));
 const withoutLasts23 = (doc: Body): Body => ({
@@ -1044,7 +1044,7 @@ const withoutTwins22 = (doc: Body): Body => ({
     ),
 });
 /**
- * MONEY 3.21.0 COMES OFF NEXT (the audit of 25 October, Z14 and Z18): the calendar of what falls due under Coming and
+ * MONEY 3.21.0 COMES OFF NEXT: the calendar of what falls due under Coming and
  * going wears its own heading and glyph again, and reads Bills and invoices alone, while one falls due.
  */
 const withoutCalendar21 = (doc: Body): Body =>
@@ -1068,7 +1068,7 @@ const withoutCalendar21 = (doc: Body): Body =>
     ),
   );
 /**
- * MONEY 3.20.0 COMES OFF BEFORE IT (B6, B8 and B24 of 24 October): no sentence of what is to pay on the card in the lines
+ * MONEY 3.20.0 COMES OFF BEFORE IT (B8 and B24 of 24 October): no sentence of what is to pay on the card in the lines
  * and no figure of it, no card fields on Accounts, no rule or script that works it out or asks to move a twin line on,
  * and no File old entries on the filing rules page.
  */
@@ -1138,7 +1138,7 @@ const withoutBatch100 = (doc: Body): Body => {
 };
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
-/** Projects' quiet line with the clause for its list's questions, added inside the unreleased portfolio 1.17.0 (waiting-work-projects-99, PGS-C18). */
+/** Projects' quiet line with the clause for its list's questions, added inside the unreleased portfolio 1.17.0 (waiting-work-projects-99). */
 const QUIET_PROJECTS = 'Nothing needs a push, {{questions-open-in:things}} question(s) for you';
 /**
  * PEOPLE'S EVERYONE AND ORGANISATIONS AS CARDS, BEFORE BATCH 6 made them lines (people as lines, the plan's People 2): each
@@ -1195,7 +1195,7 @@ const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'kpi-stale', 'pro
 const beforeKpis = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
-    /* AND NUMBERS' OWN PAGE (portfolio 1.25.0, E26), which reads the readings Portfolio holds only since 1.19.0. */
+    /* AND NUMBERS' OWN PAGE (portfolio 1.25.0), which reads the readings Portfolio holds only since 1.19.0. */
     .filter((d) => !KPI_LISTS.has(String(d.register)) && !KPI_FIGURES.has(String(d.metric)) && d.script !== 'kpi_backfill' && d.page !== 'all-numbers')
     /* AND 1.24.0'S OFFER BY KIND (B27 of 24 October), the rule and its script, which read the kind going below. */
     .filter((d) => d.rule !== 'kind-offers-kpis' && d.script !== 'kind_drafts')
@@ -1248,16 +1248,16 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
         },
         'portfolio',
         /* AND THE ONE LINE TYPED ON AN IN PLAY CARD comes off with it, added inside the unreleased 1.17.0
-           (card-edit-wire-93, PGS-C15): `about` was text alone. AND ITS WHEN, how long since anybody worked on the
-           project, added inside the same unreleased 1.17.0 (projects-last-worked-96, REC-C16). */
+           (card-edit-wire-93): `about` was text alone. AND ITS WHEN, how long since anybody worked on the
+           project, added inside the same unreleased 1.17.0 (projects-last-worked-96). */
         (now) =>
           now
             .filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said' && !(b.kind === 'queue' && b.where === 'list is things') && b.key !== 'in-play-earning' && b.key !== 'where-they-are')
-            /* AND BATCH 101'S STRIP AND LANES (projects-lanes-lines-101, PGS-C17), inside the same unreleased 1.17.0: the
+            /* AND BATCH 101'S STRIP AND LANES (projects-lanes-lines-101), inside the same unreleased 1.17.0: the
                strip In play and earning and the split Where they are go, and How they are going draws past four again. */
             .map((b) => (b.kind === 'split' && b.heading === 'How they are going' ? { ...b, when: { metric: 'projects-live', gt: 4 } } : b))
             /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the same unreleased 1.17.0
-               (waiting-work-projects-99, PGS-C18). */
+               (waiting-work-projects-99). */
             .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body === QUIET_PROJECTS ? 'Nothing needs you across {{projects-live}} project(s) in play' : b.body.replace('{{questions-open-in:things}} question(s) for you, ', '') } : b))
             .map((b) =>
               b.kind === 'cards' && Array.isArray(b.columns)
@@ -1276,7 +1276,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     undo: (fresh) => {
       /* THE UI PASS OF 20 OCTOBER COMES OFF FIRST, inside the unreleased 1.19.0. */
       const raw = beforeUiPass(fresh, 'work');
-      /* WORK 1.19.0'S THREADS AND FOLLOW-UPS COME OFF BEFORE THAT (W061, REC-C10): a thread's Status back to its four
+      /* WORK 1.19.0'S THREADS AND FOLLOW-UPS COME OFF BEFORE THAT: a thread's Status back to its four
          values with no labels and no declared moves, the day it aims for gone, and the script that starts a follow-up
          back to the title and source 1.18.0 released, read from its frozen document. */
       const was = (WORK_1_18.declarations as Body[]).find((d) => d.script === 'start_with_parent')!;
@@ -1296,9 +1296,9 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       const linked = (doc.declarations as Body[]).some((d) => d.register === 'tasks' && (d.fields as Body[]).some((f) => f.id === 'thing'));
       /* AND THE BOARD'S CAPTURE LINE comes off too, added inside the unreleased 1.19.0 (board-capture-line-83). */
       /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the unreleased 1.19.0
-         (waiting-work-projects-99, PGS-C18). */
+         (waiting-work-projects-99). */
       /* AND WORK'S HEAD AND ITS OPEN WORK WITH NO PROJECT, a fold, a list and the figure both are gated on, added inside
-         the unreleased 1.19.0 (work-head-and-no-project-101, AGT-D14 job 1, PGS-A14). */
+         the unreleased 1.19.0 (work-head-and-no-project-101, AGT-D14 job 1). */
       const headless = {
         ...doc,
         declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'tasks-no-project').map((d) => (d.page === 'work' ? (({ header: _head, ...rest }) => rest)(d) : d)),
@@ -1308,7 +1308,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
           .filter((b) => !(b.kind === 'queue' && b.where === 'list is tasks') && b.heading !== 'Needs a project' && b.heading !== 'With no project')
           .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:tasks}} question(s) for you, ', '') } : b)),
       );
-      /* AND THE BOARD'S READ, ITS LINE AND ITS LIST (audit B of 25 October, Y8), inside the unreleased 1.19.0: the board
+      /* AND THE BOARD'S READ, ITS LINE AND ITS LIST, inside the unreleased 1.19.0: the board
          read by tier and day, fifty at most, the line said nothing of Later, and Everything open stood under it. */
       const boardBefore = (b: Body): Body => {
         const { limit: _limit, ...rest } = b;
@@ -1346,15 +1346,15 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
   /* AND PEOPLE 3.4.0'S NOTE OF WHO MAY BE HELD TWICE comes off the People page with it (people-held-twice-69). */
   /* AND PEOPLE 3.4.0'S CALENDAR PAGE, added while it is unreleased (calendar-page-82). */
   /* AND PEOPLE 3.4.0'S ACTIVITY PAGE, added while it is still unreleased (activity-page-88). */
-  /* AND PEOPLE 3.6.0'S SCRIPTS PAGE (C33). */
+  /* AND PEOPLE 3.6.0'S SCRIPTS PAGE. */
   people: {
     version: '3.1.0',
     released: '36328d2fcaeb58f3',
     undo: (raw) =>
       withPage({ ...raw, declarations: (withoutRetired38(raw).declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity' && d.page !== 'scripts').map((d) => (d.metric === 'people-in-touch-30d' ? (({ snapshot: _save, ...rest }) => rest)(d) : d)) }, 'people', (now) =>
-        /* AND PEOPLE 3.4.0'S QUESTIONS ABOUT SOMEBODY, a queue and a clause in each line (waiting-people-services-99, PGS-C18). */
+        /* AND PEOPLE 3.4.0'S QUESTIONS ABOUT SOMEBODY, a queue and a clause in each line (waiting-people-services-99). */
         /* AND PEOPLE 3.4.0'S IN TOUCH AND WHAT AGENTS DID, with the night's save of the figure and the line's clause that
-           In touch took over (services-people-five-parts-101, PGS-C18). */
+           In touch took over (services-people-five-parts-101). */
         now
           .filter((b) => !(b.kind === 'queue' && b.where === 'list is people') && b.heading !== 'In touch' && b.heading !== 'What agents did')
           .map((b) => (b.kind === 'note' && b.body === '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)' ? { ...b, body: `${b.body}, {{people-in-touch-30d}} in touch in the last 30 days` } : b))
@@ -1400,7 +1400,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
 
 /**
  * A LEAD PAGE'S PLACE ON THE RAIL, `nav.place`, taken off every page: batch 101 put it inside each module's unreleased
- * step (places-and-computed-101, SHL-A18), and no released version said one.
+ * step (places-and-computed-101), and no released version said one.
  */
 const unplaced = (doc: Body): Body => ({
   ...doc,
@@ -1530,7 +1530,7 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), ['Organisations']);
   assert.deepEqual(people.filter((b) => b.kind === 'cards').map((b) => b.heading), ['Everyone']);
   for (const id of ['metric.people-in-touch-90d', 'metric.people-in-touch-12w']) assert.ok(k.packClaims('people').includes(id), `${id} is not on the record`);
-  /* AND PROJECTS HOLDS NO HEADING OVER ITS CARDS, SINCE the UI pass of 20 October (proj F5): what each earns alone, and
+  /* AND PROJECTS HOLDS NO HEADING OVER ITS CARDS (proj F5): what each earns alone, and
      the parked a lane of the cards. */
   const sections = blocks('portfolio').filter((b) => b.kind === 'section');
   assert.deepEqual(sections.map((b) => b.heading), []);
@@ -1568,7 +1568,7 @@ const FOUNDER_2_7 = (() => {
 const handedBefore = (doc: Body, id: string): Body =>
   id !== 'founder' ? doc : (({ extends: _laid, ...rest }) => ({ ...rest, declarations: FOUNDER_2_7.declarations, config: FOUNDER_2_7.config, hands: FOUNDER_2_7.hands }))(doc);
 
-/* AND ONE OF BILLS AND INVOICES WAS AN `item` (P25, the UI pass of 20 October), which a use case's label setting starts from. */
+/* AND ONE OF BILLS AND INVOICES WAS AN `item` (P25), which a use case's label setting starts from. */
 const oneBefore = (doc: Body): Body => JSON.parse(JSON.stringify(doc).replaceAll('"default":"bill or invoice"', '"default":"item"').replaceAll('{"id":"retro","label":"How it went","type":"document"},', '')) as Body;
 
 /**
@@ -1631,7 +1631,7 @@ const MONEY_BY_MONTH: Body = {
 };
 
 /**
- * THE PROJECT PAGE AS IT WAS BEFORE ITS SHAPE WAS BLOCKS (founder 3.3.0, team 2.25.0; C28 and C29): no `project`
+ * THE PROJECT PAGE AS IT WAS BEFORE ITS SHAPE WAS BLOCKS (founder 3.3.0, team 2.25.0): no `project`
  * blocks, More about not declared folded, Handed back or blocked and Money by month back at their places, and What
  * changed and the agents' cards half a row each.
  */
@@ -1685,7 +1685,7 @@ const projectBefore = (doc: Body, id: string): Body =>
       if (b.heading === 'Agents' && b.source === 'register.session')
         return [{ ...b, columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }], where: 'project is {{spoken}}' }];
       if (b.heading === 'Tools and servers') return [{ ...runsOn89(b), span: 6, where: 'kind is tool' }];
-      /* KEYS AND SKILLS LISTED EVERYBODY'S until batch 72 (project-own-cards-72, PGS-C31), as Tools and servers had. */
+      /* KEYS AND SKILLS LISTED EVERYBODY'S until batch 72 (project-own-cards-72), as Tools and servers had. */
       /* A TEAM'S KEYS WERE THE WHOLE ROW: the half Keeping it alive left, on a record that holds no services, went to the
          tile beside it (`projectTemplate`). Under Runs on nothing is beside a block that goes, so it is a third. */
       if (b.heading === 'Keys' && b.source === 'runs_on') return [{ ...runsOn89(b), span: id === 'team' ? 12 : 6, where: 'kind is key' }];
@@ -1894,7 +1894,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
   sql.close();
 });
 
-/* ── the agents pack and the use cases, in the night's own loop (`loop/research-audit-30.md`, Medium 3) ─────────────── */
+/* ── the agents pack and the use cases, in the night's own loop (Medium 3) ─────────────── */
 
 /** The agents pack as 1.7.0 declared it: no lanes over the runs, and no figure for them to be drawn on. */
 const agentsBefore = (): Body => {

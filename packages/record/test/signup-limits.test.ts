@@ -67,7 +67,7 @@ test('CHECKED, TODAY\'S LIMITS STAND: ten from one address in fifteen minutes, a
 });
 
 /*
- * AUDIT 34 FINDING 3: the keys count the place and the mailbox, not the spelling (`signup-keys.ts`). These are red
+ * The keys count the place and the mailbox, not the spelling (`signup-keys.ts`). These are red
  * until `identity.ts` keys its strikes through `ipBucket` and `mailCanon` and strikes after the address check.
  */
 

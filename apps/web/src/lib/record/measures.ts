@@ -185,7 +185,7 @@ export const allStale = (measures: readonly Measure[], nowMs: number): boolean =
   measures.length > 0 && Number.isFinite(nowMs) && measures.every((m) => m.latest !== null && nowMs - Date.parse(m.latest.at) > STALE_AFTER_MS);
 
 /**
- * NUMBERS THAT STOPPED ARRIVING, AS TILES THAT SAY THEIR AGE, SINCE the audit of 22 October (U6, U-B4): a project whose
+ * NUMBERS THAT STOPPED ARRIVING, AS TILES THAT SAY THEIR AGE: a project whose
  * numbers stopped 24 days ago drew five 30-day charts, each a short line in its first week and a dashed month after it,
  * so a reading from 28 Sep looked like this week's. Where every line in a block is older than a week, each measure is
  * a tile: its last reading, and under it how long ago in words ("4 weeks ago", once: the day is the row's). No small line: a
@@ -280,7 +280,7 @@ export function latestText(latest: readonly Latest[], underLines: boolean, besid
 }
 
 /**
- * A GROUPED BLOCK'S READINGS (its sixth column, E26): one quiet list a group, headed by the group's name, the measures in
+ * A GROUPED BLOCK'S READINGS (its sixth column): one quiet list a group, headed by the group's name, the measures in
  * no group last, and each line a kind of number with its newest value, its unit and how old it is. Every measure the
  * record listed is said, since a page of a list's numbers is where each one is found; the record caps how many.
  */

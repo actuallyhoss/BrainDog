@@ -1,5 +1,5 @@
 /**
- * What one caller holds right now: the lens (sharing plan §2.1 to §2.4). Pure functions, nothing here reads the store.
+ * What one caller holds right now: the lens. Pure functions, nothing here reads the store.
  *
  * A LENS IS COMPUTED ON EVERY CALL from the caller's role, their legacy per-list member rows, their shares and their
  * groups' shares, and a token's narrowing when an agent is calling. For each list and each capability it holds one

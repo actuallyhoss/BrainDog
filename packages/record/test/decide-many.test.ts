@@ -1,5 +1,5 @@
 /**
- * One run's questions answered in one call (scope D2): a cleanup run filed about twenty-five, and Approve all was
+ * One run's questions answered in one call: a cleanup run filed about twenty-five, and Approve all was
  * twenty-five `decide` calls. Now one call, one batch, and one Undo puts every one back; a refused member is named and
  * the rest stay written.
  */

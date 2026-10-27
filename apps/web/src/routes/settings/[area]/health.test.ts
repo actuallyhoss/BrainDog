@@ -46,7 +46,7 @@ test('the days left count today', () => {
   assert.equal(daysLeft(Date.parse('2026-09-30T23:00:00Z')), 1);
 });
 
-/* ── The lines under Slash's sentence (ENG-A05, ENG-A06), said in Settings > Agents: who answered, the provider's words, a second model ── */
+/* ── The lines under Slash's sentence, said in Settings > Agents: who answered, the provider's words, a second model ── */
 
 /** Noon on 14 October in the reader's own zone, so "today" and "yesterday" are the reader's days wherever this runs. */
 const NOON = new Date(2026, 9, 14, 12).getTime();
@@ -92,7 +92,7 @@ test('all three lines together, in order, and nothing at all from an older host 
   for (const line of engineLines(all, NOON)) assert.ok(!line.includes('—'), 'no em dash');
 });
 
-/* ── THE ONE SENTENCE (U-C7): the worst thing, or nothing ─────────────────────────────────────────────────────────── */
+/* ── THE ONE SENTENCE: the worst thing, or nothing ─────────────────────────────────────────────────────────── */
 
 test('THE WORST THING ONLY: a fault before a red check, before a missed night, before a meter, and one sentence each', () => {
   const all = healthSaid('missing', { ...MONTH, near: { key: 'runs', share: 0.914 } }, { faults: [MAIL, PAIRS], engine: DOWN, signs: signs('red', 'red'), signsAt: '/p/health' });

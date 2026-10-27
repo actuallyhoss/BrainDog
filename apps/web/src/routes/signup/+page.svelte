@@ -1,11 +1,11 @@
 <!--
   Sign-up, for a stranger: say who you are, watch the BrainDog build, then keep it with one email.
 
-  USE CASE 6, STEPS 1 TO 4 (set 9 October, `loop/progress/planner-45.md`, "The onboarding target").
+  USE CASE 6, STEPS 1 TO 4 (set 9 October, "The onboarding target").
 
   1. DESCRIBE. "Who are you?", one field with one example in it, and three promises under it. As it is typed, the
      rules read it on this device, a beat after each key (`proposeFirst` with no model, `lib/start/propose.ts`), and
-     nothing typed leaves the device. ON THE PERSON'S PRESS OF NEXT, AND ONLY THEN (USE-B05, `readerFor` in
+     nothing typed leaves the device. ON THE PERSON'S PRESS OF NEXT, AND ONLY THEN (`readerFor` in
      `lib/signup.ts`), a model reads it once at the host's reading door (`readAsks(origin).setup`, `/auth/signup/read`),
      with a fresh bot-check answer taken from the read's own widget first. One line under the field says so before the
      press, until the host answers 501 (no door, no model or no bot check), which this tab then remembers. A 501, any
@@ -1017,7 +1017,7 @@
   }
 
   /**
-   * ONE CALL TO THE RECORD'S OWN `setup` AGAINST THE NEW RECORD (USE-B04), and what it came back with. It goes through
+   * ONE CALL TO THE RECORD'S OWN `setup` AGAINST THE NEW RECORD, and what it came back with. It goes through
    * `/start`'s `accept()`, which hands `bodyOf(asked)` to `client.setup`, so a closed tab no longer leaves the record
    * part made: the record carries the call through by itself.
    *
@@ -1076,7 +1076,7 @@
     again = { name, asked: next };
     /* AN ANSWERED PRESS HANDS BACK A NEW KEY FOR WHAT IS LEFT, AND BOTH ARE KEPT BESIDE THE SENTENCE (`keepLeft`), so a
        reload sends what Try again would have: only what is left, under that key, with `again`. A Try again that went
-       in before the reload is passed over, and nothing is written twice (audit 59, claim 2). The first key stays
+       in before the reload is passed over, and nothing is written twice. The first key stays
        where it is (`keepKey`) and is what a reload uses when this cannot be kept. A press nobody answered keeps its
        key and what it asked for, so there is nothing new to keep. */
     if (out !== null && !out.unheard) {
@@ -1246,7 +1246,7 @@
           <ul class="lines">
             {#each read.heard as h, i (i)}
               <li>
-                <!-- `heard-line`, NEVER `line`: the ledger's global `.line` is a grid, and it took this row over (SF5). -->
+                <!-- `heard-line`, NEVER `line`: the ledger's global `.line` is a grid, and it took this row over. -->
                 <button type="button" class="heard-line" aria-expanded={opened === lineOf(h)} onclick={() => openLine(h)}>
                   <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : h.phrase}</span>
                   <span class="line-became">{h.you === true ? words.you : h.became}<Icon name="chevron" size="s" /></span>
@@ -1336,7 +1336,7 @@
         {#if nameByHand}
           <NameField bind:value={slug} bind:free id="up-name" />
         {:else if naming || read?.title || slug !== ''}
-          <!-- WHAT THE BOX HOLDS (audit C, X2): a name alone in a box read as anybody's, the email's local part above all. -->
+          <!-- WHAT THE BOX HOLDS: a name alone in a box read as anybody's, the email's local part above all. -->
           <p class="field-label kept-label">{words.calledLabel}</p>
           <div class="kept-head">
             <h2 class="kept-name" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? slug)}</h2>
@@ -1346,7 +1346,7 @@
       </section>
 
       {#if signedIn === null}
-        <!-- `email-row`, NEVER `row`: the ledger's global `.row` drew a rule under it and cut the field short (SF5). -->
+        <!-- `email-row`, NEVER `row`: the ledger's global `.row` drew a rule under it and cut the field short. -->
         <div class="email-row">
           <label class="field-label" for="up-email">{copy.emailLabel}</label>
           <span class="field field-lg">

@@ -1,5 +1,5 @@
 <!--
-  The close of an inner page (site F11): one slim strip on the paper, the early access line on the left and the start
+  The close of an inner page: one slim strip on the paper, the early access line on the left and the start
   button on the right; on a phone the line, then the button at full width. It replaced the huge centred close, which
   said the page's recap again. The home page has none: its free tile is its last ask.
 -->

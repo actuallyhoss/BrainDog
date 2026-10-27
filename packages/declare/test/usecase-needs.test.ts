@@ -1,5 +1,5 @@
 /**
- * A use case's `needs` (USE-B08): the part of its modules it cannot stand without, so a record starts small and grows.
+ * A use case's `needs`: the part of its modules it cannot stand without, so a record starts small and grows.
  *
  * A FILE SHARED BEFORE THE KEY READS THE SAME. Left out, `needs` is all of `modules`, and the normalised value carries no
  * `needs` key at all, so it is the same object it was and nothing fingerprinted from it moves.

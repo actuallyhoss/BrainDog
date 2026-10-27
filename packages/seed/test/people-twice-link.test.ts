@@ -1,13 +1,13 @@
 /**
- * The note over somebody held twice gives something to press (audit 69, finding 3): it said how many and stopped, so
+ * The note over somebody held twice gives something to press: it said how many and stopped, so
  * the person read a number and had nowhere to go.
  *
- * THE PEOPLE HELD TWICE, AND NOT THE WHOLE LIST (audit 74, claim 4): the link opened everyone in order of name and told
+ * THE PEOPLE HELD TWICE, AND NOT THE WHOLE LIST: the link opened everyone in order of name and told
  * the reader to look for the same person listed twice, which is the work the record had already done. The list of
  * people now opens at them alone, by the word `twice` in its address (`apps/web/src/lib/record/`), so the note says
  * "See them" and leaves the looking out. The fourth test here holds the address down.
  *
- * THE NUMBER IS HOW MANY TOO MANY (audit 78, claim 1): the figure counts the ones that would go if each pair were one
+ * THE NUMBER IS HOW MANY TOO MANY: the figure counts the ones that would go if each pair were one
  * person, and the list the link opens shows every one of each pair, so "twice: 1" stood over a list of two. The note
  * says "Too many" now, and the last test reads the figure and the people the link shows from one real record.
  *

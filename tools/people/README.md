@@ -2,7 +2,7 @@
 
 Made-up people who sign up and use BrainDog the way a stranger would, and the checks that say whether what they see
 is right. This folder holds data and checks only. Use case 6 of the vision mockup (settled on 9 October) is walked
-here for one person, Mariam. The other seven people of USE-B01 and their nightly use come in later batches.
+here for one person, Mariam. The other seven people and their nightly use come in later batches.
 
 ## Files
 
@@ -20,22 +20,22 @@ here for one person, Mariam. The other seven people of USE-B01 and their nightly
 - `check-files.mjs`: checks every person file for every field the walk reads, with no network. A file missing a field
   is refused by name. What only some people say (what each phrase becomes, `expect.heard.became`; a shop's money tile,
   `expect.today.money`; its Orders sentence, `expect.offer.lead`) is checked only where a file holds it.
-- `layla, omar, sam, nour, mona, yara, salma.json`: the other seven people of USE-B01 (Mariam stands in for Karim).
+- `layla, omar, sam, nour, mona, yara, salma.json`: the other seven people (Mariam stands in for Karim).
   `said` is the plain sentence; `says.plain`/`says.hard` are the sentence with and without a keyword; `expects` is the
   use case or none; `standing` is false for Yara and Salma; Omar and Nour carry an export in `file`.
 - `didnt-shop.json`: Hana, who names a shop only to say she has none ("I didn't run a shop; I only post on
   Instagram"). She expects none, her `standing` is false, and `test/keep-it.test.mjs` walks her to see that no shop
   is built and her record opens under her own name.
 - `expect/first-screen.mjs`: the day-0 screen checks over a rig's snapshot { path, width, text, roles, counts }; UNITS
-  names the unit that turns each one green (no-count, nothing-before-press, no-example, team-no-task: USE-B07;
-  people-only-them: USE-B06; rail-has-rows: USE-B02; no-tour: USE-B01). A snapshot may also hold `behind` (what each
+  names the unit that turns each one green (no-count, nothing-before-press, no-example, team-no-task;
+  people-only-them; rail-has-rows; no-tour:). A snapshot may also hold `behind` (what each
   rail row stands on, keyed by the row's href) and `signs` (how many vital signs read red, null with no page for
   them). Where the screens are drawn here, a page's `behind` is the lists the record says it reads (`lists` on the
   page in `boot`, the answer the rail itself is built from), so the check and the rail cannot disagree, and a list a
   pack fills on the first day is never counted as the person's own. A host that sends no `lists` is read from the
   drawn page, as before. With no screen file it draws its own: the web's rail and Today rendered for the server from a first-run walk
   (expect/draw.mjs, markup.mjs, screens.mjs), three screens a moment (1440 Today, 1440 list, 390 Today over the tab
-  bar), judged by the seven and by pages-line (PGS-C30), signs-line (PRF-A05) and own-lines-you (USE-B06: Today never
+  bar), judged by the seven and by pages-line, signs-line and own-lines-you (Today never
   calls the owner "Someone on this record" where nobody else writes on it). A check answers green, red, not seen (it
   applies and read nothing) or does not apply.
 - `sets/read-set.json` and `test/read-set.test.mjs`: forty-two sentences and the reading each must get; a sentence marked

@@ -5,7 +5,7 @@
  * TWO SHAPES, ONE CARD. The record asks today with a `rowset` that folds rows into the one it keeps (`kernel/people.ts`
  * `nearMatch`): a patch on each folded row naming the kept one in `merged_into` and deleting it, and at most one patch
  * on the kept row carrying over what the folded ones knew. Accept is Merge all, and Reject is Keep apart. A cluster
- * asked as a question of options (`loop/contract-17.md`, one question per cluster) names its answers `merge`, `apart`
+ * asked as a question of options (one question per cluster) names its answers `merge`, `apart`
  * and `pick:<who>`, one Pick a candidate, and carries `candidates`, each `{ at, name, seen }`, on its body.
  *
  * PICK ONE IS AN OPTION THE RECORD OFFERS, NEVER A SUBSET THIS SCREEN MAKES UP. A rowset's patch on the kept row carries

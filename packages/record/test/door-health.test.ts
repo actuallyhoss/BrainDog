@@ -1,5 +1,5 @@
 /**
- * `doorHealth`: every connection, its app, build and last tool call, and the agent door's seven signs (AGT-A02).
+ * `doorHealth`: every connection, its app, build and last tool call, and the agent door's seven signs.
  *
  * WHAT IS ASSERTED IS EACH SIGN AT THE EDGE IT EXISTS FOR: a key that opened a run today and called no tool is the week
  * his record had no tools; a key whose command never said a build reads `behind: null`, not 0, because nothing was

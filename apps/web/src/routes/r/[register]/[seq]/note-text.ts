@@ -1,5 +1,5 @@
 /**
- * A LONG NOTE AS A NOTE (the audit of 25 October, Y13). A person's memo is often written in markdown by whoever imported
+ * A LONG NOTE AS A NOTE. A person's memo is often written in markdown by whoever imported
  * it, and the row page printed it as one block, `**`, `##` and table pipes and all, 2,600 px on a phone. Here it is read
  * into parts the page draws (`NoteText.svelte`): headings, paragraphs that keep their line breaks, flat lists, tables
  * and rules, with bold and code inside. Nothing is ever turned into HTML: every part is drawn as text.

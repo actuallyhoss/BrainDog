@@ -1,5 +1,5 @@
 /**
- * THE ROWS OF A SOURCE THIS BUILD HAS NEVER HEARD OF, laid out by their fields (PGS-A11). A computed source used to cost an
+ * THE ROWS OF A SOURCE THIS BUILD HAS NEVER HEARD OF, laid out by their fields. A computed source used to cost an
  * arm in `page-live.ts`, one `if (b.source === ...)` a name, and a block over any other source drew the line saying it
  * cannot be drawn: a source added in the kernel's registry (`packages/kernel/src/sources/`) or the record's
  * (`packages/record/src/sources/`) waited for an edit here before anybody saw it. This reads what the record answered on

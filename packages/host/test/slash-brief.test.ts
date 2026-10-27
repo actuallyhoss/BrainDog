@@ -1,5 +1,5 @@
 /**
- * The briefing's ask on the host's side (ENG-B12): the facts go to the model with the briefing's own instructions and
+ * The briefing's ask on the host's side: the facts go to the model with the briefing's own instructions and
  * come back as `{ cards }`, on a chat-completions endpoint and on Anthropic's Messages API alike. A status that is not
  * `ok` is a throw, which the record reads as "the rules speak" (`rulesBrief`).
  *

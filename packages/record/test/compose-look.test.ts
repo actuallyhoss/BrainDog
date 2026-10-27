@@ -3,7 +3,7 @@
  * its `{ headline, order, next }` answer is checked part by part, and how Slash's look is written as a version Undo puts
  * back, never over a look the person set.
  *
- * THE DECLARATIONS ARE A STAND-IN. The kernel's `look` kind is its own (`loop/contract-17.md`), so these hold the
+ * THE DECLARATIONS ARE A STAND-IN. The kernel's `look` kind is its own, so these hold the
  * versioned store the record writes through (`install`, `retire`, `declarations`, Slash's prefs) in a few lines, the
  * way the kernel keeps one live version a declaration id.
  */

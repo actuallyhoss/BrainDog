@@ -7,7 +7,7 @@ import type { SlashClient } from './slash.ts';
 
 const HOSTS: Host[] = ['included', 'key', 'own', 'unknown'];
 
-/* THE CONSENT RULE AS A PERSON READS IT (ENG-A09): what is sent, to whom, and what never is, in both states of the
+/* THE CONSENT RULE AS A PERSON READS IT: what is sent, to whom, and what never is, in both states of the
    switch, because a person who turned it off still asks Slash things himself. */
 test('the paragraph names what is sent, to whom, and what never is, on and off', () => {
   for (const on of [true, false]) {

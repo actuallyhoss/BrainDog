@@ -12,7 +12,7 @@
  * CHANGE TO AND REMOVE ARE THE PAGE'S, NOT ITS LOOK (PGS-B08 c, d). Each sets the page he wrote whole, through
  * `page-write.ts` `changeBlock`, with the body before as its Undo. On an add-on's page the page would become his own copy
  * and stop taking the add-on's updates, so there the menu says where Change to is instead, until a change to one block
- * is an overlay of its own (PGS-B07). The kinds offered are `kindsFor`'s (`braindog-render`), handed in, so this file
+ * is an overlay of its own. The kinds offered are `kindsFor`'s (`braindog-render`), handed in, so this file
  * stays pure and its test needs no renderer.
  *
  * AND A KEY NUMBER'S OWN ROWS (the KPI plan of 21 October, 2.5): on a number drawn by a `kpis` block, "Show on Today",

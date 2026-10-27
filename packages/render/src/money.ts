@@ -268,7 +268,7 @@ export function moneySet(
 }
 
 /**
- * A DISPLAY FIGURE IN WHOLE UNITS (2.A.7): a tile's figure, a project's hero, a card, Today, the palette, a sentence.
+ * A DISPLAY FIGURE IN WHOLE UNITS: a tile's figure, a project's hero, a card, Today, the palette, a sentence.
  * "£33,850", half a unit rounding away from nought. A figure read at a glance is never a ledger line; a list, a table, a
  * row's own page and a form use `moneySet` instead and are never rounded.
  */

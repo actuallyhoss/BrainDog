@@ -56,7 +56,7 @@
  * or the tile is drawn in.
  *
  * A FIGURE IS WORDS SOMEBODY ELSE WROTE, as the label is, and an agent writes `3 of tasks#8` into one as readily as
- * a price. It is read through `spoken`, and drawn only when `spoken` takes nothing out of it (audit 72 #3).
+ * a price. It is read through `spoken`, and drawn only when `spoken` takes nothing out of it.
  */
 
 import { safeHref } from './inline.ts';

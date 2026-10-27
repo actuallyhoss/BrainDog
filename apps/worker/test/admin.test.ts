@@ -147,7 +147,7 @@ test('no em dash and none of the words a person never reads, in any of the three
 });
 
 test('the style is Look B in light and dark and draws nothing from elsewhere', () => {
-  /* RED WORDS AND RED FILLS ARE TWO TOKENS since the UI pass of 20 October: #C2362F words, #CF413A a filled button. */
+  /* RED WORDS AND RED FILLS ARE TWO TOKENS: #C2362F words, #CF413A a filled button. */
   assert.match(ADMIN_CSS, /--red: #C2362F/);
   assert.match(ADMIN_CSS, /--red-fill: #CF413A/);
   assert.match(ADMIN_CSS, /@media \(prefers-color-scheme: dark\)/);

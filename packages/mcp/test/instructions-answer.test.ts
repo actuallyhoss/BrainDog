@@ -1,5 +1,5 @@
 /**
- * `instructions {answer}` (D8): a question his order named, answered through the door as the record's
+ * `instructions {answer}`: a question his order named, answered through the door as the record's
  * `instructionsMine` answers it, and said in the record's own line. The trust boundary is the record's
  * (`packages/record/test/instructions-answer.test.ts`); this holds that the door hands the call on whole and says it.
  */

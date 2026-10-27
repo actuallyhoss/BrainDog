@@ -1,5 +1,5 @@
 /**
- * A model that does not answer is told to the operator, in the provider's own words (ENG-A01).
+ * A model that does not answer is told to the operator, in the provider's own words.
  *
  * MEASURED BEFORE THIS FILE: on his record the night's `infer.resolve` failed eight times as "No model answered for
  * 'glm-5.3-flash': the provider did not answer", filed as a question to him, and the platform's own sentence was thrown

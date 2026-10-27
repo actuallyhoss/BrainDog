@@ -1,5 +1,5 @@
 /**
- * The bot check on `POST /auth/signup/start`, proven in every mode it runs in (LCH-A02): the Worker as it ships, on the
+ * The bot check on `POST /auth/signup/start`, proven in every mode it runs in: the Worker as it ships, on the
  * listening Cloud (`cloud-serve.ts`), with a made-up secret and siteverify answered inside this process.
  *
  * MEASURED BEFORE THIS FILE: `turnstilePassed` was only ever reached with a passing answer (`signup-mode.test.ts`, the

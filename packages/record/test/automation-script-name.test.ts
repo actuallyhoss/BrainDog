@@ -1,5 +1,5 @@
 /**
- * What an automation that only starts a script is called (audit B of 25 October, Y11).
+ * What an automation that only starts a script is called.
  *
  * MEASURED BEFORE THIS: a rule with no name of its own was listed by its id, so Automations said "Close follow ups" of
  * the one script Scripts calls "Close the follow-ups of a finished task": one thing, two names, on two screens. A rule

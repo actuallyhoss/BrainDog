@@ -21,7 +21,7 @@
   import { arrivalsOf, freshOf, groupSaid, type Landed } from './landed.ts';
 
   /* `self` IS THE READER'S OWN NAME, which their own lines' face is drawn from: "You" drew a Y beside their own name on a
-     first Today ("Y Maya You", the audit of 22 October, U-C4). */
+     first Today ("Y Maya You"). */
   let { rows, review = 0, self = null }: { rows: readonly Landed[]; review?: number; self?: string | null } = $props();
   const faceOf = (r: { who: string; kind?: string | undefined }): string => (r.kind === 'you' && self !== null && self.trim() !== '' ? self : r.who);
 

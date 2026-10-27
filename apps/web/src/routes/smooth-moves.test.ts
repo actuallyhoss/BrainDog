@@ -1,5 +1,5 @@
 /**
- * The shell's moves stay smooth (fluid F1, F3, F6, F11, F12).
+ * The shell's moves stay smooth (fluid F1).
  *
  * A press lights at once and the page changes with no pause: the shell waits only a moment for a new screen to say it
  * has drawn, the old picture leaves before the new one arrives (never two titles), a stale shell is replaced only when

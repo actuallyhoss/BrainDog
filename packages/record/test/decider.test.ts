@@ -1,5 +1,5 @@
 /**
- * `setDecider`: the owner names the one person who decides a question (USE-A13).
+ * `setDecider`: the owner names the one person who decides a question.
  *
  * An owner, in a browser, hands a question to a member who holds Decides and takes it back with nobody. A member who
  * only reads is refused with her name in the sentence, a token is refused whatever level its holder has, and so is a

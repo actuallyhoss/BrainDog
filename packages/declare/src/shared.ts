@@ -93,7 +93,7 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
       at: shaped,
     });
 
-  /* `changes` SAYS WHAT ONE VERSION CHANGED, and the use case reads it as one of its own keys now (SHL-A09), so the note
+  /* `changes` SAYS WHAT ONE VERSION CHANGED, and the use case reads it as one of its own keys now, so the note
      travels on the pack it carries and a record can show it. A file that says its changes still installs exactly as one
      that does not: the note is kept out of the pack's checksum, as its title is. */
   const u = normaliseUseCase(doc);

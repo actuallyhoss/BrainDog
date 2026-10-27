@@ -167,7 +167,7 @@ test('A CLIENT ID RE-ATTACHES in any state, and a finished run comes back to act
   );
   assert.equal(events(sql, task.id)[0]?.actor, 'S1');
 
-  /* A RUN THAT LEFT A STEP AND IS WORKED IN AGAIN IS WORKING (AGT-C04, `REVIVED`): resumed and writing, it comes back
+  /* A RUN THAT LEFT A STEP AND IS WORKED IN AGAIN IS WORKING (`REVIVED`): resumed and writing, it comes back
      to active and a new stretch begins, so the step it was handed is no longer the one it leaves (`leftFreshStep`). */
   value(k.update('session', 'S1', { state: 'handoff', next: 'Pick up the sweep' }, { actor: 'p_owner' }));
   clock.advance(MIN);
@@ -297,7 +297,7 @@ test('THE KERNEL-WRITTEN FIELDS are refused from a person and from a run alike',
 
   /* EACH WITH A VALUE ITS TYPE TAKES, so the refusal is about who writes it and not about the value. */
   const INSTANTS = ['last_seen', 'started', 'stretch_at', 'next_at', 'closed_at', 'seen_before', 'pulse_at'];
-  /* last_seen on a create, or on a run never heard from here, is carried as seen_before (run-carried.ts, AGT-C10); runs-imported.test.ts and run-carried.test.ts hold that, and a run heard from here still refuses it. */
+  /* last_seen on a create, or on a run never heard from here, is carried as seen_before (run-carried.ts); runs-imported.test.ts and run-carried.test.ts hold that, and a run heard from here still refuses it. */
   for (const key of KERNEL_WRITTEN.filter((k) => k !== 'last_seen')) {
     const said = INSTANTS.includes(key) ? iso(NOW) : key === 'wrote' ? 1 : key === 'closed_as' ? 'taken' : key === 'stopped' ? 'stop' : 'x';
     for (const out of [

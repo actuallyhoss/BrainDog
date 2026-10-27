@@ -1,5 +1,5 @@
 /**
- * The block editor's `Show it only when` box: a sentence on screen, the kernel's leaf in the record (PGS-C06).
+ * The block editor's `Show it only when` box: a sentence on screen, the kernel's leaf in the record.
  *
  * THE BOX SENT ITS WORDS AS TYPED, and the kernel installs only a leaf (`declare.ts` refuses `'overdue > 0'`), so every
  * condition typed into the sheet was refused, and every stored one was shown as kept. And no comparison holds of a

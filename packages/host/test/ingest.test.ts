@@ -93,7 +93,7 @@ test('the four shapes, and nothing else', () => {
     ingest: 'ingest_sms',
     token: 'tok',
   });
-  /* A signed door on the Cloud (DOR-3): the record and the ingest, and no token, because the signature is the proof. */
+  /* A signed door on the Cloud: the record and the ingest, and no token, because the signature is the proof. */
   assert.deepEqual(servesIngest('/in/webhook/rec_1/ingest_sms'), { channel: 'webhook', rec: 'rec_1', ingest: 'ingest_sms' });
   assert.deepEqual(servesIngest('/in/email/tok'), { channel: 'email', token: 'tok' });
   /* The repeated slashes `servesKeys` already forgives, forgiven the same way. */

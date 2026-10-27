@@ -4,7 +4,7 @@
  * WHY IT IS HERE. Today needs every list's declaration before it can ask its page (its week and its people are found by
  * what the lists declare, never by their names), and a tab asked `schema` once a list: twenty-five asks on the seed,
  * which a browser sends six at a time, so the first open of Today waited five round trips before it could ask its page
- * (`loop/perf/round2.mjs`, 1.6 s at 140 ms a trip). One read answers them all.
+ * (1.6 s at 140 ms a trip). One read answers them all.
  *
  * EACH LIST IS HELD EXACTLY AS `schema` HOLDS IT. The caller is asked whether they may read at all first (`scoped`), and
  * then each list by itself through the same `guard(ctx, 'read', list)` that `schema` asks, so a list the caller may not

@@ -1,5 +1,5 @@
 /**
- * A field worked out from other fields (SHL-B18), on a real record: it installs, it reads right on every way a row
+ * A field worked out from other fields, on a real record: it installs, it reads right on every way a row
  * leaves the kernel (one row, a page, a search hit), it is never stored, and it cannot be written or sorted on. A
  * `via` page of fifty rows costs one lookup, and a link the reader cannot open derives null.
  */

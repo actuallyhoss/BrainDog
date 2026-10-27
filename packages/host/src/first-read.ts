@@ -1,5 +1,5 @@
 /**
- * `/auth/signup/read`: a model reads a stranger's first sentence before there is an account (USE-B05).
+ * `/auth/signup/read`: a model reads a stranger's first sentence before there is an account.
  *
  * ONE DOOR BOTH HOSTS MOUNT. The Worker and the self-host each build a `FirstReadDoor` from what they have (a bot
  * check, a meter, the use cases on offer, a reader bound to their model) and hand the request here, so the checks and
@@ -128,7 +128,7 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
   }
 }
 
-/* ── what is on offer: the catalogue's use cases over the build's (USE-A16) ─────────────────────────────────────── */
+/* ── what is on offer: the catalogue's use cases over the build's ─────────────────────────────────────── */
 
 /** One use case the reader may read a sentence into: what the model is told, the words it is heard in, the modules it stands on. */
 export type FirstReadCase = { id: string; title: string; summary: string; signals: readonly string[]; modules: readonly string[] };

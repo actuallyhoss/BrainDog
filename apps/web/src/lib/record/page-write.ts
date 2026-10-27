@@ -544,7 +544,7 @@ export async function setBody(
  *
  * `mine` IS NO ADD-ON SIGNED IT (`pack` absent). An add-on's page set whole by a change of kind or a removal would become
  * the person's own copy and stop taking that add-on's updates, until a change to one block of it is an overlay of its
- * own (PGS-B07); so the menu offers both only where `mine` holds. A page drawn for each row of a list is its template's,
+ * own; so the menu offers both only where `mine` holds. A page drawn for each row of a list is its template's,
  * and the template is what is changed.
  */
 export type Authored = { body: PageBody; version: number | null; template: string | null; mine: boolean };

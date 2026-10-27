@@ -55,7 +55,7 @@ const PAGE_SOURCES = new Set(['forecast.runway']);
 /**
  * The names a rule's template fills from the run and not from a list: `{{trigger.row.what}}`, `{{vars.x}}`, `{{each.0}}`
  * and `{{metric.total}}`, every head `rules.ts`'s `SPELLED` fills besides the row's own `{{field}}`. Read as lists, the
- * kernel refused a rule on Inbox under `register.inbox` as reading `register.trigger` (K4), and a rule reading
+ * kernel refused a rule on Inbox under `register.inbox` as reading `register.trigger`, and a rule reading
  * `{{metric.x}}` was placed under a list called `metric`, so a member was held from it for no reason (62.4b). A figure
  * is still a read: the walk places it through its metric (`FIGURE` below), as it places a page's `{{inbox-count}}`.
  */
@@ -115,7 +115,7 @@ function walk(body: unknown, kind: Kind, resolve: Resolve, self?: string): Touch
          as `pathsOf` skips it, and in a template a field of the row is the row's, and so is `{{spoken}}`: `fill` answers
          it with the row's spoken id before it reads a field or a metric, and `declare.ts` reserves the word as a field
          id. Read as a figure it refused the seed's own `page.skill` under `register.skills`. The record's copy read every
-         one as a figure, and held a bundle carrying a template for Inbox from Inbox's readers (K3). */
+         one as a figure, and held a bundle carrying a template for Inbox from Inbox's readers. */
       if (page)
         for (const m of node.replace(/`[^`]*`/g, ' ').matchAll(/\{\{\s*(?:[a-z]+:\s*)?([a-z][a-z0-9_-]*)\s*\}\}/g))
           if (!(forList !== null && (fields.has(m[1]!) || m[1] === 'spoken'))) figure(m[1]!);
@@ -143,7 +143,7 @@ function walk(body: unknown, kind: Kind, resolve: Resolve, self?: string): Touch
  *   - `script.<id>`: its `reads` and `writes`, or `ANY_LIST` when both are empty, as `scripts` places it. The source is
  *     not walked: the runtime holds a script to what it declares.
  *   - `ingest.<id>`: every list it writes, and `ACROSS` when it calls out, because `actions` refuses a door's host to
- *     anybody who does not read the whole record (K6: the gold door's `api.gold.example.test`).
+ *     anybody who does not read the whole record (the gold door's `api.gold.example.test`).
  *   - `metric.<id>`, and a prediction's measure asked as `metric.`: the list its `source` names, or `ANY_LIST`.
  *   - a page, a digest, a theme, a block: every list and figure the walk finds.
  *

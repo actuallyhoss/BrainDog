@@ -59,7 +59,7 @@ const LISTED = new Set(['cards', 'table', 'todo', 'timeline', 'params']);
  * and Projects 1). People then has no figure to draw; Projects keeps its splits, which draw from five in play, so a
  * record with a project or two draws none. The other parts are held as before.
  */
-/* AND WORK, SINCE the UI pass of 20 October (proj F10): At a glance spread three bare numbers across the page, the first
+/* AND WORK (proj F10): At a glance spread three bare numbers across the page, the first
    of them the head's own count, and the line says what is late and what waits on you. */
 const NO_FIGURES_TILE: ReadonlySet<string> = new Set(['people', 'portfolio', 'work']);
 
@@ -69,8 +69,7 @@ const PARTS: Record<string, (b: Block, list: string) => boolean> = {
   queue: (b, list) =>
     b.kind === 'queue' && b.source === 'governance.open' && b.where === `list is ${list}` && b.when?.metric === `questions-open-in:${list}` && b.when.gt === 0 && Object.keys(b.when).length === 2,
   figures: (b) => (b.kind === 'stat' && (b.cells ?? []).length > 0) || CHARTS.has(b.kind),
-  /* AN AGENT AT WORK: the runs that changed the list, from the log, or the rows of it an agent holds, or, SINCE the UI
-     pass of 20 October (proj F5), the list's own cards saying the agent on each, as Projects' In play does. */
+  /* AN AGENT AT WORK: the runs that changed the list, from the log, or the rows of it an agent holds, or, SINCE the redesign (proj F5), the list's own cards saying the agent on each, as Projects' In play does. */
   agents: (b, list) =>
     (b.kind === 'agents' && b.source === 'activity' && typeof b.where === 'string' && b.where.startsWith('list is ') && b.where.slice(8).split(' or ').includes(list)) ||
     (b.source === `register.${list}` && typeof b.where === 'string' && /\bagent is set\b/u.test(b.where)) ||

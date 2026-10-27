@@ -127,7 +127,7 @@
   /* THE KEYS SEEN ARE THE RECORD'S, read through the client the page already makes, with this browser behind it on an
      older record. The client may not be made yet when the file is verified, so one is made for the read. */
   const keys = recordKeys((name, args) => (client ?? createClient({ base: apiBase() })).call(name, args));
-  /* BRAINDOG'S OWN SAYS BY BRAINDOG AND NO SIGNATURE LINE (audit C, X12): "Nobody signed this version" read as a warning. */
+  /* BRAINDOG'S OWN SAYS BY BRAINDOG AND NO SIGNATURE LINE: "Nobody signed this version" read as a warning. */
   const ours = $derived(listing ? byBrainDog(listing) : false);
   const said = $derived(trust && listing ? trustSaid(trust, listing.publisher?.name ?? listing.author, ours) : null);
   /* WITHHELD, as `catalogue.ts` `withheld` says: a revoked key, a lost signature, or a different key until pressed. */
@@ -269,7 +269,7 @@
     })();
   }
 
-  /* A STORE THAT DID NOT ANSWER IS NOT AN ADD-ON THAT IS GONE (Y9): it says so, with Try again. */
+  /* A STORE THAT DID NOT ANSWER IS NOT AN ADD-ON THAT IS GONE: it says so, with Try again. */
   let storeRefused = $state<string | null>(null);
   function readStore(): void {
     storeRefused = null;
@@ -431,7 +431,7 @@
   );
   /* ONCE IT IS IN, ITS FIRST PAGE, so one press lands on what it brought (`offer.ts` `firstPageOf`). */
   const opens = $derived(adds ? firstPageOf(adds.pages, declared) : null);
-  /* SOMETHING TO PRESS: the phone's bar is drawn only then (S5), and never to say "Installed" over the last tile. */
+  /* SOMETHING TO PRESS: the phone's bar is drawn only then, and never to say "Installed" over the last tile. */
   const doable = $derived(listing !== null && listing !== undefined && filed === null && (action?.kind !== 'installed' || opens !== null) && (trust?.kind === 'changed' || !untrusted));
 
   const publisherWords = $derived(
@@ -599,7 +599,7 @@
 
       <div class="third-cell versions-cell">
         <Tile icon="history" title={words.versions} count={listing.versions.length}>
-          <!-- THE NEWEST VERSION AND WHAT IT CHANGED, then the earlier ones folded (audit C, X12): six versions of notes
+          <!-- THE NEWEST VERSION AND WHAT IT CHANGED, then the earlier ones folded: six versions of notes
                were a wall on a phone, and an old note says what a person no longer needs to read. -->
           <ol class="log versions">
             {#each listing.versions.slice(0, 1) as v (v.version)}{@render versionRow(v)}{/each}
@@ -1008,8 +1008,8 @@
     }
 
     /* THE BUTTON SITS ON THE TAB BAR, fixed to the window as the list's bulk bar is, on a bar of the board's colour with
-       one hairline over it (S5), and only while there is something to press. Sticky, it stood a tab bar's height above
-       the tab bar with the page showing through the gap (audit C, X13). The page ends the bar's height further down, so
+       one hairline over it, and only while there is something to press. Sticky, it stood a tab bar's height above
+       the tab bar with the page showing through the gap. The page ends the bar's height further down, so
        no tile ends underneath it. */
     .narrow-only {
       position: fixed;

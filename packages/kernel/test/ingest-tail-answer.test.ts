@@ -1,5 +1,5 @@
 /**
- * An answer to a tail question, carried out (REC-A02): the digits on the account, the confirmation kept for every pattern,
+ * An answer to a tail question, carried out: the digits on the account, the confirmation kept for every pattern,
  * every text that waited filed oldest first, and a closing line that says what happened, all under one Undo.
  *
  * THE SCOPE'S OWN TEST, on an invented record: twenty texts printing one card's digits at five shops are one question;

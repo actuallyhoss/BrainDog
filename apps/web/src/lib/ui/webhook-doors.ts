@@ -56,7 +56,7 @@ export type Door = {
   mintable: boolean;
   held: boolean;
   /**
-   * WHETHER THE DOOR TAKES ARRIVALS, or `null` from a host whose `doors` predates the switch (SHL-C13). `null` draws no
+   * WHETHER THE DOOR TAKES ARRIVALS, or `null` from a host whose `doors` predates the switch. `null` draws no
    * switch, because a press there could only be refused.
    */
   on: boolean | null;
@@ -183,7 +183,7 @@ export async function mintDoor(call: Call, base: string, ingest: string): Promis
  */
 export const asksFirst = (door: Door): boolean => door.held;
 
-/* ── on and off (SHL-C13) ─────────────────────────────────────────────── */
+/* ── on and off ─────────────────────────────────────────────── */
 
 /**
  * A day as the row says it: "3 October", with the year only when it is not this year's.
@@ -219,7 +219,7 @@ export type Feed = { id: string; name: string; said: string };
 /**
  * THE ADDRESSES THAT FEED THIS RECORD, newest arrival first, each with how long ago its last one came ("Last arrival 5
  * hours ago"). What comes in listed only the scheduled fetches under "Where new items come in from", and said "Nothing
- * feeds this record yet" while card texts were posted to a door every hour (the audit of 25 October, Z19). A door that
+ * feeds this record yet" while card texts were posted to a door every hour. A door that
  * has never been posted to feeds nothing, and is left to the doors' own tile.
  */
 export function feedsOf(doors: readonly Pick<Door, 'id' | 'name' | 'lastArrival'>[], now: number): Feed[] {

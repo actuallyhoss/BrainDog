@@ -19,7 +19,7 @@
  *
  * ITS CEILING IS `ADDS_DRAWN_MOST` blocks on one page, over one manifest per `pack` row the host hands in.
  *
- * A COLUMN, TOO (PGS-C29): `{ page, into: <block key>, column }` adds one column to a block of the page rather than a
+ * A COLUMN, TOO: `{ page, into: <block key>, column }` adds one column to a block of the page rather than a
  * block of its own, after the block's own columns. `into` is the key the block answers (`blockKeyOf`), so a person who
  * renames its heading keeps the column. A key the page no longer has leaves the page as it was, with nothing said: the
  * column was about a block that is gone. At most `ADDED_COLUMNS_MOST` added columns on one block, from every pack, the

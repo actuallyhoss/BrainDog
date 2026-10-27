@@ -191,10 +191,10 @@ export async function draftChange(
   body?: unknown,
   not: readonly Drafted[] = [],
 ): Promise<{ ok: true; drafted: DraftedAll } | { ok: false; fix: string }> {
-  /* TRY AGAIN SENDS THE SAME WORDS WITH WHAT IT TURNED DOWN (C34), each as its question and change, so the model drafts
+  /* TRY AGAIN SENDS THE SAME WORDS WITH WHAT IT TURNED DOWN, each as its question and change, so the model drafts
      another way and the record drops the same change if it comes back. */
   const declined = not.length === 0 ? {} : { not: not.map((d) => ({ question: d.question, change: { to: d.change.to } })) };
-  /* A PAGE THE RECORD HOLDS NONE OF YET (Today, Decide) IS SENT AS IT IS DRAWN, so the draft changes that (C25). */
+  /* A PAGE THE RECORD HOLDS NONE OF YET (Today, Decide) IS SENT AS IT IS DRAWN, so the draft changes that. */
   const out = await client.call<DraftedAll>('slashDraft', page === undefined ? { asked, ...declined } : { asked, page, ...(body === undefined ? {} : { body }), ...declined });
   if (!out.ok) return { ok: false, fix: fixOf(out) };
   return { ok: true, drafted: out.value };
@@ -219,7 +219,7 @@ export type Kept = { kind: 'kept' } | { kind: 'filed'; id: string; href: string;
  */
 export async function fileDrafted(client: SlashClient, draft: Drafted, keep: boolean): Promise<Kept> {
   /* `declaration_id` IS WHAT THE CHANGE INSTALLS, which the record asks for by name: without it every Keep it was refused
-     ("A change proposal needs declaration_id"), found on the first walk of moment 5 (C35). A bundle is named by its first member. */
+     ("A change proposal needs declaration_id"), found on the first walk of moment 5. A bundle is named by its first member. */
   const to = draft.change.to as { id?: unknown; declarations?: { id?: unknown }[] };
   /* A BUNDLE IS FILED UNDER ITS FIRST MEMBER, which the record asks for too: a page and its look were refused for want of one. */
   const first = typeof to.id === 'string' ? to.id : to.declarations?.[0]?.id;

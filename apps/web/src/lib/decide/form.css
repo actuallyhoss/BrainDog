@@ -520,7 +520,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 }
 
 /* WHAT AN OPTION WOULD CHANGE (`.ov`) LIES UNDER ITS WORDS, FROM THE NAME'S EDGE TO THE END: left to the grid's auto-placement
-   it fell into the end column, so the left column stopped short and the figure ran into a long name (audit P2). */
+   it fell into the end column, so the left column stopped short and the figure ran into a long name. */
 .dc-choice-main > .ov {
   grid-column: 2 / -1;
   grid-row: auto;

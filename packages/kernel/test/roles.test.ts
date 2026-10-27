@@ -379,7 +379,7 @@ test('A MERGE OF TWO PEOPLE KEEPS THE LATER DAY IN TOUCH of the two', async () =
   const { k, sql } = await met([register('people', fields, { meets: role })]);
   value(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com', last: '2026-06-01' }, OWNER));
   /* A COMMIT AND NOT A MAIL: a mail is text anybody could have written, and a stranger met in one who looks like Ada is
-     only offered to her as an address (H1, `people.ts`'s `offerArrival`), never asked about as a merge. */
+     only offered to her as an address (`people.ts`'s `offerArrival`), never asked about as a merge. */
   const twin = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@work.example', where: 'commit 4464966 in braindog' }, AGENT));
   const body = k.governanceRow('suggestion', twin.merge!)!.body as { rows: { at: string; patch: Record<string, unknown> }[] };
   assert.equal(body.rows.find((r) => r.at === 'people#1')?.patch.last, DAY, 'the kept person lost the newer day');

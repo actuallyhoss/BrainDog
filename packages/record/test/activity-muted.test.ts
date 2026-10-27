@@ -3,7 +3,7 @@
  *
  * MUTING CHANGED NOTHING ON TODAY. `notify.muted` filtered `whatsNew` alone, and Today's "since you were away" is a
  * `feed` over `activity`, drawn by the kernel for no reader in particular, so a rule turned off in Settings went on
- * filling the page (`loop/research-audit-11-13.md` item 2). The same reading as `test/prefs.test.ts`'s mute case, drawn
+ * filling the page. The same reading as `test/prefs.test.ts`'s mute case, drawn
  * through `previewPage` (Today's own door) and `page` (an installed page).
  */
 

@@ -60,7 +60,7 @@ export function extension(parts: KernelParts) {
     async changeKeychainWrapping(to: 'passphrase' | 'kek', rewrap: PassphraseRewrap, actor: string): Promise<Result<KeychainPassphrase>> {
       const held = recordWrapping(sql);
       if (held === null)
-        /* NOT ON THIS BRAINDOG, said as that (audit 25 October, X24): a record with no key of its own has nothing a
+        /* NOT ON THIS BRAINDOG, said as that: a record with no key of its own has nothing a
            passphrase could be put on, and "keys here have no stored value" stood under a keychain whose keys had values. */
         return no('NOT_IN_THIS_BUILD', 'Locking keys with a passphrase isn’t on this BrainDog yet.', { at: 'passphrase' });
       if (to === 'passphrase' && held.wrapped_by === 'passphrase')

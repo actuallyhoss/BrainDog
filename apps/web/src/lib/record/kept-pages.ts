@@ -1,6 +1,6 @@
 /**
  * THE LAST ANSWER OF EACH PAGE THIS TAB DREW, so a page opened again draws at once as it last was, marked as being
- * read, and the new answer replaces it when it lands (EXP-D04, "no blank flash, no spinner where a skeleton or the old
+ * read, and the new answer replaces it when it lands ("no blank flash, no spinner where a skeleton or the old
  * content can stay"). Going Money, then a project, then back to Money drew bars for the whole of each read, head
  * included, for a page this tab had drawn a minute before.
  *

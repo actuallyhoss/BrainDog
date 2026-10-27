@@ -1,6 +1,5 @@
 /**
- * The model's half of understanding who is who (`loop/research-understanding-38.md` §2, `loop/contract-17.md` "Model
- * jobs"): the doubtful pairs the kernel queues as `infer.resolve`, and the nightly read of the notes kept on people,
+ * The model's half of understanding who is who: the doubtful pairs the kernel queues as `infer.resolve`, and the nightly read of the notes kept on people,
  * organisations and projects. `model-jobs.ts` leases and meters; this file chooses what the model sees, checks what it
  * says, and keeps what it said.
  *
@@ -19,8 +18,8 @@
  *
  * NOTES ARE UNTRUSTED TEXT (§37): ASK ONLY. A name read from a note never writes a row. The ones that show a
  * relationship go to Decide as one question for each list, with the sentence that showed it, and a public figure is
- * never asked about at all. A run's handoff, what its agent said it was doing and its next step, is read the same way
- * (`loop/research-understanding-judge.md` change 4): a name there is one question, never a row.
+ * never asked about at all. A run's handoff, what its agent said it was doing and its next step, is read the same way:
+ * a name there is one question, never a row.
  *
  * AND WHAT A PERSON WROTE WORD FOR WORD IS OFFERED WITH NO MODEL AT ALL (`serveOffers`, the same change): an address
  * or a login written in their note on someone, offered to that someone as one question, and a person the record holds

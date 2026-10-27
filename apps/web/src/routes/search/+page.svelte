@@ -10,7 +10,7 @@
   spans the record; this keeps each list whole with its own count, because a person who has come here
   has already decided the ranked answer was not the one they wanted.
 
-  ONE TILE A LIST (the UI pass of 20 October, money F12). Each list that matched is a tile with its name and count,
+  ONE TILE A LIST (money F12). Each list that matched is a tile with its name and count,
   and its rows sit in it: a 32px well with the glyph of what it is, the title with the matched letters at 600, and one
   line that tells it from the next (`second.ts`). Over the lists, the best match on its own. The row is drawn here and
   not through the palette's `Result`, which is an option inside glass.

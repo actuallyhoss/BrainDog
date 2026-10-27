@@ -32,9 +32,9 @@ test('THE RUNS AT WORK ARE READ OFF THE BLOCK: the agent, what it is doing and t
   assert.equal(run?.project, 'Kiln');
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z6 (`today-1512-light.png` against `-more/run-904-390-dark-full.png`): Today said "since 22
+/* Today said "since 22
    Oct" for the run opened 22 Oct 22:21 while Agents said "2 h 54 min" for the same run, this stretch. Today's row says
-   no length until `presence` answers, and then when it was last heard, as Agents says it (the pass of 27 October). */
+   no length until `presence` answers, and then when it was last heard, as Agents says it. */
 test('A RUN OPENED TWO DAYS AGO SAYS NO "since 22 Oct" ON TODAY, and once presence answers, when Agents says it was heard', () => {
   const b = working([{ seq: 904, fields: { agent: 'claude', doing: 'Tidy projects' }, created: '2026-10-22T19:21:00Z' }] as never, [['Claude', 'Tidy projects', 'BrainDog', '']]);
   const [out] = desked([b], NOON, () => '');

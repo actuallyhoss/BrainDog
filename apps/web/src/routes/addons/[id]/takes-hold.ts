@@ -34,7 +34,7 @@ const joined = (names: readonly string[]): string =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
 /**
- * WHEN THE SETTINGS TAKE HOLD, SAID ONCE AT THE FOOT (Y10): the line under every setting was the same line fourteen
+ * WHEN THE SETTINGS TAKE HOLD, SAID ONCE AT THE FOOT: the line under every setting was the same line fourteen
  * times on the Money add-on. Only the ones that wait are named. `null` when nothing is known yet or nothing is set.
  */
 export function holdsFoot(holds: Readonly<Record<string, TakesHold>> | null, names: Readonly<Record<string, string>>, title: string): string | null {

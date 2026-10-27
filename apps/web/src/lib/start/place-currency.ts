@@ -1,6 +1,5 @@
 /**
- * A currency a place in the sentence implies, and a currency said as a person says it (the UI pass of 20 October,
- * first F9).
+ * A currency a place in the sentence implies, and a currency said as a person says it.
  *
  * A CITY IN THE SENTENCE BEATS THE DEVICE'S TIME ZONE. "A small candle shop in Leeds" typed on a laptop that keeps
  * another country's time was read as a shop keeping that country's money; the words say where the shop is, and the

@@ -1,5 +1,5 @@
 /**
- * What the walk writes can be taken back, and what it answers is placed as the walk places (research-audit-20 H1, H2):
+ * What the walk writes can be taken back, and what it answers is placed as the walk places:
  * answering "which project?" places the quiet runs in exactly the places it asked about, in one batch signed by the walk,
  * which the owner's Undo and `understand({ undo: 'last' })` both put back; and `understandPlan` reads the walk's dry
  * slice for anybody who reads every list, and nobody else.

@@ -123,7 +123,7 @@ const ROWLESS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'sect
 
 /**
  * The kinds a rule never moves: they are where the author put them because of what is around them. A PROJECT'S SHAPE
- * OPENS ITS PAGE (C28, C29), so nothing is led over it, as nothing was over the shape drawn by hand.
+ * OPENS ITS PAGE, so nothing is led over it, as nothing was over the shape drawn by hand.
  */
 const STAYS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'section', 'project']);
 
@@ -533,8 +533,7 @@ function lateSaid(late: Late, today: string): string {
 }
 
 /**
- * WHETHER A BLOCK STANDS UNDER A FOLDED HEADING: the nearest heading above it in its own column says `fold`. SINCE the
- * audit of 22 October (U12, U-A10): the rules' look on an owner's Agents page led with the folded Earlier runs, six
+ * WHETHER A BLOCK STANDS UNDER A FOLDED HEADING: the nearest heading above it in its own column says `fold`.: the rules' look on an owner's Agents page led with the folded Earlier runs, six
  * cards of runs from yesterday, and hid the Earlier heading over them, so the page opened on old runs as its lead. What
  * a page folds away is never what the rules lead with, and a heading the page folds is never one the rules hide.
  */

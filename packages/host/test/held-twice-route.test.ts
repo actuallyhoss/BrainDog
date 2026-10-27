@@ -1,5 +1,5 @@
 /**
- * `heldTwice`, who may be on the record twice (AGT-D05): routed as a READ+ read that writes nothing, handed to the
+ * `heldTwice`, who may be on the record twice: routed as a READ+ read that writes nothing, handed to the
  * record method of the same name with the list as it was sent, and answered `NOT_IN_THIS_BUILD` by a record built
  * before it had one, never a 500.
  *

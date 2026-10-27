@@ -1,5 +1,5 @@
 /**
- * THE FORM LAYOUT (the UI pass of 20 October, 2.A.26): how a settings form or an editor lays out its fields, said once.
+ * THE FORM LAYOUT: how a settings form or an editor lays out its fields, said once.
  *
  * A screen imports this sheet and wears the classes; nothing here draws a field (`controls.css` does).
  *

@@ -247,7 +247,7 @@ test('MEET IS A DATA WRITE THROUGH THE SHARED WIRING: 422 where People is switch
   assert.ok((await api.kernel.install([THINGS, PEOPLE])).ok);
   const on = await post(said);
   assert.equal(on.status, 200);
-  /* THE CONTRACT'S ANSWER (`loop/contract-17.md`): the row by its list, number and name, and how it matched. */
+  /* THE CONTRACT'S ANSWER: the row by its list, number and name, and how it matched. */
   const row = on.body.value?.row as { register?: string; seq?: number; name?: string } | undefined;
   assert.deepEqual([row?.register, row?.seq, row?.name, on.body.value?.created, on.body.value?.matched_by], ['people', 1, 'Ada Lovelace', true, 'none']);
   sql.close();

@@ -1,5 +1,5 @@
 /**
- * The first run asks back (USE-B06): the rules' questions first, then the model's, two at most, none asked twice, and
+ * The first run asks back: the rules' questions first, then the model's, two at most, none asked twice, and
  * each answer said back as a sentence of its own. Invented names only.
  */
 

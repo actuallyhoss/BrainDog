@@ -130,7 +130,7 @@ export function cloudSnapshots(
   /**
    * Copies not taken by the night: the newest `keep` stay, and the rest go.
    *
-   * A RESTORE POINT A DEPLOY TOOK IS KEPT BY AGE AND NOT BY COUNT (`restore-point.ts`, LCH-C06): seven days, and it is
+   * A RESTORE POINT A DEPLOY TOOK IS KEPT BY AGE AND NOT BY COUNT (`restore-point.ts`): seven days, and it is
    * left out of the `keep` the other labels share, so a week of pushes never pushes out a copy somebody took on purpose.
    */
   const pruneOthers = async (keep: number): Promise<void> => {

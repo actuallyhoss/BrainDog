@@ -1,7 +1,7 @@
 /**
  * The host panels, one loader each, by the name a section gives it (`panel-of.ts`, the kernel's `PANEL_TABLE`).
  *
- * A PANEL IS AN EXISTING SCREEN PART, MOUNTED AND NOT REWRITTEN (PGS-A17). The five about a row are the page's own
+ * A PANEL IS AN EXISTING SCREEN PART, MOUNTED AND NOT REWRITTEN. The five about a row are the page's own
  * (`Actions`, `Reporting`, `RunPanel`, `Seen`, `Job`); the ones about the record are the look editor of Appearance, the Slash
  * model form of Agents, the ladder of trust under Agents (`TrustRows`), whether Slash reads on its own (`SlashReads`),
  * the reader's own agent keys (`MyTokens`, which reads `ownTokens` and so lists the reader's keys and nobody else's) and

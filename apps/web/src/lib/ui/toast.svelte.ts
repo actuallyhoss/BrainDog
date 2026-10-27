@@ -7,7 +7,7 @@
  * what happened, in the past tense, with the row named, and gives back the one thing a dialog
  * cannot: the state before.
  *
- * THE WINDOW (the UI pass of 20 October, 2.A.16): five seconds for a toast that only reports, eight for one that offers
+ * THE WINDOW: five seconds for a toast that only reports, eight for one that offers
  * an action, long enough to read the sentence, look at the list, and change your mind. It pauses while the pointer is over the stack
  * or focus is inside it, because a countdown that expires while you are reaching for the button is
  * a countdown that was never really offered.

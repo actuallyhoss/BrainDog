@@ -17,7 +17,7 @@
  *
  * SIGN-UP OPENED ON 8 OCTOBER, SO WHAT RESTS ON `signup` IS `true`, and it stays true by invitation: production runs
  * `SIGNUP=invite` from 17 October, where a stranger who presses Get early access signs up with an invite or applies
- * for one, and from 20 October the site says so (D1: "Early access, invite only"). Billing is still off or in test mode, so a claim
+ * for one, and from 20 October the site says so ("Early access, invite only"). Billing is still off or in test mode, so a claim
  * that a stranger can pay, upgrade, cancel or have colleagues is `flag`. The repository is private, so a claim that
  * anybody can read the code is `not-yet`, and `claims.test.ts` asks for it to be marked again once `LAUNCH.repo` is on.
  */

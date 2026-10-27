@@ -1,5 +1,5 @@
 /**
- * WHAT TODAY READS BESIDE ITS PAGE: the briefing, and nothing of the record's housekeeping (the audit of 22 October, U3).
+ * WHAT TODAY READS BESIDE ITS PAGE: the briefing, and nothing of the record's housekeeping.
  *
  * What went stale, who the record matched, what it found wrong in its own pages and notes, what the answers taught, what
  * may be one, what has no colour and the imported rules stood under Today's More, each a read of its own after the page,
@@ -79,7 +79,7 @@ test('the page read waits on it', () => {
   assert.doesNotMatch(home, /await\s+brief\b/u);
 });
 
-test('ONE TODAY: the old one is gone (C30), so `/?classic` is an address somebody kept and it opens Home', () => {
+test('ONE TODAY: the old one is gone, so `/?classic` is an address somebody kept and it opens Home', () => {
   /* THE DOOR READS NO `classic`, and Home is the last branch alone. */
   assert.doesNotMatch(door, /searchParams\.has\('classic'\)/u);
   assert.doesNotMatch(door, /Today\.svelte/u);

@@ -1,6 +1,6 @@
 /**
  * Who is connected, in three plain parts: the app ("Claude Code", "ChatGPT"), where it runs ("Studio", or the site it
- * came from) and how it came in (signed in, or a key somebody made), with how long it has gone unused (AGT-A06).
+ * came from) and how it came in (signed in, or a key somebody made), with how long it has gone unused.
  *
  * PURE, SO `node --test` CAN IMPORT IT, for the reason `device.ts` gives.
  *

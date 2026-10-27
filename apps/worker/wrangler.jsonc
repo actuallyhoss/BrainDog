@@ -369,7 +369,7 @@
            BACKGROUND ASKS APART, each to this number of asks, AND THE TWO TOGETHER TO THIS NUMBER OF NEURONS, so neither
            spends the other's and one record never costs more than it. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
-        /* THE ROUTE (ENG-A06): SLASH_LARGE is the operator's yes to the larger model's cost, and empty is no. The three after it name
+        /* THE ROUTE: SLASH_LARGE is the operator's yes to the larger model's cost, and empty is no. The three after it name
            the operator's second provider, asked when the included model fails, with its secret SLASH_FALLBACK_KEY; any
            one empty is no second provider, and they stay empty until the published legal text names it. */
         "SLASH_LARGE": "",
@@ -422,12 +422,12 @@
            three an hour from one address until the secret half, `TURNSTILE_SECRET` (named at the end of this file),
            is set; `/healthz` says so in its `launch` sentence. */
         "TURNSTILE_SITE_KEY": "",
-        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. Suggested 300 (call 4 in loop/LAUNCH.md); the operator sets it. */
+        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. Suggested 300; the operator sets it. */
         /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
         /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. Unset in production, the owner's choice. */
         /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere and
-           `deploy.yml`'s sandbox smoke says it was skipped. EMPTY ON PURPOSE UNTIL HIS CANARY SITTING (PRF-A09, the
-           ten minutes in `loop/scope/area-proof-a.md` section 5, item 1): `tools/canary/enrol.mjs`, run by him, makes
+           `deploy.yml`'s sandbox smoke says it was skipped. EMPTY ON PURPOSE UNTIL HIS CANARY SITTING:
+           `tools/canary/enrol.mjs`, run by him, makes
            the record `ops` through the public sign-up and prints the one line that fills this. The loop never fills
            it by hand, since a record it named would be a canary nobody enrolled. */
         "OPS_RECORD": ""
@@ -599,7 +599,7 @@
            apart, each to this number of asks, and the two together to this number of neurons, so one record never costs
            more than it. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
-        /* THE ROUTE (ENG-A06): SLASH_LARGE is the operator's yes to the larger model's cost, and empty is no. The three after it name
+        /* THE ROUTE: SLASH_LARGE is the operator's yes to the larger model's cost, and empty is no. The three after it name
            the operator's second provider, asked when the included model fails, with its secret SLASH_FALLBACK_KEY; any
            one empty is no second provider, and they stay empty until the published legal text names it. */
         "SLASH_LARGE": "",
@@ -649,9 +649,9 @@
         "SIGNUP": "invite",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "",
-        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. Suggested 300 (call 4 in loop/LAUNCH.md); the operator sets it. */
+        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. Suggested 300; the operator sets it. */
         /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
-        /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. On in production since 23 October (audit call 11, taken as suggested). */
+        /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. On in production since 23 October. */
         "COUNT_VISITS": "yes",
         /* THE OPERATOR'S CANARY RECORD, as alpha's comment says, and empty until the same sitting: the line
            `tools/canary/enrol.mjs` prints goes here, in the commit after his sitting, and from then the sandbox smoke

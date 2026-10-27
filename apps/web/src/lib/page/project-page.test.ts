@@ -29,7 +29,7 @@ test('A PROJECT SAYS EACH THING ONCE: the sentence, the rail, the series and the
   assert.deepEqual(drawn, ['Waiting on you', 'More about Kiln', 'Bills and invoices', 'Keeping it alive', 'Notes', 'What changed', PLAN_BY_DATE, 'Runs on']);
 });
 
-test('MORE ABOUT IS FOLDED, AND THE PLAN IS INSIDE IT AS PLAN BY DATE, keyed anew so no look lifts it (proj F1, F3)', () => {
+test('MORE ABOUT IS FOLDED, AND THE PLAN IS INSIDE IT AS PLAN BY DATE, keyed anew so no look lifts it (proj F1)', () => {
   const got = onProject(PAGE, 'things');
   const more = got.find((b) => b.heading === 'More about Kiln')!;
   assert.equal(more.fold, true);

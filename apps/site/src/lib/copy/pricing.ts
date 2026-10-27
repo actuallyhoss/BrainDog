@@ -27,7 +27,7 @@ export type Figures = {
 
 export const pricing = {
   /**
-   * THE PRICING PAGE, the prototype's `#pricing` (`loop/site-2026-10-17/src/site.html`). Free leads
+   * THE PRICING PAGE, the prototype's `#pricing`. Free leads
    * (§35): it is the headline and the first card, the black one. Every figure is `TABLE`'s in `plans.ts`, which
    * `plans.test.ts` holds to `PLAN_TABLE`, the checkout's `HOSTED_PLANS` and the Directory's `ALLOWANCE`, and
    * `lib/pricing/cards.ts` puts each figure into these sentences.
@@ -42,7 +42,7 @@ export const pricing = {
    */
   pricing: {
     /**
-     * THE EARLY ACCESS PAGE (D2, 20 October): what `/pricing` says while `LAUNCH.billing` is off. One plan and no
+     * THE EARLY ACCESS PAGE (20 October): what `/pricing` says while `LAUNCH.billing` is off. One plan and no
      * price but its $0, a tile that says paid plans come later and are not priced, and three questions. The plans below
      * come back the day billing does, and not before. The figures are `TABLE.free`'s, filled in by the page.
      */

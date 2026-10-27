@@ -1,6 +1,6 @@
 /**
  * Work as a file: `work.pack.json` held equal to the module the build still compiles in (`packages/seed/src/modules/
- * work.ts`), so taking the module out is one small change and not a rewrite (SHL-A14, the way SHL-A13 did Estate).
+ * work.ts`), so taking the module out is one small change and not a rewrite (the way SHL-A13 did Estate).
  *
  * WHAT IS HELD. Work leans on two neighbours, Projects (a task's or a thread's project) and People (who owns a task),
  * and on nothing else. For each of the four ways a record can hold them, both, one or neither, a record is made with
@@ -205,7 +205,7 @@ function waits(doc: File): { at: string; holds: unknown }[] {
 
 /**
  * The module with the one place the plan still stores more laid on as the file says it, on a record without Projects:
- * a task's and a thread's phone line still name the project, second. Work's filters no longer empty there (C32): its
+ * a task's and a thread's phone line still name the project, second. Work's filters no longer empty there: its
  * filter by whose work it is stays when the one by project waits. And the one place the module stores more taken out
  * (`unplaced`).
  */
@@ -319,7 +319,7 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-two par
     { at: '"Tasks", "Owner"', holds: [PEOPLE] },
     { at: '"Tasks", "Project"', holds: [PROJECTS] },
     { at: '"Work", "thing"', holds: [PROJECTS] },
-    /* EVERY TASK SAYS ITS PROJECT UNDER IT, SINCE the UI pass of 20 October (proj F10), and the column waits for Projects. */
+    /* EVERY TASK SAYS ITS PROJECT UNDER IT (proj F10), and the column waits for Projects. */
     { at: '"Work", "Late", "thing"', holds: [PROJECTS] },
     { at: '"Work", "Waiting on you", "thing"', holds: [PROJECTS] },
     { at: '"Work", "This week", "thing"', holds: [PROJECTS] },
@@ -329,7 +329,7 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-two par
     /* OPEN WORK WITH NO PROJECT ASKS FOR PROJECTS WHOLE, SINCE work 1.19.0: its sentence is about the project. */
     { at: '"Work", "With no project"', holds: [PROJECTS] },
     { at: '"Board", "board", "owner"', holds: [PEOPLE] },
-    /* NO EVERYTHING OPEN UNDER THE BOARD, SINCE the audit of 25 October (Y8), so its Project and Owner wait no more. */
+    /* NO EVERYTHING OPEN UNDER THE BOARD, so its Project and Owner wait no more. */
     ...['Open', 'Due soon', 'In review', 'Handed back or blocked', 'Changed this week', 'Last worked', 'Done this week', 'Planned with a day', 'Done, by week'].map(
       (name) => ({ at: `"${name}"`, holds: [PROJECTS] }),
     ),
@@ -521,7 +521,7 @@ test('PROJECTS AND PEOPLE ARRIVING LATER: the tasks kept before are still there,
   const id = add(api, 'tasks', { ...TASK, track: thread });
   assert.ok(!stored(api).has('metric.project-open'), 'a figure asked of a project went in on a record with no projects');
   await neighbours(api, [PROJECTS, PEOPLE]);
-  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL (SHL-A08): nothing waits now, and nothing is asked. */
+  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL: nothing waits now, and nothing is asked. */
   const again = await planOf(api, file());
   assert.deepEqual([again.waiting, again.conflicts], [[], []]);
   said(await put(api, file()));
@@ -605,7 +605,7 @@ test('A FINISHED TASK CLOSES ITS OPEN FOLLOW-UPS, and leaves one in review or dr
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'tasks#2', patch: { state: 'done', note: 'Closed with Proof the spring catalogue (tasks#1).' }, version: 1 }]);
 });
 
-/* ── The questions about tasks, on Work (PGS-C18) ──────────────────────────────────────────────── */
+/* ── The questions about tasks, on Work ──────────────────────────────────────────────── */
 
 type Laid = { kind: string; heading?: string; lead?: boolean; fold?: boolean; box?: boolean; area?: string; body?: string; where?: string; when?: unknown; limit?: number; tiles?: boolean };
 type Drawn = { kind: string; heading?: string; lead?: boolean; body?: string; drawn?: boolean; values?: Record<string, Json>; queue?: { id: string }[]; matched?: number };
@@ -641,7 +641,7 @@ test('WORK ASKS ITS OWN QUESTIONS: a queue of the questions about tasks, three d
   for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:tasks\}\} question\(s\) for you/u);
 });
 
-/* FIVE SINCE the screens scope of 24 October (E24): the questions, then four bands in his order, Late, Waiting on you,
+/* FIVE SINCE the screens scope of 24 October: the questions, then four bands in his order, Late, Waiting on you,
    This week and With an agent, two to a row. */
 test('FIVE TILES BEFORE THE FOLD AT 1440, the questions over four bands in his order', () => {
   assert.deepEqual(beforeTheFold(workPage()), ['Questions for you', 'Late', 'Waiting on you', 'This week', 'With an agent']);

@@ -1,5 +1,5 @@
 /**
- * When a changed setting takes hold (SHL-A09): at once, or when the add-on next updates.
+ * When a changed setting takes hold: at once, or when the add-on next updates.
  *
  * TWO WAYS A SETTING IS READ, and the add-on file says which. A `{{config:<key>}}` in a declaration is filled when the
  * add-on is planned and installed (`filledWith` in `index.ts`), and the declaration is stored with the value it was

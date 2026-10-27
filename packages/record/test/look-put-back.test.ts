@@ -1,5 +1,5 @@
 /**
- * Put back, one step back whoever wrote the look (PGS-B12: a composition is a proposal the person can pin,
+ * Put back, one step back whoever wrote the look (a composition is a proposal the person can pin,
  * change or undo): `undoLook` installs the live look's version before it from the versions the kernel keeps, or gives the
  * page back to the rules when it had none, any day after. Slash's own six-second Undo goes back as it always did.
  */

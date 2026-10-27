@@ -214,7 +214,7 @@ export type Passed = AuditEvent & { pass?: PassSaid; steps?: readonly AuditEvent
 export type PassLine = { said: string; steps: Told[] };
 
 /**
- * ONE PASS OF THE UPDATE IS ONE LINE (SHL-A21). The night's update writes an install, a carry and a question a line,
+ * ONE PASS OF THE UPDATE IS ONE LINE. The night's update writes an install, a carry and a question a line,
  * which filled Activity with "Installed the Agents add-on" and "Installed the Work add-on"; the record now sends the
  * pass as one line, with the sentence that names how many add-ons and whether anything was kept, and every line it
  * wrote under it. This says that line, and its steps as lines Activity already draws, each keyed under the pass so two
@@ -244,7 +244,7 @@ export function passOf(e: Passed): PassLine | null {
  * the newest lines only, which the sentence says, because a count that stops at the page size and reads as the whole
  * is a confident wrong answer.
  *
- * `byWho` IS THE RECORD'S OWN COUNT OF WHO WROTE THOSE LINES (SHL-A21), worked out where an agent reads it too. The
+ * `byWho` IS THE RECORD'S OWN COUNT OF WHO WROTE THOSE LINES, worked out where an agent reads it too. The
  * record's own lines (its update, its seed, Slash) are said apart, "and BrainDog itself made 3", and never counted as an
  * agent's or a person's. One pass of the update is one line there, and so one here.
  */
@@ -391,7 +391,7 @@ export function bankName(title: string): string | null {
  * here and nowhere else.
  */
 export function thingOf(target: string, title: string | null, nameOf: (list: string) => string = listName): Thing | null {
-  /* A BANK'S LINE IN CAPITALS READS AS WORDS (H21, `readable`): "Changed LEDGER POST" is "Changed Ledger Post". */
+  /* A BANK'S LINE IN CAPITALS READS AS WORDS (`readable`): "Changed LEDGER POST" is "Changed Ledger Post". */
   const cleaned = title === null ? null : bankName(title);
   const said = cleaned !== null ? moneyInText(readable(cleaned)) : null;
   const row = ROW.exec(target);
@@ -450,7 +450,7 @@ export const scriptWords = (note: string): string =>
     .replace(/\bscript:([a-z][a-z0-9_-]*)@v\d+/gu, (_m, slug: string) => `the ${humanize(slug)} script`)
     /* A rule's id is a mechanism: "rule.meet-payees ran." is "Meet payees ran." */
     .replace(/\brule[.:]([a-z][a-z0-9_-]*)/gu, (_m, slug: string) => humanize(slug))
-    /* AND ANY OTHER NAME IN snake_case IS A MECHANISM'S (the pass of 27 October): "settle_matched_line did not
+    /* AND ANY OTHER NAME IN snake_case IS A MECHANISM'S: "settle_matched_line did not
        finish" is "Settle matched line did not finish", never the id. A caller holding the thing's title says that first. */
     .replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gu, (slug, at: number) => (at === 0 ? humanize(slug) : humanize(slug).toLowerCase()))
     .replace(/\s*·\s*$/u, '')
@@ -639,7 +639,7 @@ export function ranSaid(note: string, title: string, id: string): string {
 }
 
 /**
- * ONE LINE A RULE A DAY (the pass of 27 October). A filing rule runs on every payment that arrives and writes a
+ * ONE LINE A RULE A DAY. A filing rule runs on every payment that arrives and writes a
  * "ran" line each time, so a day of Activity was forty "Fetched · A rule: Meet payees · Meet payees ran." The runs of
  * one rule on one day that went through are its newest line, saying how many times; a run that failed stays a line of
  * its own, since that one needs him.
@@ -686,7 +686,7 @@ export const SETTLE_TWIN_MS = 60_000;
 /**
  * ONE LINE PER DECISION. Answering a question writes two lines to the log, the decision and the question closing, by
  * the same person on the same question in the same second, and Activity drew both: "Closed “Keep 6 key numbers for
- * Crumb.gg?…”" over "Decided “Keep 6 key numbers for Crumb.gg?…”" at 20:31 (the audit of 25 October, Z34,
+ * Crumb.gg?…”" over "Decided “Keep 6 key numbers for Crumb.gg?…”" at 20:31 (Z34,
  * `audit-390-light.png`). The close is folded into its decision, which keeps its own words and takes the close's note
  * ("Answered in one press, with no reason given") where it has none. A close with no decision beside it, a question
  * withdrawn or one that lapsed, is drawn as it was.
@@ -909,7 +909,7 @@ export const partWords = {
 } as const;
 
 /**
- * WHAT A LINE CHANGED, IN A PERSON'S WORDS (the pass of 27 October): a change to a row is its list ("Ledger",
+ * WHAT A LINE CHANGED, IN A PERSON'S WORDS: a change to a row is its list ("Ledger",
  * "People"), a question asked or answered is that, an export is an export, a rule's run is a run and a failed one is
  * counted apart. "What changed" was split by the log's own verbs, "Fetched 41", and said "Fetched is the biggest share".
  */

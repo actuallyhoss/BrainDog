@@ -1,5 +1,5 @@
 /**
- * The vital sign "The model answers" (`model-answers`, PRF-A05 job 1, `loop/scope/area-proof-a.md` 2.2), filed by the
+ * The vital sign "The model answers" (`model-answers`, PRF-A05 job 1), filed by the
  * host once a night through the kernel's one verb for it, `signRead`.
  *
  * WHY THE HOST FILES IT. The kernel cannot see a model call: every ask is written to Slash's own ledger, `slash_call`
@@ -12,7 +12,7 @@
  * a model job is dead, or when the last day held asks and none was answered. `none` when there was no ask in the week
  * and no model job is dead: a record nobody asked is not a green one.
  *
- * AND RED WHEN THE MONTH'S ASKS ARE SPENT (audit 40-42, 5). A budget refusal is neither an answer nor a failure, so the
+ * AND RED WHEN THE MONTH'S ASKS ARE SPENT (5). A budget refusal is neither an answer nor a failure, so the
  * two counts below pass it over, and before this five answers and then fifty refusals read "answered all 5 asks", and a
  * week of nothing but refusals read "No one asked the model anything". Now the refusals are a fact of their own, and the
  * sign is red while the newest thing in the ledger is a refusal and its month has not yet turned: nothing the record

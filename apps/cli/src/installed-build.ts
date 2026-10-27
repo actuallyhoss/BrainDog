@@ -1,5 +1,5 @@
 /**
- * Whether the command installed on this machine is newer than the one this long-lived process started from (H27).
+ * Whether the command installed on this machine is newer than the one this long-lived process started from.
  *
  * A BRIDGE OUTLIVES AN UPDATE. `braindog mcp` runs as long as its session, and `braindog update` renames a new bundle
  * over the installed file under it, so a session opened the day before kept answering as the old build: on the owner's

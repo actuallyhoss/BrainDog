@@ -1,5 +1,5 @@
 /**
- * `copies.ts` (LCH-C03): the record's copies as three facts, read from the `export` events, and the two writes a night
+ * `copies.ts`: the record's copies as three facts, read from the `export` events, and the two writes a night
  * makes. Over a real record, so the events are the ones `lifecycle` and `export` write and the file is the one
  * `exportBrainl` writes.
  */
@@ -110,7 +110,7 @@ test('A FAILED NOTE IS ALWAYS THE SAME WORDS, whatever the night threw', () => {
 });
 
 test('AN ERROR NAMING A BUCKET AND A KEY NEVER REACHES A NOTE: the reason goes to the fault alone', async () => {
-  // Audit 40-42 finding 3: a note is history anyone reading the record sees, and the raw error named the bucket.
+  // A note is history anyone reading the record sees, and the raw error named the bucket.
   const { k, sql, clock } = await record();
   const why = 'R2 bucket braindog-copies-prod refused PUT rec_01J9ZQ/snapshots/2026-10-09 (403)';
   copyFailed(sql, life(k), why, clock.now());

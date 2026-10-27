@@ -1,5 +1,5 @@
 /**
- * TRY AGAIN AFTER A PRESS THE RECORD ANSWERED (audit 55, claim 8). The record keeps a press's key once its entries are
+ * TRY AGAIN AFTER A PRESS THE RECORD ANSWERED. The record keeps a press's key once its entries are
  * in, and passes entries over only for a key it holds, so the next press goes under a new key and must carry only what
  * is still to make. A use case's plan (`formedRows`) is formed from the sentence on every press: sent again under the
  * new key, it was written a second time.

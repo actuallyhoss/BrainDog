@@ -1,5 +1,5 @@
 /**
- * HOW MANY TRIALS AN AGENT HAS LEFT TODAY ON ONE RECORD (SHL-D05). Pure: the caller hands in how many trials by a token
+ * HOW MANY TRIALS AN AGENT HAS LEFT TODAY ON ONE RECORD. Pure: the caller hands in how many trials by a token
  * this record has run since midnight UTC, and gets back how many more it may, or the refusal.
  *
  * TWENTY A DAY, BECAUSE A TRIAL IS A RUN. Each one starts a sandbox and calls a provider on the owner's plan, and an

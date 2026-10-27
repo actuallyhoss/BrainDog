@@ -297,7 +297,7 @@ test('THE KEY NAMES ONLY THE COLOURS DRAWN, what is in hand first, and a plan in
     { tone: 'bad', label: 'Late' },
     { tone: 'good', label: 'Done' },
   ]);
-  /* Warn is set from the due date alone, so it says when, never a judgement of the work (research-audit-31-32 §4). */
+  /* Warn is set from the due date alone, so it says when, never a judgement of the work. */
   assert.ok(!key('warn', undefined).some((k) => /risk/iu.test(k.label)), 'warn claims a risk nothing measured');
   assert.deepEqual(key('bad', undefined), [{ label: 'Under way' }, { tone: 'bad', label: 'Late' }], 'never a state no bar is in');
   /* One colour is nothing to tell apart, whichever it is. */

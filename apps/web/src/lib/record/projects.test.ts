@@ -109,7 +109,7 @@ test('THE CARDS IN PLAY SAY WHICH PROJECTS ARE NOT GOING WELL, with no table say
   const said = JSON.stringify(playing.rows);
   assert.match(said, /At risk/u);
   assert.match(said, /Off track/u);
-  /* WITH AN AGENT WENT IN the UI pass of 20 October (proj F1): each card names the agent that holds it, so a table
+  /* WITH AN AGENT WENT (proj F1): each card names the agent that holds it, so a table
      saying it again under the cards was the same fact twice. */
   assert.ok(!overview.blocks.some((b) => b.heading === 'With an agent'), 'a table says again which agent holds which project');
   for (const agent of ['Claude', 'Cursor']) assert.match(said, new RegExp(agent, 'u'), `no card names ${agent}, which holds a project`);

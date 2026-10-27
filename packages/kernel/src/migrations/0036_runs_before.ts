@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 36: a run carried in from somewhere else is history, and holds no next step (AGT-C10).
+ * The kernel schema, migration 36: a run carried in from somewhere else is history, and holds no next step.
  *
  * AN IMPORTED RUN KEPT THE STEP ITS ADAPTER GAVE IT, so a run nobody here ever heard from, written off in the old
  * system months ago, could be offered as the next thing to pick up. On the owner's record 295 runs came in by the

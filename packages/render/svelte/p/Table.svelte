@@ -113,7 +113,7 @@
     /** The reader's clock (`RenderOptions.now`): a day in its year is said without the year. */
     now?: number | undefined;
     /**
-     * EACH ROW'S DECLARED ACTIONS (PGS-A12) and where a press goes, handed the `TableRow` it was on. Drawn in a last
+     * EACH ROW'S DECLARED ACTIONS and where a press goes, handed the `TableRow` it was on. Drawn in a last
      * column, and at a card's end on a phone, only when both are handed; with either absent the table is as it was.
      */
     rowActions?: readonly unknown[] | null | undefined;
@@ -626,7 +626,7 @@
      Past ROWS_WINDOW_FROM rows (120, `../../src/rows-window.ts`) the table is drawn through
      `RowsWindow.svelte`, which builds the rows on screen between two spacers that keep the scrollbar
      the whole list's length; find-in-page then reaches the drawn rows alone, which is why the window
-     starts at 120 and not at one (PGS-A16). This component used to draw that sentence from its own `total`
+     starts at 120 and not at one. This component used to draw that sentence from its own `total`
      prop — which is `aria-rowcount`, and `aria-rowcount` is deliberately `-1` while a filtered list
      is still paging, so `2000 < -1` was false and the line disappeared in exactly the state it was
      written for. A cap line is about the LIST; the host has the answer's real size and draws one for
@@ -635,7 +635,7 @@
 
 <style>
   /**
-   * THE KEYBOARD'S PLACE IS ONE RING, ON THE CELL (the UI pass of 20 October, 2.A.27). The row and its cell each drew a
+   * THE KEYBOARD'S PLACE IS ONE RING, ON THE CELL. The row and its cell each drew a
    * 2px ring, one inside the other, so the caret looked doubled. The focused cell takes the ring, inset so the next cell
    * never covers it, and the caret's row takes the hover wash and nothing louder. GLOBAL, as every rule here is, so no
    * scoping class lands on a cell `toHTML` draws too (the two renderers draw one tree, `parity.test.ts`).

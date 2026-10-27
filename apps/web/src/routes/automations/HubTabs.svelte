@@ -23,7 +23,7 @@
   let { here, full = false }: { here: Tab; full?: boolean } = $props();
 
   /* Run when the track is drawn, and again whenever `here` changes, after the links have been marked. */
-  /* AFTER THE TRACK HAS SETTLED, NOT AS IT IS DRAWN (UI pass of 21 October, H29): the part decides whether a phone's
+  /* AFTER THE TRACK HAS SETTLED, NOT AS IT IS DRAWN: the part decides whether a phone's
      track scrolls once it has measured its words, so a scroll asked for at once found nothing to scroll and Runs stayed
      off the edge. Two frames, then the bar's own scroll, so the page itself never moves. */
   const inView: Attachment<HTMLElement> = (bar) => {
@@ -80,7 +80,7 @@
     white-space: nowrap;
   }
 
-  /* NO GLASS (the UI pass of 20 October): once the title row is the compact bar, the control in it is the bar's. */
+  /* NO GLASS: once the title row is the compact bar, the control in it is the bar's. */
   :global(.head[data-under] .hub-tabs) {
     background: transparent;
   }

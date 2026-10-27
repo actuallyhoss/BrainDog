@@ -2,7 +2,7 @@
  * The home page's words, band by band: the hero, who it's for, the chores, your AI tools, Slash, yours and free, and
  * the questions.
  *
- * THE UI PASS OF 20 OCTOBER (`loop/ui-pass-2026-10-20/site.md` 2a, SPEC 4.7): one product picture, the desk, then six
+ * THE HOME PAGE: one product picture, the desk, then six
  * full-bleed bands that each say one new thing, and no recap close. The words are the review's, with the spec's
  * changes (the early access line). The claims ledger (`lib/claims.ts`) reads these key paths, so a key that moves
  * moves there too.
@@ -51,7 +51,7 @@ export const home = {
       link: 'Connect your tools',
       href: '/agents',
     },
-    /* ONE PERSON AND THEIR AGENTS, SINCE THE AUDIT OF 22 OCTOBER (U-C5): "Work as a team or agency" sold what brain.dog
+    /* ONE PERSON AND THEIR AGENTS: "Work as a team or agency" sold what brain.dog
        holds while invitations wait, and its page is held. One person running client work with Claude, Cursor and Codex
        is true today. */
     team: {
@@ -72,8 +72,7 @@ export const home = {
     /* The figures beside the two headings, and the line the drawing says once nothing waits. */
     today: (n: number) => `${n} today`,
     empty: 'Nothing needs you. Everything else is handled.',
-    /* The line under the one question drawn, so the count beside the heading is what a reader can account for (the
-       audit of 22 October, U-C15). */
+    /* The line under the one question drawn, so the count beside the heading is what a reader can account for. */
     after: (n: number) => (n === 1 ? '1 more waits after this one.' : `${n} more wait after this one.`),
     askedBy: 'asked by',
     undo: 'Undo',
@@ -111,7 +110,7 @@ export const home = {
   free: {
     title: 'Free while in early access.',
     say: "BrainDog is invite only for now. Ask for an invite and we'll email you when it's ready.",
-    /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the audit of 22 October, U-C15; the
+    /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the
        site's own rule, §47): "Every feature, 3 AI tools and 20 questions to Slash a month." */
     figures: (tools: number, asks: number): string => `Every feature, ${tools} AI tools and ${asks} questions to Slash a month.`,
   },

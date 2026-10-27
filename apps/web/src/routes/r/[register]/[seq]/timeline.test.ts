@@ -45,7 +45,7 @@ test('THE FIRST LINE SAYS WHO ADDED THE ROW, "added this", and any other note is
   assert.equal(noteSaid('state from open to paid'), 'state from open to paid');
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z23 (`row-390-light.png`, Activity): "An agent Imported again from Kiln Notes." The verb
+/* "An agent Imported again from Kiln Notes." The verb
    follows the name in lower case; a note that opens on a name keeps it. */
 test('A NOTE THAT OPENS ON ITS VERB READS ON FROM THE NAME, and one that opens on a name keeps it', () => {
   assert.equal(noteSaid('Imported again from Kiln Notes.'), 'imported again from Kiln Notes.');

@@ -1,6 +1,6 @@
 /**
  * The three use cases that draw the agents working now (Solo founder, Small business, Team board) read the record's
- * own working runs, and none of them keeps a clause of its own (AGT-C02, agents 1.9.0).
+ * own working runs, and none of them keeps a clause of its own (agents 1.9.0).
  *
  * EIGHT READERS WORKED OUT "WORKING" EIGHT WAYS. These three read the Agents add-on's clause, active and heard from
  * today, so the founder's Home on the owner's record listed four agents at work over last-seen times of 11 minutes, 35

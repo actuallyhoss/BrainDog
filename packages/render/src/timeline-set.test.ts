@@ -1,4 +1,4 @@
-/** A timeline's amounts are one set: where one carries pence, every amount does (the UI pass of 20 October, H16). */
+/** A timeline's amounts are one set: where one carries pence, every amount does. */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

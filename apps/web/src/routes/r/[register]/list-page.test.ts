@@ -1,5 +1,5 @@
 /**
- * A list with a page of its own opens on it (E26): `/r/datapoints` sends a reader to the page that says it is that list's
+ * A list with a page of its own opens on it: `/r/datapoints` sends a reader to the page that says it is that list's
  * (`opens`), the list's own screen stays one word away, a reader already on the list stays there, and a reading's row
  * says where its chart is.
  */

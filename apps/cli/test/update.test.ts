@@ -1,5 +1,5 @@
 /**
- * `braindog update`, against a local server that serves a bundle, its sum and its build as the site does (AGT-A04).
+ * `braindog update`, against a local server that serves a bundle, its sum and its build as the site does.
  *
  * THE BUNDLE SERVED HERE IS A SMALL SCRIPT, because what is under test is the swap and not the command: it answers
  * `--version` with the build it is, and `install --apply` by writing the arguments it was given to a file, so the

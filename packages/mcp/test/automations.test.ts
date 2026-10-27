@@ -527,7 +527,7 @@ test('NO TOOL WAS ADDED FOR AUTOMATIONS: the sixteen are the sixteen, and the re
   for (const name of ['automations', 'automation', 'dry_run', 'automationRun', 'cancelRun']) assert.equal(TOOLS.some((t) => t.name === name), false, name);
 });
 
-/* ── run an installed rule again, dry (SHL-D07) ─────────────────────────── */
+/* ── run an installed rule again, dry ─────────────────────────── */
 
 test('AN INSTALLED RULE RUN AGAIN IS DRY: won, lost, filled and left, said in words, and nothing is written or filed', async () => {
   const { sql, api } = await record();

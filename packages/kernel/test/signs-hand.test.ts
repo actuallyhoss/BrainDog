@@ -1,5 +1,5 @@
 /**
- * An operator's hand on the record (PRF-A18, scope 2.7): `markHand` keeps one row a day under sign `hand`, apart from
+ * An operator's hand on the record (scope 2.7): `markHand` keeps one row a day under sign `hand`, apart from
  * the signs' own rows, so the night that rewrites those cannot lose it. Each kind of mark (a requeue by a person, a
  * restore, a replacing import) ends the hold on its day; nothing files a `hand` reading; `readSigns` never draws it.
  */

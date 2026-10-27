@@ -102,7 +102,7 @@
           <p class="said">{facts.people.map((p) => p.title).join(', ')}</p>
         {:else if b === 'workers'}
           <!-- EACH AGENT BY ITS MAKER'S MARK AND THE NAME A PERSON READS, as Today's Working now draws it ("claude ," was
-               the handle in lower case, and a flex gap set the comma apart: the audit of 20 October). One line of text
+               the handle in lower case, and a flex gap set the comma apart: a review). One line of text
                beside the face, so the comma sits against the name. -->
           {#each facts.agents.now as w (w.key)}
             <p class="said agent"><AgentFace agent={w.agent} run={w.run} live={w.live} size="s" /><span class="agent-said"><b>{w.name}</b>{#if w.doing}<span class="quiet">, {w.doing}</span>{/if}</span></p>

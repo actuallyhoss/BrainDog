@@ -297,7 +297,7 @@ type LogArgs     = { note: string; target?: string };                           
 type ProjectArgs = ({ registers?: string[]; where?: Predicate; q?: string; limit?: number } | { metric: string }) & { budget: { tokens: number } };
 type EventLine   = Omit<EventRow, 'rowid'> & { rowid?: number; settles?: string;                       // rowid: whole-record callers only
                    register: string | null; seq: number | null; title: string | null;                  // settles: a `decide` line's question
-                   pass?: PassSaid; steps?: EventLine[] };                                             // pass, steps: the one `update` line a pass of BrainDog's own update is said as (SHL-A21)
+                   pass?: PassSaid; steps?: EventLine[] };                                             // pass, steps: the one `update` line a pass of BrainDog's own update is said as
 type PassSaid    = { said: string; updated: number; asked: number; steps: number; at: string };
 type ByWho       = { you: number; people: number; agents: number; rules: number; record: number };    // who wrote the lines answered; a folded pass is one, the record's
 type Cursor      = number | string;                                        // a rowid, or `e.<id>` / `s.<sealed>` for a caller held to named lists

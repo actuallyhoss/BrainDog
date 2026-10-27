@@ -1,6 +1,6 @@
 /**
  * The one sentence history keeps when an agent changes an automation: who, which one, and what changed, in the steps'
- * own words (SHL-D15, job 2).
+ * own words.
  *
  * WHY. Once the owner grants an agent `automation.inside` on the ladder, its edit lands at once instead of waiting on
  * Decide, so the only place the owner sees it is history. The line has to say what the edit did the way the card would:

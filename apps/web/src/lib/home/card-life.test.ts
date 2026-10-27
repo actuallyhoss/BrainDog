@@ -1,5 +1,5 @@
 /**
- * Every project card says one live thing (the audit of 22 October, U5): who is on it, else who worked on it last from
+ * Every project card says one live thing: who is on it, else who worked on it last from
  * the runs, else how long since its work moved, else since when it has been quiet. And each project takes its newest
  * run, named by its spoken id, its row id or its name.
  */

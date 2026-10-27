@@ -14,7 +14,7 @@
   THIS FILE KEEPS THE READ, as `/p/[slug]` does for any other page: the record read with the reader's filter, its
   `opened()` and `closed()` bracket, the re-read after a write, and listening for the record to move. A first open with
   nothing in the tab draws the local copy's page at once, asked behind it as `/p/work` is (`lib/data/local.ts`). The screen as it
-  was is gone (C32, 24 October): the page narrows by whose work it is and folds what has not moved, and a record with
+  was is gone (24 October): the page narrows by whose work it is and folds what has not moved, and a record with
   tasks and no Work page is sent to its tasks list's own page (`page.ts`).
 -->
 <script lang="ts">

@@ -1,5 +1,5 @@
 /**
- * Moment 5's walk, timed (DIRECTION §45 M5, scope C35): on Today, "Show the Talabat payments as a calendar", the draft
+ * Moment 5's walk, timed: on Today, "Show the Talabat payments as a calendar", the draft
  * drawn, kept, and Today opened again with no wait.
  *
  *   node tools/look/walk-moment5.mjs [--out <dir>] [--headed]

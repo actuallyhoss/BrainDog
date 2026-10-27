@@ -116,7 +116,7 @@ test('every area this build declares has an arm in the page that draws it', () =
   for (const id of AREAS.keys()) assert.ok(route.includes(`area === '${id}'`), `the index offers ${id} and no arm draws it`);
 });
 
-test('YOU, THIS BRAINDOG AND DATA (U-C9): six rows beside six, Data the whole width under them, Keys, Add-ons and Usage listed, Delete last', () => {
+test('YOU, THIS BRAINDOG AND DATA: six rows beside six, Data the whole width under them, Keys, Add-ons and Usage listed, Delete last', () => {
   assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'This BrainDog', 'Data']);
   const rows = DEFAULT_GROUPS.map((g) => rowsOf(g).map((r) => r.label));
   assert.deepEqual(rows[0], ['Appearance', 'Navigation', 'Words and money', 'Notifications', 'Keyboard', 'Signing in']);

@@ -1,6 +1,5 @@
 /**
- * `today-brief.ts`: Today's greeting and the two or three sentences the rules write over the desk (the audit of 22
- * October, U2), and the Late tile's lines in the brief's order. Said from his record as the audit found it: a salary 13
+ * `today-brief.ts`: Today's greeting and the two or three sentences the rules write over the desk, and the Late tile's lines in the brief's order. Said from his record as the audit found it: a salary 13
  * days late, a contractor fee 14 days late, an instalment 9 days late, a refund email 7 days late, and questions waiting.
  */
 

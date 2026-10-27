@@ -65,7 +65,7 @@ test('a field no list this tab knows declares is its id in words, and a referenc
   assert.equal(sayParts({ notify: { say: 'Rate is {{vars.rate}}' } } as never).find((p) => p.ref)?.text, 'rate');
 });
 
-/* ONE FIELD THAT MUST CHANGE, AND ONE CLAUSE SAYING WHAT IT CHANGES TO, IS ONE THING (audit B of 25 October, Y14): "When an
+/* ONE FIELD THAT MUST CHANGE, AND ONE CLAUSE SAYING WHAT IT CHANGES TO, IS ONE THING: "When an
    item in Bills and invoices is changed, only when Status changes, Status is paid" said one event three times. */
 test('a change to one field, waiting for one value of it, is said as that field being set to it', () => {
   const paused = { trigger: { written: { register: 'filing_rules', op: ['update'], fields: ['state'] } }, when: 'state is paused' };

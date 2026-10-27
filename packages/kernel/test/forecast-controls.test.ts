@@ -137,7 +137,7 @@ test('THE PARTS OF ONE PLAN SAY WHICH PLAN THEY ARE, from the field the leg name
   assert.ok(counted.value.steps.every((s) => !('of' in s)));
 });
 
-test('ONE PLAN WRITTEN TWO WAYS IS ONE GROUP, under the spelling its oldest part wrote (the audit of 25 October, Y1)', async () => {
+test('ONE PLAN WRITTEN TWO WAYS IS ONE GROUP, under the spelling its oldest part wrote', async () => {
   const k = await record();
   const said = ['Pottery kiln', 'pottery kiln', ' POTTERY  KILN', 'Pottery kíln'];
   said.forEach((plan, n) => made(k, 'installments', { what: `Kiln, ${n + 1} of 4`, plan, amount: { amount: 50_000, currency: 'GBP' }, due: `2026-1${n % 3}-0${n + 1}` }));

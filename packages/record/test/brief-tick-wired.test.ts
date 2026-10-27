@@ -1,5 +1,5 @@
 /**
- * The briefing, written by the record's own tick (ENG-B12, `brief-write.ts` wired in `index.ts` as `slashBrief`).
+ * The briefing, written by the record's own tick (`brief-write.ts` wired in `index.ts` as `slashBrief`).
  *
  * THROUGH THE REAL RECORD: `slashTick` gathers the facts as the owner reads them, asks a model that has `brief` once
  * for its cards on the background allowance, and keeps them; `briefing`, read by the owner, then answers the model's

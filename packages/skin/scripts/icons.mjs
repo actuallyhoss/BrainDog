@@ -270,7 +270,7 @@ function layered(size, fill = FILL) {
 
 /**
  * AN 8-BIT RGBA PNG OF THE MARK ON NOTHING, for a browser tab: a tab draws its own ground, light or dark, and a square
- * of the house ground on a dark tab bar read as a hole (the scope of 24 October, E46).
+ * of the house ground on a dark tab bar read as a hole (the scope of 24 October).
  */
 function pngClear(size, alpha, ink) {
   const stride = size * 4 + 1;
@@ -325,7 +325,7 @@ const TAB = [16, 32];
 
 /**
  * THE SMALL MARK'S PIXELS AT `size`, a whole multiple of its grid, so every pixel is wholly the mark or wholly not: at
- * 16 pixels the big mark's curves left nothing whole, and the dog and the brain's edge went with them (E46).
+ * 16 pixels the big mark's curves left nothing whole, and the dog and the brain's edge went with them.
  */
 function pixels(size) {
   const k = size / MARK_SMALL.size;

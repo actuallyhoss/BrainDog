@@ -175,19 +175,19 @@ const question = (id: string, cost: QueueQuestion['cost'] = 'call', recommended 
 const queueBlock = (queue: QueueQuestion[], total: number, lead = false): LiveBlock =>
   decideBlockOf({ kind: 'queue', source: 'governance.open', ...(lead ? { lead: true } : {}), queue, matched: total } as never, CLOCK);
 
-/* ONE RUN'S CLEANUP FOLDS INTO ONE CARD (scope D1), so the head says both numbers (D9): the questions and the cards. */
+/* ONE RUN'S CLEANUP FOLDS INTO ONE CARD, so the head says both numbers: the questions and the cards. */
 test('the head says how many questions and, when alike ones fold, how many cards they are', () => {
   const ran = (id: string): QueueQuestion => ({ ...question(id), kind: 'rowset', body_kind: 'rowset', options: [], run: { id: 'S904', name: 'Tidy projects' } }) as QueueQuestion;
   const qs = [ran('r1'), ran('r2'), ran('r3'), ran('r4'), question('q1')];
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK);
   assert.equal(shaped.sentence.text, '5 need you, as 2 cards, all quick ones.');
-  /* THE SWITCH COUNTS QUESTIONS, as the sentence does (audit Z3), and the cards are said in the sentence. */
+  /* THE SWITCH COUNTS QUESTIONS, as the sentence does, and the cards are said in the sentence. */
   assert.equal(shaped.groups.quick, 5);
   /* A QUEUE THAT DREW SOME OF THEM says no cards, since a fold of some is not one of all. */
   assert.equal(decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 9, true), queueBlock(qs, 9)], CLOCK).sentence.text, '9 need you, all quick ones.');
 });
 
-/* AUDIT Z3 (decide-390-light.png, decide-1512-light.png): "35 need you: 2 about money, ... and 33 quick ones" sat over
+/* "35 need you: 2 about money, ... and 33 quick ones" sat over
    "Quick 18" on the laptop and "Quick 5" on the phone. The record holds 35, the queue drew 20 (its ceiling), and 14 of
    them fold into one card. One count everywhere: the sentence's. */
 test('the sentence, the switch and each column\'s head say one count of what waits (audit Z3)', () => {
@@ -203,7 +203,7 @@ test('the sentence, the switch and each column\'s head say one count of what wai
   assert.equal(head(shaped.blocks[2]), 33);
 });
 
-/* AUDIT Z4 (decide-390-light-full.png): "EGP 930,191 in all" over cards that said "Moves EGP 74,092.16 and $9,074.01"
+/* "EGP 930,191 in all" over cards that said "Moves EGP 74,092.16 and $9,074.01"
    and "Records EGP 2,155,589". The sum is what the cards say, every value of each, in their currencies. */
 test('the sentence\'s sum is the sum of what the money cards say, in their currencies (audit Z4)', () => {
   const tidy = { ...question('m1'), money: [{ amount: 5000000, currency: 'EGP' }, { amount: 907401, currency: 'USD' }, { amount: 2409216, currency: 'EGP' }] } as QueueQuestion;
@@ -228,7 +228,7 @@ test('the sentence\'s sum leaves out a goal and a charge to check, which name an
 
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);
 
-test('the head says how many need you, then the two groups in digits (today F12, U-A7): about money and what they come to, then the quick ones', () => {
+test('the head says how many need you, then the two groups in digits (today F12): about money and what they come to, then the quick ones', () => {
   const qs = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id, n) => question(id, 'call', n === 0));
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK, () => 'Claude');
   assert.equal(shaped.sentence.text, '5 need you, all quick ones.');
@@ -378,7 +378,7 @@ test('the screen shows Handled as the third column and switches between the thre
   assert.match(screen, /\.block-slot\[data-key='decide-quick'\]/u);
 });
 
-/* ── who decides (USE-A13), with invented people ── */
+/* ── who decides, with invented people ── */
 
 const ADA = 'p_ada';
 const BEN = 'p_ben';

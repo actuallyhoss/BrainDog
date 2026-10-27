@@ -142,7 +142,7 @@ test('a run placed on another project is not the handoff, although it names this
 test('among imported runs, the one waiting to be picked up is the handoff, not the one the import wrote last', async () => {
   const { sql, write, ask } = await seeded();
   const waiting = await write('S41', { state: 'handoff', next: 'Kern the lowercase pairs' });
-  /* AND AS THE IMPORT WRITES A RUN NOW (AGT-C10): with the day it was last seen in the old system, which lands as
+  /* AND AS THE IMPORT WRITES A RUN NOW: with the day it was last seen in the old system, which lands as
      `seen_before`, and a finished run's step dropped, so a done or abandoned run carried in holds none to hand over. */
   const SEEN = '2026-09-21T10:00:00.000Z';
   const done = await write('S42', { state: 'done', next: 'Ship the specimen page', last_seen: SEEN });
@@ -157,7 +157,7 @@ test('among imported runs, the one waiting to be picked up is the handoff, not t
   sql.close();
 });
 
-/* AND WITH NONE WAITING, NOTHING IS HANDED OVER (AGT-C05). A finished run's step is its history: handing over the newest
+/* AND WITH NONE WAITING, NOTHING IS HANDED OVER. A finished run's step is its history: handing over the newest
    step here in any state sent a starting session after work that had shipped. So the handoff is null, and Next says
    where the last run here stopped instead: the one the import changed latest, since none of them was heard from. */
 test('among imported runs none of which waits, nothing is handed over and Next names the one changed latest', async () => {

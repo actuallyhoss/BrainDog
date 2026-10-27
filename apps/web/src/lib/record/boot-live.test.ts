@@ -739,7 +739,7 @@ test('A ONE-LIST COLLEAGUE KEEPS THEIR LIST IN THE RAIL AT ZERO ROWS, and the sh
 });
 
 /**
- * WHO IS WORKING IS `boot`'S (EXP-D03): the runs it sends as `working`, by the record's one clock, each with the age the
+ * WHO IS WORKING IS `boot`'S: the runs it sends as `working`, by the record's one clock, each with the age the
  * record counts (`ran_s`). The rail no longer asks the record to draw a page of its own to count them.
  */
 test('the working runs are the ones boot sends, with their age, their project by name and the kind of agent', () => {

@@ -109,7 +109,7 @@ test('A USE CASE PICKED BY HAND stands over the one heard and leaves out the one
   assert.ok(alone.modules.length > 0);
 });
 
-/* A NEW PERSON WITH NO NAME HEARD WAS NOBODY (audit C, X4): the face said "Y" and Signing in said her address twice,
+/* A NEW PERSON WITH NO NAME HEARD WAS NOBODY: the face said "Y" and Signing in said her address twice,
    while People already called her Mariam from the same address. She is sent as People names her. */
 test('WITH NO NAME HEARD SHE IS SENT AS HER ADDRESS NAMES HER, and never as a word that names a mailbox', () => {
   assert.equal(nameSent({ name: 'Nadia' }, 'someone@pots.example'), 'Nadia', 'a name heard comes first');

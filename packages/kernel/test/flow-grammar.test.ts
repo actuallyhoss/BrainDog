@@ -1,7 +1,7 @@
 /**
  * `flowGrammar` says what the lint enforces, and nothing else.
  *
- * THE WEB'S COPY DRIFTED FROM THE LINT (SHL-D12): its step menu had no `meet` and no `run_job`, and its `once_per` list
+ * THE WEB'S COPY DRIFTED FROM THE LINT: its step menu had no `meet` and no `run_job`, and its `once_per` list
  * had no `run_job`. So the grammar is held here to the lint's own tables, and each argument it calls required is held
  * to the lint itself: a body giving only the required arguments of a step or a trigger installs, and the same body
  * missing any one of them is refused, through `validate`, the check every install and `checkAutomation` runs.

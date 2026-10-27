@@ -1,5 +1,5 @@
 /**
- * The model's half of the briefing (ENG-B12): when a model is asked to write it, and the one answer that is kept.
+ * The model's half of the briefing: when a model is asked to write it, and the one answer that is kept.
  *
  * Pure: nothing here reads a table, holds a kernel or asks a model. A caller hands the facts it gathered, the instant,
  * the reader's zone, a pref's get and set, and an `ask` that goes through the meter to whatever model the host has.

@@ -6,7 +6,7 @@
  * twice: 4" and sends the reader to everybody by name to look for them. The kernel already knows which people the count
  * is about (`peopleTwiceIdsIn`, read from the database alone, as the figure is), and nothing handed them to a caller.
  *
- * AND A LIST THAT SAYS WHAT MAKES TWO OF ITS ROWS THE SAME IS ANSWERED THE SAME WAY (AGT-C13). Skills of one name in one
+ * AND A LIST THAT SAYS WHAT MAKES TWO OF ITS ROWS THE SAME IS ANSWERED THE SAME WAY. Skills of one name in one
  * project are one skill, and the kernel's `clashes` names the groups that hold one key. Every row of such a group is
  * answered, the one kept and the others, so the list narrowed to them shows each pair whole.
  *
@@ -136,7 +136,7 @@ export const linksIn = (decl: unknown, register: string): string[] =>
     .map((f) => f.id);
 
 /**
- * THE WRITES THAT FOLD SOME GROUPS ONLY, out of the plan for the whole list (AGT-D04): he picked two skills that are
+ * THE WRITES THAT FOLD SOME GROUPS ONLY, out of the plan for the whole list: he picked two skills that are
  * one, and only their group is folded. Read from the writes, never from which group carries them, because the plan
  * writes a row pointing into two groups once, under the first group that names it.
  *

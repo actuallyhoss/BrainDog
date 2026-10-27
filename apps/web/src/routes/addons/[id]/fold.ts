@@ -1,5 +1,5 @@
 /**
- * Which of an add-on's settings are drawn and which fold under "More limits" (the audit of 25 October, Y10).
+ * Which of an add-on's settings are drawn and which fold under "More limits".
  *
  * THE MONEY ADD-ON DREW FOURTEEN EMPTY LIMIT BOXES, each with its currency in front so it read as a value, 4,000 px on
  * a phone. A limit nobody set and with no default of its own is folded; one that holds something stays. Fewer than

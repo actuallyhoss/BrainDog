@@ -159,7 +159,7 @@
       {@const one = testedOf(t)}
       {#if editWords.startedBy[t.trigger]}<p class="tried-trigger">{editWords.startedBy[t.trigger]}</p>{/if}
       {#if one}
-        <!-- ONE STEP TESTED ALONE (SHL-D14): how it went in words, and what it gave folded under it, so the panel says
+        <!-- ONE STEP TESTED ALONE: how it went in words, and what it gave folded under it, so the panel says
              the one step and not a bar of steps the test never meant to reach. -->
         <p class="tried-trigger">{editWords.testedStep}</p>
         {#if one.state === 'failed'}

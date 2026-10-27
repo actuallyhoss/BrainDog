@@ -1,5 +1,5 @@
 /**
- * CLAUDE CODE ON RUNS, EVERY LINE READ BACK FROM THE RECORD (AGT-C01 job b, `loop/scope/area-agents-c.md`).
+ * CLAUDE CODE ON RUNS, EVERY LINE READ BACK FROM THE RECORD (AGT-C01 job b).
  *
  * The door check (`claude-code.check.mjs`) proves a stranger's Claude Code reaches the record. This one proves what the
  * record makes of it, the run rules held by the real app rather than by a hand-written client:

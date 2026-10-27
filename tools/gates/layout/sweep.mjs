@@ -25,7 +25,7 @@ export async function sweep(run, { widths, routes: ROUTES, seeds: sweepSeeds, fl
        * including `controls.css`'s; the token is 36.) A gate that only ever emulated a mouse could
        * measure every width this product has and never once see the size a thumb gets.
        */
-      /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (PRF-B04, `openPage`): the record's clock, and a coarse pointer at a
+      /* OPENED THE ONE WAY EVERY GATE OPENS A PAGE (`openPage`): the record's clock, and a coarse pointer at a
          phone's width. The mark is taken off after the first load, so every route below is loaded with it gone. */
       const opened = await openPage(browser, run.at(ROUTES[0]), { width, touch: width < 640, record: run.asked(), ready, again: run.again });
       const { context, page } = opened;

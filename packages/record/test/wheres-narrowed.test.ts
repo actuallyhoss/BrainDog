@@ -1,5 +1,5 @@
 /**
- * A grant narrowed to some of a list's things (`wheres`) does not read every list (research-audit-22 H1, M5): a token at
+ * A grant narrowed to some of a list's things (`wheres`) does not read every list: a token at
  * `read` on the whole record held to one project's rows is refused `understandPlan`, which names payments, payees and
  * runs from everywhere; the question card does not hand it the run that asked or what the row holds now; and a key held
  * by somebody outside its rows is refused without naming them.

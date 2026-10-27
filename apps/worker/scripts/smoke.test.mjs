@@ -293,7 +293,7 @@ test('without both SMOKE_TOKEN and SMOKE_SLUG no check opens a record', () => {
   }
 });
 
-/* THE SIGNED-IN HALF, RUN WHOLE AGAINST A STUB (LCH-C02). The stub answers the unsigned checks with whichever answer
+/* THE SIGNED-IN HALF, RUN WHOLE AGAINST A STUB. The stub answers the unsigned checks with whichever answer
    each one's own judge passes, so these tests say only what the canary's questions do. */
 const TOKEN = 'rec_ops.s3cret';
 const NOWHERE = 'nobody-0011223344556677';

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * BrainDog.dmg (E51): builds the Mac app, signs and notarises it when this Mac holds a Developer ID, and lays the
+ * BrainDog.dmg: builds the Mac app, signs and notarises it when this Mac holds a Developer ID, and lays the
  * download and the update feed where the site's next deploy publishes them (`brain.dog/desktop/`).
  *
  *   node tools/desktop/release.mjs                 build for this Mac's chip
@@ -9,12 +9,12 @@
  *   node tools/desktop/release.mjs --dry-run       say what it would do, and build nothing
  *
  * TWO KINDS OF BUILD, AND IT SAYS WHICH IT MADE. With a "Developer ID Application" identity in the keychain
- * (`security find-identity -p codesigning`, the owner's Apple sitting, E49) and notarisation's account in the
+ * (`security find-identity -p codesigning`, the owner's Apple sitting) and notarisation's account in the
  * environment or in `apps/desktop/src-tauri/signing.env` (kept out of git, `signing.example.env` lists the names), the
  * app is signed, notarised and stapled, and `spctl` must accept it before anything is staged. With none, it builds an
  * UNSIGNED dmg: it runs on the Mac that built it, macOS refuses it anywhere else, and it is never staged.
  *
- * THE UPDATE IS ALWAYS SIGNED, by the updater key in the keychain (`tools/desktop/updater-key.mjs`, E50): the build
+ * THE UPDATE IS ALWAYS SIGNED, by the updater key in the keychain (`tools/desktop/updater-key.mjs`): the build
  * reads it into its own environment and `latest.json` carries the signature the app checks against its public key.
  *
  * STAGED, NOT DEPLOYED. `--stage` copies `BrainDog.dmg`, the update archive and `latest.json` into

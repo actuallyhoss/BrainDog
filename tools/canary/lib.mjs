@@ -1,6 +1,6 @@
 /**
  * What every part of the canary shares: which record it is on, how it reaches it, and the two things the owner's sitting
- * makes (`loop/scope/area-proof-a.md`, PRF-A09).
+ * makes.
  *
  * TWO PLACES, ONE SWITCH. Until the owner's sitting there is no canary on brain.dog, so every step stands up a fresh self-host
  * in its own process (the gates' record, `tools/gates/record.mjs`) and says "self-host only" on its first line. The

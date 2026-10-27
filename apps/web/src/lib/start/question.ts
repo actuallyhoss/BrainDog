@@ -10,7 +10,7 @@
  *    a shop in Alexandria is not asked. The choices are the ones the device and the words point at (`currencyChoices`).
  * 2. WHERE A SHOP'S ORDERS COME IN, where the build makes a list of orders: messages forwarded, a website or shop app,
  *    or in person. Each answer says what it means, so the person knows what they chose.
- * 3. WHAT TO CALL THEM, where no name was heard: the first entry in People is them (USE-B06).
+ * 3. WHAT TO CALL THEM, where no name was heard: the first entry in People is them.
  *
  * THE ANSWER IS A VALUE ON THE PROPOSAL (`answer`), never a write. Nothing is kept until the person keeps it all.
  *

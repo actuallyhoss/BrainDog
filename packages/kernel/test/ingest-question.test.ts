@@ -213,7 +213,7 @@ test('THE SAME QUESTION IS ASKED ONCE while it is open, and the arrival asked it
   );
   assert.doesNotMatch(joined[0]!.note, /SG\d|inbox_raw|bank-card-used/u, 'the note names an id');
 
-  /* A CHARGE AT ANOTHER SHOP JOINS TOO, WHEN WHAT WAS NOT READ IS THE ACCOUNT (REC-A02): the answer is the same for every
+  /* A CHARGE AT ANOTHER SHOP JOINS TOO, WHEN WHAT WAS NOT READ IS THE ACCOUNT: the answer is the same for every
      charge it holds, so a question per shop asked it again for each shop. The message prints no tail a lookup that says
      nothing of what it reads could take for one, so it keeps this question, joined by its door and what was missed. */
   const bakery = arrive(k, said('Cedar Lane Bakery', '8888', '40.00'), 's2b');

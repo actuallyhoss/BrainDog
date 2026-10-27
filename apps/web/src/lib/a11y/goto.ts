@@ -1,5 +1,5 @@
 /**
- * Where `g` then a letter lands, READ FROM THE RAIL rather than from a table (EXP-D09).
+ * Where `g` then a letter lands, READ FROM THE RAIL rather than from a table.
  *
  * IT WAS A TABLE OF SEVEN IN THE ROOT LAYOUT, so Money, Work, Projects, People and any page an add-on or the person put
  * in the rail had no letter, and the help sheet printed the same seven whatever the rail held. "The shortcuts are derived

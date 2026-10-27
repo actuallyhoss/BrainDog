@@ -1,5 +1,5 @@
 /**
- * A balance's age is what the bank last said (REC-B03).
+ * A balance's age is what the bank last said.
  *
  * A rolled cash figure with `read` set answers how old its balances are instead of how much they hold: the oldest day an
  * account was last confirmed (`as_of`), that day's age (`age`), or how many accounts are older than a window (`stale`).

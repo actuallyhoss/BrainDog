@@ -1,5 +1,5 @@
 /**
- * The rehearsal, reached by the record's own nightly ask (ENG-B09, `compose-rehearse.ts` wired in `index.ts`).
+ * The rehearsal, reached by the record's own nightly ask (`compose-rehearse.ts` wired in `index.ts`).
  *
  * THROUGH THE REAL RECORD: `slashTick` asks a model that arranges a page, and the look it answers is laid over the page
  * as it reads now and read as the page lint reads a page, before anything is written. One over a page that would print

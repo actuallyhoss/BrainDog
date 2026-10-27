@@ -1,5 +1,5 @@
 /**
- * The KPI rules held still (`src/kpi-rank.ts`, PLAN 2.3 to 2.5 of `loop/plans/kpis-2026-10-21`): the kind from source
+ * The KPI rules held still (`src/kpi-rank.ts`): the kind from source
  * and unit, the chart per kind and the three-point rule, stale from cadence, the Today score and its four places, and
  * the card's headline. Every constant is pinned to the one it mirrors, so a rule moved in one place goes red here.
  */

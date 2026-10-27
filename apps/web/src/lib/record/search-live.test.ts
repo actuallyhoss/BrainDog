@@ -250,7 +250,7 @@ test('A HIT FOUND BY MEANING SAYS SO IN ITS LINE, and its list counts the wordsâ
     out.value.groups[0]!.hits.map((h) => [h.title, h.detail, h.meaning ?? false]),
     [
       ['Renew the van policy with Marlow', '', false],
-      /* MARKED AND NEVER CAPTIONED (E54): the row says nothing about why it ranked. */
+      /* MARKED AND NEVER CAPTIONED: the row says nothing about why it ranked. */
       ['Kestrel motor insurance', '', true],
     ],
   );

@@ -1,5 +1,5 @@
 /**
- * WHO DECIDES A QUESTION, AND AN OWNER NAMING SOMEBODY (USE-A13, `docs/20-COLLABORATION.md`: "one named person decides").
+ * WHO DECIDES A QUESTION, AND AN OWNER NAMING SOMEBODY (`docs/20-COLLABORATION.md`: "one named person decides").
  *
  * THE RECORD SAYS IT. An open question answers `decider`, a person's id or `null`, and an owner hands it on with
  * `handQuestion({ id, to })`, or takes it back by leaving `to` out (`packages/record/src/methods/decider.ts`). Anybody

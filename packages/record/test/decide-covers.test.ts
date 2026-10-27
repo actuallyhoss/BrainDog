@@ -1,5 +1,5 @@
 /**
- * A question can close the ones it covers (scope D13): SG286 and SG287 said "Covers SG242 too" in words, and SG242
+ * A question can close the ones it covers: SG286 and SG287 said "Covers SG242 too" in words, and SG242
  * stayed open after they were answered. Filed with `covers`, accepting the newer one closes the older as moot, names it
  * in Handled, and the decision's Undo asks it again.
  */

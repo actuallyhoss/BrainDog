@@ -2,7 +2,7 @@
  * The plans, every figure of each, in one table: what a record on it costs, what it may run, how many Slash credits,
  * agents and people it holds, what extra usage costs, and the credit packs on sale.
  *
- * ONE TABLE, BECAUSE FOUR FILES HELD THE SAME FIGURES (LCH-A08): the site's price list, the checkout's words, the
+ * ONE TABLE, BECAUSE FOUR FILES HELD THE SAME FIGURES: the site's price list, the checkout's words, the
  * Directory's allowance and Slash's ask limits, and Cloud Plus was 75,000 runs in one and 60,000 in another. The
  * Directory's `ALLOWANCE` and `PLANS` are this table read again (`directory.ts`), the checkout takes its names and
  * prices from here (`apps/worker/src/billing.ts`), and `test/plans.test.ts` holds every figure.
@@ -123,7 +123,7 @@ export const teamsOn = (plan: string | null): boolean => plan === null || !(plan
 /** A pack of Slash credits: `credits` for `cents` of `CURRENCY`, on top of a plan's month. */
 export type Pack = { id: string; credits: number; cents: number };
 
-/** The packs chosen on 26 September: 100 credits for $5, 500 for $20. Sold by no checkout yet (LCH-A10). */
+/** The packs chosen on 26 September: 100 credits for $5, 500 for $20. Sold by no checkout yet. */
 export const PACKS: readonly Pack[] = [
   { id: 'credits-100', credits: 100, cents: 500 },
   { id: 'credits-500', credits: 500, cents: 2_000 },

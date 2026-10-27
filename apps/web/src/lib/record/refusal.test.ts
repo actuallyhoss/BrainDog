@@ -128,7 +128,7 @@ test('EVERY KIND GETS THE SURFACE, which is the whole defect', () => {
       assert.equal(refusal, null, 'a form reported an empty answer about rows it never read');
       continue;
     }
-    /* A PROJECT'S SHAPE READS NO ROWS EITHER (C28, C29): its host draws its parts from the project the page is about
+    /* A PROJECT'S SHAPE READS NO ROWS EITHER: its host draws its parts from the project the page is about
        (`$lib/page/kinds/project.ts`), so an empty answer is no claim about rows. */
     if (kind === 'project') {
       const { refusal } = draw(bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']));

@@ -128,7 +128,7 @@ test('THE WORKER KEEPS THE SHELL WHEN IT INSTALLS, so the open after the one tha
   assert.equal(await w.box.get(SCOPE)!.clone().text(), '<p>build A</p>');
 });
 
-test("AN ANSWER FROM THE COPY IS READ WHOLE INTO A RESPONSE OF ITS OWN, never the copy's streamed one (A31)", async () => {
+test("AN ANSWER FROM THE COPY IS READ WHOLE INTO A RESPONSE OF ITS OWN, never the copy's streamed one", async () => {
   const w = await worker(() => html('<p>build A</p>'));
   const file = `${SCOPE}_app/immutable/chunks/a1b2c3.js`;
   w.box.set(file, new Response('export const a = 1;', { headers: { 'content-type': 'text/javascript', [KEPT]: String(Date.now()) } }));

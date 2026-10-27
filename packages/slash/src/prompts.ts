@@ -28,7 +28,7 @@ export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' 
 export type TemplatePurpose = 'ask' | 'plan' | 'automation' | 'pattern' | 'prose';
 export type PromptTemplate = {
   /**
-   * The purpose the host's route is asked for (ENG-A06). OPTIONAL ON THE TYPE for a template outside `PROMPTS` that
+   * The purpose the host's route is asked for. OPTIONAL ON THE TYPE for a template outside `PROMPTS` that
    * `core.run` never takes (`jobs.ts`'s `PROSE`); every template in `PROMPTS` says one (`Routed`).
    */
   purpose?: TemplatePurpose;
@@ -433,7 +433,7 @@ export const LOW_THINKING_ROOM = 600;
 /** A template `core.run` takes, which says its purpose. */
 export type Routed = PromptTemplate & { purpose: TemplatePurpose };
 
-/* EACH TEMPLATE'S PURPOSE IS ITS CALLER'S (ENG-A06): `predicate`, `propose` and `mapping` are a person's question or his
+/* EACH TEMPLATE'S PURPOSE IS ITS CALLER'S: `predicate`, `propose` and `mapping` are a person's question or his
    file (`propose.ts` `ASKED`), `setup` the first plan (`PLANNED`), `answer` an automation's step (`answer.ts`), and
    `pattern` the record drafting its own (`jobs.ts` `DRAFTED`; a pressed pattern is still charged as `ask`, and only the models
    it is sent to are the pattern's). */

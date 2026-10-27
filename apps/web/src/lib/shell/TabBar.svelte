@@ -1,5 +1,5 @@
 <!--
-  Below 900px the rail becomes a tab bar. Not a shrunken desktop (2.A.23).
+  Below 900px the rail becomes a tab bar. Not a shrunken desktop.
 
   FOUR PLACES AND MENU: Today, Needs you, Projects and Money (`tabsOf`, or the four picked in Settings › Navigation),
   with the sidebar's glyphs and words, then Menu, which is the sidebar drawn as a page: every other place, the projects,
@@ -113,7 +113,7 @@
     text-decoration: none;
   }
 
-  /* HERE IS A SOFT FILL, as on the top bar (U-A12, F10): the word in ink a step up and the glyph on the nav's chosen fill,
+  /* HERE IS A SOFT FILL, as on the top bar: the word in ink a step up and the glyph on the nav's chosen fill,
      44 by 28. It snaps, so the glyph never crosses its own fill on the way. */
   .tab[aria-current='page'] {
     color: var(--ink);

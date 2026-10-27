@@ -1,5 +1,5 @@
 /**
- * A place that comes into the rail is said once (USE-B02, job 4).
+ * A place that comes into the rail is said once.
  *
  * A place is drawn once it has something to show, so on a new record Money is not in the rail until the first account
  * is typed. The day it comes, one toast says so: "Money is in your rail now." Nothing is said on the first draw of a

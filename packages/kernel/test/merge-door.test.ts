@@ -1,5 +1,5 @@
 /**
- * The merge door (`loop/research-audit-17.md` H2, M3, L4): only a decision or the record's own merge folds a row, and
+ * The merge door: only a decision or the record's own merge folds a row, and
  * only into a standing row of its own list that is not itself or one folded into it. A merge keeps what the two
  * disagreed on, is answered whole, and undoes back to one consistent state even after a later merge moved things on:
  * keys, links and the fields the merge carried. A restored row never comes back answering to a key another row holds.
@@ -325,7 +325,7 @@ test('A ROW IS NOT ADDED AS A SECOND OF SOMEBODY HERE: a create carrying a key a
     assert.equal(no.fix, `Ada Lovelace already has ${plain}. Add what you know to them rather than adding them twice.`);
     assert.ok(!no.fix.includes(ada.id), 'the refusal names a person, never an id');
   }
-  /* ONLY TO A WRITER WHO READS PEOPLE (research-audit-22 M5): one held away from it, and one that does not say, such as
+  /* ONLY TO A WRITER WHO READS PEOPLE: one held away from it, and one that does not say, such as
      a rule's, a flow's or an ingest's write, are told somebody has it and never who. */
   for (const w of [{ ...AGENT, reads: (list: string) => list !== 'people' }, AGENT]) {
     const no = refused(k.create('people', { name: 'Ada L', handles: ['github:ada'] }, w));

@@ -4,7 +4,7 @@
  *
  * THREE COUNTS DISAGREED ON ONE SCREEN. On the owner's record on 7 October Today's header said "Nothing needs you",
  * the rail's badge said 25, Decide's sentence said 25 and the Agents header said 4 working beside runs last heard from
- * hours before (`loop/research-direction-audit.md`, "How good is the experience on screen"). Each was worked out in
+ * hours before ("How good is the experience on screen"). Each was worked out in
  * its own place: the badge from `boot`'s count, Decide's sentence from the queue it drew, Home's line from the blocks
  * its page happened to hold, and "late" written as fourteen days in the kernel and again in the web. So `boot`, Home's
  * line and the queue's counts all read this one answer, and a header that says a number about questions, arrivals or
@@ -70,7 +70,7 @@ export type WaitingReader = {
 };
 
 /**
- * THE QUESTIONS THAT WAIT ON ONE READER, the one rule every count of them reads (scope D9): the open ones, less those
+ * THE QUESTIONS THAT WAIT ON ONE READER, the one rule every count of them reads: the open ones, less those
  * held back from the reader (`held`). The record hands it its open questions and its `holds`.
  */
 export function waitingOn<R>(open: readonly R[], held: ((row: R) => boolean) | null): R[] {

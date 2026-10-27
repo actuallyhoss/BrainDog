@@ -1,5 +1,5 @@
 /**
- * A new amount filed against an account is in that account's currency (REC-B04), and the form says so.
+ * A new amount filed against an account is in that account's currency, and the form says so.
  *
  * THE ADD FORM IGNORED THE ACCOUNT. The record already gives an amount sent with no code the code of the account its
  * `currency_from` link names, but `RowForm.svelte` drew its box in the currency of the list's other rows, so an entry

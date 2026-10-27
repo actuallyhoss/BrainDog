@@ -1,5 +1,5 @@
 /**
- * `tools/drill/pay.mjs`'s refusals and its order (LCH-A13): production refused with no way round it, a host whose
+ * `tools/drill/pay.mjs`'s refusals and its order: production refused with no way round it, a host whose
  * billing is not test mode stopping the walk at its first step, a live key refused by name, each missing name making its
  * steps skip and say why, and `PAY` in the order the rehearsal test walks.
  *

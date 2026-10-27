@@ -1,22 +1,22 @@
 /**
- * The round trip, on the record the restore drill has just put back (`loop/scope/area-launch-c.md`, LCH-C04 job 2).
+ * The round trip, on the record the restore drill has just put back (LCH-C04 job 2).
  *
  *   import { roundTrip } from './drill-trip.mjs';
  *   const trip = await roundTrip(data, { main: MAIN });   // { pass, steps: [{ name, pass, said }] }
  *
  * WHY IT EXISTS. The drill restored a copy, counted it and stopped, so nothing had ever taken a record out and put it
  * back through the commands a person runs. This does, on the drill's throwaway record and nowhere else:
- *   1. exports it twice and compares the bytes (RQ-LCH-311);
- *   2. exports it with the keys left out and counts the sealed rows at zero (RQ-LCH-185);
- *   3. reads the full export for the tables that stay on this machine (RQ-LCH-183) and
- *   4. for the record's push addresses (RQ-LCH-313);
+ *   1. exports it twice and compares the bytes;
+ *   2. exports it with the keys left out and counts the sealed rows at zero;
+ *   3. reads the full export for the tables that stay on this machine and
+ *   4. for the record's push addresses;
  *   5. puts the export back over the record it came from, which is the path `braindog import` takes (it always
- *      replaces, `docs/53-SPEC-OPERATIONS.md` :36, :63, :408), and exports again to the same bytes (RQ-LCH-187);
+ *      replaces, `docs/53-SPEC-OPERATIONS.md` :36, :63, :408), and exports again to the same bytes;
  *   6. opens the export as a second, fresh record with `braindog init --from`, and checks there
- *   7. one `import` event (RQ-LCH-191), 8. every event's actor kept, 9. a search that finds an entry (RQ-LCH-190), and
- *  10. a second import refused because the record is no longer empty (RQ-LCH-187);
+ *   7. one `import` event, 8. every event's actor kept, 9. a search that finds an entry, and
+ *  10. a second import refused because the record is no longer empty;
  *  11. imports a copy with its format raised by one and 12. one with a byte changed, and expects both refused, with the
- *      record as it was (RQ-LCH-189, RQ-LCH-188).
+ *      record as it was.
  *
  * THE REAL COMMAND, IN A CHILD PROCESS, as the drill runs `verify` and `init`: `main` is the `braindog` entry. Export and
  * import are a host's doors, so the drill's data directory is served by `braindog serve` on a free loopback port with no
@@ -335,7 +335,7 @@ export async function roundTrip(data, { main }) {
     const kek = before.kek === null ? [] : ['--kek', before.kek];
     const exportTo = (name, more = kek) => cli(['export', ...more, '-o', name, ...at]);
 
-    // 1 · THE SAME BYTES TWICE (RQ-LCH-311) ────────────────────────────────────────────────────────────────────────
+    // 1 · THE SAME BYTES TWICE ────────────────────────────────────────────────────────────────────────
     const one = exportTo('first.brainl');
     const first = read('first.brainl');
     if (one.status !== 0 || first === null) {
@@ -355,7 +355,7 @@ export async function roundTrip(data, { main }) {
     const text = first.toString('utf8').replace(/^﻿/, '');
     const lines = text.split(/\r?\n/);
 
-    // 2 · THE KEYS LEFT OUT (RQ-LCH-185) ─────────────────────────────────────────────────────────────────────────
+    // 2 · THE KEYS LEFT OUT ─────────────────────────────────────────────────────────────────────────
     const bare = exportTo('shared.brainl', ['--redact-grants']);
     const shared = (read('shared.brainl')?.toString('utf8') ?? '').split(/\r?\n/);
     const sealedIn = (ls) => {
@@ -373,7 +373,7 @@ export async function roundTrip(data, { main }) {
         : `without keys: ${lineCount(left.keys, 'key row', 'key rows')} and ${lineCount(left.sealed, 'sealed credential', 'sealed credentials')}, where the full copy carries ${full.keys} and ${full.sealed}`,
     );
 
-    // 3 · THE TABLES THAT STAY ON THIS MACHINE (RQ-LCH-183) ───────────────────────────────────────────────────────
+    // 3 · THE TABLES THAT STAY ON THIS MACHINE ───────────────────────────────────────────────────────
     const carried = headersOf(lines);
     const home = before.local.filter((t) => carried.has(t)).length;
     const ev = tableOf(lines, 'event');
@@ -385,7 +385,7 @@ export async function roundTrip(data, { main }) {
       `the copy carries ${home} of the ${before.local.length} tables that stay on this machine, and ${lineCount(exportsIn, 'export event', 'export events')}`,
     );
 
-    // 4 · THE PUSH ADDRESSES (RQ-LCH-313) ─────────────────────────────────────────────────────────────────────────
+    // 4 · THE PUSH ADDRESSES ─────────────────────────────────────────────────────────────────────────
     const leaked = before.endpoints.filter((e) => e !== '' && text.includes(e)).length;
     step(
       'the push addresses stay home',
@@ -395,7 +395,7 @@ export async function roundTrip(data, { main }) {
         : `the copy carries ${leaked} of the record's ${lineCount(before.endpoints.length, 'push address', 'push addresses')}`,
     );
 
-    // 5 · PUT BACK IN PLACE, AS `braindog import` ALWAYS DOES (RQ-LCH-187) ─────────────────────────────────────────
+    // 5 · PUT BACK IN PLACE, AS `braindog import` ALWAYS DOES ─────────────────────────────────────────
     /* THE PATH THAT WORKS. `braindog import` sends `replace: true` (brainfile.ts `importFile`, and the canary's weekly
        reset, `tools/canary/reset.mjs`), so it puts a record back as itself; the export after it is the proof it is
        whole, because a replace writes nothing of its own into what travels. */
@@ -436,13 +436,13 @@ export async function roundTrip(data, { main }) {
       for (const name of ['one import event', 'the actors kept', 'a search finds an entry', 'only into an empty record']) step(name, false, why);
     } else {
       try {
-        // 7 · ONE IMPORT EVENT (RQ-LCH-191) ──────────────────────────────────────────────────────────────────────
+        // 7 · ONE IMPORT EVENT ──────────────────────────────────────────────────────────────────────
         /* RED ON TODAY'S KERNEL, AND HONESTLY: `kernel.import` writes no event on either path (measured, 0), while
            `docs/53` §5.5 (b) step 2 says it writes one. The step stays as the requirement reads until the kernel does. */
         const imports = Number(sql.one("SELECT count(*) AS n FROM event WHERE kind = 'import'")?.n ?? 0);
         step('one import event', imports === 1, `${lineCount(imports, 'import event', 'import events')} in the fresh record, where one is right`);
 
-        // 8 · EVERY EVENT KEEPS ITS ACTOR (RQ-LCH-191) ─────────────────────────────────────────────────────────
+        // 8 · EVERY EVENT KEEPS ITS ACTOR ─────────────────────────────────────────────────────────
         const idAt = ev.columns.indexOf('id');
         const actorAt = ev.columns.indexOf('actor');
         let kept = 0;
@@ -458,7 +458,7 @@ export async function roundTrip(data, { main }) {
           `${kept.toLocaleString('en')} of the copy's ${lineCount(ev.rows.length, 'event', 'events')} kept their actor, ${lineCount(actors.size, 'actor', 'actors')} among them`,
         );
 
-        // 9 · A SEARCH FINDS AN ENTRY (RQ-LCH-190) ─────────────────────────────────────────────────────────────
+        // 9 · A SEARCH FINDS AN ENTRY ─────────────────────────────────────────────────────────────
         const hits = before.word === null ? 0 : k.search(before.word).length;
         step(
           'a search finds an entry',
@@ -466,7 +466,7 @@ export async function roundTrip(data, { main }) {
           before.word === null ? 'the copy holds no entry with a word to search for' : `a search for a word from the copy found ${lineCount(hits, 'entry', 'entries')}`,
         );
 
-        // 10 · ONLY INTO AN EMPTY RECORD (RQ-LCH-187) ──────────────────────────────────────────────────────────
+        // 10 · ONLY INTO AN EMPTY RECORD ──────────────────────────────────────────────────────────
         const again = await k.import(lines);
         const refusedFull = !again.ok && again.refusal?.code === 'IMPORT_NOT_EMPTY';
         step(
@@ -479,7 +479,7 @@ export async function roundTrip(data, { main }) {
       }
     }
 
-    // 11, 12 · A NEWER COPY AND A CHANGED BYTE, REFUSED (RQ-LCH-189, RQ-LCH-188) ─────────────────────────────────
+    // 11, 12 · A NEWER COPY AND A CHANGED BYTE, REFUSED ─────────────────────────────────
     writeFileSync(path('newer.brainl'), raised(text), { mode: 0o600 });
     const damaged = changed(text);
     if (damaged !== null) writeFileSync(path('changed.brainl'), damaged, { mode: 0o600 });

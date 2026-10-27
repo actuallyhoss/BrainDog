@@ -1,5 +1,5 @@
 /**
- * The hourly sweep of runs, with the clock moved thirteen hours (AGT-C04).
+ * The hourly sweep of runs, with the clock moved thirteen hours.
  *
  * A run silent for twelve hours that left a fresh next step and works for no other run waits as a handoff, so the step
  * reaches the next session; any other silent run is abandoned, as before. The sweep never writes done, and a run that

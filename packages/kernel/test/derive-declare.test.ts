@@ -1,5 +1,5 @@
 /**
- * A field worked out from other fields, as a declaration (SHL-B18 job 1, PGS-C10): what installs, what reads exactly,
+ * A field worked out from other fields, as a declaration (SHL-B18 job 1): what installs, what reads exactly,
  * and each way to be wrong refused at install in one sentence naming the fields. Over an invented list of things made.
  */
 

@@ -1,6 +1,6 @@
 /**
  * `capture`: one sentence a person said, kept as the several entries it became, across lists, under ONE batch, so one
- * Undo takes every one of them back (use case 6, step 5; EXP-D10, EXP-D13, USE-A08). DATA.
+ * Undo takes every one of them back (use case 6, step 5). DATA.
  *
  * WHAT IS WRITTEN IS WHAT THE PREVIEW SHOWED. The app reads the sentence on the device (`lib/tell/read.ts`, `tellRead`)
  * into `{ register, fields }` entries and shows them; this writes exactly those, one to eight, in the order sent. A field

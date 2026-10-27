@@ -1,5 +1,5 @@
 /**
- * A scheduled script may end its run by asking one question (N6, F61's run half).
+ * A scheduled script may end its run by asking one question (F61's run half).
  *
  * THE QUESTION IS A REQUEST, AS A WRITE IS. A script hands back `{ ask }` beside its writes, and `finishScript` checks
  * every change an answer would make against the declaration's own `writes:` before anything is written, then files one

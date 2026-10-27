@@ -33,7 +33,7 @@ export function writingQuiet(engine: EngineHealth | null, paused: string | null 
 }
 
 /**
- * THE ONE QUIET LINE TODAY SAYS UNDER ITS BRIEF (U7), or `null` while the model writes. While it is quiet the line says
+ * THE ONE QUIET LINE TODAY SAYS UNDER ITS BRIEF, or `null` while the model writes. While it is quiet the line says
  * the rules wrote what is above it, and his own closed key says what the engine says about it, since that one is his to
  * fix. Otherwise the month's asks spent, as `engineLine` says it. Never a second line: this is the one.
  */

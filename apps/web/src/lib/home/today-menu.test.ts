@@ -1,5 +1,5 @@
 /**
- * Today's page menu on a phone sits in the head, as on a declared page (the audit of 25 October, Y24): under a thumb it
+ * Today's page menu on a phone sits in the head, as on a declared page: under a thumb it
  * was a lone "…" on a row of its own between People and "Handed back to you", opening a sheet with one entry. A text
  * test over the styles, as this tree's other layout checks are.
  */

@@ -1,6 +1,5 @@
 <!--
-  Connect your AI tools: the door the launch is built around (LAUNCH 103, job 5), rewritten in the UI pass of 20
-  October (site F14, F20) so anyone reads it: the night head with the page's name, one line and the connect box; then
+  Connect your AI tools: the door the launch is built around, rewritten in the redesign so anyone reads it: the night head with the page's name, one line and the connect box; then
   what an AI tool gets and what it can't do, each line with its icon in a well; then the brief an AI tool starts with,
   played in a terminal on the made-up record; then a row of plain links for developers; then the early access strip.
 
@@ -141,7 +140,7 @@
     line-height: 1.5;
   }
 
-  /* AN 18PX ICON IN A 32PX WELL (site F20), as the app's tile heads draw theirs. */
+  /* AN 18PX ICON IN A 32PX WELL, as the app's tile heads draw theirs. */
   .ico {
     display: grid;
     place-items: center;

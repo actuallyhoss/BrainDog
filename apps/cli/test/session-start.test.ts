@@ -285,7 +285,7 @@ test('THE START HOOK DOES THE WORK WHENEVER WHAT IT READS MOVED, whatever the se
     assert.ok(existsSync(p.skillFile), `${id} synced`);
   }
   assert.equal(written.length, 2);
-  /* The stub sends no card (the record draws it, AGT-B07), so each start prints the one line; the sync is the file above. */
+  /* The stub sends no card (the record draws it), so each start prints the one line; the sync is the file above. */
   for (const card of written) assert.equal(card.trimEnd(), 'Connected to BrainDog. Call context.', card);
   assert.deepEqual(h.seen.map((s) => s.method).filter((m) => m !== 'heard'), ['attach', 'get', 'attach', 'get']);
 });

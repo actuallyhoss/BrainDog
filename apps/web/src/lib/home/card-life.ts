@@ -1,5 +1,5 @@
 /**
- * WHO WORKED ON EACH PROJECT LAST, for its card's one live line (the audit of 22 October, U5, U-A5 and U-B3).
+ * WHO WORKED ON EACH PROJECT LAST, for its card's one live line.
  *
  * Six of eight cards on a record held a name and a lane over 170px of white, while about 900 agent runs on that record
  * named the projects they were in. A run is the newest sign of life a project has, so each card says who worked on it

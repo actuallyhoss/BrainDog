@@ -1,5 +1,5 @@
 /**
- * The one question a script may end its run by asking (N6) survives the Cloud's runner: what the source returns as
+ * The one question a script may end its run by asking survives the Cloud's runner: what the source returns as
  * `{ ask }` comes back from `runScript` beside the writes, for `finishScript` to check and file.
  *
  * BEFORE THIS THE RETURN VALUE WAS THROWN AWAY (`await source.default(ctx)` and nothing kept), so Money's month-end

@@ -1,5 +1,5 @@
 /**
- * The tidy (AGT-C18, "how good is braindog's mcp at cleaning up stale stuff?"): one list of what went stale.
+ * The tidy ("how good is braindog's mcp at cleaning up stale stuff?"): one list of what went stale.
  *
  * WHAT WAS THERE BEFORE. One hourly sweep (`sweepRecord`) that writes runs off and closes old steps, and no read that
  * says what is stale now or what was cleaned. So nobody could say how the record was keeping itself, and the only
@@ -256,7 +256,7 @@ const faultsOpen: Finder = {
   find: (sql) => ({ stale: openFaults(sql).length, did: 0, ask: null }),
 };
 
-/* AND THE SEALED KEYS NOBODY OPENS (AGT-D17), and the things held twice in a list that says what makes two one
+/* AND THE SEALED KEYS NOBODY OPENS, and the things held twice in a list that says what makes two one
    (`rows-same`, C13's clashes): both counted only, and each file says why it asks nothing. */
 for (const finder of [runsStopped, runsEmpty, stepsOld, questionsOld, questionsMoot, faultsOpen, keysUnopened, rowsSame]) registerFinder(finder);
 

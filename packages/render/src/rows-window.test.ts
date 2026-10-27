@@ -1,5 +1,5 @@
 /**
- * A long table draws what is on screen and no more (PGS-A16): `windowOf`'s arithmetic, `revealTop`'s scroll for a caret,
+ * A long table draws what is on screen and no more: `windowOf`'s arithmetic, `revealTop`'s scroll for a caret,
  * and `RowsWindow.svelte` drawn on the server over 2,527 rows, which is the list the scope names.
  *
  * THE SPACERS ARE THE CLAIM THAT MATTERS. A window that drew the right rows and reserved the wrong height would be a

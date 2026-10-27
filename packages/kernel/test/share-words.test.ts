@@ -1,5 +1,5 @@
 /**
- * A share as one plain sentence (sharing plan §2.11, §3.5): the plan's own sentences, names never ids, no em dashes.
+ * A share as one plain sentence: the plan's own sentences, names never ids, no em dashes.
  */
 
 import { test } from 'node:test';

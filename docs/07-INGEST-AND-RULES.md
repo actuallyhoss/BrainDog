@@ -114,7 +114,7 @@ writes:
 on_conflict: skip          # skip | update | new
 ```
 
-A webhook ingest also declares `verify:`, checked at the door and never in code (DOR-3, `packages/kernel/src/declare.ts`):
+A webhook ingest also declares `verify:`, checked at the door and never in code (`packages/kernel/src/declare.ts`):
 
 | `verify:` | Checks | Row |
 |---|---|---|

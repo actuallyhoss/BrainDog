@@ -211,7 +211,7 @@ const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms:
  *
  * THE MEASURES THAT MOVED LEAD, because an import that wrote every measure at one instant made "newest first" mean
  * nothing at all, and the tiles were the first of them alphabetically: "Accounts, Pinwheel", "Active7d", "Ad spend30d"
- * (`loop/research-real-record.md`, Today 3).
+ * (Today 3).
  */
 export function measureSeries(readings: Iterable<RawReading>, opts: MeasureOpts): MeasureSeries[] {
   const all = seriesOf(readings, opts);

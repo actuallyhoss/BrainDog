@@ -19,7 +19,7 @@ export const words = {
   nothingHandled: (n: number) => `Nothing needs you. BrainDog handled ${n.toLocaleString('en-GB')} itself today.`,
   /** The calm line once something has been decided, with how long ago the last one was. */
   lastDecided: (when: string) => `Nothing needs you. The last one was decided ${when}.`,
-  /* WITH SOMETHING IN THE INBOX "NOTHING WAITS" WOULD BE FALSE (EXP-E07): the calm line then says no question waits. */
+  /* WITH SOMETHING IN THE INBOX "NOTHING WAITS" WOULD BE FALSE: the calm line then says no question waits. */
   noQuestion: 'No question waits on you.',
   noQuestionDecided: (when: string) => `No question waits on you. The last one was decided ${when}.`,
   /** The heading over the questions after the first one. */

@@ -248,7 +248,7 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
   }
   /* Where the run stopped, as the end hook sends it. A folder git cannot read sends neither field. */
   const where = await positionOf(io.cwd);
-  /* NO STATE SAID IS THE RECORD'S TO PICK, AS THE END HOOK LEAVES IT (AGT-C04). This wrote `idle` for it, and the twelve-hour
+  /* NO STATE SAID IS THE RECORD'S TO PICK, AS THE END HOOK LEAVES IT. This wrote `idle` for it, and the twelve-hour
      sweep takes an idle run as abandoned, so a run its own agent ended with `braindog session end` read Abandoned the
      next day. `end` writes done, or a handoff when the run left a fresh step, and the sweep never touches either. A
      step typed here is left first, so the record sees it as one the run left. A host with no `end` is told so and

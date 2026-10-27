@@ -1,5 +1,5 @@
 /**
- * `most` (EXP-B10): a long block of cards draws its first six, the app with a "Show all N" that opens the rest in place
+ * `most`: a long block of cards draws its first six, the app with a "Show all N" that opens the rest in place
  * and the export with a line that says how many it left out, and the two are one tree but for those.
  */
 

@@ -147,7 +147,7 @@
     line-height: var(--lh-tight);
   }
 
-  /* AN ENTRY IS INK, NOT A LINK'S RED (the money review, F2): five bills in red underlines read as five things late. The
+  /* AN ENTRY IS INK, NOT A LINK'S RED (the money review): five bills in red underlines read as five things late. The
      underline comes on hover; red is only a late entry's, beside its glyph. */
   .calendar-title a {
     color: inherit;
@@ -226,7 +226,7 @@
   }
 
   /* A DAY'S DATE IN ITS OWN COLUMN and its rows beside it, so the eye runs down the dates: the date, the name, the
-     amount at the end in tabular figures, and the entry's ring (the money review, F5). */
+     amount at the end in tabular figures, and the entry's ring (the money review). */
   .calendar-day {
     display: grid;
     grid-template-columns: 9ch minmax(0, 1fr);
@@ -248,7 +248,7 @@
     gap: var(--sp-3);
   }
 
-  /* OPEN IS A NEUTRAL RING, late a filled red dot beside its red name and glyph (2.A.6). */
+  /* OPEN IS A NEUTRAL RING, late a filled red dot beside its red name and glyph. */
   .calendar-day .calendar-item::after {
     content: '';
     grid-column: 3;
@@ -331,7 +331,7 @@
       display: grid;
     }
 
-    /* THE TABLE BECOMES SEVEN COLUMNS UNDER THEIR WEEKDAY LETTERS (the money review, F5): the days wrapped "as many to a
+    /* THE TABLE BECOMES SEVEN COLUMNS UNDER THEIR WEEKDAY LETTERS (the money review): the days wrapped "as many to a
        line as fit" put six to a line, so 7 Sep, a Monday, sat under Tuesday. A day outside the month keeps its column
        and draws nothing, so every date stands under its own weekday. At 390 a tile has about 318px, 45px a day. */
     .calendar-month {

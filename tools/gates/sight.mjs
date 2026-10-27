@@ -1,5 +1,5 @@
 /**
- * Every read the record makes of the kernel's rows sits behind a sight check (sharing plan §2.5 item 7).
+ * Every read the record makes of the kernel's rows sits behind a sight check.
  *
  *   node tools/gates/sight.mjs
  *

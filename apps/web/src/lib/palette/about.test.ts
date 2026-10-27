@@ -1,6 +1,6 @@
 /**
  * The palette's "what it is" rows (`about.ts`): a name typed in the box, answered with what it is and where it was
- * seen, from the record's `about` read (ENG-B02).
+ * seen, from the record's `about` read.
  *
  * WHAT IS HELD: one thing is one row that opens its address; a name two things share is two rows and neither is
  * picked; an answer of nothing draws nothing, not even a line saying so; and a text under three characters is never

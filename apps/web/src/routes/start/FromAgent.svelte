@@ -1,5 +1,5 @@
 <!--
-  /start?agent=1: the first run from a person's own agent (USE-B12), modelled on PostHog's install step
+  /start?agent=1: the first run from a person's own agent, modelled on PostHog's install step
   (`docs/19-INTERFACE.md`, "The first run from your own agent").
 
   THREE THINGS, TOP TO BOTTOM. How to plug in, for any agent and none by name, in the lines Settings, Agents shows; the

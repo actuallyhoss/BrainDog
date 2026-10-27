@@ -1,5 +1,5 @@
 /**
- * A script's Save waits for code (24 October, U-B18): an installed script whose code is not kept here opened with an
+ * A script's Save waits for code (24 October): an installed script whose code is not kept here opened with an
  * empty box and a live "Save and turn on", which would have filed a script of no code.
  */
 

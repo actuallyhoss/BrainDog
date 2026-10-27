@@ -66,7 +66,7 @@
   const got = $derived(answer?.slug === slug ? answer.got : null);
 
   /**
-   * THE HEAD'S SEARCH PARAM, as the page's own answer declares it (`header: { search: { param } }`, PGS-A14), and as
+   * THE HEAD'S SEARCH PARAM, as the page's own answer declares it (`header: { search: { param } }`), and as
    * the last answer of each page said it, so a page opened again is asked with its word from the first read and its
    * kept copy is found under that word. A page this tab has not read yet is asked without one, and again with it once
    * its head is known.
@@ -122,7 +122,7 @@
   /**
    * A PROJECT THIS TAB HAS DRAWN (the sidebar, the Projects cards), whose page opens in its own shape before the record
    * answers (`ProjectWaiting`), with its name, mark and colour, and not on the page being left: there is a picture of
-   * it to draw at once (the audit of 22 October, F4).
+   * it to draw at once.
    */
   const known = $derived(knownProject(apiBase(), `/p/${slug}`));
   const backTo = $derived(projectsPlace(apiBase()) ?? undefined);
@@ -343,7 +343,7 @@
     return pageOffer(pen, { slug, blocks: got.page.blocks }, { suggest: navPrefs.suggest, gone: (o) => navPrefs.isDismissed(o) || offerActions.hidden(o) });
   });
   /**
-   * WHAT EVERY AGENT IS TOLD, UNDER THE RUNS ON AGENTS (the UI pass of 20 October, today F19): the record's lessons as
+   * WHAT EVERY AGENT IS TOLD, UNDER THE RUNS ON AGENTS (today F19): the record's lessons as
    * one tile after the page's blocks, read once a record when the agents page has drawn. `told.ts` is route-only (it
    * carries the client), so it is imported here and only for this page. Nothing at nought or on a refusal.
    *

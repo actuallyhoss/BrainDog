@@ -1,5 +1,5 @@
 /**
- * A page read under a grant narrowed to some of a list's things (`wheres`), research-audit-30 Medium 2.
+ * A page read under a grant narrowed to some of a list's things (`wheres`).
  *
  * `list` hands the grant's `where` to the kernel, and a page's blocks were held by list alone: a reader held to one
  * client's jobs opened the Jobs page and was drawn every job, a count of all of them, and a filter naming every client.

@@ -1,5 +1,5 @@
 /**
- * `choiceOf`: what a decided question says it chose, for the card's "Decided 2 Oct: <the choice>" (AGT-B09).
+ * `choiceOf`: what a decided question says it chose, for the card's "Decided 2 Oct: <the choice>".
  */
 
 import { test } from 'node:test';

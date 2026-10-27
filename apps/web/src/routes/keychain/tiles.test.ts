@@ -38,7 +38,7 @@ test('THE SENTENCE SAYS HOW MANY, HOW OFTEN, AND HOW MANY HAVE NO VALUE, and has
   const kept = [...KEYS.slice(0, 3), key({ id: 'd', label: 'Kept', sealed: false, grant: null, kept: true })];
   assert.equal(sentenceOf({ keys: kept, listed: true, counts: true, asking: 0, seesMachines: true })?.text, '4 keys, opened 15 times.');
   assert.doesNotMatch(s?.text ?? '', /sealed/u, 'sealed is not a word on screen');
-  /* THE RETIRED ONES BESIDE THEM (the pass of 27 October), so the count adds up to the Keys list's. */
+  /* THE RETIRED ONES BESIDE THEM, so the count adds up to the Keys list's. */
   assert.equal(
     sentenceOf({ keys: kept, listed: true, counts: true, asking: 0, seesMachines: true, retired: 93 })?.text,
     '4 keys, opened 15 times. 93 more are retired and not listed here.',

@@ -1,5 +1,5 @@
 /**
- * One step of an automation tested alone (SHL-D14): the ask the card's "Test this step" sends, and the answers an
+ * One step of an automation tested alone: the ask the card's "Test this step" sends, and the answers an
  * earlier test gave that a later step's token picker offers.
  *
  * THE EARLIER STEPS ARE NOT TAKEN AGAIN WHERE AN ANSWER OF THEIRS IS IN HAND. Step three of a flow whose second step is

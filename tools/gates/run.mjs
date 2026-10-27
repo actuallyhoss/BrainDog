@@ -65,7 +65,7 @@ const GATES = [
      one of them passes it, which is the only thing that makes the nine below mean anything. */
   ['self-test', ['node', [join(here, 'self-test.mjs')]]],
   ['clean-room', call(join(here, 'clean-room.mjs'))],
-  /* AND WHAT THE REPOSITORY CARRIES ABOUT ITS OWNER (LCH-C11): no private name, the licence files right, the README
+  /* AND WHAT THE REPOSITORY CARRIES ABOUT ITS OWNER: no private name, the licence files right, the README
      with its Licence section and no price or badge, and on the owner's machine his own private list. Beside
      `clean-room` because both are a read of every tracked file for something that must not be in it. */
   ['public-clean', call(join(here, 'public-clean.mjs'))],
@@ -80,7 +80,7 @@ const GATES = [
      binary, so it silently stops diffing and stops merging. This is a scan of bytes rather than of
      syntax, because the defect is in the byte and not in the shape of the code around it. */
   ['nul-bytes', call(join(here, 'nul-bytes.mjs'))],
-  /* EVERY TEST FILE RUNS, AND NONE SKIPS ITS WAY TO GREEN (PRF-B01). A test no script, workflow step or
+  /* EVERY TEST FILE RUNS, AND NONE SKIPS ITS WAY TO GREEN. A test no script, workflow step or
      gate reaches is a promise nobody checks, and twelve of the runner's own sat there. A text walk, cheap
      and early, beside the other scans of the whole tree. */
   ['orphan-tests', call(join(here, 'orphan-tests.mjs'))],
@@ -101,7 +101,7 @@ const GATES = [
      the record, so the group in `ROUTES` gates nothing at runtime; it was ADMIN on a method guarded
      `read`, and the answer to that method carries every colleague's email. */
   ['guards', call(join(here, 'guards.mjs'))],
-  /* AND WHETHER EACH READ OF THE KERNEL'S ROWS SITS BEHIND A SIGHT CHECK (sharing plan §2.5): `guards` holds a method to
+  /* AND WHETHER EACH READ OF THE KERNEL'S ROWS SITS BEHIND A SIGHT CHECK: `guards` holds a method to
      its group, this holds the rows inside it to the caller. Report mode until Slice 3: it lists every call site and passes. */
   ['sight', call(join(here, 'sight.mjs'))],
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
@@ -112,7 +112,7 @@ const GATES = [
      a claim, and those claims went stale unnoticed until this read them. Beside `closed-lists` because that gate
      already holds the spelled-out block-kind counts, and this one reads the digits beside it. */
   ['docs-counts', call(join(here, 'docs-counts.mjs'))],
-  /* AND THE RULINGS PAGE AND ITS TESTS, HELD TOGETHER (SHL-A02): every settled question in docs/04-PACKS.md §9 names the
+  /* AND THE RULINGS PAGE AND ITS TESTS, HELD TOGETHER: every settled question in docs/04-PACKS.md §9 names the
      test that holds it, and a todo test says what it waits on. Beside `docs-counts` because both read a document against
      the code. */
   ['rulings', call(join(here, 'rulings.mjs'))],
@@ -155,7 +155,7 @@ const GATES = [
      and nothing held it there. Beside the kernel rule because a `'bank-hsbc-eg'` in the record is
      that rule broken without a single declaration written. */
   ['shell-words', call(join(here, 'shell-words.mjs'))],
-  /* AND THE NAMES THE ADD-ONS THEMSELVES DECLARE (SHL-A01): `shell-words` holds a list somebody wrote, and this reads every
+  /* AND THE NAMES THE ADD-ONS THEMSELVES DECLARE: `shell-words` holds a list somebody wrote, and this reads every
      pack and use case for its add-on, list, field and figure ids and fails where the core spells one as a string or
      after `register.`. What stands today is in `core-names.held.json`, which only shrinks. */
   ['core-names', call(join(here, 'core-names.mjs'))],
@@ -163,10 +163,10 @@ const GATES = [
      root, and a shipped file that imports either draws the sample on a real record. Beside `shell-words` because both
      are a grep over what the core ships for something it must not name. */
   ['no-fixtures', call(join(here, 'no-fixtures.mjs'))],
-  /* AND NO SHAPE COPY OF A RECORD IS KEPT IN THE TREE (PRF-A13): a `.brainl` made by `export --shape`, under any name,
+  /* AND NO SHAPE COPY OF A RECORD IS KEPT IN THE TREE: a `.brainl` made by `export --shape`, under any name,
      is a record's own counts and lengths, and only `--allow-shape` imports one. */
   ['no-shape-files', call(join(here, 'no-shape-files.mjs'))],
-  /* AND WHAT `no-fixtures` CANNOT SEE OF THE SAMPLE (LCH-A06): the demo's setting outside a test, and a string only the
+  /* AND WHAT `no-fixtures` CANNOT SEE OF THE SAMPLE: the demo's setting outside a test, and a string only the
      test fixture holds in the built app. It needs the build, so it runs in `--built`. */
   ['no-sample', call(join(here, 'no-sample.mjs'))],
   /* AND THE WEB NAMES NO FIRST-PARTY LIST OR PACK, AND GUESSES NO CURRENCY.
@@ -183,40 +183,40 @@ const GATES = [
      flippant register in anything a stranger reads", against 91 string literals carrying
      one, most of them in refusals, which is the prose somebody meets at the moment they are stuck. */
   ['em-dash', call(join(here, 'em-dash.mjs'))],
-  /* AND THE HOUSE WORDS, HELD BY A CHECK (EXP-B07): the list in `words.json` (row, credential, register as a noun, an id
+  /* AND THE HOUSE WORDS, HELD BY A CHECK: the list in `words.json` (row, credential, register as a noun, an id
      in a sentence, the long dash) over every copy string the app ships. Beside `em-dash` because it reads the same
      copy for a wider list, and its `page` entries are the page lint's, so a page and the source are judged by one. */
   ['words', call(join(here, 'words.mjs'))],
   /* AND THE WRITING GUIDE IS THE LIST, PRINTED (EXP-B07 job 5): docs/54-WRITING.md is what words.json makes. */
   ['words-guide', ['node', [join(here, 'words-guide.mjs'), '--check']]],
-  /* AND THE ONE CLOCK (AGT-C02): a run's `last_seen` compared with the time anywhere outside `presence.ts` is the
+  /* AND THE ONE CLOCK: a run's `last_seen` compared with the time anywhere outside `presence.ts` is the
      rail, Today and Agents saying three numbers again. Today's hits are allowed by count, and the list only shrinks. */
   ['one-clock', call(join(here, 'one-clock.mjs'))],
-  /* AND EVERY COMMIT IS ONE SHORT SENTENCE, BY HIM (WAY-B02): no tool as author, no trailer, no session link, and the
+  /* AND EVERY COMMIT IS ONE SHORT SENTENCE, BY HIM: no tool as author, no trailer, no session link, and the
      history never restarts. The commit-msg hook asks the same rules through it. */
   ['commits', call(join(here, 'commits.mjs'))],
-  /* AND NOTHING LOCAL IS TRACKED (WAY-B02): an agent's folder, a loop note, a record, a key or a `.local.json`. */
+  /* AND NOTHING LOCAL IS TRACKED: an agent's folder, a loop note, a record, a key or a `.local.json`. */
   ['hygiene', call(join(here, 'hygiene.mjs'))],
-  /* AND AN APPLIED MIGRATION IS NEVER EDITED (LCH-C06): each migration's checksum, by the runner's own `checksum`, against
+  /* AND AN APPLIED MIGRATION IS NEVER EDITED: each migration's checksum, by the runner's own `checksum`, against
      `packages/kernel/src/migrations/LOCK.json`, and a new one ships with a passing rehearsal's receipt. */
   ['migration-lock', call(join(here, 'migration-lock.mjs'))],
-  /* AND THE LOG ONLY GROWS (REC-A17, his "append-only audit"): every statement under `packages/*\/src` that updates or
+  /* AND THE LOG ONLY GROWS (his "append-only audit"): every statement under `packages/*\/src` that updates or
      deletes a line of `event` is on one list with its reason, and a seventh is red. Beside `migration-lock` because a
      migration is the one other place the log is reshaped, and that gate holds it. */
   ['audit-append-only', call(join(here, 'audit-append-only.mjs'))],
-  /* AND A RELEASED VERSION IS NEVER CHANGED IN PLACE (SHL-B03, `packs/README.md`'s "A published version never changes"):
+  /* AND A RELEASED VERSION IS NEVER CHANGED IN PLACE (`packs/README.md`'s "A published version never changes"):
      every version in the catalogue of the released commit is still there once, with its checksum, size and date, and
      no file of one moved. A new version is cut beside it. It reads history, so a shallow checkout is red. */
   ['catalogue-immutable', call(join(here, 'catalogue-immutable.mjs'))],
-  /* AND A DRAWN BOARD SHIPS ONLY WITH ITS YES (EXP-A02): a page, specimen, variant, stand-in or pick changed after its
+  /* AND A DRAWN BOARD SHIPS ONLY WITH ITS YES: a page, specimen, variant, stand-in or pick changed after its
      yes needs a new one, and a yes that misses a width, a theme or a pick is red. */
   ['board-yes', call(join(here, 'board-yes.mjs'))],
-  /* AND NO AGENT TRANSCRIPT IS READ (AGT-B10: transcripts are never read): a hook or package naming transcript_path or opening a client's session folder. */
+  /* AND NO AGENT TRANSCRIPT IS READ (transcripts are never read): a hook or package naming transcript_path or opening a client's session folder. */
   ['no-transcript', call(join(here, 'no-transcript.mjs'))],
   /* AND NO AGENT APP'S LOGIN IS NAMED (docs/48 §8): Claude Code's keychain item or file, the claude.ai login, or Codex's
      file, anywhere but a refusal list the gate names. */
   ['no-login', call(join(here, 'no-login.mjs'))],
-  /* AND ONE LEDGER FOR EVERY NUMBER A GATE IS HELD TO (PRF-B03): a budget never rises unless the owner is quoted, a debt
+  /* AND ONE LEDGER FOR EVERY NUMBER A GATE IS HELD TO: a budget never rises unless the owner is quoted, a debt
      only falls, a held list only shrinks, and a number written in a gate file is a debt. Beside the other source gates
      because it reads files and needs nothing built. */
   ['ledger', call(join(here, 'ledger.mjs'))],
@@ -260,7 +260,7 @@ const GATES = [
      clock, red on a raw id, a raw time, a key, a value that never arrived or a page error. Its own ephemeral port, for
      the reason passkey has one. */
   ['printed', call(join(here, 'printed.mjs'))],
-  /* AND THE SAME SIGN-IN ON THE HOST THAT WAS DEPLOYED, with the canary's own passkey (PRF-A09). Here there is no
+  /* AND THE SAME SIGN-IN ON THE HOST THAT WAS DEPLOYED, with the canary's own passkey. Here there is no
      CANARY_PASSKEY, so it runs on a fresh self-host and says "self-host only"; `after-deploy.yml` runs it against
      the deployed host. Its own ephemeral port, for the reason `passkey` has one. */
   ['signin-live', call(join(here, 'signin-live.mjs'))],
@@ -278,7 +278,7 @@ const GATES = [
      ask. Everywhere else it exits 3 and is named in `--allow-skip`. It is last for the same
      reason `layout` and `a11y` are: a run that fails earlier should not have deployed. */
   ['deploy-parity', call(join(here, 'deploy-parity.mjs'))],
-  /* THE RULE SHEET ON A PROOF RECORD (PGS-B01): every rule of a block, a value and a layout, read at 390 and 1440. Last,
+  /* THE RULE SHEET ON A PROOF RECORD: every rule of a block, a value and a layout, read at 390 and 1440. Last,
      beside deploy-parity, because it too reads what the internet serves. */
   ['rule-sheet', call(join(here, 'rule-sheet.mjs'))],
 ];
@@ -501,7 +501,7 @@ function declaredNeeds(name, file) {
  * which is red under CI, so what arrives is a sentence naming the gate rather than a green run
  * that checked one thing fewer than it claims.
  *
- * AND BETTER THAN EITHER LIST IS NO LIST: `--unbuilt` AND `--built` (PRF-B01). Each reads the gates' own
+ * AND BETTER THAN EITHER LIST IS NO LIST: `--unbuilt` AND `--built`. Each reads the gates' own
  * `needs` against `NEEDS` above, so the job that builds nothing and the job that builds the app each say
  * which half they are and never which gates. `--unbuilt` is every gate that declares no need. `--built` is
  * every gate that declares one and whose every need a web build meets (`built: true`). A gate that needs a

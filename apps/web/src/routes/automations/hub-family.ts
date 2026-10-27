@@ -66,7 +66,7 @@ export function familyName(list: string, did: readonly string[]): string {
  * they came. A row with no family, or the only one of its family, is itself.
  */
 export function families<T extends Kin>(rows: readonly T[]): Fold<T>[] {
-  /* TWO FAMILIES THAT WOULD BE CALLED THE SAME ARE ONE (the audit of 25 October, Z31): the record keys a family by the
+  /* TWO FAMILIES THAT WOULD BE CALLED THE SAME ARE ONE: the record keys a family by the
      body's whole shape, so rules on Ledger that set nothing a name says came as two keys, and On drew "Rules on
      Ledger" twice, 6 rules and 58. What he reads is the name, so the name is what folds. */
   const said = (r: T): string | null => (r.family ? familyName(r.family.list, r.family.did) : null);

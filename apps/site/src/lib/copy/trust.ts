@@ -157,7 +157,7 @@ export const trust = {
       },
       exportName: 'Everything, in one file',
       exportNote: 'Every list, page and rule in it',
-      /* A link and not a drawn button (site F18): a drawn button looked pressable and did nothing. */
+      /* A link and not a drawn button: a drawn button looked pressable and did nothing. */
       exportLink: 'How export works',
       exportHref: '/docs/use/export-and-delete',
     },

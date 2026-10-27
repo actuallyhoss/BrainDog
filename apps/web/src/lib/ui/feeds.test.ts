@@ -1,5 +1,5 @@
 /**
- * WHAT COMES IN NAMES WHAT FEEDS THE RECORD (the audit of 25 October, Z19).
+ * WHAT COMES IN NAMES WHAT FEEDS THE RECORD.
  *
  * WHAT WAS WRONG. Settings › What comes in said "Nothing feeds this record yet" while card texts were posted to one of
  * its web addresses and filed into the Ledger every hour, and Arrivals on Today showed 15 (`settings-ingest-390-light.png`).

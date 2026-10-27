@@ -1,5 +1,5 @@
 /**
- * A late card's ring still says how far it got (audit 34, finding 1).
+ * A late card's ring still says how far it got.
  *
  * The arc's share is the fill circle's `stroke-dasharray="N 100"` ATTRIBUTE. A stylesheet rule beats a presentation
  * attribute, so a `stroke-dasharray` rule on `.cards-ring-fill` drew every late card as a full broken circle whatever

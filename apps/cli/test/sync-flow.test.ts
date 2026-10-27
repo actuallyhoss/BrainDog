@@ -8,7 +8,7 @@
  * first, `complete` once every part hashes right, `NOT_FOUND` for a file not there). The secret store is a map. Every
  * home is a temporary folder, so nothing of this machine's is read or written, and no real store is asked anything.
  *
- * `BRAINDOG_TEST_STORE=secret-service` RUNS THE SAME FLOW ON A REAL KEYRING (G18), in a Linux container and nowhere
+ * `BRAINDOG_TEST_STORE=secret-service` RUNS THE SAME FLOW ON A REAL KEYRING, in a Linux container and nowhere
  * else: each machine keeps its items in the secret service through `secretService`, under a service name of its own
  * (`bd-test-<pid>-<n>-`), so two machines never read each other's key, and every item written is removed at the end.
  * `apps/cli/scripts/linux-keyring.sh` starts the container, its session bus and an unlocked keyring, and runs this file.

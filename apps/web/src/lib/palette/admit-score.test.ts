@@ -1,5 +1,5 @@
 /**
- * THE PALETTE FINDS A PLACE BY THE WORD A PERSON USES (EXP-D13). `scoreOf` ranks a hit by how sure it is, `ranked`
+ * THE PALETTE FINDS A PLACE BY THE WORD A PERSON USES. `scoreOf` ranks a hit by how sure it is, `ranked`
  * draws the best first inside each group, and an alias is the last resort, never ahead of a name. Every command here
  * that is not a shipped one is invented inline.
  */

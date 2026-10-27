@@ -1,5 +1,5 @@
 <!--
-  A draft's three presses, where the draft shows (DIRECTION §45): Keep, Try again and Throw away, under its card in the
+  A draft's three presses, where the draft shows: Keep, Try again and Throw away, under its card in the
   strip and over its page in the viewer. Keep is the one primary. Try again is offered only on a version a run drew,
   since it asks that run to draw it again (`held.ts` `mayAskAgain`).
 

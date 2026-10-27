@@ -73,7 +73,7 @@ const json = <T>(keys: Keys, key: string, where: string): T | undefined => {
 const family: Fixture[] = familyOf('write');
 
 /* THE COUNT IS ASSERTED SO THAT AN EIGHTEENTH CANNOT ARRIVE UNDRIVEN. `40 §6`'s table says the write
-   family is sixteen; `currency-fixed` (REC-B04, batch 40) made it seventeen. A new one finds out here that it needs a
+   family is sixteen; `currency-fixed` (batch 40) made it seventeen. A new one finds out here that it needs a
    body, rather than joining a family that nothing runs. */
 test('every write fixture in the corpus is driven here, and there are seventeen of them', () => {
   assert.equal(family.length, 17);

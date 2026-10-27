@@ -10,7 +10,7 @@
  * A DYNAMIC SEGMENT NEEDS A SAMPLE, and a route with none is a FAILURE rather than a skip: it is the
  * only way "we forgot to sample this" is distinguishable from "there is nothing here".
  *
- * AND THE SAMPLE IS THE RECORD'S (PRF-B04). `routesFor` asks the record a gate draws for its own ids, so an automation
+ * AND THE SAMPLE IS THE RECORD'S. `routesFor` asks the record a gate draws for its own ids, so an automation
  * and a catalogue entry are opened by an id they have, not by a question's. `routesOf` is the same walk with no record,
  * for the gates that have not moved onto `routesFor` yet.
  */

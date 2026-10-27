@@ -1,5 +1,5 @@
 /**
- * `sameOne`: a person says two people may be one (AGT-D05, `src/methods/same-one.ts`). It files the question the
+ * `sameOne`: a person says two people may be one (`src/methods/same-one.ts`). It files the question the
  * nightly pass files for the same people and answers its id; it merges nothing; asked twice is asked once; a caller
  * who cannot write to the list is refused, and so is a pick that is not a person.
  *

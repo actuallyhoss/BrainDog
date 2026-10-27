@@ -1,9 +1,9 @@
 /**
  * HOW EACH AGENT CONNECTS, as data: the connect box on the home page and on `/agents` draws these and types none of
- * its own (the prototype's `CONNECT`, loop/site-2026-10-17/src/site.html).
+ * its own (the prototype's `CONNECT`).
  *
  * Every way in is the one address, `MCP` in `links.ts`, with OAuth: the app opens BrainDog once to be approved, and no
- * key is pasted anywhere. Each line was checked against its maker's own docs on 17 October 2026 (LAUNCH 103, job 5):
+ * key is pasted anywhere. Each line was checked against its maker's own docs on 17 October 2026:
  *   - Claude, in the app: support.claude.com, "Getting started with custom connectors": Customize, then Connectors,
  *     then Add custom connector, on every plan (Free holds one).
  *   - Claude, in a terminal: code.claude.com/docs/en/mcp: `claude mcp add --transport http <name> <url>`, then `/mcp`

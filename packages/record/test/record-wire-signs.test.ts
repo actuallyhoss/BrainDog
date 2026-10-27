@@ -1,7 +1,7 @@
 /**
  * The record's lines of batch 44, each held by a test that goes red by itself when its line is taken out.
  *
- * 1. Audit 38-39 finding 1, the record's half: `page` draws a signs block for a key the inbox does not reach in the
+ * 1. The record's half: `page` draws a signs block for a key the inbox does not reach in the
  *    kernel's quiet words, by the rule `redSigns` asks (`pageReader`).
  * 2. PGS-A01: `pages` drops a page whose blocks are every one held from the caller (kernel `whollyWithheld`).
  * 3. SHL-D07 job 3: `ruleApply` writes every row one press fills under one batch.

@@ -10,7 +10,7 @@
  * sick, which is a different question with its own answer in that record's `/api/version`. `test/healthz.test.ts`
  * hands the bundle a `RECORD` that throws on first touch, and every number below but `night` is a constant of the build.
  *
- * THE ONE EXCEPTION IS THE DIRECTORY, ONCE, ON A GET (LCH-C01). Whether last night's copies were taken is the question an
+ * THE ONE EXCEPTION IS THE DIRECTORY, ONCE, ON A GET. Whether last night's copies were taken is the question an
  * outside watch could not otherwise answer, and the Directory is one object every isolate already wakes. It is asked
  * once a GET (`nightOf` in `index.ts`), never on a HEAD, and a Directory that does not answer is `night: null` and
  * still a 200: the Worker answering is the liveness, and the night is a second fact beside it.
@@ -66,7 +66,7 @@ const HEADERS: [string, string][] = [
 /**
  * The last nightly walk, as `nightly()` hands it to the Directory (`Directory$.nightDone`): when it closed, how many records
  * it reached, how many copies it wrote and how many failed, and whether the Directory's own copy was written. Then each
- * other job of the night by its failures (audit-35, finding 5): the deleted records' copies that would not expire, the
+ * other job of the night by its failures (audit-35): the deleted records' copies that would not expire, the
  * records whose keys are still under an old root key, the erasures still open, and whether the install counts were
  * written, absent where the walk counted nothing. `stopped` is a walk that threw, or a night that could not start: kept so
  * the night before it cannot go on saying it ran.
@@ -154,7 +154,7 @@ export const nightSaid = (night: Night | null, now: number): NightSaid | null =>
  * HEAD ANSWERS THE SAME STATUS AND HEADERS WITH NO BODY, and any other method is 405 with `Allow`, because a POST here is
  * a caller who has the wrong address.
  *
- * `night` IS THE ONE THING HERE THAT IS NOT A SETTING (LCH-C01): the last walk, read by the router with one Directory call
+ * `night` IS THE ONE THING HERE THAT IS NOT A SETTING: the last walk, read by the router with one Directory call
  * on a GET (`nightOf` in `index.ts`), so an outside watch can say a night did not run. Absent, the key is left out, which
  * is a HEAD and every caller that asked nothing of the Directory.
  */

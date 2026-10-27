@@ -524,7 +524,7 @@
           <ScopeChip scope={place} />
         {/if}
       {:else if ident}
-        <!-- A PROJECT IS ITS 8px SLOT DOT AND ITS NAME (2.A.12), as where a row applies reads: the lettered well in every
+        <!-- A PROJECT IS ITS 8px SLOT DOT AND ITS NAME, as where a row applies reads: the lettered well in every
              row was a column of badges. A retired one is the quiet ink. -->
         <span class="ident" data-retired={ident.retired ? '' : undefined}><ScopeChip scope={{ spoken: ident.name, name: ident.name, mark: ident.mark, hue: ident.hue }} /></span>
       {:else if value === null}

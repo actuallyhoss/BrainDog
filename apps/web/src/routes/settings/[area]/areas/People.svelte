@@ -276,7 +276,7 @@
     { reach: 'lists', said: copy.inviteChosenLists },
   ];
   let inviting = $state(false);
-  /* WHAT THE FORM STILL NEEDS, said under the button when it is pressed (UI pass of 21 October, H35): the button is
+  /* WHAT THE FORM STILL NEEDS, said under the button when it is pressed: the button is
      never drawn grey for a field left empty, which read as broken; it says what is missing and goes to it. */
   let inviteWhy = $state('');
   const inviteNeeds = { email: 'Add their email so the link is bound to it.', lists: 'Give at least one list a level.' } as const;
@@ -687,7 +687,7 @@
                   </label>
                   <label class="ex-field">
                     <span class="ex-label">{copy.exceptionLevel}</span>
-                    <!-- ONE LIST TAKES THE THREE LEVELS THE RECORD HONOURS THERE (`20 §1`, D5): a list's own Decides or
+                    <!-- ONE LIST TAKES THE THREE LEVELS THE RECORD HONOURS THERE (`20 §1`): a list's own Decides or
                          Owner answers nothing more than Edits does, so offering them described a power it does not grant. -->
                     <select class="ex-select" bind:value={pickLevel}>
                       {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
@@ -816,7 +816,7 @@
             {#each LEVELS as level}<option value={level}>{roleSaid(level)}</option>{/each}
           </select>
         </label>
-        <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`, D4): the record keeps an
+        <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`): the record keeps an
              appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
              otherwise learn it from the colleague. -->
         {#if inviteLevel === 'append'}<p class="hint">{copy.inviteAddsOnlyLeavesOut}</p>{/if}
@@ -889,7 +889,7 @@
 {/if}
 
 <!-- THE READ-ONLY LINKS ARE IN SHARING'S SHARED CARD, and "Read what you already have" is under Tidy up (audit
-     25 October, X19): one card said what is shared, and linking old payments is tidying, not sharing. -->
+     25 October): one card said what is shared, and linking old payments is tidying, not sharing. -->
 
 <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
      candidate for a red, irreversible "Erase a person" is the person reading it. -->

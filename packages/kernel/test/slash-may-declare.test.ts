@@ -1,5 +1,5 @@
 /**
- * What Slash may declare: a look that says it is its own, and nothing else (ENG-A16, RQ-ENG-180).
+ * What Slash may declare: a look that says it is its own, and nothing else.
  *
  * AN INSTALL WROTE ITS `declare` LINE WITH A PLAIN INSERT AND THE ACTOR IT WAS HANDED, so `slashMayWrite` never saw
  * it: a page installed as Slash was written and signed, and the first look a model wrote broke `30 §3`'s query with

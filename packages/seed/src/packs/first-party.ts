@@ -379,11 +379,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   field, so each step is a minor one.
  * - money-core 3.9.0: Cash ahead, on Money and on a book's page, offers two years at most. The record walked the longest
  *   of `horizons:` on every load (3.7.0), so five years and `last` made each opening of Money walk at least 1,825 days
- *   for a chart that opens on 90, and as far as ten years over a long plan (research audit 11-13). The longest length
+ *   for a chart that opens on 90, and as far as ten years over a long plan. The longest length
  *   is still what a walk may cost, whether a load walks it or a reader asks for it. Two lengths taken off a control, no
  *   list, field or figure, so the step is a minor one.
- * - people 3.0.0, money-core 3.10.0 and portfolio 1.14.0: the record understands who and what it meets
- *   (`loop/contract-17.md`). People gains Organisations, moved from the Founder use case under the same
+ * - people 3.0.0, money-core 3.10.0 and portfolio 1.14.0: the record understands who and what it meets.
+ *   People gains Organisations, moved from the Founder use case under the same
  *   id so a founder's rows stay, declared as the list `meet` writes a company into (`org:`), with a page each
  *   (`page.relation`) listing its people. A person gains every key they are known by, the organisation they are with,
  *   the other names they go by and whether they are the record's own person, all named in `meets:`, and their page
@@ -396,11 +396,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `<4.0.0` every money add-on asks for, refusing their next install for a change none of them reads. The ledger
  *   gains `counterparty_text`, the payee as the bank wrote it, which every bank door writes: Money's list declares it
  *   once, where each bank add-on laying its own was a conflict between any two of them. Cash ahead, on Money and on a
- *   book's page, offers five years and `last` again (research audit 16, H1): the kernel now walks two years at most
+ *   book's page, offers five years and `last` again: the kernel now walks two years at most
  *   unasked (`WALK_UNASKED`) and further only when a reader picks a longer length, which the page asks for, so the cost
  *   3.9.0 took them off for is gone. Two lengths put back on a control, so it is no step of its own. Projects gain
- *   `domains`, a field added, so a minor step. STILL 3.0.0, UNRELEASED, after the audit of October 6th
- *   (`loop/research-audit-17.md`): mail nobody's pattern claimed makes nobody, its sender kept as a mention
+ *   `domains`, a field added, so a minor step. STILL 3.0.0, UNRELEASED:
+ *   mail nobody's pattern claimed makes nobody, its sender kept as a mention
  *   (`rule.meet-senders`) unless the kernel already knows its address (`only: 'known'`), a pattern's mail from a public
  *   host names no organisation, neither rule writes a subject, Everyone is grouped by organisation and leaves out a
  *   person folded into another, and an organisation's page draws its projects and money where the record holds them
@@ -420,7 +420,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   drew the count alone: a count read yesterday is a day out this morning, and the day is the one the walk's flag
  *   stands on. A figure added and one cell of a tile changed, so a minor step that reaches a record on its own.
  * - work 1.16.0, portfolio 1.15.0, people 3.1.0 and money-core 3.13.0: the second design review's fixes 2, 3, 5, 6, 7
- *   and 8, in the declarations (`loop/research-design-critic-2.md`). EVERY VERSION BEFORE THESE IS
+ *   and 8, in the declarations. EVERY VERSION BEFORE THESE IS
  *   RELEASED, People 3.0.0 among them, so each is a version and none a reset. Work's Board loses its By status heading,
  *   and Work's line to type into is declared alone and first so a host holds it in the page's header, which is words
  *   over the declaration and moves nothing. Projects keeps its two folds only past four projects under each: while
@@ -441,7 +441,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   PEOPLE 3.1.0 ARE RELEASED, so each is a version of its own. Blocks on pages a record already holds, no list, field
  *   or figure, so each is a minor step that reaches a record on its own.
  * - money-core 3.14.0: an account's `last4` reads "Digits the bank prints", where it said "Last four digits", the words a
- *   question about an unknown card quotes back (`loop/scope/area-record-a.md`, REC-A02 job 7). Some banks print two,
+ *   question about an unknown card quotes back (REC-A02 job 7). Some banks print two,
  *   three or six, and the field holds whatever the message names. The id stays `last4`, so every bank pattern's lookup
  *   still reads it. A label on a field a record already holds, so a minor step that reaches a record on its own. Money's
  *   module is cut into a folder in the same step (`modules/money/`, REC-B01 job 1), which moves no byte of the document.
@@ -458,17 +458,17 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.16.0, ONE UNRELEASED STEP, everything since 3.15.0 folded into it. Three more signs, once the kernel reads
  *   their words (`age`, `currencies`, `empty`): `ledger-newest-days`, `currencies-held` and `uncategorised-share-30d`
  *   (REC-B01 jobs 2 and 3, `modules/money/figures/signs.ts`), and two more: `statement-oldest-days`, the age of the
- *   oldest balance (`rolled.read: age`, REC-B03), and `nights-missed-30d`, the nights the cash line kept no point, once a
- *   kept line names the lists its figure reads. Paydays (REC-B13): a repeating line gains `day_of_month` (a day 1 to 31,
+ *   oldest balance (`rolled.read: age`), and `nights-missed-30d`, the nights the cash line kept no point, once a
+ *   kept line names the lists its figure reads. Paydays: a repeating line gains `day_of_month` (a day 1 to 31,
  *   last, or two, '15, last', labelled "Days of the month") and `weekend` (leave, before, after; default leave), Money
  *   gains `rest_days` (Saturday and Sunday), and the repeating leg names both fields so the walk uses them; and
- *   `script.last_day` (F60, batch 48), once a day and fetching nothing, asks one question for every line whose Next is a
+ *   `script.last_day` (batch 48), once a day and fetching nothing, asks one question for every line whose Next is a
  *   month's last day on the 28th to the 30th, each answer's patches writing `day_of_month`. A balance's
- *   age is what the bank last said (REC-B03): `cash-as-of` and `balances-stale` read the roll's own day (`rolled.read:
+ *   age is what the bank last said: `cash-as-of` and `balances-stale` read the roll's own day (`rolled.read:
  *   as_of`, `read: stale`) where they read the typed "As of" a bank message never writes; `account-ages` dates each
  *   account by its newest statement, which a book's Accounts cards and Money's Last confirmed tile inside Heads up read
  *   through `stale: { figure }` (`modules/money/pages/parts/ages.ts`); and `rule.cash-stale`, a note each time a typed
- *   day passed a week, goes. A row's currency comes from its account and stays (REC-B04): the Ledger's `amount` declares
+ *   day passed a week, goes. A row's currency comes from its account and stays: the Ledger's `amount` declares
  *   `currency_from: account.balance` and `currency_fixed`, and its `available` and `balance_after`, a balance check's
  *   `balance`, an instalment's `amount` and a repeating line's `amount` declare `currency_from`, so an amount sent with
  *   no code takes its account's. Today's money this week (uc6-money-47): `received-7d`, the Ledger's money in over
@@ -478,7 +478,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   a script, fields and a setting added and a rule taken away, nothing another pack reads,
  *   so a minor step. NOT A QUIET ONE: a rule taken away is a loss (`packs/quiet.ts`), so a record on 3.15.0 or before is
  *   asked once in Decide ("take away Cash stale") and gets none of this until it says yes.
- * - money-core 3.17.0 (cash-check-52, REC-A17): `cash-cross-check`, Cash now worked out a second way, less Cash now. The
+ * - money-core 3.17.0 (cash-check-52): `cash-cross-check`, Cash now worked out a second way, less Cash now. The
  *   kernel walks each cash account entry by entry from its newest statement, apart from the roll, and the figure is the
  *   difference a currency at a time: nought, or the figure on Money is wrong. With no balance typed it has no value.
  *   MONEY-CORE 3.16.0 IS RELEASED (`test/fixtures/released/money-core-3.16.0.json`), so this is a version of its own. One
@@ -490,7 +490,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   A closed account (account-state-56): Accounts gains Status, open or closed, with closed its finished state, and
  *   today's cash, the oldest balance, the Last confirmed cards and a book's Accounts cards leave a closed one out. An
  *   account typed before the field counts as open. A list, fields and a state added, nothing taken away, still minor.
- *   A payment marks what it paid (pay-links-57, REC-B11): a bill gains Paid so far, an instalment Paid by, a link to
+ *   A payment marks what it paid (pay-links-57): a bill gains Paid so far, an instalment Paid by, a link to
  *   the Ledger entry that paid it, and a repeating line Last paid and Last amount. The Ledger declares
  *   `delete: refuse_while_referenced`, so a payment an instalment names is not deleted out from under it. Fields and a
  *   delete rule added, nothing taken away, still minor. The script that writes them (`scripts/settle.js`) is
@@ -501,12 +501,12 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   own filler. Money is at the most blocks a page declares, so it took the place of the line for no balance typed,
  *   which stood under the box to add an account and was untrue with accounts and none of them cash. A block swapped
  *   for another inside the unreleased step, so no version of its own.
- *   The Ledger, open (ledger-tile-59, REC-B15): the six newest entries stand in a tile of their own on Money, headed
+ *   The Ledger, open (ledger-tile-59): the six newest entries stand in a tile of their own on Money, headed
  *   Ledger, before Heads up, each line its entry, drawn once an entry has cleared. History gives up What moved, its
  *   twelve lines folded shut, so the page still declares twenty-four blocks and says what moved once. And the two late
  *   lines on Heads up say "past their due date" in the danger colour (bad-phrase-59), the words unchanged. Blocks
  *   swapped and two sentences marked inside the unreleased step, so no version of its own.
- *   A payment marks the bill it pays (settle-rule-60, REC-B11): `script.settle` is registered, and `rule.payment-settles`
+ *   A payment marks the bill it pays (settle-rule-60): `script.settle` is registered, and `rule.payment-settles`
  *   starts it when a Ledger entry that names a bill in Settles has cleared, handing the entry and the bill by their
  *   ids, which the script reads as well as a handle. The bill is part paid with the sum so far, or paid with the day;
  *   only cleared money is counted. Nothing starts it for an instalment or a repeating line: Settles points at Bills
@@ -514,7 +514,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   One more sign of life (repeating-overdue-67, REC-B11 step 8): `repeating-overdue`, how many live repeating lines
  *   have a Next more than three days gone, with nought the target. Only a line a payment was matched to before is
  *   counted (repeating-sign-fix-69): `last_paid is set`. And named for it, Matched repeating lines past their day
- *   (repeating-sign-72, audit 69 finding 5), so nought is no word on a line nothing was matched to. A figure added
+ *   (repeating-sign-72), so nought is no word on a line nothing was matched to. A figure added
  *   inside the unreleased step.
  *   A name beside the bank's words (payee-field-68, REC-B16 step 2): the Ledger gains `payee`, Paid to or from,
  *   searchable and not indexed, and `counterparty_text` is labelled As the bank wrote it.
@@ -546,7 +546,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   And Projects draws the questions about its own list (`list is things`) as a queue gated on
  *   `questions-open-in:things`, with a clause in the line (waiting-work-projects-99, PGS-C18, batch 99, inside the
  *   unreleased step): one block added to a page that is there, nothing taken away.
- * - work 1.19.0 (W061, REC-C10): a thread has six states and declared moves, a day it aims for, and a follow-up takes
+ * - work 1.19.0: a thread has six states and declared moves, a day it aims for, and a follow-up takes
  *   its parent's project, thread and owner one by one (and the agent, when the agent holding the parent made the
  *   follow-up), and a thread that is holding may be marked
  *   done (work-moves-62-63, batch 63, inside the unreleased step). WORK 1.18.0 IS RELEASED (commit 63423720), so this is a
@@ -559,9 +559,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   count, Add and a search word, and lists open work with no project under a fold of its own, over a new figure
  *   `tasks-no-project` (work-head-and-no-project-101, AGT-D14 job 1, PGS-A14, batch 101, inside the unreleased step):
  *   one figure and two blocks added, nothing taken away. And the Board reads every task in play before any done one,
- *   its line says what is kept for later, and Everything open goes from under it (audit B of 25 October, Y8, inside
+ *   its line says what is kept for later, and Everything open goes from under it (inside
  *   the unreleased step): one block taken from a page that is there, no id added or taken away.
- * - work 1.19.0, the Timeline (the add-ons pass of 27 October, inside the unreleased step): the dated tasks on one time axis
+ * - work 1.19.0, the Timeline (inside the unreleased step): the dated tasks on one time axis
  *   are a page of Work, `page.roadmap`, which the Roadmap add-on hands over (`hands`, so a record holding Roadmap keeps the
  *   page and Roadmap retires). A page added, nothing taken away, no version of its own.
  * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
@@ -579,7 +579,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   Ledger tile reads `filed-today` and `filed-for-you-30d` in its written line (ledger-by-63, REC-B20 job 3), which
  *   no host draws yet; `filed-for-you-30d` counts what an agent, a bank add-on or a rule made, where it counted
  *   anything but a person (filing-figures-draw-62-63); and `settle` leaves a Paid so far somebody typed when a pending
- *   or void payment paid none of it (audit 62, claim 1).
+ *   or void payment paid none of it.
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 66's change
  *   with no version of its own (`e84778f2db7564d6`): a plan is a thing of its own (plans-list-66, REC-B12 jobs 1 and
  *   2). The list `plans`, declared before Instalments, which gains `plan_row` and `left_after`; the script
@@ -591,10 +591,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   with no version of its own: the Ledger's `payee` (payee-field-68, above); `rule.plan-links-parts` (plans-calm-67-68,
  *   above); the page `money-plan`, one plan's page, with six figures of one plan, `plan-parts-paid`, `plan-parts`,
  *   `plan-paid`, `plan-left`, `plan-next-due` and `plan-last-due`, and two by plan, `installments-paid-by-plan` and
- *   `installments-total-by-plan` (plan-page-68, REC-B12); and `budget-passed-on`, the day a category's spending
+ *   `installments-total-by-plan` (plan-page-68); and `budget-passed-on`, the day a category's spending
  *   reached its budget, a running total with a stop (budget-passed-on-68, REC-B19 step 4).
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 70's change with
- *   no version of its own: the cash walk's leg of everyday spending (everyday-leg-69-70, audit 68 finding 4), measured
+ *   no version of its own: the cash walk's leg of everyday spending (everyday-leg-69-70), measured
  *   over the Ledger and moved a week at a time, on Cash ahead, its bridge and the four figures over the walk.
  * - money-core 3.17.0, still unreleased, takes batch 70's page changes too, each a block changed and no id added or
  *   taken away: Money's Instalments tile reads each plan's paid of total from its two figures by plan
@@ -608,7 +608,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   is filed in no book (book-figures-71); and the book page gained This month, a row of the three (book-page-71).
  *   And batch 72's (plan-lead-all-paid-72), in the same unreleased step: two figures of one plan, `plan-parts-open` and
  *   `plan-share-left`, and the plan page's second lead sentence, for a plan with every part paid. And the nightly
- *   count of `script.book_from_account` is of what still stands, as the page counts it (audit 71 finding 1).
+ *   count of `script.book_from_account` is of what still stands, as the page counts it.
  *   Batch 74 took `plan-share-left` out again (plan-lead-one-figure-74): the plan page's two lead sentences each wait
  *   on `plan-parts` and `plan-parts-open` together, two counts, so a plan in two currencies or of nought amounts is
  *   led by one sentence.
@@ -631,17 +631,17 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   eight categories, in and out, in place of one of the sample's (ruling 341, money-starter-categories-76), which no
  *   fingerprint reads. NO RECORD IS GIVEN IT AS ITS OWN YET: nothing that installs asks for `starters`, so the set
  *   reaches a record only among the sample's rows, tagged as examples, and the change notes do not promise it (audit
- *   80, finding 1). One id added, none taken away.
+ *   80). One id added, none taken away.
  *   And batch 77's, in the same unreleased step: `invoice-chased` holds two draft steps whose conditions never hold
  *   together, so an invoice paid in part that says what was paid is drafted for what is left of it
- *   (`{{short:amount-paid_so_far}}`) and every other invoice keeps its sentence (chase-part-paid-77, REC-B22). No id
+ *   (`{{short:amount-paid_so_far}}`) and every other invoice keeps its sentence (chase-part-paid-77). No id
  *   added or taken away.
  *   And batch 78's, in the same unreleased step (commit 63423720, the deployed build, holds 3.16.0), four changes and
  *   three ids added: `repeating-overdue` now counts the late with `past` inside `state is live, last_paid is set`, so
  *   a kept record reads 0 and met and a record with no matched line still reads no value (repeating-overdue-past-78,
  *   signs-metric-75-76). Money's line is split in two, one drawn, so a record whose money lasts reads that it lasts
  *   the year, and Heads up gives up its line on categories marked the other way so the page stays at twenty-four
- *   blocks, the figure still declared (money-lasts-line-78, REC-B07). A book's page gains one line under What is due,
+ *   blocks, the figure still declared (money-lasts-line-78). A book's page gains one line under What is due,
  *   that its money lasts the year, drawn on `book-lasts-until` carrying `beyond` (book-lasts-year-78, REC-A09 step 2).
  *   And a cleared payment that names nothing finds what it paid: `script.match_payment`, `rule.payment-matches` that
  *   starts it, and `rule.instalment-settles` that runs `settle` once an instalment names its payment
@@ -686,7 +686,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   nought red is "Nothing on this record needs a look", its groups are Needs a look, All good and Not checked yet, and
  *   the run of good days says every check passed. Words inside `page.health` only, no id added or taken away, so a
  *   minor step that reaches a record on its own.
- * - money-core 3.18.0 (the audit of 22 October, U4): a part of a plan whose day has gone is late. `installments-late`
+ * - money-core 3.18.0: a part of a plan whose day has gone is late. `installments-late`
  *   counts the parts still open past their day, going out, and its first row is the part late longest; Money's first
  *   line says it by name after the money, and with two books the line says the money there is (`cash-now`) where it
  *   said two counts; Heads up's line of bills late says the part first (`says:`). 3.17.0 IS RELEASED (the deploy of
@@ -696,7 +696,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   hundred at most, where they drew the first twelve by name, so the lane bar over them says In play 13 as Today and
  *   the sidebar do, where it said 5. One block's limit raised, nothing added or taken away, so a minor step that
  *   reaches a record on its own. 1.20.0 IS RELEASED (the deploy of 23 October holds it).
- * - portfolio 1.22.0 (the alive scope of 24 October, B26): Projects ships `script.kpi_backfill`, which offers each
+ * - portfolio 1.22.0 (the alive scope of 24 October): Projects ships `script.kpi_backfill`, which offers each
  *   project its key numbers from what Numbers holds, once a day and once a project, as questions on Decide. It was
  *   written and tested and declared nowhere, so a record with readings held no key number. One script added and
  *   nothing taken away, so a minor step; it asks and writes nothing itself.
@@ -705,51 +705,51 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `page.service`), with no `nav` and `fleeting`, so none takes an address from a steadier page. People's Everyone is
  *   faces, the owner left off (`self is not true`), and `people-count` counts the people it draws. Three pages added and
  *   two declarations changed, nothing taken away, so minor steps. 3.18.0, 3.5.0 and 2.2.0 ARE RELEASED (origin/master).
- * - portfolio 1.23.0 (the thinking scope of 24 October, C18 and C19): a project's plan is drawn, not listed. Stages, a
+ * - portfolio 1.23.0 (the thinking scope of 24 October): a project's plan is drawn, not listed. Stages, a
  *   list of steps over the projects, each with its done-when line, drawn on the project page as its road with the next
  *   one marked; and a project's plan field, which keeps its plan as its road alone or its roadmap alone, the shape
  *   kept from what BrainDog drew for it. Its two lead notes are one note with two sentences (`says:`), so the page
  *   stays at twenty-one blocks. A list, a field and three figures added and nothing taken away, so a minor step that
  *   reaches a record on its own. 1.22.0 is master's (the KPI backfill).
- * - money-core 3.20.0 (the scope of 24 October, B6, B8 and B24): a paid bill asks once to move its twin repeating line
+ * - money-core 3.20.0 (the scope of 24 October): a paid bill asks once to move its twin repeating line
  *   on (`bill-moves-line`, `move_line`), and a payment that fits a bill and a line under one name links the bill; a card
  *   says what is to pay on it from its texts once its limit is typed (`limit`, `to_pay`, `to_pay_on` on Accounts,
  *   `card-text-owes`, `card-limit-owes`, `card_owed`, `card-to-pay`, `card-to-pay-on`), said in Money's first line;
  *   and Filing rules says how many entries have no category with File old entries. 3.19.0 is master's (things,
  *   not rows), so a version of its own. Ids added and none taken away, so a minor step.
- * - portfolio 1.24.0 (the scope of 24 October, B27): a project's kind set offers its kind's four key numbers as drafts,
+ * - portfolio 1.24.0 (the scope of 24 October): a project's kind set offers its kind's four key numbers as drafts,
  *   one question a project (`kind-offers-kpis`, `kind_drafts`), and none to a project that holds key numbers. One rule
  *   and one script added and nothing taken away, so a minor step. 1.23.0 is master's (the stages road).
- * - portfolio 1.25.0 (E26, the screens scope of 24 October): Numbers gets a page of its own, `page.all-numbers`, which
+ * - portfolio 1.25.0 (the screens scope of 24 October): Numbers gets a page of its own, `page.all-numbers`, which
  *   says `list: datapoints`, so the list's address opens on it: each kind of number once, under the project it is for,
  *   with its newest value, unit and age, and the two that moved most this year as lines. 1.23.0 is master's and 1.24.0
  *   another lane's, so a version of its own. One page added and nothing taken away, so a minor step.
- * - estate 2.4.0 (the audit of 25 October, Z40): Services names what is lapsing, a table drawn only while `lapsing` holds
+ * - estate 2.4.0: Services names what is lapsing, a table drawn only while `lapsing` holds
  *   one, each by its name, who it is with and the day it was due, in the place of At a glance, whose two figures said
  *   no names. 2.3.0 is master's (a page for each service). One block for another and no id taken away, so a minor step.
  * - estate 2.5.0 (Vault is now Keychain): a service page links its keys as the Keychain, at /keychain. A link's words and address, no id added
  *   or taken away, so a minor step.
- * - people 3.7.0 (C33, 24 October): Scripts is a page, `page.scripts`, a table of every installed script over the
+ * - people 3.7.0 (24 October): Scripts is a page, `page.scripts`, a table of every installed script over the
  *   kernel's `scripts` source, which `/scripts` draws where it drew a list by hand, so it can be changed by saying so and
  *   pulled as any page. 3.6.0 is master's (Everyone as faces). A page added and nothing taken away, so a minor step.
- * - money-core 3.21.0 (the audit of 25 October, Z14 and Z18): the calendar of what falls due on `page.money` wears no
+ * - money-core 3.21.0: the calendar of what falls due on `page.money` wears no
  *   heading or glyph of its own, since it opens Coming and going and the tile read two headings one over the other; and
  *   it reads `source: deadlines` with money on it, as Today's Due soon does, where it read Bills and invoices alone.
- *   3.20.0 is master's (B6, B8 and B24). One block changed, nothing added or taken away, so a minor step that reaches a
+ *   3.20.0 is master's. One block changed, nothing added or taken away, so a minor step that reaches a
  *   record on its own.
- * - portfolio 1.26.0 (the audit of 25 October, Z7): the In play cards' when reads the record's own `project-worked`, a
+ * - portfolio 1.26.0: the In play cards' when reads the record's own `project-worked`, a
  *   project's tasks and its runs together, the figure Today's cards read, where it read Work's `project-last-worked`,
  *   the tasks alone. 1.25.0 is master's (Numbers' page). One column changed and no id added or taken away, so a minor
  *   step.
- * - money-core 3.22.0 (the audit of 25 October, Y1): `plans_from_names` matches a plan's name whatever its capitals,
+ * - money-core 3.22.0: `plans_from_names` matches a plan's name whatever its capitals,
  *   accents and spaces, where "harbourview" beside "Harbourview" made a second plan, and asks once about two plans already here
  *   under one name; `register.plans` gains `one_with`, which his yes sets on the second plan as it closes it, and
- *   `rule.plan-made-one` hands that plan's parts to the first. 3.21.0 is master's (Z14, Z18). A field and a rule added
+ *   `rule.plan-made-one` hands that plan's parts to the first. 3.21.0 is master's. A field and a rule added
  *   and nothing taken away, so a minor step.
  * - money-core 3.23.0 (the look of 25 October): the Lasts tile's two cells say "With what is due and expected" and "If
  *   nothing more comes in", where "Lasts past 25 Oct 2027" beside "If nothing comes in: 80 days" read as a contradiction.
  *   3.22.0 is on production. Words only, no id added or taken away, so a minor step.
- * - money-core 3.24.0 (the look of 26 October, R4): the Accounts split's limit is twelve, where six cut a seventh account off
+ * - money-core 3.24.0 (the look of 26 October): the Accounts split's limit is twelve, where six cut a seventh account off
  *   a tile beside a line that said "7 accounts". 3.23.0 is master's. One number changed, no id added or taken away, so a minor step.
  * - money-core 3.25.0: `script.settle_matched_line` binds `settle` by name in its own text, where the Worker's bundle had
  *   renamed the function it took and every run that found its repeating line threw "settle is not defined". 3.24.0 is
@@ -783,15 +783,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   (`{ order: 'seq' }`), where a list in its own order (the Ledger by day) lost the rows between two pages and a record
  *   with more than fifty lines or parts was booked and counted short. Two scripts' sources changed, no id added or taken
  *   away, so a patch step. 3.27.0 is released.
- * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
+ * - people 3.8.0: Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and
  *   nothing taken away, so a minor step.
- * - portfolio 1.27.0 (audit C of 25 October, X7): `page.portfolio` opens on an Add a project capture while nothing is
+ * - portfolio 1.27.0: `page.portfolio` opens on an Add a project capture while nothing is
  *   in play, under a line of its own where the record holds no project at all; the line saying none is in play draws
  *   only while one is parked, and the one saying nothing needs a push only while one is in play, so a new record's
- *   Projects is one line and one box. 1.26.0 is master's (Z7). Blocks added and nothing taken away, so a minor step.
- * - portfolio 1.28.0 (the look of 25 October, P7 and P11): Numbers opens on a plain line and its link to every reading says what it opens, and Where they
+ *   Projects is one line and one box. 1.26.0 is master's. Blocks added and nothing taken away, so a minor step.
+ * - portfolio 1.28.0 (the look of 25 October): Numbers opens on a plain line and its link to every reading says what it opens, and Where they
  *   are counts the projects Projects draws, Finished left out. Words and one filter moved, no id added or taken away, so a minor step.
  * - portfolio 1.29.0 (the agents' reads): a project's mark, hue and draft flag are declared `hidden_from_agents`, so the short
  *   answers an agent reads leave them out; `format: full` and the app keep them. Three fields flagged, no id added or taken away, so a minor step.

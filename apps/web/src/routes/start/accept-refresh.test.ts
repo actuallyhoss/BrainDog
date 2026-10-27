@@ -5,7 +5,7 @@
  * THAT IS THE SCRIPT THE PRESS USED TO BE (`oldScript`), which a host a release behind this page still gets: the fake
  * client here has no `setup`, which is how `accept` is told to run it. Those tests go when the script does.
  *
- * UNDER THEM, THE PRESS AS IT IS NOW (USE-B04): one `setup` call the record owns, so a tab closed after the press leaves
+ * UNDER THEM, THE PRESS AS IT IS NOW: one `setup` call the record owns, so a tab closed after the press leaves
  * a record that holds every part; a call cut off is pressed once more with `again`; a host with no such call gets the
  * script; and a file goes in through the same call, two hundred entries at a time.
  *

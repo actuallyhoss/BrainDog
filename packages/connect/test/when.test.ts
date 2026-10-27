@@ -98,7 +98,7 @@ test('the same record and ingest always get the same jitter', () => {
   assert.notEqual(jitterMs('rec_2', 'ingest_a', 3_600_000), a);
 });
 
-/* ONE FORMULA ON BOTH SIDES OF THE ROW (DOR-5). The kernel's `jitterMs` in `pull.ts` arms the
+/* ONE FORMULA ON BOTH SIDES OF THE ROW. The kernel's `jitterMs` in `pull.ts` arms the
    connector with this same arithmetic, and the number below is what it answers for these names. A
    runner that spread the run by a different amount set a due instant the record did not agree with. */
 test('the jitter is the kernel\'s own arithmetic, to the millisecond', () => {

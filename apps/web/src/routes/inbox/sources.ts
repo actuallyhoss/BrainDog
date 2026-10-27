@@ -12,7 +12,7 @@
  * COUNTED OVER WHAT WAS READ. The read stops after a few pages, so on a busy record the oldest days can be short, and
  * `partial` says so rather than drawing a quiet fortnight that was not quiet.
  *
- * AND WHETHER THE NEWEST MAIL WAS SIGNED (REC-A15). Mail the host could not check the sender's signature on is stored
+ * AND WHETHER THE NEWEST MAIL WAS SIGNED. Mail the host could not check the sender's signature on is stored
  * with the kernel's `UNVERIFIED` reason and is never matched, so Mail's well says which of the two the last one was,
  * from the reason the arrival already carries. A read that did not carry the reason says nothing rather than "signed".
  *
@@ -138,7 +138,7 @@ export function nothingEver(
 export type Quiet = { title: string; why: string; add: string; command: string | null };
 
 /**
- * THE ONE STEP TO AN ADDRESS (audit 25 October, X25). It said "Forward mail to this BrainDog's address" and never said
+ * THE ONE STEP TO AN ADDRESS. It said "Forward mail to this BrainDog's address" and never said
  * the address, and no door reads one back: the Cloud makes one on a press in What comes in, and a self-host's is a
  * file on its machine, printed by one command (`addressCommand`). A host that has not said which it is is told the
  * Cloud's way, which asks nothing of a machine it may not have.

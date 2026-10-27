@@ -1,8 +1,8 @@
 /**
  * An option its proposer marked `hard: true` cannot be taken back once it is picked, and it is that option that
- * weighs `undo`, not the question that offers it beside a safe one (audit 62, claim 6, over audit 60, claim 1). The
+ * weighs `undo`, not the question that offers it beside a safe one. The
  * question is `undo` only when every option it offers is marked. And a change that adds a field to a list that holds
- * rows is `undo` (audit 62, claim 5). `costOf` and `COST_SQL` are held here to the band each body must have, and so
+ * rows is `undo`. `costOf` and `COST_SQL` are held here to the band each body must have, and so
  * to each other: a count beside the queue that disagreed with the order it is drawn in would be the fault.
  */
 
@@ -128,7 +128,7 @@ test('EACH OPTION WEARS ITS OWN BAND, and a pick is weighed by the option picked
   assert.equal(pickCost('pattern', { options: [{ id: 'take', hard: true }] }, 'take'), 'call');
 });
 
-/* ── A field added to a list that holds rows (audit 62, claim 5) ── */
+/* ── A field added to a list that holds rows ── */
 
 const FROM = { id: 'register.tasks' };
 const FIELD = { id: 'effort', type: 'number' };

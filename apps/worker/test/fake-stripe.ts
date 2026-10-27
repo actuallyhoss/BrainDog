@@ -1,5 +1,5 @@
 /**
- * A Stripe that remembers, for the billing rehearsal (LCH-A13): it answers the forms `stripeOf` sends as Stripe's API
+ * A Stripe that remembers, for the billing rehearsal: it answers the forms `stripeOf` sends as Stripe's API
  * does, keeps the customers, Checkout Sessions, subscriptions, invoices, payments and portal sessions those forms make,
  * and plays the buyer's half on Stripe's own pages (`pay`, `confirm`, `cancelAtEnd`) and the time between (`renew`,
  * `endPeriod`). Each of those leaves the events Stripe would send in `take()`, and `signed` turns one into the request

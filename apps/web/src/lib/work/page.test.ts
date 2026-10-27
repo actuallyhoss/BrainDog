@@ -17,7 +17,7 @@ test('/?work draws the declared page on a record that holds it', () => {
 });
 
 test('/?work&classic is an address somebody kept and draws the page, and a record with tasks and no Work page opens its list', () => {
-  /* THE OLD SCREEN IS GONE (C32): nothing reads the word. */
+  /* THE OLD SCREEN IS GONE: nothing reads the word. */
   assert.equal(workView(q('work&classic'), [WORK_PAGE]), 'page');
   assert.equal(workView(q('work'), ['money']), 'list');
   assert.equal(workView(q('work'), []), 'list');

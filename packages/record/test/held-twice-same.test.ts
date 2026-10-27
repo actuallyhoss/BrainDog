@@ -309,7 +309,7 @@ test('THE QUESTION SAYS THE LIST BY ITS OWN NAME AND KEEPS BY ITS keep, and the 
   assert.deepEqual(writesOf([{ key: 'k', keep: 'b', others: ['a'], writes: gone }, { nothing: true }], 'x'), [w]);
 });
 
-/* ── the picked: "Fold into one" on the bar, for the ones he picked (AGT-D04) ─────────────────────────────────── */
+/* ── the picked: "Fold into one" on the bar, for the ones he picked ─────────────────────────────────── */
 
 /** Every door these walk through: the stand-in always, and the record's own when its kernel has the readers. */
 const doors = (r: Awaited<ReturnType<typeof studio>>): [string, Door][] => [['stand-in', standIn(r)], ...(KERNEL_HAS ? [['own', realDoor(r.api)] as [string, Door]] : [])];

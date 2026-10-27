@@ -4,7 +4,7 @@
  * THE SAME RULE THE HOST KEEPS FOR THE RESOLVE ASK (`host/src/understand.ts` `scrubbed`), here for what the record itself
  * hands a model: a row's title and a block's heading in the look and headline ask (`compose-look.ts` `lookInputOf`), and
  * a name in Slash's reading (`slash.ts` `entitiesOf`). A person met with only an address was named by it, so a page
- * listing people handed the model `ines.duarte@orchardline.example` as a title (`loop/research-audit-17.md` M1).
+ * listing people handed the model `ines.duarte@orchardline.example` as a title.
  *
  * PURE, so a test reads it in Node.
  */
@@ -38,7 +38,7 @@ const BRACKETED = /\s*[<([]\s*[^\s<>"'@()[\]]+@[^\s<>"'@()[\]]+\.[a-z]{2,}\s*[>)
 /**
  * A name as a person reads it, or `null` where it was only an address, as the MCP's own `nameOnly` reads one
  * (`packages/mcp/src/brief.ts`): `Jo <jo@kiln.example>` is `Jo`, and `jo@kiln.example` names nobody. The record keeps
- * an address as somebody's name when it knew no other (research-audit-21 item 11).
+ * an address as somebody's name when it knew no other.
  */
 export function nameOnly(said: string): string | null {
   const kept = said.replace(BRACKETED, '').trim();

@@ -1,5 +1,5 @@
 /**
- * The lens (sharing plan §2.3, §2.4): what one caller holds, as pure functions over a catalog and their shares.
+ * The lens: what one caller holds, as pure functions over a catalog and their shares.
  *
  * The plan's three people are asserted as it writes them (Sam, Lee, Priya), then the rules `checkShare` keeps, the
  * clock, the ways `lensOf` fails closed, and P7 over random share sets: adding an allow never removes sight, and adding

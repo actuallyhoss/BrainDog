@@ -1,5 +1,5 @@
 /**
- * The apps an agent works in, as one table (AGT-A07, AGT-D10, AGT-D11). Each client says whether it is on this
+ * The apps an agent works in, as one table. Each client says whether it is on this
  * machine, where it keeps its servers for a person and for a repository, how to read them, and how to write the
  * record's tools into them. `tools.ts` and `setup.ts` go through the table and know no app's files of their own.
  *

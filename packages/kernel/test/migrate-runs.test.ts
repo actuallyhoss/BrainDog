@@ -1,5 +1,5 @@
 /**
- * Migration 28's three data steps (AGT-C04), run from the hourly sweep 200 runs at a time.
+ * Migration 28's three data steps, run from the hourly sweep 200 runs at a time.
  *
  * MEASURED BEFORE: about 740 of the 752 runs on the owner's record read abandoned, because the end hook wrote idle and
  * the sweep wrote every closed session off twelve hours later. What is asserted: a run whose newest state line is the

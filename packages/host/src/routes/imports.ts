@@ -1,6 +1,6 @@
 /**
  * The route rows for every import made into the record and the owner's word on each (`packages/record/src/methods/
- * imports.ts`, ENG-A13).
+ * imports.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because `router-groups` holds each row's group to
  * `docs/30-BLUEPRINT.md` §5 and `guards` holds the record method of the same name to the guard its group implies.

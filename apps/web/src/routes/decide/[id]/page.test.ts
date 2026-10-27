@@ -133,7 +133,7 @@ test('the sentence the controls point at is rendered, and before the first of th
  * laptop the one thing this screen is for was below the fold. Then they were one folded tile under the options, a
  * second treatment beside the options' tile and the comments floating on the board under both.
  */
-test('the options come first with what it changes under them in their tile, and why and the comments are the second tile (scope E37)', () => {
+test('the options come first with what it changes under them in their tile, and why and the comments are the second tile', () => {
   const head = page.indexOf('<PageHead icon="decide"');
   const tile = page.indexOf('<Tile class="gate">');
   const options = page.indexOf('<section class="options"');
@@ -141,7 +141,7 @@ test('the options come first with what it changes under them in their tile, and 
   const does = page.indexOf('<section class="does"');
   const thread = page.indexOf('<Thread');
   const shut = page.lastIndexOf('</Tile>');
-  /* WHAT IT CHANGES UNDER THE ANSWERS, IN THEIR TILE (scope E37): beside them it left half the board empty under two buttons. */
+  /* WHAT IT CHANGES UNDER THE ANSWERS, IN THEIR TILE: beside them it left half the board empty under two buttons. */
   assert.ok(head >= 0 && tile > head && options > tile && does > options && aside > does && thread > aside && shut > thread, 'the tiles no longer read options, then what it changes, then the comments');
   /* TWO TILES ON THE SCREEN, and nothing folded shut in the way of what it changes. */
   assert.equal(page.match(/<Tile\b/gu)?.length, 2, 'the gate is one tile again, or three');
@@ -243,7 +243,7 @@ test('nothing a reader was invited to read is hidden from them', () => {
  *
  * MEASURED on the walk of 2 October: a press made a round trip and then asked "Why?", and two of the owner's decisions
  * carried the reasons "f" and "y". So the press sends the answer alone, the one line opens only on the record's own
- * `wants: 'reason'`, and the suggested answer is the one filled primary and says so on its own button (UX21).
+ * `wants: 'reason'`, and the suggested answer is the one filled primary and says so on its own button.
  */
 test('one press is the answer, and a reason is asked for only when the record asks', () => {
   const chooseAt = page.indexOf('function choose(key: string) {');
@@ -253,7 +253,7 @@ test('one press is the answer, and a reason is asked for only when the record as
   assert.match(page, /out\.from === 'refused' && out\.wants === 'reason' && said === undefined/u, 'the one line opens on something other than the record asking');
   assert.match(page, /\{#if asked\}\n\s+<form class="line-form" onsubmit=\{sendReason\}>/u, 'the reason line is drawn without the record asking');
 
-  /* THE SUGGESTED ANSWER IS THE ONE FILLED PRIMARY (UX21), "Accept, suggested" on its own button, as on the queue's cards
+  /* THE SUGGESTED ANSWER IS THE ONE FILLED PRIMARY, "Accept, suggested" on its own button, as on the queue's cards
      (`primaryOf`): of the record's two answers the suggested one is filled, and Accept only where nothing is suggested.
      The press is still the reader's. A question of options is a card each, and its own button gives it (today F9). */
   const snippetAt = page.indexOf('{#snippet answer(');
@@ -325,7 +325,7 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
   const handler = page.slice(start, page.indexOf('\n  }\n', start));
   assert.match(handler, /if \(typing\(\) \|\| fromInput\(e\.target\)\) return;/u, 'a key from inside a field or a box reaches the gate');
   assert.match(handler, /pressMerge\(merge\.apart, mergeWords\.keptApart\);/u, 'Backspace keeps a merge apart with no Undo');
-  /* A DECLINE IS HELD FOR ITS UNDO ON EVERY QUESTION (audit 19 M10 took Enter away on a hard one, never the hold), and the
+  /* A DECLINE IS HELD FOR ITS UNDO ON EVERY QUESTION (Enter was taken away on a hard one, never the hold), and the
      line it leaves says the question as the title does, with no address or id in it. */
   assert.match(
     handler,
@@ -350,7 +350,7 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
 /**
  * THE SIDE, AS THIS PAGE ASKS FOR IT (`side.ts`, `../lead.ts`), held by what it returns and not by the markup's text.
  * The tests that stood here read the side's markup as regexes, and passed with it present whatever it said (audit
- * 31-32, finding 6). These hold what the page is handed for a question as the record sends one: its why, each answer's
+ * 31-32). These hold what the page is handed for a question as the record sends one: its why, each answer's
  * reason as filed (`reasonIn`), and its body. Each fails on a revert of finding 5.
  */
 const asked = (q: { context?: string; options: { key: string; body: string }[]; body?: unknown }) =>

@@ -129,7 +129,7 @@ test("Slash's asks as a ring only where the answer carries an allowance of them"
   assert.equal(asksOf({ ...capped, asks: null }), null);
 });
 
-/* ── the audit of 25 October, X21 and X22: every line true of a three-run month, and no allowance off the Cloud ── */
+/* ── every line true of a three-run month, and no allowance off the Cloud ── */
 
 test('X21: off the Cloud the month names no allowance: no rings, no plan, and the sentence says no limit', () => {
   const view = offCloud(usageFromLedger(ledger(3), '2026-09', '2026-09-15'));

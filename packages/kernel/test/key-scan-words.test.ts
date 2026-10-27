@@ -1,5 +1,5 @@
 /**
- * The words of the key scan (`key-scan.ts`, audit 43-44 #4): where a key is said in words a person reads, so the
+ * The words of the key scan (`key-scan.ts`): where a key is said in words a person reads, so the
  * figure's `why` names "an entry", never "a row", and never an id.
  */
 

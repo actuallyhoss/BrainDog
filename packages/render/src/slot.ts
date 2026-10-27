@@ -1,5 +1,5 @@
 /**
- * The eight category slots (the UI pass of 20 October, 1.3): a project, a person, an agent with no maker's colour, a
+ * The eight category slots: a project, a person, an agent with no maker's colour, a
  * chart series that is one of those. Each is two tokens, `--cat-<slot>` (the strong colour: a glyph, a letter, a dot)
  * and `--cat-<slot>-tint` (the soft fill: a well, a disc), solved to clear 4.5:1 on the tile and on each other in light
  * and in dark. No slot is red or orange, so nothing in a category reads as late or as the accent.

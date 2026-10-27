@@ -11,7 +11,7 @@ import { since, sinceWords } from 'braindog-render';
 
 import { addedSaid, agoSaid, daySaid, daysOf, daysTo, dueSaid, importKeysOnly, sentenceOf } from './said.ts';
 
-/* THE AUDIT OF 25 OCTOBER, Z23 (`row-390-light.png`): Tags "kilnnotes:servicereading:oracle-a1:cpu:2026-09-28" listed as
+/* Tags "kilnnotes:servicereading:oracle-a1:cpu:2026-09-28" listed as
    a fact. An import's keys are not a person's tags; a tag a person wrote is. */
 test('TAGS THAT ARE ONLY AN IMPORT\'S KEYS ARE NOT LISTED, and a person\'s tags are', () => {
   assert.equal(importKeysOnly(['kilnnotes:servicereading:oracle-a1:cpu:2026-09-28']), true);
@@ -65,7 +65,7 @@ test('THE AGE SAYS ITS UNIT IN WORDS, never "7w" or "12h"', () => {
   assert.equal(agoSaid('not a time', MORNING), '');
 });
 
-test('ONE DAY READS ONE AGE EVERYWHERE: Added, Activity and the list say 28 Sep from 24 Oct as the fields do (Z25)', () => {
+test('ONE DAY READS ONE AGE EVERYWHERE: Added, Activity and the list say 28 Sep from 24 Oct as the fields do', () => {
   const NOW = Date.UTC(2026, 9, 24, 19);
   const at = '2026-09-28T10:00:00.000Z';
   /* The fields and the list read the record's ladder: "4w ago" in a cell, "4 weeks ago" in words. */

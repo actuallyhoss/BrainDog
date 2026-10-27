@@ -1,5 +1,5 @@
 /**
- * What the walk would not do on its own, filed in the order its answers matter (research-audit-22, batch 23's
+ * What the walk would not do on its own, filed in the order its answers matter (batch 23's
  * leftovers): where runs belong before whether a payee is a company, so `SLASH_OPEN_CAP` never leaves every slot to
  * payees; a payee that may be an organisation the person holds is asked as one rowset giving it the key; a run question
  * that names no place is not filed, and says so; and a yes places only the places the walk asked about, never every run

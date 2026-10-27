@@ -1,5 +1,5 @@
 /**
- * `braindog export --mirror <folder>` (AGT-A13) on the seed record, served over HTTP as a host serves the three reads an
+ * `braindog export --mirror <folder>` on the seed record, served over HTTP as a host serves the three reads an
  * agent uses: `boot` for the record's own index, `schema` for a list's fields, `list` page by page.
  *
  * THE HOST HERE STANDS IN FOR A SIGN-IN, so it can hold one list back, as the record does to a sign-in that may not

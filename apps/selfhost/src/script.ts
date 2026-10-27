@@ -32,7 +32,7 @@ import { pinFor, pinnedSend, systemResolve, type OpenKey, type Pinned, type Reso
  *
  * WHAT IT GOVERNS: a scheduled action (`pull`, `call`, `poll`, a connector) and a script's `ctx.fetch`, which are the
  * requests an installed add-on makes. WHAT IT DOES NOT: the read of the public add-on registry, which is
- * `BRAINDOG_KENNEL`'s (`kennel.ts`, RQ-SHL-308), a webhook or mail the owner set up, and a shared file read at an
+ * `BRAINDOG_KENNEL`'s (`kennel.ts`), a webhook or mail the owner set up, and a shared file read at an
  * address somebody pasted. The two switches are named apart in `49 §5.24` so an operator never reads one as the other.
  *
  * `null` IS A VALUE THAT IS NEITHER, and `main.ts` refuses to start on it rather than guess which was meant.

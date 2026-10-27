@@ -45,7 +45,7 @@ export type ScriptWrite =
   | { op: 'update'; spoken: string; patch: unknown; version: number };
 
 /**
- * The one question a run may end by asking (N6): what the script returned as `{ ask }`, beside its writes.
+ * The one question a run may end by asking: what the script returned as `{ ask }`, beside its writes.
  *
  * `unknown` ON THE ANSWER AND THIS SHAPE ONLY AS THE PROMISE, because it is the script's own return value carried out of
  * the sandbox untouched, so `finishScript` reads every part of it as it would a stranger's. Each option's patches are the
@@ -324,7 +324,7 @@ export type ScriptProposed = { queued?: true; id?: string; joined?: true; widene
  * EVERY ROW IT NAMES IS A WRITE THE SCRIPT ASKS FOR, made later and by somebody else, for `askOf`'s reason: accepting a
  * rowset writes its rows signed by the person deciding, so a rowset over a list outside the declaration's `writes:` would
  * be the script reaching a list the owner never approved, with the owner's own hand. The list a rowset names, the list
- * any of its rows names (a fold's moved links, AGT-C13), the list each row it updates is in, and the list each patch of
+ * any of its rows names (a fold's moved links), the list each row it updates is in, and the list each patch of
  * an option changes are all held to `writes:`. What is left is the gate's to check, and it checks it when it is tried.
  */
 export function proposalOf(deps: Pick<ScriptRunDeps, 'registerOf'>, script: string, writes: readonly string[], p: unknown): Result<ScriptProposal> {

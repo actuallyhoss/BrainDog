@@ -1229,7 +1229,7 @@ const cats = (scheme: Scheme) =>
     ]),
   );
 
-/** SPEC 1.1: frame 3.1's surfaces, text and status, and the two reds as decided (0.1 item 2, 0.2, C1). */
+/** SPEC 1.1: frame 3.1's surfaces, text and status, and the two reds as decided (0.1 item 2, 0.2). */
 export const HOUSE_FRAME: Record<Scheme, Frame> = {
   light: {
     board: '#F3F4F6',
@@ -1269,11 +1269,11 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     ...cats('light'),
   } as Frame,
   dark: {
-    /* 2026-10-22, THE BOARD A STEP DARKER AND THE BAR ON IT (UI audit of 22 October, 26). A tile measured 1.09:1 against
+    /* 2026-10-22, THE BOARD A STEP DARKER AND THE BAR ON IT. A tile measured 1.09:1 against
        #0F121A, so in dark the tiles barely parted from the page, and the bar was a navy of its own (#171B33) that read
        as another product's. The tile stays where every ink and intent on it was solved, and the board goes down to
        #090B10 under it.
-       2026-10-23, THE FRAME ON ITS OWN INDIGO AGAIN, WITH AN EDGE (frame B, U8): the bar on the board had no edge at all,
+       2026-10-23, THE FRAME ON ITS OWN INDIGO AGAIN, WITH AN EDGE (frame B): the bar on the board had no edge at all,
        so the frame is #171B33 with the rule under it, and its chosen place a soft step up that still holds ink-3 at 4.6.
        2026-10-23, THE FRAME IN THE MARK'S RED, NOT A NAVY (his word: "red tones works better"): an oxblood that sits under
        the red mark as its own ground, ink at 15.1 on it, and its chosen place a step up that holds ink-3 at 4.9.

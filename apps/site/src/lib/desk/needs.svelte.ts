@@ -1,7 +1,7 @@
 /**
  * What waits for Maya, as two stores with one set of moves: `needs`, the desk's (its Today tile, its Needs you place,
  * the count on the tab and the line's "2 need you"), and `asked`, the chores band's questions, which are
- * things the desk does not show (site F1: each thing is said once).
+ * things the desk does not show (each thing is said once).
  *
  * THE MOVES ARE A PURE REDUCER (`step`), and a store only holds its result in a rune. Answer yes and the ask leaves
  * the open list and its done line goes first in the done list, with an Undo. Not now drops it with no done line. Undo

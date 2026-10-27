@@ -1,5 +1,5 @@
 /**
- * A PROJECT'S WHAT CHANGED READS AS SENTENCES (the audit of 25 October, Z22).
+ * A PROJECT'S WHAT CHANGED READS AS SENTENCES.
  *
  * WHAT WAS WRONG, on BrainDog's page (`-more/row-braindog-390-light.png`): a stray "8" before the second line, both
  * lines "Claude Code Added the visu…", a capital verb after the name, and "You Put back by an undo." for an undo.

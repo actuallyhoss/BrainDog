@@ -1,5 +1,5 @@
 /**
- * The agent door's own signs, the record's half: `heard`, DATA, and `doorSigns`, READ+ (AGT-B01, so "the
+ * The agent door's own signs, the record's half: `heard`, DATA, and `doorSigns`, READ+ (so "the
  * agent door lists its tools and its briefing is true").
  *
  * WHAT A MARK IS AND WHAT THE MARKS ADD UP TO IS THE KERNEL'S (`kernel/src/door.ts`): one row a run a kind, a count that
@@ -14,7 +14,7 @@
  * `doorSigns` IS THE WHOLE RECORD'S, as `signs` is: it counts every session of every key, so a member held to one list
  * is refused in one sentence.
  *
- * `doorHealth` IS THE OWNER'S, ADMIN (AGT-A02): every connection that can act on the record, a key or a runner machine,
+ * `doorHealth` IS THE OWNER'S, ADMIN: every connection that can act on the record, a key or a runner machine,
  * with the app its newest run named, the build of the command behind it and when it last called a tool, and seven signs
  * that would each have said something on the week his record had no tools. Each sign is a number, or `null` where there
  * is nothing to judge yet (no run in a day, no build said, no runner set up), because a sign that read 0 there would
@@ -41,7 +41,7 @@ export const HEARD_TAKES = ['kind', 'n', 'ms', 'build', 'client'] as const;
 /**
  * The marks only the door leaves, through `doorHeard`: a session said hello, was given the tools, made calls, was answered
  * INTERNAL. `heard`, the routed one, refuses them, since a key that could post `called` could turn `delivered`, the tool
- * list's sign and `door_used` green on its own say (audit 38-39, finding 5).
+ * list's sign and `door_used` green on its own say.
  */
 export const DOOR_ONLY = ['hello', 'listed', 'called', 'internal'] as const;
 
@@ -333,7 +333,7 @@ export function methods(deps: RecordDeps) {
     /**
      * One mark the agent door leaves as a session meets it: it said hello, was given the tools, made calls, was answered
      * INTERNAL. NOT ROUTED: the host's route table has no row for it, so only the door, holding the record itself, calls
-     * it. A `called` from a key also moves that key's `last_tool_at` (`noteTool`, audit 38-39 finding 2); the door marks
+     * it. A `called` from a key also moves that key's `last_tool_at` (`noteTool`); the door marks
      * `called` at most once a minute a caller, so this is one more statement on that mark and none on most calls.
      */
     async doorHeard(args: unknown, ctx: CallContext): Promise<Heard> {

@@ -136,7 +136,7 @@ test('A FAULT THE KERNEL RAISED IS READ BY THE OWNER through the real record: it
   sql.close();
 });
 
-test('A FAILED NIGHT SAYS WHY IN PLAIN WORDS to the owner and her agent, and never the raw reason (A22)', async () => {
+test('A FAILED NIGHT SAYS WHY IN PLAIN WORDS to the owner and her agent, and never the raw reason', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const raw = 'snapshot over 40 MiB: this record dumped 52428800 bytes and the Worker signs the whole file in memory. Raise the ceiling or stream it (51 §10).';

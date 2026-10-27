@@ -1,6 +1,6 @@
 /**
  * `braindog keys scan [<folder>] [--project <name>] [--deposit] [--host <host>]`: every key lying in a repository's
- * files, by name (AGT-D08). He had 72 keys in folders and nothing found them; this names each one and the file it lies
+ * files, by name. He had 72 keys in folders and nothing found them; this names each one and the file it lies
  * in, and the one command that seals them, so he can seal them all and delete the copies in the clear.
  *
  * WHAT IS A KEY FILE: a `.env` or `.env.<ending>`, a `.dev.vars`, anything under a folder named `.secrets`, a `.pem` or

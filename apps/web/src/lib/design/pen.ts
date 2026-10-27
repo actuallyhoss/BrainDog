@@ -5,8 +5,8 @@
  * dismiss, and a dismissal is terminal on every device. The record sends its own offers on `boot` as `pen`, each carrying
  * the whole declaration keeping it writes (`packages/record/src/emergent.ts`), already held to "max 3 waiting" (HD.224).
  *
- * ONE COUNT (ENG-B14). The record is the one recommender, icons included, so the browser makes no offer of its own.
- * THE NAVIGATION SHAPE IS NOT OFFERED (C11, 24 Oct): one sidebar and one bar are drawn for everyone since nav A, so a
+ * ONE COUNT. The record is the one recommender, icons included, so the browser makes no offer of its own.
+ * THE NAVIGATION SHAPE IS NOT OFFERED (24 Oct): one sidebar and one bar are drawn for everyone since nav A, so a
  * shape offer would change nothing anyone sees, and one a host still sends is left out. `penCount` is the figure the
  * rail, the Slash page and Settings say.
  *
@@ -105,13 +105,13 @@ export function glyphOf(offer: Offer): IconName {
   return offer.item.kind === 'page' ? 'doc' : offer.item.kind === 'column' ? 'rows' : 'grid';
 }
 
-/** Whether an offer a host sent is a navigation shape, which the pen no longer draws (C11). */
+/** Whether an offer a host sent is a navigation shape, which the pen no longer draws. */
 export const isShapeItem = (item: PenItem): boolean => item.kind === 'shape' || item.id.startsWith('shape:');
 
 /**
  * Every offer still waiting, in the order the pen draws them: the record's, strongest first as it sent them. A dismissed
  * offer is gone here as well as on the record, so a dismissal holds before `boot` is read again. A navigation shape a
- * host still sends is left out (C11), and the browser makes no offer of its own (ENG-B14).
+ * host still sends is left out, and the browser makes no offer of its own.
  */
 export function waiting(record: readonly PenItem[], gone: (id: string) => boolean): Offer[] {
   const out: Offer[] = [];
@@ -133,14 +133,14 @@ export const suggested = (n: number): string => `${n} suggested`;
  */
 export const penCount = (record: readonly PenItem[], gone: (id: string) => boolean): number => waiting(record, gone).length;
 
-/* ── the offer on a list's own screen (USE-B03: an offer is shown where the person is) ─────────────────────────────── */
+/* ── the offer on a list's own screen (an offer is shown where the person is) ─────────────────────────────── */
 
 /** The card's own words (a unit's new words live in a module it owns, never in `copy.ts`). */
 export const offerWords = {
-  /** Who made the offer, beside Slash's mark: an offer drawn from use is Slash's (ENG-B17). */
+  /** Who made the offer, beside Slash's mark: an offer drawn from use is Slash's. */
   noticed: 'Slash noticed',
   make: 'Make it',
-  /** A place offered for a view he already uses (`place:`, USE-B13): Keep writes it as it stands, so nothing is made. */
+  /** A place offered for a view he already uses (`place:`): Keep writes it as it stands, so nothing is made. */
   keep: 'Keep it',
   making: 'Making it',
   notNow: 'Not now',

@@ -1,5 +1,5 @@
 /**
- * `fault.ts` (AGT-C06): a fault is one line a cause, counted, cleared, and read as a plain sentence.
+ * `fault.ts`: a fault is one line a cause, counted, cleared, and read as a plain sentence.
  *
  * Over migration 30's own SQL on a bare database, with only the three tables its script touches, so this file holds
  * whatever the rest of the ledger is doing: the record-wide behaviour is `outbox.test.ts` and `schedule-fault.test.ts`.

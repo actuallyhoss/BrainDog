@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS dir_member (
   PRIMARY KEY (person, record)
 );
 
--- WHO WAS TAKEN OFF A RECORD, so a tab still open on it is told its access ended (sharing plan §2.8) rather than the
+-- WHO WAS TAKEN OFF A RECORD, so a tab still open on it is told its access ended rather than the
 -- one 403 a stranger gets. Written by leave, cleared by join. Nothing here opens anything, and a copy leaves it out:
 -- a restore that forgot it says "You are not on this record." to the same person, which is still true.
 CREATE TABLE IF NOT EXISTS dir_left (
@@ -552,7 +552,7 @@ export type Directory = ReturnType<typeof createDirectory>;
 /* ── plans and usage ─────────────────────────────────────────────────────── */
 
 /**
- * The plans a record can be on, and each one's allowance, read from the one table of plans (`plans.ts`, LCH-A08), where
+ * The plans a record can be on, and each one's allowance, read from the one table of plans (`plans.ts`), where
  * every figure is chosen. `free` is Free, one person's record at no charge with a small allowance, which a record made
  * at sign-up without paying starts on (`FREE_PLAN` in `apps/worker/src/billing.ts`); `hosted` is Cloud and `plus` is
  * Cloud Plus, the two the checkout sells (`HOSTED_PLANS` there); `selfhost` is counted and never limited.
@@ -1107,7 +1107,7 @@ export type InviteAnswers = {
 type InviteStored = { code_hash: string; note: string; made_at: number; ends_at: number | null; spent_at: number | null; held_until: number | null; made: string | null };
 
 /**
- * The host's last restore drill (LCH-C04): when it ran, whether it passed, and its counts. COUNTS ONLY, never a name,
+ * The host's last restore drill: when it ran, whether it passed, and its counts. COUNTS ONLY, never a name,
  * an address or a record's id, because every record's Backups area reads it as "This host's last restore test".
  *
  * A FACT ABOUT THE HOST, NOT ABOUT ONE RECORD (the scope's critic): only the operator holds the key that opens a copy,
@@ -2640,7 +2640,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
 
     /**
      * One more sign-up reading by the included model today, and whether it is within the day's `most`, for every
-     * stranger at once (`first-read`, USE-B05). Kept in `dir_fail` under `read.<day>.<key>`, a prefix no lockout uses,
+     * stranger at once (`first-read`). Kept in `dir_fail` under `read.<day>.<key>`, a prefix no lockout uses,
      * with `until` at the day's end so the sign-in prune keeps the row all day. Capped one past `most`, so the count
      * stops growing once the day is spent.
      */

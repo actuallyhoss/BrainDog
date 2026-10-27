@@ -1,5 +1,5 @@
 /**
- * `setup`: a record set up in one call, by its owner (USE-B04).
+ * `setup`: a record set up in one call, by its owner.
  *
  * THE PRESS WAS A SCRIPT IN THE BROWSER, a dozen calls in a tab (`apps/web/src/routes/start/accept.ts`), and a closed
  * tab left the record part made: some add-ons, no entries and no person. Here the record does all of it in the one

@@ -1,5 +1,5 @@
 <!--
-  Scripts: `/scripts`, every installed script and where it stands, as a declared page (C33, 24 October).
+  Scripts: `/scripts`, every installed script and where it stands, as a declared page (24 October).
 
   A PAGE BODY LIKE ANY OTHER. Its blocks are `page.scripts`, the People add-on's (`packages/seed/src/modules/scripts.ts`):
   one line and a table of every script over the kernel's `scripts` source, drawn by the one page reader through
@@ -37,7 +37,7 @@
   import HubTabs from '../automations/HubTabs.svelte';
   import { MediaQuery } from 'svelte/reactivity';
 
-  /* THE HUB'S TABS, AS ON AUTOMATIONS (the pass of 27 October): beside the name at a desk's width, under the
+  /* THE HUB'S TABS, AS ON AUTOMATIONS: beside the name at a desk's width, under the
      sentence on a phone, with Scripts the one marked. */
   const phone = new MediaQuery('(width < 900px)', false);
 
@@ -124,7 +124,7 @@
   /* THE PAGE'S OWN LINE IS THE HEAD'S, so it is not drawn again as a tile under it. */
   /* THE ONES THAT RAN COME FIRST, the latest on top, and "Not run yet" closes the list. */
   const ranAt = (e: { fields: Record<string, unknown> }): number => (typeof e.fields.last_at === 'string' ? Date.parse(e.fields.last_at) || 0 : 0);
-  /* AND WHAT HAS STOPPED COMES BEFORE THEM ALL (the pass of 27 October): a refused last run, then a paused script,
+  /* AND WHAT HAS STOPPED COMES BEFORE THEM ALL: a refused last run, then a paused script,
      the ones the head names in red. The refused one sat ninth, under "9 more". */
   const trouble = (e: { fields: Record<string, unknown> }): number => troubleOf(e.fields);
   const drawn = $derived<Opened | null>(

@@ -124,7 +124,7 @@ export const THINGS: Fields[] = [
      an invoice whose terms ran out 38 days ago. Portage started in May of this year and has earned nothing
      either year. Tallow earned in the year before and nothing since, which is what "park it or retire it"
      looks like as a pair of numbers, and it is out of every figure below because it is out of play. */
-  /* EACH ONE'S COLOUR IS A CATEGORY SLOT AND ITS MARK AN ICON, SINCE the UI pass of 20 October (1.3): Kiln blue (265),
+  /* EACH ONE'S COLOUR IS A CATEGORY SLOT AND ITS MARK AN ICON (1.3): Kiln blue (265),
      Marlow & Co pink (352), Portage teal (185) and Tallow yellow (90), each a slot's own hue so no two read alike, and
      marks the app draws as glyphs (tag, board, globe, archive) where the wells drew a letter. */
   /* AND WHAT EACH ONE IS, IN A LINE, since portfolio 1.6.0: the words under a project's name on the Overview's cards, so a
@@ -147,7 +147,7 @@ export const PROJECTS_SAID: readonly { things: number; by: string; hours: number
 ];
 
 /**
- * THE SAMPLE'S KEY NUMBERS (the KPI plan of 21 October, K3). Kiln's: what it earns a month, which leads its card and
+ * THE SAMPLE'S KEY NUMBERS (the KPI plan of 21 October). Kiln's: what it earns a month, which leads its card and
  * its page, how many studios hold a licence, and the specimen downloads nobody has reported for three weeks, so a stale
  * number is on the sample too. Marlow & Co's hours billed, which he pinned to Today, and Portage's subscribers, whose
  * day went by short of its target, so Today shows a pin, a miss and a stale number side by side. `thing` is the
@@ -249,7 +249,7 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
     /* THE PROJECTS, for every register with a `scope:` field: a run is placed in the project whose
        repositories or folders it is working in, and is global anywhere else. */
     scopes: { repos: 'repos', folders: 'folders' },
-    /* A PROJECT OTHER ENTRIES POINT AT STAYS, SINCE portfolio 1.16.0 (REC-C08, "there is no delete"). A task, a bill, a
+    /* A PROJECT OTHER ENTRIES POINT AT STAYS, SINCE portfolio 1.16.0 ("there is no delete"). A task, a bill, a
        service or a person that names it was left pointing at nothing when it went; now the delete is refused and the
        sentence names the lists that still point at it and how many, as Accounts does. A project nothing points at
        goes, and comes back, as before. Finished is how a project leaves the board. */
@@ -395,7 +395,7 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
     title: 'name',
     mobile: ['name', 'value', 'at'],
     pack: 'portfolio',
-    /* NEWEST FIRST BY THE MOMENT A NUMBER IS FOR (PGS-B06); the kernel breaks a tie by the row's id. */
+    /* NEWEST FIRST BY THE MOMENT A NUMBER IS FOR; the kernel breaks a tie by the row's id. */
     order: { field: 'at', dir: 'desc' },
     fields: [
       { id: 'name', label: 'Measure', type: 'text', required: true, index: true, search: true },
@@ -543,7 +543,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   'projects-aim-30d': counted('projects-aim-30d', 'Aiming within 30 days', `${LIVE}, aim after yesterday, aim before +31d`),
   'projects-past-aim': counted('projects-past-aim', 'Past the day they aimed for', `${LIVE}, aim before today`, { lte: 0 }),
   'projects-parked': counted('projects-parked', 'Parked', 'lane is parked'),
-  /* HOW MANY ARE EARNING, REMEMBERED EACH NIGHT, SINCE portfolio 1.17.0 (PGS-C17), for the strip on Projects that says it
+  /* HOW MANY ARE EARNING, REMEMBERED EACH NIGHT, SINCE portfolio 1.17.0, for the strip on Projects that says it
      beside In play with the line of its nights. A count and not the year's money: that is the sum of What each one earns,
      and a figure is said once on a page (`packages/seed/test/portfolio.test.ts`). */
   'projects-lane-earning': { ...counted('projects-lane-earning', 'Earning', 'lane is earning'), snapshot: { grain: 'day', into: 'series.projects-lane-earning' } },
@@ -595,7 +595,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   },
   /* HOW THE PROJECTS IN PLAY ARE GOING, as parts of one whole, with the ones nobody has said about as their own part. */
   'projects-by-health': { ...counted('projects-by-health', 'How they are going', LIVE), group_by: 'health' },
-  /* WHAT THE SPLIT ABOVE IS DRAWN ON, SINCE portfolio 1.17.0 (PGS-C17): the projects in play somebody said how they are
+  /* WHAT THE SPLIT ABOVE IS DRAWN ON, SINCE portfolio 1.17.0: the projects in play somebody said how they are
      going about. A record where nobody has drew one grey bar of Not said yet, which says nothing a person can act on. */
   'projects-with-health': counted('projects-with-health', 'Saying how they are going', `${LIVE}, health is set`),
   /* EVERY PROJECT BY ITS STATUS, SINCE portfolio 1.6.0: one track cut into earning, building, parked and finished, so the
@@ -778,7 +778,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* WHETHER ANYBODY HAS SAID WHERE A PROJECT STANDS, SINCE portfolio 1.16.0 (REC-C16): how it is going, how far along,
+  /* WHETHER ANYBODY HAS SAID WHERE A PROJECT STANDS, SINCE portfolio 1.16.0: how it is going, how far along,
      the day it aims for or the agent on it. The project page draws those four when one is said, and its own figures
      when none is, so a project nobody has described is never a dash. A tree, because it ORs four fields. */
   'project-said': {
@@ -798,7 +798,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* WHAT WAS WORKED ON THIS WEEK, SINCE portfolio 1.16.0 (REC-C16): the tasks on a project written to in the last seven
+  /* WHAT WAS WORKED ON THIS WEEK, SINCE portfolio 1.16.0: the tasks on a project written to in the last seven
      days, made, moved or finished. Read off the day the record stamps a task with when it changes, so it says the
      project is moving or has gone quiet without anybody typing a word about it. */
   'project-moved-7d': {
@@ -817,7 +817,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
      put on a task of the project, made, moved or finished, to the reading's own day. Read off the record's own
      `updated_at` and never a typed day, so a project nobody describes still says "2 days" or "40 days". A project with no
      task reads nothing, never nought. Filed with Work beside `project-moved-7d`, by the list it reads.
-     QUIET PAST THIRTY DAYS, SINCE work 1.19.0 (W096, REC-C16): the target is the most days a project in play may go
+     QUIET PAST THIRTY DAYS, SINCE work 1.19.0: the target is the most days a project in play may go
      with nothing written on it, so a reading of 40 misses it and is drawn in the late tone beside its word, on the
      project page's Where it stands and on its card in play. A declaration, so a person who means a fortnight writes 14.
      TASKS ONLY: a figure reads one list, and no shape takes the newest of three figures, so a project worked through
@@ -1074,7 +1074,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     /* CALLED WHAT THE NAVIGATION CALLS IT, SINCE portfolio 1.9.0: the title read Overview under a top bar that says
        Projects, so a person pressed one word and landed on another. */
     title: 'Projects',
-    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101): the lead pages sit Work, Orders, Projects,
        Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
     nav: { section: 'Projects', order: 5, place: 30 },
     icon: 'thing',
@@ -1088,7 +1088,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          speaks when nothing is in play, and the one saying nothing needs you then has no clause left to say, so a page
          still reads one line. */
       {
-        /* A RECORD WITH NO PROJECT AT ALL, SINCE portfolio 1.27.0 (audit C of 25 October, X7): a new record's Projects
+        /* A RECORD WITH NO PROJECT AT ALL, SINCE portfolio 1.27.0: a new record's Projects
            said "No project is in play. Add one, or set a parked one building." over nothing to press, and nothing was
            parked. One line, and the Add a project box under it says how. No figure, so no line is asked of it. */
         kind: 'note',
@@ -1106,7 +1106,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        /* ONLY WHILE ONE IS PARKED, SINCE portfolio 1.27.0 (audit C of 25 October): a new record has none to set
+        /* ONLY WHILE ONE IS PARKED, SINCE portfolio 1.27.0: a new record has none to set
            building, so it said a step it could not take. The record with no project at all has the line before this. */
         when: { all: [{ metric: 'projects-live', is: 0 }, { metric: 'projects-parked', gt: 0 }] },
         body: 'No project is in play. Add one, or set a parked one building.',
@@ -1116,7 +1116,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          with a fact instead (`key: board`): what is late, what is due this week, whose numbers went quiet, what waits and
          what renews, naming the projects. The two lines for a record with no project stay above. */
       {
-        /* ONE BOX TO ADD A PROJECT WHILE NONE IS IN PLAY, SINCE portfolio 1.27.0 (audit C of 25 October): the page said
+        /* ONE BOX TO ADD A PROJECT WHILE NONE IS IN PLAY, SINCE portfolio 1.27.0: the page said
            "Add one" with nothing to press. Under the line, as Work's box is under its own, and a project added here is
            Building, the first of its lanes. */
         kind: 'capture',
@@ -1150,8 +1150,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tones: { on_track: 'good', at_risk: 'warn', off_track: 'bad' },
         /* ONLY PAST FOUR PROJECTS IN PLAY, SINCE portfolio 1.12.0 (the visual review of October 2nd). Three projects drew
            three equal thirds, which says nothing the line and the cards under it do not; a bar earns its row when there
-           are too many cards to read at a glance. AND ONLY WHILE ONE OF THEM SAYS HOW IT IS GOING, SINCE portfolio 1.17.0
-           (PGS-C17): with no health set on any it drew one bar of Not said yet. */
+           are too many cards to read at a glance. AND ONLY WHILE ONE OF THEM SAYS HOW IT IS GOING, SINCE portfolio 1.17.0:
+          with no health set on any it drew one bar of Not said yet. */
         when: { all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] },
       },
       /* NO NEEDS YOU TABLE, SINCE portfolio 1.11.0. It listed the projects at risk with their health and next step, and
@@ -1172,7 +1172,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* EACH CARD WEARS THE PROJECT'S OWN MARK IN ITS OWN HUE, SINCE portfolio 1.6.0, the identity the list declares
            (`identity: { mark, accent }`), and says what the project is under its name (`about`, drawn as the quieter
            line under a title). Neither is a fact, so the three facts below are unchanged.
-           THE ONE LINE IS TYPED ON THE CARD, SINCE portfolio 1.17.0 (PGS-C15): `edit: true` on `about`, written after a
+           THE ONE LINE IS TYPED ON THE CARD, SINCE portfolio 1.17.0: `edit: true` on `about`, written after a
            pause through the page's own writer where the reader may write the list, and text everywhere else. */
         columns: [
           { field: 'name', as: 'title' },
@@ -1200,11 +1200,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
              cards` that the app's `withKpis` reads too (`trendsOf` in the kernel's `pages.ts`), by that number's own
              periods, and this figure only on a card whose project keeps none with a value. */
           { metric: 'project-done-by-week:{{name}}', kpi: 'headline', as: 'trend' },
-          /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.17.0 (W096, REC-C16): Work's `project-last-worked` for the
+          /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.17.0: Work's `project-last-worked` for the
              card's own project, the reading the project page's Where it stands draws, said in the card's head as "Worked on 2
              days ago", or "Quiet for 40 days" in the late tone once it misses its thirty days. A project with no task reads
              nothing and the card draws no line. So a quiet project is seen on the list.
-             ITS TASKS AND ITS RUNS TOGETHER, SINCE portfolio 1.26.0 (the audit of 25 October, Z7): the record's own
+             ITS TASKS AND ITS RUNS TOGETHER, SINCE portfolio 1.26.0: the record's own
              `project-worked`, the figure Today's cards read, so a card here says "Claude worked on it 20 minutes ago"
              where Today does, and never "4 days ago" from the tasks alone. */
           { metric: 'project-worked:{{name}}', as: 'when', label: 'Worked on' },
@@ -1214,17 +1214,17 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            among them, and the lane bar the app draws over these cards said "In play 5" where Today, the sidebar and the
            More sheet said 13. A count read off part of a list is never drawn; a hundred is past any record's projects. */
         limit: 100,
-        /* DRAWN ONLY WHILE ONE IS IN PLAY OR PARKED, SINCE portfolio 1.13.0 and the UI pass of 20 October: its empty line,
+        /* DRAWN ONLY WHILE ONE IS IN PLAY OR PARKED, SINCE portfolio 1.13.0 and the redesign: its empty line,
            the one thing to do on a page with no project, is the line's now, and a parked one is a lane of these cards. */
         when: { any: [{ metric: 'projects-live', gt: 0 }, { metric: 'projects-parked', gt: 0 }, { metric: 'projects-retired', gt: 0 }] },
       },
       {
-        /* WHAT A RULE OR AN AGENT ASKED ABOUT A PROJECT, SINCE portfolio 1.17.0 (PGS-C18), answered here, three at a time,
+        /* WHAT A RULE OR AN AGENT ASKED ABOUT A PROJECT, SINCE portfolio 1.17.0, answered here, three at a time,
            one tile each, and the rest in Decide: the questions whose row is on Projects (`list is things`), counted by
            `questions-open-in:things` and drawn only while that is above nought. A project's own page draws its own
            (`about is {{spoken}}`); this is every project's at once. UNDER IN PLAY AND BEFORE THE OPEN TILE, which takes
            every block after it up to the next heading: at 1440 In play and earning, Where they are, How they are going,
-           In play, this and that tile, six before the fold (since 1.17.0, PGS-C17). */
+           In play, this and that tile, six before the fold (since 1.17.0). */
         kind: 'queue',
         heading: 'Waiting on you',
         icon: 'ask',
@@ -1300,7 +1300,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * with how it moved as the line beside it, and the plan leads the main column. Nineteen blocks.
    */
   /**
-   * NUMBERS, THE LIST'S OWN PAGE, SINCE portfolio 1.22.0 (E26): `list: datapoints` sends `/r/datapoints` here, where the
+   * NUMBERS, THE LIST'S OWN PAGE, SINCE portfolio 1.22.0: `list: datapoints` sends `/r/datapoints` here, where the
    * generic list drew 2,527 readings a row each, 9,350 px of "CPU, bake" four weeks ago. Each kind of number is said once,
    * under the project it is for (the sixth column, `thing`), with its newest value, its unit and how old it is; the two
    * that moved most over the year are drawn as lines above them. A reading's row page opens here searched for its name
@@ -1360,7 +1360,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     layout: { rail: 4 },
     requires: ['register.things', 'register.stages', 'register.tasks', 'register.session', 'register.obligations', 'register.services', 'register.transactions'],
     blocks: [
-      /* THE PROJECT'S OWN SHAPE, AS BLOCKS OF ITS PAGE, SINCE founder 3.3.0 and team 2.25.0 (C28, C29, 24 October): its hero with its
+      /* THE PROJECT'S OWN SHAPE, AS BLOCKS OF ITS PAGE, SINCE founder 3.3.0 and team 2.25.0 (24 October): its hero with its
          Path and Money under it, then its Work and Who is on it with Runs on and the agents on it under them. They were
          drawn by hand over the blocks below, so the page pulled as text did not say they were there and none could be
          moved, hidden or changed. Each is a `project` block now, its parts named in the order they are drawn, read for
@@ -1478,19 +1478,19 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tones: { at_risk: 'warn', off_track: 'bad' },
         limit: 1,
         empty: 'Nobody has said where {{name}} stands yet.',
-        /* ONLY WHILE SOMEBODY HAS SAID ONE OF THE FOUR, SINCE portfolio 1.16.0 (REC-C16). On a record nobody had
+        /* ONLY WHILE SOMEBODY HAS SAID ONE OF THE FOUR, SINCE portfolio 1.16.0. On a record nobody had
            described a project on, which is every imported one, the card was a dash and nothing else on every project
            page; the figures under the same heading speak instead. */
         when: { metric: 'project-said:{{name}}', gt: 0 },
       },
       {
-        /* WHERE IT STANDS FROM WHAT HAPPENED ON IT, SINCE portfolio 1.16.0 (REC-C16): drawn while nobody has said, so
+        /* WHERE IT STANDS FROM WHAT HAPPENED ON IT, SINCE portfolio 1.16.0: drawn while nobody has said, so
            its figures stand alone, which is how a project stays until its owner answers the tidy after an import. What
            was worked on this week, from the day the record stamps each task it writes. What is open is At a glance's
            first figure straight above, so it is not said twice. How long since anybody worked on it beside that, from the
            same stamps (`project-last-worked`), so a project that went quiet a month ago reads "30 days" and not only a
            nought for this week. A use case that keeps more adds its own cell (founder's numbers this week).
-           LAST WORKED READS ITS RUNS TOO, SINCE founder 3.4.0 and team 2.26.0 (the audit of 25 October, Z7): the
+           LAST WORKED READS ITS RUNS TOO, SINCE founder 3.4.0 and team 2.26.0: the
            record's own `project-worked`, the figure its card on Projects and on Today reads. */
         kind: 'stat',
         heading: 'Where it stands',
@@ -1700,7 +1700,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
 
            EACH CARD SAYS WHERE IT APPLIES AND WHO USED IT LAST. `scope` is the chip, the project's mark, and it is
            the project's on every card here: the kernel answers the project's own first and the ones that apply
-           everywhere after them, and all three blocks ask for `scope is project` (PGS-C31). A key or a skill that
+           everywhere after them, and all three blocks ask for `scope is project`. A key or a skill that
            applies everywhere is under them, in And from everywhere, faint and without the chip; mixed in under every
            project it was the same three of everybody's, read as the project's own.
 

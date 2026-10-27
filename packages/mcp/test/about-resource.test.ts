@@ -1,5 +1,5 @@
 /**
- * `braindog:about/<name>` at the agent door (ENG-B02): what one thing on the record is, asked by its name, answered by
+ * `braindog:about/<name>` at the agent door: what one thing on the record is, asked by its name, answered by
  * the record's own `about` and held to what the caller may read.
  *
  * THROUGH A REAL RECORD, as `mcp.test.ts` drives the door: the surface is the record itself, so the name an agent

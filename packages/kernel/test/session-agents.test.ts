@@ -1,5 +1,5 @@
 /**
- * One run is one agent (research audit 14, H5 and M2): a write that names no run joins its token's open run only when
+ * One run is one agent: a write that names no run joins its token's open run only when
  * both are the same kind of agent in the same app, and a name somebody gave a run is never taken for the record's.
  *
  * MEASURED BEFORE: every ChatGPT, VS Code and unknown run is `agent = 'other'`, and the ladder let `other` through, so a

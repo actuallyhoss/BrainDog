@@ -874,7 +874,7 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
     if (url.protocol !== 'https:' || url.origin !== request.origin || !allowed.has(url.origin))
       return refuse('PULL_ORIGIN_REFUSED', `${url.host} is not an origin an installed declaration names, so nothing was sent.`);
     if (refusedHost(url) !== null) return refuse('PULL_ORIGIN_REFUSED', `${url.host} is a private or local address, so nothing was sent.`);
-    /* A KEY GOES ONLY TO ITS OWN HOST (SHL-C05), checked BEFORE the key is opened or anything resolved. A declaration
+    /* A KEY GOES ONLY TO ITS OWN HOST, checked BEFORE the key is opened or anything resolved. A declaration
        that names a person's Oxbow key and another host passes the origin check, since the origin is its own; what it may
        not do is carry that key there. `opens` is the keychain entry's words, read as a host the one way the kernel reads
        them (`hostOpened`); an entry that names no host is held to nothing here, and its first approval pins one

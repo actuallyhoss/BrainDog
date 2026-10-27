@@ -1,7 +1,7 @@
 /**
  * `scripts`: every installed script, one row each, as the record's `scripts` read answers them (`script-rows.ts`).
  *
- * THE ROWS `/scripts` DRAWS (C33, 24 October): the list of scripts was a screen built by hand over that read, and is a
+ * THE ROWS `/scripts` DRAWS (24 October): the list of scripts was a screen built by hand over that read, and is a
  * declared page now, drawn by the one page reader, so a person or an agent can change it by saying so. A script is no
  * list's row: the block is shown to a reader of the whole record, as the read itself is held to the lists a script
  * touches and a page block cannot be held row by row.

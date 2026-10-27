@@ -59,7 +59,7 @@ test('MANY OF A LIST, where its name does not say it: the declared singular turn
   assert.equal(manySaid('Log', 'log entry'), 'log entries');
   assert.equal(manySaid('Put by', 'saving'), 'savings');
   assert.equal(manySaid('Stock', 'box'), 'boxes');
-  /* THE PLURALS ENGLISH DOES NOT BUILD (audit 58, claim 4): never "5 childs" or "4 lifes". */
+  /* THE PLURALS ENGLISH DOES NOT BUILD: never "5 childs" or "4 lifes". */
   assert.equal(manySaid('Children', 'child'), 'children');
   assert.equal(manySaid('Lives', 'life'), 'lives');
   assert.equal(manySaid('Staff', 'woman'), 'women');
@@ -115,7 +115,7 @@ test('THE COMPACT FORM IS ONE LINE: the sentence and a way to open it, and nothi
   assert.ok(html.includes(`aria-label="${offerWords.noticed}: ${ledger.why}"`));
   for (const kept of ['offer-mini', 'offer-acts', offerWords.make, offerWords.notNow]) assert.ok(!html.includes(kept), `${kept} is drawn before the line is opened`);
 
-  /* TWO LINES AT MOST, SINCE THE AUDIT OF 25 OCTOBER (Z18, `loop/proof/looks/audit-2026-10-25/money-390-light-full.png`):
+  /* TWO LINES AT MOST:
      one line at 390 cut the question itself, "30 transactions this week. Want a pag…". It wraps, and only past two lines
      is it cut. */
   const css = source('./OfferCard.svelte');

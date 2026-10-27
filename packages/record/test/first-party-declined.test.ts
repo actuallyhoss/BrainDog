@@ -1,9 +1,9 @@
 /**
- * BrainDog's own updates hold to what the person did (research-audit-21 items 5 and 6): a declaration the person took
+ * BrainDog's own updates hold to what the person did: a declaration the person took
  * off is never laid again unasked, since the tick reads what was taken off from the declaration log; and an update the
  * owner said no to is remembered for that version, so it is neither asked again nor put in on a later night; and a
- * carry that throws after an update went in is said, and the night goes on (item 7). THE AGENTS PACK AND A USE CASE ARE
- * HELD TO THE SAME (`loop/research-audit-30.md`, Medium 3): the tick lends `remembers`, so one that would lose something
+ * carry that throws after an update went in is said, and the night goes on. THE AGENTS PACK AND A USE CASE ARE
+ * HELD TO THE SAME (Medium 3): the tick lends `remembers`, so one that would lose something
  * is asked about once, and a no is kept for its version as it is for the five modules.
  */
 
@@ -65,7 +65,7 @@ test('WHAT THE OWNER TOOK OFF IS ASKED ABOUT, NEVER LAID AGAIN UNASKED, and a no
   sql.close();
 });
 
-test('A CARRY THAT THROWS AFTER AN UPDATE WENT IN IS SAID, AND THE NIGHT GOES ON (research-audit-21 item 7)', async () => {
+test('A CARRY THAT THROWS AFTER AN UPDATE WENT IN IS SAID, AND THE NIGHT GOES ON', async () => {
   const now = { at: Date.UTC(2026, 9, 6, 3) };
   const sql = openSqlite();
   const catalogue = seedCatalogue().map((e) =>

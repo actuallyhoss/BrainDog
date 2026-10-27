@@ -65,7 +65,7 @@ test('EVERY PERSON WHO SETS UP IS THE FIRST ENTRY IN PEOPLE, unless People is of
   const heard = hear('Sami, I run a studio');
   assert.deepEqual(introduce(heard, 'sami@example.com', on), { name: 'Sami', email: 'sami@example.com', where: 'onboarding' });
   assert.deepEqual(introduce(heard, null, on), { name: 'Sami', where: 'onboarding' });
-  /* NO NAME TYPED: the one answered, else the one in the address (USE-B06: the chip alone made nobody). */
+  /* NO NAME TYPED: the one answered, else the one in the address (the chip alone made nobody). */
   const student = hear("I'm a student");
   assert.deepEqual(introduce(student, 'l.haddad@example.com', on, { answered: 'Layla' }), { name: 'Layla', email: 'l.haddad@example.com', where: 'onboarding' });
   const address = { address: true };

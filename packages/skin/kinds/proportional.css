@@ -25,7 +25,7 @@
     margin-block-start: var(--sp-4);
   }
 
-  /* THE TRACK IS CAPPED AT 480px AND THE FIGURE SITS RIGHT AFTER IT (the money review, F5): on a 1100px tile a 4px bar
+  /* THE TRACK IS CAPPED AT 480px AND THE FIGURE SITS RIGHT AFTER IT (the money review): on a 1100px tile a 4px bar
      ran the whole width and its figure stood 700px from the name it belongs to. */
   .prop-row {
     display: grid;

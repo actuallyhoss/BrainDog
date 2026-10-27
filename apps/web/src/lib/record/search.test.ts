@@ -220,7 +220,7 @@ test('`/search` is a destination the palette teaches', () => {
 
 test('the count is styled on every screen, not only on a phone', () => {
   /* The rule was written INSIDE the phone's media block, so on a desktop it fell back to the
-     default. The count is now said and not shown (2.A.15), and the rule that hides it from the eye
+     default. The count is now said and not shown, and the rule that hides it from the eye
      has to hold on every screen or a desktop prints it in the field. */
   const at = PALETTE.indexOf('.p-count {');
   const media = PALETTE.indexOf('@media (width < 640px)');

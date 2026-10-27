@@ -1,5 +1,5 @@
 /**
- * Every project in play says how long since anybody worked on it, on its card on Projects (REC-C16's left part, W096).
+ * Every project in play says how long since anybody worked on it, on its card on Projects (REC-C16's left part).
  *
  * A QUIET PROJECT WAS SEEN ONLY INSIDE IT. A project page's Where it stands reads `project-last-worked`, the days since
  * the newest write on any of its tasks, and the In play cards on Projects read none of it, so a project nobody had

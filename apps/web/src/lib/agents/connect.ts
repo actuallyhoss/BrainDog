@@ -1,5 +1,5 @@
 /**
- * The connect sheet (AGT-A07), what it decides with no runes: the ways in, the lines each one hands over, and the
+ * The connect sheet, what it decides with no runes: the ways in, the lines each one hands over, and the
  * live row under the open one that turns from "Waiting for its first call" to "Connected" when the app makes its call.
  *
  * PURE, SO `node --test` CAN IMPORT IT. The sheet (`ConnectSheet.svelte`) draws these and asks the record; the clock,
@@ -71,7 +71,7 @@ export const connectWords = {
 } as const;
 
 /**
- * THE APPS CONNECT YOUR AGENT OFFERS, IN ITS ORDER (`first-connect.ts`, audit C of 25 October, X15), so the first screen
+ * THE APPS CONNECT YOUR AGENT OFFERS, IN ITS ORDER (`first-connect.ts`), so the first screen
  * and this sheet never offer different ones; then Codex, which setup also finds, the address alone, and the key.
  */
 export const CONNECT_TILES: readonly ConnectTile[] = [

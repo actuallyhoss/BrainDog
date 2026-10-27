@@ -1,6 +1,6 @@
 /**
  * `braindog mcp` as a thin bridge: each line the app writes goes to the host's own `POST /mcp`, and its answer comes back
- * as one line (AGT-A03).
+ * as one line.
  *
  * THE SERVER IS THE HOST'S, NOT THIS COMMAND'S. Before this the command composed the server itself over a surface of one
  * host call per method (`surface.ts`), so a deploy reached no agent until its machine updated the command, and every
@@ -21,7 +21,7 @@
  * so this answer and every later one come from the refusing server (`signed-out.ts`). A network failure, a 5xx or the
  * budget: the refusal `UNREACHABLE` with its sentence (`surface.ts`).
  *
- * A WRITE WHOSE ANSWER WAS LOST IS SENT ONCE MORE, AND IS STILL ONE ENTRY (AGT-B05). A timeout does not say whether the
+ * A WRITE WHOSE ANSWER WAS LOST IS SENT ONCE MORE, AND IS STILL ONE ENTRY. A timeout does not say whether the
  * host wrote: before this the call was never sent twice, so the agent was told it failed and wrote it again itself, two
  * tasks for one "add a task". Now a `create` or an `update` carries an operation id, the app's own or one made here, and
  * an answer that never came sends the same call with the same id once more. The record keeps the id on the first line of
@@ -30,13 +30,13 @@
  * `op_id`: a host that predates it refuses an argument it does not list, and every write would fail. A read is never
  * sent twice, and nothing else is.
  *
- * A WRITE THAT MAY HAVE LANDED SAYS SO (audit 40-42, finding 9). Every other write, and a resend still away, was told
+ * A WRITE THAT MAY HAVE LANDED SAYS SO. Every other write, and a resend still away, was told
  * "could not be reached", so the agent wrote it again: a timeout, a 5xx and an unreadable answer all left after the host
  * may have written. Now the away outcome says `maybe`, true for those three and false only when the request never left
  * (refused, no such host, no route), and a write's call with `maybe` answers `UNREACHABLE_MAYBE`: read before sending
  * again. A read and the handshake keep the old sentence, since nothing they do can be twice.
  *
- * A DEPLOY MID-SESSION IS SEEN. Every answer carries `braindog-build` (AGT-A02). When it differs from the one seen at the
+ * A DEPLOY MID-SESSION IS SEEN. Every answer carries `braindog-build`. When it differs from the one seen at the
  * handshake, the bridge writes one `notifications/tools/list_changed` and refreshes its cache, and the handshake told
  * the app `tools.listChanged`, so the app asks for the new list.
  *
@@ -246,7 +246,7 @@ const stateless = (version: string | undefined): boolean => version === undefine
 /**
  * A tool's answer as Claude Code's model should read it: the short lines alone, without the JSON copy beside them.
  *
- * CLAUDE CODE HANDS ITS MODEL `structuredContent` WHEN A RESULT HAS ONE, in place of the text (audit of 22 Oct, E5: 659
+ * CLAUDE CODE HANDS ITS MODEL `structuredContent` WHEN A RESULT HAS ONE, in place of the text (659
  * answers in his sessions, every one read as JSON, 1.5 to 4 times the tokens). So the lines BrainDog writes for a model
  * never reached one, and what he told a run from the app, which rides on the text of the next answer, was marked seen
  * by a model that was never shown it. The copy stays for a refusal, for a call that asked `format: "full"`, for a
@@ -266,7 +266,7 @@ export function linesForModel(reply: Reply, client: ClientInfo, message: Message
  *
  * A CLIENT OF THAT REVISION NEVER SENDS `initialize`, so its name was never read and `linesForModel` never knew it was
  * Claude Code: a session started with `claude -p` on 24 Oct had its `context` handed to the model as the JSON copy, not
- * the card's lines (H3). Every request carries the name, so the bridge reads it there too.
+ * the card's lines. Every request carries the name, so the bridge reads it there too.
  */
 export function namedIn(message: unknown): ClientInfo | null {
   if (!isObject(message) || !isObject(message.params) || !isObject(message.params._meta)) return null;
@@ -291,7 +291,7 @@ function unreachableSurface(): McpSurface<Ctx> {
   return Object.fromEntries(Object.keys(signedOutSurface('')).map((name) => [name, no])) as unknown as McpSurface<Ctx>;
 }
 
-/** The tools a lost answer is sent again for: the two that write and take an operation id (AGT-B05). */
+/** The tools a lost answer is sent again for: the two that write and take an operation id. */
 const RETRIED: ReadonlySet<string> = new Set(['create', 'update']);
 
 /** The names of the tools a `tools/list` result says take `op_id`, read from each one's `inputSchema`. */
@@ -549,7 +549,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   const byChannel = new Set<string>();
   /* WHETHER THE APP HAS AGREED A REVISION, so no notification goes before the handshake is answered. */
   let greeted = false;
-  /* WHETHER THIS SESSION HAS COMMITTED (scope B31), read from git at most once a minute until it has, then kept. */
+  /* WHETHER THIS SESSION HAS COMMITTED, read from git at most once a minute until it has, then kept. */
   let committed = false;
   let committedRead = 0;
 
@@ -902,7 +902,7 @@ export const attaches = (method: string | undefined, headers: Record<string, str
   typeof headers['x-braindog-client'] === 'string' && (method === 'tools/call' || typeof headers['x-braindog-session'] === 'string');
 
 /**
- * THE RUN ENDS WHEN THE APP CLOSES THIS SERVER (plan §4.4). 842 of 888 runs on the owner's record were never ended:
+ * THE RUN ENDS WHEN THE APP CLOSES THIS SERVER. 842 of 888 runs on the owner's record were never ended:
  * SessionEnd does not fire for a window that was killed, a `-p` run or a subagent, and an app with no hooks has none.
  * The app closing standard input is the one end every session has, so the bridge sends `end` then, once.
  *
@@ -940,7 +940,7 @@ async function endOnClose(io: BridgeIo, target: Target, ran: Record<string, stri
 export const COMMITTED_EVERY_MS = 60_000;
 
 /**
- * WHETHER THE SESSION HAS COMMITTED SINCE IT STARTED (scope B31): HEAD in its folder is not the commit its start hook
+ * WHETHER THE SESSION HAS COMMITTED SINCE IT STARTED: HEAD in its folder is not the commit its start hook
  * kept (`head_at_start`). The session's own file first, then the folder's. No file, no commit kept, or no git: no.
  */
 export async function committedSince(env: Record<string, string | undefined>, cwd: string, client: string | null): Promise<boolean> {

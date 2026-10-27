@@ -121,7 +121,7 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
      Without it `record_index` names only the figures a page draws; the probe keeps it off until
      the client's table carries the name, so no call goes out for a route that is not there. */
   if (routed.has('figures')) later.figures = (ctx: Ctx) => ask<{ id: string; name?: string }[]>(ctx, 'figures');
-  /* AND `offered`, WHICH IS WHY A STDIO SESSION'S LIST OF RESOURCES IS ONE ROUND TRIP (AGT-B04): without it the door
+  /* AND `offered`, WHICH IS WHY A STDIO SESSION'S LIST OF RESOURCES IS ONE ROUND TRIP: without it the door
      reads every fixed address and draws every page to learn what to list, a round trip each over this transport. A host
      that answers it with a refusal is listed the old way, so a host older than the route costs nothing but the time. */
   if (routed.has('offered')) later.offered = (ctx: Ctx) => ask<unknown>(ctx, 'offered');

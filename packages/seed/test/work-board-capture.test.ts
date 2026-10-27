@@ -61,7 +61,7 @@ test('THE BOARD DECLARES WORK’S OWN CAPTURE LINE, first after its sentences an
   assert.ok(blocks.slice(0, at).every((b) => b.kind === 'note' && b.lead === true), 'something other than the lead sentences is before the capture line');
   assert.ok(blocks.slice(at).every((b) => b.lead !== true), 'a lead sentence is after the capture line');
   assert.equal(blocks[at + 1]?.kind, 'board', 'the board is not straight after the capture line');
-  /* THE BOARD IS THE PAGE'S LAST BLOCK, SINCE the audit of 25 October (Y8): Everything open listed its tasks again. */
+  /* THE BOARD IS THE PAGE'S LAST BLOCK: Everything open listed its tasks again. */
   assert.equal(blocks.length, at + 2, 'the Board page gained a block other than the capture line');
 
   /* THE SAME LINE AS WORK'S, word for word, so the two pages ask one question of one list. */

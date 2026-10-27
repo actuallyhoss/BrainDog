@@ -1,5 +1,5 @@
 /**
- * A project page lists the keys and the skills that are the project's own (PGS-C31, the step after Tools and servers).
+ * A project page lists the keys and the skills that are the project's own (the step after Tools and servers).
  *
  * HIS PAGES OFFERED EVERY KEY HE HOLDS UNDER EVERY PROJECT. `runs_on` answers a project's own first and the ones that
  * apply everywhere after them, so Keys and Skills on a project with none of its own filled with three of everybody's,

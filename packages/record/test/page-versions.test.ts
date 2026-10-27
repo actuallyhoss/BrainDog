@@ -110,7 +110,7 @@ test('AN UNKNOWN PAGE IS REFUSED BY THE NAME ASKED, and so is a call that names 
   sql.close();
 });
 
-/* ── a version is cut to the lists its reader may read (audit 61, claim 7) ── */
+/* ── a version is cut to the lists its reader may read ── */
 
 const list = (id: string, name: string) => ({ register: id, name, title: 'name', fields: [{ id: 'name', type: 'text' }] });
 const over = (...blocks: Record<string, unknown>[]) => ({ page: 'desk', title: 'Desk', blocks });
@@ -230,7 +230,7 @@ test('PUT BACK APPLIES A VERSION AS IT WAS ANSWERED, and against a page changed 
   sql.close();
 });
 
-/* ── a block over a figure the record no longer holds (audit 64, claim 2) ── */
+/* ── a block over a figure the record no longer holds ── */
 
 const payroll = { metric: 'payroll-total', name: 'Payroll total', source: 'register.salaries', value: { count: 'id' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' };
 const stat = (metric: string) => ({ kind: 'stat', cells: [{ metric }] });

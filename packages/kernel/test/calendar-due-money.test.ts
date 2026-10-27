@@ -1,9 +1,9 @@
 /**
- * A calendar of what falls due, with its money, is what Today's Due soon reads (the audit of 25 October, Z14).
+ * A calendar of what falls due, with its money, is what Today's Due soon reads.
  *
  * His Today's Due soon named an insurance premium, a task and a salary coming in on 31 October, read across every
  * list (`sources/deadlines.ts`). Money's calendar of the next thirty days read Bills and invoices alone, so it marked 25
- * October and nothing else (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`). A calendar over `deadlines` now
+ * October and nothing else. A calendar over `deadlines` now
  * names a third column, the amount, signed by the way it goes, and draws only what the record's cash walk moves, as Due
  * soon does: a repeating bill once, on its line, and no paused line.
  */

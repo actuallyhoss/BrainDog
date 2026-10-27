@@ -1,5 +1,5 @@
 /**
- * A month on the changelog and the days under it say one count (site F17).
+ * A month on the changelog and the days under it say one count.
  *
  *   node --test apps/site/test/changelog-months.test.ts
  *

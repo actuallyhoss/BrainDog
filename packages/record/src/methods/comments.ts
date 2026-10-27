@@ -146,7 +146,7 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       const at = targetOf(ctx, args?.on);
       if (at === null) return no('REF_UNKNOWN', NOTHING, { at: 'on' });
-      /* AND A ROW SHE MAY COMMENT ON (sharing plan §2.6): seen is not enough once a grant reads more than it writes, and
+      /* AND A ROW SHE MAY COMMENT ON: seen is not enough once a grant reads more than it writes, and
          one she may not comment on is answered as one that is not there. */
       if (at.list !== null && !sight.mayWrite(ctx, at.list, at.target.slice('entry:'.length)))
         return no('REF_UNKNOWN', NOTHING, { at: 'on' });

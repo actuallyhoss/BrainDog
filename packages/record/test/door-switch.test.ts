@@ -1,5 +1,5 @@
 /**
- * A door switched off and on again keeps its address (SHL-C13): `doorSwitch`, `doorIsOff`, `turnedAway` and `doorFacts`.
+ * A door switched off and on again keeps its address: `doorSwitch`, `doorIsOff`, `turnedAway` and `doorFacts`.
  *
  * MEASURED BEFORE THIS WAS WRITTEN: nothing turned a door off but retiring its declaration, and `heldDigest` deletes the
  * digest of a retired one, so the token a sender carried stopped verifying for good. Here the digest `ingestVerify`

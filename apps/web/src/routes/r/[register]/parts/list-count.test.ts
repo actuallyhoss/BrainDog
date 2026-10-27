@@ -1,5 +1,5 @@
 /**
- * The head counts the list, not what has been loaded (the audit of 25 October, Y18): Numbers read "200+ of 2,527" and
+ * The head counts the list, not what has been loaded: Numbers read "200+ of 2,527" and
  * the Ledger "200+ of 322" over lists the record had already counted. The head says the list's count, and the foot says
  * what is shown while the rest is still to come.
  */

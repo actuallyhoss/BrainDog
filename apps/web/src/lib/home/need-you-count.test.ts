@@ -1,5 +1,5 @@
 /**
- * One count of what needs you (SF4, today F2): the rail's badge, the phone tab's badge, Today's header sentence and the
+ * One count of what needs you (today F2): the rail's badge, the phone tab's badge, Today's header sentence and the
  * Needs you tile's count all read `boot`'s open questions (`waits.questions`, less what was just pressed), so they say one
  * number before an answer and the same smaller one in the frame after it.
  */

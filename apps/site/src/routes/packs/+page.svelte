@@ -2,7 +2,7 @@
   `/packs`: the add-on store as a stranger sees it. Every public listing as a card, a search, and the categories as one
   segmented control.
 
-  THE SITE'S DESIGN (site F17): the night head with the search in its slot, then the store on the board's ground with
+  THE SITE'S DESIGN: the night head with the search in its slot, then the store on the board's ground with
   the categories over the cards, then a night band that says anybody can make one and points at the docs, and the
   early access strip. Two neighbours never share a ground in either scheme.
 
@@ -74,7 +74,7 @@
       <p class="none">{w.none}</p>
     {:else}
       <div class="bar">
-        <!-- ONE SEGMENTED CONTROL, one category at a time (site F17). On a phone it scrolls inside its own track. -->
+        <!-- ONE SEGMENTED CONTROL, one category at a time. On a phone it scrolls inside its own track. -->
         <div class="track" role="group" aria-label={w.filters}>
           <button type="button" class="seg" aria-pressed={picked === null} onclick={() => (picked = null)}>
             {w.all}<span class="seg-n num">{data.cards.length}</span>
@@ -303,7 +303,7 @@
     list-style: none;
   }
 
-  /* A CARD: flat, radius 16, no edge and no shadow (site F7). */
+  /* A CARD: flat, radius 16, no edge and no shadow. */
   .addon {
     position: relative;
     display: flex;

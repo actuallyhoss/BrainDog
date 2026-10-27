@@ -1,6 +1,6 @@
 /**
  * ONE FIELD, said the same way on every form: a label, the control, and one line under it that is the field's help or,
- * when the record refused it, the record's own sentence (EXP-C06, "field error replaces help in --red with danger
+ * when the record refused it, the record's own sentence ("field error replaces help in --red with danger
  * edge").
  *
  * PURE, and no rune, so `node --test` holds it: `Field.svelte` draws what these answer and decides nothing itself.

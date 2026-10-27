@@ -293,7 +293,7 @@ type Drew = Drafted & {
   code?: string | undefined;
   /** `Ran.served` of the drafting call, kept beside its code so the ledger can tell a timeout from a model not reached. */
   served?: boolean | undefined;
-  /** `Ran.candidate` of the drafting call: the host's handle for the model on its route that answered (ENG-A06). */
+  /** `Ran.candidate` of the drafting call: the host's handle for the model on its route that answered. */
   candidate?: string | undefined;
 };
 
@@ -1034,7 +1034,7 @@ export type SetupAnswer = {
   rows: { list: string; fields: Record<string, unknown> }[];
   draft: string | null;
   /**
-   * The one question the model would ask back, where the answer would change what is built (USE-B06), or null.
+   * The one question the model would ask back, where the answer would change what is built, or null.
    *
    * ONE, NEVER TWO (settled on 9 October, `apps/web/src/lib/start/question.ts`, over the scope's two). Absent where the
    * model said nothing about it, which reads as null.
@@ -1325,7 +1325,7 @@ const askedOnce = async (id: PromptId, slots: Record<string, string>, engine: In
 };
 
 /**
- * THE FIRST READ, BEFORE THERE IS AN ACCOUNT (USE-B05): a stranger's sentence at sign-up read once through `inference`
+ * THE FIRST READ, BEFORE THERE IS AN ACCOUNT: a stranger's sentence at sign-up read once through `inference`
  * and held by `setupOf`, as `proposeSetup` reads an owner's.
  *
  * NO RECORD, NO OWNER, NO LEDGER AND NO MONTH'S COUNT. There is no record yet to hold a row in or an owner to test, so the

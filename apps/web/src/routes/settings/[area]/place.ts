@@ -76,7 +76,7 @@ const area = (address: string, label: string, icon: IconName, line: string): Are
  * scheme.
  */
 export const DEFAULT_GROUPS: readonly AreaGroup[] = [
-  /* THREE GROUPS SINCE 24 OCTOBER (U-C9): You, This BrainDog and Data. You and This BrainDog stand side by side, six
+  /* THREE GROUPS SINCE 24 OCTOBER: You, This BrainDog and Data. You and This BrainDog stand side by side, six
      rows each, so both columns end together and no hole is left under the shorter; Data runs the whole width under them,
      with Delete its last row. Keys, Add-ons and Usage, pages of their own, are listed here too, where they were in no
      group at all. */
@@ -99,7 +99,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     icon: 'settings',
     areas: [
       area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
-      /* PEOPLE & SHARING HOLDS WHAT PEOPLE DID, roles and invites, and every share beside them (sharing plan §3.2). The
+      /* PEOPLE & SHARING HOLDS WHAT PEOPLE DID, roles and invites, and every share beside them. The
          sharing address opens it too (`MOVED`). */
       area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and what you share'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
@@ -107,24 +107,24 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
          was a row opening `/packs`, a page of its own with no Settings rail. */
       area('/settings/addons', 'Add-ons', 'packs', 'What is added to this record, and its updates'),
     ],
-    /* ONE HEALTH (audit 25 October, Y4): the record's vital signs, its Health page, with the count Today and the
+    /* ONE HEALTH: the record's vital signs, its Health page, with the count Today and the
        sentence above this index say. An area here called Health said "32 things went stale" while that page said 9. */
     outside: [
-      /* ONE NAME FOR IT (audit 25 October, X24): the page is Keychain, and this row said Keys. */
+      /* ONE NAME FOR IT: the page is Keychain, and this row said Keys. */
       { label: 'Keychain', href: '/keychain', icon: 'vault', line: 'The keys your agents are handed', before: 'addons' },
       { label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'What on this record needs a look' },
     ],
   },
-  /* WHAT THE RECORD KEEPS AND COSTS, AND THE ONE IRREVERSIBLE ACT AS ITS LAST ROW, drawn in red (U-C9). It stood in a
+  /* WHAT THE RECORD KEEPS AND COSTS, AND THE ONE IRREVERSIBLE ACT AS ITS LAST ROW, drawn in red. It stood in a
      group of its own, one row under a heading, and left a hole beside it the height of a tile. */
   {
     title: 'Data',
     icon: 'archive',
     span: 12,
     areas: [
-      /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY (the audit of 22 October, U3): what it found wrong in its own pages
+      /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY: what it found wrong in its own pages
          and notes, what went stale, what is here twice, what it matched and learned. Read only when it is opened. Called
-         Health until 25 October (Y4), beside a Health page that counted something else; `/settings/health` still lands. */
+         Health until 25 October, beside a Health page that counted something else; `/settings/health` still lands. */
       area('/settings/tidy', 'Tidy up', 'filter', 'What the record found to tidy in itself'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
       area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
@@ -137,7 +137,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
 ];
 
 /**
- * THE DESIGN BOOK IS NOT A SETTING, SINCE BATCH 6 (call 6), AND NOT UNDER SETTINGS SINCE THE UI PASS OF 20 OCTOBER (agents
+ * THE DESIGN BOOK IS NOT A SETTING, SINCE BATCH 6 (call 6), AND NOT UNDER SETTINGS (agents
  * F29): it lives at `/design`, reached from the index's "⋯ › Design book", and `/settings/look` goes there.
  */
 export const OFF_INDEX: readonly Area[] = [];

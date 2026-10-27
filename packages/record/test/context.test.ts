@@ -176,7 +176,7 @@ test('CONTEXT OVER THE SEED: the run, Kiln, the last handoff, who is live, what 
     ),
   );
 
-  /* A METHOD, so it is among the five the brief answer leads with (kind first, as `learnings` reads them, AGT-B09). */
+  /* A METHOD, so it is among the five the brief answer leads with (kind first, as `learnings` reads them). */
   value(await api.create({ register: 'learnings', fields: { lesson: 'Export the variable font last.', kind: 'method', project } }, owner));
   value(await api.create({ register: 'learnings', fields: { lesson: 'Proof on paper before the web.', confirmed_on: '2026-01-02' } }, owner));
   const person = value<{ rows: Entry[] }>(await api.list({ register: 'people', limit: 1 }, owner)).rows[0] ?? assert.fail('the seed has no people');
@@ -228,7 +228,7 @@ test('CONTEXT OVER THE SEED: the run, Kiln, the last handoff, who is live, what 
   );
   assert.match(here.next, new RegExp(`step Claude \\(${before.spoken}\\) left: take it with handoff take ${before.spoken}`));
 
-  /* THE SAME TREE, AND THE CARD MADE FROM ALL OF IT (AGT-B07, AGT-B08): the run beside this one is named once under the
+  /* THE SAME TREE, AND THE CARD MADE FROM ALL OF IT: the run beside this one is named once under the
      warning, the step leads Next, and the caller, a key whose command said no build, is not called behind. */
   assert.deepEqual(here.also_here?.runs.map((r) => r.name), [`Claude (${beside.spoken})`]);
   assert.equal(here.also_here?.lines[0], 'Two sessions in one working tree overwrite each other. Coordinate or stop.');

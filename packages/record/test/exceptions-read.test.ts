@@ -1,5 +1,5 @@
 /**
- * `exceptions`: what stopped on this record, asked of the record in names (`src/methods/exceptions.ts`, ENG-B13).
+ * `exceptions`: what stopped on this record, asked of the record in names (`src/methods/exceptions.ts`).
  *
  * A list that took something new day after day and then went quiet is said once, by the name its people call it and
  * the day it stopped, to whoever may read that list. It is read from what the record already holds, kept in no table,

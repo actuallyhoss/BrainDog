@@ -1,5 +1,5 @@
 /**
- * Whose allowance a ledger row spent is what the row says, and nothing the host works out (ENG-A05).
+ * Whose allowance a ledger row spent is what the row says, and nothing the host works out.
  *
  * THE COUNT USED TO BE READ OUT OF A ROW'S KIND, ITS `filed` AND THE WORDS OF ITS QUESTION. A headline was "a `pattern`
  * row whose question is the headline's", and a background ask was "a `pattern`, `prose` or `embed` row that filed

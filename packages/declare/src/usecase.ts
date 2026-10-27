@@ -199,7 +199,7 @@ export type UseCase = {
   /** First-party packs installed before the use case's own, in dependency order. */
   modules: string[];
   /**
-   * The part of `modules` this use case cannot stand without (USE-B08): a record starts with these and what the person
+   * The part of `modules` this use case cannot stand without: a record starts with these and what the person
    * named, and grows into the rest when its moment comes. Left out, it is all of `modules`, so a use case file shared
    * before the key existed reads the same and normalises to the same object (`standsOn` in `packages/seed`).
    */
@@ -227,7 +227,7 @@ export type UseCase = {
    */
   links: ExampleLink[];
   /**
-   * What it lays over the add-ons it stands on, by add-on id (SHL-A09): `{ work: { words, config, hide } }`. Empty when
+   * What it lays over the add-ons it stands on, by add-on id: `{ work: { words, config, hide } }`. Empty when
    * the file says none. Each part is applied when the use case goes in, as the person's own choice, so the add-on's next
    * update keeps it: the words are this use case's label settings (`useCasePack`), the config is sent with the add-on's
    * install (`overSettings`), and the hidden pages come off the rail (`overHidden`).
@@ -782,7 +782,7 @@ const VOICE_TITLES: Readonly<Record<VoiceKey, string>> = {
 /**
  * What a label's setting is called at `/packs/<id>`. A list's own words are titled by what the list is called (`calls`):
  * "Name of the Bills list", "What one is called in the Bills list", "What the Bills list holds". It read "Label: things"
- * and "Label: one of put by", which are ids a person never sees anywhere else (research audit 11-13).
+ * and "Label: one of put by", which are ids a person never sees anywhere else.
  *
  * A FIELD'S OR A VALUE'S LABEL, AND ANY LABEL KEPT BY ITS HASH, KEEPS THE KEY'S OWN SPELLING: "Label: people, role". A
  * long key is stored as `lk_<hash>`, and its title is the only place the key is written down, which `labelKeyOf` (and the

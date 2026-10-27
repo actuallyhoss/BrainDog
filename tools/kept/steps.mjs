@@ -1,7 +1,6 @@
 /**
  * The kept lane's steps: a fresh founder's record, made by sign-up, the add-ons installed from the catalogue, fed from a
- * stand-in the lane owns, one schedule turn, and the rows read back (SHL-A19 jobs 1 and 2,
- * `loop/scope/area-shell-a.md:996-1044`; "how do things happen autonoumously and dynamically?").
+ * stand-in the lane owns, one schedule turn, and the rows read back.
  *
  * NOTHING HERE IS HIS. The record is a stranger's, signed up through the public path by the drill's own steps
  * (`tools/drill/steps.mjs`, imported and never written again), and every add-on goes in through the record's own
@@ -120,7 +119,7 @@ export async function installFromCatalogue(ctx, id, { fill = null } = {}) {
   /* A PLAN REFUSED FOR A LIST THE RECORD DOES NOT HOLD YET puts in the modules the file stands on (`requires.packs`), as
      the refusal tells a person to ("Install work first") and as an agent's arrange of the add-on does (the catalogue
      offers it with those modules under it), then is read again, once. A founder's record holds Projects and Money on
-     its first day and Work only when the words point at it (USE-B08, founder 2.7.0), so project-brief and roadmap go
+     its first day and Work only when the words point at it (founder 2.7.0), so project-brief and roadmap go
      in after Work. The modules go in through the record's own first-run door, `setup` with `again`, which passes over
      one that is on. */
   let diff = {};

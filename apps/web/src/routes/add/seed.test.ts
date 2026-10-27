@@ -1,5 +1,5 @@
 /**
- * Capture from the phone in one press (E45): the manifest offers "Add a task" and "Ask" on a long press of the Home
+ * Capture from the phone in one press: the manifest offers "Add a task" and "Ask" on a long press of the Home
  * Screen icon and takes a share, and what a share hands becomes the palette's first words.
  */
 

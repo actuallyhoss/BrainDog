@@ -1,5 +1,5 @@
 <!--
-  A list as a page the record composes (PGS-A23), drawn at `/r/<list>?declared` while the screen as it was stays put.
+  A list as a page the record composes, drawn at `/r/<list>?declared` while the screen as it was stays put.
 
   THE BODY IS THE KERNEL'S AND THE DRAWING IS THE RECORD'S. `listPage` composes a page from the list's own declaration
   (`declared.ts`), the record draws it as it draws an installed one and writes nothing (`previewPage`, through

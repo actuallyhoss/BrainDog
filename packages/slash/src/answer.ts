@@ -205,7 +205,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
       let touched = false;
       /* AND THE NAME THE HOST SENT, off a reply that came back. `core.run` keeps the template's (`nameIn`). */
       let sent: string | undefined;
-      /* EACH CALL STARTS WITH NO MARKS, so a route's walk (ENG-A06) leaves the last attempt's: a provider candidate's 401
+      /* EACH CALL STARTS WITH NO MARKS, so a route's walk leaves the last attempt's: a provider candidate's 401
          after the included model threw is read as that 401, and under the provider's own name. `core.run` hands each
          candidate's own wire through `watch`. */
       const watch = (wire: Inference): Inference => ({
@@ -258,7 +258,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          assign them. */
       const reached = heard as Heard | null;
       const refusedBy = stopped as Stopped | null;
-      /* A CANDIDATE ON ITS OWN WIRE (ENG-A06) IS NAMED AS THE WALK RAN IT, `ran.model`. */
+      /* A CANDIDATE ON ITS OWN WIRE IS NAMED AS THE WALK RAN IT, `ran.model`. */
       const used = ran.candidate !== undefined ? ran.model : ((sent as string | undefined) ?? reached?.model ?? ran.model);
       /* ONE BINDING THROW HAD TWO PRICES UNTIL THIS LINE. Measured:
          the Worker's included model threw after `AI.run` was called, and a person's read settled it under

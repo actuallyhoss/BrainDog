@@ -263,7 +263,7 @@ import { RUNS } from './verbs.ts';
 import { lookThemeFault, looksOf, themeFor, type LookOffer } from './theme-pick.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
-/* WHAT `setup` ANSWERS (USE-B04), for the host's table of calls, the client and the first run's screen. */
+/* WHAT `setup` ANSWERS, for the host's table of calls, the client and the first run's screen. */
 export type { SetupAnswer, SetupPart } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
@@ -293,7 +293,7 @@ export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, atWork, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
 export { headlineAgrees, HEADLINES_HELD, heldOn, heldSaid, type Disagrees, type HeadlinesHeld } from './headlines.ts';
 export { firewall, FIREWALL_FAULT } from './sight.ts';
-/* THE RULE `pages()` DROPS A PAGE BY (PGS-A01), so a reader of the record names the kernel's rule and not a copy of it. */
+/* THE RULE `pages()` DROPS A PAGE BY, so a reader of the record names the kernel's rule and not a copy of it. */
 export { whollyWithheld } from '@braindog/kernel';
 export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps } from './signs.ts';
 export { PASS_KIND, installedTwice, passSentence, type ByWho, type PassSaid, type UpdatePass } from './update-pass.ts';
@@ -324,17 +324,17 @@ export {
   type PageBasis,
   type SlashHeadline,
 } from './headlines.ts';
-/* THE BRIEFING'S CARDS (ENG-B12, `briefing.ts`): the facts a briefing is written from, the check a model's cards pass,
+/* THE BRIEFING'S CARDS (`briefing.ts`): the facts a briefing is written from, the check a model's cards pass,
    and the rules' own cards. The read is `briefing` in `methods/briefing.ts`. */
 export { BRIEF_CARDS_MOST, BRIEF_FACTS_MOST, BRIEF_KINDS, BRIEF_LINE_MOST, BRIEF_RANK, BRIEF_RULES_MOST, briefBasis, briefCandidates, briefFault, briefFrom, briefInput, briefOf, rulesBrief, type Brief as Briefing, type BriefAnswer, type BriefCard, type BriefFact, type BriefInput, type BriefKind, type BriefModel } from './briefing.ts';
 /* AND THE MODEL'S HALF (`brief-write.ts`): when it is asked, and the one answer kept. The tick is `slashBrief` below. */
 export { BRIEF_ASKED, BRIEF_ASKS_DAY, BRIEF_HOURS, BRIEF_KEPT, BRIEF_NO_ANSWER, briefSlot, briefTick, keptBrief, type BriefAsk, type BriefAsked, type KeptBrief } from './brief-write.ts';
 /* AND THE WRITTEN BRIEF (`written-brief.ts`): sentences rewritten when the rows the brief reads change. */
 export { WRITTEN_ASKS_DAY, WRITTEN_KEPT, WRITTEN_NEEDS_MOST, WRITTEN_QUIET_MS, WRITTEN_RETRY_MS, WRITTEN_SENTENCES_MOST, WRITTEN_STATE, needsOf, writtenOf, writtenShown, writtenTick, type WrittenInput, type WrittenRead } from './written-brief.ts';
-/* THE ONE RECOMMENDER AND THE ONE QUEUE OF WHAT THE RECORD OFFERS TO ARRANGE (ENG-B14, `design-agent.ts`), under one name
+/* THE ONE RECOMMENDER AND THE ONE QUEUE OF WHAT THE RECORD OFFERS TO ARRANGE (`design-agent.ts`), under one name
    because its own are short words (`Offer`, `Queue`, `recommend`). Nothing in the record calls it yet. */
 export * as designAgent from './design-agent.ts';
-/* THE REHEARSAL OF A LOOK BEFORE IT IS WRITTEN (ENG-B09, `compose-rehearse.ts`), and the two refusals a basis is given. */
+/* THE REHEARSAL OF A LOOK BEFORE IT IS WRITTEN (`compose-rehearse.ts`), and the two refusals a basis is given. */
 export { REFUSALS_MOST, lookRefusedKey, noteRefusal, refusedFor, rehearse, type Refused, type RehearseDeps, type RehearseFinding, type RehearseRule, type Rehearsal } from './compose-rehearse.ts';
 
 /** A payee the nightly walk would not give a held organisation's key on its own (`HeldAsk` in `kernel/src/backfill.ts`). */
@@ -463,7 +463,7 @@ export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
 export type Level = (typeof LEVELS)[number];
 
 /**
- * A level a caller holds for one call: the five, and `comment` (sharing plan §2.15), which a share at the comment rung
+ * A level a caller holds for one call: the five, and `comment`, which a share at the comment rung
  * gives: read and propose, and nothing above. No `member` row stores it, so the table's CHECK is untouched; only the
  * lens hands it to a host, which hands it here.
  */
@@ -567,12 +567,12 @@ export type CallContext = {
 
   /**
    * Who is seeing as somebody (`preview`): the owner or Admin whose session it is, for the audit's `preview:<person>`
-   * (sharing plan §2.10). Set only by a host, beside `preview`.
+   * Set only by a host, beside `preview`.
    */
   previewBy?: string | undefined;
 
   /**
-   * Whether this person can confirm it is them with a passkey, inline (sharing plan §6, default 1): a share that widens
+   * Whether this person can confirm it is them with a passkey, inline (default 1): a share that widens
    * asks for a fresh proof only then. Set only by a host, from the Directory's session answer.
    */
   confirmable?: boolean | undefined;
@@ -1013,7 +1013,7 @@ const TOKEN_REACH: Record<Scope, Need[]> = {
 
 const LEVEL_REACH: Record<HeldLevel, Need[]> = {
   read: ['read'],
-  /* READ AND PROPOSE, the comment rung of a share (sharing plan §2.1): comments and suggestions on what they can see. */
+  /* READ AND PROPOSE, the comment rung of a share: comments and suggestions on what they can see. */
   comment: ['read', 'propose'],
   /* AND NO READ, which is the whole of what `append` means. 20 §1: *"`create`, `propose` and `log`
      — and no read. The conservative half: an appender sees nothing, not even what it filed."* This
@@ -1218,7 +1218,7 @@ export const ON_WORD_PREF = 'agents.answer_on_word' satisfies PrefKey;
  * cookie's own words (`apps/web/src/lib/pref.ts`), `look.contrast` the high-contrast palette, and `look.accent` one of the
  * suggested accents by name, or `House`. The browser keeps a first-paint copy of each, written from these.
  *
- * `look.theme` IS WHICH INSTALLED LOOK THIS PERSON IS DRAWN IN (PGS-A21): `house`, or an installed `theme` declaration's
+ * `look.theme` IS WHICH INSTALLED LOOK THIS PERSON IS DRAWN IN: `house`, or an installed `theme` declaration's
  * id; absent, or a theme since uninstalled, is the record's own, else the first by id (`theme-pick.ts`).
  *
  * `look.shot` IS SCREENSHOT MODE, ON OR OFF (batch 62): the person's own words are plated while the screen is shown to
@@ -1537,7 +1537,7 @@ export type Boot = {
   /** Whether a model is behind Slash on this host, as `version` says it (`Build.slash`), so the app need not ask. */
   slash: boolean;
   /**
-   * THE RECORD'S COPIES AS THREE FACTS (`copyFacts`, LCH-C03): when the last nightly copy was kept and its size, and when
+   * THE RECORD'S COPIES AS THREE FACTS (`copyFacts`): when the last nightly copy was kept and its size, and when
    * a person last exported it, each `null` until there is one ("First copy tonight", "Never exported"). Read from the
    * record's own `export` events, which never travel in a copy. Only to a caller who may take a copy (`admin`), as
    * Settings > Backups and Export are; absent for anybody else.
@@ -1594,7 +1594,7 @@ export type EventLine = Omit<LogLine, 'rowid'> & {
   /** What the thing is called: a row's title, or a question. */
   title: string | null;
   /**
-   * On the one line a pass of BrainDog's own update is said as (kind `update`, SHL-A21): its sentence and counts, with
+   * On the one line a pass of BrainDog's own update is said as (kind `update`): its sentence and counts, with
    * every line it wrote under it as `steps`, newest first, each still undone on its own.
    */
   pass?: import('./update-pass.ts').PassSaid;
@@ -1747,7 +1747,7 @@ export type Understanding = {
 };
 
 /**
- * What `meet` is told (`loop/contract-17.md`): who, by a name, an address, a handle or keys (`kind:value`), whether a person
+ * What `meet` is told: who, by a name, an address, a handle or keys (`kind:value`), whether a person
  * or an organisation, the organisation a person is with and its domain, their role, and where they were met. `source` is
  * a short plain phrase (`commit 4464966 in braindog`, `mail from halden.example`); `where` is the older word for it.
  */
@@ -1775,7 +1775,7 @@ export type MeetSaid = {
 export type Asked = { asked: { id: string; question: string; why: string; joined?: true } };
 
 /**
- * What `meet` answers (`loop/contract-17.md`): the row they turned out to be, by its handle and name, or `null` when a
+ * What `meet` answers: the row they turned out to be, by its handle and name, or `null` when a
  * name with no key was only kept as a mention; whether it was added; how it matched; and the question a doubtful match
  * opened on Decide, by its handle.
  */
@@ -1804,7 +1804,7 @@ export type MergeCluster = {
 };
 
 /**
- * What a token may do under his settings (plan §5.1), as `whoami` and `context` answer it, to read and never to write:
+ * What a token may do under his settings, as `whoami` and `context` answer it, to read and never to write:
  * the row it works under and how that matched (`null` while the record holds no row that applies, when nothing
  * narrows), min(token scope, the row's ceiling), that as one sentence, the lists and projects it writes (`null` for
  * all), the tools switched off, his brief for it, its context size, whether his stop switch (Claude Code's hooks) and
@@ -1883,14 +1883,14 @@ export type Context = {
   waiting_here?: number;
   /**
    * The last three questions a person decided for this project, newest first, each as "Decided 2 Oct: <the choice>"
-   * (`decidedHere`, AGT-B09), so an agent opening a session here is told what was already answered and asks it no more.
+   * (`decidedHere`), so an agent opening a session here is told what was already answered and asks it no more.
    */
   decided?: string[];
   /** Up to three learnings of kind `rule`, this project's first, read from every learning and not only the five sent, and how many more. */
   rules?: { rows: Brief[]; more: number };
   /**
    * Every register with a scope field the caller may read: the project's open rows, then the global ones nearer-wins
-   * leaves, five in all unless `format: 'full'` asked for twenty of each (`capRegister`, AGT-B09). `here` and
+   * leaves, five in all unless `format: 'full'` asked for twenty of each (`capRegister`). `here` and
    * `everywhere` count every open row of each, `more` how many this answer leaves out, and `rest` the call that lists them.
    */
   registers: { id: string; name: string; role?: string; rows: Brief[]; inherited: Brief[]; truncated: boolean; here?: number; everywhere?: number; more?: number; rest?: string | null }[];
@@ -1912,13 +1912,13 @@ export type Context = {
   /** Rows of a fading register left out because nobody confirmed them in ninety days. */
   faded: number;
   /**
-   * The record's vital signs that are red now, each by its name with its one sentence (`signs`, SHL-D01), so a session
+   * The record's vital signs that are red now, each by its name with its one sentence (`signs`), so a session
    * starts knowing what is broken. Only to a caller who reads the whole record, as `signs` itself answers only them:
    * anybody narrower is answered `[]`, since a sign counts across every list.
    */
   signs: { name: string; said: string }[];
   /**
-   * How many things are stale where the caller stands (AGT-C18): the counts of the lines the read `stale` answers them,
+   * How many things are stale where the caller stands: the counts of the lines the read `stale` answers them,
    * added up, which that read says one by one with the call that clears each. A number and no names. What the tidy's
    * finders count across every list is in it only for a caller who reads the whole record; anybody narrower is
    * counted their own steps and questions. Optional on the type only, so a context drawn by hand still reads;
@@ -1933,7 +1933,7 @@ export type Context = {
    */
   ask?: string;
   /**
-   * THE CARD AN AGENT STARTS FROM (`card.ts`, AGT-B07), composed here so the start hook, `context` and `braindog context`
+   * THE CARD AN AGENT STARTS FROM (`card.ts`), composed here so the start hook, `context` and `braindog context`
    * print one text: about 120 words, never past 150. `card_next` is its Next line alone, for a session that just
    * compacted, or `null` with no step.
    */
@@ -1960,7 +1960,7 @@ export type Context = {
   /** What his settings let this agent do, as one sentence (§3.2, section 3); `null` for a caller who is no agent. */
   may?: string | null;
   /**
-   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`, sharing plan §2.9): "You act for Sam:
+   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`): "You act for Sam:
    * Kiln, view; amounts hidden." `null` for a person, and for an owner's agent, which reaches everything.
    */
   reach?: string | null;
@@ -1975,7 +1975,7 @@ export type Context = {
   /** The task `context { task }` asked for, whole, so an update needs no `get` (§3.1, §4.3). */
   task?: TaskInHand | null;
   /**
-   * WHAT AN AGENT READS, RANKED AND BUDGETED (`context-plan.ts`, plan §3.2): Stop and Told first, the card, then what it
+   * WHAT AN AGENT READS, RANKED AND BUDGETED (`context-plan.ts`): Stop and Told first, the card, then what it
    * may do, its rules, who else is here, its lane, decisions and lessons, cut to `budget` tokens at `depth`, each cut
    * section ending with the call that reads the rest. Only for an agent's key; `card` stays the start hook's.
    */
@@ -1991,7 +1991,7 @@ export type Context = {
 /** What `handoff { task }` or `{ done }` did to the task: its spoken name, its state now, and the question when it was asked. */
 export type HandedTask = { spoken: string; state: string | null; asked?: Asked['asked'] };
 
-/** How much `context` answers (plan §3.1): `brief` is the default. */
+/** How much `context` answers: `brief` is the default. */
 export const CONTEXT_DEPTHS = ['card', 'brief', 'task', 'full'] as const;
 export type ContextDepth = (typeof CONTEXT_DEPTHS)[number];
 
@@ -2008,13 +2008,13 @@ export type TaskInHand = { spoken: string; register: string; list: string; versi
 type Where = { project?: string; depth?: ContextDepth; task?: TaskInHand };
 
 /**
- * What `context { since }` answers (plan §3.1, §3.4): only what moved for the caller's run since the stamp it holds, as
+ * What `context { since }` answers (§3.4): only what moved for the caller's run since the stamp it holds, as
  * the lines to say ("Nothing new." when nothing did), what is pending, what stops it, and the stamp now.
  */
 export type ContextSince = { since: { stamp: string | null; changed: boolean; pending: Told[]; stop: Stop | null; lines: string[] } };
 
 /**
- * `Boot.me.lens`: a short fingerprint (FNV-1a, base 36) of what this caller's shares narrow them to, or `null` when
+ * `Boot.me.lens`: a short fingerprint (base 36) of what this caller's shares narrow them to, or `null` when
  * nothing is. Only a fingerprint, so the conditions a share holds never travel to the app to be kept.
  */
 export function lensMark(ctx: Pick<CallContext, 'wheres' | 'writes' | 'hides'>): string | null {
@@ -2058,7 +2058,7 @@ export type Version = {
   slash: boolean;
   /**
    * The caller's grant when shares made their access (`CallContext.grant`): a tab that sees its epoch move re-boots onto
-   * what it now holds (sharing plan §2.8). Absent for anybody who holds no share, the owner among them.
+   * what it now holds. Absent for anybody who holds no share, the owner among them.
    */
   grant?: Grant;
   /**
@@ -2084,7 +2084,7 @@ export type Build = {
    * Optional, so a build that does not name its host is a record whose `boot` carries no `host` key at all.
    */
   host?: 'cloud' | 'self-host';
-  /** The oldest command this host's door still works with, `MIN_CLI` from packages/mcp/src/build.ts (AGT-A02). */
+  /** The oldest command this host's door still works with, `MIN_CLI` from packages/mcp/src/build.ts. */
   min_cli?: string;
 };
 
@@ -2162,7 +2162,7 @@ export type RecordDeps = {
    * `Pick` so the record's own sentences about a step can read it.
    */
   answersSlash?: boolean | undefined;
-  /** A self-host started with `--allow-shape`: its import takes a shape copy (PRF-A13), passed to the kernel's `RecordOptions.allowShape`. Absent is no. */
+  /** A self-host started with `--allow-shape`: its import takes a shape copy, passed to the kernel's `RecordOptions.allowShape`. Absent is no. */
   allowShape?: boolean | undefined;
   /**
    * What signs an exported `.brain`, when this host holds the record's signing key.
@@ -2213,7 +2213,7 @@ export type RecordDeps = {
   /** Whether this host can make a read-only link to a page, and why not (`sharesOf` at the Worker's door). Absent is no. */
   shares?: (() => { can: boolean; why?: string }) | undefined;
   /**
-   * The Plus gate on a share to somebody not on the record yet (sharing plan §2.15), the host's because the host knows
+   * The Plus gate on a share to somebody not on the record yet, the host's because the host knows
    * the plan: the Worker's answers Free's one-person refusal where it sells plans, beside its `invite` wrapper. Absent,
    * nothing is held back, which is the self-host and every host while it sells nothing.
    */
@@ -2291,7 +2291,7 @@ export type RecordDeps = {
    * `NOT_IN_THIS_BUILD` rather than guessing.
    */
   directory?: Directory | undefined;
-  /** How this host turns a search into a vector (ENG-B18, `near.ts`), or nothing where it cannot. */
+  /** How this host turns a search into a vector (`near.ts`), or nothing where it cannot. */
   meaning?: import('./near.ts').Meaning | undefined;
 };
 
@@ -2366,7 +2366,7 @@ const metSource = (line: string): string => (line.includes(' · ') ? line.slice(
 const metLinesOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((l): l is string => typeof l === 'string') : []);
 
 /**
- * WHETHER THE ONE PERSON HOLDING THE OWNER'S ADDRESS MAY BE MARKED AS THEM WITHOUT ASKING (research-audit-23 item 1):
+ * WHETHER THE ONE PERSON HOLDING THE OWNER'S ADDRESS MAY BE MARKED AS THEM WITHOUT ASKING:
  * somebody typed in, or met at least once in a note, a call or a run of the owner's, and never only in commits or only in
  * mail. A forged commit or a spoofed mail that came first can make a person holding the owner's address, and marked
  * as him their name would take in all his own later work. Anybody else is asked about on Decide.
@@ -2776,14 +2776,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     const refused = allows(at, need, listName) ?? (register ? reaches(ctx, register) : null);
     if (refused !== null || ctx.principal.kind !== 'token' || need === 'read') return refused;
-    /* AND WHAT HE SET FOR THIS AGENT, AND WHETHER HE STOPPED IT (plan §5.1, §2.4), for a token's change only. The run's
+    /* AND WHAT HE SET FOR THIS AGENT, AND WHETHER HE STOPPED IT (§2.4), for a token's change only. The run's
        own calls are left through both: a stopped run still answers, hands off and ends, and Read is about his rows. */
     if (asked === OWN_RUN || asked === SESSION) return null;
     return settingsStop(ctx) ?? runHeld(ctx);
   };
 
   /**
-   * The settings row a token's call works under (`profileFor`, plan §5.1): the nearest row for its key, its profile or
+   * The settings row a token's call works under (`profileFor`): the nearest row for its key, its profile or
    * its machine with its kind, or its kind, else Defaults. Read once a call. `null` for anybody who is no token, AND FOR A ROW THE RECORD
    * DOES NOT HOLD: until the hourly data step has written Defaults and a row for each kind its runs used (migration 42),
    * nothing narrows, so an agent keeps what its token gives it and a record never wakes up to every write asked.
@@ -2804,7 +2804,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return lists.some((l) => l === list || l.toLowerCase() === name);
   };
 
-  /** A token on a Read row changes nothing (plan §5.1): refused in the row's words, which only the owner can change. */
+  /** A token on a Read row changes nothing: refused in the row's words, which only the owner can change. */
   const settingsStop = (ctx: CallContext): Refusal | null => {
     const p = profileOf(ctx);
     if (p === null || p.ceiling !== 'read') return null;
@@ -2816,7 +2816,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * WHETHER HE STOPPED OR PAUSED THIS RUN (plan §2.4): the refusal every change of a stopped run meets, for every client,
+   * WHETHER HE STOPPED OR PAUSED THIS RUN: the refusal every change of a stopped run meets, for every client,
    * `RUN_STOPPED` or `RUN_PAUSED` in his words, or `null`. A helper obeys its lead's (`stopOf`), and a helper whose own
    * run is not open yet is held by its lead's too. Read on every ask, as `profileOf` is and for its reason: a stop he
    * pressed a moment ago holds the very next change.
@@ -2832,7 +2832,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * WHAT HIS SETTINGS ASK INSTEAD OF WRITE (plan §5.1, "writes outside become questions"): a write by a token whose row
+   * WHAT HIS SETTINGS ASK INSTEAD OF WRITE ("writes outside become questions"): a write by a token whose row
    * is at Suggest, or that names a list or a project the row does not, is filed as a question with the reason in his
    * row's words, as a write the ladder holds back is. `null` when the row lets it through, or no row applies.
    */
@@ -2860,7 +2860,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * What a token may do under his settings, as `whoami` and `context` say it (plan §5.1): the row and how it matched,
+   * What a token may do under his settings, as `whoami` and `context` say it: the row and how it matched,
    * min(token scope, the row's ceiling), the sentence, the lists and projects it writes, the tools switched off, its
    * brief, its context size and whether it is stopped. `null` for anybody who is no token.
    */
@@ -2967,7 +2967,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * One row marked as `marked` does, and `mine` when the viewer made it: only its maker may keep it private or share it
-   * again. Less the fields hidden from the viewer (`sight.maskRow`, sharing plan §2.7).
+   * again. Less the fields hidden from the viewer (`sight.maskRow`).
    */
   const markedRow = (ctx: CallContext, row: Entry | null): Entry | null => {
     if (row === null) return row;
@@ -2981,12 +2981,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * Whether a row this caller can already read on the register is one their own narrowed grant still admits, and which
-   * rows of a batch are (`sight.ts`, sharing plan §2.5 item 3).
+   * rows of a batch are (`sight.ts`).
    * `list` and register counts hand `kernel.scope(ctx, register)` (the grant and the private rows) straight to the kernel,
    * which narrows there; a reader that answers rows read some other way (`get`, `history`, a block or question rowset, a
    * search hit, a log line, an MCP tool, a Slash read) asks `sight` instead, which asks the kernel's `admittedIds` under
    * the same rule once per list per 500 rows. It replaced `rowAdmitted`, which read each row again through `list`.
-   * THE SAME OBJECT HOLDS WRITES TO THE ROW (sharing plan §2.6): `mayWrite`, `writable`, `within` and `added`.
+   * THE SAME OBJECT HOLDS WRITES TO THE ROW: `mayWrite`, `writable`, `within` and `added`.
    */
   const sight = sightOver({ kernel, sql, listName, reads: (ctx, register) => readable(ctx, register) === null });
 
@@ -3367,7 +3367,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       kernel.create(register, { ...fields, tags: exampleTag(fields) }, {
         actor: actorOf(ctx),
         cascade: false,
-        /* THE ADD-ON'S OWN WRITE, which is what a list's `once` reads (SHL-A09). A create is never narrowed by it. */
+        /* THE ADD-ON'S OWN WRITE, which is what a list's `once` reads. A create is never narrowed by it. */
         pack: true,
         ...(note === undefined ? {} : { note }),
       } as never),
@@ -3384,7 +3384,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       );
       return made.ok;
     },
-    /* WHAT THE LAST INSTALL REMEMBERED PLANTING, AND AN UPDATE GOING OVER ONE OF THOSE ROWS (SHL-A09): the add-on's own
+    /* WHAT THE LAST INSTALL REMEMBERED PLANTING, AND AN UPDATE GOING OVER ONE OF THOSE ROWS: the add-on's own
        write again, so a field its list says is written once stays as the row holds it. A row a person deleted is left. */
     planted: (pack) => kernel.packPlanted(pack),
     reseed: (register, row, fields) => {
@@ -3504,7 +3504,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          held to some lists Slash yields nothing, or it kept back offers that were shown nowhere (pen-window-53-54). */
       held: queued !== null && !partial ? queued.ranked.map((i) => i.id) : [],
       dismissed: gone,
-      /* THE PEN'S PART OF THE ONE COUNT (ENG-B14), whole whoever asks, as the slots on Decide are. */
+      /* THE PEN'S PART OF THE ONE COUNT, whole whoever asks, as the slots on Decide are. */
       waiting: queued?.waiting.length ?? 0,
     };
     const busy = usage.agents.length > 0;
@@ -3537,7 +3537,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       "SELECT id, body, status, resolved_as, opened_by, drafted_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset', 'change', 'options') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
       SLASH,
     )) {
-      /* THE DAY IT WAITS UNTIL AND, ONCE TAKEN BACK, WHY (ENG-B14), for the Slash page's lines. */
+      /* THE DAY IT WAITS UNTIL AND, ONCE TAKEN BACK, WHY, for the Slash page's lines. */
       let lapses: string | undefined;
       try {
         const body = JSON.parse(row.body) as Record<string, unknown>;
@@ -3728,7 +3728,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         dropped.push(large ? `This BrainDog is too large for the included model to read, so ${fell}` : `The model did not answer, so ${fell}`);
       }
     }
-    /* THE ONE QUEUE (ENG-B14): every arrangement drafted, the rules' or the model's, carries its rank and its day, and only
+    /* THE ONE QUEUE: every arrangement drafted, the rules' or the model's, carries its rank and its day, and only
        as many file as the one count leaves room for, the pen's and Decide's; the rest are held, each saying why. */
     const queue = queueFiling(r.usage, drafts, (d) => r.asked.has(d.key));
     drafts = queue.file;
@@ -3779,7 +3779,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { filed, skipped } = await slashFiling([draft], slashReading());
       return { filed, dropped: said(skipped) };
     }
-    /* WHAT THE RULES COULD NOT DRAW IS ASKED OF THE MODEL ONCE (C14): the key is kept before the ask, so an ask that
+    /* WHAT THE RULES COULD NOT DRAW IS ASKED OF THE MODEL ONCE: the key is kept before the ask, so an ask that
        fails or hangs is never paid for again, and what comes back passed the design check in `describe` before it is
        filed here as the drawing, with what it cost said beside its reason. */
     kernel.setPref(SLASH, DREW_MODEL_PREF, [...asked, draft.key].slice(-200));
@@ -3901,7 +3901,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     [walked.ledger.batch, walked.runs.batch, walked.services.batch].filter((b): b is string => b !== null);
 
   /**
-   * WHAT THE WALK WROTE IS KEPT WHERE IT CAN BE TAKEN BACK (research-audit-20 H1). The night's slices, a slice done by
+   * WHAT THE WALK WROTE IS KEPT WHERE IT CAN BE TAKEN BACK. The night's slices, a slice done by
    * hand and the runs placed by answering one of its questions each keep their batches here, newest first, so
    * `understand({ undo: 'last' })` puts back the last walk without anybody holding its handles, and `walkedBatches` hands
    * them to anything that lists what the walk did. A row's byline finds the same batch on its own event, and Undo there
@@ -3995,7 +3995,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const understandNow = async (dry: boolean, ctx: CallContext): Promise<Result<Understanding>> => {
     const after = understandCursor();
-    /* THE KERNEL'S OWN DRY WALK (research-audit-21 item 13), which rolls back by a savepoint at any depth, and says its
+    /* THE KERNEL'S OWN DRY WALK, which rolls back by a savepoint at any depth, and says its
        first writes in names while they are still there to be named (`planned`). */
     if (dry) {
       let walked: ReturnType<Kernel['backfill']>;
@@ -4027,8 +4027,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * WHO THE RECORD'S OWN PERSON IS, ON A RECORD MADE BEFORE SIGN-UP SAID SO (`loop/research-understanding-judge.md`,
-   * change 1). Sign-up marks the person it meets as `self` (`apps/web/src/routes/start/accept.ts`), and a record made
+   * WHO THE RECORD'S OWN PERSON IS, ON A RECORD MADE BEFORE SIGN-UP SAID SO. Sign-up marks the person it meets as `self` (`apps/web/src/routes/start/accept.ts`), and a record made
    * before that, or before People had the part, has nobody marked, so its owner's own commits meet nobody and his own
    * rows never fold. Once People declares the part (a first-party update brings it), and while nobody is marked:
    *
@@ -4037,8 +4036,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *   filed as one question and accepted at once by the record, so it is one decision in one batch, on Decide as done,
    *   with Undo.
    * - OTHERWISE ONE QUESTION, "Which of these is you?": when nobody holds it, when several do, when the one who does was
-   *   met only where anybody could have written the address (research-audit-23 item 1), and straight away when the
-   *   address is a shared inbox's (`admin@`, `info@`), which no person can hold (item 2). It names at most
+   *   met only where anybody could have written the address, and straight away when the
+   *   address is a shared inbox's (`admin@`, `info@`), which no person can hold. It names at most
    *   `SELF_ASKED_MOST` people, the holder first and then those whose names share a word with the owner's. Asked once;
    *   a pick marks that person in the decision's own batch, so its Undo takes the mark back, and "None of these" marks
    *   nobody.
@@ -4185,8 +4184,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The self question answered: the person picked is marked as the owner, IN THE DECISION'S OWN BATCH (research-audit-23
-   * item 3), so Undo of the pick takes the mark back with the answer and puts the question back on Decide.
+   * The self question answered: the person picked is marked as the owner, IN THE DECISION'S OWN BATCH,
+   * so Undo of the pick takes the mark back with the answer and puts the question back on Decide.
    *
    * THE PEOPLE IT OFFERED ARE KEPT, under its id, after the mark lands: a question an Undo put back is answered again
    * from them, and a second pick marks again. Let go only when the question is, so the night asks it afresh.
@@ -4247,7 +4246,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * An update question answered: a no, or a dismissal, is kept as the version declined, so the next night neither asks
-   * again nor installs it (research-audit-21 item 6). A yes forgets any earlier no, since the module is then in.
+   * again nor installs it. A yes forgets any earlier no, since the module is then in.
    */
   const firstPartyAnswered = (id: string, option: string | null): void => {
     const asked = kernel.prefsOf(FIRST_PARTY_ASKED)[id] as { pack?: unknown; version?: unknown } | undefined;
@@ -4407,7 +4406,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const carryStopped = new Set<string>();
     /* AND WHAT A PAGE THE OWNER CHANGED GOES WITHOUT, asked once for each update that kept one (`keptAsk`). */
     const keptSaid: string[] = [];
-    /* A NO HOLDS FOR THAT VERSION (research-audit-21 item 6): a module the owner said no to at the version this build
+    /* A NO HOLDS FOR THAT VERSION: a module the owner said no to at the version this build
        ships is left out of what the record holds for this check, so it is neither asked again nor put in on a later
        night whose plan happens to lose nothing. A newer version than the one declined is asked about afresh. THE AGENTS
        PACK AND A USE CASE AS MUCH AS THE FIVE: the version is read from `shippedVersion`, which says it for each. */
@@ -4433,7 +4432,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const id = got.value.pack.manifest.pack;
           const from = kernel.packStates().find((p) => p.id === id)?.version ?? null;
           const put = await installHeld(kernel, got.value.pack, got.value.diff, host, planHash, []);
-          /* EACH MODULE'S CARRY IN ITS OWN TRY (research-audit-21 item 7): the install is in, so a carry that throws is
+          /* EACH MODULE'S CARRY IN ITS OWN TRY: the install is in, so a carry that throws is
              said and the night goes on to the next module, keeping every step said so far. */
           if (put.ok)
             try {
@@ -4462,7 +4461,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (put.ok && to !== undefined) kernel.setPref(FIRST_PARTY_ASKED, put.value.id, { pack: q.body.install, version: to });
           return put;
         },
-        /* WHAT THE PERSON TOOK OFF, read from the declaration log (research-audit-21 item 5), so an update never lays it again unasked. */
+        /* WHAT THE PERSON TOOK OFF, read from the declaration log, so an update never lays it again unasked. */
         tookOff: () => takenOff(),
         /* A NO IS KEPT FOR ANY PACK ASKED ABOUT HERE (`propose` above, `firstPartyAnswered`), so the agents pack and a use
            case are asked about as the five are, and not left waiting for the person to update them by hand. */
@@ -4702,7 +4701,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * The whole places a run question is about, as the kernel said them when it asked (`wheres`), and nothing else. NEVER
-   * READ AGAIN FROM ITS LAST NAME (research-audit-22 H2): every unplaced run whose remote or folder ended in `app` was
+   * READ AGAIN FROM ITS LAST NAME: every unplaced run whose remote or folder ended in `app` was
    * once taken for the question's, so a yes about one `app` placed somebody else's on another host with it.
    */
   const placesOf = (one: { wheres?: unknown }): string[] =>
@@ -4723,7 +4722,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * A RUN QUESTION ABOUT SEVERAL WHOLE PLACES, ONE QUESTION PER PLACE (research-audit-23 item 6), each saying how many
+   * A RUN QUESTION ABOUT SEVERAL WHOLE PLACES, ONE QUESTION PER PLACE, each saying how many
    * runs it covers and kept by its place, so one yes never places `sam/lantern` and somebody else's `lantern` together.
    * The kernel keys a run question by its whole place already (`runsSlice`); this holds for a walk that groups places by
    * their last name anyway. A question about one owner's repositories (`run-project:owner:`) is about all of them, and
@@ -4763,7 +4762,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * THE SHOPS MET BY A NAME A CARD TEXT CUT SHORT, AS ONE CHANGE HE SAYS YES OR NO TO (the audit of 25 October, Y2): each
+   * THE SHOPS MET BY A NAME A CARD TEXT CUT SHORT, AS ONE CHANGE HE SAYS YES OR NO TO: each
    * the walk found another shop's whole name for is folded into it, as a merge he presses is (`merged_into`), and each
    * other is retired on the day he answers, kept with its payments. Every row at the version the walk read it at, so a
    * shop changed since is not overwritten and the gate refuses the stale answer. A list that cannot say a shop is
@@ -4822,8 +4821,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       case 'service-project':
       case 'run-project': {
-        /* A RUN'S ONE GUESS IS ASKED TOO, as "Is that Lantern?" with Yes and No (`loop/research-understanding-judge.md`,
-           change 2): the walk places a run only by a whole remote or a sure folder a project lists, so a project listing
+        /* A RUN'S ONE GUESS IS ASKED TOO, as "Is that Lantern?" with Yes and No: the walk places a run only by a whole remote or a sure folder a project lists, so a project listing
            only a bare name is a guess, and dropping it left those runs neither placed nor asked about. */
         if (one.projects.length < (one.kind === 'run-project' ? 1 : 2)) return [];
         const projects: Record<string, string> = {};
@@ -4857,7 +4855,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A choice the nightly walk asked, answered: link the service to the project picked, or place every run in that
    * repository that no project holds yet in it. Anything else is not the walk's, and `Neither` does nothing but answer it.
    *
-   * THE RUNS ARE PLACED AS THE WALK PLACES THEM (research-audit-20 H2): in one transaction and one batch, signed
+   * THE RUNS ARE PLACED AS THE WALK PLACES THEM: in one transaction and one batch, signed
    * `rule:backfill` with the version each was read at, so a throw places none of them, and the owner's Undo takes them all
    * back the walk's way (`methods/undo.ts`), which no run's own row would let the general undo do. ONLY THE PLACES ASKED
    * ABOUT, WHOLE: a run is placed when its remote, or its folder when it has none, is one the question was about
@@ -4899,7 +4897,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (out.ok) wrote += 1;
       }
       /* AND THE REMOTE IS LISTED ON THE PROJECT, in the same batch, so later runs in it place themselves and one Undo
-         takes back the listing with the runs (`loop/research-understanding-judge.md`, change 2). Only a whole remote
+         takes back the listing with the runs. Only a whole remote
          the question was about, as its runs spell it, and never one the project lists already. */
       if (home.repos !== null) {
         const repos = home.repos;
@@ -5120,7 +5118,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      and each closed field's values that have no name. */
   const lintTypesOf = (register: string): Record<string, string> | null => {
     const s = kernel.schemaOf(register);
-    /* A LIST IS DRAWN AS WHAT IT HOLDS: a person's projects, a list of refs, are drawn by their names (C38). */
+    /* A LIST IS DRAWN AS WHAT IT HOLDS: a person's projects, a list of refs, are drawn by their names. */
     return s ? Object.fromEntries(Object.entries(s.fields).map(([k, f]) => [k, f.type === 'list' && typeof (f as { of?: unknown }).of === 'string' ? (f as { of: string }).of : f.type])) : null;
   };
   const lintKeysOf = (register: string): Record<string, string[]> | null => {
@@ -5135,7 +5133,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * A LOOK IS REHEARSED BEFORE IT IS WRITTEN (`compose-rehearse.ts`, ENG-B09): laid over the page as it reads now and
+   * A LOOK IS REHEARSED BEFORE IT IS WRITTEN (`compose-rehearse.ts`): laid over the page as it reads now and
    * read as the page lint reads a page. One that would print a fault is not written and is counted against the basis it
    * was composed from (`look.refused.<page>`); after two for one basis the page is left to its rules until it moves.
    * Answers the sentence for the log, or `null` for a look that may be written.
@@ -5197,7 +5195,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const basis = homeBasis(home, today);
       if (owed(HOME_PAGE, basis, undefined)) due.push({ page: home, basis });
     }
-    /* AND THE PAGES PER ROW, A PROJECT'S AMONG THEM (the thinking scope of 24 October, C4): a project's hero said its
+    /* AND THE PAGES PER ROW, A PROJECT'S AMONG THEM (the thinking scope of 24 October): a project's hero said its
        rules' line alone. Pages somebody wrote first, then a page per row, the row touched last first, all under the same
        `HEADLINE_PAGES_MOST`: a page left out is still owed, and a later ask of the day takes it. */
     const listed = kernel.pages();
@@ -5346,7 +5344,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * THE BRIEFING, WRITTEN BY A MODEL (ENG-B12, `brief-write.ts`): the one place a model is asked for it. The facts are
+   * THE BRIEFING, WRITTEN BY A MODEL (`brief-write.ts`): the one place a model is asked for it. The facts are
    * gathered as somebody who reads the whole record does, which is how its owner reads `briefing`, so what is kept
    * stands for the owner's own basis and for nobody who reads less (`keptBrief`). `briefTick` asks once a part of the
    * day in the record's own zone and again when the facts move, and keeps the answer in Slash's own prefs.
@@ -5361,7 +5359,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   let briefLooked = Number.NEGATIVE_INFINITY;
   const slashBrief = async (nowMs: number, again = false): Promise<string[]> => {
     const model = deps.slashModel;
-    /* A MODEL THAT WRITES THE BRIEF IS NOT ASKED FOR IT: Today greets only (DIRECTION §51) and the agents' briefing passes
+    /* A MODEL THAT WRITES THE BRIEF IS NOT ASKED FOR IT: Today greets only and the agents' briefing passes
        cards alone, so its ask every change bought sentences nobody read. Nor does it fall to the cards' ask below. */
     if (typeof model?.written === 'function') return [];
     if (typeof model?.brief !== 'function') return [];
@@ -5459,7 +5457,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The page's look (`loop/contract-17.md`) as this caller is sent it: the kernel lays it over the blocks as this caller is
+   * The page's look as this caller is sent it: the kernel lays it over the blocks as this caller is
    * shown them (the `reader` `page` hands down), and its one next action may still name a row of a block she is not shown,
    * in words that say what the row is. Kept
    * only when the row it names is drawn in a block she is shown. Slash's next goes out only while what it was written
@@ -5632,7 +5630,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const SLASH_DAILY = 'slash.daily';
   const SLASH_LAST = 'slash.last';
-  /** The day `lintTick` last ran a round (PRF-A04), kept as the record's own pref beside its updates. */
+  /** The day `lintTick` last ran a round, kept as the record's own pref beside its updates. */
   const LINT_HOLDER = 'braindog:signs';
   const LINT_LAST = 'pages-clean.last';
   /** The day the record's words were last walked for `textFaults`, kept apart from the lint's so a deploy day still gets one. */
@@ -5702,12 +5700,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   });
 
   /**
-   * WHAT THE PAGE READ CUTS A BLOCK'S ACTIONS TO (PGS-A17): the caller's level on the record as a write checks it, who
+   * WHAT THE PAGE READ CUTS A BLOCK'S ACTIONS TO: the caller's level on the record as a write checks it, who
    * they are to it (its owner, a member signed in, an agent on a token, a link), and the verbs that run here. A caller
    * with no level on the record reads as `read`; the system reads as `read` and is named nobody.
    */
   /**
-   * WHAT THE RECORD HANDS A PAGE READ MADE FOR A CALLER (PGS-A11): its own sources (`lists`, `pages`, `sources/index.ts`),
+   * WHAT THE RECORD HANDS A PAGE READ MADE FOR A CALLER: its own sources (`lists`, `pages`, `sources/index.ts`),
    * made for this reader, and the name of whoever wrote a line of the log, as this reader may be told it (`namesFor`), or
    * `null`, so an Activity page's who filter says People and never an id.
    */
@@ -5930,7 +5928,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const PART: Refusal = { code: 'FORBIDDEN', fix: 'This is worked out from a whole list, and you are shown only part of that list.', at: 'source' };
 
   /**
-   * A block over a list with a field hidden from this caller (sharing plan §2.7), held back (`PART`) when it names a
+   * A block over a list with a field hidden from this caller, held back (`PART`) when it names a
    * hidden field anywhere it was written (a column, its `where`, an order, a sum, a group, a `{{field}}` in prose) or
    * reads that list any way but as its own rows: a figure is worked out over the hidden field as surely as over the
    * rows. A block that draws rows and names none of them is drawn, its rows masked by the page (`sight.mask`).
@@ -5973,7 +5971,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * words a heading was filled with, a line's buckets), which the kernel still makes over the whole list, so a block
    * holding one is held whole.
    *
-   * `wholeRead` IS HER ROWS ADDED UP (PGS-B05), since the block is drawn again over exactly them, EXCEPT where the
+   * `wholeRead` IS HER ROWS ADDED UP, since the block is drawn again over exactly them, EXCEPT where the
    * whole is read past them: a heat's `of:` and a block with `inherit: true` (`wholePast` in `ownRows`).
    */
   const ROW_SAFE: ReadonlySet<string> = new Set([
@@ -5988,7 +5986,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * A block over a list this caller's grant narrows (`wheres`), drawn again from the rows their `where` admits and no
-   * others (research-audit-30 Medium 2).
+   * others.
    *
    * THE KERNEL DRAWS A PAGE FOR NOBODY IN PARTICULAR, so it reads the list whole, and `heldBy` asked only whether she may
    * read the list at all. Measured (`test/page-wheres-narrowed.test.ts`): a token held to the paper jobs opened the Jobs
@@ -6337,7 +6335,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const exampleTag = (fields: Record<string, unknown>): string[] => {
     const already = Array.isArray(fields.tags) ? (fields.tags as unknown[]).map(String) : [];
-    /* AND A FORMED ROW IS NOT AN EXAMPLE EITHER (USE-B07: no fresh record holds a row tagged example). */
+    /* AND A FORMED ROW IS NOT AN EXAMPLE EITHER (no fresh record holds a row tagged example). */
     return already.includes('example') || already.includes('formed') ? already : [...already, 'example'];
   };
 
@@ -6871,7 +6869,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * how a person in a browser is never a run.
    */
   const writerOf = (ctx: CallContext): Pick<WriteContext, 'actor' | 'principal' | 'session' | 'via'> => {
-    /* AND WHO IS AUDITED FOR IT (sharing plan §2.10): a writer who is not an owner, whose write keeps an `access_via`
+    /* AND WHO IS AUDITED FOR IT: a writer who is not an owner, whose write keeps an `access_via`
        line naming the shares that admitted it. */
     const audited = auditedOf(ctx);
     const via = audited === null ? {} : { via: audited.agent ? { who: audited.who, agent: true } : { who: audited.who } };
@@ -6886,7 +6884,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * WHO A CALL IS AUDITED AS (sharing plan §2.10): a person who is not an owner, or the person an agent acts for when they
+   * WHO A CALL IS AUDITED AS: a person who is not an owner, or the person an agent acts for when they
    * are not one. An owner, the system, a link, a runner and a call seen as somebody (counted as `preview:`) are not.
    */
   const auditedOf = (ctx: CallContext): { who: string; agent: boolean } | null => {
@@ -6929,7 +6927,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const laddered = (ctx: CallContext, register: string, op: 'create' | 'update', patch: unknown, self: Entry | null): { caller: Caller; gate: Gate; held?: true } | null => {
     if (register === SESSION) return null;
     const said = patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? (patch as Record<string, unknown>) : {};
-    /* HIS SETTINGS FIRST, which only narrow (plan §5.1): a write his row does not let through is asked whatever rung the
+    /* HIS SETTINGS FIRST, which only narrow: a write his row does not let through is asked whatever rung the
        agent has earned, and an instruction lifts none of it (§10.3). */
     const asks = settingsAsk(ctx, register, said, self);
     const caller = callerOf(ctx);
@@ -7039,7 +7037,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * A new row's identity hue, chosen once at create (`28 §3.2`, PGS-A06): when its list names an `identity.accent` whole
+   * A new row's identity hue, chosen once at create (`28 §3.2`): when its list names an `identity.accent` whole
    * number field and the row brings none, the theme's `nextAccentHue` of the hues the list already holds, so each new
    * project wears a colour of its own, far from the others for every kind of sight. Written into the fields, so it is
    * frozen with the row and never worked out again; a hue the caller sent stands, `null` too. Rows made before keep the hue drawn
@@ -7066,7 +7064,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const askInstead = (ctx: CallContext, register: string, row: Record<string, unknown>, self: Entry | null, why: string, outside = false): Result<Asked> => {
     const question = askedOf(register, row, self);
-    /* THE SAME WRITE TRIED AGAIN JOINS THE OPEN QUESTION (AGT-C07): its cause is the list, the row (or `new`) and a hash
+    /* THE SAME WRITE TRIED AGAIN JOINS THE OPEN QUESTION: its cause is the list, the row (or `new`) and a hash
        of what it would write, so another patch to the same row is another question. */
     const target = typeof row.at === 'string' ? row.at : 'new';
     const patch = row.patch ?? row;
@@ -7121,7 +7119,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (rows.length === 0) return out;
     const caller = callerOf(ctx);
     if (caller === null) return out;
-    /* THE IDS GO AS ONE JSON ARRAY (AGT-B03): one placeholder a row put a read of more than a hundred over the Durable
+    /* THE IDS GO AS ONE JSON ARRAY: one placeholder a row put a read of more than a hundred over the Durable
        Object's limit on bound values, so an agent's `list` of 101 answered INTERNAL. Two values bound at any length. */
     const by = sql.one<{ actor: string }>(
       `SELECT actor FROM event WHERE kind = 'create' AND target IN (SELECT value FROM json_each(?))
@@ -7158,7 +7156,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * A FACT A READ IS WRITTEN FROM, HELD FOR `HELD_MS` WHILE THE RECORD'S VERSION STANDS (W1-D, plan §4.2): `context`,
+   * A FACT A READ IS WRITTEN FROM, HELD FOR `HELD_MS` WHILE THE RECORD'S VERSION STANDS (W1-D): `context`,
    * `boot` and the rest each worked the same facts out again on every call, which on his record was 1.1 s of record time
    * for `context` alone. In this object's memory only, never stored, so a restart costs one slow call. Every write moves
    * the version (`stamp`), so nothing written is missed; what moves without one, a run's heartbeat and the clock, is at
@@ -7319,7 +7317,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const now = clock.now();
     /* UNDER HER GRANT ON THE RUNS AND WITHOUT A RUN KEPT PRIVATE FROM HER, as `list` reads them for her (`kernel.scope`). */
     const rows = heardSince(ctx, LIVE, now, 50);
-    /* THE SAME TREE, NOT THE SAME FOLDER NAME (`sameTree`, AGT-B08): the same machine and repository, and neither run
+    /* THE SAME TREE, NOT THE SAME FOLDER NAME (`sameTree`): the same machine and repository, and neither run
        working for the other. "Same repo" was the folder's name on any machine, so a session on the laptop was warned
        about one on the desktop in a folder of the same name, and about its own helpers. The caller is read from its
        hints, its spoken name included, so its own run and its helpers are never in its tree. */
@@ -7352,7 +7350,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * is the record itself (Slash's nightly look), which reads everything.
    */
   /**
-   * THE OPEN QUESTIONS THAT WAIT ON A READER, the one list every count of them is taken from (scope D9): `boot`'s
+   * THE OPEN QUESTIONS THAT WAIT ON A READER, the one list every count of them is taken from: `boot`'s
    * `counts.decide` and `waits.questions`, the start card's Waiting line, and so `governance`'s `matched`. `null` is the
    * record itself, which reads every one.
    */
@@ -7448,7 +7446,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The open questions `context` sends, each placed as `context-caps.ts` reads a question (`Placed`, AGT-B09): the
+   * The open questions `context` sends, each placed as `context-caps.ts` reads a question (`Placed`): the
    * project of the run that asked it, and the projects of the rows it is about, by their handles, so this project's
    * questions lead and are counted. Held as `waitingFor` holds them; the places are never sent.
    */
@@ -7509,7 +7507,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * The questions a person decided, newest first, each with what was chosen (`choiceOf`) and placed as `placedWaiting`
-   * places an open one, so `decidedHere` says this project's last three (AGT-B09). Held as `waitingFor` holds them.
+   * places an open one, so `decidedHere` says this project's last three. Held as `waitingFor` holds them.
    *
    * A PERSON'S ANSWER ONLY, as the kernel remembers one (`remembered` in `govern.ts`): the newest close of each question,
    * and not one a rule made when its run ended, nor Slash's, nor the asker taking back its own. ONE BOUND QUERY: the
@@ -7557,7 +7555,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /* AND A MERGE ASKED ABOUT SEVERAL ROWS CARRIES EACH OF THEM, with where each was seen (`clusterOf`), so Decide draws one
      card with Merge all, Keep apart and Pick instead of a rowset of patches nobody can read. */
   /* AND THE DECISION CARD'S FACTS (`cardFactsOf`), so /decide/<id> says who asked from which app, what money moves and
-     what changes from what to what, as the queue's card does (`loop/research-audit-19.md` H3). */
+     what changes from what to what, as the queue's card does. */
   const asked = <T>(ctx: CallContext, register: string, row: T): T => {
     if (register !== 'suggestion' || row === null || typeof row !== 'object' || typeof (row as { id?: unknown }).id !== 'string') return row;
     const merge = clusterOf(ctx, row as Record<string, unknown>);
@@ -7854,7 +7852,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          hold it: a token held to the paper jobs read the court jobs' titles and fields off `whatsNew`. */
       if (!row || readable(ctx, row.register) || !seen.admits(row)) return null;
       const title = kernel.register(row.register)?.title;
-      /* AND A LINE ABOUT A FIELD HIDDEN FROM HER IS DROPPED, A CREATE'S `to` LESS THE HIDDEN KEYS (sharing plan §2.7). */
+      /* AND A LINE ABOUT A FIELD HIDDEN FROM HER IS DROPPED, A CREATE'S `to` LESS THE HIDDEN KEYS. */
       return sight.maskLine(ctx, row.register, { ...bare, register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') || null : null });
     }
     if (kind === 'suggestion' || kind === 'decision') {
@@ -7984,7 +7982,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     let walked = 0;
     while (walked < WALK) {
       const batch = kernel.eventsBefore(at, BATCH);
-      /* WHICH ROWS THE BATCH IS ABOUT, AND WHICH SHE IS SHOWN, ASKED ONCE FOR THE BATCH (sharing plan §2.13). */
+      /* WHICH ROWS THE BATCH IS ABOUT, AND WHICH SHE IS SHOWN, ASKED ONCE FOR THE BATCH. */
       const seen = sight.lines(ctx, batch);
       for (const e of batch) {
         if (e.rowid < floor) return done(null);
@@ -8016,7 +8014,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `lineOf`'s own question of every list she holds at a level of its own. A list raised to `write` still reads. Who
    * holds a rowid is `holdsRowids`, which asks this and more.
    *
-   * AND A GRANT NARROWED TO SOME OF A LIST'S THINGS (`wheres`) DOES NOT READ EVERY LIST (research-audit-22 H1). A token
+   * AND A GRANT NARROWED TO SOME OF A LIST'S THINGS (`wheres`) DOES NOT READ EVERY LIST. A token
    * at `read` on the whole record held to one project's rows passed this, and `understandPlan` and the question card
    * named payments, payees and runs from the rest of the record to it. Reading every list is reading all of each.
    */
@@ -8036,7 +8034,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const readsAcross = (ctx: CallContext): boolean =>
     wholeRecord(ctx) &&
     Object.keys(ctx.wheres ?? {}).length === 0 &&
-    /* AND NO FIELD HIDDEN ANYWHERE (sharing plan §2.7): reading every list is reading all of each row of each, so a share
+    /* AND NO FIELD HIDDEN ANYWHERE: reading every list is reading all of each row of each, so a share
        that hides one field switches on every conservative path already built for a narrowed caller. */
     Object.values(ctx.hides ?? {}).every((fields) => fields.length === 0) &&
     Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
@@ -8291,7 +8289,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the number the kernel was asked about, and only that word is rewritten, NOT EVERY NUMBER IN THE SENTENCE.
    */
   /**
-   * MANY ANSWERED THE SAME WAY IN ONE CALL (scope D2): `decide { ids, decide: { option, reason? } }`. One transaction and
+   * MANY ANSWERED THE SAME WAY IN ONE CALL: `decide { ids, decide: { option, reason? } }`. One transaction and
    * one batch, so the record moves once and one Undo (`undo { decision }` on any of them) puts every one back. A member
    * refused is named with its sentence and the rest stay written. Only rowsets and options go in a group: a kind that
    * installs, applies or merges lands its own way, so it is answered on its own.
@@ -8824,7 +8822,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * than whichever row the database happened to return first. Retiring the owner's own look, or uninstalling the pack,
    * drops the row, and the next `boot` answers `null`: the house theme is back.
    *
-   * AND THE PERSON'S OWN `look.theme` PICKS FIRST (PGS-A21, `theme-pick.ts` `themeFor`): `house` is the house look on
+   * AND THE PERSON'S OWN `look.theme` PICKS FIRST (`theme-pick.ts` `themeFor`): `house` is the house look on
    * purpose, an installed theme's id is that theme, and anything else falls back to the rule above.
    */
   const themeInstalled = (ctx: CallContext): { id: string; body: string; checksum: string } | null => {
@@ -8900,7 +8898,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * NOR DOES ONE THEIR GRANT NARROWS (`whereFor`): the query reads every row of a list, so a member who sees only some
    * of its rows would be told the currency of rows held back from them.
    */
-  /* AND EVERY CURRENCY THE RATES PRESET CAN QUOTE, AND ONE MORE (REC-B02). Two were read, so a record in EGP, USD and GBP
+  /* AND EVERY CURRENCY THE RATES PRESET CAN QUOTE, AND ONE MORE. Two were read, so a record in EGP, USD and GBP
      was answered two and the preset quoted one of USD or GBP. 21 is the pack's `RATES_CURRENCIES_MOST` (20,
      `packs/rates-poll/fill.ts`) and one over it, so a record past it is told so; `currency` still reads only one. */
   const drawnIn = (ctx: CallContext): { currency: string | null; money: string[] } => {
@@ -9183,7 +9181,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
 
   /**
-   * The list `meet` writes organisations into and the field playing each of its parts (`loop/contract-17.md`), or
+   * The list `meet` writes organisations into and the field playing each of its parts, or
    * `null`: the kernel's own answer (`kernel.orgsList()`, `orgRole` in `packages/kernel/src/roles.ts`), so this guard
    * and the write it guards can never name two lists. TWO DECLARING LISTS ARE NONE, as for `meets:`, and the list
    * `meet` files people in is never also the organisations.
@@ -9245,7 +9243,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * What the Next lines say beside the open step (`nextLines`): the step itself; else a step taken here that its taker is
-   * still working on, "Claude Code (S815) took this 3 min ago"; else the newest run here that ended, so a session starts
+   * still working on, "Claude Code took this 3 min ago"; else the newest run here that ended, so a session starts
    * knowing where the last one stopped. `here` is the briefing's place; the caller's own run is never any of them. With
    * only older steps open, it says nothing: "Nothing was handed over" would not be true, and they are counted elsewhere.
    */
@@ -9309,7 +9307,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * THE CONTEXT WITH ITS CARD (`card.ts`, AGT-B07), so the start hook, `context` and `braindog context` print one text
+   * THE CONTEXT WITH ITS CARD (`card.ts`), so the start hook, `context` and `braindog context` print one text
    * made here by one set of rules, whatever build of the command sits on the machine. `build` says which command called
    * (its `x-braindog-cli` on this call, else what its key last said) and whether it is older than the oldest the door
    * still works with (`Build.min_cli`), which is the card's last line when it is.
@@ -9352,7 +9350,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind: behindIn(drawn.card) }, reach };
     /* THE OWNER'S OWN `braindog context` KEEPS THE CARD `card.ts` DRAWS, with its More line and its signs. */
     if (key === null) return out;
-    /* AN AGENT'S KEY IS ANSWERED THE PLAN (`context-plan.ts`, plan §3), drawn from the facts this context already holds:
+    /* AN AGENT'S KEY IS ANSWERED THE PLAN (`context-plan.ts`), drawn from the facts this context already holds:
        what stops it, what he told it, what it may do, his brief and its budget, at the depth it asked. ITS CARD IS THE
        PLAN'S, ONE TEXT BYTE FOR BYTE: the start hook prints `card`, `context` over `/mcp` says `plan_card`, and
        `/api/context` answers `card`, so all three are the plan's card and an agent is never told one card at start and
@@ -9480,7 +9478,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * from where its run was. A caller who may not read the projects register stands nowhere in
    * particular: naming the project would name a row of a register it cannot see.
    *
-   * HELD PER CALLER AND PLACE (W1-D, plan §4.1): the same caller with the same hints is answered what it was answered
+   * HELD PER CALLER AND PLACE (W1-D): the same caller with the same hints is answered what it was answered
    * while the record's version stands, for up to `HELD_MS` (`heldFor`), a copy each time so no reader can change it for
    * the next. Which caller is everything the context says of her but the call's own batch and when she last proved who
    * she is, neither of which a briefing reads.
@@ -9539,7 +9537,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * WHAT MOVED FOR THE CALLER'S RUN SINCE A STAMP (`context { since }`, plan §3.4): the instructions for it made, seen,
+   * WHAT MOVED FOR THE CALLER'S RUN SINCE A STAMP (`context { since }`): the instructions for it made, seen,
    * taken, answered or withdrawn since, and what stops it, as the lines to say, or "Nothing new." A session with no run
    * has nothing to have moved.
    */
@@ -9572,7 +9570,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * ONE TASK WHOLE, for `context { task }` (plan §3.1, §4.3): its fields and version, so the update that follows needs no
+   * ONE TASK WHOLE, for `context { task }` (§4.3): its fields and version, so the update that follows needs no
    * `get`, its project by spoken name, and its last three history lines, newest first. A row the caller may not read is
    * answered as a row that is not there.
    */
@@ -9605,7 +9603,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** The briefing worked out now, held by nothing: `briefing` above holds it, and the sign that checks it reads this. */
   const briefingNow = (ctx: CallContext, where: Where = {}): Context => {
     const hints = ctx.session ?? {};
-    /* HOW MUCH IS SENT (AGT-B09): five rows a list unless the caller asked for the full answer, twenty of each. */
+    /* HOW MUCH IS SENT: five rows a list unless the caller asked for the full answer, twenty of each. */
     const format = (hints as { format?: unknown }).format === 'full' ? 'full' : 'brief';
     const token = ctx.principal.kind === 'token';
     const run = ctx.principal.kind === 'token' ? kernel.findRun(hints, ctx.principal.id) : null;
@@ -9662,7 +9660,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       : repo
         ? { field: 'repo', is: repo }
         : null;
-    /* THE STEP LEFT HERE IS AN OBJECT THAT CLOSES (`openHandoffs`, AGT-C05). Of the runs here waiting in `handoff`, the
+    /* THE STEP LEFT HERE IS AN OBJECT THAT CLOSES (`openHandoffs`). Of the runs here waiting in `handoff`, the
        caller's own set aside, the newest under a day old that no later run passed over is the one handed over, and
        the rest are counted as `earlier`. It replaced three reads that handed over the newest step here in any state and
        at any age, so on the owner's record a starting session was told to begin a batch that had shipped hours before. A
@@ -9859,7 +9857,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (fades) learned.push(...rows.map((row) => brief(decl, f.id, row, 'project')), ...inherited.map((row) => brief(decl, f.id, row, 'global')));
     }
 
-    /* THE MANNERS EVERY CLIENT IS TOLD, whatever it was built with (AGT-C05): say what you are doing once you know it,
+    /* THE MANNERS EVERY CLIENT IS TOLD, whatever it was built with: say what you are doing once you know it,
        take the step if it is yours to do, and leave one next step before you stop. */
     const next =
       token && !run
@@ -9874,7 +9872,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        as `topic`, which places its run (`topicRun`). One that said a topic no project is called is told so instead. */
     const ask = token && unplaced && project === null && holder && !readable(ctx, holder.id) ? topicLine(hints.topic) : null;
 
-    /* THIS PROJECT'S QUESTIONS FIRST (AGT-B09), and how many of them there are. */
+    /* THIS PROJECT'S QUESTIONS FIRST, and how many of them there are. */
     const asked = projectWaiting(placedWaiting(ctx), project?.spoken ?? null, ASKED);
     const people = peopleHere(met, format === 'full' ? MET : 5, everyone);
 
@@ -9888,7 +9886,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       next_lines,
       waiting: asked.waiting.map(({ id, question }) => ({ id, question })),
       waiting_here: asked.here,
-      /* WHAT HE ALREADY ANSWERED HERE (AGT-B09), so nobody asks him again. */
+      /* WHAT HE ALREADY ANSWERED HERE, so nobody asks him again. */
       decided: decidedHere(placedDecided(ctx), project?.spoken ?? null, DECIDED, kernel.identity()?.tz ?? 'UTC'),
       registers,
       rules: rulesOf(learned, project?.spoken ?? null),
@@ -9904,7 +9902,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       next,
       ...(ask === null ? {} : { ask }),
     };
-    /* WHAT STOPS IT AND WHAT HE TOLD IT (plan §3.2, sections 0 and 1, never cut), its stamp, and what his settings let
+    /* WHAT STOPS IT AND WHAT HE TOLD IT (sections 0 and 1, never cut), its stamp, and what his settings let
        it do and his brief for it (sections 3 and 4): the facts the context plan ranks the rest under. */
     if (token) {
       const spoken = run ? `${PREFIX}${String(run.seq)}` : null;
@@ -10059,7 +10057,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * A write that would fold one person or organisation into another, or put back or take out one already folded, said as
-   * a refusal, or `null`. ONLY THE DECIDE PATH MERGES (`loop/research-audit-17.md` H2): the write path reads any write
+   * a refusal, or `null`. ONLY THE DECIDE PATH MERGES: the write path reads any write
    * that sets `merged_into` as a merge and points every row that named the folded one at the other, so a plain `update` from
    * anybody with write access merged two people with nobody asked, and could point one at a row that is gone, on another
    * list, or itself. A merge is a question on Decide, filed by `meet` or with `propose`, and Undo on it is how one comes
@@ -10099,7 +10097,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * A key the row being written would carry that already belongs to another live row of its list, said as a refusal
    * naming that row and sending the caller to `meet`, or `null`. ONLY ON THE LISTS PLAYING `meets:` OR `org:`, whose keys
-   * are how one person or organisation is known across every source (`loop/contract-17.md`): a second row under a key
+   * are how one person or organisation is known across every source: a second row under a key
    * one row already holds is the duplicate the understanding layer exists to prevent, and `meet` is the call that adds
    * to the row that has it. The kernel's key table keeps the first holder and lets a row written past this door simply
    * not answer to the key (`entities.ts`), so this door is where the duplicate is stopped.
@@ -10146,7 +10144,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!holder || holder.deleted_at !== null || holder.register !== register || holder.id === self) continue;
       const title = kernel.register(register)?.title;
       const name = title === undefined ? null : text(holder.fields[title]);
-      /* SHOWN ONLY TO SOMEBODY WHO READS ALL OF THE LIST (research-audit-22 M5): a grant narrowed to some of its rows
+      /* SHOWN ONLY TO SOMEBODY WHO READS ALL OF THE LIST: a grant narrowed to some of its rows
          (`wheres`) may not be shown the name of a row outside them. */
       const shown = readable(ctx, register) === null && kernel.scope(ctx, register) === undefined;
       if (ctx.principal.kind === 'person') {
@@ -10167,7 +10165,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * `meet` HELD TO THE ROW (sharing plan §2.6): a meeting the kernel matched onto somebody already there whom this caller
+   * `meet` HELD TO THE ROW: a meeting the kernel matched onto somebody already there whom this caller
    * may not write (outside her rule, private to another, on a list she only adds to) is unwound, so she is never handed
    * their name. Meeting them as if they were not there would add a second row under their key, so it is refused in the
    * words a unique collision gets, which no more proves a row exists than that one does.
@@ -10185,7 +10183,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     unwound(() => kernel.transaction(() => heldMet(ctx, kernel.meet(sent, by) as Result<unknown>)));
 
   /**
-   * AN AGENT'S `meet`, AT ITS RUNG (research-audit-20 H4). What `meet` does on its own stays automatic,
+   * AN AGENT'S `meet`, AT ITS RUNG. What `meet` does on its own stays automatic,
    * since understanding is meant to fill People without asking and every write it makes keeps its Undo: a person or an
    * organisation it adds, the dated line of where they were met, the last day in touch, the run's project, and a merge
    * the kernel's strong rules make. What the agent asserts on top about somebody the record ALREADY holds (a key carried
@@ -10239,7 +10237,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const assertedOn = (ctx: CallContext, met: unknown, mark: number): Asserting['asserted'] | null => {
     const m = (met ?? {}) as { row?: { id?: unknown } | null; created?: unknown; matched_by?: unknown };
-    /* A STRONG FOLD IS READ AS A KEY MATCH IS (research-audit-22 M1): the row folded in was the agent's, and what it
+    /* A STRONG FOLD IS READ AS A KEY MATCH IS: the row folded in was the agent's, and what it
        carried onto the person kept (a key above all) is an assertion about somebody the record already held. */
     if (m.created === true || (m.matched_by !== 'key' && m.matched_by !== 'strong') || typeof m.row?.id !== 'string') return null;
     const row = kernel.get(m.row.id);
@@ -10323,7 +10321,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The kernel's answer to `meet` as the contract says it (`loop/contract-17.md`), with the row by its handle and its
+   * The kernel's answer to `meet` as the contract says it, with the row by its handle and its
    * name, and the question by the handle this caller is handed, never a row's own id.
    *
    * AND THE ANSWER THE KERNEL GAVE BEFORE THE CONTRACT, `{ person, created, linked, merge }`, read into the same shape:
@@ -10349,7 +10347,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             register: at.register,
             id: kernel.nameOf(at.id),
             seq: at.seq,
-            /* IN A NAME, NEVER AN ADDRESS (research-audit-21 item 11): a person added with only an address as their name
+            /* IN A NAME, NEVER AN ADDRESS: a person added with only an address as their name
                is said by the part before its `@`, as the kernel names one it met by an address alone. */
             name: spokenName((title === undefined ? null : text(at.fields[title])) ?? (typeof row?.name === 'string' ? row.name : '')) ?? kernel.nameOf(at.id),
           }
@@ -10490,7 +10488,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return ok({ url: asked, text: read.text, bytes: read.bytes });
   };
 
-  /* ── the audit's reads (sharing plan §2.10) ──────────────────────────── */
+  /* ── the audit's reads ──────────────────────────── */
 
   /**
    * WHAT ONE READ IS COUNTED AS, after it was answered: `list:<id>`, `row:<entry id>` (get, history, backlinks), `search`
@@ -10639,7 +10637,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const { block, note, ...rest } = JSON.parse(d.body) as Record<string, unknown>;
         blocks[d.id] = rest as KindSpec & { title: string; purpose: string };
       }
-      /* WITHOUT THE FIELDS HIDDEN FROM HER (sharing plan §2.7), as `list` reads her filters: a list she is shown in part
+      /* WITHOUT THE FIELDS HIDDEN FROM HER, as `list` reads her filters: a list she is shown in part
          has the fields she is shown, and an order or a state by a hidden one is no order or state of hers. */
       const hidden = sight.hidden(ctx, args.register);
       if (hidden.size === 0) return ok({ ...decl, blocks });
@@ -10795,7 +10793,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not. */
       /* A SWITCHED-OFF ADD-ON'S LIST IS REFUSED NAMING THE ADD-ON (ruling 298), as a write to it is, not "There is no
          register called tasks", which sends a person looking for a list that is only asleep. */
-      /* HER OWN FILTER AND ORDER ARE READ WITHOUT THE FIELDS HIDDEN FROM HER (sharing plan §2.7), so naming one is a
+      /* HER OWN FILTER AND ORDER ARE READ WITHOUT THE FIELDS HIDDEN FROM HER, so naming one is a
          field the list does not have, and the rows come back without them (`sight.mask`). */
       if (args.short !== undefined && args.short !== null && typeof args.short !== 'boolean')
         return no('VALUE_MALFORMED', `short is true or false, and ${JSON.stringify(args.short) ?? String(args.short)} is neither.`, { at: 'short' });
@@ -10840,7 +10838,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (may) return { ok: false as const, refusal: may };
       const who = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : undefined;
       if (who === undefined) return no('FORBIDDEN', 'A row is kept private by a person, signed in.', { at: 'principal' });
-      /* ONLY SOMEBODY WITH A ROLE ON THE RECORD (a `*` row) KEEPS ROWS PRIVATE (sharing plan §2.6): a guest invited to some
+      /* ONLY SOMEBODY WITH A ROLE ON THE RECORD (a `*` row) KEEPS ROWS PRIVATE: a guest invited to some
          lists works in the open there. */
       if ('level' in ctx.principal && ctx.principal.level === null)
         return no('FORBIDDEN', 'Only somebody with a role on the whole record can keep a row private. Ask the owner for one.', { at: 'principal' });
@@ -11112,7 +11110,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              was listed by its title to somebody invited to file rows into it and nothing else. */
           /* AND NEVER A PAGE ABOUT A ROW THEY CANNOT READ, which `seesPage` says why. */
           .filter((p) => seesPage(ctx, p))
-          /* AND NEVER A PAGE WHOSE BLOCKS ARE EVERY ONE HELD FROM THEM (PGS-A01): a page over three lists, one of them
+          /* AND NEVER A PAGE WHOSE BLOCKS ARE EVERY ONE HELD FROM THEM: a page over three lists, one of them
              hers, passes `seesPage`, and when each block it draws reads the other two it opened onto nothing. Somebody
              who reads every list alike is held from no block, so her pages are not drawn to ask. */
           .filter((p) => everyList || !drawnWithheld(ctx, p.slug))
@@ -11335,7 +11333,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * THE RECORD LINTS ITS OWN PAGES (PRF-A04), for a host's tick and never routed: one round over the pages it can draw,
+     * THE RECORD LINTS ITS OWN PAGES, for a host's tick and never routed: one round over the pages it can draw,
      * on its own data, and the sign `pages-clean` filed through the kernel with the findings as its facts. Once a UTC day
      * at most, and the day is kept before the round, as `slashTick` keeps its own, so a round that throws is not retried
      * until tomorrow. Nothing is observed: a page read by the lint is not a page somebody opened.
@@ -11377,7 +11375,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         keysOf: lintKeysOf,
         now: () => Date.now(),
       });
-      /* THE WHOLE ROUND IS KEPT BESIDE THE SIGN (C39): its reading carries six facts, and Settings › Health lists every
+      /* THE WHOLE ROUND IS KEPT BESIDE THE SIGN: its reading carries six facts, and Settings › Health lists every
          finding from this, each with its page's address by its title. */
       const slugs = new Map(kernel.pages().map((p) => [p.title, p.slug] as const));
       kernel.setPref(ROUND_HOLDER, ROUND_KEPT, keptRound(round, clock.now(), (title) => slugs.get(title) ?? null));
@@ -11584,7 +11582,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
          read again, so a value she was never offered narrows nothing either. */
       /* AND BY A LIST HER GRANT NARROWS TO SOME OF ITS ROWS (`wheres`): the values are counted over every row of it. */
-      /* AND BY A FIELD HIDDEN FROM HER ON A LIST IT READS (sharing plan §2.7): its values are what the field holds. */
+      /* AND BY A FIELD HIDDEN FROM HER ON A LIST IT READS: its values are what the field holds. */
       const unseen = (f: PageFilter): boolean =>
         f.reads.some((list) => Object.hasOwn(ctx.wheres ?? {}, list) || (!everyList && readable(ctx, list) !== null) || sight.hidden(ctx, list).has(f.field));
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
@@ -11637,7 +11635,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A PROJECT'S SHAPE, ASKED WITH `shape`, on a page about a project's row (`project-shape.ts`): what its parts draw,
          each its own method's answer to this caller, so the host reads none of it for itself. WHETHER OR NOT THE PAGE
          DECLARES THE PARTS: a page of a use case older than founder 3.3.0 or team 2.25.0 declares none, and the host
-         draws them in their places all the same (the audit of 25 October, Z1). */
+         draws them in their places all the same. */
       const param = (out.value as { param?: { register?: unknown; seq?: unknown } }).param;
       const shape =
         (args.shape === true || args.shape === '1' || args.shape === 'true') && shapeAsks !== null && typeof param?.register === 'string' && typeof param.seq === 'number'
@@ -11739,7 +11737,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (fault) {
         let text = JSON.stringify(fault);
         for (const { back } of renamed) for (const [name, was] of back) text = text.replaceAll(name, was);
-        /* AND NO HIDDEN FIELD AMONG ITS CHOICES (`sight.mask`, sharing plan §2.7). */
+        /* AND NO HIDDEN FIELD AMONG ITS CHOICES (`sight.mask`). */
         return sight.mask(ctx, { ok: false as const, refusal: JSON.parse(text) as typeof fault });
       }
 
@@ -11821,7 +11819,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
       /* A KNOB'S LONGER LENGTHS ARE OFFERED IN A PREVIEW ONLY AS FAR AS A PREVIEW WALKS. The kernel once walked to the
          longest of `horizons:`, so a body opening on 30 days and offering 3,650, or `last`, walked that far under a guard
-         that read 30 (`loop/research-audit-11-13.md` item 1). It now walks unasked to `WALK_UNASKED` at most, two years and
+         that read 30. It now walks unasked to `WALK_UNASKED` at most, two years and
          a day (`walkReach` in `packages/kernel/src/pages.ts`), and further only for a length a reader picks, which a
          preview never passes. That is still past `PREVIEW_HORIZON_MOST`, and refusing such a block refused Money's own
          Cash ahead, which offers two years, in every "As it will look". So the lengths past `PREVIEW_HORIZON_MOST`, and
@@ -12194,7 +12192,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            is a different answer from "none" and the two must never be one value. */
         registers: ctx.registers ?? null,
         may,
-        /* WHAT HIS SETTINGS LET THIS AGENT DO (plan §5.1, §8.2), to read and never to write: `null` for anybody who is no
+        /* WHAT HIS SETTINGS LET THIS AGENT DO (§8.2), to read and never to write: `null` for anybody who is no
            token. */
         effective: effectiveOf(ctx),
       });
@@ -12573,7 +12571,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const said = (args ?? {}) as Record<string, unknown>;
       const wrong = stray(said, HANDOFF);
       if (wrong) return { ok: false, refusal: wrong };
-      /* TAKE AND DROP CLOSE ANOTHER RUN'S STEP (AGT-C05), and each is a call of its own. `take` is an agent's: its run
+      /* TAKE AND DROP CLOSE ANOTHER RUN'S STEP, and each is a call of its own. `take` is an agent's: its run
          picks the step up, the run that left it is done, and the second of two agents racing for one step is refused in
          the kernel's sentence, who took it and when, passed on unchanged. `drop` closes a step that is no longer true,
          with the reason in words, by an agent or by a person from the app. */
@@ -12626,7 +12624,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (typeof said.state === 'string' && !(HANDOFF_STATES as readonly string[]).includes(said.state))
         return no('ENUM_VALUE_UNKNOWN', `state is one of ${HANDOFF_STATES.join(', ')}, or left out.`, { at: 'state', allowed: HANDOFF_STATES });
-      /* A TASK IN HAND, TAKEN OR FINISHED IN THE SAME CALL (plan §4.3): `task` puts it in the run's hand and sets it doing,
+      /* A TASK IN HAND, TAKEN OR FINISHED IN THE SAME CALL: `task` puts it in the run's hand and sets it doing,
          `done` closes it with the note, so a finished task is one call and not three. An agent's, on its own run. */
       if (said.task !== undefined && said.done !== undefined) return no('VALUE_MALFORMED', 'Take a task or finish one, not both in one call.', { at: 'done' });
       const handKey = said.task !== undefined ? 'task' : said.done !== undefined ? 'done' : null;
@@ -12904,7 +12902,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const by = ctx.principal.kind === 'person' ? { ...writerOf(ctx), principal: { kind: 'person' as const } } : writerOf(ctx);
       const sent = { ...met, ...(doubted ? { untrusted: true } : {}) } as never;
       if (caller === null) return tail(meeting(ctx, meetHeld(ctx, sent, by)));
-      /* AN AGENT ON A SUGGEST GRANT ONLY EVER LEAVES A MENTION (research-audit-20 H4): its scope holds every kind at Ask
+      /* AN AGENT ON A SUGGEST GRANT ONLY EVER LEAVES A MENTION: its scope holds every kind at Ask
          (`CEILING`), so nothing it meets is written, and nothing is asked either, since the owner chose for it to suggest. */
       if (CEILING[caller.scope] !== 'quiet') return tail(ok(mentioned(kind, said, caller, null)));
       return tail(metOnLadder(ctx, caller, kind, said, sent, by));
@@ -13048,7 +13046,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A ROW THE BODY NAMES THAT SHE MAY NOT WRITE IS ONE THAT IS NOT THERE, held to her lens (`sight.ts`). */
       const opened = kernel.propose(args, { ...writerOf(ctx), sees: (list, id) => sight.mayWrite(ctx, list, id) });
       const filed = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
-      /* A JOINED QUESTION IS ANSWERED AS A FILED ONE IS (AGT-C07): its name, its card's facts, and the sentence the agent
+      /* A JOINED QUESTION IS ANSWERED AS A FILED ONE IS: its name, its card's facts, and the sentence the agent
          passes on, since an open question already holds this cause (`cause`, the filer's or derived) and nothing new was
          asked. Never landed by this caller's rung or by rule: it is waiting on the person for whoever asked it first. */
       /* A QUESTION ANSWERED FROM MEMORY (govern-47's `remembered`) files nothing, so the ladder and the rules have nothing
@@ -13105,7 +13103,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const run = target && args.decide !== undefined ? ruleAsked(target) : null;
       const answering = run ? answersNot(ctx, run) : null;
       if (answering) return { ok: false as const, refusal: answering };
-      /* A QUESTION HANDED TO SOMEBODY IS HERS OR AN OWNER'S TO ANSWER (USE-A13); put off is anybody's. */
+      /* A QUESTION HANDED TO SOMEBODY IS HERS OR AN OWNER'S TO ANSWER; put off is anybody's. */
       const handed = args.defer === undefined ? kernel.deciderFault(String(args.id), actorOf(ctx), ctx.principal.kind === 'person' && ctx.principal.level === 'owner') : null;
       if (handed !== null) return no('FORBIDDEN', handed, { at: 'id' });
       /* NO VERDICT IS A MISSING ANSWER, NOT A BAD ONE. With none of the three it fell through to the
@@ -13120,8 +13118,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A MERGE IS ANSWERED IN THE CARD'S WORDS (`mergeAnswer`): Merge all, Keep apart, or one candidate picked. */
       /* AND IN PART BY PLACE, with what the kept one gains worked out again for the ones picked. The rowset's patch on the
          kept row carries every candidate's handles at once, so rows that took some folds and not others handed the kept
-         person what the ones left apart knew, or left what the picked one knew on a deleted row
-         (`loop/research-audit-17.md` M3). `rows` is read as the candidates it names, as `pick:<row>` is one. */
+         person what the ones left apart knew, or left what the picked one knew on a deleted row.
+        `rows` is read as the candidates it names, as `pick:<row>` is one. */
       const picking = (args.decide as { rows?: unknown } | undefined)?.rows;
       const merging =
         args.decide && typeof args.decide.option === 'string'
@@ -13132,7 +13130,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (merging !== null && 'code' in merging) return { ok: false as const, refusal: merging };
       if (merging === null && picking !== undefined && target && foldsOf(target as Record<string, unknown>) !== null)
         return no('VALUE_MALFORMED', 'A merge is answered as Merge all, Keep apart, or the ones that are the same picked by their rows.', { at: 'rows' });
-      /* AN ARRANGEMENT IS ACCEPTED IN PART BY THE PARTS IT NAMES (REC-A06), each by the id the question files on it; the
+      /* AN ARRANGEMENT IS ACCEPTED IN PART BY THE PARTS IT NAMES, each by the id the question files on it; the
          kernel takes those and keeps the rest open as the same question. None named is the whole of it, as before. */
       const parts = (args.decide as { parts?: unknown } | undefined)?.parts;
       if (parts !== undefined && (!Array.isArray(parts) || !parts.every((x) => typeof x === 'string' && x.length > 0)))
@@ -13247,7 +13245,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!landed.ok) return tail(landed);
         return tail(settledAs(ctx, args.id, out));
       }
-      /* A LOOK PICK (ENG-B20) SETS HIS OWN look.theme, checked again against the themes installed now. */
+      /* A LOOK PICK SETS HIS OWN look.theme, checked again against the themes installed now. */
       const look = out.ok && out.value.apply?.kind === 'settings' ? lookLanding(out.value.apply.body, kernel.declarations().filter((d) => d.kind === 'theme').map((d) => d.id)) : null;
       if (out.ok && look !== null) {
         if (!look.ok) {
@@ -13384,7 +13382,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * Set this record up in one call (USE-B04): `{ usecase?, alongside?, packs?, settings?, voice?, names?, me?, rows?,
+     * Set this record up in one call: `{ usecase?, alongside?, packs?, settings?, voice?, names?, me?, rows?,
      * pages?, declarations?, again?, key? }`, an arrangement as `propose` takes one, with the owner themselves (`me`) and
      * what they call their lists (`names`). Answers `{ done, failed: [{ part, label, why }], skipped? }` (`SetupAnswer`).
      *
@@ -13856,7 +13854,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which rule?', { at: 'id' });
-      /* ONE PRESS IS ONE BATCH (SHL-D07): every row the rule fills is written under the one batch minted here, so one
+      /* ONE PRESS IS ONE BATCH: every row the rule fills is written under the one batch minted here, so one
          undo puts the whole press back, where the kernel's default gave each row a batch of its own. */
       const batch = ctx.batch ?? mintBatch();
       const out = kernel.applyRule(args.id, { ...(args.dry === undefined ? {} : { dry: args.dry }), ...(args.limit === undefined ? {} : { limit: args.limit }), batch });
@@ -13971,14 +13969,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             const list = kernel.register(id);
             return list ? [{ id, name: list.name, level: held }] : [];
           }),
-          /* AND WHAT IS SHARED WITH THE ADDRESS, said to them in the share's own words (sharing plan §3.4): "Ada shared
+          /* AND WHAT IS SHARED WITH THE ADDRESS, said to them in the share's own words: "Ada shared
              Pottery with you. You can edit tasks in Pottery until 1 Dec." Names, never ids. `null` when nothing waits. */
           shared: sharedSaid(sql, kernel.catalog(), kernel.sharesWaiting(email), clock.now(), kernel.identity()?.tz ?? undefined),
         });
       }
       const { id, email, name } = args.person;
       const joined = await kernel.acceptInvitation(args.token, { person: id, email, ...(name ? { name } : {}) });
-      /* WHOEVER JOINS IS A PERSON ON THE RECORD (USE-A18), met by the address the host has just verified, as `setup` meets
+      /* WHOEVER JOINS IS A PERSON ON THE RECORD, met by the address the host has just verified, as `setup` meets
          the one who signs up: the entry already holding that address is matched, so the same address joining again makes
          no second one, and one is made when nobody holds it, under the name they gave. Never when no list plays `meets`
          (nobody is put back into a list its owner switched off), and NEVER MARKED AS THE OWNER'S OWN: `self` says whose
@@ -15279,7 +15277,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the row index never held one; the kernel reads the log's newest lines for the words, and `sightOf` holds each to
          what the caller sees, so a comment on a thing she may not see is neither answered nor counted. Asked before the
          empty case below, so the two answers have one shape. */
-      /* A COMMENT FOUND BY A FIGURE SHE IS SHOWN AS "£…" IS NOT FOUND (sharing plan §2.7): to a caller amounts are hidden
+      /* A COMMENT FOUND BY A FIGURE SHE IS SHOWN AS "£…" IS NOT FOUND: to a caller amounts are hidden
          from, a comment is a hit only while what she typed is still in its words with their amounts taken out. */
       const said = String(args.q ?? '').trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
       const masked = sight.amountsHidden(ctx);
@@ -15311,7 +15309,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and where the words found fewer
          than five, the rows nearest the query's own meaning fused in (`near.ts`), each marked `by: 'meaning'`. Before the
          reach below, which only drops hits and so keeps the order it is given. */
-      /* NOT BY MEANING OVER A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER (sharing plan §2.7): a row's vector holds what
+      /* NOT BY MEANING OVER A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER: a row's vector holds what
          that field says, so those hits keep the words' order and no row of the list is fused in. */
       /* AND NOT BY MEANING AT ALL FOR A FIGURE ASKED BY SOMEBODY AMOUNTS ARE HIDDEN FROM: a row's vector holds the amounts
          written in it, so the nearest rows to "923.47" are the ones that say it. */
@@ -15344,7 +15342,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * A door found a field hidden from its caller still in an answer (`firewall`, sharing plan §2.5 item 6), took it off,
+     * A door found a field hidden from its caller still in an answer (`firewall`), took it off,
      * and says so here: fault `lens.firewall`, one per method, so the path that did not mask is named to an operator.
      * Not a route; the doors call it, never a caller.
      */
@@ -15354,7 +15352,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * One tool an agent called at the MCP door and was answered, counted as `mcp:<tool>` for whoever it acts for when
-     * they are not an owner (sharing plan §2.10). Not a route; the door calls it, never a caller.
+     * they are not an owner. Not a route; the door calls it, never a caller.
      */
     toolSeen(args: { tool?: unknown } | undefined, ctx: CallContext): void {
       const tool = typeof args?.tool === 'string' ? args.tool.slice(0, 64) : '';

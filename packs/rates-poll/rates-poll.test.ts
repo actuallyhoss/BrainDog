@@ -325,7 +325,7 @@ test('EXCHANGE RATES ARE POLLED LIKE ANY ADDRESS: approved once, one row of fx a
   sql.close();
 });
 
-/* ── the spec a record fills the file with, from what it holds (REC-B02) ──────────────────────── */
+/* ── the spec a record fills the file with, from what it holds ──────────────────────── */
 
 test('THE ADDRESS A SPEC IS FILLED WITH IS THE FILE’S, with the base at its end', () => {
   /* `RATES_ADDRESS` IS A HAND COPY, because `fill.ts` may not read the pack file. Measured red: with the copy set to

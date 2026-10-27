@@ -1,5 +1,5 @@
 /**
- * `pagesCensus` (PGS-A01): one row a page the caller may open, read off the kernel's `censusOf`, with the dashes counted
+ * `pagesCensus`: one row a page the caller may open, read off the kernel's `censusOf`, with the dashes counted
  * by the page lint and nothing else, cut to what the caller may read, and writing nothing.
  *
  * THE METHOD FILE OVER A REAL KERNEL. The record's own guards are stood in for by two that refuse as they do: a shared

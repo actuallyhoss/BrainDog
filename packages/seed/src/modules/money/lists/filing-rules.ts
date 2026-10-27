@@ -3,7 +3,7 @@
 import type { MoneyRegister } from './shared.ts';
 
 /**
- * A TEXT, HOW MUCH OF IT MUST BE THERE, AND THE CATEGORY IT FILES UNDER, SINCE money-core 3.17.0 (REC-B10).
+ * A TEXT, HOW MUCH OF IT MUST BE THERE, AND THE CATEGORY IT FILES UNDER, SINCE money-core 3.17.0.
  * Categorising rules: prefix, contains, regex, ranked, with a dry run.
  *
  * A LIST OF ITS OWN, AND IT WAS ONE FIELD ON A CATEGORY. A category held one "Matches", so a shop a bank writes two

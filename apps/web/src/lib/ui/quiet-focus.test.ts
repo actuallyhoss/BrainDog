@@ -1,6 +1,5 @@
 /**
- * A PAGE'S NAME FOCUSED AFTER A MOVE DRAWS NO RING ON A COLD OPEN, AND STILL DOES FOR A KEYBOARD (the audit of 25
- * October, Z26: a heavy black box round "Numbers" on a page opened from a link, `list-390-light.png`).
+ * A PAGE'S NAME FOCUSED AFTER A MOVE DRAWS NO RING ON A COLD OPEN, AND STILL DOES FOR A KEYBOARD (a heavy black box round "Numbers" on a page opened from a link, `list-390-light.png`).
  *
  * The browser's own `:focus-visible` cannot be asked from `node --test`, so what is tried is the mark the layout's rule
  * reads (`main h1[data-quiet]:focus`), and the layout's markup is read for the places it is wired.

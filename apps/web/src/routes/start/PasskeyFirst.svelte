@@ -4,7 +4,7 @@
 
   A PERSON WHO SIGNED UP HAS ONLY THEIR MAILBOX. Without a passkey every later sign-in is another email to wait for.
   So the ask comes while they are still holding the device that opened the link, in that device's own name ("Use this
-  iPhone", `passkeyAsk`), and the passkey is named for it as it is made (`platformLabel`, LCH-A04), so Settings lists
+  iPhone", `passkeyAsk`), and the passkey is named for it as it is made (`platformLabel`), so Settings lists
   it by the device and not as "Passkey". One press; "Not now" leaves it for Settings > Recovery.
 
   ASKED ONLY WHEN IT WOULD HELP (`passkeyOffered`): the host offers passkeys, this person has none yet, and this browser

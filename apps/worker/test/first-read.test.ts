@@ -144,7 +144,7 @@ test('THE OFFER IS THE BUILD: every use case, and modules with their lists', () 
   assert.ok(offer.modules.some((m) => m.lists.length > 0 && m.lists.every((l) => l.fields.length > 0)));
 });
 
-/* ── the catalogue's use cases on offer (USE-A16) ───────────────────────────────────────────────────────────── */
+/* ── the catalogue's use cases on offer ───────────────────────────────────────────────────────────── */
 
 const LANDLORD_SAID = 'I rent out six flats and need to keep track of rent and repairs.';
 const LANDLORD_SIGNALS = ['landlord', 'flats', 'flat', 'tenants', 'rent out', 'repairs'];

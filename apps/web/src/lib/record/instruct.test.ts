@@ -188,7 +188,7 @@ test('A RUN DRAWN ALONE, ON TODAY\'S SHEET, SAYS NO PROFILE AND NO BRANCH (Y25)'
 
 test('EVERY ROW SAYS HONESTLY WHAT CAN STOP IT: hooks at its next tool call, or only its next BrainDog call', () => {
   const claude = presenceOf(CLAUDE, ROWS, PROJECTS);
-  /* NO PLUMBING WORDS (Y25): "tool call" and "hooks" said how, where he needs only when. */
+  /* NO PLUMBING WORDS: "tool call" and "hooks" said how, where he needs only when. */
   assert.equal(claude.reach, 'Pause and Stop take effect at its next step.');
   assert.match(claude.confirm.stop, /^Stop Claude on Kiln\? Its next step is refused/u);
   const codex = presenceOf(CODEX, ROWS, PROJECTS);
@@ -333,7 +333,7 @@ test('WHO IS OPEN NOW: the runs that did something, the ones that wrote nothing 
   assert.equal(machineNamed('Teos-MacBook-Pro.local', [pc]), 'MacBook Pro', 'a Mac keeps its own kind');
 });
 
-/* ── an order that names questions (D8) ─────────────────────────────────── */
+/* ── an order that names questions ─────────────────────────────────── */
 
 test('HIS WORDS NAME THE QUESTIONS THE RUN MAY ANSWER, each with his answer, and a "don\'t" names none', () => {
   assert.deepEqual(answersSaid('accept SG243'), [{ question: 'SG243', option: 'accept' }]);

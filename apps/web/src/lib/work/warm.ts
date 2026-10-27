@@ -1,5 +1,5 @@
 /**
- * The Work page read ahead of the press (`loop/research-104.md` 2.5): a pointer resting on a link to Work, a finger
+ * The Work page read ahead of the press: a pointer resting on a link to Work, a finger
  * down on one, or the keyboard reaching one reads the page into `kept.ts`, so the visit draws it at once.
  *
  * ONCE A VERSION. A page already kept at this version, or a read already out for it, asks nothing; a refusal is not

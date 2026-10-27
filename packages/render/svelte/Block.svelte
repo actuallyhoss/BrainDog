@@ -97,7 +97,7 @@
      * as a 44px toggle only when this is passed and as a picture of one otherwise.
      */
     onpath?: ((row: Row, done: boolean) => void) | undefined;
-    /** A list block's table asks for its next rows past the cursor its first page handed out (PGS-A16): the host reads them. */
+    /** A list block's table asks for its next rows past the cursor its first page handed out: the host reads them. */
     onmore?: ((block: Block) => void) | undefined;
     /**
      * THE ROW CURSOR (`../src/cursor.ts`), READS AND NOT WRITES, so a host can walk a page's rows with j/k across its
@@ -120,7 +120,7 @@
     onselect?: ((row: Row, on: boolean) => void) | undefined;
     selected?: readonly string[] | undefined;
     /**
-     * A DECLARED ACTION PRESSED (PGS-A12): the action, the row it sat on, and a switch's or a choice's new value. Handed
+     * A DECLARED ACTION PRESSED: the action, the row it sat on, and a switch's or a choice's new value. Handed
      * to `Actions`, which draws the block's `actions` under it only when this is passed, and with the block's
      * `row_actions` to `List` (each row's end) and to a table's `Table` (a last column); a preview or the mirror passes
      * nothing and gets the block as it always was. The grid's cards and board are a later job.

@@ -11,7 +11,7 @@
   one screen, for a few days, and the entry chunk every screen waits for does not carry it. What each step would find is
   the first run's own sentence, said from the lists this record keeps.
 
-  CONNECT OPENS THE CONNECT SHEET HERE (AGT-A07, "offered by the first run"): the one command and the live row that says
+  CONNECT OPENS THE CONNECT SHEET HERE ("offered by the first run"): the one command and the live row that says
   when the agent has called, so the first agent is connected without leaving Today. The sheet is a chunk of its own,
   loaded with `import()` on the first press as Settings, Agents loads it, so Home carries none of it. Its `listen` is the
   one Settings hands it (`agents/listen.ts`). The step is still a link to Settings, Agents: a press with a modifier, a

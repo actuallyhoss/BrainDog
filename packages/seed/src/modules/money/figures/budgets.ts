@@ -45,7 +45,7 @@ export const BUDGET_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
-  /* HOW MANY BUDGETS ARE SET, WHICH IS WHAT MONEY'S OWN BUDGETS TILE IS DRAWN ON (audit 70 finding 1, budgets-set-73).
+  /* HOW MANY BUDGETS ARE SET, WHICH IS WHAT MONEY'S OWN BUDGETS TILE IS DRAWN ON (budgets-set-73).
      `pages/parts/budget.ts` draws the tile `when: { metric: 'budgets-set', gt: 0 }`, and until now only the Personal use
      case declared that count (`usecases/personal.ts`), so a record with Money and no Personal drew no tile and was told
      nothing. The figure a Money block reads is Money's to declare.

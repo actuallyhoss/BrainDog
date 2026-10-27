@@ -74,7 +74,7 @@ export const VERDICT_REASON_MOST = 500;
  */
 export const RECENT_MOST = 5_000;
 /**
- * The id prefix the Kennel keeps for its own nightly probe (`tools/probe/stranger.mjs`, SHL-B01): a publish whose id
+ * The id prefix the Kennel keeps for its own nightly probe (`tools/probe/stranger.mjs`): a publish whose id
  * begins with it is refused from any publisher but one the operator trusted with `probe` (`kennel review trust <p>
  * --probe`), and even from that one only as an add-on whose file says `unlisted: true`, so a probe never reaches a
  * listing or the count of add-ons from outside.
@@ -288,7 +288,7 @@ function mayTake(listed: CatalogueEntry | null, owner: Publisher | null, identit
   }
   const key = identity.signature.key_id;
   if (signers.includes(key) || rotatedFrom(statements, signers, key) !== null) return ok(true);
-  /* AN ID A PERSON PUBLISHED UNSIGNED MAY BE CLAIMED BY THAT PERSON'S KEY (SHL-B07): the host signed them in beside the
+  /* AN ID A PERSON PUBLISHED UNSIGNED MAY BE CLAIMED BY THAT PERSON'S KEY: the host signed them in beside the
      signature, so the key is theirs. Once signed, the id is pinned to the key by the signature on that version. */
   if (owner?.kind === 'person' && identity.person !== undefined && identity.person === owner.id) return ok(true);
   return pinned === undefined ? theirs : no<true>('SIGNATURE_INVALID', `Earlier versions of ${id} are signed by key ${pinned}, and this one by key ${key}. Sign it with that key.`, { at: 'signature' });

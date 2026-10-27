@@ -495,7 +495,7 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
 });
 
 /**
- * NO STEP ON THE PAGE RESTACKS A STAT, BECAUSE NONE IS NEEDED, AND THIS IS THE MEASUREMENT THAT SAYS SO (PRF-B21).
+ * NO STEP ON THE PAGE RESTACKS A STAT, BECAUSE NONE IS NEEDED, AND THIS IS THE MEASUREMENT THAT SAYS SO.
  *
  * The page carried its own money step, `@container (inline-size < 288px)` in `PageBody.svelte`, which put a stat's
  * figures one to a row under 288px of slot. Then `stat.css` began drawing every stat as rows under 480px of block, and

@@ -1,5 +1,5 @@
 /**
- * The drill's lapse step (`lapsed.mjs`, LCH-C04, RQ-LCH-314) against the Cloud harness: `startCloud` from
+ * The drill's lapse step (`lapsed.mjs`) against the Cloud harness: `startCloud` from
  * `apps/worker/test/cloud-serve.ts`, the Worker's own `fetch` over a real Directory and real records, billing in test
  * mode with a made-up key and signing secret, as `apps/worker/test/billing-packs.test.ts` sets them.
  *

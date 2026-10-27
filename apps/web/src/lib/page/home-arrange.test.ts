@@ -57,7 +57,7 @@ test("Today's body is built from what the shell says the record holds", () => {
   assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false, quiet: true, runs: true });
 });
 
-test("who is working and the projects are Today's blocks where the reader may read the runs and the record keeps projects (C27)", () => {
+test("who is working and the projects are Today's blocks where the reader may read the runs and the record keeps projects", () => {
   const member = { level: 'member', owner: false, person: 'p_2', lists: ['session'], levels: { session: 'read' } } as never;
   assert.equal(holdsOf({ lists: [], pages: [], me: member }, {}).runs, true, 'a reader of the runs is shown who is working');
   const none = { level: 'member', owner: false, person: 'p_2', lists: ['tasks'], levels: { tasks: 'read' } } as never;
@@ -95,7 +95,7 @@ test('the line a task is typed into is named by the tasks list as the record wor
   assert.equal(holdsOf({ ...shell, lists: [] }, { 'tasks:one': 'job' }).one, undefined, 'no tasks list, no word for one');
 });
 
-test('the headings are asked of the voice that speaks, and Needs you keeps its name and its calm line (U1)', () => {
+test('the headings are asked of the voice that speaks, and Needs you keeps its name and its calm line', () => {
   const asked: string[] = [];
   const voice = voiceOf((key: VoiceKey) => (asked.push(key), `said ${key}`));
   assert.equal(voice.comingUp, 'said coming_up');
@@ -117,7 +117,7 @@ test('the previews are the bodies their screens draw, as plain copies', async ()
   assert.equal(await previewedBody('money', holds), null);
 });
 
-/* FINDING 3 OF THE AUDIT OF BATCHES 11 TO 13: the first Done froze Today as the arranger saw it that minute. */
+/* The first Done froze Today as the arranger saw it that minute. */
 
 test('the body a first Done keeps is the house words, not the voice the arranger spoke in that minute', async () => {
   const kept = await previewedBody('today', { tasks: true, adds: true, money: true });
@@ -166,7 +166,7 @@ test('a kept heading is said in the voice that speaks, words somebody wrote are 
     { kind: 'note' },
   ];
   const out = inVoice(blocks, said);
-  /* ONE OF THE FIVE PLACES IS NEVER RENAMED (U1): the tile says Needs you, as the bar and the rail do. */
+  /* ONE OF THE FIVE PLACES IS NEVER RENAMED: the tile says Needs you, as the bar and the rail do. */
   assert.equal(out[0], blocks[0]);
   assert.equal(out[1]?.heading, 'Next at the kiln');
   assert.equal(out[1]?.empty, 'Clear ahead.');

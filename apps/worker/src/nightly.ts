@@ -117,7 +117,7 @@ export type Walk = {
   /** One record's copy. Throwing is how it reports a failure, and the reason is the sentence. */
   snapshot: (record: string) => Promise<{ key: string; bytes: number; rows: number }>;
   /**
-   * The record told its copy was kept, so its own Settings can say when and how large (`copyKept` in the kernel, LCH-C03).
+   * The record told its copy was kept, so its own Settings can say when and how large (`copyKept` in the kernel).
    * ABSENT, THE RECORD IS NOT TOLD, for the reason `expire` is optional.
    */
   kept?: ((record: string, copy: { key: string; bytes: number }) => Promise<void>) | undefined;

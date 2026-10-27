@@ -464,7 +464,7 @@ test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A Q
   assert.equal(k.get(notes)?.fields.project, '', 'a folder holding another project’s says nothing about which');
   assert.equal(k.get(scratch)?.fields.project, '', 'nor on Windows, in whatever case the drive was written');
   assert.equal(k.get(atKiln)?.fields.project, k.nameOf(kiln), 'the folder a project lists, holding none, places');
-  assert.equal(k.get(inKiln)?.fields.project, '', 'a folder further down it is a question (research-audit-22 M4)');
+  assert.equal(k.get(inKiln)?.fields.project, '', 'a folder further down it is a question');
   assert.equal(k.get(remote)?.fields.project, k.nameOf(ids.quarry!), 'a remote places whatever folder it is in');
   assert.equal(k.get(contradicted)?.fields.project, '', 'Brightside’s folder, but Lantern’s repository');
 

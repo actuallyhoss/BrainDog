@@ -178,7 +178,7 @@ export function briefing(attached: Attached, _at: Where, _moved: Moved, o: CardF
  * The Next line alone, for a session that just compacted: the step it is on, without what it already read. `null` when
  * there is no step, and then the hook prints nothing.
  *
- * THE RECORD'S `card_next` (AGT-B07): its Next line alone, scrubbed as the card is, and `null` from it means there is no
+ * THE RECORD'S `card_next`: its Next line alone, scrubbed as the card is, and `null` from it means there is no
  * step. Only a record that drew a card without one has its card's Next line looked for, and a host that drew no card
  * has no Next line to give.
  */

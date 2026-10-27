@@ -436,7 +436,7 @@ test('A HEADLINE IS WHOLE UNITS, AND EGP IS WRITTEN EGP THERE AS EVERYWHERE: "EG
 });
 
 /**
- * A SMALLER AMOUNT ROUNDED IS A DIFFERENT AMOUNT (research audit 14-15a, M6): any headline of a hundred or more lost its
+ * A SMALLER AMOUNT ROUNDED IS A DIFFERENT AMOUNT: any headline of a hundred or more lost its
  * fraction, so £100.49 was "£100" and £999.50 "£1,000", on a tile read against the ledger rows it counts.
  */
 test('A HEADLINE IS ROUNDED ONLY FROM TEN THOUSAND UP, and a bar\'s value is never rounded', () => {

@@ -1,6 +1,6 @@
 <!--
-  One project as a card, the same on Today, on Projects and on the site's desk (the UI pass of 20 October, proj section
-  4, F4, F13, F15): the one card everywhere.
+  One project as a card, the same on Today, on Projects and on the site's desk (proj section
+  4): the one card everywhere.
 
   A TILE ON THE BOARD IN THE PROJECT'S COLOUR, NEVER A STRIPE: `--tile`, radius 16, no border, no shadow and no edge across
   the top. Its colour is its slot (`slotStyle`), worn by the well, the meter, the line and the arrow, and by the fill
@@ -16,13 +16,13 @@
        with no money leads with how far along it is instead ("35%", "of the way"), so no card has a hole;
     C  the meter, "60% · aiming 20 Sep";
     D  the next step after an arrow, two lines at most;
-    E  pinned to the foot, ITS ONE LIVE LINE (`lifeOf`, the audit of 22 October, U5): who is on it now, else who worked on
+    E  pinned to the foot, ITS ONE LIVE LINE (`lifeOf`): who is on it now, else who worked on
        it last from the runs, else how long since its work moved, else since when it has been quiet, with a face or a
        dot in its colour. On a phone too, since on an empty card it is the one thing said.
   No brief: the project's page says what it is in its hero. NO HEIGHT OF ITS OWN, SINCE the same audit: every card was
   248px whatever it held, so a name and a lane sat over 170px of white; a row is as tall as its tallest card.
 
-  NOTHING LIFTS (SF15): under the pointer the fill takes 5% of the project's colour (8% dark) over `--d-state`, pressed
+  NOTHING LIFTS: under the pointer the fill takes 5% of the project's colour (8% dark) over `--d-state`, pressed
   10% (12% dark) over `--d-press`, and the focus is the one ring. A figure that changes while the card is on screen
   washes for a second and a half (`--arrived`) and rolls in (proj F9).
 -->

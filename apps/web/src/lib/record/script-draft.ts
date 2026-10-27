@@ -201,7 +201,7 @@ export function faultsOf(d: Draft): { at: 'title' | 'starts' | 'egress' | 'sourc
 }
 
 /**
- * WHETHER SAVE MAY BE PRESSED (24 October, U-B18): never while it is sending or once filed and waiting, and never while
+ * WHETHER SAVE MAY BE PRESSED (24 October): never while it is sending or once filed and waiting, and never while
  * the code box is empty. It was held only while sending, so an installed script whose code is not kept here opened with
  * an empty box and a live "Save and turn on" that would file a script of no code.
  */

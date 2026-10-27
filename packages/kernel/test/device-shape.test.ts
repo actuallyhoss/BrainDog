@@ -1,5 +1,5 @@
 /**
- * The shape reach (PRF-A13): a standing grant, approved once with six digits, that takes shape copies and reads nothing
+ * The shape reach: a standing grant, approved once with six digits, that takes shape copies and reads nothing
  * else.
  *
  * WHAT "NOTHING ELSE" MEANS HERE. A shape bearer is held as `device_grant.token_hash` on a row of reach `shape`, so the

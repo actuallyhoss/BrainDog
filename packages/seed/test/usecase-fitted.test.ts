@@ -1,5 +1,5 @@
 /**
- * A use case's pack cut to the lists a record holds (`fitted`, USE-B08): over every shipped use case and every mix of the
+ * A use case's pack cut to the lists a record holds (`fitted`): over every shipped use case and every mix of the
  * modules it names, generated here and never listed by hand, no part of the cut document names a list the record will not
  * hold, and the record takes it. What reads a held list stays, a page left empty goes, a part that says
  * `when: { holds }` is left to the plan, and a document asked for with no `holds` is the one it always was.

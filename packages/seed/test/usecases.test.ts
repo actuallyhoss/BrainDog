@@ -244,7 +244,7 @@ test('STUDIES COME BESIDE A PERSONAL RECORD WHEN THE SENTENCE MENTIONS THEM, and
 });
 
 /**
- * USE CASE 6 OF THE VISION, Mariam's sentence word for word (`loop/progress/planner-45.md`): the candle shop is Shop, which
+ * USE CASE 6 OF THE VISION, Mariam's sentence word for word: the candle shop is Shop, which
  * carries Orders and Products, and the freelance design is Small business beside it. Before Shop, "shop" was one of
  * Small business's words and the sentence was proposed a business with no list to write an order in.
  */

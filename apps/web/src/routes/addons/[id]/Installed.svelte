@@ -88,7 +88,7 @@
   /** The pack id the record holds it under, when the address names it otherwise (`founder` for `usecase-founder`). */
   let { packId = null }: { packId?: string | null } = $props();
   const id = $derived(packId ?? String(page.params.id));
-  /* BRAINDOG'S OWN PARTS HAVE NO OFF SWITCH (the add-ons pass of 27 October): Projects, People, Work and Agents are
+  /* BRAINDOG'S OWN PARTS HAVE NO OFF SWITCH: Projects, People, Work and Agents are
      BrainDog, not an add-on to choose, so their page says "Part of BrainDog" and draws no switch. */
   const core = $derived(isCore(id));
 
@@ -213,7 +213,7 @@
   });
 
   /**
-   * WHEN EACH SETTING TAKES HOLD (SHL-A09): at once, or when this add-on next updates, worked out from its own file
+   * WHEN EACH SETTING TAKES HOLD: at once, or when this add-on next updates, worked out from its own file
    * (`takes-hold.ts`). `undefined` while the file is read, and no line is drawn then; `null` when it cannot be read,
    * and the form says the general rule once instead of guessing per setting.
    */
@@ -318,7 +318,7 @@
   }
 
   /**
-   * THE HEAD'S SWITCH SAYS WHAT IT DOES AND ASKS BEFORE IT TURNS AN ADD-ON OFF (UI audit of 22 October, 23). It sat
+   * THE HEAD'S SWITCH SAYS WHAT IT DOES AND ASKS BEFORE IT TURNS AN ADD-ON OFF. It sat
    * unlabelled at the head's end, where it read as a setting of the page, and one press took every list and page of the
    * add-on out of the menu. Off now asks once, in a line under the head, with what it takes away; on is at once.
    */
@@ -365,7 +365,7 @@
   });
 
   const entries = $derived(Object.entries(settings?.config ?? {}));
-  /* THE BLANK LIMITS FOLD, AND WHAT EVERY SETTING SHARES IS SAID ONCE AT THE FOOT (Y10): the Money add-on was fourteen
+  /* THE BLANK LIMITS FOLD, AND WHAT EVERY SETTING SHARES IS SAID ONCE AT THE FOOT: the Money add-on was fourteen
      empty boxes, each with the same two lines under it. */
   const fold = $derived(foldOf(entries, settings?.values ?? {}));
   let unfoldedMore = $state(false);
@@ -451,9 +451,9 @@
 
   /* A LIST OR PAGE THIS TAB HAS NOT READ YET IS ITS ADDRESS PUT IN WORDS, never the bare `money_overview`. */
   const inWords = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1).replaceAll(/[-_]/g, ' ');
-  /* A PAGE IS CALLED WHAT THE RECORD CALLS IT (UI pass of 21 October, P45), the title the nav and the browse page say,
+  /* A PAGE IS CALLED WHAT THE RECORD CALLS IT (P45), the title the nav and the browse page say,
      before the sample's name for it or its address in words. */
-  /* THE PAGES A PERSON OPENS BY NAME (UI audit of 22 October, 23): a page drawn for each row of a list ("Someone",
+  /* THE PAGES A PERSON OPENS BY NAME: a page drawn for each row of a list ("Someone",
      "Relation", titled by the row) is not one of them, so it is not listed as a page the add-on adds. */
   const shownPages = $derived((pack?.pages ?? []).filter((p) => !(pack?.rowPages ?? []).includes(p)));
 
@@ -793,7 +793,7 @@
         </Tile>
       {/if}
     {:else if !(pack && (pack.registers.length || shownPages.length))}
-      <!-- ONLY WHEN IT ADDS NOTHING ELSE (UI pass of 21 October, P45): beside the lists and pages it added, a tile saying
+      <!-- ONLY WHEN IT ADDS NOTHING ELSE (P45): beside the lists and pages it added, a tile saying
            there is nothing to set was a tile of nothing. -->
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
            where somebody comes to find out what they were. Nothing to set is a quiet line under its
@@ -812,7 +812,7 @@
     </div>
     {#if pack && (pack.registers.length || shownPages.length)}
      <div class="adds-cell">
-      <!-- WHAT IT HOLDS AS INSTALLED AND THE STORE SAY IT (E21), "3 lists and 2 pages", never the two summed into one. -->
+      <!-- WHAT IT HOLDS AS INSTALLED AND THE STORE SAY IT, "3 lists and 2 pages", never the two summed into one. -->
       <Tile icon="rows" class="section" data-surface="tile" title={copy.installDiff} meta={describe(moduleHolds(pack)) || undefined}>
         <div class="section-body">
           <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->

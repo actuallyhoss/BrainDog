@@ -1,5 +1,5 @@
 /**
- * A running total and a measured trend are read (REC-B09).
+ * A running total and a measured trend are read.
  *
  * "a cumulative reducer with an optional stop condition, returning the first row that crosses" (P.218), and "compound
  * growth with a band, or flat" (P.221). Both were published shapes refused by name. Held here:

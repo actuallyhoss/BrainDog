@@ -1074,7 +1074,7 @@ const DECLARED: Record<string, Version> = {
       "`metric.budgets-set` goes to Money with its id (`hands.metric.budgets-set.money-core`; budgets-set-73, integrate 73): money-core 3.17.0 declares the count itself, two packs cannot own one figure, and `page.home-personal`'s budget tile reads Money's; one id handed on, none added, and 2.3.1, released at 63423720, stays as it was -> f49f7464dd5d89cc",
     ],
   },
-  /* A NEW HOME OFFERS SOMETHING TO PRESS (USE-A08): 2.4.0 is live since the 1b55e940 deploy, so this is a version and not
+  /* A NEW HOME OFFERS SOMETHING TO PRESS: 2.4.0 is live since the 1b55e940 deploy, so this is a version and not
      a reset. It holds what 2.4.0 held and one count more, `metric.savings-held`, which Home's line naming a first savings
      goal waits on; the link and the two lines are blocks of `page.home-personal`. */
   'personal@2.5.0': {
@@ -1541,18 +1541,18 @@ const DECLARED: Record<string, Version> = {
     declares: '8a82770e8f8c8827',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
-      "Folded into the unreleased 2.6.0 (pinwheel-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
+      "Folded into the unreleased 2.6.0: `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
       "Folded into the unreleased 2.6.0 (estate-numbers-61, REC-C12; integrate 61; a builder wrote it as 2.7.0, and 2.6.0 was never deployed: commit 63423720 holds 2.5.0): Numbers gains `about_service`, the figure `service-numbers` is added, and Server and provider numbers is laid on Renewals (the field is `about_service` and not the builder's `service`, a word the core-names gate would then refuse in two dozen places of the core); `adds.page.estate.5` and `metric.service-numbers` gained -> 8828553c41a19dd5",
-      "Folded into the unreleased 2.6.0 (founder-numbers-edge-64, audit 61 claim 5; integrate 64; commit 63423720 still holds 2.5.0): `metric.service-numbers` and the block it switches on end their ninety days today (`at before tomorrow`), so a reading dated after today is neither counted nor drawn -> f9fa3e40e32ae41d",
-      "Folded into the unreleased 2.6.0 (founder-bound-66; integrate 66; commit 63423720 still holds 2.5.0): `metric.datapoints-7d`, `metric.datapoints-30d`, `metric.datapoints-reported` and `metric.project-numbers-7d` end today (`at before tomorrow`), so a reading dated after today is not a number reported -> 9c75914a4b35aa6a",
-      "Folded into the unreleased 2.6.0 (founder-runway-words-68; integrate 68; commit 63423720 still holds 2.5.0): `metric.datapoints-held` and the dashboard's Latest numbers end today (`at before tomorrow`) -> b7181eced6b7c8f8",
-      "Folded into the unreleased 2.6.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.5.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), so a project with none of its own draws neither card where each listed everybody's -> 63df5982b0d1f484",
-      "Folded into the unreleased 2.6.0 (batch 74, integrate 74; commit 63423720 still holds 2.5.0), one fingerprint for two changes, no id added or taken away: `page.project`'s At a glance cell over `project-owed` is labelled Still to come in, where it said Owed to you (owed-words-74); and `page.home-founder`'s line of what there is ends \"it lasts the year\" when the walk reached its last day above zero, a second lead note drawn on `all:` of one book and `runway-days` carrying `beyond`, the line with the days stepping aside on `beyond: false` (founder-lasts-74, REC-B07) -> dee2ed32ad8a72ee",
+      "Folded into the unreleased 2.6.0: `metric.service-numbers` and the block it switches on end their ninety days today (`at before tomorrow`), so a reading dated after today is neither counted nor drawn -> f9fa3e40e32ae41d",
+      "Folded into the unreleased 2.6.0: `metric.datapoints-7d`, `metric.datapoints-30d`, `metric.datapoints-reported` and `metric.project-numbers-7d` end today (`at before tomorrow`), so a reading dated after today is not a number reported -> 9c75914a4b35aa6a",
+      "Folded into the unreleased 2.6.0: `metric.datapoints-held` and the dashboard's Latest numbers end today (`at before tomorrow`) -> b7181eced6b7c8f8",
+      "Folded into the unreleased 2.6.0: `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), so a project with none of its own draws neither card where each listed everybody's -> 63df5982b0d1f484",
+      "Folded into the unreleased 2.6.0, one fingerprint for two changes, no id added or taken away: `page.project`'s At a glance cell over `project-owed` is labelled Still to come in, where it said Owed to you (owed-words-74); and `page.home-founder`'s line of what there is ends \"it lasts the year\" when the walk reached its last day above zero, a second lead note drawn on `all:` of one book and `runway-days` carrying `beyond`, the line with the days stepping aside on `beyond: false` (founder-lasts-74, REC-B07) -> dee2ed32ad8a72ee",
       "Inside the unreleased 2.6.0 (project-runs-tile-87, AGT-C12 job d and AGT-D12 job 2; integrate 87; commit 63423720 holds 2.5.0): `page.project`'s Agents reads a run of its own that wrote something (`parent is empty, wrote is not 0`), titled by the agent with `doing_said` under it; Keys, Tools and servers and Skills sit under a boxed section Runs on, a third of the tile each where each was a half, with And from everywhere under them (`kind is not action, scope is global`, five); Money by month is the tile's width where it was a half, so no row is left with a hole over the new heading; no id added or taken away -> 86861bc4c9e643e6",
       "Inside the unreleased 2.6.0 (founder-home-quiet-88, ENG-B13 'Seen'; batch 88; commit 63423720 holds 2.5.0, and the task asked for 2.7.0, which this file's own rule refuses for a version never released): `page.home-founder` draws Gone quiet, a table over the source `exceptions` with What, Last seen and Before, six lines at most, straight under what the money is and not drawn while nothing is quiet; it was a seventh tile, so Working now is folded shut under a section Agents at work, held to `runs-working` as its table is; two blocks added, no id added or taken away -> 48875c311c09ba01",
       "Inside the unreleased 2.6.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.5.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 6bb5b7dec0fe3e2b",
       "Inside the unreleased 2.6.0 (seen-section-91, ENG-B03 'Seen: the about answer'; batch 91; commit 63423720 holds 2.5.0): `page.project` ends with a section Where it was seen naming `panel: seen`, after its More about tile, and the same section is laid on People's pages for an organisation and a person after Notes, the last block of their own (`adds.page.relation.6`, `adds.page.someone.7`), last among the additions so those before keep their numbers; three blocks added, nothing taken away -> bd926c3bbb84b916",
-      "Inside the unreleased 2.6.0 (numbers-order-categories-97, batch 97; commit 63423720 holds 2.5.0): `register.datapoints` (Numbers) declares its order, newest first by `at`, the moment a number is for -> 8a82770e8f8c8827",
+      "Inside the unreleased 2.6.0: `register.datapoints` (Numbers) declares its order, newest first by `at`, the moment a number is for -> 8a82770e8f8c8827",
     ],
   },
   /* CUT BESIDE 2.6.0, WHICH THE CATALOGUE PUBLISHES AND FREEZES (0d9bc36e): the file it shares gains `needs`, Projects
@@ -1583,8 +1583,8 @@ const DECLARED: Record<string, Version> = {
   },
   /* NUMBERS HANDED TO PORTFOLIO (the KPI plan of 21 October, K1-A): 2.7.0 IS PUBLISHED AND FROZEN, and a list this pack
      declared goes, so a major step, as 2.0.0 was when organisations went to People. */
-  /* THE AUDIT OF 25 OCTOBER (Y16, Y2). 3.4.0 IS MASTER'S, so a version of its own. No id added or taken away. */
-  /* AUDIT C OF 25 OCTOBER (X7). 3.5.0 IS MASTER'S, so a version of its own beside portfolio 1.27.0. Nothing of its own changed. */
+  /* 3.4.0 IS MASTER'S, so a version of its own. No id added or taken away. */
+  /* AUDIT C OF 25 OCTOBER. 3.5.0 IS MASTER'S, so a version of its own beside portfolio 1.27.0. Nothing of its own changed. */
   'founder@3.7.0': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
@@ -1654,12 +1654,12 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '539dcf5be4dde3ed',
     history: [
-      "The audit of 25 October (Z7): `page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 0ff9d64c783bfafe",
-      "The audit of 25 October (Z20): `page.dashboard` heads its numbers with their age once the newest is past a week, over `metric.datapoints-age`, added, and `page.project` heads its numbers Numbers -> d81b8e572fbeb078",
-      "The audit of 25 October (Y16, Y2): `page.dashboard` draws two charts and lists up to forty, and its Organisations table leaves out a retired one; no id added or taken away -> 539dcf5be4dde3ed",
+      "`page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 0ff9d64c783bfafe",
+      "`page.dashboard` heads its numbers with their age once the newest is past a week, over `metric.datapoints-age`, added, and `page.project` heads its numbers Numbers -> d81b8e572fbeb078",
+      "`page.dashboard` draws two charts and lists up to forty, and its Organisations table leaves out a retired one; no id added or taken away -> 539dcf5be4dde3ed",
     ],
   },
-  /* THE AUDIT OF 25 OCTOBER (Z7, Z20). 3.3.0 IS MASTER'S, so a version of its own. A figure added. */
+  /* 3.3.0 IS MASTER'S, so a version of its own. A figure added. */
   'founder@3.4.0': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
@@ -1681,11 +1681,11 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'd81b8e572fbeb078',
     history: [
-      "The audit of 25 October (Z7): `page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 0ff9d64c783bfafe",
-      "The audit of 25 October (Z20): `page.dashboard` heads its numbers with their age once the newest is past a week, over `metric.datapoints-age`, added, and `page.project` heads its numbers Numbers -> d81b8e572fbeb078",
+      "`page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 0ff9d64c783bfafe",
+      "`page.dashboard` heads its numbers with their age once the newest is past a week, over `metric.datapoints-age`, added, and `page.project` heads its numbers Numbers -> d81b8e572fbeb078",
     ],
   },
-  /* THE PROJECT'S SHAPE AS BLOCKS (C28, C29). 3.2.0 IS LIVE, so a version of its own. */
+  /* THE PROJECT'S SHAPE AS BLOCKS. 3.2.0 IS LIVE, so a version of its own. */
   'founder@3.3.0': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
@@ -1756,7 +1756,7 @@ const DECLARED: Record<string, Version> = {
     declares: 'e844999b8bf97975',
     history: [
       "`register.datapoints` is handed to Portfolio 1.19.0 (`hands.register.datapoints.portfolio`), which declares it under the same id, and its organisation and service, links to People's and Estate's lists, stay this pack's, laid on it (`extends.register.datapoints.organisation`, `extends.register.datapoints.about_service`); `setting.label_datapoints` and `setting.one_datapoints` go with the list and the example number leaves the pack's own seeds for the module examples; every figure, page and addition over Numbers stays -> 0507ca88190ea60f",
-      "Inside the unreleased 3.0.0 (the UI pass of 20 October, P25): `setting.one_obligations` starts from `bill or invoice`, Money's own word for one of Bills and invoices now, where it started from `item` -> 09904ef1a119de83",
+      "Inside the unreleased 3.0.0: `setting.one_obligations` starts from `bill or invoice`, Money's own word for one of Bills and invoices now, where it started from `item` -> 09904ef1a119de83",
       "Inside the unreleased 3.0.0 (the KPI plan of 21 October, K3-C): `page.project` draws Key numbers, a `kpis` block `for: project` the whole width under Waiting on you, the project's own key numbers with their lines, targets and late marks; a block added, no id added or taken away -> e844999b8bf97975",
     ],
   },
@@ -1854,17 +1854,17 @@ const DECLARED: Record<string, Version> = {
     declares: '28ca804962485e64',
     history: [
       "`page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), where it listed everybody's (pinwheel-60, written into 2.20.0 by batch 60 and moved here by integrate 61) -> 11f9e7507ab3a446",
-      "Folded into the unreleased 2.21.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.20.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), where each listed everybody's -> 2cb324c057827f0d",
+      "Folded into the unreleased 2.21.0: `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), where each listed everybody's -> 2cb324c057827f0d",
       "Inside the unreleased 2.21.0 (project-runs-tile-87, AGT-C12 job d and AGT-D12 job 2; integrate 87; commit 63423720 holds 2.20.0): `page.project`'s Agents reads a run of its own that wrote something (`parent is empty, wrote is not 0`), titled by the agent with `doing_said` under it; Keys, Tools and servers and Skills sit under a boxed section Runs on, a third of the tile each where each was a half, with And from everywhere under them (`kind is not action, scope is global`, five); Money by month is the tile's width where it was a half, so no row is left with a hole over the new heading; no id added or taken away -> 89c71e2ca313fac9",
-      "Inside the unreleased 2.21.0 (founder-home-quiet-88; integrate 88; commit 63423720 holds 2.20.0): `page.home-team` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under its line and not drawn while nothing is quiet; a block added, no id added or taken away -> 1d4ea792097cdc3f",
+      "Inside the unreleased 2.21.0: `page.home-team` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under its line and not drawn while nothing is quiet; a block added, no id added or taken away -> 1d4ea792097cdc3f",
       "Inside the unreleased 2.21.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.20.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 5670bdbb3a98c6a6",
-      "Inside the unreleased 2.21.0 (team-cycle-follows-100, USE-A10; batch 100; commit 63423720 holds 2.20.0): the burn-down fills itself, three rules and two scripts (`rule.ticket_done_ticks_plan`, `rule.ticket_reopened_unticks_plan`, `rule.cycle_day_each_morning`, `script.plan_follows_ticket`, `script.cycle_day`) tick a planned line with its ticket and write each morning's cycle day; `page.home-team`'s Bring the team in loses Invite your team and its burn-down's empty line says the record writes the day -> 8a1edbc9f3331acf",
+      "Inside the unreleased 2.21.0: the burn-down fills itself, three rules and two scripts (`rule.ticket_done_ticks_plan`, `rule.ticket_reopened_unticks_plan`, `rule.cycle_day_each_morning`, `script.plan_follows_ticket`, `script.cycle_day`) tick a planned line with its ticket and write each morning's cycle day; `page.home-team`'s Bring the team in loses Invite your team and its burn-down's empty line says the record writes the day -> 8a1edbc9f3331acf",
       "Inside the unreleased 2.21.0 (the KPI plan of 21 October, K3-C; commit 63423720 holds 2.20.0): `page.project` draws Key numbers, a `kpis` block `for: project` the whole width under Waiting on you, the project's own key numbers with their lines, targets and late marks; a block added, no id added or taken away -> 28ca804962485e64",
     ],
   },
-  /* BRING THE TEAM IN SAYS NOTHING OF CLOUD (the audit of 22 October, U-C4). 2.21.0 is live on brain.dog. */
-  /* THE AUDIT OF 25 OCTOBER (Z7). 2.25.0 IS MASTER'S, so a version of its own. No id added or taken away. */
-  /* AUDIT C OF 25 OCTOBER (X7). 2.26.0 IS MASTER'S, so a version of its own beside portfolio 1.27.0. Nothing of its own changed. */
+  /* BRING THE TEAM IN SAYS NOTHING OF CLOUD. 2.21.0 is live on brain.dog. */
+  /* 2.25.0 IS MASTER'S, so a version of its own. No id added or taken away. */
+  /* AUDIT C OF 25 OCTOBER. 2.26.0 IS MASTER'S, so a version of its own beside portfolio 1.27.0. Nothing of its own changed. */
   'team@2.28.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
@@ -1931,10 +1931,10 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '761527ae3a0e3fd6',
     history: [
-      "The audit of 25 October (Z7): `page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 761527ae3a0e3fd6",
+      "`page.project`'s Where it stands reads Last worked off the record's own `project-worked`, the tasks and the runs together, where it read Work's `project-last-worked`, the tasks alone; no id added or taken away -> 761527ae3a0e3fd6",
     ],
   },
-  /* THE PROJECT'S SHAPE AS BLOCKS (C28, C29). 2.24.0 IS LIVE, so a version of its own. */
+  /* THE PROJECT'S SHAPE AS BLOCKS. 2.24.0 IS LIVE, so a version of its own. */
   'team@2.25.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
@@ -2059,7 +2059,7 @@ const DECLARED: Record<string, Version> = {
     history: [
       "The title of `page.home-business` says Today where it said Overview -> dda4e6d26f4e24c5",
       "`setting.voice_fills_with` says money coming in and money going out where it said what you are owed and what you owe (business-words-69) -> 92204fb054af5ecd",
-      "Inside the unreleased 1.7.1 (founder-home-quiet-88; integrate 88; commit 63423720 holds 1.7.0): `page.home-business` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under What you have and not drawn while nothing is quiet; a block added, no id added or taken away -> b4eb9cf32455cdd4",
+      "Inside the unreleased 1.7.1: `page.home-business` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under What you have and not drawn while nothing is quiet; a block added, no id added or taken away -> b4eb9cf32455cdd4",
     ],
   },
   /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. Unreleased, so the
@@ -2099,10 +2099,10 @@ const DECLARED: Record<string, Version> = {
     declares: '68b91519bbf178bd',
     history: [
       'The Orders line counts every other order nothing was paid on beside the one it names (`orders-owed-named.more` in `page.orders`, shop-owed-53-54) -> 4b43574d8fd8259f',
-      "Folded into the unreleased 1.2.0 (owed-words-70-71, audit 69 finding 4; commit 63423720 holds 1.0.0): `page.orders` heads its tile of orders not paid in full Still to come in, as Today's money tile says it, with its empty line, and `setting.voice_fills_with` says the money still to come in -> 68b91519bbf178bd",
+      "Folded into the unreleased 1.2.0: `page.orders` heads its tile of orders not paid in full Still to come in, as Today's money tile says it, with its empty line, and `setting.voice_fills_with` says the money still to come in -> 68b91519bbf178bd",
     ],
   },
-  /* THE ORDERS PAGE'S PLACE ON THE RAIL (places-and-computed-101, SHL-A18). 1.2.0 IS IN THE CATALOGUE, so a version. */
+  /* THE ORDERS PAGE'S PLACE ON THE RAIL (places-and-computed-101). 1.2.0 IS IN THE CATALOGUE, so a version. */
   'shop@1.3.0': {
     holds: `
       metric.orders-30d metric.orders-due-7d metric.orders-late metric.orders-owed metric.orders-owed-named metric.orders-owed-other
@@ -2115,7 +2115,7 @@ const DECLARED: Record<string, Version> = {
       '`page.orders` says its place on the rail, `nav.place` 20, second after Work (places-and-computed-101, SHL-A18; batch 101) -> 3ebf3b51d97bdce0',
     ],
   },
-  /* A BOX TO ADD AN ORDER (audit C of 25 October, X7). 1.3.0 IS MASTER'S, so a version of its own. */
+  /* A BOX TO ADD AN ORDER. 1.3.0 IS MASTER'S, so a version of its own. */
   'shop@1.4.0': {
     holds: `
       metric.orders-30d metric.orders-due-7d metric.orders-late metric.orders-owed metric.orders-owed-named metric.orders-owed-other
@@ -2125,7 +2125,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'db1dc8be3e901825',
     history: [
-      '`page.orders` opens on a capture box for `register.orders` under its line, "Add an order", where a new shop drew nothing to press (audit C of 25 October, X7) -> db1dc8be3e901825',
+      '`page.orders` opens on a capture box for `register.orders` under its line, "Add an order", where a new shop drew nothing to press -> db1dc8be3e901825',
     ],
   },
   'guide@1.7.0': {

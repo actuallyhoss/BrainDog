@@ -1,5 +1,5 @@
 /**
- * The Share sheet's template chips (sharing plan §2.11, §3.1): Accountant, Contractor, Assistant and Reviewer, read from
+ * The Share sheet's template chips: Accountant, Contractor, Assistant and Reviewer, read from
  * the kernel's templates (`SHARE_TEMPLATES`) and never written out here, so the rows a chip writes are the ones the
  * record's own templates say.
  *

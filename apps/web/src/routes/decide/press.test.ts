@@ -106,7 +106,7 @@ test('a held answer waits on the window’s timers, called as the window’s, as
   assert.equal(sent, 1, 'a held answer was not sent once when flushed');
 });
 
-test('a hard question keeps its suggestion and loses only Enter (audit 19 M10)', () => {
+test('a hard question keeps its suggestion and loses only Enter', () => {
   assert.equal(acceptKey({ ...options('per seat'), band: 'undo' }), null, 'no key answers what is hard to undo');
   /* NOR AN ANSWER THAT IS ITSELF THE HARD ONE, on a question whose band is only a call (batch 64): suggested, it loses
      Enter; a safe suggestion beside it keeps Enter. */
@@ -176,7 +176,7 @@ test('the money accepting writes is summed in each currency and never across two
     registers,
   );
   assert.deepEqual(transfer, [{ amount: 600, currency: 'GBP' }]);
-  /* AND AMOUNTS THAT POINT BOTH WAYS NAME ALL THEY MOVE, never the net (audit M5): -£5 and +£3 is £8 written, not £2. */
+  /* AND AMOUNTS THAT POINT BOTH WAYS NAME ALL THEY MOVE, never the net: -£5 and +£3 is £8 written, not £2. */
   const mixed = { register: 'expenses', rows: [{ amount: { amount: -500, currency: 'GBP' } }, { amount: { amount: 300, currency: 'GBP' } }] };
   assert.deepEqual(movesOf(mixed, registers), [{ amount: 800, currency: 'GBP' }]);
   /* AMOUNTS THAT ALL POINT ONE WAY KEEP THEIR NET, sign and all: the net is what moves. */

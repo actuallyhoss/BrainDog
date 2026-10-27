@@ -1,5 +1,5 @@
 /**
- * `pagesCensus` and `checkPaths` (PGS-A01, REC-A12 job 4): routed as READ+ reads that write nothing, beside `pages`,
+ * `pagesCensus` and `checkPaths` (REC-A12 job 4): routed as READ+ reads that write nothing, beside `pages`,
  * handed to the record methods of the same names, and answered `NOT_IN_THIS_BUILD` by a record built before it had
  * them, never a 500.
  *

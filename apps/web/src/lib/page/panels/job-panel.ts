@@ -1,6 +1,6 @@
 /**
  * The jobs for one project, under a section that says `panel: job` on the project's page: the last three runs that
- * name it, where each stands in words, and one line to type what to do with a Start beside it (PGS-C16).
+ * name it, where each stands in words, and one line to type what to do with a Start beside it.
  *
  * THE JOBS SCREEN'S READERS, NOT A COPY OF THEM. The runs come in the record's order and are put in the order Jobs puts
  * them (`ordered`: the live ones on top, then newest first), the kinds are the ones "Run a job" offers

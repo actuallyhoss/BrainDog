@@ -1,5 +1,5 @@
 /**
- * What a scheduled action writes, for the install's approval (SHL-C09: "An agent can propose a scheduled action: the
+ * What a scheduled action writes, for the install's approval ("An agent can propose a scheduled action: the
  * host, the interval, the key by reference, and what it writes", D0b.55 to D0b.59).
  *
  * THE LINE SAID WHERE AND HOW OFTEN AND NOT WHAT LANDS. `CALLS OUT <host> · every 1h · grant "<label>"` is the whole of

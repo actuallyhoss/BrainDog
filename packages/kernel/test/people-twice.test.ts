@@ -1,5 +1,5 @@
 /**
- * Somebody held twice is one question, with no model (AGT-D05, "likely duplicates are offered as a merge").
+ * Somebody held twice is one question, with no model ("likely duplicates are offered as a merge").
  *
  * TWO RULES THAT NEED NOBODY TO ANSWER BUT HIM. Two rows marked as the record's own person are one question, keeping the
  * row that holds the address he signs in with. Two live rows of one name, where at most one holds any address, handle

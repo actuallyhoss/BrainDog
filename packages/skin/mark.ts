@@ -23,7 +23,7 @@ export const MARK = {
 };
 
 /**
- * THE MARK FOR A BROWSER TAB, 16 PIXELS SQUARE (the scope of 24 October, E46): `MARK` drawn at 16 pixels lost the
+ * THE MARK FOR A BROWSER TAB, 16 PIXELS SQUARE (the scope of 24 October): `MARK` drawn at 16 pixels lost the
  * brain's edge and the dog both, a red blob 12 pixels tall with a pink notch in it. This is the same drawing redrawn on
  * the 16-pixel grid it is shown on: the brain's lobes as steps in its edge, the dog's ear, eye and snout each at least
  * a pixel, and nothing between two pixels to blur. A tab at twice the density draws each pixel as four.

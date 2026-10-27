@@ -2,7 +2,7 @@
  * The week offer: a list with a day on its entries, four of them in this week, read on three different weeks and with no
  * page that reads it by the week, is offered a page of its week (`emergent.ts`, `weeksOffered`).
  *
- * WHAT IS HELD: a record 13 days old is offered nothing drawn from use, however much it is used (ENG-B17); at 15 days
+ * WHAT IS HELD: a record 13 days old is offered nothing drawn from use, however much it is used; at 15 days
  * Orders, with four due this week and read on three weeks, is offered one week page, whose sentence says what was seen
  * in the list's own words, which passes the lint keeping it meets and which keeping makes; Not now holds; a list read on
  * two weeks is not offered; a list a page already draws by the week is not offered a second; and on a record made the

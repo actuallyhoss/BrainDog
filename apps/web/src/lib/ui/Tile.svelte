@@ -1,6 +1,6 @@
 <!--
-  A content tile: the one surface that holds a group of rows, a figure, its chart and the line saying what it means
-  (the UI pass of 20 October, 2.A.4). It is the only tile: `Section.svelte`, its older door, went in wave 4 (F11).
+  A content tile: the one surface that holds a group of rows, a figure, its chart and the line saying what it means.
+  It is the only tile: `Section.svelte`, its older door, went in wave 4.
 
   THE HEADING ROW IS THE TILE'S OWN, so every tile on every screen starts the same way: a 28px NEUTRAL well with an 18px
   icon, the title at 15/600 in ink, an optional count at 15/500 in `--ink-3`, and at the far end one link ("All 17",
@@ -44,7 +44,7 @@
   }: {
     /** The glyph in the heading's well. */
     icon?: IconName | undefined;
-    /** Accepted and ignored: a tile's heading well is always neutral (2.A.5). */
+    /** Accepted and ignored: a tile's heading well is always neutral. */
     tone?: 'action' | 'danger' | 'earn' | 'live' | 'warn' | undefined;
     title?: string | undefined;
     /** Beside the title in the quiet ink. A zero is a count too here, since a tile that holds a number says it. */

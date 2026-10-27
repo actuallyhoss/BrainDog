@@ -1,5 +1,5 @@
 /**
- * The palette's way in to a new page (PGS-C30): `New page: Wedding`, read out of the query and made on the press.
+ * The palette's way in to a new page: `New page: Wedding`, read out of the query and made on the press.
  *
  * THE SENTENCE IS THE WHOLE INTERFACE, as it is for the add row (`create.ts`): there is no form behind the row, the box
  * already holds the name. `paging()` reads it, a pure function over the words and who is asking.
@@ -85,7 +85,7 @@ export const rowTitle = (p: Paging): string => (p.title === '' ? label(p.suggest
 export const pageHref = (slug: string): string => `/p/${slug}`;
 
 /**
- * Where a page just made opens: its address, asking for "Describe it" to be open already (ENG-B11), so one sentence
+ * Where a page just made opens: its address, asking for "Describe it" to be open already, so one sentence
  * builds it. The page's own menu reads the mark and takes it out of the address (`page/change-open.ts`), and where
  * Slash has no model there it opens the page as it is. SPELLED HERE, since the palette is in the layout every screen
  * waits for; `change-open.test.ts` holds it to that file's reading.

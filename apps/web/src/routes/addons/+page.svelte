@@ -5,7 +5,7 @@
   `listingsOf` (`$lib/market/listing.ts`), so they are searched and named the same way everywhere. Anything private,
   unlisted or withdrawn is in no listing.
 
-  IN THE ORDER A PERSON SHOPS (the add-ons pass of 27 October): one search over names, what each does and the lists it
+  IN THE ORDER A PERSON SHOPS: one search over names, what each does and the lists it
   brings; then "Suggested for you", at most three, each with its reason from this record's own signs and questions
   (`$lib/market/suggest.ts`); then the starters, with the example setups behind one card; then every add-on on the shelf
   of what it is for (`$lib/market/shelves.ts`), four to a shelf with Show all. BrainDog's own parts (Projects, People,

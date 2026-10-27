@@ -1,5 +1,5 @@
 /**
- * `--unbuilt` and `--built`: the two selections a workflow makes by need, never by name (PRF-B01).
+ * `--unbuilt` and `--built`: the two selections a workflow makes by need, never by name.
  *
  *   node --test tools/gates/test/select.test.mjs
  *

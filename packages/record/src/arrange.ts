@@ -176,7 +176,7 @@ export const forgetHeld = (kernel: Kernel, id: string): void => kernel.setPref(W
  * Whether a plan made again only brings parts that waited, and brings nothing a person has to be asked about.
  *
  * ADDITIVE: the same version over itself, with fewer parts waiting than before and none waiting that did not, so a part
- * that landed is never taken back out (RQ-SHL-454: the add-on that made it true may be off, and the part stays).
+ * that landed is never taken back out (the add-on that made it true may be off, and the part stays).
  * Nothing retired, renamed, retyped or taken over, and no other add-on left broken.
  * AND ONLY WHAT WAITED: every list, page or rule the plan would add or change holds a part that arrives. A setting somebody
  * changed and has not installed yet would otherwise ride in with it and rename a list nothing waited on, with no press.
@@ -200,7 +200,7 @@ function arrivesAlone(pack: Pack, diff: Diff, before: readonly { at: string }[])
 /**
  * THE RULE AN ADD-ON'S PUBLISHER EARNS for a part that arrives: whether it lands with no press. Every publisher earns the
  * same today, since the file is the one the owner already installed at this version and `arrivesAlone` has passed it.
- * The one place a rule by publisher goes when the catalogue says who signed what (SHL-A10).
+ * The one place a rule by publisher goes when the catalogue says who signed what.
  */
 const earnsAlone = (_pack: Pack): boolean => true;
 
@@ -255,7 +255,7 @@ export async function planAgain(d: { kernel: Kernel; installed: () => Installed;
     const order = installOrder([...files.values()].map((f) => ({ id: f.manifest.pack, version: f.manifest.version, requires: f.manifest.requires.packs })), d.installed());
     for (const id of order) {
       /* ONE ADD-ON AT A TIME: a throw from one plan or install leaves that one waiting, and the ones after it are
-         still tried (audit of batch 51, finding 7). */
+         still tried. */
       try {
         const file = files.get(id)!;
         const diff = await plan(file, d.installed());
@@ -366,7 +366,7 @@ const offered = (items: readonly { id: string; title: string }[]): string => {
 
 /**
  * A key an arrangement needs, worked out by the record (REC-A06 step 6): its label, the one host it opens, whether a run by
- * itself uses it, and the parts that need it (F67), so Decide unticks the part a missing key holds and leaves the rest.
+ * itself uses it, and the parts that need it, so Decide unticks the part a missing key holds and leaves the rest.
  */
 export type ArrangeNeed = { label: string; opens: string; scheduled: boolean; parts: string[] };
 
@@ -403,7 +403,7 @@ export function needsOf(approve: readonly string[]): Omit<ArrangeNeed, 'parts'>[
 }
 
 /**
- * THE KEYS IT NEEDS, EACH WITH THE PARTS THAT NEED IT (F67), so Decide unticks the part a missing key holds and leaves the
+ * THE KEYS IT NEEDS, EACH WITH THE PARTS THAT NEED IT, so Decide unticks the part a missing key holds and leaves the
  * rest. `owners` is each part's own lines; a key two parts call out with is both parts'.
  */
 export function needsByPart(approve: readonly string[], owners: ReadonlyMap<string, readonly string[]>): ArrangeNeed[] {
@@ -769,7 +769,7 @@ export function arranger(d: ArrangeDeps) {
    * `kept` is each declaration an update leaves as the owner changed it, with the name the owner gave it. `order` is the
    * packs in the order they install, which is the order a proposal files and `apply` runs. `state` is the record as the
    * last of them leaves it, which an arrangement's pages are linted against. `calls` is each pack's own lines and what
-   * it calls out, so a key and a call are said beside the part that needs them (F67), never only for the whole.
+   * it calls out, so a key and a call are said beside the part that needs them, never only for the whole.
    */
   type Planned = {
     order: string[];
@@ -1001,7 +1001,7 @@ export function arranger(d: ArrangeDeps) {
   type Passed = { part: string; label?: string; why: string };
 
   /**
-   * THE SETTINGS OF AN ARRANGEMENT, EACH UNDER THE ADD-ON THAT KEEPS IT (USE-B04). Three ways in: `{ pack, values }` as
+   * THE SETTINGS OF AN ARRANGEMENT, EACH UNDER THE ADD-ON THAT KEEPS IT. Three ways in: `{ pack, values }` as
    * ever; `{ values }` alone, where each key goes to the add-on that declares it, one this installs before one already
    * on, which is the loop the first run ran in the browser for `home_currency`; and `names`, a list's own word
    * (`{"projects":"Shops"}`, and `"projects:one"` for one of them), kept as the label of the use case that will speak.
@@ -1088,7 +1088,7 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /**
-   * `me`, THE PERSON WHOSE RECORD THIS IS (USE-B04): `{ name, email?, note? }`, the name by the rule a rename keeps
+   * `me`, THE PERSON WHOSE RECORD THIS IS: `{ name, email?, note? }`, the name by the rule a rename keeps
    * (`personNameOf`). ONLY THE OWNER'S OWN SETUP SAYS IT. A proposal that carried it would have an agent say who the
    * owner is, and marking a row as them folds their commits and mail into it, so it is refused there.
    */
@@ -1327,7 +1327,7 @@ export function arranger(d: ArrangeDeps) {
         if (shared.value.doc === null)
           return refuse('PACK_MALFORMED', `${u.title} carries no lists or pages of its own, only the modules it names: ${listed(u.modules)}. Propose installing those instead.`, 'body.file');
         body = { install: packIdOf(u.usecase), doc: shared.value.doc };
-        /* THE MODULES IT CANNOT STAND WITHOUT, when it names them (`needs`, USE-B08), else every module it names. */
+        /* THE MODULES IT CANNOT STAND WITHOUT, when it names them (`needs`), else every module it names. */
         fromFile = { title: u.title, summary: u.summary, modules: [...(u.needs ?? u.modules)] };
       }
       if (typeof body.install !== 'string') return ok(body);
@@ -1491,7 +1491,7 @@ export function arranger(d: ArrangeDeps) {
     /* A SETTING A DECLARATION READS, on an add-on this does not install, plans that add-on again (`replanned`). */
     const again: Body[] = [];
     const calls: string[] = [];
-    /* EACH PART'S OWN LINES AND CALLS, so a key and a call out are said beside the part that makes them (F67). */
+    /* EACH PART'S OWN LINES AND CALLS, so a key and a call out are said beside the part that makes them. */
     const lines = new Map<string, string[]>();
     const heard: Call[] = [];
     const heardSent: Body[] = [];
@@ -1771,7 +1771,7 @@ export function arranger(d: ArrangeDeps) {
    */
   /** The catalogue entry's own step after its pack is in. A throw or a refusal in it leaves the install as it is. */
   /**
-   * THE OWNER, WRITTEN INTO THEIR OWN RECORD (USE-B04), by the rules the first run kept in the browser. With a list that
+   * THE OWNER, WRITTEN INTO THEIR OWN RECORD, by the rules the first run kept in the browser. With a list that
    * plays `meets` on, they are met as anybody is, at their own keyboard; the row is marked as them only when this call
    * made it or found it by their address, never on a name alone, which may be somebody else of that name. A name with no
    * address is only a mention to `meet`, and a People list without the parts `meet` writes refuses it, so they are
@@ -1833,7 +1833,7 @@ export function arranger(d: ArrangeDeps) {
       rows: [],
       declarations: [],
     };
-    /* ALL OR NONE WITHIN WHAT WAS TAKEN (REC-A06). Each write that lands leaves how to take it back, and one that will not
+    /* ALL OR NONE WITHIN WHAT WAS TAKEN. Each write that lands leaves how to take it back, and one that will not
        land takes every earlier one back, newest first, so the question reopens holding the whole take with none of it
        applied, and a second yes starts from where the first did. This said "Already applied, and kept: ..." and kept
        them: an install landed, the settings after it were refused, and the reopened question held an add-on that was
@@ -2074,7 +2074,7 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /**
-   * A RECORD SET UP IN ONE CALL (USE-B04): what the first run asks for, read as an arrangement and applied here, by the
+   * A RECORD SET UP IN ONE CALL: what the first run asks for, read as an arrangement and applied here, by the
    * owner and signed by them. The press was a script in the browser, and a closed tab left the record part made.
    *
    * READ WHOLE, APPLIED PIECE BY PIECE. `prepare` checks all of it against the record as its add-ons leave it, and a
@@ -2202,7 +2202,7 @@ export function arranger(d: ArrangeDeps) {
             let version = Number(r.version);
             let out: ReturnType<Kernel['update']> | null = null;
             /* NO NOTE OF ITS OWN: the feed says a note in the verb's place, and "You Changed by a plan accepted on Decide"
-               named a place that is Needs you now (the audit of 22 October, U-C4). The batch ties the plan's writes. */
+               named a place that is Needs you now. The batch ties the plan's writes. */
             const by = { actor, batch, cascade: false };
             if (Object.keys(patch).length > 0) out = kernel.update(register, r.at, patch as never, { ...by, version });
             if (out?.ok) version = out.value.version;

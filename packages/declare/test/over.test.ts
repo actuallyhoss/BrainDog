@@ -1,5 +1,5 @@
 /**
- * What a use case lays over the add-ons it stands on (SHL-A09): the file's `over`, by add-on id.
+ * What a use case lays over the add-ons it stands on: the file's `over`, by add-on id.
  *
  * IT WAS CODE. A use case renamed a module's lists and set its targets through functions that knew each module, so a
  * stranger's use case could do neither and a stranger's add-on could be laid over by nobody. The file says it now:

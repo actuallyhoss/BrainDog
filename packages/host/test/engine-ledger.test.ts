@@ -5,7 +5,7 @@
  * what the model was asked and what it answered was counted by arithmetic nothing fed. The read built here is what a host
  * hands the record as `engineLedger`, so each case runs it over a ledger `createSlash` built, the way both hosts open one.
  *
- * AND THE MENTIONS (audit 63 claim 5). `understanding.unattached` read 0 on every record, because no host handed the
+ * AND THE MENTIONS. `understanding.unattached` read 0 on every record, because no host handed the
  * mentions: nothing read which of them point at something. `mentionsAttached` is that read, over the record's own
  * `entity_mention` as the kernel's migration 23 makes it, and as ENG-B03 will widen it.
  */
@@ -97,7 +97,7 @@ test('A MENTION AS THE RECORD KEEPS IT TODAY POINTS AT NOTHING: each is read as 
 });
 
 test('A MENTION THAT NAMES ITS HOLDER IS ATTACHED, and one whose attach was undone is not', () => {
-  /* The table once ENG-B03 has widened it (`loop/scope/area-engine-b.md`, decision 2). */
+  /* The table once ENG-B03 has widened it. */
   const sql = openSqlite();
   sql.exec(MENTIONS);
   sql.exec('ALTER TABLE entity_mention ADD COLUMN holder TEXT');

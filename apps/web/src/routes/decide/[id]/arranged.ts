@@ -75,7 +75,7 @@ export type Part =
 export type Take = { id: string; name: string; requires: string[]; keys: string[] };
 
 /**
- * A door or pattern an update takes away while it still files messages (REC-A16): `part` is the part that takes it away,
+ * A door or pattern an update takes away while it still files messages: `part` is the part that takes it away,
  * so Accept asks twice only when that part is taken. `unless` is the part that installs the add-on taking it over, when
  * one does: such a door is said as a move, and asks twice only when its add-on is left unticked and the update is not.
  */
@@ -85,7 +85,7 @@ export type Stop = { part: string; name: string; unless?: string };
  * `takes` only on an arrangement with parts, and `stops` only when a live door goes, with the add-on taking it if one
  * does: both are left out otherwise, so a story without them reads as it always did.
  */
-/** `said` is the whole change as one sentence, for the question's own page (scope E37); `summary` the queue's counts. */
+/** `said` is the whole change as one sentence, for the question's own page; `summary` the queue's counts. */
 export type Arranged = { lead: string; parts: Part[]; summary: string; said?: string; takes?: Take[]; stops?: Stop[] };
 
 /**
@@ -286,7 +286,7 @@ function planned(
         moving.push({ kind: copy.arrangeMoving, title: copy.arrangeMovesTo(title, text(gone.to_name) || moduleName(text(gone.to))), lines: [] });
         continue;
       }
-      /* A DOOR OR PATTERN THAT STILL FILES MESSAGES (REC-A16, `live`, which the record marks for one that took an
+      /* A DOOR OR PATTERN THAT STILL FILES MESSAGES (`live`, which the record marks for one that took an
          arrival in thirty days or holds a live address). An add-on in the catalogue that declares it is added to the
          same question as a second step (`taken_by`), and is named here; with none, messages to it stop being filed, which
          is said on its own and asked twice. */
@@ -465,7 +465,7 @@ function settingsLines(s: Row, installing: readonly string[], ctx: Context, body
 }
 
 /**
- * THE KEYS IT NEEDS, from `needs` when the record worked them out (REC-A06), else from each call out's own keys, one line
+ * THE KEYS IT NEEDS, from `needs` when the record worked them out, else from each call out's own keys, one line
  * a label. A key the record lists is used by a scheduled run unless it says otherwise; a call's key always is, since a
  * call runs with nobody signed in.
  */
@@ -852,7 +852,7 @@ export function partialOf(kind: string, body: Row, fix: string): Partial | null 
 }
 
 /**
- * WHAT APPEARS, AS SENTENCES WHERE IT CAN BE SAID IN ONE (scope E37): a group of names under a verb ("Adds" over "Pages:
+ * WHAT APPEARS, AS SENTENCES WHERE IT CAN BE SAID IN ONE: a group of names under a verb ("Adds" over "Pages:
  * Profiles", "Lists: Profiles, Places") is one sentence a kind, and a line that is already a sentence ("Profiles adds 2
  * fields to Tools: ...") is that sentence. `null` for what has more to show than words: a page drawn, a look's colour,
  * a script's source, a list's own lines; those stay the preview's.

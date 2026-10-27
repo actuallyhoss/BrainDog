@@ -1,5 +1,5 @@
 /**
- * The route row for a person ringing their own devices once (`packages/record/src/methods/push-test.ts`, REC-A15).
+ * The route row for a person ringing their own devices once (`packages/record/src/methods/push-test.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same

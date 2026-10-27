@@ -53,7 +53,7 @@ export type Drawing = Unpictured & {
   keep:
     | { kind: 'page'; declaration: string; body: Record<string, unknown> }
     | { kind: 'row'; list: string; at: string; version: number; field: string }
-    /* THE RULES COULD NOT DRAW IT (C14): the model is asked, about this page, in `drewAsk`'s words. */
+    /* THE RULES COULD NOT DRAW IT: the model is asked, about this page, in `drewAsk`'s words. */
     | { kind: 'model'; page: string; asked: string };
 };
 
@@ -87,7 +87,7 @@ function datedOf(sql: Sql, kernel: Kernel, reads: (list: string) => boolean): Dr
       if (rows < DATED_LEAST) continue;
       const block = shapeBlock({ kind: 'calendar', list: shapeListOf(decl), heading: `${decl.name} by day`, span: 12 });
       const found: Unpictured = { kind: 'dated', page: slug, pageTitle: title, list, listName: decl.name, rows };
-      /* A CALENDAR THE RULES CANNOT DRAW, OR ONE THE DESIGN CHECK REFUSES, IS THE MODEL'S TO DRAW (C14), asked once. */
+      /* A CALENDAR THE RULES CANNOT DRAW, OR ONE THE DESIGN CHECK REFUSES, IS THE MODEL'S TO DRAW, asked once. */
       if (!block || designCheck({ blocks: [block], reads }).length > 0) {
         out.push({ ...found, keep: { kind: 'model', page: slug, asked: drewAsk(found) } });
         continue;
@@ -211,7 +211,7 @@ export function drawingsOf(sql: Sql, kernel: Kernel, reads: (list: string) => bo
 export type DrewDraft = { key: string; question: string; body_kind: 'change' | 'options'; body: Record<string, unknown>; by: 'rules'; cause: string };
 
 /**
- * Today's one drawing when the rules cannot draw it (C14): the words the model is asked, about the page, and what the
+ * Today's one drawing when the rules cannot draw it: the words the model is asked, about the page, and what the
  * question it files says. The caller asks, holds what comes back to the design check, and files it with its cost.
  */
 export type DrewAsk = { key: string; question: string; why: string; asked: string; page: string; cause: string };

@@ -1,5 +1,5 @@
 /**
- * ONE COUNT OF WHAT WAITS (scope D9): his record said "waiting on the owner 28" on an agent's start card beside "30 open"
+ * ONE COUNT OF WHAT WAITS: his record said "waiting on the owner 28" on an agent's start card beside "30 open"
  * and "about 28 cards". On the seed, at one version, `boot`'s `counts.decide` and `waits.questions`, the start card's
  * Waiting line and `governance`'s `matched` say one number for each reader, read from `waitingRows`.
  */

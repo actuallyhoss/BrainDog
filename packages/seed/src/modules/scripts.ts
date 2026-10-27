@@ -1,5 +1,5 @@
 /**
- * Scripts: every installed script and where it stands, as one page every record can open (C33, 24 October).
+ * Scripts: every installed script and where it stands, as one page every record can open (24 October).
  *
  * IT WAS A SCREEN BUILT BY HAND (`apps/web/src/routes/scripts/+page.svelte`, 109 lines over the record's `scripts` read),
  * and is a declared page now, drawn by the one page reader, so a person changes it by saying so and an agent reads and

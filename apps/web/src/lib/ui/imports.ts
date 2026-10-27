@@ -1,5 +1,5 @@
 /**
- * Outside text, as Settings > Agents says it (ENG-A13: untrusted text drops the run to Ask for the
+ * Outside text, as Settings > Agents says it (untrusted text drops the run to Ask for the
  * rest of it): the line under an agent whose run read something from outside the record, and each import with
  * the owner's own answer to whether all of it is his.
  *

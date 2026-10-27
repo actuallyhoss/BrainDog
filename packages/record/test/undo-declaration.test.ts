@@ -122,7 +122,7 @@ test('A STALE HASH PUTS NOTHING BACK, declaration or row', async () => {
   sql.close();
 });
 
-/* WHO MAY PUT A DECLARATION BACK (audit 62, claim 8). `undo` is the record's ADMIN guard before it reads anything: a
+/* WHO MAY PUT A DECLARATION BACK. `undo` is the record's ADMIN guard before it reads anything: a
    token is refused whatever its level, the owner's own agent included, and so is a person below owner. So no agent and
    no colleague can install an earlier page, rule or list through Put back; nothing but the guard holds that, and this
    holds the guard, for the look and for the press alike. */
@@ -145,7 +145,7 @@ test('NO TOKEN AND NO MEMBER BELOW OWNER PUTS A DECLARATION BACK, not even to lo
   sql.close();
 });
 
-/* AND THE STEP REFUSES IT ITSELF, WHATEVER THE DOOR LETS IN (audit 62, claim 8, the part batch 63 left). The test above
+/* AND THE STEP REFUSES IT ITSELF, WHATEVER THE DOOR LETS IN (the part batch 63 left). The test above
    holds the door. This one takes the door away: the method file is built with a guard that admits everybody, as it
    would be the day undo is opened to an agent for its own run, and over the record's own ladder. A put back that
    installs an earlier page is still the owner's alone, for the look and for the press, and a put back of plain writes

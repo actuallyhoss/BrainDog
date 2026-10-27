@@ -1,5 +1,5 @@
 /**
- * The four vitals of the record itself (SHL-A06, and the newest rate's age beside them), each read red on a record planted to fail it, then green once the
+ * The four vitals of the record itself (and the newest rate's age beside them), each read red on a record planted to fail it, then green once the
  * plant is gone, with names and no ids in what a person reads.
  *
  * THE RECORDS ARE BUILT THROUGH THE KERNEL'S OWN VERBS: a list with an amount installed, rows created by a person. The

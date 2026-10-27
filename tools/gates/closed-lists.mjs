@@ -543,7 +543,7 @@ export default function closedLists(
   }
 
   /**
-   * THE CONTROLS NO ROW MAY WEAR AS ITS MARK (PGS-A06), written twice: `CONTROLS` in the renderer's
+   * THE CONTROLS NO ROW MAY WEAR AS ITS MARK, written twice: `CONTROLS` in the renderer's
    * `glyphs/names.ts`, which the app and both drawers read, and `CONTROLS` in the kernel's `marks.ts`, which
    * refuses `MARK_IS_CONTROL` on a write. The kernel imports no renderer, so the copy is the price, and this is
    * what keeps it honest: a control added to one side only is a picture one side draws and the other refuses,

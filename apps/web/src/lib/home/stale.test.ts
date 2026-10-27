@@ -292,7 +292,7 @@ test('THE TILE: a lesson pair is its sentence and one quiet press, held while it
   assert.equal(tile.match(/row\.keep\(\)/gu)?.length, 1);
 });
 
-/* ── What the tidy found, finder by finder, in a fold under the list (AGT-C18) ─ */
+/* ── What the tidy found, finder by finder, in a fold under the list ─ */
 
 test('THE TIDY IS READ BY import() ONCE THE PART DRAWS, never by what every screen loads, and only with a line to sit under', () => {
   assert.match(tile, /import\('\.\/tidy-week\.ts'\)/u);

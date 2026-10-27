@@ -112,7 +112,7 @@ test('MONEY DECLARES THE FOUR, after every figure it already held, and a fresh r
   for (const id of FOUR) assert.equal(METRICS[id]!.format, 'money', `${id} names a currency or is no money figure`);
   /* LAST IN THE DOCUMENT, in this order, so no figure a record already holds moves. Twenty-three came after them by
      batch 74, which took `plan-share-left` out again (plan-lead-one-figure-74), and twenty-four by batch 76, with
-     `book-lasts-until` (book-lasts-until-76), and twenty-seven by the UI pass of 20 October, which put the three of the
+     `book-lasts-until` (book-lasts-until-76), and twenty-seven, which put the three of the
      next unpaid part of each plan last, and twenty-eight by money-core 3.18.0, with the parts late after them, and
      thirty-nine by money-core 3.29.0, with the eleven of the Budgets, Payees and Reports pages. */
   assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES) && !(id in PLAN_PAGE_FIGURES)).slice(-FOUR.length - 39, -39), [...FOUR]);
@@ -216,7 +216,7 @@ test('A CATEGORY IS SHOWN A CHANGE ONLY WHERE THE GATE PASSES, each category ask
   assert.deepEqual(said(r.software), [null, 'one of the two windows is empty']);
   assert.equal(part(got, r.software)?.value, 12_000);
 
-  /* THREE ENTRIES THIS MONTH AGAINST FORTY LAST MONTH IS NO CHANGE EITHER (REC-B19, "Done when"). */
+  /* THREE ENTRIES THIS MONTH AGAINST FORTY LAST MONTH IS NO CHANGE EITHER ("Done when"). */
   const gifts = value<Entry>(r.k.create('categories', { name: 'Gifts', direction: 'out', state: 'live' }, OWNER));
   for (let d = 1; d <= 10; d += 1) for (let n = 0; n < 4; n += 1) spent(r, `2026-08-${String(d).padStart(2, '0')}`, 500, gifts);
   for (const on of ['2026-09-01', '2026-09-02', '2026-09-03']) spent(r, on, 500, gifts);

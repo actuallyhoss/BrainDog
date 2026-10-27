@@ -22,16 +22,16 @@ declares; the page lint reads what a page prints on a real record, and Health sh
 | MCP | the agent app by its name, such as Claude Code or Cursor | A protocol's initials; the person knows the app they use. | `system-word` |
 | snapshot | backup | The Backups page holds copies of the record, and a backup is the word for one. | `system-word` |
 | Spark | Slash | The assistant was renamed Slash, everywhere. | `system-word` |
-| recommended | suggested | Suggested is the one word (RQ-EXP-412). | `system-word` |
-| Submit | a verb and its object, such as Save the bill | A button says what it does to what (RQ-EXP-408). | the source only |
-| OK | Done, or a verb and its object | A button says what it does to what (RQ-EXP-408). | the source only |
-| isn't code | not just code | The product's words are "not just code" (RQ-EXP-417). | `system-word` |
+| recommended | suggested | Suggested is the one word. | `system-word` |
+| Submit | a verb and its object, such as Save the bill | A button says what it does to what. | the source only |
+| OK | Done, or a verb and its object | A button says what it does to what. | the source only |
+| isn't code | not just code | The product's words are "not just code". | `system-word` |
 | an id in a sentence | the thing's name; a run's handle only beside its name | Names, never ids, in anything a person reads. The page lint's raw-id rule holds the same on a drawn page. | the source only |
 | the long dash | a comma, a colon or a new sentence | No em dashes in copy a person reads. A dash alone is the drawn mark for no value and is forgiven. The page lint's em-dash rule holds the same on a drawn page. | the source only |
 
 ## Titles, headings, labels and buttons
 
-A title, a heading, a label or a button is a name, not a sentence (RQ-EXP-409). A key ending in one of those words holds one. Say the same words with no full stop. A body is a sentence and ends in one; an ellipsis promises more and is not a full stop.
+A title, a heading, a label or a button is a name, not a sentence. A key ending in one of those words holds one. Say the same words with no full stop. A body is a sentence and ends in one; an ellipsis promises more and is not a full stop.
 
 ## Buttons of one word
 

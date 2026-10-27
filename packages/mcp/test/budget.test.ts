@@ -57,12 +57,12 @@
  * its run. Its line says no more than when to send it ("No folder: what they work on"), the `start` prompt, which costs
  * the list nothing, says the rest, and `context`'s description lost "else". It measured 2,760.
  *
- * WHAT A TURN PAYS FOR IS WHAT THE MODEL READS, SO A TOOL'S `_meta` IS LEFT OUT (24 October, scope H15). A host reads
+ * WHAT A TURN PAYS FOR IS WHAT THE MODEL READS, SO A TOOL'S `_meta` IS LEFT OUT (24 October). A host reads
  * `_meta` and hands the model the name, title, description, schema and hints: a card's resource address and whether a
  * host loads a tool at once (`anthropic/alwaysLoad`) or finds it by search (`anthropic/searchHint`) never reach a turn.
  * The ceiling did not move; the two cards' `_meta` it used to count came out of the figure, which measured 2,656.
  *
- * THE CARD TEACHES `context`'s `project`, NOT THE LIST (25 October, audit D). A run in no project is told on its card to
+ * THE CARD TEACHES `context`'s `project`, NOT THE LIST (25 October). A run in no project is told on its card to
  * name it to `context`, which is the moment it applies, so `project` stays undescribed; `undo`'s "Refused for anyone
  * else's" went, since its refusal says so, and `list`'s "predicate tree" became "filters". The limits keep "1 to 100",
  * which `mcp.test.ts` reads against the record's ceiling. It measured 2,714 before and 2,703 after.
@@ -159,7 +159,7 @@ test('EVERY TOOL HAS A TITLE A PERSON READS, in plain words that name none of th
    allowed for. A ceiling of their own, so they cannot grow by quietly spending the tools' share. */
 test('the instructions are at or under 400 tokens, and each tool description under 200', () => {
   assert.ok(tokenBudget(INSTRUCTIONS) <= 400, `the instructions are ${tokenBudget(INSTRUCTIONS)} tokens`);
-  /* THE LEARNING LINE SAYS WHEN, and names topic as the skill's name (scope B30): "only if" was read as never. */
+  /* THE LEARNING LINE SAYS WHEN, and names topic as the skill's name: "only if" was read as never. */
   assert.ok(INSTRUCTIONS.split('\n').includes('After a fix, a surprise or a dead end a later session would repeat, create a learning: topic is the skill it bears on, by name; because says how it went wrong.'));
   for (const tool of TOOLS) {
     const tokens = tokenBudget(tool.description);

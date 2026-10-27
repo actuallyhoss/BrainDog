@@ -436,7 +436,7 @@ test('sessionsLive DERIVES stale, quiet, age_s, ran_s AND same_repo, leaves fini
   assert.deepEqual(
     live.map((r) => [r.spoken, r.stale, r.quiet, r.age_s, r.ran_s, r.same_repo]),
     [
-      /* S1 has been silent fifty minutes: it is stale, and `live` leaves a stale run out (AGT-C02). */
+      /* S1 has been silent fifty minutes: it is stale, and `live` leaves a stale run out. */
       ['S2', false, false, 0, 0, false],
     ],
   );
@@ -447,7 +447,7 @@ test('sessionsLive DERIVES stale, quiet, age_s, ran_s AND same_repo, leaves fini
   clock.advance(31 * MIN);
   const later = value<LiveRun[]>(await api.sessionsLive({}, owner)).find((r) => r.spoken === 'S2');
   assert.deepEqual([later?.state, later?.quiet, later?.stale, later?.ran_s], ['active', true, false, 0]);
-  /* And the briefing leaves out S1, eighty-one minutes silent and so stale (AGT-C02): a dead run is not live. */
+  /* And the briefing leaves out S1, eighty-one minutes silent and so stale: a dead run is not live. */
   const ctx = value<Context>(await api.context({}, agent({ ...HERE, client_id: 'c-9' })));
   assert.deepEqual(ctx.live.same_repo.map((r) => [r.spoken, r.quiet]), []);
   sql.close();

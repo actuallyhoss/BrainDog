@@ -1,5 +1,5 @@
 /**
- * A point in a line needs a rate of its own day (REC-B05, job 2).
+ * A point in a line needs a rate of its own day.
  *
  * A ROW IN A SUM TAKES THE NEAREST RATE THERE IS AND SAYS HOW OLD IT IS. A point is drawn as that day's, so a point
  * priced at a rate weeks old, or at a later rate standing in, is a day's figure nobody measured on that day. `snapshot`
@@ -207,7 +207,7 @@ test('AN AMOUNT OF A SUNDAY AND ONE OF A MONDAY ARE PRICED AT FRIDAY’S RATE, t
   sql.close();
 });
 
-/** How many nights the line missed, the figure over it (REC-B01). */
+/** How many nights the line missed, the figure over it. */
 const MISSED: MetricDecl = {
   metric: 'spent-nights-missed',
   name: 'Nights the spending line missed',

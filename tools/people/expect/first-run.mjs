@@ -1,5 +1,5 @@
 /**
- * Use case 6, walked: the seven steps of the onboarding target (settled on 9 October, `loop/progress/planner-45.md`
+ * Use case 6, walked: the seven steps of the onboarding target (settled on 9 October, 
  * "The onboarding target"), for one person, through the doors a browser uses, each said as one line, green or red with
  * what it saw.
  *
@@ -10,7 +10,7 @@
  * Home's own readers; and, the clock moved fifteen days, Orders read on three weeks, the pen's offer for her pattern and
  * the sentence the Orders page opens on. Nothing reaches into the file.
  *
- * TWO HALVES, AS `loop/scope/area-usecases-b.md` USE-B01 ASKS. `expect.*` are pure: each takes what the walk saw and
+ * TWO HALVES, AS  USE-B01 ASKS. `expect.*` are pure: each takes what the walk saw and
  * answers `{ id, pass, saw }`, so the proof area's rig can hand them a snapshot of its own. `walk` is the thin driver
  * that gathers what they read, on a fresh self-host (`selfHost`) or on any host a caller hands in.
  *
@@ -54,7 +54,7 @@ export const STEPS = [
   { n: 7, id: 'offer', name: 'A page for her pattern' },
 ];
 
-/** Words the first run never says (USE-B01): a tour, a checklist, a progress count. */
+/** Words the first run never says: a tour, a checklist, a progress count. */
 const NEVER = /\b(tour|checklist|getting started)\b|\b\d+ of \d+\b/iu;
 
 /** Every string a words object holds, functions called with a stand-in, so a check reads the copy as drawn. */
@@ -86,7 +86,7 @@ export const expect = {
    * promises: free with no card, nothing saved until it is kept, and theirs to export or move. `seen.copy` is every
    * sentence the sign-up screen draws; `seen.question` is its heading and `seen.chips` the five starting points.
    *
-   * THE FIVE ARE NO LONGER DRAWN AS CHIPS (the UI pass of 20 October, first F6, a chip cloud): the screen is the question
+   * THE FIVE ARE NO LONGER DRAWN AS CHIPS (first F6, a chip cloud): the screen is the question
    * and one field, and `STARTING_POINTS` in `apps/web/src/lib/first-run.ts` holds the five as what the reading is held to
    * understand. So the walk hands in those, and her starting point must still be one of exactly five.
    */
@@ -277,7 +277,7 @@ export const expect = {
   },
 
   /**
-   * At most one box to type in and one email field on the first screen (USE-B07). `seen.fields` is each field the
+   * At most one box to type in and one email field on the first screen. `seen.fields` is each field the
    * screen draws, `{ role, type }`, as the rig read it; a field for an email is `type: 'email'`.
    */
   fields(seen) {
@@ -290,7 +290,7 @@ export const expect = {
     return missing.length === 0 ? pass('fields', `${boxes} box and ${emails} email field on the first screen`) : fail('fields', missing.join('; '));
   },
 
-  /** At most four presses from the first screen to Today (USE-B07). `seen.presses` names each, in order; `null` where Today was never reached. */
+  /** At most four presses from the first screen to Today. `seen.presses` names each, in order; `null` where Today was never reached. */
   presses(seen) {
     if (!Array.isArray(seen.presses)) return { id: 'presses', pass: null, saw: `not reached: ${seen.why ?? 'Today never opened'}` };
     const n = seen.presses.length;
@@ -300,7 +300,7 @@ export const expect = {
 
   /**
    * The first reading on screen within thirty seconds of the first key, for a script typing forty words a minute
-   * (USE-B07). `seen.at` is when, in milliseconds from the first key, a reading first named something she typed beyond her
+   * `seen.at` is when, in milliseconds from the first key, a reading first named something she typed beyond her
    * name (`firstReadAt`); `null` where nothing she typed was ever read. With no model on the host (`seen.model` false)
    * that is not measured, as her hard sentence is: the rules read only some languages, and the page asks a model.
    */
@@ -327,7 +327,7 @@ export const CHECKS = [
   { n: 'd', id: 'presses', name: 'Four presses to Today', until: 'USE-B07' },
 ];
 
-/** The friction as numbers (USE-B07). */
+/** The friction as numbers. */
 export const FRICTION = { boxes: 1, emails: 1, presses: 4, firstReadMs: 30_000, wpm: 40 };
 
 /** The roles a person types into. */
@@ -473,7 +473,7 @@ const dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);
 
 /* ── the walk ─────────────────────────────────────────────────────────────────────────────────────────── */
 /**
- * WHY A SIGN-UP CALL WAS REFUSED, AS A REASON AND NEVER AS THE REFUSAL'S KIND ALONE (audit 78 claim 7: a host that
+ * WHY A SIGN-UP CALL WAS REFUSED, AS A REASON AND NEVER AS THE REFUSAL'S KIND ALONE (a host that
  * answers 404 read "sign-up refused: refused"). The host's own sentence where it sent one. Where it sent none, that is
  * said, with what the sign-up page shows a person at that moment (`send` and `makeFree` in its +page.svelte) and the
  * kind kept as the last word.
@@ -843,7 +843,7 @@ export function endOf(results, host) {
  * IT LEAVES WITH 0 ONLY ON A WALK THAT IS NOT RED (`redOf`), AND WITH 1 ON ANYTHING ELSE, a throw among them, which is
  * said in red on the error stream. ITS LAST LINE SAYS HOW MUCH WAS WALKED (`endOf`): 0 with "day 15 not walked" is a
  * hosted run that stopped a step short of the whole. Read through a pipe (`| tail`), the shell answers with the pipe's exit code, not
- * this one: that, and nothing here, was the "exit 0 while red" of audit 75.
+ * this one: that, and nothing here, was the "exit 0 while red" reported once.
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { readFileSync } = await import('node:fs');

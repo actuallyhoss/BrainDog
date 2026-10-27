@@ -1,5 +1,5 @@
 <!--
-  The Share sheet's way in, without the sheet (sharing plan §3.1): the "Share" button a header draws, and the sheet
+  The Share sheet's way in, without the sheet: the "Share" button a header draws, and the sheet
   itself loaded by `import()` the first time it is opened. The sheet, its condition picker and the kernel's sentences
   are a chunk nobody who only reads a list or a page waits for.
 

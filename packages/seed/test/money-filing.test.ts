@@ -86,7 +86,7 @@ test('THE LIST IS DECLARED, and the Ledger says which rule filed an entry withou
   assert.deepEqual(field('filing_rules', 'direction')?.values, ['in', 'out', 'either']);
   assert.deepEqual(field('filing_rules', 'state')?.values, ['on', 'off']);
   assert.equal(field('filing_rules', 'account')?.required, undefined);
-  /* THE FOURTH RUNG ON A CATEGORY TOO, for the one version its "Matches" stays (rules-link-54, item 5). */
+  /* THE FOURTH RUNG ON A CATEGORY TOO, for the one version its "Matches" stays (rules-link-54). */
   assert.deepEqual(field('categories', 'match_by')?.values, ['exact', 'starts', 'contains', 'pattern']);
   assert.equal((field('categories', 'match_by')?.labels as Record<string, string>).pattern, 'A pattern');
   assert.equal(field('transactions', 'filed_by')?.to, 'filing_rules');

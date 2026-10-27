@@ -1,7 +1,7 @@
 /**
  * The kernel schema, migration 39: `entry_made`, the index under a list read in its default order.
  *
- * A LIST THAT DECLARES NO ORDER COMES BACK NEWEST MADE FIRST (PGS-B06): `ORDER BY created_at DESC, id DESC` in `list`.
+ * A LIST THAT DECLARES NO ORDER COMES BACK NEWEST MADE FIRST: `ORDER BY created_at DESC, id DESC` in `list`.
  * The one index a list had was migration 1's `entry_live (register, updated_at DESC)`, from when the default was last
  * changed first, so since the default moved every such read found the list's rows and then sorted all of them to hand
  * back the first page. On a list of a few hundred rows nobody sees it; on a ledger of tens of thousands it is every

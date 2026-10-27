@@ -59,7 +59,7 @@
   );
 
   let held = $state<{ id: string; script: Opened } | null>(null);
-  /* A SCRIPT OPENS ON WHAT IT DOES (24 October, U-B18): its card, the sentence of where it stands and its last runs, and
+  /* A SCRIPT OPENS ON WHAT IT DOES (24 October): its card, the sentence of where it stands and its last runs, and
      the form folded under "Change it". A script with no card to say it, or whose code is not kept here, opens on the
      form, since that is the one thing on the page. */
   let changing = $state<string | null>(null);

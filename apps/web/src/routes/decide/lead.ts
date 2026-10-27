@@ -17,7 +17,7 @@ import type { Question } from '../../lib/record/schema.ts';
 export const AIM = 3;
 
 /*
- * WHEN A QUESTION IS LATE IS THE RECORD'S TO SAY, NOT THIS FILE'S (EXP-E07). It was fourteen days here, and again in the
+ * WHEN A QUESTION IS LATE IS THE RECORD'S TO SAY, NOT THIS FILE'S. It was fourteen days here, and again in the
  * kernel, so the rail, Today and Decide could each count late their own way. `boot` sends it (`lateDays`, the shell's)
  * and each function below takes it; a host older than the field sends none, and then nothing is drawn late here.
  */
@@ -142,8 +142,8 @@ export function countSentence(
   const overdue =
     stale === 0 ? '' : stale === n ? (n === 1 ? past : `all of them ${past}`) : `${numberWord(stale)} of them ${past}`;
   /* HOW MANY, THEN WHERE: "The first ten are hard to undo" read as a rank, not a count, so the count is said as one
-     ("Ten of them are hard to undo."); one is "one of them" (it was "the first one", which named a place in the queue: audit 60, claim 3), and all is "all of them". IT DOES NOT SAY THEY COME
-     FIRST (audit 58, claim 3): the queue ranks by how long a question can wait before its band (`WAIT_RANK_SQL`, then
+     ("Ten of them are hard to undo."); one is "one of them" (it was "the first one", which named a place in the queue), and all is "all of them". IT DOES NOT SAY THEY COME
+     FIRST: the queue ranks by how long a question can wait before its band (`WAIT_RANK_SQL`, then
      `BAND_RANK_SQL`, in the kernel), so a hard one opened today sits behind an older easy one.
      "Of them" is said once a sentence: after "three of them for over two weeks" it is "Four are hard to undo". */
   const hard = Math.min(Number(undo), n);
@@ -205,7 +205,7 @@ export function waitedOf(
  * sentence that says what they count), as the figures a waffle draws, with that sentence as the chart's reading.
  *
  * NEVER READ OUT OF PROSE. The first "N of M" in an agent's reason was drawn here as Evidence, and an agent's reasons
- * say "2 of 5 steps" as often as "41 of 58 lines" (audit 31-32, finding 5): a chart that a sentence's grammar can
+ * say "2 of 5 steps" as often as "41 of 58 lines": a chart that a sentence's grammar can
  * summon is not evidence of anything. No field, no chart; the reason is still drawn as words.
  *
  * `value` and `of` are whole numbers with `value` no more than `of` and `of` at least three, so a waffle has a whole

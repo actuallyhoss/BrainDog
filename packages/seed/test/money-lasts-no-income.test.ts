@@ -112,7 +112,7 @@ test('THREE FULL MONTHS OF CLEARED SPENDING SHORTEN IT: the everyday leg is in t
   assert.ok(lasts !== null && lasts < 68, `the money lasts ${String(lasts)} days with no income, as long as it did with no spending`);
 });
 
-/* THE LASTS TILE SAYS IT, SINCE THE UI PASS OF 20 OCTOBER (money F3), beside the day on what is due, and the lead says
+/* THE LASTS TILE SAYS IT (money F3), beside the day on what is due, and the lead says
    what there is: the two answers to how long it lasts stood a screen apart, one in the line and one in the tile. */
 test('MONEY\'S HERO SAYS IT, and the one line drawn says where the money is kept and that it lasts the year', async () => {
   const { k } = await lived();

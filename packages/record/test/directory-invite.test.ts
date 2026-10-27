@@ -1,7 +1,7 @@
 /**
  * Sign-up codes: minted, held, spent and ended, against a real Directory and a fixed clock.
  *
- * WHAT MUST HOLD (LCH-A01, kept for when sign-up is by invitation again). A new address needs a code; the code is held
+ * WHAT MUST HOLD (kept for when sign-up is by invitation again). A new address needs a code; the code is held
  * by the proof its start mailed, so the same code twice is refused the second time; it is spent, naming the person,
  * when the proof makes them; an ended code makes nobody; a known address needs none; only the hash is kept; and no copy
  * of the Directory carries a code.

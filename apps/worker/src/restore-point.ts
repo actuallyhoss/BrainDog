@@ -1,5 +1,5 @@
 /**
- * A restore point before a deploy (LCH-C06): every record written in the last seven days takes a copy under one label,
+ * A restore point before a deploy: every record written in the last seven days takes a copy under one label,
  * through the same `copies.take` a record's own copies go through (`copies.ts`), or, in `check` mode, is opened once and
  * copies nothing.
  *
@@ -17,7 +17,7 @@
  * PAGED, AS THE NIGHT'S WALK IS. A larger fleet runs one request out of time, so the walk stops after `budgetMs` at a
  * page's end and answers `cursor`; the caller asks again with it until there is none.
  *
- * NO RECORD ASKED IS NOT A PASS (audit 45-46, finding 1). A walk that asked nobody opened nothing, and "0 failed" of
+ * NO RECORD ASKED IS NOT A PASS. A walk that asked nobody opened nothing, and "0 failed" of
  * nobody read as green in the deploy log. The Directory is the walk's only list, so the door cannot tell an empty host
  * from a list that came back empty; the caller can, and says so with `open: true` ("this host holds at least one open
  * record", which the workflow knows from its canary). Then a whole walk that asked nobody is `empty` and one `failed`,

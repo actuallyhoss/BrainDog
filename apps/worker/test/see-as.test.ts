@@ -1,5 +1,5 @@
 /**
- * See as (sharing plan §3.3, T11) at the Worker's door: `x-braindog-as` is read only by the API door, only for an owner's
+ * See as at the Worker's door: `x-braindog-as` is read only by the API door, only for an owner's
  * or an Admin's cookie, never as an owner, and the context it makes is the person's own, marked `preview`. The router
  * then refuses every route that writes under it.
  */

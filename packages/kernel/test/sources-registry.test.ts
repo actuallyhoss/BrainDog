@@ -13,7 +13,7 @@
  * TAKEN AGAIN FOR `activity` ALONE IN BATCH 64 (run-by-64): each line a run signed now says who the run is (`run_by`),
  * since the record hands a feed its runs (`runOf`). The line differs from the one before by those keys and nothing else.
  *
- * TAKEN AGAIN IN W102 (usage-sources-102, SHL-C12): `actions` and `runs_on` carry the month's five counts, an action's
+ * TAKEN AGAIN IN W102 (usage-sources-102): `actions` and `runs_on` carry the month's five counts, an action's
  * `requests`, `bytes` and `held` beside its `runs` and `failures`, and a key, a tool or a skill on `runs_on` `null` in
  * all five; `actions again` lists the new fields as allowed. The three `usage.*` answers are new. Nothing else moved.
  *

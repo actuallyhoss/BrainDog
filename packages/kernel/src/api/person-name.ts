@@ -67,8 +67,7 @@ const wordsOf = (part: string): string[] =>
 
 /**
  * The spellings a form left in place of a name, compared as `spellingOf` writes them, so `Your.Name`, `y o u r n a m e`
- * and `“Name”` are each one entry. The audit's thirty-one, which were all stored (`loop/research-batch-fifty-audit.md`
- * section 3), "Your Name", "First Name" and "Last Name". A WHOLE NAME, NEVER A WORD IN ONE: `Name` alone is refused
+ * and `“Name”` are each one entry. The audit's thirty-one, which were all stored, "Your Name", "First Name" and "Last Name". A WHOLE NAME, NEVER A WORD IN ONE: `Name` alone is refused
  * and `Namelia` is a name.
  */
 const SPELLINGS: ReadonlySet<string> = new Set([

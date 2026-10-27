@@ -1,5 +1,5 @@
 /**
- * WHO DECIDES A QUESTION (USE-A13): the line each reader meets, the members an owner may name, a hand the record takes
+ * WHO DECIDES A QUESTION: the line each reader meets, the members an owner may name, a hand the record takes
  * and one it refuses, and a question naming nobody drawn as it always was. Invented names only.
  */
 

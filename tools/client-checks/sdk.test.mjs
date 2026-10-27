@@ -1,5 +1,5 @@
 /**
- * A REAL CLIENT'S HANDSHAKE, ON EVERY PUSH (PRF-A06).
+ * A REAL CLIENT'S HANDSHAKE, ON EVERY PUSH.
  *
  * The official MCP client SDKs of `clients.json` greet the agent door two ways, over stdio to `braindog mcp` and over
  * HTTP to `/mcp`, of a record started as the gates start theirs (`tools/gates/record.mjs`). At each revision named

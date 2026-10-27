@@ -39,10 +39,10 @@
     /* THE REWRITES OF THE UI PASS OF 20 OCTOBER (agents F27): what a person can do, not what a deployment lacks. */
     keyOutside: 'Kept outside BrainDog',
     askForIt: 'Going back to a copy',
-    /* NEEDS YOU, AS THE BAR CALLS IT (audit 25 October, X20): the page said Decide, a name nothing else on screen uses. */
+    /* NEEDS YOU, AS THE BAR CALLS IT: the page said Decide, a name nothing else on screen uses. */
     missedLine: 'Run it now from Needs you, or let tonight try again.',
     answer: 'Answer it',
-    /* THE NIGHT'S COPY AND HIS EXPORTS, AS ROWS (the pass of 27 October): a host whose copies a browser cannot list
+    /* THE NIGHT'S COPY AND HIS EXPORTS, AS ROWS: a host whose copies a browser cannot list
        still copies the record each night, and the exports he took are his backups too. "No backups here yet" stood
        over both. */
     nightly: 'Copied every night',
@@ -129,27 +129,27 @@
   });
 
   /**
-   * THE NIGHT'S COPY IN ONE LINE OVER THE LIST (LCH-C03), from `boot`'s `copies`: its age and size, "First copy
+   * THE NIGHT'S COPY IN ONE LINE OVER THE LIST, from `boot`'s `copies`: its age and size, "First copy
    * tonight" on a record with none yet, and past 26 hours the deeper red with the word Late, never the colour alone.
    * `boot` is the one the layout already asked, so arriving here asks nothing more; a host older than the field draws
    * no line.
    */
   let facts = $state<CopyFacts | null>(null);
   const lastCopy = $derived(facts ? copyLine(facts, Date.now()) : null);
-  /* NO COPY KEPT YET: "First copy tonight" is then the empty state's title, and not a line over "No backup yet" (X20). */
+  /* NO COPY KEPT YET: "First copy tonight" is then the empty state's title, and not a line over "No backup yet". */
   const firstTonight = $derived(facts !== null && facts.last_copy_at === null);
   $effect(() => {
     untrack(() => void readBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : null)));
   });
 
   /**
-   * THIS HOST'S LAST RESTORE TEST BESIDE IT (LCH-C04), from `GET /account/drill`: "passed 12 days ago", or "Never
+   * THIS HOST'S LAST RESTORE TEST BESIDE IT, from `GET /account/drill`: "passed 12 days ago", or "Never
    * tested" in the deeper red with the words, never the colour alone. The host's fact, so the same on every record. A
    * self-host has no such door and answers 404, and that draws no line, as does a host that could not be read. A host
    * whose `boot` says it is a self-host is not asked at all, so its console carries no 404 for a door it never had.
    */
   let drill = $state<DrillFacts | null>(null);
-  /* NO RESTORE TEST IS SAID BEFORE THERE IS A COPY (U-C7): "Never tested" over a record with no copy yet read as a fault. */
+  /* NO RESTORE TEST IS SAID BEFORE THERE IS A COPY: "Never tested" over a record with no copy yet read as a fault. */
   const drillSaid = $derived(drill && facts?.last_copy_at ? drillLine(drill, Date.now()) : null);
   $effect(() => {
     if (shell.host === 'self-host') return;
@@ -366,7 +366,7 @@
            host that keeps no copies is a promise the next row takes back. -->
       <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
       {@render missedRow()}
-      <!-- THE NIGHT'S COPY FIRST, as `boot` says it (the pass of 27 October): its age and size, late past 26 hours.
+      <!-- THE NIGHT'S COPY FIRST, as `boot` says it: its age and size, late past 26 hours.
            A host that sends no such fact, or a record never copied, keeps the row that says there is none. -->
       {#if lastCopy && facts?.last_copy_at}
         <div role="status">
@@ -504,7 +504,7 @@
     <!-- THE RECORD'S OWN ANSWER, AND NOTHING UNTIL IT ARRIVES. There were four answers, and the
          two that were not the record's came from the sample's `DEPLOYMENT.kind`: which host the
          build thought it was on, drawn for as long as the read took and for the sample always. -->
-    <!-- EACH GOING BACK SAYS HOW (audit 25 October, X20): on the Cloud by writing to us, on a self-host by the command on
+    <!-- EACH GOING BACK SAYS HOW: on the Cloud by writing to us, on a self-host by the command on
          its machine, and over a list with no copy yet, what Restore this will do once there is one. -->
     {#if copiesFrom === 'refused'}
       <StateRow icon="history" title={words.askForIt} line={shell.host === 'cloud' ? copy.restoreNotHere : copy.restoreSelfHost} />

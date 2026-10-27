@@ -267,7 +267,7 @@
   const pairs = $derived<Laid[]>(laid.map((x, at) => ({ ...x, at })));
 
   /**
-   * THE PROJECT'S SHAPE, ITS PARTS AS THE PAGE DECLARES THEM (`{ kind: project, part }`, C28 and C29): the hero, Path and
+   * THE PROJECT'S SHAPE, ITS PARTS AS THE PAGE DECLARES THEM (`{ kind: project, part }`): the hero, Path and
    * Money, Work and Who is on it, Runs on and the agents on it, over both columns and before them, in the order they are
    * declared, as the shape stood over the page when it was drawn by hand. Each row lays its own parts
    * (`ProjectPart.svelte`). On a page at its own address and not while arranging, where each is a block of its column.
@@ -1062,7 +1062,7 @@
           enter(Number(under.id.slice(`${ids}b-`.length)) - 1);
           break;
         }
-        /* A ROW THAT CARRIES ITS OWN ACTIONS PRESSES THE FIRST ONE (PGS-A12), as a click on it would. */
+        /* A ROW THAT CARRIES ITS OWN ACTIONS PRESSES THE FIRST ONE, as a click on it would. */
         const first = under.querySelector<HTMLElement>('[data-row-action]');
         if (first) {
           first.click();

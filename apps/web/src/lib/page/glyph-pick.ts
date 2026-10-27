@@ -1,5 +1,5 @@
 /**
- * The glyphs a tile may wear, by group, for the picker in the block editor (PGS-A19): pure, so the reading is tested
+ * The glyphs a tile may wear, by group, for the picker in the block editor: pure, so the reading is tested
  * without a component, and `GlyphPicker.svelte` is runes and markup over it.
  *
  * THE GROUPS ARE THE RENDERER'S OWN, `glyphGroups` in `braindog-render`, each headed by its `GROUP_SAYS` line, never a

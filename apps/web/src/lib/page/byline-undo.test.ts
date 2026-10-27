@@ -1,6 +1,6 @@
 /**
  * A byline's Undo reads the plan first: a change on its row alone goes back in one press, and one that touched more says
- * what else, in names, and lets the reader take back only this row's part (audit 20, M4).
+ * what else, in names, and lets the reader take back only this row's part.
  */
 
 import { test } from 'node:test';
@@ -66,7 +66,7 @@ test('a step is this row’s by list and number, or by the row’s id, and never
   assert.equal(isOn(s({ register: 'ledger', seq: 99, row: 'A' }), { ...HERE, id: 'A' }), false, 'the number the record says wins');
 });
 
-test('TWO ROWS WITH THE SAME TITLE IN ONE WALK are told apart: only the one on this row is this row’s (audit 22, M2)', () => {
+test('TWO ROWS WITH THE SAME TITLE IN ONE WALK are told apart: only the one on this row is this row’s', () => {
   const walk = plan([
     step('STRIPE PAYOUT', { register: 'ledger', seq: 12, row: 'A' }),
     step('STRIPE PAYOUT', { register: 'ledger', seq: 13, row: 'B' }),
@@ -85,7 +85,7 @@ test('TWO ROWS WITH THE SAME TITLE IN ONE WALK are told apart: only the one on t
 });
 
 test('AN UNTITLED ROW never claims another row: a plan that touched one other row is asked about first', () => {
-  /* THE OLD FIRST BRANCH took a single row's change as this row's when this one had no title (audit 22, M2). */
+  /* THE OLD FIRST BRANCH took a single row's change as this row's when this one had no title. */
   const one = askOf(plan([step('a payment', { list: 'Money', row: 'B' }), step('a payment', { list: 'Money', row: 'B', label: 'Note' })]), { ...HERE, id: 'A' });
   assert.ok(one);
   assert.equal(one.mine, 0);

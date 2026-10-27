@@ -111,7 +111,7 @@ const failedOf = (out: Failed): Said => ({
 
 /** The thread on one thing, named as the record takes it: `tasks#3`, `suggestion:<id>` or `decision:<id>`. */
 export async function readThread(base: string, on: string, clock: () => number = Date.now): Promise<Heard> {
-  /* A READ THAT NEVER ANSWERS SETTLES AS UNREACHABLE, so the card never says Reading for good (audit P21). */
+  /* A READ THAT NEVER ANSWERS SETTLES AS UNREACHABLE, so the card never says Reading for good. */
   let timer: ReturnType<typeof setTimeout> | undefined;
   const slow = new Promise<Failed>((done) => (timer = setTimeout(() => done({ ok: false, refusal: { code: 'UNREACHABLE', fix: '' } }), READ_MS)));
   /* AND A READ THAT THROWS SETTLES TOO: a client that fails before it answers left the thread at "Reading the

@@ -1,5 +1,5 @@
 /**
- * A person proves a phone rings: `pushTest` (`src/methods/push-test.ts`, REC-A15). One `notify.push` per subscription
+ * A person proves a phone rings: `pushTest` (`src/methods/push-test.ts`). One `notify.push` per subscription
  * the caller holds and none of anybody else's, a sentence when there are none, a token refused, and a second press
  * inside a minute held with the seconds left.
  *

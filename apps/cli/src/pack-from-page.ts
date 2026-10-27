@@ -1,5 +1,5 @@
 /**
- * `braindog addon new <id> --from-page <file.dog>`: an add-on started from a page a person pulled (SHL-B09, job 6).
+ * `braindog addon new <id> --from-page <file.dog>`: an add-on started from a page a person pulled.
  *
  * A PAGE FILE HOLDS THE PAGE AND NOTHING IT READS. `braindog page pull` writes the stored page body (`@braindog/dog`),
  * so a table names its list as `register.bills` and a stat cell its figure as `metric.bills-due`, and neither comes

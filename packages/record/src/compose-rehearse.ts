@@ -1,5 +1,5 @@
 /**
- * A look is rehearsed before it is written (ENG-B09, decision 3 check 4): laid over the page as it reads now, and the
+ * A look is rehearsed before it is written (decision 3 check 4): laid over the page as it reads now, and the
  * lint for what a page prints is run over the result.
  *
  * WHY. A look the model composed is trusted for nothing as it came (`compose-look.ts`), and each of its parts is

@@ -1,5 +1,5 @@
 /**
- * AN AUTOMATION'S ASK READS THE LAST ATTEMPT'S THROW (ENG-A06). On a route, the included model may throw and the next
+ * AN AUTOMATION'S ASK READS THE LAST ATTEMPT'S THROW. On a route, the included model may throw and the next
  * candidate answer on its own wire. What `answer` reads off a throw (stopped, touched, unsent, heard, the name sent) is
  * the last attempt's, so a provider's 401 after the included model fell over is a status no retry mends, and not an
  * `UNREACHABLE` the outbox ladder asks again with the operator's key. Every model is canned.

@@ -79,7 +79,7 @@ const DROP_SAID = {
 export type DropWhy = keyof typeof DROP_SAID;
 
 /**
- * The verb of an attach (ENG-B15): a name in a text put on the row it is, by the sentence it was seen in. It is the
+ * The verb of an attach: a name in a text put on the row it is, by the sentence it was seen in. It is the
  * kernel's `ATTACH` (`change-kind.ts`), said here until the kernel's index hands it out, and a test holds the two equal.
  */
 export const ATTACH_VERB = 'attach';
@@ -116,7 +116,7 @@ export type StandingKind = { kind: string; rung: Rung; since: string; lifted: bo
 export type Standing = { agents: { agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: StandingKind[] }[] };
 
 /**
- * One import made into the record (ENG-A13): the run it wrote as, said as a person reads a run (`S12`), when it first
+ * One import made into the record: the run it wrote as, said as a person reads a run (`S12`), when it first
  * wrote, how many rows it brought into each list by the list's name, and what the owner said of it: `true` his own,
  * `false` outside text, `null` not said yet.
  */
@@ -261,7 +261,7 @@ export function ladder(deps: LadderDeps) {
   };
 
   /**
-   * Every import made into the record (ENG-A13), `IMPORTS_SHOWN` at most, newest first, each with what it brought in:
+   * Every import made into the record, `IMPORTS_SHOWN` at most, newest first, each with what it brought in:
    * the rows its run created, counted by the list they are in, from the history its writes are signed in. ONE QUERY AN
    * IMPORT, bounded by the run's own signature. READ-ONLY. An import that created nothing is still one made, with none.
    */
@@ -287,7 +287,7 @@ export function ladder(deps: LadderDeps) {
   };
 
   /**
-   * The owner's word on one import, by his own press (ENG-A13): `yes` it is his own, `no` it is outside text.
+   * The owner's word on one import, by his own press: `yes` it is his own, `no` it is outside text.
    * Kept with when and by whom; it moves no rung and files nothing. `run` is one `importsFound` names (the method checks).
    */
   const adopt = (run: string, yes: boolean, by: string): void => kernel.setPref(IMPORTS, run, { yes, at: iso(), by });
@@ -312,7 +312,7 @@ export function ladder(deps: LadderDeps) {
 
   /**
    * Whether a write is a learning captured where its run is, or one confirmed, which pass at any rung ("Capturing a
-   * learning needs nobody", AGT-C14): asked about, the first ten never got written, so no agent kept what it found out.
+   * learning needs nobody"): asked about, the first ten never got written, so no agent kept what it found out.
    *
    * A LEARNING IS READ FROM WHAT ITS LIST DECLARES, never from the list's name: a day the record fades rows by
    * (`fadeOf`, the same reading `context` and the card make). Any add-on's list that declares one is treated alike.
@@ -346,7 +346,7 @@ export function ladder(deps: LadderDeps) {
 
   /**
    * Whether a write only marks done the task in the run's own hand: the one `handoff` put on the run (`task`, by its
-   * spoken name), moved to `done` and nothing else changed (H16, "a task shows the agent's work").
+   * spoken name), moved to `done` and nothing else changed ("a task shows the agent's work").
    *
    * A RUN FINISHING ITS OWN WORK IS TOLD, NOT ASKED. Every kind asked until ten were kept, so on the owner's record twelve
    * tasks sat with agents and none was ever closed by one: each "done" waited in Needs you beside the questions that
@@ -450,7 +450,7 @@ export function ladder(deps: LadderDeps) {
    * Take an agent back to Ask on these kinds, or on every kind when `kinds` is `null`, and forget what it was kept for,
    * so climbing again starts from nothing. `why` is which of the five it was, kept for `standing` to say.
    *
-   * AND AN OFFER STILL WAITING FOR ONE OF THEM IS WITHDRAWN (research-audit-20 M2). "You kept them all" stopped being true
+   * AND AN OFFER STILL WAITING FOR ONE OF THEM IS WITHDRAWN. "You kept them all" stopped being true
    * the moment one was undone, declined a third time or written in a burst, and a yes to it would have set the rung the
    * drop just took away. It is answered as not done, signed by the ladder, so Decide shows it settled and never asks it.
    */
@@ -590,7 +590,7 @@ export function ladder(deps: LadderDeps) {
    * Who asked for what a batch the ladder landed wrote, and the kinds it asked for, or `null` for a batch that is not
    * one. SLASH'S QUESTION IS LANDED UNDER THE LADDER'S NAME (`LADDER_RULE`), since a model writes nothing but what it
    * proposes, so an Undo of an attach that landed alone finds no agent in its own lines: this is how the Undo still
-   * takes Slash's rung back (ENG-B15, "always undoable"). THE KINDS ARE THE QUESTION'S STAMP, worked out when it was
+   * takes Slash's rung back ("always undoable"). THE KINDS ARE THE QUESTION'S STAMP, worked out when it was
    * asked: read from its body now, the line it added is already there and an attach reads as the edit it is not.
    */
   const landed = (batch: string): { agent: string; kinds: string[] } | null => {
@@ -609,7 +609,7 @@ export function ladder(deps: LadderDeps) {
   /* ── where every agent stands, read back ────────────────────────────── */
 
   /**
-   * Where every agent stands (ENG-A12): each connected grant that may change the record, by the name its owner gave it,
+   * Where every agent stands: each connected grant that may change the record, by the name its owner gave it,
    * with every kind it has a rung for, and Slash once it has one. READ-ONLY: it writes no row and makes none at Ask.
    *
    * AN AGENT WITH NO RUNG HAS NO KINDS, which reads as everything asks, and is listed because it is connected. A grant
@@ -716,7 +716,7 @@ export function ladder(deps: LadderDeps) {
   };
 
   /**
-   * The owner's own "Ask again" (ENG-A12, its "undo"): an agent back to asking on one kind, said in the words
+   * The owner's own "Ask again" (its "undo"): an agent back to asking on one kind, said in the words
    * `standing` says it in, or on every kind it was lifted on when `kind` is `null`. It is `drop` with `owner` for why,
    * so `standing` says "You put it back to asking." and an offer waiting on that kind is withdrawn.
    *

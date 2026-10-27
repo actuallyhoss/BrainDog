@@ -1,5 +1,5 @@
 /**
- * `faults`, `retryFault` and `withdraw` (AGT-C06, AGT-C07): routed in the groups `docs/30-BLUEPRINT.md` §5 gives them,
+ * `faults`, `retryFault` and `withdraw`: routed in the groups `docs/30-BLUEPRINT.md` §5 gives them,
  * handed to the record methods of the same names, and answered `NOT_IN_THIS_BUILD` by a record built before them,
  * never a 500.
  *

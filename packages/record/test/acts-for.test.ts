@@ -1,5 +1,5 @@
 /**
- * An agent acting for a colleague is told in one line what it can reach (`acts-for.ts`, sharing plan §2.9): "You act
+ * An agent acting for a colleague is told in one line what it can reach (`acts-for.ts`): "You act
  * for Sam: Kiln, view; amounts hidden." Said by `context` as its Reach line, never cut, never an id; nothing for an
  * owner's agent or a person.
  */

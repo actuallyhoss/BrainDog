@@ -6,7 +6,7 @@
  * NOTHING HERE WRITES. What is asked of the record from here is its `previewChange`, which runs inside a rehearsal and
  * keeps nothing, and every page the proposal makes is drawn by it, not Home alone.
  *
- * NOTHING IS DRAWN THAT NOBODY TYPED (USE-B07). A page is drawn over the person's own name, the entries their sentence
+ * NOTHING IS DRAWN THAT NOBODY TYPED. A page is drawn over the person's own name, the entries their sentence
  * filled and the first entries of the files they brought (`ownRows`), and a page none of those reach is its name and one
  * line of what it will hold (`pageShown`). No example, and no sample row Slash drafted, is ever drawn as theirs.
  */

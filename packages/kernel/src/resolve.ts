@@ -1,5 +1,5 @@
 /**
- * The other pairs (ENG-B04, job 2): what the record may hold twice that is not a person, and a name it has seen with
+ * The other pairs: what the record may hold twice that is not a person, and a name it has seen with
  * nothing that identifies it beside the one row that name reads as.
  *
  * TWO KINDS OF PAIR, AND BOTH REST ON A NAME. Two live rows of ONE list, organisations or projects, whose names agree:

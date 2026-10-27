@@ -2,8 +2,8 @@ import { cases } from './copy/cases.ts';
 import { DESKTOP_NOTARIZED } from './desktop.ts';
 
 /**
- * The one page written for one kind of person that a visitor reaches (D5); the rest are in `HELD`. /for/teams IS HELD
- * TOO SINCE THE AUDIT OF 22 OCTOBER (U-C5, his call 10 taken as suggested): it sold working as a team while brain.dog
+ * The one page written for one kind of person that a visitor reaches; the rest are in `HELD`. /for/teams IS HELD
+ * TOO (his call 10 taken as suggested): it sold working as a team while brain.dog
  * holds invitations, so a team that signed up from it could not do what it showed.
  */
 export const FOR_SHOWN: readonly string[] = ['/for/founders'];
@@ -21,7 +21,7 @@ export const FOR_SHOWN: readonly string[] = ['/for/founders'];
  */
 export const LAUNCH = {
   signup: true, // a stranger can make a hosted record at SIGNUP
-  invite: true, // sign-up is by invite (SIGNUP=invite): every start button says "Get early access" (SF13, D1)
+  invite: true, // sign-up is by invite (SIGNUP=invite): every start button says "Get early access"
   billing: false, // the Hosted price is charged
   repo: false, // the GitHub repository is public (the owner)
   cli: false, // the CLI is on npm under the name the docs print
@@ -36,9 +36,9 @@ export type LaunchFlag = keyof typeof LAUNCH;
  * The addresses held until the site is public. The changelog and its feed since W.170, because the site was not
  * deployed publicly yet, and the packs with the site's design ("Packs and the
  * changelog stay held"), the Mac download until a signed build exists, and the pages for personal records, students
- * and new projects (D5, 20 October: the slogan is about a business, and those pull the other way), and the page for
- * teams while inviting people is held (U-C5, 22 October). The pricing page
- * came back on 20 October as the one-plan early access page with no prices (D2). The sources stay (`routes/changelog/entries.ts`, the catalogue `routes/packs/` reads); only
+ * and new projects (20 October: the slogan is about a business, and those pull the other way), and the page for
+ * teams while inviting people is held (22 October). The pricing page
+ * came back on 20 October as the one-plan early access page with no prices. The sources stay (`routes/changelog/entries.ts`, the catalogue `routes/packs/` reads); only
  * what a visitor can reach is held. A pack's own page (`/packs/<id>`) is never prerendered while `/packs` is held.
  *
  * A HELD ADDRESS ANSWERS 404 AND WRITES NO FILE, so the site's own 404 page answers it the way it answers any miss
@@ -49,7 +49,7 @@ export const HELD: readonly string[] = [
   '/changelog',
   '/changelog.xml',
   '/packs',
-  /* THE MAC DOWNLOAD UNTIL A NOTARISED DMG IS STAGED (E52, `desktop.ts`, set by `tools/desktop/release.mjs --stage`). */
+  /* THE MAC DOWNLOAD UNTIL A NOTARISED DMG IS STAGED (`desktop.ts`, set by `tools/desktop/release.mjs --stage`). */
   ...(DESKTOP_NOTARIZED ? [] : ['/download']),
   ...Object.values(cases.drawn.moreFor)
     .map((more) => more.href)

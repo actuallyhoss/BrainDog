@@ -1,5 +1,5 @@
 /**
- * A list block reads its next rows past a cursor, and stops at the last (PGS-A16). The record is a fake `io` here: the
+ * A list block reads its next rows past a cursor, and stops at the last. The record is a fake `io` here: the
  * record's own page read taking `cursor` is the host's half and is not in this tree yet.
  *
  * WHAT MATTERS: the cursor the last answer gave is the one asked with next, a `null` cursor asks nothing, a refusal

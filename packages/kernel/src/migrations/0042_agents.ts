@@ -163,7 +163,7 @@ const KIND_NAMES: Readonly<Record<string, string>> = {
  * Migration 42's data step: one settings row per kind of agent the record's runs have used, each at the scope of the
  * token that kind's newest run was opened with, then `default` at `propose` (Suggest). Answers how many rows it wrote.
  *
- * HIS CURRENT AGENTS KEEP WHAT THEY HAVE (plan §5.2): Claude on his Mac, whose token writes, gets a row at `write`, and
+ * HIS CURRENT AGENTS KEEP WHAT THEY HAVE: Claude on his Mac, whose token writes, gets a row at `write`, and
  * only a kind no row matches starts at Suggest. A kind whose newest run carries no token, or a token since deleted,
  * starts at `propose` like a new one.
  *

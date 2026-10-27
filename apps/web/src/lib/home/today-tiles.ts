@@ -72,7 +72,7 @@ export { needYouCount } from './need-you.ts';
 /** The sentence under the title, and the one phrase in it that needs him, drawn red; `''` when nothing does. */
 export type Sentence = { text: string; needs: string };
 
-/** A count in a sentence: always digits (SF14), so "8 need you" never stands beside "Seven" in one line. */
+/** A count in a sentence: always digits, so "8 need you" never stands beside "Seven" in one line. */
 const digits = (n: number): string => n.toLocaleString('en-GB');
 
 /** How far past its day something is, in words: "a day", "five days", "three weeks", "two months". */
@@ -114,10 +114,10 @@ const NOTHING_LATE = 'nothing is late';
  * "8 need you. £7,200 owed to you is late, and £10,540 you owe. 2 agents are working." (spec 4.1, today F2, and the
  * Today polish of 20 October: short sentences.) WHAT NEEDS YOU LEADS, as the badge's number and in red; the late money
  * is its own sentence, or "Nothing is late." with something to ask; who is working closes it, in ink.
- * Numbers are always digits (SF14). With nothing needing you it says so ("Nothing needs you."), and then the late money,
+ * Numbers are always digits. With nothing needing you it says so ("Nothing needs you."), and then the late money,
  * when there is some, is the red phrase, since it is the one thing that wants a look.
  *
- * "NOTHING NEEDS YOU" ONLY WHEN NOTHING DOES (EXP-E07): with something in the inbox and no question, the line says that
+ * "NOTHING NEEDS YOU" ONLY WHEN NOTHING DOES: with something in the inbox and no question, the line says that
  * in its place.
  */
 export function sentenceOf({ needYou, late = null, lateThings = 0, lateRead = late !== null, agents, inbox = 0 }: SentenceParts): Sentence {

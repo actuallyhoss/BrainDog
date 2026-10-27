@@ -1,5 +1,5 @@
 /**
- * Typing in a page's head narrows the page (PGS-A14): the word under `header.search.param` keeps, on every list the page
+ * Typing in a page's head narrows the page: the word under `header.search.param` keeps, on every list the page
  * draws, the rows whose title or a field marked `search: true` holds it, and the head says how many it found. One letter
  * narrows nothing; a page whose head declares no search reads the same word as nothing; a field not marked is not
  * searched. Invented lists and words throughout.

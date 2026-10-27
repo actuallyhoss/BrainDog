@@ -38,7 +38,7 @@ No secret is printed, logged or written. What was live is kept in `.ship/live-be
 prints the `rollback.mjs decide` and `wrangler rollback` lines that put it back. After a red Parity or Smoke the
 rollback steps run as they do in the workflow.
 
-A green deploy then attaches the status page (`loop/status/index.html`, or `BRAINDOG_STATUS_PAGE`) to the BrainDog
+A green deploy then attaches the status page (or `BRAINDOG_STATUS_PAGE`) to the BrainDog
 project (`things#21`, or `BRAINDOG_STATUS_ON`) as the next version of its "Status" visual, so the loop folder is not its
 only copy. An unchanged page writes nothing, and a failed attach is said without turning the deploy red.
 

@@ -4,7 +4,7 @@
  *   node --test tools/gates/test/variants.test.mjs
  *
  * WHY A NAMED LIST. `record.mjs`'s `VARIANTS` is read by `layout` and `a11y`, which draw whatever it holds, so a variant
- * taken out of it went with no finding: the gates measured less and printed the same green (PRF-A07, RQ-PRF-081). The
+ * taken out of it went with no finding: the gates measured less and printed the same green. The
  * names below are what the gates must draw, and the list in `record.mjs` is held to them both ways: one missing is
  * red, and one added without being named here is red, because a record nobody named is a record nobody checks.
  *

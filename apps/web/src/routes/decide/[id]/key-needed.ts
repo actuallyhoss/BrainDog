@@ -1,9 +1,9 @@
 /**
- * Keeping one key an arrangement needs, from its sitting page (`KeyNeeded.svelte`, REC-A07).
+ * Keeping one key an arrangement needs, from its sitting page (`KeyNeeded.svelte`).
  *
  * THE TYPED KEY OUTLIVES A REFUSAL; THE PASSPHRASE NEVER DOES. The key used to be emptied before the request went out,
  * so a Keychain behind a passphrase, which refuses the first try for want of one and only then grows the field, threw the
- * key away with it: the person typed the passphrase and had nothing left to send (audit 40-42, finding 8). Now the
+ * key away with it: the person typed the passphrase and had nothing left to send. Now the
  * passphrase goes with the one request and is emptied before it leaves, and the key is emptied only once the record
  * has kept it, as the Keys screen's sheet does (`keychain/+page.svelte`, `saveKey`).
  *

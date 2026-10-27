@@ -9,7 +9,7 @@
  * person decide in BrainDog; write short and plain for a phone. `budget.test.ts` holds the 512.
  *
  * WHAT IS LEFT AFTER THEM IS WHAT HOLDS ACROSS TOOLS: how an answer reads, the credential rule, when a learning is worth
- * keeping, and what a refusal hands back. The learning line says WHEN, not only when not (scope B30): "only if a future
+ * keeping, and what a refusal hands back. The learning line says WHEN, not only when not: "only if a future
  * session would otherwise get it wrong" was read as "never", and 904 runs wrote none; and it names `topic` as the
  * skill's name, which is what drafts a skill's next version at the daily look. Money, compare-and-set and the handoff's manners moved to the descriptions of
  * the tools they are about (`index.ts`), where a model reads them when it picks the tool.

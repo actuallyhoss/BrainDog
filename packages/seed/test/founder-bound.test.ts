@@ -1,5 +1,5 @@
 /**
- * A number dated after today is not a number reported (founder-bound-66, audit 64 claim 7).
+ * A number dated after today is not a number reported (founder-bound-66).
  *
  * The founder's four counts of numbers (`datapoints-7d`, `datapoints-30d`, `datapoints-reported` and
  * `project-numbers-7d`) end today, by Estate's own clause (`at before tomorrow`), as `service-numbers` has since

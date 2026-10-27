@@ -5,7 +5,7 @@
  * at work. Quiet is worked out when read and never stored (`isQuiet` in `session.ts`), and `sessions.live` answers it
  * beside the rows from the record's own clock, so every host draws the same runs as gone quiet.
  *
- * AND `sessions.working`, THE ONE NUMBER (AGT-C02): the rail, Today and the Agents headline said four while two of the
+ * AND `sessions.working`, THE ONE NUMBER: the rail, Today and the Agents headline said four while two of the
  * four were last heard from hours before. Fifteen minutes is the line, and a helper is folded under its parent.
  */
 

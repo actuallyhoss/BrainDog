@@ -1,5 +1,5 @@
 /**
- * THE SIGHT MODULE (sharing plan §2.5 items 3 and 5): what a caller is shown of the rows they read, and which rows they
+ * THE SIGHT MODULE: what a caller is shown of the rows they read, and which rows they
  * may write. One object, `sight`, which `index.ts` builds once and hands every method (`RecordDeps.sight`).
  *
  * THE READ HALF (Slice 3, `readSight`). ONE QUESTION, ASKED IN BATCHES. `rowAdmitted` read each row again through
@@ -49,7 +49,7 @@ export type Sighted = {
 
 const NONE: ReadonlySet<string> = new Set();
 
-/** The fields of one list hidden from this caller (sharing plan §2.7), none for almost everybody. */
+/** The fields of one list hidden from this caller, none for almost everybody. */
 export const hiddenOf = (ctx: Pick<Sighted, 'hides'>, register: string): ReadonlySet<string> => {
   const fields = ctx.hides?.[register];
   return fields === undefined || fields.length === 0 ? NONE : new Set(fields);
@@ -110,7 +110,7 @@ const without = <T extends Record<string, unknown>>(o: T, keys: ReadonlySet<stri
 export const FIREWALL_FAULT = 'lens.firewall';
 
 /**
- * THE DOORS' SAFETY NET (sharing plan §2.5 item 6): every row left in an answer with a field hidden from its caller, the
+ * THE DOORS' SAFETY NET: every row left in an answer with a field hidden from its caller, the
  * field taken off, and which `list.field` were found. A pure walk, the same at `/api` and `/mcp`; the door that finds
  * one raises fault `lens.firewall` naming the method. Never the main control: every method masks its own answer, and a
  * strip here is a path that did not. `listOf` names the list of a row the MCP door shapes by its spoken id alone, and
@@ -188,8 +188,8 @@ export function readSight(kernel: Kernel) {
   const viewer = (ctx: Sighted): string | undefined => viewerOfRead(ctx);
 
   /**
-   * Whether this caller reads the whole of a list: every row, no rule of their own on it, and every field, none hidden
-   * (sharing plan §2.7), which is who a figure over it is answered to. Private rows are still left out by `viewer`.
+   * Whether this caller reads the whole of a list: every row, no rule of their own on it, and every field, none hidden,
+   * which is who a figure over it is answered to. Private rows are still left out by `viewer`.
    */
   const whole = (ctx: Sighted, register: string): boolean => whereFor(ctx.wheres, register) === undefined && hiddenOf(ctx, register).size === 0;
 
@@ -211,7 +211,7 @@ export function readSight(kernel: Kernel) {
 
   /**
    * The rows a batch of log lines is about, each read once, and which of them the caller is shown, asked once per list
-   * for the whole batch (sharing plan §2.13: one query per list per 500 lines). Deleted rows are read too, since a
+   * for the whole batch (one query per list per 500 lines). Deleted rows are read too, since a
    * deleted row's lines are still shown.
    */
   const lines = (ctx: Sighted, batch: readonly Line[]): LineSight => {
@@ -301,7 +301,7 @@ export function readSight(kernel: Kernel) {
   };
 
   /**
-   * An answer as this caller is shown it (sharing plan §2.7): every row in it masked (`maskRow`), and every log line in
+   * An answer as this caller is shown it: every row in it masked (`maskRow`), and every log line in
    * it that names its list (`maskLine`) masked or dropped. A walk of the whole answer, asked only of a caller from whom
    * something is hidden, so everybody else is handed the answer as it was.
    */
@@ -432,7 +432,7 @@ export function writeSight(deps: SightDeps) {
     return out;
   };
 
-  /** The fields of a list hidden from this caller (sharing plan §2.7): a patch naming one names a field the list lacks. */
+  /** The fields of a list hidden from this caller: a patch naming one names a field the list lacks. */
   const hiddenFields = (ctx: CallContext, register: string): ReadonlySet<string> => hiddenOf(ctx, register);
 
   /**

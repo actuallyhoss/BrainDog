@@ -2,9 +2,9 @@
  * Batch 85's wiring through a real record: the lines that hand what was built to the kernel that runs it.
  *
  * - A draft the queue answers is filed under the cause its job was queued for (`pattern:<shape>`), so the shape's one
- *   question is found by its cause and not only by its samples (ENG-B07).
+ *   question is found by its cause and not only by its samples.
  * - A time-sensitive notice inside the record's quiet hours sounds nothing, is kept, and leads the next digest; outside
- *   them, and on a record that turned them off, it sounds as it did (AGT-C19).
+ *   them, and on a record that turned them off, it sounds as it did.
  * - The names a host reads the bands, the other pairs and the owed shapes by are the kernel's own exports, and none of
  *   them folds or asks by being read.
  */

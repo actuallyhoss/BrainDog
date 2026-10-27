@@ -5,7 +5,7 @@
   else Today's body (`todayHome` in `default-home.ts`), built from what the record holds and drawn by the record with
   `previewPage`. All three go through `PageView` with `mode: 'home'`, so a question is answered where it is shown, a
   task is ticked where it is drawn, and a line is captured without leaving. Today was a screen of its own, retired on
-  24 October (C30) once this one did all it did; `/?classic` opens this one.
+  24 October once this one did all it did; `/?classic` opens this one.
 
   CALM BEFORE RICH. One line under the title, worked out from the blocks drawn (`sentenceOf`), with the
   phrase that needs the reader in red. When Slash wrote Home's line today the line is its (`home-line.ts`), red only
@@ -24,11 +24,11 @@
   at the same things the tiles and the sidebar already hold. A page the person kept is drawn as they laid it out, with
   Arrivals over it.
 
-  WHAT IS LATE, WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF THE BODY (C27, 24 October): declared in `todayHome`,
+  WHAT IS LATE, WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF THE BODY (24 October): declared in `todayHome`,
   answered by the record, and drawn in their slots as the desk's own tiles (`desk-part.ts`, which this file marks the
   blocks with). Only Arrivals and the foot of Needs you are still Home's own, laid among the tiles (`desk-order.ts`).
 
-  THE RECORD'S HOUSEKEEPING IS NOT HERE (the audit of 22 October, U3): what went stale, who it matched, what it found
+  THE RECORD'S HOUSEKEEPING IS NOT HERE: what went stale, who it matched, what it found
   wrong in its own pages and notes, what the answers taught, what may be one, what has no colour and the imported rules
   are Settings › Health, read only when that opens. Today asks none of them, the walk of every page and note least of all.
 -->
@@ -165,7 +165,7 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  /* TODAY IS TODAY ON EVERY RECORD (the audit of 22 October, U1): a use case adds words for new things and never renames
+  /* TODAY IS TODAY ON EVERY RECORD: a use case adds words for new things and never renames
      one of the five places, so neither the title nor the calm line takes the voice's word ("Team", "Nothing needs your
      call"). */
   const title = copy.today;
@@ -173,11 +173,11 @@
 
   /* TODAY'S HEADINGS IN THE VOICE THAT SPEAKS, read before the page is asked for so a voice that lands after the first
      read asks it again in its own words. Built by the same helper the arrange mode rebuilds Today's body with, so the
-     body arranged is the body drawn. NEEDS YOU IS A PLACE AND KEEPS ITS NAME there, and so does its calm line (U1). */
+     body arranged is the body drawn. NEEDS YOU IS A PLACE AND KEEPS ITS NAME there, and so does its calm line. */
   const voice = $derived<HomeVoice>(voiceOf(said));
 
   /**
-   * ONLY A PAGE THE PERSON KEPT IS DRAWN IN THE DESK'S PLACE (U1). A use case's own `home-<id>` page never replaces the
+   * ONLY A PAGE THE PERSON KEPT IS DRAWN IN THE DESK'S PLACE. A use case's own `home-<id>` page never replaces the
    * desk: on his record the Solo founder's report page stood where Today should be, with its tables, a by-book chart and
    * "Needs your call", and no desk change since 19 October ever reached it. The desk draws on every record, and the use
    * case's page stays a page of the record, in the nav and the palette, and Today never links to it: the desk's foot
@@ -486,7 +486,7 @@
       /* EVERY LIST'S DECLARATION GOES WITH IT, but a list the copy never keeps and one that holds a secret. */
       const lists = data.lists.map((x) => x.id).filter((id) => !l.NEVER_KEPT.has(id) && (REGISTERS[id] === undefined || !l.holdsSecret(REGISTERS[id])));
       /* WHAT WAS HANDLED GOES WITH IT AS IT LANDED, so the copy is the whole first screen and not the page alone, with
-         the line pushing it down when it lands. The desk's tiles are blocks of the page (C27), so they go with it. */
+         the line pushing it down when it lands. The desk's tiles are blocks of the page, so they go with it. */
       await Promise.race([handledLanded, new Promise((done) => setTimeout(done, DESK_WAIT_MS))]);
       let ticket = mark;
       if (tab.localTicket() !== mark) {
@@ -678,7 +678,7 @@
 
   const live = $derived(got?.from === 'live' ? got : null);
 
-  /* WHAT WAITS AND WHO IS WORKING, AS `boot` SAYS IT (EXP-E07): the rail's badge and this header say one number, and the
+  /* WHAT WAITS AND WHO IS WORKING, AS `boot` SAYS IT: the rail's badge and this header say one number, and the
      working tile lists the runs `boot` says are working. `null` from a host older than the field. */
   const waits = $derived.by((): HomeWaits | null => {
     const w = waitsNow();
@@ -740,7 +740,7 @@
   const desked = $derived.by(() => {
     if (!got || got.from !== 'live' || !shaped) return null;
     /* ON A PHONE NEEDS YOU SHOWS FOUR, the first with its buttons and the rest rows a tap opens (the style below), and
-       its count still says how many wait: the rest are "N more". AND THE LATE LIST IS THE LATE TILE'S on the desk (C27):
+       its count still says how many wait: the rest are "N more". AND THE LATE LIST IS THE LATE TILE'S on the desk:
        the first late block of the page is drawn as the desk's late tile, a line a thing with its button, and any other
        late block is marked not drawn at its place. */
     const lateAt = board ? (late?.at ?? []) : [];
@@ -800,7 +800,7 @@
   const asOf = (): string => `${moving.version} ${wrote()}`;
 
   /**
-   * WHETHER THE MODEL THAT WRITES IS QUIET (`engine-line.ts` `quietLine`, U7): not answering, his key closed, or the
+   * WHETHER THE MODEL THAT WRITES IS QUIET (`engine-line.ts` `quietLine`): not answering, his key closed, or the
    * month spent. The engine is asked only where a model is behind Slash. While it answers, nothing is said.
    */
   let engine = $state.raw<{ health: EngineHealth | null; month: SlashStatus | null } | null>(null);
@@ -907,8 +907,8 @@
   const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
 
   /**
-   * TODAY SPEAKS FIRST (the audit of 22 October, U2): on the board, over the tiles, a greeting by the time of day and his
-   * name, and nothing more since 23 October (DIRECTION §51): what is late and what needs him are the tiles' to say. The
+   * TODAY SPEAKS FIRST: on the board, over the tiles, a greeting by the time of day and his
+   * name, and nothing more since 23 October: what is late and what needs him are the tiles' to say. The
    * head keeps only the phone's bar, and the date and the
    * sun glyph go: the tab already says where he is. Not on a first Today, which opens on its card, nor a kept page, which
    * is drawn as its owner laid it out.
@@ -1118,7 +1118,7 @@
     {#if !board}{@render landedPart()}{/if}
 
     <!--
-      TODAY SPEAKS FIRST (U2), AND ONLY TO GREET (23 October, his word: the sentence under it "summarizes everything that's
+      TODAY SPEAKS FIRST, AND ONLY TO GREET (23 October, his word: the sentence under it "summarizes everything that's
       already shown in the late"): the greeting is the screen's `h1`, and what is late, what needs him and who is working
       are the tiles under it, said once there and not twice.
     -->
@@ -1133,7 +1133,7 @@
       each where the 19 October desk puts it. A kept page is its own board.
     -->
     <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
-      <!-- WHAT IS LATE LEADS THE DESK, a line a thing with its button (U2, U-A13): beside who is working at a desk, and the
+      <!-- WHAT IS LATE LEADS THE DESK, a line a thing with its button: beside who is working at a desk, and the
            first thing under the brief on a phone. A block of the page since C27, the first in its order (`desked`). -->
       <!-- THE FIRST ROW'S RIGHT COLUMN UNDER WHO IS WORKING AND CASH, held so nothing laid out later lands in it. -->
       {#if board && shaped}<span class="row-one-rest" aria-hidden="true"></span>{/if}
@@ -1219,7 +1219,7 @@
     line-height: 18px;
   }
 
-  /* ── the head: the greeting and the brief (U2) ─────────────────────────── */
+  /* ── the head: the greeting and the brief ─────────────────────────── */
 
   /* ON THE BOARD, NOT ON A TILE (the approved look of 19 October): the greeting at 34/40 in the display face (28/34 on a
      phone, `--fs-hero`). */
@@ -1265,7 +1265,7 @@
     order: 19;
   }
 
-  /* UNDER A THUMB THE ⋯ IS IN THE HEAD, AS ON A DECLARED PAGE (Y24): at the end of the greeting's row, raised over the
+  /* UNDER A THUMB THE ⋯ IS IN THE HEAD, AS ON A DECLARED PAGE: at the end of the greeting's row, raised over the
      board as a pointer raises it, and never a row of its own among the tiles, where it stood alone between People and
      Handed back to you. The greeting keeps a tap of room at its end so no word runs under it. */
   @media (hover: none) {
@@ -1485,7 +1485,7 @@
     order: 1;
   }
 
-  /* NEEDS YOU AND ITS FOOT ARE ONE TILE (today F3, F6): the foot butts the queue's lower edge, the corners between them
+  /* NEEDS YOU AND ITS FOOT ARE ONE TILE (today F3): the foot butts the queue's lower edge, the corners between them
      square, and the queue keeps only a step of air under its last line. With nothing to ask the foot is the tile. */
   .body[data-board]:has(:global([data-needs-foot]:not([data-alone]))) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
     padding-block-end: var(--sp-3);
@@ -1767,7 +1767,7 @@
   /* ── the tiles, as Today draws them (the Today polish of 20 October) ── */
 
   /* THE TILES COME IN ONCE, on the first load: a fade and a 4px rise, the first six one after another `--d-stagger`
-     apart, so the last is still by 450ms (`motion.ts` `ARRIVAL`, scope E39). A tile past the sixth is simply there. */
+     apart, so the last is still by 450ms (`motion.ts` `ARRIVAL`). A tile past the sixth is simply there. */
   .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)),
   .body[data-board][data-enter] > :global(:not(.row-one-rest)) {
     animation: tile-in var(--d-page) var(--ease-out) both;

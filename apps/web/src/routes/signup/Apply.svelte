@@ -1,6 +1,6 @@
 <!--
   @component
-  Sign-up by invitation, reached with no code: the page says so and offers a way in (LAUNCH 103, item 10). The site says
+  Sign-up by invitation, reached with no code: the page says so and offers a way in. The site says
   nothing about invites and keeps "Start free"; only here, when the host is in invite mode and nobody is signed in, is
   a person told, and asked to apply. A code in the address (`#code=`) never reaches this screen: the page goes straight
   to sign-up with it.

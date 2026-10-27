@@ -1,7 +1,7 @@
 <!--
   One result, as the palette and `/search` both draw it: the glyph of what it is in a 28px neutral well, its title at
   15/400, and one line saying which one it is (why it matched, where it sits, when it changed), with a figure's reading
-  at the trailing edge (2.A.15).
+  at the trailing edge.
 
   ONE ROW IN TWO PLACES. `/search` is where somebody goes when the palette's ranked list was not
   enough, and a result drawn differently there would be a second thing to learn about the same object. The box around

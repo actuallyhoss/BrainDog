@@ -1,5 +1,5 @@
 /**
- * What a record starts with is what its use case cannot stand without, and what the person named (USE-B08).
+ * What a record starts with is what its use case cannot stand without, and what the person named.
  *
  * BEFORE: `modulesFor` installed every module a use case names, whatever was said, so a founder had five add-ons on day 0
  * and a record never grew into anything because it already held everything. A use case's `needs` is the part of its

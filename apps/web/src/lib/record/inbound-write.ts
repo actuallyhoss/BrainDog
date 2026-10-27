@@ -39,7 +39,7 @@ import { wroteOutside } from '@braindog/client';
 export const mailUrl = (origin: string, token: string): string => `${origin.replace(/\/+$/, '')}/in/email/${token}`;
 
 /**
- * THE ONE COMMAND THAT PRINTS A SELF-HOST'S MAIL ADDRESS (audit 25 October, X25), run on the machine BrainDog runs on.
+ * THE ONE COMMAND THAT PRINTS A SELF-HOST'S MAIL ADDRESS, run on the machine BrainDog runs on.
  *
  * A self-host has no door that reads an address back, and none is wanted: the token is a file, `<data>/<slug>/
  * inbound.token`, that `braindog init` wrote (`apps/selfhost/src/main.ts`). So the address is this origin's mail door

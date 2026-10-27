@@ -166,7 +166,7 @@
   }
   const doors = read(() => (anOwner ? `doors ${apiBase()}` : null), doorsNow);
   const doorList = $derived(doors.value ?? []);
-  /* WHAT HAS FED THE RECORD THROUGH THOSE DOORS, newest first, on the reader's clock (Z19). */
+  /* WHAT HAS FED THE RECORD THROUGH THOSE DOORS, newest first, on the reader's clock. */
   const feeds = $derived(feedsOf(doorList, Date.now()));
 
   /**
@@ -181,7 +181,7 @@
     openInbox: 'Open the Inbox',
     /* WHERE THE HOST HAS NO DOOR (agents F27): one plain sentence, and on the hosted service no file a person cannot
        reach. */
-    /* THE SELF-HOST CARD IS ONE SENTENCE AND THE COMMAND TO COPY (audit 25 October, X25): it named a file and what
+    /* THE SELF-HOST CARD IS ONE SENTENCE AND THE COMMAND TO COPY: it named a file and what
        writing and deleting it do, and never the address. */
     unrouted: "This BrainDog's mail address is kept on the machine it runs on. Run this there to print it:",
     unroutedHosted: 'Forwarding addresses are not offered here yet.',
@@ -226,7 +226,7 @@
          Reconnect and Retry now buttons that only said what would have happened. The shell's
          own refusal is already on the screen, so nothing here repeats it. -->
     <!-- AND EVERY WEB ADDRESS THAT FED IT, with its last arrival (`feedsOf`): card texts posted every hour are a source,
-         and the tile said nothing fed the record (Z19). A reader who cannot read the doors is not told nothing does. -->
+         and the tile said nothing fed the record. A reader who cannot read the doors is not told nothing does. -->
     {#if feeds.length > 0}
       <ul class="feeds">
         {#each feeds as feed (feed.id)}

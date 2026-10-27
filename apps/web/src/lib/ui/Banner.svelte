@@ -1,5 +1,5 @@
 <!--
-  The one banner (the UI pass of 20 October, 2.A.17, frame F21): a line across the work, under the top bar, that says a
+  The one banner (frame F21): a line across the work, under the top bar, that says a
   thing about the whole record and not one screen of it. Billing lapsed (`LapseLine`) and offline (`Pull`) are the two.
 
   ONE SHAPE: 48 tall at least, 12 by 16 in, radius 12, inset by the gutter, filled by what it means: `late` is

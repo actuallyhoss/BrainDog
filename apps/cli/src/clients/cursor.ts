@@ -1,5 +1,5 @@
 /**
- * Cursor, as the clients table holds it: where it keeps servers, the reader, and the writer (AGT-A07, AGT-D10, AGT-D11).
+ * Cursor, as the clients table holds it: where it keeps servers, the reader, and the writer.
  *
  * WHERE AND WHAT, FROM CURSOR'S OWN DOCUMENTS (cursor.com/docs/context/mcp, read 2026-10-14): a person's servers are
  * the `mcpServers` object of `~/.cursor/mcp.json`, and a repository's of its `.cursor/mcp.json`. A stdio server has

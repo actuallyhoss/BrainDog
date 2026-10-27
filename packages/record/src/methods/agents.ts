@@ -116,7 +116,7 @@ const PULSE_TAKES = ['stamp', 'shown', 'how'] as const;
 const SHOWN_MOST = 50;
 
 /**
- * One row of `presence` (plan §4.4): a session open now, with where it is, what it says it is doing, what it holds
+ * One row of `presence`: a session open now, with where it is, what it says it is doing, what it holds
  * from him, its helpers, how long it has run and when it was last heard, and how a stop reaches it.
  */
 export type PresenceRow = {
@@ -242,7 +242,7 @@ export function methods(deps: RecordDeps) {
     /**
      * A session closed: end the caller's run, once. A token's call, needing `propose`, and the end hook's one write.
      *
-     * THE RECORD PICKS THE STATE, NOT THE CALLER (AGT-C04). The hook used to write `idle`, and twelve hours later the
+     * THE RECORD PICKS THE STATE, NOT THE CALLER. The hook used to write `idle`, and twelve hours later the
      * sweep took every idle run as abandoned, so about 740 of the owner's 752 runs that closed normally read Abandoned a
      * day later. The kernel's `endRun` decides instead: a run that left a fresh next step and works for nobody waits as a
      * handoff; any other is done, its old next step cleared and "Ended at <head> with no next step." written. Its helpers
@@ -384,7 +384,7 @@ export function methods(deps: RecordDeps) {
     },
 
     /**
-     * The sessions open now (plan §4.4), newest heard from first: Today's "Working now", the Agents page and a
+     * The sessions open now, newest heard from first: Today's "Working now", the Agents page and a
      * project's "Working here now", in one read. Each row says the agent, its machine, project, repository, worktree,
      * branch and what it says it is doing; the instruction and the task in hand; its helpers; how long it has run and
      * when it was last heard; whether he paused or stopped it; and whether a stop halts its next tool call (Claude Code
@@ -432,7 +432,7 @@ export function methods(deps: RecordDeps) {
         const at = [of(f, 'started') ?? r.created_at, back.get(r.id) ?? null, of(f, 'stretch_at')].filter((v): v is string => v !== null && Number.isFinite(Date.parse(v)));
         return at.reduce((a, z) => (Date.parse(z) > Date.parse(a) ? z : a), at[0] ?? r.created_at);
       };
-      /* THE KEYS THE RUNS SPOKE WITH, read once, so each row can say whether its key proves its app (H19). */
+      /* THE KEYS THE RUNS SPOKE WITH, read once, so each row can say whether its key proves its app. */
       const keys = new Map<string, RunToken>();
       const readOnly = new Set<string>();
       for (const t of kernel.listTokens())

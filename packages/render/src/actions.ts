@@ -1,5 +1,5 @@
 /**
- * A block's declared actions, planned for a drawer (PGS-A12): which controls are shown, which fold, and what each is.
+ * A block's declared actions, planned for a drawer: which controls are shown, which fold, and what each is.
  *
  * THE SHAPE IS THE PAGE'S, checked by the record before it reaches here (`packages/kernel/src/row-actions.ts` cleans a
  * block's `actions` and a row's `row_actions` and cuts them to what this reader may press). This module only decides

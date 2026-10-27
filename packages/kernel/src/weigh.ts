@@ -122,10 +122,10 @@ export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
        undo of such a decision has a step for it (`undo.ts`, `declaredIn`): the earlier body is installed again as a
        new version, through the record's `undo`, which makes it ready first and writes it second. So a change is
        `shape`, with a `from` or without one. Batches 58 to 61 held it at `undo` while a plan for it had no step
-       (audit 58, claim 2).
+      .
        A RETYPE WITH A `from` STAYS `undo`: it rewrites the answers under the field, and `undo.ts` leaves it
        with a sentence. `retypes` is `govern.ts`'s `isRetype`.
-       AND SO DOES A FIELD ADDED TO A LIST THAT HOLDS ROWS (audit 62, claim 5). Put back takes the field off again only
+       AND SO DOES A FIELD ADDED TO A LIST THAT HOLDS ROWS. Put back takes the field off again only
        until somebody fills it; after that it leaves the step and says the field holds answers now (`undo.ts`,
        `filledSince`), and on a list in use that is the common case, so the question says so before the press and not
        after. A list with no row yet has nothing to fill, and stays `shape`. */
@@ -145,7 +145,7 @@ export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
     /* AN OPTION THAT WRITES (`patches`, govern-47) IS A ROWSET ON THE PICK, so it is weighed as one (`optionCost`); one
        that only says a choice is a call.
        AN OPTION ITS PROPOSER MARKED `hard: true` IS ONE THAT CANNOT BE TAKEN BACK ONCE PICKED, AND IT IS THAT OPTION
-       THAT IS HARD, NOT THE QUESTION (audit 62, claim 6). Batches 60 to 63 weighed the question by its worst option,
+       THAT IS HARD, NOT THE QUESTION. Batches 60 to 63 weighed the question by its worst option,
        so a pack update that offered "Keep my pages" beside "Take the update's page" was counted and ranked as the worst
        kind, and keeping was worded as hard. `optionCost` and `pickCost` say each option's own band.
        THE QUESTION IS `undo` ONLY WHEN NO PICK AVOIDS IT: every option it offers is marked. Otherwise it is weighed by
@@ -377,7 +377,7 @@ const OPTION_UNDO_SQL = `(COALESCE(json_type(o.value, '$.hard'), '') = 'true' OR
 
 /**
  * `costOf` as SQL over a `suggestion` row's `body_kind` and `body` columns, so a queue counts and ranks every open
- * question without reading one body into this process (audit 16, M5). Each arm is `costOf`'s own, in its order, and
+ * question without reading one body into this process. Each arm is `costOf`'s own, in its order, and
  * `test/weigh-sql.test.ts` holds the two to the same answer over every shape `costOf` reads.
  *
  * IT READS THE `declaration` TABLE AS WELL (batch 60), for the fields a list's history withholds, so it is `costOf`

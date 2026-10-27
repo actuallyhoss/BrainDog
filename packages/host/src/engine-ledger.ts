@@ -16,7 +16,7 @@
  * A MISSING TABLE IS NOT A FAULT, as in `slashOwnKeyOf`: the read can be asked before the first question of the day has
  * created Slash's tables, and then nothing was asked.
  *
- * THE MENTIONS ARE THE RECORD'S, NOT SLASH'S (`mentionsAttached`, audit 63 claim 5): `entity_mention` lives in the
+ * THE MENTIONS ARE THE RECORD'S, NOT SLASH'S (`mentionsAttached`): `entity_mention` lives in the
  * record's SQLite, which is Slash's on the Worker and a file of its own on a self-hosted record, so a host hands the
  * reader the record's and the ledger Slash's.
  */
@@ -70,7 +70,7 @@ const mentionTable = (sql: Pick<Sql, 'one'>): string | undefined =>
  *
  * WHAT ATTACHED MEANS. A mention is a name met with nothing that identifies it, kept with where it was seen and no row
  * it points at, so on the table as it stands every mention is not attached, and that is the true count, not a missing
- * one. ENG-B03 gives a mention its `holder` (`loop/scope/area-engine-b.md`, decision 2), and from then one that names a
+ * one. ENG-B03 gives a mention its `holder`, and from then one that names a
  * holder is attached, unless the attach was undone (`undone_at`). Which of the two tables this is, is read off its own
  * `CREATE` text at every ask, so the migration needs no line here and a record that has not run it is still read.
  *

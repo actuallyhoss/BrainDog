@@ -10,7 +10,7 @@
   which draws the filter as rows and as a sentence and asks the record for its count through `previewPage`. There is no
   second editor of a `where` here, because two editors of one tree are two readings of it.
 
-  AN ICON ON ANY BLOCK (PGS-A19). The field shows the glyph the block wears and its name; Choose opens the picker
+  AN ICON ON ANY BLOCK. The field shows the glyph the block wears and its name; Choose opens the picker
   (`GlyphPicker.svelte`, by a dynamic import) in place, by group, and the pick goes out in the same patch as every other
   edit. "No icon" takes the key off.
 
@@ -489,7 +489,7 @@
       {:else}
         <label class="label" for="{uid}-when">{blockWords.when}</label>
         <div class="field"><input id="{uid}-when" class="field-input" type="text" bind:value={draft.when} autocomplete="off" /></div>
-        <!-- AND THE ONE TEST A FIGURE WITH NO VALUE MEETS, offered as a choice so nobody has to know its words (PGS-C06). -->
+        <!-- AND THE ONE TEST A FIGURE WITH NO VALUE MEETS, offered as a choice so nobody has to know its words. -->
         <Button weight="quiet" disabled={whenNothing(draft.when) === null} onclick={() => { const said = whenNothing(draft!.when ?? ''); if (said) draft!.when = said; }}>{blockWords.whenNothing}</Button>
         <p class="help" data-bad={whenOk ? undefined : ''}>{whenOk ? blockWords.whenHelp : blockWords.whenBad}</p>
       {/if}

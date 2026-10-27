@@ -1,5 +1,5 @@
 /**
- * His widths and columns through the record (PGS-B07): a look by owner that says `span` and `area` is installed, read
+ * His widths and columns through the record: a look by owner that says `span` and `area` is installed, read
  * back off the record whole, and laid over the page a read draws; the engine's look laid under it never takes them
  * away, and Slash's look never carries any.
  */

@@ -9,7 +9,7 @@
  *
  * THE ORDER, ONE STEP AT A TIME:
  *   1. Today and Decide, the frame's. They are no add-on's and no declaration moves them, so they lead every rail.
- *   2. The person's pinned places, in the order they pinned them. What a person pins always wins (D38).
+ *   2. The person's pinned places, in the order they pinned them. What a person pins always wins.
  *   3. Each section an add-on declares (`nav: { section, order }`), one place a section, opening on its first page by
  *      `order`. A section whose pages declare where it sits on the rail (`nav.place`, the lowest of its pages') comes by
  *      that number; a section that says nothing follows them, in the order its add-ons were installed.

@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 43: shares, groups, token narrowing and the access log (sharing plan §2.2).
+ * The kernel schema, migration 43: shares, groups, token narrowing and the access log.
  *
  * A SHARE IS ONE ROW: who, what, at which rung, with hidden fields and time, as an allow or a deny. `what`, `caps`,
  * `hide` and `hours` hold JSON (`lens.ts` reads them), and `what` names lists and rows by id, never by name, so renaming

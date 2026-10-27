@@ -1,5 +1,5 @@
 /**
- * An add-on's update goes over the rows it planted, and a field written once keeps what the row holds (SHL-A09).
+ * An add-on's update goes over the rows it planted, and a field written once keeps what the row holds.
  *
  * NO UPDATE TOUCHED A PLANTED ROW. An install planted a list's example rows once and every later version left them
  * alone, so `once` had nothing to be obeyed by, and the day an update did write them a category a person had renamed

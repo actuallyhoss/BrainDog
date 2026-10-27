@@ -1,5 +1,5 @@
 /**
- * A card's line typed on in place (PGS-C15): the page's writer as the `write` a `cards` block is handed.
+ * A card's line typed on in place: the page's writer as the `write` a `cards` block is handed.
  *
  * THE PAUSE IS THE DRAWER'S. `Cards.svelte` waits for the typing to stop (`braindog-render`'s `card-edit.ts`), trims,
  * and sends nothing when the line is as it opened, so `write` is called once per edit with what the line says then.

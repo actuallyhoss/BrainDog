@@ -1,5 +1,5 @@
 /**
- * THE AUDIT OF 25 OCTOBER, Z38 (`cf-logs --worker braindog-production --errors`): twenty errors at 13:19:45Z on 24
+ * Twenty errors at 13:19:45Z on 24
  * October, `/api/pulse` "Connection closed: this Durable Object instance is no longer active. Reconnect or retry the
  * request." A read or a pulse is asked once more through a new stub; a write is never sent twice.
  */

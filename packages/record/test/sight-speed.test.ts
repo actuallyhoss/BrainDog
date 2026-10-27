@@ -1,5 +1,5 @@
 /**
- * A narrowed reader's page of the log is drawn inside the plan's bound (sharing plan §2.13, Slice 3): one
+ * A narrowed reader's page of the log is drawn inside the plan's bound (Slice 3): one
  * `recentHistory` page of 50 lines, for a reader held to one project's tasks, in 60 ms or less over 100,000 events.
  *
  * WHAT IT GUARDS. A log line about a row is shown only when the reader's grant admits the row, and that was asked one row

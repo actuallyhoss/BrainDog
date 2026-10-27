@@ -1,5 +1,5 @@
 /**
- * ONE DECISION IS ONE LINE IN ACTIVITY (the audit of 25 October, Z34).
+ * ONE DECISION IS ONE LINE IN ACTIVITY.
  *
  * WHAT WAS WRONG. Answering "Keep 6 key numbers for Crumb.gg?" wrote a decision and the question's close, both by him,
  * both at 20:31, and Activity drew both: "Closed “Keep 6 key numbers…”" with "Answered in one press, with no reason

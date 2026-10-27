@@ -20,7 +20,7 @@
  *     a bare `node --test` reaching every test file under its folder, which is what Node does with it;
  *   * a gate under `tools/gates` that spawns `--test` with a literal path.
  *
- * A SCRIPT NOBODY RUNS IS NOT A RUN, and a step under `if: false` is not one either: audit 35 found both
+ * A SCRIPT NOBODY RUNS IS NOT A RUN, and a step under `if: false` is not one either: both were found once
  * read as reached. A comment naming `node --test` is prose and reaches nothing, so a workflow's `#`
  * lines are dropped and a gate is read for the argument list it spawns rather than for the words.
  *

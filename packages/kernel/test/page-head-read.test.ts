@@ -1,5 +1,5 @@
 /**
- * The page's head as a record reads it (PGS-A14): a page declaring `header:` installs, and its read answers the head's
+ * The page's head as a record reads it: a page declaring `header:` installs, and its read answers the head's
  * parts resolved, the action cut to the reader's level as a block's actions are, through `kernel.page`'s `level`.
  * Invented list, page and words throughout.
  */

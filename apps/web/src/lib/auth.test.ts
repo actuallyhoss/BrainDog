@@ -333,7 +333,7 @@ test('NOTHING THROWS AND NOTHING LOGS, whatever comes back', async () => {
   assert.deepEqual(said, [], 'something was written to the console');
 });
 
-/* ── names and the frame's Sign out (LCH-A04) ───────────────────────────── */
+/* ── names and the frame's Sign out ───────────────────────────── */
 
 test('a passkey is named for the device that made it, and an iPad asking as a Mac is still an iPad', () => {
   const on = (userAgent: string, maxTouchPoints = 0) => platformLabel({ navigator: { userAgent, maxTouchPoints } });

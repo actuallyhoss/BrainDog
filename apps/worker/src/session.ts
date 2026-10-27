@@ -48,7 +48,7 @@ export type Deps = {
   /** Whether a person the record holds nothing for is on it and stopped, so the refusal says so. Absent, the door says its own words. */
   stopped?: (record: string, person: string) => Promise<boolean>;
   /**
-   * Whether a person the record holds nothing for once held a share there, and whose record it is (sharing plan §2.8),
+   * Whether a person the record holds nothing for once held a share there, and whose record it is,
    * so the refusal says their access ended and the app wipes its copy. Absent, or `null`, the door says its own words.
    */
   ended?: (record: string, person: string) => Promise<{ owner: string | null } | null>;
@@ -160,7 +160,7 @@ export type BearerDeps = {
   knows: (record: string) => Promise<boolean>;
   /**
    * `reach` is what the token's own row says it opens beyond its scope (`verifyToken`), absent from an older record.
-   * `build` is the command's own build as its `x-braindog-cli` header says it (AGT-A02), for the record to keep on the key
+   * `build` is the command's own build as its `x-braindog-cli` header says it, for the record to keep on the key
    * as its `last_build`, and absent when the caller sent none. The record drops a value that is not a build.
    */
   verify: (
@@ -267,7 +267,7 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
   const record = recordOf(authorization);
   if (!record || !(await deps.knows(record))) return { status: 401 };
   const bearer = /^Bearer\s+(.+)$/i.exec(authorization ?? '')?.[1];
-  /* THE COMMAND SAYS ITS BUILD ON EVERY CALL (AGT-A02), and it goes down with the bearer so the record can say which
+  /* THE COMMAND SAYS ITS BUILD ON EVERY CALL, and it goes down with the bearer so the record can say which
      machine is behind. Only a short one goes: a build is `YYYY.MM.DD+<hash>`, and the record drops anything else anyway. */
   const said = request.headers.get(CLI_HEADER)?.trim();
   const build = said !== undefined && said !== '' && said.length <= CLI_BUILD_MOST ? said : undefined;

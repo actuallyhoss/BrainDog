@@ -1,5 +1,5 @@
 /**
- * A look is rehearsed before it is written (ENG-B09, decision 3 check 4): laid over the page as it reads now, and read
+ * A look is rehearsed before it is written (decision 3 check 4): laid over the page as it reads now, and read
  * by the lint for what a page prints. The page here is a desk with a late list and an empty one, which is the shape
  * the composer met on his record: a look that led with the empty one drew a blank at the top of the page.
  */

@@ -16,14 +16,14 @@
  * so its versions are its template's. A page they may not open and a page that is not there are the same refusal,
  * which names what was asked and the pages there are.
  *
- * AND EACH VERSION IS CUT TO THE LISTS ITS READER MAY READ (audit 61, claim 7). `opens` asks about the lists the page
+ * AND EACH VERSION IS CUT TO THE LISTS ITS READER MAY READ. `opens` asks about the lists the page
  * reads TODAY, and an older version may have read others: a Desk that once drew Salaries handed that block's source to
  * somebody invited to Notes alone. So a block over a list the caller may not read is left out of the version, and so
  * is a block whose words name that list, and `cut` says how many were left out. It says a count and never which
  * lists. A cut version is not the page as it stood, so a host does not offer to put it back: applying it would take
  * those blocks away from everybody.
  *
- * AND SO IS A BLOCK OVER A FIGURE THE RECORD NO LONGER HOLDS (audit 64, claim 2). The kernel names a figure's lists by
+ * AND SO IS A BLOCK OVER A FIGURE THE RECORD NO LONGER HOLDS. The kernel names a figure's lists by
  * reading the figure, and one since taken out reads nothing, so a stat over a payroll total came back whole to the
  * Notes reader the day the total was retired. Nothing left says which lists it read, so the block is left out for
  * anybody who does not read every list, and counted in `cut` with the rest.
@@ -145,7 +145,7 @@ export function methods(deps: RecordDeps) {
    *
    * AN AGENT'S KIND IS READ OFF ITS RUN, AND THE RUNS ARE THE OWNER'S OWN LIST. A reader who may not read the runs, or
    * not that run, is told "An agent": "Claude Code" under a version said which app the owner works with to somebody the
-   * runs were never shared with (sharing plan §2.7, the lens leftovers). An `agent:` actor says its kind in its own
+   * runs were never shared with (the lens leftovers). An `agent:` actor says its kind in its own
    * name, and is held the same way.
    */
   const whoOf = (actor: string, ctx: CallContext): string => {

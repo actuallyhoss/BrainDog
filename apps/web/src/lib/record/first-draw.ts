@@ -1,6 +1,6 @@
 /**
  * The signed-in reads the app's first screens make: `boot` and what the root layout asks beside it, and the home page's
- * reads. ONE LIST, SO THE DEPLOY'S SMOKE AND THE APP CANNOT DRIFT (LCH-C02).
+ * reads. ONE LIST, SO THE DEPLOY'S SMOKE AND THE APP CANNOT DRIFT.
  *
  * WHY IT EXISTS. His Usage broke on a commit whose deploy was green, because no step of a deploy opened a record. The
  * smoke (`apps/worker/scripts/smoke.mjs`) now asks a canary record every read in this list with its token, and a 500 on

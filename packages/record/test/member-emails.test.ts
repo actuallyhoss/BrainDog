@@ -1,5 +1,5 @@
 /**
- * No read a reader makes holds a colleague's address (USE-A12, RQ-USE-090 and RQ-USE-091).
+ * No read a reader makes holds a colleague's address.
  *
  * "MEMBER LEVELS SAY WHO MAY SEE IT". A person invited to read a record sees its work, and the address each
  * colleague signed in with is not its work: it is how that colleague is reached, and a reader holding nine of them is

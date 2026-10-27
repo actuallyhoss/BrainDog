@@ -293,7 +293,7 @@ function matchFolded(folded: string, entries: readonly (readonly [string, Json])
  * AND A TAIL IS AT LEAST THREE DIGITS, the shortest the bank was measured printing. Shorter, `***-8` and `***27`
  * each filed at `exact` against the one row ending in them.
  *
- * AND THE OTHER WAY ROUND (REC-A02): when exactly one row's stored digits, three or more, are the end of LONGER printed
+ * AND THE OTHER WAY ROUND: when exactly one row's stored digits, three or more, are the end of LONGER printed
  * digits, that is a tail match too. A card whose last four he typed as `7731` is printed `***7731`, a whole token, and
  * one he typed as its last three is printed with four. Like the masked tail it is a guess about money, so the kernel
  * files it once for a person to confirm (`tailOf`), as it does the other direction.

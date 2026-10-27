@@ -85,7 +85,7 @@ export function bars(items: readonly BarsInput[], o: BarsOptions): BarsGeometry 
   const valueCol = Math.max(0, ...values.map((v) => textWidth(v, LABEL))) + GAP;
   const noteCol = Math.max(0, ...items.map((it) => (it.note ? textWidth(it.note, LABEL) + 8 : 0)));
 
-  /* A LABEL WIDER THAN TWO FIFTHS GOES OVER ITS BAR (the audit of 25 October, Z29): held to the column, "File a Ledger
+  /* A LABEL WIDER THAN TWO FIFTHS GOES OVER ITS BAR: held to the column, "File a Ledger
      entry in its account's book" ran on under its own bar at 390 and the bar was drawn over the words. Over the bar it
      has the width but the value's, and is cut with an ellipsis only past that. */
   const stacked = longest > Math.round(o.width * 0.4);

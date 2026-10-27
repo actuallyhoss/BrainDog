@@ -30,7 +30,7 @@
   let exporting = $state<ExportKind | null>(null);
 
   /**
-   * WHEN THE RECORD WAS LAST TAKEN AWAY, from `boot`'s `copies` (LCH-C03): "Last exported: 3 days ago" or "Never
+   * WHEN THE RECORD WAS LAST TAKEN AWAY, from `boot`'s `copies`: "Last exported: 3 days ago" or "Never
    * exported". The layout's `boot`, so arriving asks nothing; a host older than the field draws no line.
    */
   let facts = $state<CopyFacts | null>(null);
@@ -108,7 +108,7 @@
   };
 
   /**
-   * WHAT THIS RECORD KEEPS, IN ITS OWN NAMES: the three lists that hold the most, then how many more (Y22). The two
+   * WHAT THIS RECORD KEEPS, IN ITS OWN NAMES: the three lists that hold the most, then how many more. The two
    * slices name the person's own things rather than the system's word for them.
    */
   const things = $derived.by(() => {

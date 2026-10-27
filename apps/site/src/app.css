@@ -2,8 +2,7 @@
  * The site's own half of the stylesheet. Everything else is `@braindog/skin`, and the colours and faces are Look B's
  * (`look-b.css`).
  *
- * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER as the UI pass of 20 October rebuilt it (`loop/ui-pass-2026-10-20/
- * site.md`, SPEC 4.7): a dark night band at the top of every page (the header, then the page's own head), then
+ * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER as the redesign rebuilt it: a dark night band at the top of every page (the header, then the page's own head), then
  * full-bleed colour bands, each on its own ground in both schemes, with flat radius-16 tiles inside, and a dark
  * footer. No glass, no gradients, no glows, no shadows. Titles are Lexend 600 set tight, every other word is Geist.
  * Red is the app's two tokens: `--red-fill` under white words (the start button, an answer, a count, the chores
@@ -381,7 +380,7 @@
 
   /**
    * THE SITE DESIGN'S BUTTONS: a 48px rectangle, radius 12, in Geist 500. `.red` is the solid red
-   * with white words: the start button (`lib/site/Start.svelte`) and a drawing's suggested answer (site S2); `.ghost`
+   * with white words: the start button (`lib/site/Start.svelte`) and a drawing's suggested answer; `.ghost`
    * sits on the night ground, `.line` and `.quiet` on the page, and `.sm` is the 34px one. A `.btn` with none of these
    * is the quiet one, so a kept page's plain button stays drawn.
    *
@@ -545,7 +544,7 @@
     display: none !important;
   }
 
-  /* THE BIG CARDS of an inner page: paper, the black one and the red one, flat, radius 16 like every tile (site F7). */
+  /* THE BIG CARDS of an inner page: paper, the black one and the red one, flat, radius 16 like every tile. */
   .card {
     position: relative;
     overflow: hidden;
@@ -725,7 +724,7 @@
     }
   }
 
-  /* ── The home's full-bleed bands (site F6, F7) ────────────────────────────── */
+  /* ── The home's full-bleed bands ────────────────────────────── */
 
   /**
    * A BAND IS ONE IDEA, EDGE TO EDGE, on its own ground (`--band-*` in Look B), so two neighbours never share one in
@@ -765,7 +764,7 @@
     color: var(--ink);
   }
 
-  /* A BAND'S HEADING (site F8): two lines at 1440, heavy and tight; its one line under it at 18/1.5. */
+  /* A BAND'S HEADING: two lines at 1440, heavy and tight; its one line under it at 18/1.5. */
   .band-h2 {
     margin: 0;
     max-inline-size: 17ch;
@@ -849,7 +848,7 @@
     }
   }
 
-  /* A PHONE'S BANDS SIT CLOSER (the audit of 22 October, U-C10): six bands at 48 each way were a screen of ground. */
+  /* A PHONE'S BANDS SIT CLOSER: six bands at 48 each way were a screen of ground. */
   @media (max-width: 760px) {
     .band[class*='band--'] {
       padding-block: 40px;
@@ -865,7 +864,7 @@
   }
 
   /**
-   * A BAND RISES 8PX AS IT SCROLLS IN, AND NEVER HIDES (site F4): a transform-only rise on the scroll's own timeline,
+   * A BAND RISES 8PX AS IT SCROLLS IN, AND NEVER HIDES: a transform-only rise on the scroll's own timeline,
    * so a full-page capture, a reader that does not scroll and a crawler all see every band at full strength, and a
    * browser without scroll timelines simply draws it in place.
    */

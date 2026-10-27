@@ -45,7 +45,7 @@ test('A CREATE ENDS WITH A RECEIPT IN NAMES AND THE BATCH, and undo by the same 
   const made = await call('create', { register: 'tasks', fields: { what: 'Receipt a write' } }, me);
   assert.ok(!made.error, made.text);
   const last = made.text.split('\n').at(-1) ?? '';
-  /* THE TEXT NAMES IT ONCE, in the line above the receipt, and the receipt beside the answer names it whole (audit D, W15). */
+  /* THE TEXT NAMES IT ONCE, in the line above the receipt, and the receipt beside the answer names it whole. */
   assert.match(made.text.split('\n')[0] ?? '', /Receipt a write/u, made.text);
   assert.match(last, /^Receipt: To undo, call undo with batch /u, last);
   assert.ok(batchOf(last) !== '', last);

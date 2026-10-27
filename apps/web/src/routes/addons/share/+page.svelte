@@ -279,7 +279,7 @@
     if (!client) return;
     const mine = ++drafts;
     if (draft === null) draft = { state: 'reading' };
-    /* NEVER LEFT READING (UI audit of 22 October, 22): a write, a read of the last version or a diff that throws ends
+    /* NEVER LEFT READING: a write, a read of the last version or a diff that throws ends
        in a sentence, not in "Reading the file" for as long as the page stays open. */
     try {
       const out = await exportShared(client, args);
@@ -340,7 +340,7 @@
   {:else}
     {#if live && speaking === null}<p class="note">{copy.shareNoUseCase}</p>{/if}
 
-    <!-- TWO COLUMNS FROM 1100 (2.A.26): what goes in the file on the left, what it changes and how an installer sees it
+    <!-- TWO COLUMNS FROM 1100: what goes in the file on the left, what it changes and how an installer sees it
          on the right; the submit row inside the last tile of the first column, primary first. -->
     <form
       class="share-form form-two"
@@ -412,7 +412,7 @@
             {#if signals.length > 0}
               <label class="row-pick"><input type="checkbox" bind:checked={withSignals} /><span>{words.signals([...signals])}</span></label>
             {/if}
-            <!-- THE SKILLS BEHIND ONE LINE THAT COUNTS THEM (E22), shut until opened. -->
+            <!-- THE SKILLS BEHIND ONE LINE THAT COUNTS THEM, shut until opened. -->
             <details class="skills-pick">
               <summary class="rows-h tap">{words.skillsPicked(skillsPicked.length, skillRows.length)}</summary>
             <fieldset class="rows">
@@ -492,7 +492,7 @@
     max-inline-size: 100%;
   }
 
-  /* ON A PHONE THE PAGE'S OWN CONTROL, THE WHOLE WIDTH (UI pass of 21 October, H33): at its words' width the second
+  /* ON A PHONE THE PAGE'S OWN CONTROL, THE WHOLE WIDTH: at its words' width the second
      choice wrapped under the first. */
   @media (width < 640px) {
     :global(.segmented.modes) {

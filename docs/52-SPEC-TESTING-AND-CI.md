@@ -838,7 +838,7 @@ cannot tell which of the two is the mistake.*
 
 ### 8.2 · A seventh workflow: the lane after a deploy
 
-`after-deploy.yml` runs when `deploy.yml` ends green on master (PRF-A09). It runs one step for each file
+`after-deploy.yml` runs when `deploy.yml` ends green on master. It runs one step for each file
 in `tools/canary/lane.d/`, in name order, against the canary record `ops` on `brain.dog`: the signed-in
 smoke, `signin-live`, the look with the canary's session, and the `signs` route. A red smoke or sign-in
 starts the rollback `deploy.yml` already has (`rollback.mjs decide`, then `wrangler rollback`); a red look
@@ -974,7 +974,7 @@ Each decision names the design document to amend in the same revision ([35-SPEC-
 | 16 | **INP on the target phone is a release checklist row, not a workflow step**, until an ADB harness exists | 18 §6; 53 |
 | 17 | **`deploy-parity` also checks the deployed build id**, at the public `/.well-known/braindog-build` rather than at `READ+` `/api/version`, which takes a bearer this job has never held: the `app` tuple must equal the deploying run's `BRAINDOG_BUILD` | 33 §8; 22 §9 |
 | 18 | **`refusal-fixtures` is a script and the runners of 40 §6.** The script owns the enumeration (a code per fixture, a fixture per code); the `via` runners of 40 §6, in the packages 40's table names, own *produces exactly it* | 33 §8; 30 §6 |
-| 19 | **Interface with [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md), confirmed.** This spec reads `PAGES`, `SEED`, `REFUSALS`, `PACKS` as 40 §2 exports them, the `Page.expect` shape, the `corpus` record, and the materialiser at `packages/kernel/test/materialise.ts` (40 §5.3). Two asks of 40: `materialise` takes `{ locale }` so a record can be built `ar` for the RTL half (decision 13), and a fixture job stream for `job-view` | 40 §5.3 (the `locale` option); 40 §3 (a `jobs/` stream) |
+| 19 | **Interface with [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md), confirmed.** This spec reads `PAGES`, `SEED`, `REFUSALS`, `PACKS` as 40 §2 exports them, the `Page.expect` shape, the `corpus` record, and the materialiser at `packages/kernel/test/materialise.ts` (40 §5.3). Two asks of 40: `materialise` takes `{ locale }` so a record can be built `ar` for the RTL half, and a fixture job stream for `job-view` | 40 §5.3 (the `locale` option); 40 §3 (a `jobs/` stream) |
 | 20 | **`clean-room.txt` is the owner's file.** Its content is never derived, generated or reviewed by a builder; the gate asserts only that it is non-empty and that nothing matches | — |
 | 21 | **`budgets.mcp` and 44's `BUDGETS` are one number twice, asserted equal.** `mcp-budget` deep-equals them on the five shared keys before counting; a change to either without the other is red | 44 §2 (cite `budgets.json`); 33 §8 |
 | 22 | **The four `test/env.ts`, `test/e2e/`, `braindog dev` and `PAGES` names are 50's and 48's**, adopted over this spec's first-draft `harness.ts`, `server.ts`, `FIXTURES` — one name per thing across the two specs | 50 §3, §9 (no change; recorded so the audit sees the agreement) |

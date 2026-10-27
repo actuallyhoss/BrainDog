@@ -1,6 +1,6 @@
 /**
  * A search for a figure, by a caller from whom amounts are hidden, matches only where the figure is still in the text
- * once its amounts are taken out (`figuresStillIn`, `maskedMatched`, sharing plan §2.7).
+ * once its amounts are taken out (`figuresStillIn`, `maskedMatched`).
  */
 
 import { test } from 'node:test';

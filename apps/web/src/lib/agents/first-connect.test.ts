@@ -18,7 +18,7 @@ test('five apps, each with a line for this record and no key', () => {
   assert.ok(apps.every((a) => !/bearer|token|—/iu.test(a.line + a.what)));
 });
 
-test('ON A PHONE CLAUDE COMES FIRST, the one app there with no terminal (audit C, X3)', () => {
+test('ON A PHONE CLAUDE COMES FIRST, the one app there with no terminal', () => {
   const lines = connectLines('https://brain.dog', 'acme');
   assert.deepEqual(
     appLines(lines, lines.install, true).map((a) => a.name),

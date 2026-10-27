@@ -98,7 +98,7 @@ test('each distinct plan text becomes one plan, named as the parts name it', () 
   const parts = [part('Car', 5), ...desk(), part('Car', 4), part('desk', 6), part('  ', 7)];
   const out = plansFromNames(parts, []);
   /* IN THE ORDER THEIR FIRST PARTS WERE WRITTEN. A TEXT WRITTEN ANOTHER WAY IS THE SAME PLAN, named as its oldest part
-     writes it (the audit of 25 October, Y1); a blank one is no plan. */
+     writes it; a blank one is no plan. */
   assert.deepEqual(out.plans, [{ name: 'Desk', state: 'open' }, { name: 'Car', state: 'open' }]);
   /* A PLAN MADE IN THIS RUN HAS NO ID UNTIL THE RUN IS OVER, so its parts are linked by the next one. */
   assert.equal(out.waiting, 6);

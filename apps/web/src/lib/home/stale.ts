@@ -12,7 +12,7 @@
  * IT NEVER FAILS THE SCREEN. A record with no such call, a reader it refuses, a record where nothing is stale and a
  * line that dropped all answer nothing, and nothing draws nothing: Home stands as it did before.
  *
- * AND TWO THINGS THE LESSONS SAY, under the record's own lines (AGT-C16, AGT-D15): a skill whose lessons its text does
+ * AND TWO THINGS THE LESSONS SAY, under the record's own lines: a skill whose lessons its text does
  * not take in yet ("deploy has 2 lessons it does not take in yet", a link to the skill), and one lesson two projects
  * learned ("Kiln and Portage learned the same thing", with the one press that puts "Keep it once" to the person on
  * Decide). Each is its own read, `skillsBehind` and `learningsTwice`; a host that answers neither draws what it drew.
@@ -66,7 +66,7 @@ export type Kept = { ok: true; href: string } | { ok: false; said: string; gone:
 const PLACE: Readonly<Record<string, string>> = { steps: '/p/agents', questions: '/decide' };
 
 /**
- * THINGS HERE TWICE ARE NOT THINGS GONE STALE (audit 25 October, Y4). The record says each list holding twins as a line
+ * THINGS HERE TWICE ARE NOT THINGS GONE STALE. The record says each list holding twins as a line
  * of its own, all under the one kind `rows-same`; Settings counted them as stale ("32 things went stale" over "32 keys
  * are here twice") beside a Health page that said 9. They are drawn under their own heading, each list a line.
  */

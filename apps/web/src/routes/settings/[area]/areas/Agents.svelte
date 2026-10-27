@@ -8,7 +8,7 @@
   agent works under. What it decides is `lib/agents/profile.ts`. Only he changes these: `setAgentProfile` is ADMIN and
   refuses every token, so a colleague is not shown the rows.
 
-  ONE BUTTON, CONNECT AN AGENT (AGT-A07), where three boxes of text stood. It opens the connect sheet
+  ONE BUTTON, CONNECT AN AGENT, where three boxes of text stood. It opens the connect sheet
   (`lib/agents/ConnectSheet.svelte`), loaded with `import()` on the first press so the entry carries none of it: six
   ways in, each line with its Copy, a script's key made in its own tile, and a live row that says Connected when the
   app makes its first call.
@@ -316,7 +316,7 @@
     keyDecides: 'Until you set one, an agent does what its key allows.',
     profiles: (name: string) => `${name}'s profiles`,
     seeThem: 'See their runs',
-    /* "yesterday", not "1d ago" (UI pass of 21 October, P38). */
+    /* "yesterday", not "1d ago" (P38). */
     lastHeard: (when: string) => `Last heard ${when === '1d ago' ? 'yesterday' : when}`,
     on: ', on ',
     slash: 'Slash',
@@ -674,7 +674,7 @@
             <span class="who-words">
               <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
               <span class="who-name" dir="auto">{parts.app}</span>
-              <!-- ONE QUIET LINE UNDER THE NAME (UI audit of 22 October, 11): where it runs and how it came in ("Signed in",
+              <!-- ONE QUIET LINE UNDER THE NAME: where it runs and how it came in ("Signed in",
                    "A key you made"), then the facts, each its own item so a wrap breaks between them. A machine's grant
                    is said by its two words at the row's end, so its sentence is not drawn under it as well. -->
               {#if !scope.whole && !c.machine}<span class="who-detail who-reach">{reachOf(c)}</span>{/if}
@@ -726,7 +726,7 @@
   />
   <TrustRows />
 
-  <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, in a tile of its own that says what it is (audit C, X16):
+  <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, in a tile of its own that says what it is:
        its lists and pages by name and its figures as one count, so the offer fits on a phone's screen. -->
   {#if offer}
     {@const folded = foldedAdds(offer)}

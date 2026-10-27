@@ -1,5 +1,5 @@
 /**
- * `board-yes`: a screen is not restyled without a board with a yes (EXP-A01, rule 7 of the experience area).
+ * `board-yes`: a screen is not restyled without a board with a yes (rule 7 of the experience area).
  *
  *   node tools/gates/board-yes.mjs [root]
  *
@@ -17,7 +17,7 @@
  *     `variants/*`, `stand-ins/*`). One edited after its yes is not the board the yes was given to.
  *
  * A BOARD WITH NO `yes.json` GOVERNS NOTHING YET, so the gate starts quiet and tightens board by board. A board with a
- * `yes.json` and no `paths.json` holds only its own drift. `board`, `units` and `said` are what `loop/tools/plan.mjs`
+ * `yes.json` and no `paths.json` holds only its own drift. `board`, `units` and `said` are what 
  * reads (`readYes`), so a yes the planner counts is a yes this gate holds.
  *
  * HASHES ARE OF THE TEXT WITH ITS LINE ENDINGS FOLDED, so a checkout that writes CRLF reads the same file. Images are
@@ -169,7 +169,7 @@ export function judge(root, board, files) {
   const governs = Object.keys(now.paths).length;
   const nowords = typeof yes.said !== 'string' || yes.said.trim() === '';
   if (nowords) findings.push(`  ${at}/yes.json  holds no words in said, so this screen has no board with a yes.`);
-  /* `board` AND `units` ARE WHAT THE PLANNER COUNTS (`loop/tools/plan.mjs` `readYes`): a yes that names neither holds
+  /* `board` AND `units` ARE WHAT THE PLANNER COUNTS: a yes that names neither holds
      every unit waiting on it for good, so it is said here rather than found a batch later. */
   if (typeof yes.board !== 'string' || yes.board.trim() === '' || !Array.isArray(yes.units) || yes.units.some((u) => typeof u !== 'string'))
     findings.push(`  ${at}/yes.json  names no board or no list of units, so the planner cannot count this yes. Take it again with board.mjs --yes.`);

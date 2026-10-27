@@ -117,7 +117,7 @@ export type RecordDeps = {
   /** An owner or an Admin in a browser, and no token of any kind (`index.ts`, `team`). Absent, an owner only. */
   team?: ((ctx: CallContext, reads?: string) => Refusal | null) | undefined;
   /**
-   * The Plus gate on a share to somebody not on the record yet (sharing plan §2.15): a refusal when this record's plan
+   * The Plus gate on a share to somebody not on the record yet: a refusal when this record's plan
    * does not share with outsiders. Absent, nothing is held back, which is every host while it sells nothing.
    */
   plus?: ((ctx: CallContext, who: { kind: string; id: string }) => Refusal | null | Promise<Refusal | null>) | undefined;
@@ -188,7 +188,7 @@ export type RecordDeps = {
   engineProbe?: (() => Promise<import('./engine-probe.ts').EngineProbe>) | undefined;
   /** Slash's ledger, the mentions and the open questions since an instant (host). Absent, `engineReadings` answers `null`. */
   engineLedger?: import('./engine-readings.ts').EngineLedgerRead | undefined;
-  /** The host's own build and MIN_CLI (AGT-A02), which doorHealth answers and reads behind against. Absent, both are null. */
+  /** The host's own build and MIN_CLI, which doorHealth answers and reads behind against. Absent, both are null. */
   doorBuild?: import('./door.ts').DoorBuild | (() => import('./door.ts').DoorBuild);
   /** The host's catalogue, by id and title, which packsRemoved names a removed add-on by. Absent, it is said by its id. */
   catalogue?: readonly { id: string; title: string }[] | undefined;

@@ -101,7 +101,7 @@ export async function verify(args: string[], io: VerifyIo): Promise<number> {
   try {
     bytes = readFileSync(resolve(io.cwd, file));
   } catch (e) {
-    /* A FILE THAT IS NOT THERE IS SAID SO (audit D, W8): "could not be read" left a person to guess at a typo or a lock. */
+    /* A FILE THAT IS NOT THERE IS SAID SO: "could not be read" left a person to guess at a typo or a lock. */
     io.say((e as { code?: unknown }).code === 'ENOENT' ? `There is no file at ${file}. Check the path, or run braindog export to make one.` : `${file} could not be read.`);
     return 1;
   }

@@ -277,7 +277,7 @@ export const words = {
   when: 'A change takes effect the next time this add-on is installed or updated, unless the setting says it is held at once.',
   save: 'Save',
   reset: 'Reset',
-  /* A BLANK SUM SAYS IT IS BLANK (Y10): its currency in front of an empty box read as a value. */
+  /* A BLANK SUM SAYS IT IS BLANK: its currency in front of an empty box read as a value. */
   notSet: 'Not set',
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
   speaksAlone: 'It is the only starter on, so the record speaks in its words. This becomes a choice when a second one is on.',

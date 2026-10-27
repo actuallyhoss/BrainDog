@@ -419,7 +419,7 @@ async function worker(open: { url: string }[] = []) {
   return { on, shown, opened, focused, waited, fire, scope };
 }
 
-test('A PUSH WITH A PATH SHOWS THE SAME LINE AND A TAP OPENS THAT PATH, never a word that came with it (E44)', async () => {
+test('A PUSH WITH A PATH SHOWS THE SAME LINE AND A TAP OPENS THAT PATH, never a word that came with it', async () => {
   const w = await worker();
   await w.fire('push', { data: { json: () => ({ open: `${BASE}/kiln/decide/sg_01JQ`, title: 'Invoice 41 is late' }) } });
   assert.equal(w.shown[0]?.[0], 'Something in your BrainDog needs you');
@@ -523,7 +523,7 @@ test('THE SHELL NAMES A HOME SCREEN ICON IOS WILL USE, a square PNG that ships, 
   assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [180, 180]);
 });
 
-test('A TEST PRESS SAYS WHAT THE RECORD SENT, and never that nothing was turned on (pushTest, REC-A15)', async () => {
+test('A TEST PRESS SAYS WHAT THE RECORD SENT, and never that nothing was turned on (pushTest)', async () => {
   const line = 'Sent to 2 devices. It should arrive within a minute.';
   assert.deepEqual(await sendTest(caller({ pushTest: { ok: true, value: { devices: 2, line } } }).call), { kind: 'sent', line });
   assert.deepEqual(await sendTest(caller({ pushTest: { ok: true, value: { devices: 1 } } }).call), { kind: 'sent', line: testWords.sent(1) });

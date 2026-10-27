@@ -107,7 +107,7 @@ export function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
  * Which rows of one list fall due on one of its day fields, as the record's cash walks say: the rows any leg over that
  * list and that day moves, or `[]` when no walk reads them, or one cannot be read here.
  *
- * WHAT THE WALK DOES NOT MOVE DOES NOT FALL DUE (the scope of 24 October, B4 and B5). A repeating line that is paused is
+ * WHAT THE WALK DOES NOT MOVE DOES NOT FALL DUE (the scope of 24 October). A repeating line that is paused is
  * not walked (`state is live`), and a bill that repeats is walked as its repeating line and not as itself, so listing
  * either as due said a paused fee was two weeks late and one premium twice in Due soon. Read off the legs the record
  * already declares, as `moneyWayOf` reads their money, so no module's own word for a live line is written here. A row
@@ -115,7 +115,7 @@ export function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
  * alone), and a list no walk reads keeps every row that is not finished.
  */
 export function walkedOf(schema: Schema, field: string, legs: readonly unknown[], deps: PageDeps, kit: Pick<SourceKit, 'predicateOf'>): Predicate[] {
-  /* A LEG HELD BY A HOLE IS ONE PAGE'S PART OF A WALK, NOT THE RECORD'S (the audit of 25 October, Z15): a book's page walks
+  /* A LEG HELD BY A HOLE IS ONE PAGE'S PART OF A WALK, NOT THE RECORD'S: a book's page walks
      Money's legs held to that book, `book is {{name}}`, filled only on that page. Read here the hole names no book, and
      that one leg left the bill and its repeating line both due, one premium twice on Today. The walk it narrows is
      among the legs already. */

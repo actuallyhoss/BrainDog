@@ -1,5 +1,5 @@
 /**
- * The row beside a list is the one panel every declared page opens (PGS-C04): `RowPanel`, through a host the list
+ * The row beside a list is the one panel every declared page opens: `RowPanel`, through a host the list
  * screen makes (`listHost` in `lib/page/row-host.svelte.ts`). The hand-built peek drew every field and could change
  * none; the panel changes a row in one write, says so with an Undo, and the list reads its rows again so the changed
  * day shows at once.
@@ -72,7 +72,7 @@ test('`p` AND THE MENU\'S PEEK OPEN THE ROW ON THE HOST', () => {
   assert.match(SCREEN, /const typed = host\.host\.dirty && host\.opened !== null && host\.opened !== seq;/u);
 });
 
-test('ESC IN THE LIST CLOSES AN OPEN PEEK BEFORE IT CLEARS A SELECTION (scope E40)', () => {
+test('ESC IN THE LIST CLOSES AN OPEN PEEK BEFORE IT CLEARS A SELECTION', () => {
   const esc = branch("e.key === 'Escape' && host.opened !== null");
   assert.match(esc, /host\.close\(\);/u);
   assert.ok(SCREEN.indexOf("e.key === 'Escape' && host.opened !== null") < SCREEN.indexOf("e.key === 'Escape' && selected.size > 0"), 'the peek closes first');

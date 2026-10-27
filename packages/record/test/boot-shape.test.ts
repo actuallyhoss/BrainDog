@@ -1,5 +1,5 @@
 /**
- * The shell's one round trip (EXP-D03): `boot` carries what the app asked for in four more calls before its first
+ * The shell's one round trip: `boot` carries what the app asked for in four more calls before its first
  * paint. What waits (`waits`), who is working (`working`), the voice the record speaks in (`voice`, which was the add-ons
  * list and one or more add-on settings reads) and whether a model is behind Slash (`slash`, which was `version`). It says
  * its shape with a number, and the fields it carried before stay for a release.

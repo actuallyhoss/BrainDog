@@ -1,5 +1,5 @@
 /**
- * Who else is in this working tree, and a next step that is true or absent (AGT-B08).
+ * Who else is in this working tree, and a next step that is true or absent.
  *
  * On the owner's record a session saw six warning lines, four about sessions dead for hours, and another was told to
  * start a batch ten hours old and 53 commits behind. So the warning is said once and only for runs working in the same

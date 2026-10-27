@@ -1,5 +1,5 @@
 /**
- * What a `form` block decides, as functions both drawers call (PGS-A15): which fields are shown, which control each is,
+ * What a `form` block decides, as functions both drawers call: which fields are shown, which control each is,
  * what is missing, and the typed values a new row is created with.
  *
  * THE FORM IS THE RECORD'S ANSWER, checked by the kernel before it reaches here (`packages/kernel/src/kinds/form.ts`):

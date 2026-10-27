@@ -76,7 +76,7 @@ import { fileURLToPath } from 'node:url';
 import { skipDir } from './lib.mjs';
 
 /**
- * THE PUBLIC WORDS OF ONE COUNTRY THAT THE KERNEL HOLDS TODAY (SHL-A01): five card processors and four places.
+ * THE PUBLIC WORDS OF ONE COUNTRY THAT THE KERNEL HOLDS TODAY: five card processors and four places.
  * `packages/kernel/src/identity-keys.ts` strips them off a payee so two spellings of one shop are one payee, which is
  * one country's banking written into the part every record runs. They are public names, so they are listed and
  * printed like any tracked word; the owner's own names are the hashes below and are never printed.
@@ -179,7 +179,7 @@ const KNOWN = new Map(PRIVATE_WORDS.map((e) => [hashOf(e.word), e.word]));
  * Every package and every app is in scope by default, so a new core package is watched the day it exists.
  *
  * `packs` IS THE THIRD WORKSPACE ROOT AND IS LEFT OUT ON PURPOSE, the one text gate that does not read
- * it (an audit found all four text gates reading only these two). These words are the use cases the
+ * it (testing found all four text gates reading only these two). These words are the use cases the
  * core must not name, and a pack is exactly where a use case goes: a gold rate or a bank's pattern
  * lives in a record or a shared pack, never in `packages/`. It is `packages/seed`'s exemption below,
  * for the directory that took over its job.

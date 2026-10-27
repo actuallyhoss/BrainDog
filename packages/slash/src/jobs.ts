@@ -11,7 +11,7 @@
  * version 3 a job's `pattern` row was counted with his asks by its kind, so on the included model the record's own
  * drafts spent his 80. A press at the raw inbox is his, and `proposePattern` says that (`PRESSED`).
  *
- * AND WHAT IT BOUGHT (ENG-A10): a draft is written `pattern`, a digest's sentences `prose`, an embedding `embed`. All
+ * AND WHAT IT BOUGHT: a draft is written `pattern`, a digest's sentences `prose`, an embedding `embed`. All
  * three were `look` until then, the daily look's own purpose, so a month's thinking read as one line and the plan's
  * floor for each (`packages/host/src/budget-plan.ts`) had no rows of its own to count. The rows already written keep
  * what they say: nothing here rereads the ledger, and the step to store version 3 (`FILL_2`, `call.ts`) still reads an
@@ -86,7 +86,7 @@ const PRESSED = { purpose: 'ask', spends: 'person' } as const;
 /** What a pattern read, for the fold and the ledger: how many messages, and never what they said. */
 const readOf = (n: number): ReadTrace[] => [{ register: 'inbox_raw', rows: n, predicate: 'shape' }];
 
-/** How many arrivals of one shape the record's own draft is handed (ENG-B07). */
+/** How many arrivals of one shape the record's own draft is handed. */
 const OLDEST = 3;
 
 /** An arrival's time as a number to order by, or `null` where it does not read as one. */
@@ -189,7 +189,7 @@ export const patterns = (
       },
       inference: engine,
     });
-    /* A CANDIDATE ON ITS OWN WIRE (ENG-A06) BYPASSES `engine`, whose `sent` would still hold an earlier attempt's name. */
+    /* A CANDIDATE ON ITS OWN WIRE BYPASSES `engine`, whose `sent` would still hold an earlier attempt's name. */
     const used = ran.candidate !== undefined ? ran.model : (sent ?? ran.model);
 
     const account = (status: 'ok' | 'refused' | 'error', code?: string, filed?: string): void =>
@@ -311,7 +311,7 @@ export const patterns = (
 
     /* THE RECORD'S OWN JOB, SO NOBODY'S CONTEXT: the index is read as `slash`, which is how the kernel files what this
        drafts, and the row is settled `ok` with nothing in `filed`, because the filing is the ack's and happens after. */
-    /* THE THREE OLDEST, AND HOW MANY WAIT (ENG-B07): the model reads the backlog's own text and is told it is a backlog.
+    /* THE THREE OLDEST, AND HOW MANY WAIT: the model reads the backlog's own text and is told it is a backlog.
        The anchor check is run on the three it was sent, so a sample it never saw cannot vouch for an anchor. `waiting` is
        never fewer than the samples handed, so a host that says nothing reads as today; and nothing here retries a draft
        that failed, which stays his press. */

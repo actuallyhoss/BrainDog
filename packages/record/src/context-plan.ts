@@ -246,7 +246,7 @@ const span = (s: number | undefined): string | null => {
 /** A name and a list as a person says it: "Tasks", "Tasks and Learnings", "Tasks, Notes and Learnings". */
 const and = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
 
-/** His words as an agent reads them, always marked as his (plan §10.2): `Mara said in BrainDog (IN4): "…"`. */
+/** His words as an agent reads them, always marked as his: `Mara said in BrainDog: "…"`. */
 const voice = (who: string, id: string, said: string, verb = 'said'): string => `${who} ${verb} in BrainDog (${id}): "${oneLine(said)}"`;
 
 /** The answer's first line when the run is stopped or paused, and what still works. */

@@ -1,5 +1,5 @@
 /**
- * `slashReads`, the one switch for Slash's background reading (ENG-A09).
+ * `slashReads`, the one switch for Slash's background reading.
  *
  * WHY THIS FILE EXISTS. The consent rule says background reading is on until the owner says otherwise and has one switch.
  * Asserted here: it is on by default, an owner in a browser turns it off and on, no argument reads it without changing

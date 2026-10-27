@@ -1,5 +1,5 @@
 /**
- * The agent door's own signs (AGT-B01): marks the door leaves as clients connect, and what they add up to.
+ * The agent door's own signs: marks the door leaves as clients connect, and what they add up to.
  *
  * WHY THIS EXISTS. For a week no client was given the tool list and nothing in the record knew: the dead week was found
  * by reading 65 client log files by hand. A mark is the door saying what happened to one session, so the record can

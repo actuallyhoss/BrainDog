@@ -41,7 +41,7 @@ export type DoesNames = {
   /**
    * Whether `list` has a field of this id at all. A patch that sends one it lacks is refused when it is written, so
    * the yes changes nothing there and the line does not name it: it read "Changes Zzz internal in Tasks.", an id
-   * read as words, under a question whose own title left the field out (audit 79, claim 4). Asked apart from `field`,
+   * read as words, under a question whose own title left the field out. Asked apart from `field`,
    * which is `null` for a field the list holds and gave no label. Without it every field a patch sends is named.
    */
   holds?: (list: string, field: string) => boolean;
@@ -111,7 +111,7 @@ const SHORT = 80;
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 /**
  * Where an entry is (`things#3`), anywhere in a text ("Fix tasks#8"), or a bare id: a handle, which a line never says.
- * It was held to the whole text, so a title that named an entry in passing was quoted with its handle (audit 79, claim 1).
+ * It was held to the whole text, so a title that named an entry in passing was quoted with its handle.
  */
 const HANDLE = /[\w.-]+#\d+|^[0-9A-HJKMNP-TV-Z]{26}$/u;
 /** A text that holds an address somebody is written to, or that is a host's name and nothing else. */
@@ -119,7 +119,7 @@ const ADDRESS = /@|^(?:[a-z0-9-]+\.)+[a-z]{2,}$/iu;
 
 /**
  * A text that is where a file or a page is, which a line never says. Any text with a slash in it was held back, so a
- * stage of "Q3/Q4" or a status of "N/A" read as its field alone (audit 79, claim 6). A path is told by its shape:
+ * stage of "Q3/Q4" or a status of "N/A" read as its field alone. A path is told by its shape:
  * it starts at a root, a home, a dot or a drive; it holds `://`; or it has no space in it and either ends in a slash,
  * starts with a host's name, ends in a file's name ("docs/review.md"), or runs three parts deep with a letter in it
  * ("src/lib/kiln", where "13/10/2026" is a day somebody typed). Two plain words with a slash between them are said.
@@ -144,7 +144,7 @@ const isPath = (text: string): boolean =>
  * One short value as a person reads it, `null` for none, and `undefined` for one a line cannot say: a handle, a path or
  * an address, a text too long to quote, or a shape it does not know. Money is said in its own currency, a day as a day.
  *
- * A DAY WITH A TIME IS NOT SAID (audit 79, claim 2). An instant's day is whichever one the reader's zone puts it in,
+ * A DAY WITH A TIME IS NOT SAID. An instant's day is whichever one the reader's zone puts it in,
  * and nothing here knows the zone: 22:30 in UTC on the 13th is the 14th in Cairo, and the calendar day cut off the
  * front said the 13th. So only a value held as a day is said as one, and the field of an instant is named alone.
  */
@@ -257,7 +257,7 @@ function changesSaid(rows: readonly unknown[], names: DoesNames, list: string): 
   const bare: string[] = [];
   for (const field of fields) {
     /* WHAT EACH ENTRY WOULD HOLD, and what it holds now: one entry says both, several say only a value they all take.
-       ONE ENTRY IS READ, WHICHEVER IT IS (audit 79, claim 3). What several entries held is never said, so reading it of
+       ONE ENTRY IS READ, WHICHEVER IT IS. What several entries held is never said, so reading it of
        each was a read for every entry and field on every draw of the queue: 2,500 for one question changing five
        fields of 500 entries. The one thing those reads decided is whether the field may be valued at all, a secret or
        a file, and that is the list's to say and the same for every entry of it, so the first is asked for all. */

@@ -1,5 +1,5 @@
 /**
- * The shell's one request goes out as the page parses (EXP-D03): `app.html` asks for `boot` beside the first chunks, at
+ * The shell's one request goes out as the page parses: `app.html` asks for `boot` beside the first chunks, at
  * the address the app will ask, and `readBoot` takes that answer once and only for that address.
  *
  * THE TEMPLATE GUESSES THE RECORD BY THE APP'S OWN RULE (`split` in `lib/at.ts`), written again in a line of script that

@@ -130,7 +130,7 @@ const SPACE_RUN = /(\p{White_Space})\p{White_Space}+/gu;
  *
  * SOMETHING VISIBLE AND SOMETHING DANGEROUS IS REFUSED, NOT CLEANED. `node:sqlite` stored `Bo\u0000Tanner` as `Bo`
  * at the bind, and nobody was told; cleaning here would be the same silence one layer up. Refused: a control
- * character (NUL, CR, LF, BEL, ESC, tab, DEL, C1), a bidi control (an override makes the stored `Bo nimda` draw as `Bo admin`), an
+ * character (NUL, CR, LF, BEL, ESC, tab, DEL), a bidi control (an override makes the stored `Bo nimda` draw as `Bo admin`), an
  * invisible character between two visible ones, a joiner outside the scripts and emoji that spell with one, a mark
  * with no letter under it or more than `MARKS_MAX` in a row, private use, a noncharacter, a lone surrogate (stored as
  * U+FFFD), and more than `NAME_MAX`. The one thing cleaned inside is a run of spaces, which draws as a gap between
@@ -227,7 +227,7 @@ export type InviteLook = {
   level?: Level | null;
   lists?: { id: string; name: string; level: Level }[];
   /**
-   * WHAT IS SHARED WITH THE ADDRESS (sharing plan §3.4), said from the share's own sentences: "Ada shared Pottery with you.
+   * WHAT IS SHARED WITH THE ADDRESS, said from the share's own sentences: "Ada shared Pottery with you.
    * You can edit tasks in Pottery until 1 Dec." Names, never ids. `null` or absent when nothing is shared with it.
    */
   shared?: string | null;

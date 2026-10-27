@@ -103,7 +103,7 @@ test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {
 
 /**
  * THE DECLARATION IS THE ONE THE IMPORT FILED BEFORE, BUT FOR ITS NAME. The setup file's `polls` were built in code by
- * the seed's old `pollPack`, which went when the form and the importer moved onto this file (REC-C01). So the poll it
+ * the seed's old `pollPack`, which went when the form and the importer moved onto this file. So the poll it
  * built for a synthetic setup file's poll, with a project and a key, is written out here, and a spec that names no
  * date and no money still fills it to the letter: moving onto this file changes nothing polled.
  */
@@ -268,7 +268,7 @@ const DIARY = {
 /**
  * PORTFOLIO FROM BEFORE IT HELD NUMBERS: 1.16.0 as brain.dog last served it (`packages/seed/test/fixtures/released`),
  * without its example rows, the way a record still on that version holds it. Today's Portfolio declares Numbers
- * itself, with a reading that may be money (REC-C03), so a record with Portfolio and no readings list, or with another
+ * itself, with a reading that may be money, so a record with Portfolio and no readings list, or with another
  * pack's, is a record on this version.
  */
 const BEFORE_NUMBERS = {

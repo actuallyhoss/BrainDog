@@ -1,5 +1,5 @@
 /**
- * A new Personal Home offers something to press (USE-A08, Personal 2.5.0).
+ * A new Personal Home offers something to press (Personal 2.5.0).
  *
  * BEFORE: a fresh Personal record opened on a line of zeros, "Nothing falls due in the next two weeks" and nothing to
  * press, where Student leads with "Add homework" and the founder with "Bring your money in". Now Home declares three

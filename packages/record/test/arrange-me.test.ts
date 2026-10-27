@@ -1,5 +1,5 @@
 /**
- * The owner themselves, what they call their lists, and a setting named by its key alone, in an arrangement (USE-B04).
+ * The owner themselves, what they call their lists, and a setting named by its key alone, in an arrangement.
  *
  * THESE WERE A SCRIPT IN THE BROWSER (`apps/web/src/routes/start/accept.ts`): meet the person and mark the row as them,
  * rename each module's lists in its declaration, and ask every module whether it keeps `home_currency`. A closed tab

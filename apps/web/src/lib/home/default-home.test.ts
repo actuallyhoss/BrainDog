@@ -126,7 +126,7 @@ test('THE DESK NAMES A FEW PEOPLE where the record keeps a list of them, by its 
   assert.equal(peopleOf([people], null), undefined);
   assert.equal(peopleOf([], 'folk'), undefined);
   const p = peopleOf([people], 'folk')!;
-  /* AND LEAVES OUT WHO IS FOLDED INTO ANOTHER, as People counts them (audit Z9). */
+  /* AND LEAVES OUT WHO IS FOLDED INTO ANOTHER, as People counts them. */
   assert.deepEqual(p, { register: 'folk', name: 'Folk', icon: 'users', title: 'name', fact: 'org', where: 'merged_into is empty' });
   assert.equal(peopleOf([{ ...people, icon: 'heart' } as never], 'folk')?.icon, 'heart');
   const tile = todayHome({ tasks: true, adds: true, money: true, people: p }).blocks.find((b) => b.source === 'register.folk') as unknown as { key: string; span: number; heading: string; columns: { field: string; as: string }[]; limit: number };
@@ -137,9 +137,9 @@ test('THE DESK NAMES A FEW PEOPLE where the record keeps a list of them, by its 
   assert.equal(tile.limit, PEOPLE_LIMIT);
 });
 
-/* AUDIT Z9 (today-390-light-full.png, people-390-light.png): Today said "People 8" over every row of the list, the
+/* Today said "People 8" over every row of the list, the
    record's own person and those merged into another among them, while People said "7 contacts". */
-test('Today counts the people People counts: never the reader, never one merged into another (audit Z9)', () => {
+test('Today counts the people People counts: never the reader, never one merged into another', () => {
   const people: WeekDecl = {
     id: 'folk',
     name: 'Folk',
@@ -727,7 +727,7 @@ test('THE MONEY TILE SAYS WHAT IS STILL TO COME IN, beside what was paid and wha
   assert.deepEqual(weekMoney().cells?.map((c) => c.label), ['Paid', 'Came in', 'Still to come in']);
 });
 
-/* ── the line Today says while a vital sign reads red (PRF-A05) ── */
+/* ── the line Today says while a vital sign reads red ── */
 
 /** Today's two notes on `signs-red`, of which the record draws one at most. */
 const signNotes = (holds: Holds = { tasks: true, adds: true, money: true, health: true }) =>

@@ -1,5 +1,5 @@
 /**
- * The drill, as one command: a stranger's whole life on one host (LCH-A03, `loop/scope/area-launch-a.md:365-418`).
+ * The drill, as one command: a stranger's whole life on one host.
  *
  *   node tools/drill/run.mjs --host <origin> [--steps a,b] [--live] [--lapse] [--pay]
  *
@@ -12,7 +12,7 @@
  * name), and `DRILL_OPERATOR_KEY` (the operator key, for the sweep, and to mint the run's own code when no code is
  * named). Each one missing makes the steps that need it skip and say why.
  *
- * `--lapse` ADDS THE LAPSE STEP (`lapsed.mjs`, LCH-C04): once the record exists and before `erase`, its billing is marked
+ * `--lapse` ADDS THE LAPSE STEP (`lapsed.mjs`): once the record exists and before `erase`, its billing is marked
  * lapsed through the host's own payment door in Stripe test mode, an export and a read still answer and a write is
  * refused, then billing resumes. OFF BY DEFAULT, so the lane after a deploy runs what it ran until the lapse step is switched on. It reads
  * `DRILL_LAPSE_SECRET` and `DRILL_LAPSE_SUBSCRIPTION` by name and never prints them.

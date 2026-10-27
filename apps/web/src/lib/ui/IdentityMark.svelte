@@ -1,5 +1,5 @@
 <!--
-  A thing's mark and its name: the mark in its square (`IconWell`, the UI pass of 20 October 2.A.5), then the name.
+  A thing's mark and its name: the mark in its square (`IconWell`), then the name.
 
   THE MARK IS `markOf`'s, the same answer the card drawers give (`braindog-render`'s `cards.ts`): the glyph the row's
   mark names when it may be one, else the first letter of the row's own name, so Oxbow.gg with the mark `cake` wears the

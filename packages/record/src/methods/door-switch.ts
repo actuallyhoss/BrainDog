@@ -1,6 +1,6 @@
 /**
  * A door switched off and on again without losing its address: `doorSwitch({ ingest, on })` (ADMIN), and the three reads
- * the host and the doors list ask of it (SHL-C13).
+ * the host and the doors list ask of it.
  *
  * THERE WAS "no way to switch a door off" (H.101). The only way to stop a door was to retire its declaration, which
  * drops its token (`heldDigest` in `index.ts`), so a sender stopped for an afternoon needed a new address the morning

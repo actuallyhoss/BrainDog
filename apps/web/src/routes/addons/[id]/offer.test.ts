@@ -1,6 +1,6 @@
 /**
  * The install card's sentences of what waits (`offer.ts`): the parts the plan left out until the record holds a list
- * (SHL-A11). Which key an install sends to which host is the plan sheet's (`$lib/market/plan.ts`). And an update that
+ * Which key an install sends to which host is the plan sheet's (`$lib/market/plan.ts`). And an update that
  * waits on another (`afterOthers`, `installInTurn`): the listing's own page takes the holder's update first.
  */
 
@@ -209,7 +209,7 @@ test('the listing hands its plan what else waits, so the wait is read where the 
   assert.match(page, /planFor\(client, listing, file, held, copy\.writeRaced, \(\) => waitingOf\(fetch, kennel, held\)\)/u);
 });
 
-/* AFTER INSTALL, ONE PRESS LANDS ON WHAT IT BROUGHT (audit C of 25 October, X9): its first page that opens on its own. */
+/* AFTER INSTALL, ONE PRESS LANDS ON WHAT IT BROUGHT: its first page that opens on its own. */
 
 test('the page Installed opens is the first that needs no row chosen, by its title', () => {
   const pages = [

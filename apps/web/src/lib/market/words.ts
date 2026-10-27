@@ -11,7 +11,7 @@ export const words = {
   /* THE WAY FROM THE STORE TO WHAT THIS RECORD HOLDS, Settings › Add-ons. */
   yours: 'Your add-ons',
   searchHint: 'Search add-ons and starters',
-  /* THE STORE (the add-ons pass of 27 October): starters first, then the shelves, and what the record suggests itself. */
+  /* THE STORE: starters first, then the shelves, and what the record suggests itself. */
   store: {
     sentence: 'Things you can add to your record. Each one shows you its plan before anything changes.',
     suggested: 'Suggested for you',
@@ -37,7 +37,7 @@ export const words = {
     showFewer: 'Show fewer',
     all: 'All',
   },
-  /* ONE ADD-ON'S PAGE, AS THIS RECORD HOLDS IT (the add-ons pass of 27 October): what it reaches, always, even nothing;
+  /* ONE ADD-ON'S PAGE, AS THIS RECORD HOLDS IT: what it reaches, always, even nothing;
      its versions with the one on this record marked; and who made it, under what licence, and where it is offered. */
   about: {
     reaches: 'What it reaches',
@@ -107,7 +107,7 @@ export const words = {
   ruleOther: 'Runs when something happens in the record',
   examples: (n: number): string => (n === 0 ? 'No examples' : n === 1 ? '1 example' : `${n} examples`),
   /* A VERSION'S TAG, OR NONE: "Adds something" on every row said nothing (agents F25), and "New" on every minor from 1.4
-     to 1.13 said nothing either (UI pass of 21 October, P46). A major is still said, since it takes something away. */
+     to 1.13 said nothing either (P46). A major is still said, since it takes something away. */
   bump: { major: 'Takes something away', minor: '', patch: 'Fixes' },
   first: 'First version',
   /* A DAY, NEVER ISO: "2 Sep" this year, "2 Sep 2025" before it. A version is dated to the day, so a

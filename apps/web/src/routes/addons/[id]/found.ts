@@ -1,5 +1,5 @@
 /**
- * ONE PAGE PER ADD-ON (the add-ons pass of 27 October): `/addons/<id>` is the add-on as this record holds it when it holds
+ * ONE PAGE PER ADD-ON: `/addons/<id>` is the add-on as this record holds it when it holds
  * it, and the store's page for it when it does not. The two disagreed (one said version 1.21.0 and two pages, the other
  * "Update to 1.23.0" and four), so which one an address draws is decided here, once, from what the record holds.
  *

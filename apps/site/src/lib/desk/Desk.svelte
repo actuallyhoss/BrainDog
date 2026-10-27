@@ -1,6 +1,6 @@
 <!--
   The live desk in the hero: the app's own window on Maya's made-up record, drawn as the app's 19 October Today
-  (site F5, SPEC 4.7): the top bar with the five places and their icons, the count on Needs you, the "Ask or change
+  (SPEC 4.7): the top bar with the five places and their icons, the count on Needs you, the "Ask or change
   anything" bar, who is working, and Maya's face. Five places to press through (§23: the product's own parts, never a
   screenshot).
 
@@ -36,7 +36,7 @@
   const tabs: Record<string, HTMLButtonElement> = {};
 
   const count = $derived(needs.open.length);
-  /* THE VISITOR'S OWN DAY on the phone's bar, once the page runs (U-C15). */
+  /* THE VISITOR'S OWN DAY on the phone's bar, once the page runs. */
   let date = $state('');
   onMount(() => void (date = dateSaid(new Date())));
 
@@ -507,7 +507,7 @@
     box-shadow: 0 0 0 2px var(--tile);
   }
 
-  /* THE ANSWER BUTTONS: the suggested one solid red with white words (site S2), the other quiet. */
+  /* THE ANSWER BUTTONS: the suggested one solid red with white words, the other quiet. */
   .win :global(.dbtn) {
     all: unset;
     box-sizing: border-box;
@@ -610,7 +610,7 @@
     }
   }
 
-  /* THE PHONE: Today alone, in a 380px frame that clips, SINCE THE AUDIT OF 22 OCTOBER (U-C10). The places pinned as its
+  /* THE PHONE: Today alone, in a 380px frame that clips. The places pinned as its
      bottom bar and the frame's 540px made the hero a screen and a half before the first band; the desk at 760 and up
      keeps its five places. */
   @media (max-width: 760px) {

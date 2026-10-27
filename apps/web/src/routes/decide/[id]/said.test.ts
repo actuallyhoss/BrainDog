@@ -1,5 +1,5 @@
 /**
- * What a question changes, in sentences (scope E37): each group of what appears is one sentence of its own, where it was
+ * What a question changes, in sentences: each group of what appears is one sentence of its own, where it was
  * a heading over a grid of labels ("Pages / Lists / Measures"), and what has more to show than words stays the preview's.
  */
 

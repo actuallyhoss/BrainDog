@@ -3,7 +3,7 @@
  * parts of a person that name one, taken out. A record on Founder 1.x held `organisations` as Founder's own list, and
  * the People it held declared none, so a rebuild with today's People would have two packs claiming one list before
  * the update under test began. It is also the owner's own record before the update reaches it: People 2.x, no
- * organisations, no `self` (`loop/STATUS.md`).
+ * organisations, no `self`.
  *
  * WHAT GOES WITH THE ORGANISATIONS: a person's `org`, `keys`, `aliases` and `self`, the cards' grouping by `org`
  * (`group`, `fold`), the Organisations cards and figure, an organisation's page, the two rules that meet one, and the

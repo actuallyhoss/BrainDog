@@ -202,7 +202,7 @@ const ON_RECORD = `SELECT s.record FROM dir_slug s
 /**
  * The owner of the record a live name means, when this person was taken off it (`dir_left`): `?1` the person, `?2` the
  * slug. Asked only after `ON_RECORD` found nothing, so somebody who was on a record and is not now is told their access
- * ended (sharing plan §2.8), and every other name keeps the one 403.
+ * ended, and every other name keeps the one 403.
  */
 const LEFT_RECORD = `SELECT p.name, p.email FROM dir_slug s
      JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
@@ -424,7 +424,7 @@ export type SignupNeeds = { needs: 'code' };
 export type SignupProof = { proof: string };
 
 /**
- * A person giving one of their own passkeys a name of their choosing (LCH-A04): `label` is what they typed.
+ * A person giving one of their own passkeys a name of their choosing: `label` is what they typed.
  *
  * The arm `AuthCall` in `@braindog/ports` now carries too, kept here under this name for the hosts and the self-host
  * start that import it from `@braindog/record/directory`.

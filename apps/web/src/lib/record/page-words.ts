@@ -1,5 +1,5 @@
 /**
- * The words for making a page (PGS-C30), apart from the call that makes one (`page-new.ts`).
+ * The words for making a page, apart from the call that makes one (`page-new.ts`).
  *
  * A FILE OF ITS OWN, because the rail draws the line and its heading on every screen and the call carries the client:
  * the rail imports these words, and `page-new.ts` only when somebody presses Enter in the box.

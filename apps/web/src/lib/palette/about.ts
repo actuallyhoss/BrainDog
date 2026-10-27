@@ -2,7 +2,7 @@
  * What a name typed in the palette is, and where it was seen: the rules of the palette's "what it is" rows.
  *
  * PURE, SO `node --test` CAN IMPORT IT, beside `slash.ts` and for its reason: a `.svelte` file cannot be imported by a
- * test. `Palette.svelte` asks the record's `about` read (ENG-B02) for the text in the box and draws what this file
+ * test. `Palette.svelte` asks the record's `about` read for the text in the box and draws what this file
  * makes of the answer, as rows like any other result.
  *
  * ONE THING IS ONE ROW, AND TWO ARE TWO. When the name settles on one thing the record answers it as `is`, and that is

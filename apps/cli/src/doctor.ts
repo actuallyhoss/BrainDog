@@ -209,7 +209,7 @@ const isOurHook = (command: string, which: string): boolean => new RegExp(`brain
 /**
  * THE FOUR HOOKS BESIDE THE START AND THE END, by their event and word as `install` writes them. Without the prompt and
  * tool hooks what he tells a run from the app waits for the run's next BrainDog call, and two of his three profiles had
- * the start and end hooks only (audit of 22 Oct, E5). Named only where the start hook is there, so a profile BrainDog
+ * the start and end hooks only. Named only where the start hook is there, so a profile BrainDog
  * was never installed in says so once.
  */
 const OTHER_HOOKS = [

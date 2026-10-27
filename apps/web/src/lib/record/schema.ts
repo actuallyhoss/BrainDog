@@ -666,7 +666,7 @@ export type AuditEvent = {
   target?: string;
   note: string;
   version: number;
-  /** On the one line a pass of BrainDog's own update is said as (SHL-A21): its sentence and counts, and the lines it wrote. */
+  /** On the one line a pass of BrainDog's own update is said as: its sentence and counts, and the lines it wrote. */
   pass?: { said: string; updated: number; asked: number; steps: number; at: string };
   steps?: AuditEvent[];
   /** How the line settled a suggestion, as `settlingOf` reads it; absent on a line that settled none. */

@@ -1179,7 +1179,7 @@ async function proposePack(id: string, doc: Record<string, unknown>, question: s
   const { causeOf, connect, joinedSaid } = await import('./skills.ts');
   const at = await connect(host, io);
   if (typeof at === 'number') return at;
-  /* ASKED ONCE (AGT-C07): the same pack asked for again, from here or another machine, joins the open question. */
+  /* ASKED ONCE: the same pack asked for again, from here or another machine, joins the open question. */
   const ask = (body: Record<string, unknown>) => at.client.call<{ id: string; joined?: true; said?: string }>('propose', { question, body_kind: 'pack', body, ...causeOf(`install#${id}`) });
   let answer = await ask({ install: id, doc });
   if (byId && refused(answer) && answer.refusal.at === 'body.doc') answer = await ask({ install: id });

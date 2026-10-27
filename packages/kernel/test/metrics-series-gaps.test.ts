@@ -1,5 +1,5 @@
 /**
- * A figure over a kept line (REC-B01): `source: 'series.<figure>'` with `value: { count: 'missing' }` and a window
+ * A figure over a kept line: `source: 'series.<figure>'` with `value: { count: 'missing' }` and a window
  * answers how many days of the window hold no point in that figure's line, by the record's own days. It is how Money
  * says its nights stopped: `snapshot` counted the days it could not write and kept the count nowhere.
  *

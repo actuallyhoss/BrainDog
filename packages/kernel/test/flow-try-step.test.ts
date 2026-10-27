@@ -1,5 +1,5 @@
 /**
- * One step of an automation tried alone (SHL-D14): the try stops after the step asked for, the earlier steps' answers
+ * One step of an automation tried alone: the try stops after the step asked for, the earlier steps' answers
  * that were given are used rather than taken again, and each step hands back what it kept under its `as:` (`out`), cut
  * at 4 KB and with a secret withheld. A call still answers `would`, and nothing outlives the rehearsal.
  *

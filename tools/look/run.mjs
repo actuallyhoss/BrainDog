@@ -1,5 +1,5 @@
 /**
- * The look: real screens of a record, with no one's hands (`loop/scope/area-proof-a.md` 2.4, PRF-A02).
+ * The look: real screens of a record, with no one's hands.
  *
  *   node tools/look/run.mjs --source seed|lived|file:<path>|live:<record> --set six|nine|all [--out <dir>] [--screens a,b,c]
  *
@@ -124,7 +124,7 @@ export async function serve(source, { build = join(ROOT, 'apps', 'web', 'build')
   return { origin, app: `${origin}${APP_BASE}${source.prefix}`, server, close: () => new Promise((r) => server.close(() => r())) };
 }
 
-/** Where this look writes, and a refusal when a source that counts as seen is pointed outside `loop/proof/looks`. */
+/** Where this look writes, and a refusal when a source that counts as seen is pointed outside its looks folder. */
 export function outFor(source, given, root = ROOT, at = new Date()) {
   const stamp = at.toISOString().slice(0, 16).replace(':', '-');
   const out = given === undefined ? join(root, LOOKS, `${source.name}-${stamp}`) : resolve(given);

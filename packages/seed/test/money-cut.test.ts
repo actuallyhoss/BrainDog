@@ -1,5 +1,5 @@
 /**
- * Money is a folder, and `money.ts` is one line that exports it (REC-B01 job 1, `loop/scope/area-record-b.md`).
+ * Money is a folder, and `money.ts` is one line that exports it (REC-B01 job 1).
  *
  * THE CUT WAS A PURE MOVE, AND THIS IS WHAT KEEPS IT ONE. `money.ts` was 2,858 lines that every unit after it had to
  * edit at once. A part that grows back into it, or a part file that grows past what one person reads in a sitting, is

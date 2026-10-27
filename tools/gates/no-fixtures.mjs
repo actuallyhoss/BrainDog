@@ -8,7 +8,7 @@
  * live in `apps/web/src/lib/record/fixtures/`, and this is what keeps them there: any file in one of `PLACES` that is
  * not a test and not in a `fixtures/` directory, and imports a module through a `fixtures/` path, is a finding.
  *
- * A LIST AND NOT ONE FOLDER (PRF-A07: the invented record is for the gates and for nothing else).
+ * A LIST AND NOT ONE FOLDER (the invented record is for the gates and for nothing else).
  * This read `apps/web/src` alone, so the command's scratch record imported its three product parts from the seed's
  * root and no gate said so (`apps/cli/src/scratch.ts`, until 9 October). Everything that runs a record for somebody
  * is on the list: the web app, the worker, the self-host, the command, and the host, record and agent-door packages.

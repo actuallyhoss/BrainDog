@@ -1,5 +1,5 @@
 /**
- * Shop, use case 6 of the vision (`loop/progress/planner-45.md`, "The onboarding target"): a fresh record made for a
+ * Shop, use case 6 of the vision ("The onboarding target"): a fresh record made for a
  * shop holds Orders and Products and nothing in them, its Orders page draws nothing until an order is in, and nothing
  * is written as an example, whether the first run asks for the use case's examples or not.
  */
@@ -95,7 +95,7 @@ test('THE ORDERS PAGE DRAWS NOTHING ON A NEW SHOP, and each tile once an order i
   const { k, sql } = await made(['shop'], false);
   const blocks = value<{ blocks: Drawn[] }>(k.page('orders')).blocks;
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  /* ONE BOX TO ADD THE FIRST ORDER, SINCE 1.4.0 (audit C, X7): the page said "Nothing here yet" and nothing to press. */
+  /* ONE BOX TO ADD THE FIRST ORDER, SINCE 1.4.0: the page said "Nothing here yet" and nothing to press. */
   const adds = blocks.filter((b) => b.kind === 'capture' && b.drawn !== false);
   assert.deepEqual(adds.map((b) => b.heading), ['Add an order']);
   const shown = blocks.filter((b) => b.drawn !== false && b.heading !== undefined && b.kind !== 'capture');
@@ -111,7 +111,7 @@ test('THE ORDERS PAGE DRAWS NOTHING ON A NEW SHOP, and each tile once an order i
   for (const b of after) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const drawn = after.filter((b) => b.drawn !== false && b.heading !== undefined && b.kind !== 'capture');
   assert.deepEqual(drawn.map((b) => b.heading), ['Due this week', 'Still to come in']);
-  /* THE TILE IS HEADED AS TODAY'S MONEY TILE OPENS IT (audit 69 finding 4): `OWED_TO_YOU` in
+  /* THE TILE IS HEADED AS TODAY'S MONEY TILE OPENS IT: `OWED_TO_YOU` in
      `apps/web/src/lib/home/default-home.ts` is the same words, held equal by hand since the seed cannot read the web. */
   const orders = (SHOP.pack.declarations as readonly { page?: string; blocks?: { kind: string; heading?: string }[] }[]).find((d) => d.page === 'orders');
   assert.ok(orders?.blocks?.some((b) => b.kind === 'table' && b.heading === 'Still to come in'), 'page.orders holds no table headed Still to come in');

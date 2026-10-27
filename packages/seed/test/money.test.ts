@@ -929,8 +929,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   assert.notEqual(lead.drawn, false, 'a record with one set of money reads no line about it');
   /* NO DAY COUNT IN IT SINCE money-core 3.11.0: Runs out says it, beside the walk. */
   /* AND HOW FAR CASH MOVED ON A MONTH AGO, since the sample holds its nights from the moment it is made (`cashPoints`). */
-  /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the UI pass
-     of 20 October (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
+  /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the redesign (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
   /* EACH CURRENCY APART, AND THE ACCOUNTS THE ACCOUNTS TILE LISTS, SINCE money-core 3.27.0: the sample keeps one
      currency, so nothing is said converted, and every account it counts as cash holds money. */
   assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on', 'cash-by-account.groups']);
@@ -941,7 +940,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
-  /* IN WORDS SINCE THE UI PASS OF 20 OCTOBER: "6% down on a month ago", where it said "−6%". */
+  /* IN WORDS: "6% down on a month ago", where it said "−6%". */
   assert.equal(hero.values?.['cash-now.moved'], `${-moved}% down`);
   /* THE LINE IS WHERE THE MONEY IS KEPT, a sentence, and then the part that is late, a sentence of its own. */
   const [money, late] = lead.body?.split(/(?<=\.)\s+/u) ?? [];
@@ -1316,12 +1315,11 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
   made('Home');
   const two = drawn();
   assert.ok(!two.includes(undefined), 'the line of one book is still said over two');
-  /* AND THE LINE SAYS WHERE THE MONEY IS KEPT INSTEAD, SINCE money-core 3.17.0, and how much there is, since 3.18.0 (the
-     audit of 22 October, U4): what each book holds is still the tile under it. */
+  /* AND THE LINE SAYS WHERE THE MONEY IS KEPT INSTEAD, SINCE money-core 3.17.0, and how much there is, since 3.18.0: what each book holds is still the tile under it. */
   assert.equal(two[0], 'kept in');
   /* WHAT IS WAITING ON THE PERSON MAY LEAD, wherever a page declares it, and Money declares it nowhere since REC-B23
-     step 7. The filter stays for a look that puts the questions first while there are any (`look.<page>`'s `lead`,
-     `loop/contract-17.md`): the books' figure is held beside the walk among the rest either way. */
+     step 7. The filter stays for a look that puts the questions first while there are any (`look.<page>`'s `lead`):
+     the books' figure is held beside the walk among the rest either way. */
   assert.deepEqual(two.filter((h) => h !== 'Waiting on you').slice(0, 2), ['kept in', ''], 'the hero follows the line');
 });
 

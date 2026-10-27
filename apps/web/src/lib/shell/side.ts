@@ -29,7 +29,7 @@ export type SideProject = {
 };
 
 /**
- * A PROJECT'S NAME AS THE SIDEBAR SAYS IT (the scope of 24 October, E2): a name typed as a slug, all small letters with
+ * A PROJECT'S NAME AS THE SIDEBAR SAYS IT (the scope of 24 October): a name typed as a slug, all small letters with
  * hyphens or underscores ("kiln-site"), is said in words with a capital ("Kiln site"), as it sat beside "Glaze shop".
  * Any other name is kept as written, so "Clay.co", "iOS app" and "PotBoard" are never recased. Only what is drawn: the
  * row's own title is still what a figure or an agent's run names it by.
@@ -96,7 +96,7 @@ export function factOf(p: Pick<SideProject, 'late' | 'working' | 'moved'>): { te
 }
 
 /**
- * WHAT A PROJECT'S ROW SAYS UNDER ITS NAME ON THE PHONE (the audit of 25 October, Z32): its lane and its next step, as
+ * WHAT A PROJECT'S ROW SAYS UNDER ITS NAME ON THE PHONE: its lane and its next step, as
  * the laptop's cards say them ("Building · Ship the first build"), where the phone drew a bare list of names. Either
  * alone where the other is not said, and nothing where neither is. `label` is the lane's own word, as its list says it.
  */

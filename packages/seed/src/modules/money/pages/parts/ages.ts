@@ -2,7 +2,7 @@
  * `register.balances` in its `requires`, as a page names every list a block writes to. */
 
 /**
- * THE DAY AN ACCOUNT'S CARD IS DATED BY, SINCE money-core 3.16.0 (REC-B03): the newest statement Cash now restarts the
+ * THE DAY AN ACCOUNT'S CARD IS DATED BY, SINCE money-core 3.16.0: the newest statement Cash now restarts the
  * account from (`account-ages`, grouped by the account's name), written over the card's `as_of` in the answer
  * (`staleDaysOf` in `packages/kernel/src/pages.ts`). The typed "As of" is only the day somebody typed a balance, and a
  * bank message never writes it, so a card dated by it read out of date for ever. An account no statement ever confirmed

@@ -2,7 +2,7 @@
  * TODAY, DECLARED: the page every record opens on when it declares neither its use case's `home-<id>` nor a `home`
  * page, and what Home does to whichever of the three it draws ("every page is declared").
  *
- * A PAGE BODY LIKE ANY OTHER. Today was a screen of its own (retired 24 October, C30), and Overview a second
+ * A PAGE BODY LIKE ANY OTHER. Today was a screen of its own (retired 24 October), and Overview a second
  * one over the house Home; both are this body now, drawn by the one reader (`PageView` in `home` mode), so a person or
  * an agent reshapes Today by installing a `home` page, and one look holds everywhere.
  *
@@ -179,7 +179,7 @@ const keyed = (key: DeskKey) => ({ key }) as const;
  * THE BLOCKS TODAY'S DESK SHOWS AT REST, by the key each is declared under (the 19 October desk, roadmap slice 1a): what
  * needs you, who is working and the cash in the first row, the few key numbers that lead under it (`numbersTile`), the
  * record's week where it keeps one, then the projects, and what is coming up and a few people beside Arrivals. WHO IS
- * WORKING AND THE PROJECTS ARE BLOCKS OF THE BODY SINCE 24 OCTOBER (C27): Home draws each as the desk's own tile
+ * WORKING AND THE PROJECTS ARE BLOCKS OF THE BODY SINCE 24 OCTOBER: Home draws each as the desk's own tile
  * (`deskOf`), where they were parts it drew around the page. Every other block of Today's
  * own body folds behind one More (`deskFolded`), and so does every tile Home draws around the page.
  */
@@ -281,7 +281,7 @@ export function peopleOf(decls: readonly (WeekDecl & { icon?: string | undefined
 }
 
 /**
- * THE PEOPLE EVERY SCREEN COUNTS (audit Z9, today-390-light-full.png): Today said "People 8" over every row of the list,
+ * THE PEOPLE EVERY SCREEN COUNTS (today-390-light-full.png): Today said "People 8" over every row of the list,
  * the record's own person and those folded into another among them, while People said "7 contacts". So the tile leaves
  * out who the list's `meets:` role marks as the reader (`self`) and as merged (`merged_into`, a link to the list
  * itself), as People's own count does. A list with neither keeps every row. Read off the declaration, never a name.
@@ -378,7 +378,7 @@ export const SIGNS_RED = 'signs-red';
 export const SIGNS_PAGE = 'health';
 
 /**
- * THE LINE TODAY SAYS WHILE A VITAL SIGN READS RED (PRF-A05: a sign that fails says so in the app), in the
+ * THE LINE TODAY SAYS WHILE A VITAL SIGN READS RED (a sign that fails says so in the app), in the
  * words the health sentence in Settings says it in. TWO NOTES ON THE ONE FIGURE, so one of them draws at most and the
  * count reads as a person says it, as the Health page's own line does. `signs-red` reads nothing while no sign has
  * anything to judge by and nought once none is red, and neither draws a note: a Today with nothing wrong is as it was.
@@ -401,7 +401,7 @@ export const QUIET = 'exceptions';
 const QUIET_WORDS = { heading: 'Gone quiet', subject: 'What', since: 'Last seen', was: 'Before' } as const;
 
 /**
- * WHAT WENT QUIET (ENG-B13): the things this record was taking and has stopped taking, one line each, with what a person
+ * WHAT WENT QUIET: the things this record was taking and has stopped taking, one line each, with what a person
  * calls it, the day it was last there and what it was before, in the record's own words ("Written to on 5 of 14 days").
  * Each was said only on its own page, so a feed that stopped a fortnight ago was found by opening the page it fed.
  *
@@ -440,7 +440,7 @@ export function quietHeld<B extends { source?: string | undefined; refusals: rea
 export const NUMBERS: string = KPIS_KIND;
 
 /**
- * THE FEW KEY NUMBERS THAT LEAD TODAY (loop/plans/kpis-2026-10-21, 2.5, decided 21 Oct): his pins first, then one a
+ * THE FEW KEY NUMBERS THAT LEAD TODAY (2.5, decided 21 Oct): his pins first, then one a
  * project in play, off target before stale, stale before late, late before a big change, money before the rest, four at
  * most. THE RECORD RANKS THEM (`kpisForToday` in the kernel's `kpi-rank.ts`), and nothing here orders them again.
  *
@@ -562,7 +562,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       ...(holds.quiet ? [quietTile()] : []),
       ...(holds.tasks ? work : [lateMoney]),
       /* WHO IS WORKING, the record's runs at work by its one clock (`sessions.working`), only while one is (`runs-working`).
-         The desk draws it as Working now, each run with how long it has been at it (`WorkingNow.svelte`, C27). */
+         The desk draws it as Working now, each run with how long it has been at it (`WorkingNow.svelte`). */
       ...(holds.runs ? [workingTile(voice)] : []),
       /* CASH AHEAD (today F5): the cash now, how long it lasts, and what comes in and goes out in the next thirty days,
          read from the Money page's own figures, where that page is. ITS LINE IS THE TWELVE WEEKS AHEAD, the walk the
@@ -588,7 +588,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       /* THE FEW KEY NUMBERS THAT LEAD, under cash: drawn only where the record keeps one. */
       numbersTile(),
       /* THE PROJECTS IN PLAY, as their cards, where the record keeps a list of them. The desk draws them as its row of
-         cards with the lanes over them (`ProjectCards.svelte`, C27). */
+         cards with the lanes over them (`ProjectCards.svelte`). */
       ...(holds.projects ? [projectsTile(holds.projects)] : []),
       /* THE NEXT FEW THINGS THAT FALL DUE ACROSS EVERY LIST, from today on, read on their own so what is late never
          takes their place; a task already drawn in a block above is not drawn again. */
@@ -615,7 +615,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
 }
 
 /**
- * WHO IS WORKING, as Today declares it (C27): the record's runs working now, with the agent, what it says it is doing,
+ * WHO IS WORKING, as Today declares it: the record's runs working now, with the agent, what it says it is doing,
  * its project and when it was last heard from, six at most, and only while one is (the desk leaves an empty one out, `desk-part.ts`). A table, so a page kept from Today
  * draws it as any page draws runs; Today's desk draws it as Working now.
  */
@@ -639,7 +639,7 @@ export const WORKED_FIGURE = 'project-worked';
 export const PROJECTS_READ = 500;
 
 /**
- * THE PROJECTS, as Today declares them (C27): cards over the list that keeps them, by name. Which are in play and in
+ * THE PROJECTS, as Today declares them: cards over the list that keeps them, by name. Which are in play and in
  * what order is the desk's to say from each row's lane (`project-cards.ts` `cardsOf`), as it said it when it read the
  * list itself, so the block reads the whole list and names no lane.
  */
@@ -651,7 +651,7 @@ export function projectsTile(p: { register: string; title: string; name: string 
     heading: p.name,
     icon: 'grid',
     source: `register.${p.register}`,
-    /* AND WHEN EACH WAS LAST WORKED ON, BY THE RECORD'S ONE FIGURE (the audit of 25 October, Z7): its tasks and its runs
+    /* AND WHEN EACH WAS LAST WORKED ON, BY THE RECORD'S ONE FIGURE: its tasks and its runs
        read together (`project-worked`), the figure Projects' cards read too, so both say one time. */
     columns: [{ field: p.title, as: 'title' }, { metric: `${WORKED_FIGURE}:{{${p.title}}}`, as: 'when', label: 'Worked on' }],
     limit: PROJECTS_READ,
@@ -853,7 +853,7 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  */
 /**
  * WHAT WAITS AND WHO IS WORKING, AS `boot` SAYS IT (`waits.svelte.ts`), which Home's line and its working tile read in
- * place of what the page happened to draw (EXP-E07, AGT-C02): the line counts every open question and every agent at
+ * place of what the page happened to draw: the line counts every open question and every agent at
  * work by the record's one count, and the tile lists only the runs `boot` says are working. Absent from an older host,
  * and Home then counts what it drew, as before.
  */
@@ -933,7 +933,7 @@ export function homeDrawn(
       shaped.push(gone === 0 && late.length === 0 ? b : pick(b, rest, undefined, rest.length === 0 ? 0 : b.total - gone - late.length));
       continue;
     }
-    /* NEEDS YOU LEADS WITH THE MONEY (today F3), oldest first in each group, and its count is the badge's (SF4). */
+    /* NEEDS YOU LEADS WITH THE MONEY (today F3), oldest first in each group, and its count is the badge's. */
     if (isQueue(b) && b.key === 'needs-you' && b.queue) {
       const total = waits ? waits.questions : b.total;
       /* THE HEAD SAYS THE ONE COUNT, an agent's question with the rest (`counted`); "N more" stays the questions'. */
@@ -988,7 +988,7 @@ const isWeekDue = (b: LiveBlock, w: Week): boolean =>
 const isWeekMoney = (b: LiveBlock): boolean => b.kind === 'stat' && (b.metrics ?? []).some((m) => (WEEK_IN as readonly string[]).includes(m.id));
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-/** A count in a sentence: digits always (SF14), never a word beside a figure. */
+/** A count in a sentence: digits always, never a word beside a figure. */
 const opening = (n: number): string => n.toLocaleString('en-GB');
 
 /** A day this week as a sentence says it: "today", "tomorrow", "Friday", and the short day past the week. */
@@ -1473,7 +1473,7 @@ export function sumsSaid(sums: ReadonlyMap<string, number>): string | null {
 /**
  * THE PAGE'S LINE (spec 4.1, today F2): "8 need you. £7,200 owed to you is late. 2 agents are working."
  *
- * WHAT NEEDS YOU IS ONE COUNT (SF4): `boot`'s open questions (`waits`), the number the badge and the Needs you tile say,
+ * WHAT NEEDS YOU IS ONE COUNT: `boot`'s open questions (`waits`), the number the badge and the Needs you tile say,
  * and nothing is added to it. Without `waits` (an older host) it is what the page's queues hold. LATE IS ITS OWN CLAUSE,
  * said with its money (`lateSumsOf`), and where no late thing carries money, as a count of things. WHO IS WORKING is
  * `boot`'s too. `null` when the page holds none of those blocks and nothing waits, so a page of figures says its own line.

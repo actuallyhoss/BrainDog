@@ -1,5 +1,5 @@
 /**
- * Messages waiting to be filed open the messages (audit 25 October, Y6). The line above Settings said "Messages wait to be
+ * Messages waiting to be filed open the messages. The line above Settings said "Messages wait to be
  * filed. Look", and Look opened the Health page, which said the same line again. Where the reader can open what came in,
  * the link opens it; anybody else is taken to the signs as before.
  */

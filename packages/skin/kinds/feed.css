@@ -92,7 +92,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A COUNT SAYS IT IS ONE (the pass of 27 October): a bare "2" before "Claude changed Priya Raman" read as a
+  /* A COUNT SAYS IT IS ONE: a bare "2" before "Claude changed Priya Raman" read as a
      stray figure, so a burst's count is "2×", how many times the line happened. */
   .feed-count:not(:empty)::after {
     content: '×';
@@ -166,7 +166,7 @@
 
   /* TWO PLAIN LINES AT MOST PER EVENT: the name and what they did in the same weight, cut at the end of the second line,
      so a long payee never makes one event three lines tall beside its neighbours. One line cut a phone's "Claude Code
-     added the visu…" before it said anything, and hid a burst's "and 7 more like this" (the audit of 25 October, Z22). */
+     added the visu…" before it said anything, and hid a burst's "and 7 more like this". */
   .feed-what {
     display: -webkit-box;
     min-inline-size: 0;

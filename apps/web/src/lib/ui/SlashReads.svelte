@@ -1,5 +1,5 @@
 <!--
-  Whether Slash reads on its own, and what a model is sent when it does (`slashReads`, ENG-A09).
+  Whether Slash reads on its own, and what a model is sent when it does (`slashReads`).
 
   ONE PARAGRAPH AND ONE SWITCH, in Settings beside the daily look. The paragraph says what on and off mean, what is sent
   (the fields a job needs), to whom, and what never is; the switch is the owner's, in a browser. For anyone the record

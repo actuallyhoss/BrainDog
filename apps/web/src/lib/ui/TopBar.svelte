@@ -51,7 +51,7 @@
     </ol>
   </div>
 
-  <!-- THE ONE WAY TO ASK, drawn as the field the palette opens out of (`data-palette-from`, U13), its key at rest. -->
+  <!-- THE ONE WAY TO ASK, drawn as the field the palette opens out of (`data-palette-from`), its key at rest. -->
   {#if !searching}
     <button type="button" class="bar-ask tap" data-palette-from="bar" aria-keyshortcuts="/ Control+K Meta+K" onclick={() => onfind?.()}>
       <Icon name="search" size="m" /><span class="bar-ask-words">{copy.palettePlaceholder}</span><kbd aria-hidden="true">/</kbd>
@@ -139,7 +139,7 @@
   }
 
   /* ASK, DRAWN AS THE FIELD IT OPENS: 320 wide on `--tile-2` with a hairline, so it reads as a field on the nav's
-     surface in both themes (U-A12), the words at 14 in the quiet ink, and its key. */
+     surface in both themes, the words at 14 in the quiet ink, and its key. */
   .bar-ask {
     display: inline-flex;
     align-items: center;

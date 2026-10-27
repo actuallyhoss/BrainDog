@@ -1,6 +1,6 @@
 /**
  * A project's KPIs, ranked and shaped: which kind each one is, which chart draws it, whether it has stopped arriving,
- * which four lead Today, and which one leads its project's card (`loop/plans/kpis-2026-10-21/PLAN.md` 2.3 to 2.5).
+ * which four lead Today, and which one leads its project's card.
  *
  * WHY THIS IS ITS OWN FILE. The `kpis` page source (K2-A) reads the rows and their readings; what it does with them is
  * a handful of rules the owner decided on 21 October, and a rule kept inside a reader that touches the store is a rule

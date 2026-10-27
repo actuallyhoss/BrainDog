@@ -1,5 +1,5 @@
 /**
- * A mark that names no glyph (REC-C17): the kernel's copy of the names a mark can be drawn by, the figure that counts
+ * A mark that names no glyph: the kernel's copy of the names a mark can be drawn by, the figure that counts
  * the rows wearing a word the set does not draw, and the rule that lets such a mark be written once more.
  *
  * WHAT WAS MEASURED BEFORE IT: 26 projects on a real record held the old system's icon name in `mark`, twelve of the 22

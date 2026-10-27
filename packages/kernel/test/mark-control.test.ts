@@ -1,5 +1,5 @@
 /**
- * The controls no row may wear as its mark (PGS-A06): the kernel's copy of the list, read directly, and the gate that
+ * The controls no row may wear as its mark: the kernel's copy of the list, read directly, and the gate that
  * holds it equal to the renderer's.
  *
  * `marks.ts` imports nothing, so this file stands on it alone. The gate is aimed at a planted tree, a copy of its own

@@ -36,7 +36,7 @@ test('Today is held to its own ceiling for the kept copy, and every other screen
   assert.equal(judge([row(other, { copy: 31 })], P).length, 1);
 });
 
-test('a screen over its reads budget, one with none, and one asking a read twice are each a finding (scope 2026-10-24 A6, A11)', () => {
+test('a screen over its reads budget, one with none, and one asking a read twice are each a finding (scope 2026-10-24 A6)', () => {
   const other = SCREENS.find((s) => !s.today);
   const over = judge([row(other, { calls: 6, by: { list: 6 } })], P);
   assert.equal(over.length, 1);

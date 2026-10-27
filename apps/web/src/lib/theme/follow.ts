@@ -89,7 +89,7 @@ let adopted: string | null = null;
  * Adopt the person's look from a `boot` answer, once for each person and record, and send their changes to the record
  * from now on.
  *
- * IN THIS ORDER, each step for a reason the audit of batches 11 to 13 found:
+ * IN THIS ORDER, each step for a reason found in testing:
  * - A cookie stamped for somebody else is that person's look, so it is taken off before anything is adopted, and this
  *   person starts from the house look and their own record's answer.
  * - THE STAMP IS THE PERSON, NOT THE RECORD. The same person opening another of their records keeps the look on screen

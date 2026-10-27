@@ -338,7 +338,7 @@ test('and a colour restore drops is not written over the record', async () => {
 test('HOUSE PAINTS THE WORKING RED, AND A SWATCH MOVES THE BUTTONS BUT NOT LATE', () => {
   const house = readFileSync(fileURLToPath(new URL('../../../../packages/skin/house.css', import.meta.url)), 'utf8');
   /* The first scheme block is light (SPEC 1.1): the fill BrainDog red, pressed deeper under the pointer, a white label,
-     and red as words and marks the deeper #C2362F (C1). */
+     and red as words and marks the deeper #C2362F. */
   assert.match(house, /--red-fill: #CF413A;/u, 'house.css does not paint the buttons BrainDog red');
   assert.match(house, /--red-fill-hover: #B3322C;/u, 'house.css does not press to the deeper red');
   assert.match(house, /--on-red: #FFFFFF;/u, 'the label on the red fill is not white');

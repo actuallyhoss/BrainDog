@@ -47,7 +47,7 @@ export const words = {
   notYours: 'Your keys could not be listed here.',
   /** The machines half, when the record refused to list them. */
   machinesNotYours: 'Only the owner sees the machines that may open keys.',
-  /* IN PLAIN WORDS WHERE THE RECORD'S OWN WERE ITS INSIDES (the pass of 27 October): "listDevices, in ADMIN, was
+  /* IN PLAIN WORDS WHERE THE RECORD'S OWN WERE ITS INSIDES: "listDevices, in ADMIN, was
      not sent" and "a token cannot reach the vault" were drawn as they came. Each says what to do instead. */
   keysHow: 'Sign in again, then open the Keychain.',
   machinesHow: 'Sign in as the owner to see them and approve a new one.',

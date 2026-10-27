@@ -156,7 +156,7 @@ test('A PODCAST OPENS ON A PODCAST PLAN, linked: its milestone underway, its fir
 
 });
 
-/* A PROJECT OF NO KNOWN KIND IS PLANNED TOO (USE-A09). Until the general plan was a kind, a boat, a thesis or a wedding
+/* A PROJECT OF NO KNOWN KIND IS PLANNED TOO. Until the general plan was a kind, a boat, a thesis or a wedding
    formed nothing and the guide opened on empty lists, since its own example rows are never written. */
 const BOAT = 'I want to restore an old wooden boat and sail it next summer';
 

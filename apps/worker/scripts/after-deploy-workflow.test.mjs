@@ -1,5 +1,5 @@
 /**
- * `after-deploy.yml`, the lane after a deploy (PRF-A09), read off the workflow file and its shell run for real.
+ * `after-deploy.yml`, the lane after a deploy, read off the workflow file and its shell run for real.
  *
  *   node --test apps/worker/scripts/after-deploy-workflow.test.mjs
  *

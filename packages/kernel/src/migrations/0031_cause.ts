@@ -1,12 +1,12 @@
 /**
- * The kernel schema, migration 31: a question has a cause (AGT-C07).
+ * The kernel schema, migration 31: a question has a cause.
  *
  * `suggestion.cause` IS THE KEY FOR WHAT A QUESTION IS ABOUT, and one open question holds a cause at a time: a unique
  * index over the cause of the open ones, so the database refuses a second even when a caller forgot to look. A closed
  * question keeps its cause, and any number of closed ones may share it, since asking again after an answer is allowed.
  *
  * `decision.cause` IS THE SAME KEY ON THE ANSWER, so a question asked again can be found with the answer it was given
- * (AGT-C08). Indexed with the decision's time, newest answer first. A decision filled from the question it settled,
+ * Indexed with the decision's time, newest answer first. A decision filled from the question it settled,
  * paired as `govern.ts`'s `SETTLED` pairs them, when that question carried one.
  *
  * TWO REBUILDS AND NOT TWO `ADD COLUMN`S, for migration 25's reason: `migrate.test.ts` rewinds the ledger and applies
@@ -79,7 +79,7 @@ export const DECISION_KEPT = 'A decision is kept as it was made. Supersede it wi
 
 /**
  * A decision is never rewritten: only erasure may turn its words into tombstones (`erase.ts`, `ERASED`), and nothing
- * else of it moves. A decision that could be edited is a record of nothing (AGT-C09). Its cause may go the same way,
+ * else of it moves. A decision that could be edited is a record of nothing. Its cause may go the same way,
  * since a cause a filer typed can carry a name.
  */
 export const DECISION_TRIGGER = `CREATE TRIGGER IF NOT EXISTS decision_kept BEFORE UPDATE ON decision

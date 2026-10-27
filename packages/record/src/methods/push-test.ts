@@ -1,12 +1,12 @@
 /**
- * A person proves a phone rings, on their own press: `pushTest`, DATA, a person's own as `setPref` is (REC-A15).
+ * A person proves a phone rings, on their own press: `pushTest`, DATA, a person's own as `setPref` is.
  *
  * ONE `notify.push` PER SUBSCRIPTION THE CALLER HOLDS, AND NOBODY ELSE'S. Turning push on keeps a row in `push_sub`
  * (`packages/record/src/push.ts`), and until now nothing told anybody whether it still rang: a dead subscription was
  * found only when a real notice never arrived. The jobs go in through the kernel's own queue (`kernel.outbox`), in the
  * `{ sub: { id } }` shape the Worker's deliverer reads (`apps/worker/src/deliver.ts`), so a 404 or 410 drops the dead
  * row the way it does for any other push, and an eighth failure is the outbox's fault `outbox#notify.push`, never a
- * question (`deadLetter` in `kernel/src/outbox.ts`, AGT-C06).
+ * question (`deadLetter` in `kernel/src/outbox.ts`).
  *
  * A PERSON, NOT A TOKEN, for `subscribePush`'s reason: a phone is somebody's, and an agent has no lock screen. Any level
  * may, since the push rings only the caller's own devices.

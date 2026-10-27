@@ -41,7 +41,7 @@ export const words = {
   notNow: 'Not now',
   stops: "What stops this install",
   adds: 'Adds',
-  /* THE NUMBERS A PLAN ADDS, AS ONE ROW (audit C, X10): seventeen of them named one under another buried its lists. */
+  /* THE NUMBERS A PLAN ADDS, AS ONE ROW: seventeen of them named one under another buried its lists. */
   addsNumbers: (n: number) => (n === 1 ? 'and 1 number' : `and ${n.toLocaleString('en-GB')} numbers`),
   handed: 'already here, under another add-on',
   changes: 'Changes',

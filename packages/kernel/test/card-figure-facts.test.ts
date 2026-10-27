@@ -1,5 +1,5 @@
 /**
- * A card's fact over a figure (REC-C16): `{ metric: 'project-open:{{name}}', as: 'fact', label: 'Open' }` on a cards block,
+ * A card's fact over a figure: `{ metric: 'project-open:{{name}}', as: 'fact', label: 'Open' }` on a cards block,
  * read once a card with the hole filled from the card's own row, so a list of projects says how many things each has open.
  *
  * WHAT WAS MEASURED BEFORE IT: a cards block could name a figure only as its trend or its when, so every fact on a project

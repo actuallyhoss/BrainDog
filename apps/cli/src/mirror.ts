@@ -1,5 +1,5 @@
 /**
- * The mirror (AGT-A13): the record as a folder of plain files a person can read and git can diff.
+ * The mirror: the record as a folder of plain files a person can read and git can diff.
  *
  * `README.md` names every list with its count and the day the folder was written; `<list>/README.md` says the list's
  * name, its fields in their declared order and its count; `<list>/<number>.md` is one live row: its fields first, as

@@ -298,7 +298,7 @@ test('a colleague held to named lists is offered those, and the sample offers ev
   assert.deepEqual(create.offered(sample).map((l) => l.id), create.addable(registers).map((l) => l.id));
 });
 
-/* ── the plain line (EXP-D13) ─────────────────────────────────────────────── */
+/* ── the plain line ─────────────────────────────────────────────── */
 
 const INTO = { register: 'tasks' };
 

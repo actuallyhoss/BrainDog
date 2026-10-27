@@ -334,7 +334,7 @@ figure is found by its id (`{{work.open-tasks}}`), by its id after the module's 
 the projects say they earn); two such totals, or a figure that waits for a parameter, answer nothing. A step through a
 link reads the far row only for a reader of both lists, and a reading only for a reader of its list. A reading is one
 reading, never a sum: a reading in another currency beside it is not added or converted. *Amended October 14th 2026
-(PGS-B13, twice).*
+(twice).*
 
 **Lexically**, a path is `segment ('.' segment)*`; a segment is
 `[A-Za-z][A-Za-z0-9_-]*` or `register#digits`. Anything after `{{` that is not a path, or one of the
@@ -357,7 +357,7 @@ Four rules, learned by the predecessor over a month of real use:
 handed `UNNAMED` for each, so rule 1's path is printed as the author's words in prose and left out of a chip, a tile, a
 card or a bar, while a path that names a field this row holds nothing in is still the dash. A computed source's answer
 also carries its columns' `types` (`run` and `instant` among them, as on `runs_on`'s *Last used by* and *Last used*), so
-a host draws a run as its agent and a day, never a handle or a raw time. *Amended October 9th 2026 (PGS-B02).*
+a host draws a run as its agent and a day, never a handle or a raw time. *Amended October 9th 2026.*
 
 **A reading's fifth column is money.** On a `stat` or `lines` over readings the columns are `[when, value, name, unit,
 amount]`; the fifth names a money field, and a reading that holds one is drawn as that amount in its currency, never

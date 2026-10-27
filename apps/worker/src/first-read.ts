@@ -11,7 +11,7 @@
  * THE COUNT IS THE DIRECTORY'S. Six readings a day for one address and the ceiling for all are counted by key and UTC
  * day over `MeterStore`, which the Cloud hands as the Directory's `firstReadHit`; `store: null` keeps the door off.
  *
- * WHAT IS ON OFFER IS THE CATALOGUE'S (USE-A16): the use cases bundled with the shell, read once from the static assets
+ * WHAT IS ON OFFER IS THE CATALOGUE'S: the use cases bundled with the shell, read once from the static assets
  * and merged over the ones compiled in (`catalogueOffer`), so the landlord who types "I rent out six flats" can be read
  * into Landlord. Without the assets, or with a catalogue that does not read, the compiled list, said once in the log.
  */
@@ -156,7 +156,7 @@ const readOnce = new WeakMap<Assets, Promise<SetupOffer>>();
 let bare: Promise<SetupOffer> | null = null;
 
 /**
- * WHAT A STRANGER'S SENTENCE MAY BE READ INTO (USE-A16): the catalogue's use cases bundled with the shell, merged over the
+ * WHAT A STRANGER'S SENTENCE MAY BE READ INTO: the catalogue's use cases bundled with the shell, merged over the
  * build's (`firstReadOfferFrom`), so a front published as a file is offered at sign-up with no code change. Read lazily,
  * once, and kept. No assets, or a catalogue that does not read, is the build's list and one log line, never a 500.
  */

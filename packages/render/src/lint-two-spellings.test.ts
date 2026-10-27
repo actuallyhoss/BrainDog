@@ -1,6 +1,6 @@
 /**
  * `two-spellings`: one currency written two ways in one part of a page, or one amount with and without its minor
- * digits there, is a finding; every amount written the one writer's way is clean (EXP-B06).
+ * digits there, is a finding; every amount written the one writer's way is clean.
  */
 
 import { test } from 'node:test';

@@ -12,11 +12,11 @@
   months with two of them above nought; otherwise the total is a line. Bars in the project's colour, the period before at
   45% of it over the tile so it holds in dark.
 
-  ONE AT A TIME ON A PROJECT'S PAGE (C28, 24 October): Path and Money are each a block of the page (`only`), laid side by
+  ONE AT A TIME ON A PROJECT'S PAGE (24 October): Path and Money are each a block of the page (`only`), laid side by
   side by the page's own flow (`project-parts.ts`); with no `only` both are drawn in one row, as before.
 
   EACH TILE IS AS TALL AS ITS CONTENT (`align-self: start`), so neither stretches to the other. "Show the data" waits for
-  the pointer on a wide screen with a fine pointer (SF10), and is always there on a phone.
+  the pointer on a wide screen with a fine pointer, and is always there on a phone.
 -->
 <script lang="ts">
   import { monthShort } from 'braindog-render';
@@ -59,7 +59,7 @@
     moneyRows?: readonly DataRow[];
     /** Which figures changed in the read just landed (`data-arrived`, proj F9). */
     arrived?: ReadonlySet<string>;
-    /** The one tile to draw, where the page lays each as a block of its own (C28). */
+    /** The one tile to draw, where the page lays each as a block of its own. */
     only?: 'path' | 'money' | null;
   } = $props();
 
@@ -624,7 +624,7 @@
     }
   }
 
-  /* SHOW THE DATA WAITS FOR THE POINTER on a wide screen (SF10): there, but quiet, until the tile is hovered or holds focus. */
+  /* SHOW THE DATA WAITS FOR THE POINTER on a wide screen: there, but quiet, until the tile is hovered or holds focus. */
   @media (hover: hover) and (pointer: fine) and (width >= 1100px) {
     .show-data[aria-expanded='false'] {
       opacity: 0;

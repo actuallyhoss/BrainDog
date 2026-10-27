@@ -1,5 +1,5 @@
 /**
- * Threads that plan, and follow-ups that follow (REC-C10, Work 1.19.0), on a real record.
+ * Threads that plan, and follow-ups that follow (Work 1.19.0), on a real record.
  *
  * A THREAD HAD FOUR STATES AND NO DECLARED MOVES, so an idea went straight to done, and it had the day it was opened
  * and no day it aims for, so it was in no "Due this week". A follow-up took its parent's project and thread and never

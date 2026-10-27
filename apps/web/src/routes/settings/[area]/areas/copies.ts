@@ -1,6 +1,6 @@
 /**
- * The night's copy and the last export, as Settings says them (LCH-C03): `boot`'s `copies` to the one line over the
- * Backups list and the one line in Export. And this host's last restore test beside the copy line (LCH-C04), at the end.
+ * The night's copy and the last export, as Settings says them: `boot`'s `copies` to the one line over the
+ * Backups list and the one line in Export. And this host's last restore test beside the copy line, at the end.
  *
  * THE FACTS ARE THE RECORD'S, AND LOCAL: `last_copy_at`, `last_copy_bytes` and `last_export_at`, read from the newest
  * `export` events (`packages/kernel/src/copies.ts`, `copyFacts`) and sent on `boot` as `copies`. Each may be `null`.
@@ -73,7 +73,7 @@ export function exportLine(facts: CopyFacts, now: number): string {
 }
 
 /**
- * THE EXPORTS SOMEBODY TOOK, AS THE LOG KEEPS THEM (the pass of 27 October): every export writes one `export`
+ * THE EXPORTS SOMEBODY TOOK, AS THE LOG KEEPS THEM: every export writes one `export`
  * event whose note begins `sections` (`packages/kernel/src/copies.ts`), and the night's own dump is one too, written as
  * `system`, which is the nightly copy and never an export. Backups said "No backups here yet" over a log whose Activity
  * counted four of his exports, so it lists them, newest first, the instants alone.
@@ -158,7 +158,7 @@ export async function readDrill(io: typeof fetch, base = ''): Promise<DrillFacts
 /**
  * The drill line: the sentence, whether it is a fault, and the word that marks it beside the deeper red. A test never
  * run is a fault, and stays one until the operator runs the first; so is a failed test, and a pass past 35 days.
- * A PASS THAT TRIED NO RECORD'S COPY IS NOT "PASSED" (finding 8): the Directory's copy opened and nothing else was
+ * A PASS THAT TRIED NO RECORD'S COPY IS NOT "PASSED": the Directory's copy opened and nothing else was
  * restored, so the line says exactly that, as a fault, until a test restores at least one record's copy.
  */
 export type DrillLine = { text: string; fault: boolean; mark: string | null };

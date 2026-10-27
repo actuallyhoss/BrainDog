@@ -60,7 +60,7 @@ export const account = {
   /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
      the two disagreeing about what the record is called. */
-  /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE (Y22): a record named after its owner read "Delete Marta". */
+  /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE: a record named after its owner read "Delete Marta". */
   deleteWhat: (record: string): string =>
     `Deleting the record named ${record} removes every list and page, and everything they hold. It cannot be undone.`,
   deleteRecord: 'Delete this record',
@@ -257,7 +257,7 @@ export const account = {
   identityPasskeysWay: 'Passkeys',
   identityPasskeys: (n: number) => (n === 0 ? 'None yet' : n === 1 ? 'One passkey' : `${n} passkeys`),
 
-  /* A PASSKEY'S NAME (LCH-A04): each passkey is a line under How you sign in, named for the device that made it, and
+  /* A PASSKEY'S NAME: each passkey is a line under How you sign in, named for the device that made it, and
      renamed here through the host's `POST /auth/passkey/rename`. The host's own sentence answers an empty name. */
   identityPasskeyWay: 'Passkey',
   identityRenamePasskey: 'Rename',
@@ -484,7 +484,7 @@ export const account = {
    */
   theKeyIs:
     'These copies are locked with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
-  /* NAMED BY ITS FILE ON A SELF-HOST (audit 25 October, X20): it began "If you run BrainDog yourself", said only to the
+  /* NAMED BY ITS FILE ON A SELF-HOST: it began "If you run BrainDog yourself", said only to the
      person who does. `kek` in the data folder is where `braindog init` writes it (`apps/selfhost/src/main.ts`). */
   theKeyWhere: "The key is the file named kek in BrainDog's data folder, made at set-up. Keep a copy somewhere else, or these copies cannot be opened.",
   restore: 'Going back',
@@ -502,7 +502,7 @@ export const account = {
    * app's reach (`53 §5.4`), and going back to one is a thing to ask for.
    */
   restoreNotHere: `Going back to an earlier copy is asked for rather than pressed: write to ${SUPPORT_EMAIL} and say which day.`,
-  /* AND ON A SELF-HOST, HOW (X20): the copy and the going back are two commands on the machine it runs on. */
+  /* AND ON A SELF-HOST, HOW: the copy and the going back are two commands on the machine it runs on. */
   restoreSelfHost: 'On the machine BrainDog runs on, braindog backup <folder> keeps a copy of all of it, and braindog restore <folder> puts that copy back.',
 
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
@@ -550,7 +550,7 @@ export const account = {
   firstDoorWhy: 'Open the link you were given when this BrainDog was set up. You can add a passkey once you are in.',
   /* IN PLACE OF `mailDown`, which says "Use a passkey" to somebody who has none yet. */
   firstDoorMailDown: 'Mail is not going out right now, so your sign-in link cannot be sent. Try again in a few minutes.',
-  /* THE SENT SCREEN'S SECOND LINE, a minute after the press (LCH-A04): the host answers alike for any address, so the
+  /* THE SENT SCREEN'S SECOND LINE, a minute after the press: the host answers alike for any address, so the
      screen cannot know the letter failed, and this is what it can say that is true either way. */
   linkSentLater: 'Nothing yet? Check the address, or send it again.',
   sendAgain: 'Send it again',
@@ -646,7 +646,7 @@ export const account = {
   sizeOnDisk: (size: string) => `${size} on disk`,
   restoreThis: 'Restore this copy',
   restoreLive: 'Put the record back to one of the copies above. What it holds now is kept as a copy first.',
-  /* NO COPY ABOVE YET (X20): "one of the copies above" over none. */
+  /* NO COPY ABOVE YET: "one of the copies above" over none. */
   restoreFirst: 'Once a copy is kept, Restore this beside it puts the record back to that day.',
   restoreConfirm: (id: string) => `Put the record back to ${id}? Everything written since then is replaced.`,
   keepAsIs: 'Keep it as it is',
@@ -781,7 +781,7 @@ export const account = {
   signupWaitingWhy: 'Your payment is in. This takes a few seconds.',
   signupWaitingSlow: 'This is taking longer than it should. Your BrainDog is made as soon as the payment arrives, so check again in a minute.',
   signupCheckAgain: 'Check again',
-  /* SIGN IN'S FOOT, BY WHO MAY SIGN UP (first F4, SF13): invite only asks for an invite, open creates one; closed says
+  /* SIGN IN'S FOOT, BY WHO MAY SIGN UP (first F4): invite only asks for an invite, open creates one; closed says
      nothing, because nobody can be sent anywhere. Never "Make a record". */
   signupAskInvite: 'New here? Get early access',
   signupCreate: 'New here? Create your BrainDog',
@@ -836,7 +836,7 @@ export const account = {
   closeLeave: 'Done',
   closeUnreached: 'Your account could not be closed just now. Try again in a minute.',
 
-  /* SETTINGS > BACKUPS AND EXPORT: THE NIGHT'S COPY AND THE LAST EXPORT (LCH-C03), drawn by `areas/copies.ts`. */
+  /* SETTINGS > BACKUPS AND EXPORT: THE NIGHT'S COPY AND THE LAST EXPORT, drawn by `areas/copies.ts`. */
   copiesLastSized: (when: string, size: string) => `Last copy: ${when}, ${size}`,
   copiesLast: (when: string) => `Last copy: ${when}`,
   copiesFirst: 'First copy tonight',
@@ -847,7 +847,7 @@ export const account = {
   exportedLast: (when: string) => `Last exported: ${when}`,
   exportedNever: 'Never exported',
 
-  /* SETTINGS > BACKUPS: THIS HOST'S LAST RESTORE TEST (LCH-C04), drawn by `areas/copies.ts` `drillLine`. The host's,
+  /* SETTINGS > BACKUPS: THIS HOST'S LAST RESTORE TEST, drawn by `areas/copies.ts` `drillLine`. The host's,
      never the record's: only the operator holds the key that opens the copies, so every record reads the same line. */
   drillPassed: (when: string) => `This BrainDog's last restore test: passed ${when}`,
   drillFailed: (when: string) => `This BrainDog's last restore test: failed ${when}`,

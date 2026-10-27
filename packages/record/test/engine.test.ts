@@ -1,5 +1,5 @@
 /**
- * `engineHealth`, the record's half of the engine's health (ENG-A02).
+ * `engineHealth`, the record's half of the engine's health.
  *
  * WHY THIS FILE EXISTS. The daily vital-sign read and a read token ask the record whether Slash's model answers, and the
  * record cannot read Slash's ledger itself, so the host hands the read in. Asserted here: the method answers the host's

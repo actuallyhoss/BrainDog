@@ -1,5 +1,5 @@
 /**
- * The line under a question on Decide names only fields the list has (`DoesNames.holds`, audit 79, claim 4). A patch
+ * The line under a question on Decide names only fields the list has (`DoesNames.holds`). A patch
  * may send a field the list lacks: the write refuses it, so the yes changes nothing there, and the line named it by
  * its id read as words. Read on a real record, as Decide's queue reads it.
  */

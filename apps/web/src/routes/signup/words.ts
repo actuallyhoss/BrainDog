@@ -105,7 +105,7 @@ export const words = {
   /** The header's half of it from 640px: the question in the second ink, then only "Sign in" as the link. */
   haveAsk: 'Already have a BrainDog?',
   /**
-   * SIGN-UP BY INVITATION, REACHED WITH NO CODE (LAUNCH 103, item 10): its own screen (`Apply.svelte`), not the closed
+   * SIGN-UP BY INVITATION, REACHED WITH NO CODE: its own screen (`Apply.svelte`), not the closed
    * page. The site says nothing about invites; only this page does, and it offers a way in: apply, and be emailed.
    */
   inviteTitle: 'Early access, invite only',
@@ -120,7 +120,7 @@ export const words = {
   optional: 'Optional',
   applySend: 'Ask for an invite',
   /**
-   * THE ONE LINE UNDER EACH FORM THAT NAMES THE TERMS AND THE PRIVACY POLICY (the scope of 24 October, F8): the Terms say
+   * THE ONE LINE UNDER EACH FORM THAT NAMES THE TERMS AND THE PRIVACY POLICY (the scope of 24 October): the Terms say
    * "By making an account or using BrainDog, you agree to these terms", and nothing on sign-up linked them. Short, so it
    * is one line on a phone. Each link opens the site's own page in a tab of its own, so what was typed here stays.
    */

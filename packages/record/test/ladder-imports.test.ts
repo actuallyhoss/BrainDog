@@ -1,5 +1,5 @@
 /**
- * Every import made into the record, and the owner's word on each, the ladder's half (ENG-A13, "Untrusted text
+ * Every import made into the record, and the owner's word on each, the ladder's half ("Untrusted text
  * (mail, bank texts, imports, other people's rows, add-on descriptions) drops the run to Ask"): `importsFound` counts
  * what each import's run created by list, `adopt` keeps what the owner said, `importActors` names every import he has not
  * said is his own, and `standing` says which agent is asking about everything and why.

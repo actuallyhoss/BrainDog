@@ -52,7 +52,7 @@ function meterBuilder(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps
         engine: async () => engine,
         model: INCLUDED_MODEL,
         rate,
-        /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09), read each time a background ask is about to be held: off,
+        /* HIS SWITCH FOR SLASH READING ON ITS OWN, read each time a background ask is about to be held: off,
            no row is written and no model is asked. The record keeps it as Slash's own pref (`slashReads`). */
         reads: () => api().kernel.prefsOf('slash')['slash.reads'] !== false,
       });

@@ -1,5 +1,5 @@
 /**
- * A `form` block, drawn from the record's answer (PGS-A15): a few labelled fields and one button that adds a row to a
+ * A `form` block, drawn from the record's answer: a few labelled fields and one button that adds a row to a
  * list, drawn by `braindog-render`'s `Form.svelte` and pressed through the page's `act`, the write every declared
  * action takes, so the row lands with its receipt and its one Undo (`page-writes.ts`).
  *

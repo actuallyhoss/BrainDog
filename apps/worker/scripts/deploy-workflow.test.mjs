@@ -228,7 +228,7 @@ function takeRestorePoint({ migration, key = true, status = 200, said = null, ca
 const tallied = (asked) => ({ ok: true, value: { mode: 'take', asked, records: asked, opened: asked, copied: asked, failed: 0, said: `Restore point: ${asked} asked.` } });
 
 test('a push that changes a migration goes on when the live build answers the door 404, and says plainly that no copy was taken', () => {
-  /* THE DEPLOY THAT FIRST SHIPS THE DOOR (audit 51, finding 1): red here stopped the only job that can ship it. */
+  /* THE DEPLOY THAT FIRST SHIPS THE DOOR: red here stopped the only job that can ship it. */
   const ran = takeRestorePoint({ migration: true, status: 404 });
   assert.equal(ran.code, 0, `a missing door stopped the deploy that would ship it:\n${ran.out}`);
   assert.match(ran.out, /::warning::Take a restore point: not run: the live build has no restore-point door, or no operator key of its own\. A migration changed in this deploy and no copy was taken before it\./);

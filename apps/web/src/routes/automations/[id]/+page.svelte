@@ -101,7 +101,7 @@
 
   const flow = new FlowDraft({ slash: () => page.data.slash === true });
 
-  /* WHETHER THIS RULE TELLS HIM, ON ITS OWN PAGE (U-C7): Settings > Notifications listed every rule that tells you, one
+  /* WHETHER THIS RULE TELLS HIM, ON ITS OWN PAGE: Settings > Notifications listed every rule that tells you, one
      read each, and now sends here. Off puts the rule in his own `notify.muted` (`../../settings/[area]/muted.ts`), so its
      notices leave his Today feed and nobody else's; an urgent one still shows. */
   const tellWords = { stop: 'Stop telling me', start: 'Tell me again', stopped: 'It no longer tells you', started: 'It tells you again' };
@@ -211,7 +211,7 @@
   }
 
   /**
-   * THE SCREEN'S ONE CALL IS THE WHOLE OPENING, the list and then the one automation (audit B of 25 October, Y15). It was
+   * THE SCREEN'S ONE CALL IS THE WHOLE OPENING, the list and then the one automation. It was
    * closed once the list came back, so with nothing else out the screen said it was ready while `from` was still
    * `reading` and nothing was drawn: the look caught a blank page at 390 dark marked ready at 0.8 s.
    */
@@ -304,7 +304,7 @@
   $effect(() => {
     untrack(() => void readDeclared());
   });
-  /* READY ONCE IT IS PAINTED, NOT ONCE IT IS DECIDED (the scope of 24 October, E35): said from the effect, the look caught
+  /* READY ONCE IT IS PAINTED, NOT ONCE IT IS DECIDED (the scope of 24 October): said from the effect, the look caught
      an empty main already marked ready. Two frames is the first one after the screen has been drawn, and a screen left
      before then says nothing for the next one. */
   $effect(() => {
@@ -719,7 +719,7 @@
     <PageHead icon="refresh" kicker={words.heading} back="/automations" {title} sentence={said?.text} needs={said?.needs || undefined}>
       {#snippet actions()}
         {#if row}
-          <!-- ON A PHONE THE HEAD HOLDS ONLY THE "⋯" (2.A.20), and Rename is its first line. -->
+          <!-- ON A PHONE THE HEAD HOLDS ONLY THE "⋯", and Rename is its first line. -->
           {#if !phone.current}<Button onclick={() => flow.select('trigger')}>{editWords.rename}</Button>{/if}
           <Menu label={editWords.more(title)} align="end" bind:open={menuOpen}>
             {#snippet trigger()}<span class="more-trigger"><Icon name="more" size="m" /><span class="vh">{editWords.more(title)}</span></span>{/snippet}
@@ -744,7 +744,7 @@
     </PageHead>
     {#if lockedSay}<p class="locked" role="status">{lockedSay}</p>{/if}
     <div class="page">
-      <!-- THE SENTENCE FIRST (the pass of 27 October): the whole automation in words, the script it runs named,
+      <!-- THE SENTENCE FIRST: the whole automation in words, the script it runs named,
            over the tabs that take it apart. Said from the draft, so an edit on the canvas says itself here too. -->
       {#if whole}<p class="whole">{whole}</p>{/if}
       <Segmented class="tabs" role="group" aria-label={title}>
@@ -807,7 +807,7 @@
               <p class="said">{copy.flowRunAfterSave}</p>
             {/if}
             <div class="foot-actions">
-              <!-- NOT DRAWN UNTIL THERE IS A STEP TO TAKE BACK (audit B of 25 October, Y14): greyed, the two read as presses
+              <!-- NOT DRAWN UNTIL THERE IS A STEP TO TAKE BACK: greyed, the two read as presses
                    under "Nothing has changed since it was opened". Each comes once the canvas holds a change for it. -->
               {#if flow.canUndo || flow.canRedo}
                 <Button disabled={!flow.canUndo} kbd={canvasWords.undoKey} onclick={undo}>{copy.undo}</Button>
@@ -832,7 +832,7 @@
             <Tried {kind} path={flow.path} {owner} rows={pickRows} {rowsRead} {arrivals} bind:pick inline={triedNow} run={ranNow} contest={contestNow} />
           {/if}
 
-          <!-- RUN AGAIN OVER WHAT IS ALREADY THERE (SHL-D07): the owner's, for a saved inline rule that sets a field, and
+          <!-- RUN AGAIN OVER WHAT IS ALREADY THERE: the owner's, for a saved inline rule that sets a field, and
                loaded only here, by `import()`, so no other screen carries it. -->
           {#if owner && row && againField !== null}
             {#await import('./RunAgain.svelte') then part}

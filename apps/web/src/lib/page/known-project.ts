@@ -1,6 +1,6 @@
 /**
  * THE PROJECTS THIS TAB HAS DRAWN, by the address each opens on, so a project's page opens in its own shape before the
- * record answers (the audit of 22 October, F4 and fluid F2). The sidebar and the Projects cards already hold each one's
+ * record answers (F4 and fluid F2). The sidebar and the Projects cards already hold each one's
  * name, mark, colour and lane; the page opened from them drew a blank board, then a list skeleton that looked nothing
  * like a project, then a blank again, and only then the project.
  *

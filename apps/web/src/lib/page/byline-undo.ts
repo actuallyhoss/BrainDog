@@ -1,5 +1,5 @@
 /**
- * A BYLINE'S UNDO, WHEN THE CHANGE WAS BIGGER THAN THE ROW (audit 20, M4). A row the nightly walk linked carries the
+ * A BYLINE'S UNDO, WHEN THE CHANGE WAS BIGGER THAN THE ROW. A row the nightly walk linked carries the
  * walk's whole batch, so one press on its Undo took back up to two hundred links and organisations it never showed. Now
  * the plan is read first (`undo-write.ts` `undoPlan`, dry): a change that touched only this row goes back at once, as
  * before, and one that touched more says what it will take back, in names, before anything moves, as Undo this run does
@@ -7,7 +7,7 @@
  *
  * WHICH STEPS ARE THIS ROW'S is read off the plan by the record's handles alone: a step's list and number (`at`), which
  * the record says on every step but a stop, or its id for the row (`row`) where the page knows this row's. Never by
- * title (audit 22, M2): a walk batch can hold two payments both called "STRIPE PAYOUT", and a row with no title shares
+ * title: a walk batch can hold two payments both called "STRIPE PAYOUT", and a row with no title shares
  * its name with every other, so a title says nothing about which row a step was on. A step none of that ties to this
  * row is another row's, and the change is asked about before it goes back. Once a step is known to be this row's, a
  * step with the same id and no number is too.

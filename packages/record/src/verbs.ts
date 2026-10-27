@@ -1,6 +1,5 @@
 /**
- * WHAT A PRESS ON A DECLARED ACTION CALLS, and how it is taken back (PGS-A12, `loop/scope/area-pages-a.md` 2.2,
- * decision 3).
+ * WHAT A PRESS ON A DECLARED ACTION CALLS, and how it is taken back.
  *
  * A page names a verb from the kernel's table (`packages/kernel/src/row-actions.ts`, `ACTION_VERBS`), which says the
  * level it needs, whether it can be undone and what a press sends. This is the other half: each verb bound to the one

@@ -1,6 +1,6 @@
 /**
- * Packs of Slash credits on the Worker's billing doors (LCH-A10, "more is bought as credit packs rather than priced by
- * the ask"), and a gift's row (LCH-A12) that no Stripe event moves. Checkout with `{ record, pack }` opens a Stripe
+ * Packs of Slash credits on the Worker's billing doors ("more is bought as credit packs rather than priced by
+ * the ask"), and a gift's row that no Stripe event moves. Checkout with `{ record, pack }` opens a Stripe
  * Checkout in `payment` mode for any record its owner holds, Free included; the paid session adds the pack's credits
  * once; a refund takes back the rest; the list names the packs on sale and each record's credits.
  *

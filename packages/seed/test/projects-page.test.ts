@@ -1,5 +1,5 @@
 /**
- * Projects says where every project stands (PGS-C17, batch 101): by lane, how many are in play and earning over time,
+ * Projects says where every project stands (batch 101): by lane, how many are in play and earning over time,
  * and how they are going only once somebody has said.
  *
  * BEFORE: `projects-by-lane` was declared and drawn by nothing, the nightly saves of In play were read by no cell on the

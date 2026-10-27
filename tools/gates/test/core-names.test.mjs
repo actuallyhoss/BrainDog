@@ -1,6 +1,6 @@
 /**
  * `core-names`, asked of this tree, of its planted trees, and of the rules one at a time; and the nine public words
- * `shell-words` took on the same day (SHL-A01, `loop/scope/area-shell-a.md`).
+ * `shell-words` took on the same day.
  *
  *   node --test tools/gates/test/core-names.test.mjs
  *

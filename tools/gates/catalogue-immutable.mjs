@@ -1,5 +1,5 @@
 /**
- * `catalogue-immutable`: a version the released build holds is never changed in place (SHL-B03).
+ * `catalogue-immutable`: a version the released build holds is never changed in place.
  *
  *   node tools/gates/catalogue-immutable.mjs [root] [base]
  *

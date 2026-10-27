@@ -1,5 +1,5 @@
 /**
- * What typing in a page's head narrows (PGS-A14): the word a reader typed under the head's `search: { param }`, as the
+ * What typing in a page's head narrows: the word a reader typed under the head's `search: { param }`, as the
  * clauses that keep a row of each list the page draws whose title, or a field its list marks `search: true`, holds it.
  *
  * THE SAME WORDS THE RECORD'S SEARCH FINDS A ROW BY. The fields are the ones `fts.ts` indexes (`projectedText`: the

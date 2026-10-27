@@ -4,7 +4,7 @@
  *
  * WHY IT EXISTS. On 2 October Projects froze the owner's tab, and nobody could make it freeze again: three browsers,
  * every width, forty forced re-reads and his own prefs put into `boot` all answered in under 130ms
- * (`loop/research-freeze.md`). A freeze that cannot be reproduced is found by the next one naming itself, so the shell
+ * A freeze that cannot be reproduced is found by the next one naming itself, so the shell
  * starts this once and the next long block says where it happened.
  *
  * HOW IT KNOWS. The browser's own record of long frames (`long-animation-frame`), which names each script that ran in

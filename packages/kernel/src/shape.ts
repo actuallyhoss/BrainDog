@@ -1,5 +1,5 @@
 /**
- * The shape copy: a record's export with every value scrambled and every structure kept (PRF-A13, `area-proof-a.md`
+ * The shape copy: a record's export with every value scrambled and every structure kept (`area-proof-a.md`
  * 2.5).
  *
  * WHY IT EXISTS. Every gate draws an invented record, and the faults that matter show up on a lived one: residue, a

@@ -197,7 +197,7 @@ test('A NIGHT NEEDS THE LIVE BUILD NAMED, AND AN IDENTITY INSIDE THE REPOSITORY 
   assert.deepEqual(leftIn(temp), []);
 });
 
-// ─── --record, --identity-cmd and the receipt (LCH-C06) ───────────────────────────────────────────────────────────
+// ─── --record, --identity-cmd and the receipt ───────────────────────────────────────────────────────────
 
 const LOCK = join(REPO, 'packages', 'kernel', 'src', 'migrations', 'LOCK.json');
 type Entry = { checksum: string; applied: boolean; rehearsed: { at: string; records: number; rows: number; pass: boolean } | null };

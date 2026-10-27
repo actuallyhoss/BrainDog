@@ -1,5 +1,5 @@
 /**
- * An order he sends from BrainDog that names questions (D8, `methods/instructions.ts`).
+ * An order he sends from BrainDog that names questions (`methods/instructions.ts`).
  *
  * WHAT IS HELD, THE TRUST BOUNDARY FIRST: a run with no order answers nothing; a run whose order names other questions
  * answers none but those; a run that read outside text still files its writes as questions, and answers only what the

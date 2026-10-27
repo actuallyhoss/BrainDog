@@ -1,5 +1,5 @@
 /**
- * A table's rows in groups on a live page (ENG-B10): a table block whose rows carry their group (`PageRow.group`,
+ * A table's rows in groups on a live page: a table block whose rows carry their group (`PageRow.group`,
  * `{ value, name }`) answers the drawn block the same `groups` a card block gets, aligned with the rows, and each drawn
  * row says its group by name, which the table draws its headings from.
  *

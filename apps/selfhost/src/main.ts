@@ -94,7 +94,7 @@ const dataDir = (): string => env.BRAINDOG_DATA ?? '/data';
 const BUILT = fileURLToPath(new URL('../../web/build/app', import.meta.url));
 
 /**
- * The kernel's migration lock, beside the migrations it locks (LCH-C06): one line per migration file, its checksum.
+ * The kernel's migration lock, beside the migrations it locks: one line per migration file, its checksum.
  * Found through the kernel package's own entry, so it is the lock of the kernel this process runs, wherever that is.
  */
 const LOCK_FILE = fileURLToPath(new URL('./migrations/LOCK.json', import.meta.resolve('@braindog/kernel')));
@@ -580,7 +580,7 @@ async function serve(): Promise<void> {
 
   /* AN EXPLICIT FILE STILL WINS, because every test and every `braindog dev` in this repository
      opens a bare file with no data directory behind it. */
-  /* `--allow-shape` (PRF-A13, shape-guard-49) is the one flag `serve` reads, and it is never a file. */
+  /* `--allow-shape` (shape-guard-49) is the one flag `serve` reads, and it is never a file. */
   const allowShape = argv.slice(3).includes('--allow-shape');
   const explicit = argv.slice(3).find((a) => a !== '--allow-shape') ?? env.BRAINDOG_FILE;
   /* AND IT MUST ALREADY BE A RECORD. `openSqlite` CREATES the file, so a mistyped flag

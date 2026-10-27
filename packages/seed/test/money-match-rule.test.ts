@@ -216,7 +216,7 @@ test('a repeating line among several that fit is no question: picking it would w
   assert.equal(RULE!.steps[0]!.script.input.asks, 'linked');
 });
 
-test('a bill and a repeating line under one name are one money twice: the bill takes the payment, and its being paid asks once to move the line on (B6)', async () => {
+test('a bill and a repeating line under one name are one money twice: the bill takes the payment, and its being paid asks once to move the line on', async () => {
   const m = await money();
   const theBill = m.bill();
   const line = m.made('recurring', LINE);

@@ -449,7 +449,7 @@ discovered broken the first time it is needed.
 | 4 | A fourth suggestion body — **`change`**: a declaration diff with its prediction | 2d | ~5d |
 | | **Total** | **9d** | **≈22d** |
 
-The table is the estimate it was planned on. It is built now (ENG-B17), as one loop under one set
+The table is the estimate it was planned on. It is built now, as one loop under one set
 of governors, and this is the decision as it stands.
 
 **One question before Slash files anything.** `mayPropose` in `packages/kernel/src/observe.ts`

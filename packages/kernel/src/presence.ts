@@ -1,5 +1,5 @@
 /**
- * One clock for a run: whether it is working, quiet, left a step, ended, stopped, or is from before (AGT-C02).
+ * One clock for a run: whether it is working, quiet, left a step, ended, stopped, or is from before.
  *
  * EIGHT READERS WORKED IT OUT EIGHT WAYS. The rail, Today, the Agents headline, a page's mark on the row an agent is on,
  * the record's live read and the briefings each compared `last_seen` with the clock in their own words, so on the
@@ -63,7 +63,7 @@ export const stateOf = (row: { state?: string | null; fields: Record<string, Jso
 
 /**
  * When a run was last heard from, in milliseconds: its `last_seen`; else the day it was last seen where it was carried in
- * from (`seen_before`, AGT-C10); else when its row last changed.
+ * from (`seen_before`); else when its row last changed.
  *
  * THE CARRIED DAY BEFORE THE ROW'S OWN, because an imported run's row changed on the morning of the import, and read
  * that way 295 runs of the owner's were all last seen the same day. `runAge` reads this, so it follows with no change.
@@ -118,7 +118,7 @@ export function isStale(row: { fields: Record<string, Json>; updated_at: string 
 export const BEAT_MS = 60_000;
 
 /**
- * A run says it is still working: its `last_seen` moves to now, in place, and answers whether it moved (AGT-C03).
+ * A run says it is still working: its `last_seen` moves to now, in place, and answers whether it moved.
  *
  * A HEARTBEAT IS NOT A WRITE (P.132): no version, no `updated_at`, no event, the same in-place statement the ladder
  * gives a found run (`attribute` in `index.ts`), so a session that reads, thinks or edits files reads as working without
@@ -269,7 +269,7 @@ export const CALL_MS = 2 * 60_000;
 export const THINKING_MS = 15 * 60_000;
 /** An open run whose bridge has not pulsed in this long is gone. */
 export const GONE_MS = 2 * 60_000;
-/** The bridge pulses every 15 s; a pulse closer than this to the last moves nothing (plan §10.9: once per 10 s a run). */
+/** The bridge pulses every 15 s; a pulse closer than this to the last moves nothing (once per 10 s a run). */
 export const PULSE_MIN_MS = 10_000;
 
 /** The one live word for a run now (`LiveState`). */
@@ -299,7 +299,7 @@ export const isPresent = (run: { state?: string | null; fields: Record<string, J
 
 /**
  * The bridge says the session is open: the run's `pulse_at` moves to `nowMs`, in place, and answers whether it moved
- * (plan §4.4, `pulseRun` in §8.3).
+ * (`pulseRun` in §8.3).
  *
  * A PULSE IS NOT A WRITE, for a heartbeat's reason (`beatRun`): no version, no `updated_at`, no event, so a session
  * open for a day leaves no line in its history. Only an open run, active or idle: a pulse revives nothing, so a run

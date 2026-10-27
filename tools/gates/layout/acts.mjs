@@ -39,7 +39,7 @@ export const ACTS = {
       name: 'capture typed',
       run: async (page) => {
         /* THE CAPTURE LINE OPENS FROM THE LIST'S PRIMARY: the toolbar's "Add …" from 640, the head's "+" below it as a
-           sheet (the UI pass of 20 October, money F7), so the act opens it first. */
+           sheet (money F7), so the act opens it first. */
         if (!(await page.locator('#capture').isVisible())) await page.locator('.capture-open:visible, [data-capture-open]:visible').first().click({ timeout: 4000 });
         await page.fill('#capture', 'a');
         await page.waitForSelector('.capture-go, [data-capture-go]:not([disabled])', { timeout: 4000 });

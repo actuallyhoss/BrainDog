@@ -1,5 +1,5 @@
 <!--
-  A LONG NOTE AS A NOTE (the audit of 25 October, Y13): headings, bold, lists and tables drawn, never the marks they were
+  A LONG NOTE AS A NOTE: headings, bold, lists and tables drawn, never the marks they were
   written in, and past eight lines it opens folded with Show all. Every part is drawn as text (`note-text.ts`).
 
   THE BUTTON SITS ABOVE THE PHONE'S EDIT OVERLAY, as a link in a fact does, so a thumb on Show all opens the note and a

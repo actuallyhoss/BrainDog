@@ -20,5 +20,5 @@
 </script>
 
 <Button weight="bare" onclick={() => saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</Button>
-<!-- "SHARE THIS VIEW" (sharing plan §3.1): the rows the chips pick, shared as their condition. An owner's or an Admin's. -->
+<!-- "SHARE THIS VIEW": the rows the chips pick, shared as their condition. An owner's or an Admin's. -->
 {#if shareView}<Button weight="bare" onclick={() => shareView?.()}><Icon name="external" size="s" />{copy.shareThisView}</Button>{/if}

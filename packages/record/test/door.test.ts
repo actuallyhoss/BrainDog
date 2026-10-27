@@ -1,5 +1,5 @@
 /**
- * `heard` and `doorSigns`: the agent door's own signs through the record (AGT-B01).
+ * `heard` and `doorSigns`: the agent door's own signs through the record.
  *
  * What is asserted is the door, not the sums, which are the kernel's (`kernel/test/door.test.ts`): a mark from a token
  * with no run is kept against the token and opens no run, a mark from a session with a run is kept against that run, a

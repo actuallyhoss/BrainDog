@@ -1,7 +1,7 @@
 /**
- * `headline-agrees` (EXP-E07): a number in a header that names questions, arrivals or agents equals `waiting()`, and a
+ * `headline-agrees`: a number in a header that names questions, arrivals or agents equals `waiting()`, and a
  * header says nothing needs the reader only when no question and nothing in the inbox waits. A function now, held here;
- * the page lint (PRF-A04) runs it over every header later.
+ * the page lint runs it over every header later.
  *
  * The cases are the four headers on the owner's record on 7 October, which said "nothing", 25, 25 and 4 working.
  */

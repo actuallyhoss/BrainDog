@@ -1,5 +1,5 @@
 /**
- * A card's line typed on in place (PGS-C15): which line may be, and what a pause in the typing sends.
+ * A card's line typed on in place: which line may be, and what a pause in the typing sends.
  *
  * A column that says `edit: true` (`kernel/src/declare.ts` checks the shape at install) is drawn by
  * `svelte/Cards.svelte` as a box that looks like the text it replaces, where the host hands the card a writer. The rule

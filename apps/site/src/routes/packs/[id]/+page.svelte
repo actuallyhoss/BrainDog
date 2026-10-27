@@ -1,7 +1,7 @@
 <!--
   `/packs/<id>`: one add-on, as a stranger weighs it before adding it.
 
-  THE SITE'S DESIGN (site F17): the night head holds the way back, the add-on's name and its one line, who made it and
+  THE SITE'S DESIGN: the night head holds the way back, the add-on's name and its one line, who made it and
   how many hold it, and "Add to your BrainDog" as the page's one red. Under it, on the board's ground, the drawing of
   what it adds beside three tiles: what it brings by name, who made it, and its versions.
 
@@ -278,7 +278,7 @@
     line-height: 1.5;
   }
 
-  /* A TILE: flat, radius 16, no edge and no shadow (site F7). */
+  /* A TILE: flat, radius 16, no edge and no shadow. */
   .tile {
     gap: 16px;
     padding: 24px;

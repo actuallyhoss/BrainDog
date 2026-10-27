@@ -383,7 +383,7 @@ const PAID = /^(?:paid|pays|sent|transferred)\b\s*/iu;
 const GOT = /^(?:received|got)\b\s*/iu;
 const SPENT = /^(?:i|we)\s+(?:paid|spent|sent|transferred)\b\s*|^spent\b\s*/iu;
 const QTY = /^(\d{1,4}|a dozen|a couple of|a couple|dozen|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|an?)\s+/iu;
-/* A COUNT OF THINGS FOR SOMEBODY NAMED IS AN ORDER FROM THEM (audit C, X8): "14 mugs for Lina", "two vases for Omar
+/* A COUNT OF THINGS FOR SOMEBODY NAMED IS AN ORDER FROM THEM: "14 mugs for Lina", "two vases for Omar
    Said". Only a count said in figures or words, never "a" alone, and only before a name, so "14 mugs for Friday" and
    "glaze 14 mugs for the market" are nobody's order. */
 const SAID_COUNT = ['a dozen', 'dozen', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'].map((w) => `[${w[0]}${w[0]!.toUpperCase()}]${w.slice(1)}`).join('|');
@@ -469,7 +469,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
       c = after;
     } else if (PRONOUN.test(c) && acts(c.replace(PRONOUN, ''))) {
       c = c.replace(PRONOUN, '');
-      /* "SHE" AFTER AN ORDER IS WHOEVER PLACED IT, where nobody else was named since (audit C, X8): "14 mugs for Lina,
+      /* "SHE" AFTER AN ORDER IS WHOEVER PLACED IT, where nobody else was named since: "14 mugs for Lina,
          she paid 1200" is Lina paying. Somebody nobody named stays somebody. */
       if (subject === null || lastOrder === null) someone = true;
     }
@@ -654,7 +654,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     rows.push({
       register: l.id,
       fields,
-      /* ONE LINE, READ AS A PERSON SAYS IT (audit C, X8): "EGP 1,200.00 from Lina", then "paid, kept in Bills and
+      /* ONE LINE, READ AS A PERSON SAYS IT: "EGP 1,200.00 from Lina", then "paid, kept in Bills and
          invoices", where it said "EGP 1,200.00 in" over "into Bills and invoices". */
       said: `${spelled(amount, currency)} ${into ? (who ? `from ${who}` : 'in') : 'out'}${by ? `, by ${by}` : ''}`,
       detail: `${settled ? 'paid, ' : ''}kept in ${l.name}`,

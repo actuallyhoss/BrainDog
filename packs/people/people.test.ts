@@ -1,6 +1,6 @@
 /**
  * People as a file: `people.pack.json` held equal to the module the build still compiles in
- * (`packages/seed/src/modules/people.ts`), so taking the module out is one small change and not a rewrite (SHL-A14).
+ * (`packages/seed/src/modules/people.ts`), so taking the module out is one small change and not a rewrite.
  *
  * WHAT IS HELD. People leans on two lists it does not own: Projects (`things`), which a person and an organisation are
  * met in and which an organisation's page draws, and Money's ledger (`transactions`), which that page draws too. Money
@@ -217,7 +217,7 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
      the version the module is at and nothing a record already holds is changed in place. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.people);
   /* 3.6.0 SINCE 24 October (things, not rows): Everyone as faces, the owner left off. 3.5.0 is released. 3.7.0
-     SINCE 24 October (C33): Scripts is a page. 3.8.0 SINCE 25 October (Y2): an organisation can be retired. 3.9.0
+     SINCE 24 October: Scripts is a page. 3.8.0 SINCE 25 October: an organisation can be retired. 3.9.0
      SINCE 27 October: one line a person, and shops from card texts apart. 4.0.0 SINCE 27 October: Health, Scripts,
      Calendar and Activity leave for core. */
   assert.equal(doc.version, '4.0.0');
@@ -397,7 +397,7 @@ test('PROJECTS AND MONEY ARRIVING LATER: the person kept before is still there, 
   said(await put(api, file()));
   const id = add(api, 'people', PERSON);
   said(await put(api, firstPartyDocument('portfolio', { holds: [PROJECTS], seeds: [] })));
-  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL (SHL-A08): only the Money block waits now. */
+  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL: only the Money block waits now. */
   const again = await planOf(api, file());
   assert.deepEqual(again.waiting, await waitingParts([PROJECTS]));
   assert.deepEqual(again.conflicts, []);

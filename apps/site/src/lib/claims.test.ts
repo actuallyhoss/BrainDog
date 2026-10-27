@@ -243,7 +243,7 @@ test('no sentence in the copy says a claim the ledger marks not yet', () => {
 });
 
 /**
- * THE ORDER OF LAUNCH (LCH-A02, H.14): the legal pages go live before sign-up opens, a bot check is keyed before it does,
+ * THE ORDER OF LAUNCH (H.14): the legal pages go live before sign-up opens, a bot check is keyed before it does,
  * billing goes live only with both prices and a door a person can come through, and the legal pages only once their
  * texts hold no `[owner:` marker. `launchOrder` says every broken rule in a line.
  *

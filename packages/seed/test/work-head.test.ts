@@ -73,13 +73,13 @@ function project(k: Kernel, name: string): string {
   return value<{ id: string }>(k.create('things', fields as never, { actor: 'p_1' }), `adding ${name}`).id;
 }
 
-/* NO SEARCH WORD, SINCE the UI pass of 20 October (proj F10): "Search this page" floated between the name and the line with
+/* NO SEARCH WORD (proj F10): "Search this page" floated between the name and the line with
    no field round it, and the frame's own search is one press away. The head is the count and Add. */
 test('WORK DECLARES A HEAD: its open count and one Add, no search word, and the kernel’s own check passes it', () => {
   const header = (PAGES.work as { header?: unknown }).header;
   assert.deepEqual(header, { count: { metric: 'tasks-in-play' }, action: { verb: 'row.create', label: 'Add' } });
   assert.equal(headerFault(header, { figures: new Set(Object.keys(METRICS)), fields: null }), null);
-  /* THE COUNT IS WORK'S OWN FIGURE, called Open, and counts what the project chips count (E24): every task not finished. */
+  /* THE COUNT IS WORK'S OWN FIGURE, called Open, and counts what the project chips count: every task not finished. */
   assert.equal((METRICS['tasks-in-play'] as { name?: string }).name, 'Open');
   assert.equal((METRICS['tasks-in-play'] as { where?: string }).where, 'state is not done or dropped');
 });

@@ -18,7 +18,7 @@
  * operator's monthly ceiling counts it. A build that throws is let go, so the next pass builds again. On an endpoint the
  * key is opened as `system`, which `wireOf` in `slash.ts` keeps for callers with nobody asking, and a model job has nobody.
  *
- * AND ON THE SAME FACTS AS EVERY ASK (ENG-A06): the engine is built with `includedRoute`, so a pattern is asked of the
+ * AND ON THE SAME FACTS AS EVERY ASK: the engine is built with `includedRoute`, so a pattern is asked of the
  * candidates `routeFor('pattern', includedCandidates(env))` names, which today is the included model alone: the operator's
  * second provider is on the answering route only. A digest's prose is walked by `digestProse` itself, outside `core.run`:
  * `routeFor('prose')` names the flash model and the second model after it.
@@ -54,7 +54,7 @@ export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: Slash
   return {
     draft: async (samples, waiting) => (await engine()).draftPattern(samples, waiting),
     prose: async (digest) => (await engine()).digestProse(digest),
-    /* THROUGH THE ENGINE, OVER THE `AI` BINDING (ENG-B18): the engine's own model embeds with `aiInference`'s `embed`
+    /* THROUGH THE ENGINE, OVER THE `AI` BINDING: the engine's own model embeds with `aiInference`'s `embed`
        wherever that binding is bound (`slash.ts` `embedOver`), and `embedTexts` writes each call's `slash_call` row, so
        the month's embed count, the half-month rule and the vital signs read what was sent. It skipped the engine once,
        and the count read 0 whatever went out. Offered whenever the binding exists; absent, `infer.embed` is never
@@ -73,7 +73,7 @@ export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: Slash
 }
 
 /**
- * A search's words as a vector on this Worker (ENG-B18), for the record's search by meaning: `queryVector` over the
+ * A search's words as a vector on this Worker, for the record's search by meaning: `queryVector` over the
  * engine's `embed` above and the background allowance this Durable Object's ledger counts (`backgroundMeter`), so a query
  * is one `slash_call` row of kind `embed`, asked only while his switch is on (`reads`) and the month has room past its
  * kept half, and kept a day. `now` is the Durable Object's clock, the wall's by default. `undefined` where the Worker cannot embed, and the search is by words.

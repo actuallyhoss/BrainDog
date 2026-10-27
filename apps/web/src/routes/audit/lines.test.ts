@@ -341,7 +341,7 @@ test('the words about what is hidden name the person’s own things, in plain wo
   }
 });
 
-/* ── a rule's runs, one line a day (the pass of 27 October) ──────── */
+/* ── a rule's runs, one line a day ──────── */
 
 test('a rule’s quiet runs on one day are one line saying how many times, and a failed run stays its own', () => {
   const ran = (h: number, by: string, note = 'rule.meet-payees ran.') => one({ ...ev(iso(29, h), by, 'pull', 'declaration:rule.meet-payees'), note });
@@ -429,7 +429,7 @@ test('A NAMED RUN IS STILL COUNTED AS AN AGENT', () => {
   assert.deepEqual(t.groups, [{ group: 'agent', count: 1 }, { group: 'you', count: 1 }]);
 });
 
-/* THE READER'S MARK (PGS-C02): once Activity's stamp lands, what the away read holds is `seenAfter()`, and the sentence
+/* THE READER'S MARK: once Activity's stamp lands, what the away read holds is `seenAfter()`, and the sentence
    under the title says so. The stamp's own rule is tested where it lives (`lib/page/read-mark.test.ts`). */
 test('THE AWAY LINE IS NOT DRAWN AFTER A STAMP: what was read is said as nothing new', () => {
   const before = { actors: ['p_1', 'run_2', 'run_2'], capped: true, byWho: null };
@@ -439,7 +439,7 @@ test('THE AWAY LINE IS NOT DRAWN AFTER A STAMP: what was read is said as nothing
   assert.equal(readMarkOf(9, after.actors.length), null, 'a page already stamped stamped again');
 });
 
-/* ── who suggested and who settled (ENG-B16) ───────────────────────────── */
+/* ── who suggested and who settled ───────────────────────────── */
 
 test('A SUGGESTION OF SLASH’S THAT SOMEBODY SETTLED SAYS BOTH NAMES, in the answered card’s own words', () => {
   const mara = 'p_01M2PAZ28BN3FTKQB266DVT4HX';

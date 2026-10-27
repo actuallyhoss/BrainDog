@@ -54,7 +54,7 @@ export type AccountRow = {
   spends: Spends;
   /** `Ran.served`, handed on as it came: a throw the host marked as coming after its model ran, which counts once. */
   served?: boolean | undefined;
-  /** The router's name for the path the call took and the model it tried on it (ENG-A06). Absent until a router says. */
+  /** The router's name for the path the call took and the model it tried on it. Absent until a router says. */
   route?: string | undefined;
   candidate?: string | undefined;
   /** The provider's own words for a failure, already cut and with nothing shaped like a key in it. Absent until a host says. */
@@ -73,7 +73,7 @@ export type Ran = {
    * model that did not answer, and `account` spends nothing for it.
    */
   served: boolean;
-  /** The host's handle for the candidate that ended a route's walk (ENG-A06), for the caller's row. Absent with no route. */
+  /** The host's handle for the candidate that ended a route's walk, for the caller's row. Absent with no route. */
   candidate?: string | undefined;
   /**
    * The provider's words on a throw from a route's candidate, scrubbed and cut (`thrownRaw`), for the
@@ -107,7 +107,7 @@ export type RunArgs = {
    */
   schema?: object | undefined;
   /**
-   * A caller's watch over a route candidate's own wire (ENG-A06), so what it reads off a throw is the last attempt's and
+   * A caller's watch over a route candidate's own wire, so what it reads off a throw is the last attempt's and
    * not an earlier one's. Absent, a candidate's wire is asked as it came.
    */
   watch?: ((inference: Inference) => Inference) | undefined;
@@ -202,7 +202,7 @@ export const ulid = (ms: number): string => {
  * own SQLite, where a bare `settings` and `call` read as the record's. The next change to a column raises this number and
  * adds its step to `openStore`.
  *
- * 3 IS THE LEDGER SAYING WHOSE ALLOWANCE A ROW SPENDS (ENG-A05): `slash_call` gains `purpose`, `spends`, `route`,
+ * 3 IS THE LEDGER SAYING WHOSE ALLOWANCE A ROW SPENDS: `slash_call` gains `purpose`, `spends`, `route`,
  * `candidate` and `raw`, and `FILL_2` reads every older row once to say what it was. A build at 2 refuses a store at 3
  * (`openStore`), so the deploy that carries this cannot be rolled back past without Slash going quiet.
  */
@@ -267,7 +267,7 @@ const COLUMNS_3: readonly (readonly [string, string])[] = [
 const INDEX_3 = 'CREATE INDEX IF NOT EXISTS slash_call_spends ON slash_call(spends, ts)';
 
 /**
- * AN ASK TURNED AWAY BECAUSE THE MONTH'S ASKS ARE SPENT LEAVES ONE ROW (model-sign-49, audit 40-42 finding 5): model `-`,
+ * AN ASK TURNED AWAY BECAUSE THE MONTH'S ASKS ARE SPENT LEAVES ONE ROW (model-sign-49): model `-`,
  * `refused`, `SLASH_BUDGET_SPENT`. Before this every month-cap refusal returned before any row was written, so the vital
  * sign `model-answers` read five answers and then fifty capped asks as "answered all 5", and fifty capped asks alone as
  * "No one asked". Under `-` it is never an ask the meter counts (`asksUsed`, the host's `drafted` and the worker's
@@ -533,8 +533,8 @@ const refusedWith = (out: Result<unknown>): string | undefined => ('refusal' in 
 
 /**
  * `priced` IS THE HOST'S ANSWER TO WHOSE NEURONS EACH TIER SPENDS, and `['a']` is `46 §4.1`'s. `tiers` IS ITS ANSWER TO
- * WHICH TIERS IT RUNS AT ALL. See `SlashOptions` in `index.ts` for the host that answers otherwise. `route` IS ITS ROUTER
- * (ENG-A06), the candidates `run` walks before a caller's rules speak; absent, every ask goes to its template's model.
+ * WHICH TIERS IT RUNS AT ALL. See `SlashOptions` in `index.ts` for the host that answers otherwise. `route` IS ITS ROUTER,
+ * the candidates `run` walks before a caller's rules speak; absent, every ask goes to its template's model.
  */
 export const core = (
   sql: Sql,
@@ -715,7 +715,7 @@ export const core = (
       return { ran: { model, ms, usage, served: true, out: ok(parsed) } };
     };
 
-    /* THE WALK (ENG-A06), only where the host handed a route and the ask is the template's own: his own key (`b`) and a
+    /* THE WALK, only where the host handed a route and the ask is the template's own: his own key (`b`) and a
        model he named are his choice and never fall to another, so either is asked as before. No route, or an empty one,
        is the one call this function always made. */
     const walk = route === undefined || model !== template.model || settings().tier === 'b' ? [] : route(template.purpose);
@@ -808,7 +808,7 @@ export const core = (
        `ask_id` still cannot run free: `propose.ts` refuses it before it holds anything, off the row the first pass 2
        left under `<ask_id>:propose` (`reserve`'s `id` parameter, just above).
 
-       AND WHOSE ASK IT IS IS WHAT THE ROW SAYS, since version 3 (ENG-A05). The count read `kind IN ('read', 'pattern')`,
+       AND WHOSE ASK IT IS IS WHAT THE ROW SAYS, since version 3. The count read `kind IN ('read', 'pattern')`,
        so a pattern the record drafted for itself, a headline and a reading of who is who each spent one of his 80 on the
        included model (`test/spends.test.ts`). It reads `spends = 'person'` now, which the caller wrote with the row, and
        an attempt no model answered says `none` there whatever name it is under (`unspent`). `COUNT_3` says why the tier

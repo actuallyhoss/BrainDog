@@ -39,7 +39,7 @@ export const INSTALMENTS_FIGURES: Record<string, SeedMetric> = {
 };
 
 /**
- * THE PARTS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4): a part still open whose day has gone, going out.
+ * THE PARTS LATE, SINCE money-core 3.18.0: a part still open whose day has gone, going out.
  * A part was called "next", in grey, nine days after its day, while a late bill was red in Heads up and on Today. Its
  * rows name the part Money's first line says (`{{installments-late.first}}`, the one late longest), with its amount and
  * its day, and Heads up's line says the same. Its own export, declared last in Money (`figures/index.ts`), so every

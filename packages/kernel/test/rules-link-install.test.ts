@@ -1,5 +1,5 @@
 /**
- * A link's `where` and `take` are checked as the rule is installed, and a pattern as its row is written (REC-B10).
+ * A link's `where` and `take` are checked as the rule is installed, and a pattern as its row is written.
  *
  * THE CHECKS LIVED ONLY IN THE DRY RUN. A rule filtering the linked list by a field it does not declare installed, and
  * the pass left the step out for ever; a pattern that can take for ever was stored and then never run. Both are now

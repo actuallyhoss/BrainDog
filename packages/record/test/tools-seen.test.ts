@@ -1,5 +1,5 @@
 /**
- * What one machine holds, written down by the record (`src/methods/tools-seen.ts`, AGT-D02): every server, command line
+ * What one machine holds, written down by the record (`src/methods/tools-seen.ts`): every server, command line
  * and integration matched to its row by what it runs, added when new, stamped when seen again, and asked about only
  * when a known name now runs something else.
  *

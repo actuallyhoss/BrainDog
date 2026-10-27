@@ -10,7 +10,7 @@
  * record's version and `MAX(rowid)` is monotonic, so an id that also sorts by time makes an export
  * page cheap and a "what happened next" query an index scan rather than a join.
  *
- * TWO IDS MINTED IN THE SAME MILLISECOND ARE STRICTLY INCREASING (K10). Without that, two rows
+ * TWO IDS MINTED IN THE SAME MILLISECOND ARE STRICTLY INCREASING. Without that, two rows
  * written in one transaction can sort either way, and every list that pages by id can show one of
  * them twice or neither.
  */

@@ -38,7 +38,7 @@ export function filtersOf(page: unknown): Filter[] {
       if (value === null) return [];
       const label = typeof v.label === 'string' && v.label.trim() !== '' ? v.label : value;
       if (label === '') return [];
-      /* A PROJECT'S HUE, so its chip wears the project's dot (E24). */
+      /* A PROJECT'S HUE, so its chip wears the project's dot. */
       const hue = typeof v.hue === 'number' && Number.isInteger(v.hue) && v.hue >= 0 && v.hue < 360 ? { hue: v.hue } : {};
       return [typeof v.count === 'number' ? { value, label, count: v.count, ...hue } : { value, label, ...hue }];
     });
@@ -75,7 +75,7 @@ export const sameFilter = (a: Readonly<Record<string, string>>, b: Readonly<Reco
 };
 
 /**
- * THE WORD TYPED ON THE PAGE'S HEAD (PGS-A14), as the address holds it under the head's own param (`?q=kiln`, which
+ * THE WORD TYPED ON THE PAGE'S HEAD, as the address holds it under the head's own param (`?q=kiln`, which
  * `declared-head.ts` `searchQuery` writes): trimmed, and `null` where there is none, so an empty field asks nothing.
  * No param, a page whose head has no search, is no word.
  */

@@ -157,7 +157,7 @@ test('AN ERASURE PUTS THE KEPT FAULTS AWAY, because they name rows, and the next
   sql.close();
 });
 
-/* ── the page lint's whole round (C39) ──────────────────────────────────── */
+/* ── the page lint's whole round ──────────────────────────────────── */
 
 const printedOf = async (api: Awaited<ReturnType<typeof record>>['api'], ctx: CallContext = owner) => {
   const out = await api.textFaults({}, ctx);

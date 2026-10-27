@@ -1,5 +1,5 @@
 /**
- * ENG-B20 job 1: Slash's reach, its tools-and-skills and tone sources (`loop/scope/area-engine-b.md`).
+ * ENG-B20 job 1: Slash's reach, its tools-and-skills and tone sources.
  *
  * WHAT THE OWNER'S RECORD SHOWED: the one skill Slash offered said "Its steps are not written yet.", so what was offered
  * was a name. These hold the rules that end it: a skill is offered only when three runs in one project did the same

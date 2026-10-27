@@ -99,7 +99,7 @@ const NOTES: Declaration = {
 const SEATED_22 = '2026-10-02T00:00:00.000Z';
 /** And when migration 26 seats the one after, with when a run started. */
 const SEATED_26 = '2026-10-07T00:00:00.000Z';
-/** And when migration 28 seats the one after that, with how a run's work went (AGT-C04). */
+/** And when migration 28 seats the one after that, with how a run's work went. */
 const SEATED_28 = '2026-10-08T00:00:00.000Z';
 /** And when migration 42 seats the one after that, with what he told a run and whether it is open (agents and MCP plan). */
 const SEATED_42 = '2026-10-21T00:00:00.000Z';

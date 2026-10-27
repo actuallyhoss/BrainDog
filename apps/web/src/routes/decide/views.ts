@@ -323,7 +323,7 @@ function shortDay(iso: string): string {
 /**
  * THE AMOUNTS ACCEPTING A MONEY QUESTION WOULD MOVE, one a currency, in minor units, or `null` where it moves none.
  * What accepting writes is read as the card reads it (`card.ts` `movesOf`, every value and not the first), so "in all"
- * is the sum of what the cards say (audit Z4: "EGP 930,191 in all" over cards of EGP 74,092.16 and $9,074.01, and EGP
+ * is the sum of what the cards say ("EGP 930,191 in all" over cards of EGP 74,092.16 and $9,074.01, and EGP
  * 2,155,589). A question that writes none is read off its sentence ("GBP 4,800.00") ONLY WHERE THE SENTENCE IS MONEY
  * THAT FELL DUE (`moneyRowOf`), the bill or invoice its answer settles or chases. Any other amount a sentence names is
  * not money an answer moves: a revenue goal ("aiming for $1,500") and a charge somebody is asked to check were added to
@@ -346,13 +346,13 @@ function amountsIn(q: QueueQuestion): { minor: number; currency: string }[] | nu
  * come to, then how many quick ones; digits always. The sum is said only where every money question names its amount,
  * and per currency, never added across.
  *
- * IT LEADS WITH THE COUNT, IN RED, SINCE THE AUDIT OF 22 OCTOBER (U-A7): "3 quick ones." was a category's label and not
+ * IT LEADS WITH THE COUNT, IN RED: "3 quick ones." was a category's label and not
  * a sentence. Now "8 need you: 3 about money, £7,239 in all, and 5 quick ones.", or "6 need you, all quick ones."
  */
 export function groupSentence(money: readonly QueueQuestion[], quick: readonly QueueQuestion[], quickCount = quick.length, cards?: number): { text: string; needs: string } {
   const total = money.length + Math.max(0, quickCount);
   if (total === 0) return { text: '', needs: '' };
-  /* AND HOW MANY CARDS, WHEN ALIKE ONES FOLD (scope D9): "22 need you" over six cards read as a count that disagreed. */
+  /* AND HOW MANY CARDS, WHEN ALIKE ONES FOLD: "22 need you" over six cards read as a count that disagreed. */
   const folded = cards !== undefined && cards > 0 && cards < total ? `, as ${cards.toLocaleString('en-GB')} ${cards === 1 ? 'card' : 'cards'}` : '';
   const needs = `${total.toLocaleString('en-GB')} ${total === 1 ? 'needs' : 'need'} you${folded}`;
   let sum = '';
@@ -419,7 +419,7 @@ export function decideDrawn(
      question is drawn once. A page with one open queue draws every question in it, as it always did. */
   const money = pool.filter(aboutMoney);
   const quick = pool.filter((q) => !aboutMoney(q));
-  /* ONE COUNT OF WHAT WAITS (audit Z3): "35 need you: 2 about money and 33 quick ones" sat over "Quick 18" on the laptop
+  /* ONE COUNT OF WHAT WAITS: "35 need you: 2 about money and 33 quick ones" sat over "Quick 18" on the laptop
      (the questions drawn) and "Quick 5" on the phone (the cards). Each group is counted in questions, the record's
      count where it says more than the queue held, as the sentence, the badge and Today count them. */
   if (waits) open = waits.questions;
@@ -467,7 +467,7 @@ export function decideDrawn(
       ...(qs.length === 0 ? { drawn: false } : {}),
     } as LiveBlock;
   });
-  /* THE LINE SAYS HOW MANY, THEN THE TWO GROUPS (today F12, U-A7): "8 need you: 3 about money, £7,239 in all, and 5
+  /* THE LINE SAYS HOW MANY, THEN THE TWO GROUPS (today F12): "8 need you: 3 about money, £7,239 in all, and 5
      quick ones." The red is on how many. */
   /* THE QUICK ONES ARE EVERY OPEN QUESTION THAT IS NOT ABOUT MONEY, by the record's count where it says more than the
      queue held (`quickCount`). */
@@ -586,7 +586,7 @@ const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD', 'UNREACHABLE', '
 /* ── who decides: the reader's own questions first ────────────────────── */
 
 /**
- * THE QUESTIONS NAMED FOR THE READER COME FIRST (USE-A13), under `heading`, and the rest keep the record's order after
+ * THE QUESTIONS NAMED FOR THE READER COME FIRST, under `heading`, and the rest keep the record's order after
  * them. `yours` is how many at the front are the reader's; `heading` is `null` when none is, so a record where nobody
  * names a decider draws Decide exactly as before. A question from a record older than the column names nobody.
  */

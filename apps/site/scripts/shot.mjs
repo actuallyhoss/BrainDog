@@ -7,7 +7,7 @@
  * screenshot is of a page that would never ship. Serving the artefact the adapter actually wrote is
  * the only way to photograph the artefact the adapter actually wrote.
  *
- * OR IT LOOKS AT A SITE THAT IS ALREADY UP (LCH-B02). `--origin https://brain.dog` photographs what a
+ * OR IT LOOKS AT A SITE THAT IS ALREADY UP. `--origin https://brain.dog` photographs what a
  * stranger is served today and not what this checkout would build. The skin moved under the site on
  * 7 October and no one knew, because nothing looked at brain.dog: `.github/workflows/site-live.yml`
  * runs this every day against production.

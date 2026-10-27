@@ -1,5 +1,5 @@
 /**
- * The lane's seventh step: the kept lane on the canary's host (SHL-A19, `tools/kept/run.mjs`).
+ * The lane's seventh step: the kept lane on the canary's host (`tools/kept/run.mjs`).
  *
  * THE LANE ITSELF IS `tools/kept/run.mjs`; this file only says when the canary runs it. A fresh founder signs up as the
  * stranger's drill does, each kept add-on is installed from the host's own catalogue, fed, given one turn and read back,

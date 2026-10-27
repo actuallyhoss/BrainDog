@@ -254,7 +254,7 @@ test('THE EIGHTH FAILURE IS VISIBLE, because a notification that silently gave u
   assert.equal(row(sql, id).attempts, 8);
   assert.equal(sql.all("SELECT 1 FROM schedule WHERE kind = 'retry' AND state = 'pending'").length, 0, 'a ninth retry');
 
-  /* A FAULT, NEVER A QUESTION (AGT-C06). The eighth failure files nothing in Decide: retrying a mail server that refuses
+  /* A FAULT, NEVER A QUESTION. The eighth failure files nothing in Decide: retrying a mail server that refuses
      is an operator's work, and the owner was being asked to do it. It raises one fault for the kind instead. */
   assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0, 'a dead letter filed a question');
   assert.equal(sql.all("SELECT 1 FROM event WHERE kind = 'suggest'").length, 0, 'a dead letter announced a question');
@@ -417,7 +417,7 @@ test('EVERY ONE OF THE TEN KINDS IS HANDLED NOW, and a kind that were not would 
   assert.equal(drained.dead, 1);
   assert.equal(sql.one<{ state: string }>("SELECT state FROM schedule WHERE id = 's_1'")?.state, 'failed');
 
-  // A fault for the kind, and no question (AGT-C06).
+  // A fault for the kind, and no question.
   assert.equal(sql.all('SELECT 1 FROM suggestion').length, 0);
   assert.equal(sql.one<{ cause: string }>('SELECT cause FROM fault')?.cause, 'schedule#pull');
   void k;

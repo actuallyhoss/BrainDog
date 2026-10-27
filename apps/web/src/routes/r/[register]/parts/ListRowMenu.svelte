@@ -64,7 +64,7 @@
     keepPrivate?: ((seq: number, on: boolean) => void) | undefined;
     /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only. */
     onhanded?: ((entry: Entry) => void) | undefined;
-    /** Share the row with somebody (sharing plan §3.1), for an owner or an Admin; absent for anybody else. */
+    /** Share the row with somebody, for an owner or an Admin; absent for anybody else. */
     share?: ((seq: number) => void) | undefined;
   } = $props();
 
@@ -168,7 +168,7 @@
 </RowMenu>
 
 <style>
-  /* THE ROWS ARE `Menu`'s (2.A.13): 36 tall, 48 in the phone's sheet, a 16px icon in a 20px slot. What is this file's is
+  /* THE ROWS ARE `Menu`'s: 36 tall, 48 in the phone's sheet, a 16px icon in a 20px slot. What is this file's is
      the state's dot in that slot, the tick at the end of the one the row is in, and Select's box. */
   .mi-name {
     flex: 1;

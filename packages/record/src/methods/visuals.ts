@@ -1,6 +1,6 @@
 /**
  * Visuals: `attachVisual`, `visuals`, `visual` and `settleVisual`, a page with its pictures hung on a task, a project, a
- * question or a decision (DIRECTION §45). Asked as a note is asked, since it changes no value; the bytes stay in the
+ * question or a decision. Asked as a note is asked, since it changes no value; the bytes stay in the
  * host's store.
  *
  * A VERSION MAY COME AS A DRAFT (`draft: true`), which waits beside the version the visual stands at and never replaces
@@ -100,7 +100,7 @@ export type VisualRead = {
   versions: { version: number; title: string; by: string; at: string; bytes: number; pictures: number; batch: string | null; draft: boolean }[];
 };
 
-/** The three presses a draft offers (DIRECTION §45). */
+/** The three presses a draft offers. */
 export const SETTLE_AS = ['keep', 'throw', 'again'] as const;
 
 /** What `settleVisual` takes: the visual, the version pressed on, and the press. */
@@ -187,7 +187,7 @@ export function methods(deps: RecordDeps) {
       const target = `entry:${row.id}`;
       return sightOf(ctx, target) === null ? { code: 'REF_UNKNOWN', fix: NOTHING, at: 'on' } : { target, list: row.register, id: row.id, words: wordsOf(ctx, target) };
     }
-    /* BY ITS NAME, as `get` takes one (plan §4.3): the one thing whose title is these words, case and spacing aside. */
+    /* BY ITS NAME, as `get` takes one: the one thing whose title is these words, case and spacing aside. */
     if (said.length > 200) return { code: 'REF_UNKNOWN', fix: NOTHING, at: 'on' };
     const hits = kernel.search(said, { limit: 20 }).filter((h) => sightOf(ctx, `entry:${h.id}`) !== null);
     const exact = hits.filter((h) => words(kernel.titleOfRow(h.id) ?? '') === words(said));
@@ -397,7 +397,7 @@ export function methods(deps: RecordDeps) {
     },
 
     /**
-     * A person settles a version in BrainDog (DIRECTION §45). DATA, a person's alone: an agent suggests, and the person
+     * A person settles a version in BrainDog. DATA, a person's alone: an agent suggests, and the person
      * decides. `keep` makes the visual stand at the draft that waits; `throw` throws that draft away; `again` throws it
      * away when it waits and tells the run that drew the version to draw it again, as a draft. Each names the version
      * pressed on, so a press on a screen a newer version has passed is refused rather than settling the wrong one.

@@ -1,5 +1,5 @@
 /**
- * Things here twice are not things gone stale (audit 25 October, Y4): Settings said "32 things went stale" over the one
+ * Things here twice are not things gone stale: Settings said "32 things went stale" over the one
  * line "32 keys are here twice", while Health said 9 things needed a look. A list's twins are their own heading, each list
  * a line that opens where they fold, and the stale count is only what went stale.
  */

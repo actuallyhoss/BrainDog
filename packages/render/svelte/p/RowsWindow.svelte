@@ -1,6 +1,6 @@
 <!--
   `RowsWindow` — `Table` for a long list: the same props, the same cell body, the same grid and the same phone cards,
-  but only the rows on screen are built (PGS-A16). The rest of the height is two spacers, so the scrollbar is as long as
+  but only the rows on screen are built. The rest of the height is two spacers, so the scrollbar is as long as
   the whole list, and a sentinel past the last row asks the host for more (`onmore`), as `Table`'s does.
 
   WHAT IT KEEPS OF `Table`. One tab stop and the arrows (`moveCell`), walking every row of the list and not only the

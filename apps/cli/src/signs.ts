@@ -1,5 +1,5 @@
 /**
- * `braindog signs [--json] [--strict]`: the record's vital signs, read now (PRF-A01: a daily check watches all of
+ * `braindog signs [--json] [--strict]`: the record's vital signs, read now (a daily check watches all of
  * that). Whether bank messages are being filed, whether project numbers still arrive, whether questions pile up on one
  * cause, how old the oldest open question is, and whether runs end true, each as the record says it.
  *

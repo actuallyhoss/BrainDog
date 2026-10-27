@@ -554,7 +554,7 @@ test('THE SENTENCE IS LEFT OFF WHERE THE HEADLINE SAYS HOW LONG IT LASTS, the fl
   assert.match(html, /class="forecast-pin"/u);
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z16 (`loop/proof/looks/audit-2026-10-25/money-390-light-full.png`, Cash ahead): cash fell to
+/* Cash fell to
    today and the walk steps up three days on, and "Today" over "EGP 752,841.68", set over the dot to the end side, was drawn
    across the line that climbs there. The label goes to a corner the line leaves free, inside the plot. */
 test('TODAY\'S LABEL SITS IN A CORNER THE LINE LEAVES FREE, so a walk that climbs the day after never runs through it', () => {

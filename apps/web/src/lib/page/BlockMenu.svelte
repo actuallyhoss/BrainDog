@@ -1,5 +1,5 @@
 <!--
-  A BLOCK'S OWN MENU (PGS-B08): Move up, Move down, the other column, its width, Change to, Hide and Remove, from the
+  A BLOCK'S OWN MENU: Move up, Move down, the other column, its width, Change to, Hide and Remove, from the
   block's head, at every width. Each press is one kept change and one line with Undo; the rows are `block-menu.ts`'s.
 
   CHANGE TO AND REMOVE SET THE PAGE HE WROTE (`page-write.ts` `changeBlock`), and the rest set its look. Whether he wrote

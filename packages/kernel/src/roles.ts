@@ -86,7 +86,7 @@ export const PARTS: Readonly<Record<RoleName, readonly Part[]>> = {
     { part: 'merged_into', types: ['ref'], says: 'a ref to its own list', to: 'self', optional: true, later: true },
     { part: 'met', types: ['list'], of: 'text', says: 'a list of text', optional: true, later: true },
     { part: 'projects', types: ['list'], of: 'ref', says: 'a list of refs to projects', optional: true, to: 'projects', later: true },
-    /* THE DAY IT WAS RETIRED, SINCE People 3.8.0 (the audit of 25 October, Y2): a shop met by a name a card text cut short
+    /* THE DAY IT WAS RETIRED, SINCE People 3.8.0: a shop met by a name a card text cut short
        is put away on his answer, never deleted, and the walk over the past makes nothing more of it. */
     { part: 'retired', types: ['day'], says: 'a day', optional: true, later: true },
   ],

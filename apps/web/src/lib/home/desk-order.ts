@@ -17,7 +17,7 @@ const RANKS: Readonly<Record<string, number>> = {
   working: 2,
   cash: 3,
   /* THE FEW KEY NUMBERS THAT LEAD, a row of their own under the first: after cash, before the record's week and the
-     projects (loop/plans/kpis-2026-10-21, 2.8). */
+     projects (2.8). */
   numbers: 4,
   'week-due': 5,
   'week-money': 6,
@@ -37,7 +37,7 @@ const PLACES: readonly (readonly [Placed, number])[] = [
   ['landed', 8],
 ];
 
-/** What is late leads the desk (U2), whatever key the page declares it under: it is the late tile (`desk-part.ts`). */
+/** What is late leads the desk, whatever key the page declares it under: it is the late tile (`desk-part.ts`). */
 const LATE = 0;
 
 /** A block's place in the picture, by the key it is declared under. */

@@ -1,5 +1,5 @@
 /**
- * The test database refuses what the Durable Object refuses (AGT-B03, PRF-B25).
+ * The test database refuses what the Durable Object refuses.
  *
  * Three cases plant one statement past one ceiling and assert the throw names the code and the statement's first
  * line; the rest show what must still pass. If `openSqlite` stops guarding by default, those three go red on their

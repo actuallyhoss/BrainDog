@@ -60,7 +60,7 @@ import { words as pageWords, type Paging } from './new-page.ts';
  * `customise` IS THE SAME SHAPE. `Dark mode`, `Open on Money`, `Hide Inbox`: the change and the thing it changes are
  * words in the box, read by `customise()` in `customise.ts`, and what it takes is `Live.customise`.
  *
- * `page` TOO (PGS-C30). `New page: Wedding` makes a page whose name is typed in the box, read by `paging()` in
+ * `page` TOO. `New page: Wedding` makes a page whose name is typed in the box, read by `paging()` in
  * `new-page.ts`, and what it takes is `Live.page`.
  */
 export const ACTS = ['undo', 'add', 'customise', 'page', 'money'] as const;
@@ -123,7 +123,7 @@ export type Command = {
   /** Present only on a command that can be unavailable. Absent means it can always run. */
   when?: (live: Live) => boolean;
   /**
-   * THE OTHER WORDS A PERSON REACHES FOR (EXP-D13). Somebody after their mail types `mail`, not `Inbox`, and a
+   * THE OTHER WORDS A PERSON REACHES FOR. Somebody after their mail types `mail`, not `Inbox`, and a
    * palette that answers only to the screen's own name makes them learn the app's vocabulary first. Plain lower-case
    * words, at most six, and never another command's name: `scoreOf` ranks an alias hit below every hit on a title, so
    * a word that is somebody else's name would be a second door to the wrong place.
@@ -213,7 +213,7 @@ export function admits(c: Command, among: readonly Command[] = COMMANDS): Refusa
 const plain = (s: string): string => tokensOf(s).join(' ');
 
 /**
- * HOW WELL A COMMAND ANSWERS WHAT WAS TYPED, or `null` when it does not answer at all (EXP-D13, HD.119's one matcher).
+ * HOW WELL A COMMAND ANSWERS WHAT WAS TYPED, or `null` when it does not answer at all (HD.119's one matcher).
  *
  * The order is the order of how sure the hit is. The whole name typed is 5, the name's beginning 4, the beginning of a
  * word in it 3 (every typed word starting one of the name's words, the rule the palette filtered with before), the
@@ -353,7 +353,7 @@ export const COMMANDS: readonly Command[] = [
     when: (live) => (live.customise?.length ?? 0) > 0,
   },
   /**
-   * AND THE ROW THAT MAKES A PAGE (PGS-C30). No control made one: a person who wanted an empty page pasted source.
+   * AND THE ROW THAT MAKES A PAGE. No control made one: a person who wanted an empty page pasted source.
    *
    * THE TITLE HERE IS THE DECLARATION'S. The palette draws `New page`, then `New page: Wedding` once the box holds a
    * name, and `Suggest a page` for somebody who does not own the record, all of it `new-page.ts`'s reading of the

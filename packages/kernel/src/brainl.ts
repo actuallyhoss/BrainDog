@@ -762,7 +762,7 @@ export type CheckOptions = { key?: string | undefined; shape?: boolean | undefin
 /**
  * The refusal for a shape copy put back where it may not go, or `null`.
  *
- * A SHAPE COPY IS A RECORD'S STRUCTURE WITH EVERY VALUE SCRAMBLED (PRF-A13), and it opens like any export. Put back over
+ * A SHAPE COPY IS A RECORD'S STRUCTURE WITH EVERY VALUE SCRAMBLED, and it opens like any export. Put back over
  * a real record it would replace every name, amount and note with gibberish that reads as his, which is the one thing a
  * copy made to share must never do. So an import refuses it unless it was asked for: a scratch record (the look's
  * `openShape`) or a self-host started with `--allow-shape`. Read off the file's own mark, the same one the gate reads.

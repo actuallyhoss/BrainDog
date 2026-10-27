@@ -1,6 +1,6 @@
 /**
- * Where a row with no scope belongs, worked out from what the record already knows (AGT-D04 job 1, decision 5 of
- * `loop/scope/area-agents-d.md`): every key, tool and skill placed nowhere is given the one project its evidence names,
+ * Where a row with no scope belongs, worked out from what the record already knows:
+ * every key, tool and skill placed nowhere is given the one project its evidence names,
  * with that evidence said in words, so a person answers one question a list and not one press a row.
  *
  * THE FOUR VOTES, two strong and two weak:

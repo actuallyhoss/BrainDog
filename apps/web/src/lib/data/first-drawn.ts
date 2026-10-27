@@ -3,7 +3,7 @@
  *
  * A BROWSER KEEPS SIX REQUESTS TO ONE HOST AT ONCE, and on Today's first open the account's records for the switcher and
  * who is working now, asked again behind what `boot` said of them, took two of the six while Today's page was asked, so
- * the page and the walks of the lists its rows name waited their turn (`loop/perf/r3-diag.mjs`). They are asked once
+ * the page and the walks of the lists its rows name waited their turn. They are asked once
  * the first screen has drawn instead, or after `FIRST_WAIT_MS` should it not, and what they fill in was drawn from
  * `boot` meanwhile, so nothing moves for the wait.
  *

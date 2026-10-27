@@ -1,5 +1,5 @@
 /**
- * What the tidy found, finder by finder, under what went stale on Home (AGT-C18): "Empty runs: 41 stale, 3 cleared
+ * What the tidy found, finder by finder, under what went stale on Home: "Empty runs: 41 stale, 3 cleared
  * this week", a line a kind of thing.
  *
  * THROUGH THE RECORD'S OWN FIGURES AND NOTHING ELSE. Each finder answers two figures on request, `stale-<finder>` (how

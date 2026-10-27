@@ -30,7 +30,7 @@ type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 export const CATALOGUE_BASE = KENNEL_AT;
 
 /**
- * WHAT A STORE THAT DID NOT ANSWER SAYS (Y9). A refused or failed read was taken for a host with no store, so Browse
+ * WHAT A STORE THAT DID NOT ANSWER SAYS. A refused or failed read was taken for a host with no store, so Browse
  * quietly listed the built-ins alone and an add-on's own page said "Nothing here by that name". A host with no store
  * answers 404 or the app's own page, and only that is read as none.
  */
@@ -122,7 +122,7 @@ export async function catalogueTitles(index: CatalogueIndex | null): Promise<Map
 /**
  * The line a person reads under each entry's name, by the pack id a record holds it under: what its catalogue says it is
  * for. An installed add-on that is not one of this build's modules read only its lists there, so Holdings was described
- * as "Holdings" (the audit of 25 October, Z11).
+ * as "Holdings".
  */
 export async function catalogueLines(index: CatalogueIndex | null): Promise<Map<string, string>> {
   if (!index) return new Map();
@@ -136,8 +136,7 @@ export const SHIPPED_INDEX_AT = '/app/catalogue/index.json';
 /**
  * THE CATALOGUE THIS BUILD SHIPS, for naming what is installed when the Kennel does not answer. Every pack in `packs/` is
  * in it, listed or not, so an add-on installed by id is named by its title ("HSBC Egypt alerts") and never by its id
- * ("Bank hsbc eg"), which is what a host with no Kennel, or a read the Kennel refused, drew (the audit of 25 October,
- * Z11). `null` when it cannot be read: the names then fall back as before.
+ * ("Bank hsbc eg"), which is what a host with no Kennel, or a read the Kennel refused, drew. `null` when it cannot be read: the names then fall back as before.
  */
 export async function readShippedCatalogue(fetcher: Fetcher): Promise<CatalogueIndex | null> {
   try {
@@ -165,7 +164,7 @@ export const byBrainDog = (l: { source: string; author: string; publisher?: { ki
 
 /**
  * A version's signature line, or `null` where there is nothing to say: BrainDog's own add-ons are not signed, and "Not
- * checked" under every one of their versions read as a warning about BrainDog's own work (audit C, X12).
+ * checked" under every one of their versions read as a warning about BrainDog's own work.
  */
 export const signedLine = (signature: Signature | null | undefined, ours: boolean): string | null => (!signature && ours ? null : signedWords(signature));
 

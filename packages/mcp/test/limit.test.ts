@@ -1,5 +1,5 @@
 /**
- * The agent door's limits (AGT-B03, RQ-AGT-409): a limit under 1 reaches the record as sent and is refused there in the
+ * The agent door's limits: a limit under 1 reaches the record as sent and is refused there in the
  * record's words, never made 1 without a word; a limit past a hundred is answered a hundred, and the answer's last line
  * says how many of how many and that the rest is the same call with the cursor beside it.
  *

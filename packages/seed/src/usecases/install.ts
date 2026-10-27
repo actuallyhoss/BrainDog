@@ -357,7 +357,7 @@ function carriedWhole(u: UseCase, today: string, said: string | null | undefined
  * once they are in. A sentence that forms nothing plants nothing, because the use case's own examples are never written
  * (`carriedDocument`).
  *
- * A FORMED ROW CARRIES `formed` AND NEVER `example` (USE-B07): what somebody's own words asked for is theirs, so "Clear
+ * A FORMED ROW CARRIES `formed` AND NEVER `example`: what somebody's own words asked for is theirs, so "Clear
  * the examples" can never take it, and no fresh record holds a row tagged `example`. A row that is not formed, which the
  * plan carries none of today, is still tagged as the install tags it.
  */
@@ -453,7 +453,7 @@ const whereNames = (where: unknown, fields: ReadonlySet<string>): boolean =>
 const FRAMES = new Set(['note', 'section']);
 
 /**
- * A DOCUMENT CUT TO THE LISTS A RECORD HOLDS (USE-B08), for any pack, so a use case can go in with what it stands on and
+ * A DOCUMENT CUT TO THE LISTS A RECORD HOLDS, for any pack, so a use case can go in with what it stands on and
  * grow into the rest. `holds` is every list the record will hold once the document is in; the document's own lists and
  * the kernel's are held whatever it says. Out go: a list's link field to a list not held (with the columns, filters,
  * roles and seed values over it); a figure counted over a list not held, or asked of a field so taken out; a rule about,

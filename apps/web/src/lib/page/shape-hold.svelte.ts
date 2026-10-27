@@ -1,5 +1,5 @@
 /**
- * ONE PROJECT'S SHAPE, READ ONCE FOR EVERY PART OF IT ON ITS PAGE (C28, C29, 24 October). The hero, Path and Money,
+ * ONE PROJECT'S SHAPE, READ ONCE FOR EVERY PART OF IT ON ITS PAGE (24 October). The hero, Path and Money,
  * Work, Who is on it, Runs on and the agents on it are blocks the page declares (`{ kind: project, part }`), each drawn
  * in its own slot (`ProjectPart.svelte`); what they draw is one read of the row the page is about, held here, so seven
  * blocks ask the record once and not seven times. `PageView.svelte` makes one for the page and hands it down.
@@ -8,7 +8,7 @@
  * three figures; the Work tile's two columns; the path; who is on it; what it runs on; and who was here today. Nothing
  * here is drawn: each part reads what it needs.
  *
- * ONE CLOCK (SF3): open work and what is late are counted on the record's day (`recordNow`), as Work counts it. One read
+ * ONE CLOCK: open work and what is late are counted on the record's day (`recordNow`), as Work counts it. One read
  * of the work list that points here holds the hero's counts, the Work tile and the Path.
  *
  * LIVE (proj F9): the page is read again when the record moves, and its new answer is taken here, the old one kept on
@@ -45,7 +45,7 @@ import { checklistOf, datesOf, happenedOf, heroFactsOf, numbersOf, runsOnOf, ses
 /** Where a project sends its numbers is set up. */
 const FEED_SETUP = '/automations?new=door&preset=numbers';
 
-/** A ring of done work only from five tasks, and never at nought (the audit of 22 October, U-B7). */
+/** A ring of done work only from five tasks, and never at nought. */
 const RING_FROM = 5;
 /** The states a task waits on a person in. */
 const WAITS = ['review', 'blocked'];
@@ -290,7 +290,7 @@ export class ShapeHold {
   runsOn = $derived(this.shape?.facts.runsOn ?? []);
   sessions = $derived(this.read?.sessions ?? []);
   /**
-   * ONE TILE FOR THE AGENTS ON IT (the UI review of 21 October): the band, Working here now or Tell agents, is drawn for
+   * ONE TILE FOR THE AGENTS ON IT: the band, Working here now or Tell agents, is drawn for
    * the owner and for anyone while a run is on it, and then it carries the day bar and who was here today itself.
    * "Agents here today" stands on its own only where the band is not drawn, so the two runs are never listed twice.
    */

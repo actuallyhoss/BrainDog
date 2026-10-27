@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 33: `device_grant` rebuilt with an eighth reach, `shape` (PRF-A13).
+ * The kernel schema, migration 33: `device_grant` rebuilt with an eighth reach, `shape`.
  *
  * `shape` IS A STANDING GRANT THAT TAKES SHAPE COPIES AND READS NOTHING ELSE. Approved once with six digits, it lets the
  * owner's own machine take a copy of the record whose words, numbers and dates are scrambled (`shape.ts`), so the look

@@ -46,7 +46,7 @@ export type TextPart = {
   text: string;
   /** The paths the kernel said name nothing here. Absent, the walk judges by `TextNames`. */
   unnamed?: readonly string[];
-  /** The fields of the row this text sits on, which a one-word path reads first (PGS-B03). */
+  /** The fields of the row this text sits on, which a one-word path reads first. */
   own?: readonly string[];
   /** The fields of that row that are lists, whose `.count` the row answers. */
   ownLists?: readonly string[];

@@ -1,5 +1,5 @@
 <!--
-  The desk's Agents, as the app's Agents page draws it (site F5): the AI tools Maya has connected, each by its maker's
+  The desk's Agents, as the app's Agents page draws it: the AI tools Maya has connected, each by its maker's
   mark, name and when it was last seen, beside what is working now. The home page's AI tools band shows the notes and
   the connect line, so this place repeats neither.
 -->

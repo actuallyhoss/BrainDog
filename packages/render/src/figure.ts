@@ -17,7 +17,7 @@ const NUMBER = /(?<![\p{L}\p{N}.,])[−-]?\d[\d,]*(?:\.(\d+))?/u;
 /**
  * `value` in the shape of `template`: `£34,850.00`, `USD 12.00`, `−£1,600.00`, or a plain number.
  *
- * A STORED FIGURE IS NOT COPIED, IT IS READ (REC-C05). When the template is one `money()` wrote, `EGP 1,299.00`,
+ * A STORED FIGURE IS NOT COPIED, IT IS READ. When the template is one `money()` wrote, `EGP 1,299.00`,
  * only its currency is taken (`readFigure`) and the value is written as an amount in it. Told the home currency
  * (a code, or `null` for a record with none), by the one writer, in the setting asked for. Not told, in the stored
  * form again, so whoever draws it next (`axisFigure`, `headlineFigure`) reads an amount and never a drawing.

@@ -80,7 +80,7 @@ export async function openFile(path, { name = 'file', record = basename(path), n
 }
 
 /**
- * Open a self-host on a shape copy (`braindog export --shape`, PRF-A13): the file is put into a scratch record and that
+ * Open a self-host on a shape copy (`braindog export --shape`): the file is put into a scratch record and that
  * record is served as `openFile` serves any.
  *
  * THE ONE PLACE A SHAPE COPY IS ASKED FOR. Every import refuses one by its mark (`shapeRefusal` in `brainl.ts`), so a

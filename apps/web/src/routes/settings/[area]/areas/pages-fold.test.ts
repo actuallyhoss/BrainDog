@@ -1,5 +1,5 @@
 /**
- * Settings > Navigation's fold and order (the audit of 25 October, Y20).
+ * Settings > Navigation's fold and order.
  *
  * "1047 more pages" stood under Add a page: every run's, person's and project's own page counted as one more page to
  * add. The fold says the kinds now, and no count of pages a row made. And Needs you was ninth, under Activity, where

@@ -1,6 +1,6 @@
 /**
- * Amounts that stand together are written alike (2.A.7): a whole set shows no pence, a set with pence shows two places
- * on every amount, a display figure is whole. And bank capitals read as a person writes them (2.A.8).
+ * Amounts that stand together are written alike: a whole set shows no pence, a set with pence shows two places
+ * on every amount, a display figure is whole. And bank capitals read as a person writes them.
  */
 
 import { test } from 'node:test';

@@ -1703,7 +1703,7 @@ who enforces.
 ## ADR-071 · One table of plans, and every figure is read from it
 
 **Decided.** Every figure of every plan is one row of `PLAN_TABLE` in `packages/record/src/plans.ts`
-(LCH-A08, 9 October 2026). Money is whole cents of one currency, USD. The figures:
+(9 October 2026). Money is whole cents of one currency, USD. The figures:
 
 | Plan | Price | Runs | Requests | Data | Script time | Slash credits | Agents | People |
 |---|---|---|---|---|---|---|---|---|

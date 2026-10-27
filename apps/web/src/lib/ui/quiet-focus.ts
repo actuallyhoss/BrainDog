@@ -1,5 +1,5 @@
 /**
- * A PAGE'S NAME TAKES FOCUS AFTER A MOVE, AND WEARS ITS RING ONLY FOR A KEYBOARD (the audit of 25 October, Z26).
+ * A PAGE'S NAME TAKES FOCUS AFTER A MOVE, AND WEARS ITS RING ONLY FOR A KEYBOARD.
  *
  * The layout hands focus to the new page's `h1` after a link or a `goto`, so a keyboard and a screen reader carry on from
  * the page's name. Its ring was hidden by `:focus:not(:focus-visible)`, and that is the browser's guess, not the reader's:

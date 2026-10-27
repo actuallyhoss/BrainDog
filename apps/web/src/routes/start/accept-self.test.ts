@@ -4,7 +4,7 @@
  * with, and marks that entry as them (People's `self`): the first entry in their People, before any client.
  *
  * TWO HALVES. First the body the press sends (`bodyOf`): who the person is goes to the record as `me`, and the record
- * decides where it is kept (`setup`, USE-B04). Then the script the press used to be, which a host a release behind
+ * decides where it is kept (`setup`). Then the script the press used to be, which a host a release behind
  * still gets (`oldScript`): its fake client has no `setup`, which is how `accept` is told to run it. That half is
  * deleted with the script.
  *
@@ -76,7 +76,7 @@ test('A NAME WITH NO ROW OF ITS OWN IS WRITTEN AS THEM, marked where the list ha
   assert.deepEqual((made[0]?.args as { fields: Record<string, unknown> }).fields, { name: 'Sami', note: "I'm a student", self: true });
 });
 
-test('WITH NO NAME HEARD, THE PERSON IS STILL THE FIRST IN PEOPLE, by the name in their address (USE-B06)', async () => {
+test('WITH NO NAME HEARD, THE PERSON IS STILL THE FIRST IN PEOPLE, by the name in their address', async () => {
   const { client, calls } = record({ created: true, matched_by: 'none' });
   await accept(client, asked("I'm a student", 'sami@example.com'));
   const meet = calls.find((c) => c.name === 'meet');

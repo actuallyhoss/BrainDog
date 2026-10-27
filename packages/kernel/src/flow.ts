@@ -246,7 +246,7 @@ export type FlowDeps = {
    */
   held?: { until: number; say: string } | null | undefined;
   /**
-   * WHO A RUN ACTS FOR, BY ITS RULE (sharing plan §2.12): `null` where it runs as the record does, its maker an owner
+   * WHO A RUN ACTS FOR, BY ITS RULE: `null` where it runs as the record does, its maker an owner
    * or nobody; `stop` with the sentence a run ends on once its maker can no longer reach the record; else the
    * dependencies of its maker's lens (`deps`, with `bounded` set), and the sentence a run is skipped with when the row
    * it started for is not one that lens shows (`unseen`). Absent, every run runs as the record does.
@@ -1371,7 +1371,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
     finish(deps, run, 'cancelled', off);
     return null;
   }
-  /* A RUN A COLLEAGUE TURNED ON READS AND WRITES THROUGH THEIR LENS (sharing plan §2.12), and ends, saying why, once they
+  /* A RUN A COLLEAGUE TURNED ON READS AND WRITES THROUGH THEIR LENS, and ends, saying why, once they
      can no longer reach the record. Asked at every turn, so a share revoked while a run waits stops it at its wake. */
   const bound = deps.trial ? null : (deps.boundTo?.(run.rule) ?? null);
   if (bound !== null && 'stop' in bound) {
@@ -1997,7 +1997,7 @@ function meetOne(
       ...(only === 'known' ? { only } : {}),
       ...(keys.length === 0 ? {} : { keys }),
       where: named.where ?? `rule.${rule}`,
-      /* UNTRUSTED ALWAYS (H1): a rule's meet reads its trigger's text, a mail's or a bank text's or an import's, so the
+      /* UNTRUSTED ALWAYS: a rule's meet reads its trigger's text, a mail's or a bank text's or an import's, so the
          guard holds whatever its `source` is worded as, and a key it already knows is still met as before. */
       untrusted: true,
     },

@@ -1,6 +1,6 @@
 /**
- * The approval says what a scheduled action writes (SHL-C09: "the install shows every host an action calls, and how
- * often;", D0b.40): the list, the project and each measure, by name, in one sentence under the call line.
+ * The approval says what a scheduled action writes ("the install shows every host an action calls, and how
+ * often;"): the list, the project and each measure, by name, in one sentence under the call line.
  */
 
 import { test } from 'node:test';

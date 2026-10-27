@@ -1,5 +1,5 @@
 /**
- * What `watch.yml` runs, when, and with what it may touch, read off the workflow file (LCH-C01).
+ * What `watch.yml` runs, when, and with what it may touch, read off the workflow file.
  *
  *   node --test apps/worker/scripts/watch-workflow.test.mjs
  *

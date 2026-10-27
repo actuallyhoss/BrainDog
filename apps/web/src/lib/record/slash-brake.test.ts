@@ -1,5 +1,5 @@
 /**
- * The brake's sentence on the Slash tile (ENG-B17): said in whole answers when it is on, nothing when it is off or was
+ * The brake's sentence on the Slash tile: said in whole answers when it is on, nothing when it is off or was
  * not read, and nothing on a refusal. The words are checked because a wrong count draws as correctly as a right one.
  */
 
@@ -65,7 +65,7 @@ test('READ, A REFUSAL, NO READINGS OR A THROW: null, and the tile says nothing',
   assert.equal(await readBrake(throws), null);
 });
 
-test('LAPSES COUNTED (ENG-B17): the sentence says it stopped offering, counting the ones he let pass', () => {
+test('LAPSES COUNTED: the sentence says it stopped offering, counting the ones he let pass', () => {
   assert.equal(
     brakeLine({ on: true, share: 0.1, of: 20, lapsed: 4 }),
     'Slash stopped offering: you took up 2 of its last 20, counting the ones you let pass.',

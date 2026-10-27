@@ -1,5 +1,5 @@
 /**
- * What an arrangement arms is filed the way Decide's one sentence reads it (audit 56, claim 5).
+ * What an arrangement arms is filed the way Decide's one sentence reads it.
  *
  * An arrangement filed its calls as `calls`, a part's host and how often, which the kernel's `doesOf('install', body)`
  * does not read: it reads `calls_out`, each call with the key's label and what runs it. So the sentence under an add-on

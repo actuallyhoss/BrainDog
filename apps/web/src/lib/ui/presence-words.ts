@@ -1,5 +1,5 @@
 /**
- * The one word a run reads as, for a person (AGT-C04, AGT-C10): Working now, Gone quiet, Left a step, Ended, Stopped,
+ * The one word a run reads as, for a person: Working now, Gone quiet, Left a step, Ended, Stopped,
  * or From before.
  *
  * THE KERNEL TELLS SIX APART (`presenceOf` in `@braindog/kernel`), and every screen folded them into the face's three

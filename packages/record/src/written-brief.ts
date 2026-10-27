@@ -1,5 +1,5 @@
 /**
- * The written brief (decision 4): two or three plain sentences on where things stand, which a small model
+ * The written brief: two or three plain sentences on where things stand, which a small model
  * rewrites only when the rows the brief reads change, and which Today then shows at once.
  *
  * Pure: nothing here reads a table or holds a kernel. A caller hands the facts it gathered (`briefFactsFor`), the

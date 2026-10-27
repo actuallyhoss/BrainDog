@@ -182,7 +182,7 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
      new record neither does, so neither is drawn. SINCE FOUNDER 1.16.0 the way in for money waits for a record with no
      cash, and the week's numbers for one, so a new record reads its line and how to bring its numbers in. Working now
      is left out while no run is working, by the record's own look, which hides a block that drew nothing
-     (`composeLook` in `packages/kernel/src/compose.ts`, `loop/contract-17.md`). */
+     (`composeLook` in `packages/kernel/src/compose.ts`). */
   assert.deepEqual(drawnBlocks.map((b) => b.heading), [undefined, 'Bring your numbers in']);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const hidden = blocks.filter((b) => (b as { drawn?: boolean }).drawn === false).map((b) => b.heading);
@@ -251,7 +251,7 @@ test('A TEAM’S PRODUCT IN PLAY HAS A PAGE: where it stands, its tickets and it
   const headings = page.blocks.map((b) => b.heading);
   assert.ok(headings.includes('Where it stands') && headings.includes('Waiting on you') && headings.includes('Agents'), headings.join(', '));
   assert.ok(!headings.includes('Money') && !headings.includes('Keeping it alive'), 'a team record holds no money or services');
-  /* WHAT IS HANDED BACK IS THE WORK TILE'S WITH YOU SINCE team 2.25.0 (C28, C29): the page declares the shape's parts,
+  /* WHAT IS HANDED BACK IS THE WORK TILE'S WITH YOU SINCE team 2.25.0: the page declares the shape's parts,
      which the app draws from its read of the product, and its own tile of the same tasks went. */
   /* AND SINCE team 2.28.0 (the project page of 27 October) THREE BLOCKS: the hero beside its lane's tile, its numbers
      beside its work, and its dates, people, agents, what was decided and what happened. */

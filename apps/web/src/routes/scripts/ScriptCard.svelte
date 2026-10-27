@@ -29,7 +29,7 @@
 
   let { s, named, onresumed }: { s: Script; named: (list: string) => string; onresumed?: (() => void | Promise<void>) | undefined } = $props();
 
-  /* THE RECORD'S CLOCK (SF3): every date on the tile is the record's, read against its own now. */
+  /* THE RECORD'S CLOCK: every date on the tile is the record's, read against its own now. */
   const now = (): number => recordNow();
   const said = $derived(stateOf(s, now()));
   const recent = $derived(recentOf(s));

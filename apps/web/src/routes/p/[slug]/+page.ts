@@ -14,7 +14,7 @@ import { at } from '$lib/at.ts';
 /**
  * Each page, and the screen it is drawn as.
  *
- * `/p/scripts` TOO (audit B of 25 October, Y11): `/scripts` draws the People add-on's own `page.scripts` under a head of
+ * `/p/scripts` TOO: `/scripts` draws the People add-on's own `page.scripts` under a head of
  * its own, so the page's address was a second list of the same scripts, with a line in place of the count.
  */
 export const SCREENS: Readonly<Record<string, string>> = { activity: '/audit', scripts: '/scripts' };

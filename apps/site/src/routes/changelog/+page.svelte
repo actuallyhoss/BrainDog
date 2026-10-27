@@ -6,7 +6,7 @@
   `./entries.ts`, where `../../../scripts/changelog.mjs` holds them against `git log`. The chart, its one line and every
   count are taken from the same entries when the page is built, so none of them can drift from the list.
 
-  THE SITE'S DESIGN (site F17): the night head with the count and the feed, then the board. At a desk the control and
+  THE SITE'S DESIGN: the night head with the count and the feed, then the board. At a desk the control and
   the chart sit in a column that stays in view beside the months; on a phone they come first. A month is a heading and
   its tally, and each day under it is a tile that folds, the newest open and marked "Latest". The month's count is every
   entry in it, the newest day's included, so a month and its days never disagree.
@@ -136,7 +136,7 @@
 <section class="board">
   <div class="wrap layout">
     <aside class="side">
-      <!-- ONE SEGMENTED CONTROL (site F17): all, or one kind. It needs scripting; without it every fold still reads. -->
+      <!-- ONE SEGMENTED CONTROL: all, or one kind. It needs scripting; without it every fold still reads. -->
       <div class="track" role="group" aria-label={copy.filters}>
         <button type="button" class="seg" aria-pressed={only === null} onclick={() => (only = null)}>
           {copy.all}<span class="seg-n num">{ITEMS.length}</span>
@@ -330,7 +330,7 @@
 
   /* ── The chart tile ────────────────────────────────────────────────────── */
 
-  /* A TILE: flat, radius 16, no edge and no shadow (site F7). */
+  /* A TILE: flat, radius 16, no edge and no shadow. */
   .tile {
     gap: 16px;
     padding: 24px;

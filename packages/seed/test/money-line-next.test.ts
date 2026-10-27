@@ -1,5 +1,5 @@
 /**
- * A REPEATING LINE IS NEVER LEFT PAID AND UNMOVED (repeat-next-80b-82, audit 80 finding 2).
+ * A REPEATING LINE IS NEVER LEFT PAID AND UNMOVED (repeat-next-80b-82).
  *
  * Batch 80 gave `payment-matches` a second step that kept a payment on the repeating line it paid, "Last paid" and
  * "Last amount", and left "Next" where it was, since no run can be handed the day after. A line left so read late once

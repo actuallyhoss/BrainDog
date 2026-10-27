@@ -14,7 +14,7 @@
  * grant. A proposal breaks down into the same keys, plus four of its own: `shape:<list>` for a change to a list's
  * fields, `automation` for anything that runs unattended, `addons` for packs, settings and arrangements, and `call` for
  * a choice between options. An `attach` is `<list>:attach`: a name in a text put on the row it is, by the sentence it
- * was seen in, which is its own kind so it can be earned apart from editing the row (ENG-B15).
+ * was seen in, which is its own kind so it can be earned apart from editing the row.
  *
  * THE FLOOR IS FIXED RULES AND NOTHING ELSE, the way `costOf` is. A kind on the floor is Ask for every agent, every
  * grant and every rung, Slash included, and no setting lifts it:
@@ -55,7 +55,7 @@ export type ChangeKind = { key: string; list: string | null; verb: string; floor
 export const CALL = 'call';
 export const ADDONS = 'addons';
 export const AUTOMATION = 'automation';
-/** The verb of a mention attached to a row it names, `<list>:attach` (ENG-B15). */
+/** The verb of a mention attached to a row it names, `<list>:attach`. */
 export const ATTACH = 'attach';
 
 /** How many days of an existing write token's own writes keep their kinds at Do and tell, once, when the ladder arrives. */
@@ -157,7 +157,7 @@ function rowFloor(w: Pick<WriteSaid, 'op' | 'shape' | 'madeBy' | 'person'>): Flo
 
 /**
  * Whether a value sent for a field empties it: nothing, an empty text or a list with nothing in it, the three the write
- * path removes the field for (`isAbsent`, K2). `''` was missed, and a note sent as `''` cleared it as a plain edit.
+ * path removes the field for (`isAbsent`). `''` was missed, and a note sent as `''` cleared it as a plain edit.
  */
 const emptied = (v: unknown): boolean => v === null || v === '' || (Array.isArray(v) && v.length === 0);
 
@@ -195,7 +195,7 @@ export function kindsOfWrite(w: WriteSaid): ChangeKind[] {
   const money = (keys: string[], clearing: boolean): boolean =>
     keys.some((k) => fields.get(k)?.type === 'money' && patch[k] !== undefined && (clearing || patch[k] !== null));
   const identity = new Set(w.shape?.identity ?? []);
-  /* A NEW ROW IS WHO SOMEBODY IS WHEN IT IS MADE WITH MORE THAN NAMES (research-audit-21): made already merged, as the
+  /* A NEW ROW IS WHO SOMEBODY IS WHEN IT IS MADE WITH MORE THAN NAMES: made already merged, as the
      record's own person, or holding the addresses, handles, keys or domain `meet` files arrivals by. An agent that may
      add people could otherwise make a second owner, or a row that takes someone's mail, without asking. A part sent
      empty, or `self` sent false, sets nothing. */
@@ -233,7 +233,7 @@ export function kindsOfWrite(w: WriteSaid): ChangeKind[] {
 export const kindOfWrite = (w: WriteSaid): ChangeKind => dearest(kindsOfWrite(w))!;
 
 /**
- * The kind of a mention attached to a row it names, `<list>:attach` (ENG-B15): a name read in a text, put on the row
+ * The kind of a mention attached to a row it names, `<list>:attach`: a name read in a text, put on the row
  * the reader took it to be, with the sentence it was seen in. OFF THE FLOORS, so it can be earned apart from editing
  * the row, and always undoable: it adds a line where the row was seen and changes nothing it says.
  *

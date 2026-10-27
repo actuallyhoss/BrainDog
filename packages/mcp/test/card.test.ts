@@ -4,7 +4,7 @@
  * THE BRIEF IS FIVE SHORT LINES, EACH LEFT OUT WHEN IT HAS NOTHING: who and where, then `Also`, `Next`, `Signs`, `Waiting`,
  * `Learned`, `More` and `Update`, the record's order (`packages/record/src/card.ts`). No Who slot: the critic cut it, and
  * `context` prints the record's card, which has none. At most three things a slot and 1,500 characters in all, every
- * line cut at a word. This package composes no card (AGT-B07): the rules for each slot are the record's, held in
+ * line cut at a word. This package composes no card: the rules for each slot are the record's, held in
  * `packages/record/test/card.test.ts`, and a context with no card is one line, held in `briefing-relay.test.ts`.
  *
  * AND ON A RECORD LIKE THE OWNER'S, THE WHOLE ANSWER IS UNDER 1,500 TOKENS. Measured there before the card, `context`
@@ -82,7 +82,7 @@ const step = (from: string, age_s: number) => ({ from, next: 'Sign off instances
 
 /* THE CASES THAT HELD THE CARD THIS PACKAGE COMPOSED (an empty slot left out, the head's project and machine, a step
    checked before acting, questions alike counted once, the two newest learnings, a long slot cut at a word) moved with
-   the composer to the record (AGT-B07). What holds here is that a context with none composes none. */
+   the composer to the record. What holds here is that a context with none composes none. */
 test('A CONTEXT WITH NO CARD COMPOSES NONE: one line, whatever else it sends', () => {
   const said = briefed({ context: { session: run, project: { spoken: 'things#1', name: 'Kiln' }, handoff: step('S5', HOUR), waiting: [{ id: 'SG69', question: 'Does Kiln licence per seat?' }] }, look, home: null }).card;
   assert.equal(said, 'Connected to BrainDog. Call context.');
@@ -133,15 +133,15 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   const slots = shaped(said);
   assert.equal(said.split('\n')[0], 'Claude Code on MacBook, working on Kiln');
   assert.doesNotMatch(text, /Studio-MacBook/u, 'the machine was said by its own name');
-  /* THE CARD IS THE RECORD'S (AGT-B07), whose rules its own tests hold: a step left more than a week ago is not handed
+  /* THE CARD IS THE RECORD'S, whose rules its own tests hold: a step left more than a week ago is not handed
      over, so the seed's fortnight-old one is no Next, and the question asked twice by one run is said once. The task the
      seed hands to claude is Next, since the briefing carries the field Tasks' hand.agent names (worker-door-tests-44). */
   assert.doesNotMatch(slots.get('Next') ?? '', /Sign off instances/u, `a step a fortnight old was handed over: ${slots.get('Next') ?? ''}`);
   assert.match(slots.get('Next') ?? '', /^Variable axis QA on the new cut \(handed to you\)/u);
   const waiting = slots.get('Waiting') ?? '';
-  /* WHAT COSTS MOST TO LEAVE WAITING LEADS (AGT-C08, `govern.ts` `order: 'wait'`), not the newest: by Decide's own rank
+  /* WHAT COSTS MOST TO LEAVE WAITING LEADS (`govern.ts` `order: 'wait'`), not the newest: by Decide's own rank
      the seed's change to Kiln and Portage is said before the four questions this run asked a moment ago. */
-  /* THIS PROJECT'S COUNT IS SAID BESIDE ALL OF THEM when fewer wait here (scope D9). */
+  /* THIS PROJECT'S COUNT IS SAID BESIDE ALL OF THEM when fewer wait here. */
   assert.match(waiting, /^\d+ (?:here of \d+ )?on [^,]+, first: Update Kiln’s note and move Portage to earning\?$/u);
   /* LEARNED IS THE SEED'S TWO METHODS, though fifty facts were written after them: a method comes before a fact, and
      `context` now cuts what it hands in that order (`learnedSorted`), where it used to hand the twenty last changed. */
@@ -152,7 +152,7 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
      and the number says it is a floor where the record stopped counting them. */
   const keys = result.structuredContent.registers.find((r) => r.id === 'credentials') as { rows: unknown[]; everywhere?: number; more?: boolean } | undefined;
   assert.ok(keys && (keys.everywhere ?? 0) >= 20 && keys.more === true && keys.rows.length <= 10, JSON.stringify(keys));
-  /* NO MORE LINE: this is context, and every cut section of the plan ends with the call that reads the rest (plan §3.2). */
+  /* NO MORE LINE: this is context, and every cut section of the plan ends with the call that reads the rest. */
   assert.equal(slots.get('More'), undefined, 'context told the agent to call context');
   assert.doesNotMatch(text, /Deploy key \d+/u, 'a key that applies everywhere was listed by name');
   assert.doesNotMatch(text, /tool-\d+/u, 'a tool was listed as work');

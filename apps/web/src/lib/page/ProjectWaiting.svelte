@@ -1,5 +1,5 @@
 <!--
-  A PROJECT'S PAGE WHILE IT IS READ, IN THE PROJECT'S OWN SHAPE (the audit of 22 October, F4 and fluid F2): its hero as it
+  A PROJECT'S PAGE WHILE IT IS READ, IN THE PROJECT'S OWN SHAPE (F4 and fluid F2): its hero as it
   will land, the well with its mark in its colour and its name where the hero puts it, then the frames of the tiles under
   it. What is known is drawn (the sidebar and the Projects cards already hold the name, the mark and the colour); only
   what the record has yet to say is a bar.

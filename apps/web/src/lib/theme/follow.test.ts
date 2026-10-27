@@ -56,7 +56,7 @@ test('nobody signed in adopts nothing and sends nothing; a person is adopted onc
 });
 
 /**
- * THE COOKIE'S LOOK IS STAMPED WITH WHOSE IT IS (the audit of batches 11 to 13, finding 4). `bd_pref` covers the whole
+ * THE COOKIE'S LOOK IS STAMPED WITH WHOSE IT IS. `bd_pref` covers the whole
  * host and each record keeps its own `look.*`, so a second person on the same browser met the first person's look for
  * every key they had never set, and looks chosen before the record kept them were never sent to it.
  */

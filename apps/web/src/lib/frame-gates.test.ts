@@ -1,5 +1,5 @@
 /**
- * THE FRAME'S GATES (the UI pass of 20 October, wave 4): what the pass took out stays out.
+ * THE FRAME'S GATES (wave 4): what the pass took out stays out.
  *
  * Six refusals, each over every component, stylesheet and script of the app, the skin and the renderer (and the site
  * where it says so), read as text with the comments taken out, so a comment that quotes an old spelling is not a use:
@@ -265,7 +265,7 @@ test('a segment sits in the one track that draws it', () => {
     const text = outsideTracks(markup(file));
     return [...text.matchAll(/\bclass="segment[\s"]|\bclass=\{\[?\s*'segment'/gu)].map(() => at(file));
   });
-  assert.deepEqual([...new Set(found)], [], `wrap the segments in <Segmented> (2.A.9): ${[...new Set(found)].join(', ')}`);
+  assert.deepEqual([...new Set(found)], [], `wrap the segments in <Segmented>: ${[...new Set(found)].join(', ')}`);
 });
 
 /* ── 6. No icon button named only by its title ───────────────────────────── */

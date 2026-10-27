@@ -1,5 +1,5 @@
 /**
- * The bridge's look at the installed command (H27): a session opened before `braindog update` is told once that a newer
+ * The bridge's look at the installed command: a session opened before `braindog update` is told once that a newer
  * command is installed, read off the bundle's own `cliBuild`, and never on a checkout or an older or the same build.
  */
 

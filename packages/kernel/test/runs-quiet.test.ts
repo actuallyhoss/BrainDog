@@ -1,5 +1,5 @@
 /**
- * Open is not working (AGT-C02): a run that is open and not working is quiet, and working is active and
+ * Open is not working: a run that is open and not working is quiet, and working is active and
  * heard from inside fifteen minutes (`WORKING_MS`, the one clock in `presence.ts`). Worked out when read and never a
  * state of its own; and a run's age stands still once it stops.
  *

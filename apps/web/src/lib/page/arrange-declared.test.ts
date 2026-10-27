@@ -1,5 +1,5 @@
 /**
- * ARRANGE AND CHANGE THIS PAGE ARE HANDED ONLY THE BLOCKS THE PAGE DECLARES (audit 74, claim 1).
+ * ARRANGE AND CHANGE THIS PAGE ARE HANDED ONLY THE BLOCKS THE PAGE DECLARES.
  *
  * WHAT WAS MEASURED. A page with a tile converted at rates that are out of date draws one note under everything, which
  * the reader adds and the page never declared (`page-live.ts` `footed`, marked `synthetic`). The part handed Arrange

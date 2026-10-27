@@ -145,7 +145,7 @@ test('THE PACK DECLARES THE TWELVE AND THE BALANCE READING, needs money-core 3.1
   /* 1.6.0 IN BATCH 17, a minor step: a card charge and an InstaPay transfer keep the payee as the bank wrote it. */
   /* 1.7.0 IN BATCH 34, a minor step on the same floor: each money form takes its account's currency, each lookup says what it finds, and the near rules read the printed balance and the InstaPay reference. */
   /* 1.7.1 IN BATCH 37, a patch: its note says a balance can come back to a figure it printed before; nothing a record reads moved. */
-  /* 1.7.2 IN THE UI PASS OF 20 OCTOBER, a patch: it is `unlisted`, left out of every public listing (decision D6). */
+  /* 1.7.2, a patch: it is `unlisted`, left out of every public listing (decision D6). */
   /* 1.7.3 ON 26 OCTOBER, a patch: it names its own icon for the store. */
   assert.equal(doc.version, '1.7.3');
   assert.deepEqual(ingestsOf(doc), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());

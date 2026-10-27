@@ -1,5 +1,5 @@
 /**
- * A `signs` BLOCK READ BY SOMEBODY WITH NO INBOX REACH (audit 38-39, finding 1): each sign is told in the kernel's words
+ * A `signs` BLOCK READ BY SOMEBODY WITH NO INBOX REACH: each sign is told in the kernel's words
  * (`quietSign`) before it is a row, so neither a column nor a `where:` reads a message's text. The record's own reader,
  * and one the host says may read the inbox, read each sign as it was filed.
  */

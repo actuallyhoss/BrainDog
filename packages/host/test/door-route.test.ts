@@ -1,5 +1,5 @@
 /**
- * `heard` and `doorSigns`, the agent door's own signs (AGT-B01): `heard` routed as one DATA write, a POST whose body is
+ * `heard` and `doorSigns`, the agent door's own signs: `heard` routed as one DATA write, a POST whose body is
  * the mark; `doorSigns` as one READ+ read taking how many days back. Each is handed to the record method of its name, and
  * a record built before either answers `NOT_IN_THIS_BUILD`, never a 500.
  *

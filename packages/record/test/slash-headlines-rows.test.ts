@@ -1,5 +1,5 @@
 /**
- * A project's page gets the model's line too (the thinking scope of 24 October, C4). A page per row's lead is its next
+ * A project's page gets the model's line too (the thinking scope of 24 October). A page per row's lead is its next
  * step, which the template fills in as words, so it named no figure and the night never asked about it. Now the night
  * asks about pages per row after the pages somebody wrote, from what their tiles count, and the page read carries the
  * line while those tiles still say it; a tile that moves takes the line away until the next ask.

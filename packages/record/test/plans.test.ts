@@ -1,5 +1,5 @@
 /**
- * The one table of plans (LCH-A08): every figure of every plan, written out once more here, so a figure moved in
+ * The one table of plans: every figure of every plan, written out once more here, so a figure moved in
  * `plans.ts` turns this red and says which plan and which figure, and so does a copy of the table with one figure
  * moved (the planted fault). The Directory's `ALLOWANCE` and `PLANS` and its Free sentences are held to the table too.
  */

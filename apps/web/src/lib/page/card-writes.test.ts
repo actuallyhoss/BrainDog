@@ -1,6 +1,6 @@
 /**
  * A card's line typed on in place: one update of the one field on that row, a refusal said by the field's label, and
- * no writer at all for a reader who may not write the list (PGS-C15, `card-writes.ts`).
+ * no writer at all for a reader who may not write the list (`card-writes.ts`).
  *
  * Invented names only: this app may not import `fixtures/names.ts`.
  */

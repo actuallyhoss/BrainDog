@@ -1,5 +1,5 @@
 <!--
-  An address that leads to nothing on this record (the UI pass of 20 October, 2.A.18): `Empty`'s whole-screen form,
+  An address that leads to nothing on this record: `Empty`'s whole-screen form,
   the kind `no-results`, with Today and Search.
 
   ONE SCREEN FOR BOTH DOORS A MISTYPED ADDRESS COMES THROUGH. A path that is one segment long reaches `routes/[id]`, the

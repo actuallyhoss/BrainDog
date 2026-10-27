@@ -120,7 +120,7 @@ test('A PERSON IS MATCHED BY EMAIL IN A COMMIT, and gains a dated line and the p
   assert.equal(row.fields.name, 'Ada Lovelace', 'a name the owner typed was overwritten by one read from a commit');
   assert.equal(row.fields.role, 'client');
   assert.equal(row.fields.email, 'ada@example.com');
-  /* Anybody who can push may sign with her address and any login beside it (research-audit-21 M9). */
+  /* Anybody who can push may sign with her address and any login beside it. */
   assert.equal(row.fields.handles, undefined, 'a handle read from a commit was carried onto her');
   assert.deepEqual(row.fields.projects, [project]);
   assert.deepEqual(row.fields.met, [`${DAY} · commit 4464966 in braindog`]);
@@ -313,7 +313,7 @@ test('A CLUSTER IS ONE QUESTION: three spellings of one person are asked about t
   sql.close();
 });
 
-test('ACCEPTING A MERGE CARRIES WHAT THE KEPT ROW LACKED, the email first, so the second address finds one person (H2)', async () => {
+test('ACCEPTING A MERGE CARRIES WHAT THE KEPT ROW LACKED, the email first, so the second address finds one person', async () => {
   const { k, sql, project } = await record();
   const first = value<Entry>(k.create('people', { name: 'Ada Lovelace', handles: ['github:ada-l'] }, OWNER));
   const met = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@work.example', where: 'commit 4464966 in braindog' }, AGENT));
@@ -378,7 +378,7 @@ test('A MERGE DRAWN BEFORE SOMEBODY EDITED THE ROW IS STALE, and accepting it ch
 
 test('THE STRONG RULES MERGE ON THEIR OWN, as one batch, and Undo puts both back and never merges them again', async () => {
   const { k, sql } = await record();
-  /* Met in a commit first: a commit folds only into somebody met in commits alone (audit 19 H1). */
+  /* Met in a commit first: a commit folds only into somebody met in commits alone. */
   const first = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorv@lanternfish.example', where: 'commit 0 in lanternfish' }, AGENT)).row!;
 
   const met = value<Met>(k.meet({ name: 'Teodor Vance', email: 'teodorv@pellucid.example', where: 'commit 1 in lanternfish' }, AGENT));

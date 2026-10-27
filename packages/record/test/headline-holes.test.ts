@@ -1,5 +1,5 @@
 /**
- * A HEADLINE SAYS A NUMBER AS A HOLE, NEVER AS A DIGIT (ENG-B09, decision 3 check 3), and a page is owed a new look
+ * A HEADLINE SAYS A NUMBER AS A HOLE, NEVER AS A DIGIT (decision 3 check 3), and a page is owed a new look
  * minutes after its basis moves.
  *
  * The model is handed each figure with its id and writes `{{id}}` where the number goes. The record fills the hole from

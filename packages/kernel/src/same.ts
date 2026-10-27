@@ -1,5 +1,5 @@
 /**
- * Which rows of a list are here twice, and what folding them would write (AGT-C13, jobs c and d).
+ * Which rows of a list are here twice, and what folding them would write (jobs c and d).
  *
  * A LIST SAYS WHAT MAKES TWO OF ITS ROWS ONE, in its own `same:` (`declare.ts`'s `sameFault`), and `entities.ts`'s
  * `rowKeys` reads that as one key a row: `same:<list>:<where>:<what>`. This file reads those keys three ways:
@@ -256,9 +256,9 @@ function confirmDayOf(decl: SameDecl): string | undefined {
 }
 
 /**
- * A SECOND ROW SAYING WHAT A FIRST SAYS IS REFUSED AT THE DOOR (AGT-C13), or `null`. A create, or a change to one of
+ * A SECOND ROW SAYING WHAT A FIRST SAYS IS REFUSED AT THE DOOR, or `null`. A create, or a change to one of
  * the rule's fields or its `within`, that leaves the row here (live, not finished) while another row here says the same,
- * is refused `ALREADY_KNOWN`: "Skills already has ponytail (SK4). Change that one rather than adding it twice." The row
+ * is refused `ALREADY_KNOWN`: "Skills already has ponytail. Change that one rather than adding it twice." The row
  * named is the one `clashes` would keep, `at` is the rule's first field, and `try` is the call that confirms the first
  * (its confirming day set to today) or, on a list with none, changes it with the rest of what was sent.
  *

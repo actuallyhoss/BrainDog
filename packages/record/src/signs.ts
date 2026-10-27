@@ -1,6 +1,6 @@
 /**
- * Three of the record's vital signs, filed by the record layer through the kernel's `signRead` (PRF-A05 jobs 2 and 3,
- * `loop/scope/area-proof-a.md` 2.2): whether the briefing a new session is handed is true (`briefing-true`), whether
+ * Three of the record's vital signs, filed by the record layer through the kernel's `signRead`:
+ * whether the briefing a new session is handed is true (`briefing-true`), whether
  * agents that connect are given the tool list (`tools-listed`), and whether what shipped is what runs (`arrived`,
  * PRF-A20: add-ons, the command and the model). The route that reads every sign is `methods/signs.ts`.
  *
@@ -128,7 +128,7 @@ function newestRepos(sql: Sql): string[] {
 
 /**
  * The run whose step a session standing here should be handed: the newest step the kernel marks `next` here
- * (`openHandoffs`, AGT-C05), the one the briefing hands, so a step a done run left, or one older than the kernel hands
+ * (`openHandoffs`), the one the briefing hands, so a step a done run left, or one older than the kernel hands
  * over, is not expected. Here is the project the briefing placed the caller on, or the repository alone.
  */
 function expectedHandoff(sql: Sql, repo: string, project: string | null, nowMs: number): RunRow | null {
@@ -387,7 +387,7 @@ function updatesAsked(sql: Sql, installed: ReadonlySet<string>): { id: string; o
 const joined = (parts: readonly string[]): string => (parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
 
 /**
- * `arrived` (PRF-A20): whether what shipped is what runs. RED when an add-on switched on has had a newer version in this
+ * `arrived`: whether what shipped is what runs. RED when an add-on switched on has had a newer version in this
  * host's catalogue for more than two nights; when an update to one has waited on its question past two nights; when the
  * newest session the command opened carries a build more than two days older than the one this host serves; or when
  * this is the cloud and no model is set up behind Slash, which no ask would ever show. Each line names the add-on or the
@@ -401,7 +401,7 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
   const addOns = installedAddOns(deps.sql);
   const names = new Map(addOns.map((p) => [p.id, addOnName(p.id, p.title)]));
   /* THE MANIFEST'S OWN TITLE, where it has one. An add-on without one is named by the catalogue's title, as Add-ons
-     names it, and never by its id said as words ("Bank hsbc eg" beside "HSBC Egypt alerts", audit 25 October, Y5). */
+     names it, and never by its id said as words ("Bank hsbc eg" beside "HSBC Egypt alerts"). */
   const titled = new Map(addOns.flatMap((p) => (typeof p.title === 'string' && p.title.trim() !== '' ? [[p.id, addOnName(p.id, p.title)] as const] : [])));
   /* Each red thing: its line, and what it is called in the sentence that counts them. */
   const red = new Map<string, { line: string; who: string }>();

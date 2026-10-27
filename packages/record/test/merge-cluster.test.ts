@@ -1,5 +1,5 @@
 /**
- * A doubtful merge is one question for the whole cluster (`loop/contract-17.md`), and Decide draws it as one card: every
+ * A doubtful merge is one question for the whole cluster, and Decide draws it as one card: every
  * candidate by name with where each was seen, and three answers, Merge all, Keep apart and Pick. The question is a
  * `rowset` whose rows fold rows into one through `merged_into`, so the record reads the candidates out of it and says
  * which rows each one is, and `decide` with `rows` merges only the ones picked, carrying only what they brought.

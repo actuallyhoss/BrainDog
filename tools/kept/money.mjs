@@ -138,7 +138,7 @@ export async function stripe(ctx) {
 const account = (ctx, fields) => create(ctx, 'accounts', { balance: { amount: 0, currency: 'EUR' }, as_of: today(), ...fields });
 
 /**
- * `salary-rule`: a rule built on the primitives, as his imported "Salary: holds …" rules are (RQ-SHL-097), and nothing
+ * `salary-rule`: a rule built on the primitives, as his imported "Salary: holds …" rules are, and nothing
  * for it in any add-on: a category, an account, a filing rule that files money in whose text holds a payer's name, and
  * a matching row. Green when the row is filed by the rule, read back from the row (`filed_by`, `category`). A row
  * written by hand that the rule leaves alone is tried again after one turn, which is when a record files what waited.

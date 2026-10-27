@@ -1,5 +1,5 @@
 /**
- * A DECLARED PAGE THAT DRAWS WHAT IS NEW STAMPS THE READER'S MARK WHEN SHE LEAVES IT (PGS-C02), through the one stamp
+ * A DECLARED PAGE THAT DRAWS WHAT IS NEW STAMPS THE READER'S MARK WHEN SHE LEAVES IT, through the one stamp
  * Home and Activity use (`read-mark.ts` `stampOf`), and A HOME'S PAGE MENU IS ON THE SENTENCE'S ROW ON A PHONE (look
  * fault N).
  *

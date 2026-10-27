@@ -94,7 +94,7 @@ test('A PART NOBODY PLANNED IS REFUSED AT THE INSTALL, and nothing is written', 
   assert.ok((await k.install([list([{ id: 'contact', type: 'text' }])])).ok);
 });
 
-test("A LIST'S OWN ORDER names one of its fields that sorts, and which way it reads (PGS-B06)", () => {
+test("A LIST'S OWN ORDER names one of its fields that sorts, and which way it reads", () => {
   const dated = (order: unknown) => list([{ id: 'day', type: 'day' }, { id: 'paid', type: 'money' }], { order });
   assert.equal(validate(dated({ field: 'day', dir: 'desc' })), null);
   assert.equal(validate(dated({ field: 'name' })), null);

@@ -541,7 +541,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* A LONG TASK IS ITS NAME AND THE REST QUIET, TWO LINES AT MOST (E23): the rest after the first clause in the quiet
+  /* A LONG TASK IS ITS NAME AND THE REST QUIET, TWO LINES AT MOST: the rest after the first clause in the quiet
      ink, and the whole cut at the second line with "…". On a span inside the title, so the button's tap box is not
      clipped with it. */
   .item-words {

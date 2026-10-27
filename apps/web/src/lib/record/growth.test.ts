@@ -311,7 +311,7 @@ test('and every capped list draws the line that says so', () => {
   }
   const table = readFileSync(join(routes, 'r/[register]/parts/ListTable.svelte'), 'utf8');
   assert.ok(/cap=\{DOM_CAP\}/.test(table), 'r/[register]/parts/ListTable.svelte slices to the cap and does not pass it to Table');
-  /* A SAVED VIEW DRAWS THE LIST'S OWN TABLE (the UI pass of 20 October, money F10), so the cap reaches `Table` through
+  /* A SAVED VIEW DRAWS THE LIST'S OWN TABLE (money F10), so the cap reaches `Table` through
      `ListTable` above, over rows the view has sliced to the same cap. */
   const view = readFileSync(join(routes, 'v/[view]/+page.svelte'), 'utf8');
   assert.match(view, /<ListTable\b/, 'v/[view]/+page.svelte draws a table of its own and not the list\'s');

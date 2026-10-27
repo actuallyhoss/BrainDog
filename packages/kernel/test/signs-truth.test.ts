@@ -1,5 +1,5 @@
 /**
- * The signs read true where audit 35 found them reading green over a fault (loop/research-audit-35.md, findings 1 and 6).
+ * The signs read true where they once read green over a fault.
  *
  * EACH CASE IS THE FAULT ITSELF, BUILT THROUGH THE KERNEL'S VERBS where a verb makes it: runs that crash after leaving a
  * step and are swept, a pattern whose dedupe sets every text aside, a filer that stops filing. Where only a feed writes

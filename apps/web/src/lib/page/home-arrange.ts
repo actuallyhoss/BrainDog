@@ -16,7 +16,7 @@
  * the record holds, and an installed home is arranged like any other page.
  *
  * AND NOTHING THE FIRST DONE INSTALLS IS THE ARRANGER'S OWN, or Today froze as the owner saw it on the day they arranged
- * it (`loop/research-audit-11-13.md`, finding 3). The body kept is the one any reader of the record would be drawn:
+ * it. The body kept is the one any reader of the record would be drawn:
  * - ITS HEADINGS ARE THE HOUSE LINES, which the page reader says in the voice that speaks (`inVoice`), so a line changed
  *   in Settings › Words, or another use case speaking, still reaches Today once it is kept.
  * - THE LINE A TASK IS TYPED INTO IS KEPT wherever the record keeps tasks, and the reader draws it only for somebody who
@@ -42,7 +42,7 @@ type Fetch = NonNullable<Parameters<typeof createClient>[0]['fetch']>;
 const SESSION_LIST = 'session';
 
 /**
- * THE LIST A RECORD KEEPS ITS PROJECTS IN, as Today declares its cards over it (C27): the one of its lists, as this tab
+ * THE LIST A RECORD KEEPS ITS PROJECTS IN, as Today declares its cards over it: the one of its lists, as this tab
  * has learnt them, that declares `scopes` (`project-cards.ts` `projectsOf`), with the field its rows are named by and the
  * name the record gives it. `undefined` where it keeps none, or none is learnt yet.
  */
@@ -79,15 +79,15 @@ export function keptAs(slug: string, pages: readonly string[]): Kept | null {
  *
  * AND THE RECORD'S WEEK, where it keeps one (`weekOf`), which the caller reads off the lists' declarations it has learnt
  * (`weekHeld`). AND WHETHER IT HAS THE HEALTH PAGE, which Today's line on the vital signs opens (`signsLine`): the line is
- * drawn only where that page is, and only for the owner: a count of the record's insides is not a member's to be told (audit 71). AND WHAT WENT QUIET (`quietTile`), which is the owner's as the vital signs are: the record shows that source only to a reader of every list, and the shell says that for certain only of the owner. Home hands the week in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
- * lost "Orders due this week" and the week's money on the day it was arranged (B46.8).
+ * drawn only where that page is, and only for the owner: a count of the record's insides is not a member's to be told. AND WHAT WENT QUIET (`quietTile`), which is the owner's as the vital signs are: the record shows that source only to a reader of every list, and the shell says that for certain only of the owner. Home hands the week in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
+ * lost "Orders due this week" and the week's money on the day it was arranged.
  */
 export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Labels = labels(), week?: Week): Holds {
   const list = shell.lists.find((l) => l.id === TASKS);
   const tasks = list !== undefined;
   const bare = REGISTERS[TASKS] ?? (list ? { id: TASKS, name: list.name, one: singularOf(list.name) } : undefined);
   const one = tasks && bare ? relabel(bare, heard).one : undefined;
-  /* WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF TODAY'S BODY (C27): runs only for a reader who may read them, and the
+  /* WHO IS WORKING AND THE PROJECTS ARE BLOCKS OF TODAY'S BODY: runs only for a reader who may read them, and the
      projects over the list this tab has learnt keeps them. */
   const projects = projectsHeld(shell.lists);
   return {
@@ -117,7 +117,7 @@ export async function weekHeld(shell: Pick<Shell, 'lists'>): Promise<Week | unde
 
 /**
  * Today's headings in the voice that speaks, as Home asks for them. NEEDS YOU IS ONE OF THE FIVE PLACES AND KEEPS ITS
- * NAME, and its calm line with it (the audit of 22 October, U1): a use case words new things and never renames a place,
+ * NAME, and its calm line with it: a use case words new things and never renames a place,
  * and "Needs your call" over the tile named a place the bar and the rail call Needs you.
  */
 export function voiceOf(said: (key: VoiceKey) => string): HomeVoice {
@@ -141,7 +141,7 @@ export const HOUSE_VOICE: HomeVoice = voiceOf((key) => VOICE_LINES[key]);
 
 /**
  * The voice keys a kept heading may be, and the keys a kept empty line may be: the ones `todayHome` asks the voice for,
- * less Needs you's heading and calm line, which are a place's and are never said another way (U1).
+ * less Needs you's heading and calm line, which are a place's and are never said another way.
  */
 const HEADINGS: readonly VoiceKey[] = ['right_now', 'since_away', 'working_now', 'coming_up', 'overdue'];
 const EMPTIES: readonly VoiceKey[] = ['nothing_due'];
@@ -214,7 +214,7 @@ export async function previewedBody(slug: string, holds: Holds): Promise<PageBod
     return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.health ? { health: true } : {}), ...(holds.quiet ? { quiet: true } : {}), ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
   }
   if (slug === 'decide') return plainBody((await import('../../routes/decide/views.ts')).decideHome());
-  /* SCRIPTS IS THE PEOPLE ADD-ON'S PAGE (C33), drawn from that body until the record keeps one. */
+  /* SCRIPTS IS THE PEOPLE ADD-ON'S PAGE, drawn from that body until the record keeps one. */
   if (slug === 'scripts') {
     const { pack: _pack, ...body } = (await import('@braindog/seed/packs/scripts')).SCRIPTS_PAGES.scripts!;
     return plainBody(body);

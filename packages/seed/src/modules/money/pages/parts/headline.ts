@@ -15,7 +15,7 @@ const ACCOUNTS_SAID = '{{cash-by-account.groups}} account(s)';
 const WHAT_THERE_IS = `Kept in ${ACCOUNTS_SAID}.`;
 
 /**
- * AND A PART THAT IS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4: "Money's first line says how much he
+ * AND A PART THAT IS LATE, SINCE money-core 3.18.0 ("Money's first line says how much he
  * has and that the part is late"): the part late longest by its name, what it is and how long since its day, as a
  * sentence of its own after the money. Its figures are `installments-late`'s first row, so on a record with nothing
  * late the sentence has no figure that reads and goes whole (`leadOf`), and the line is what it was.
@@ -53,7 +53,7 @@ export const HEADLINE: Record<string, unknown>[] = [
 ];
 
 /**
- * THE LINE MONEY OPENS ON, SPLIT BY WHETHER THE MONEY LASTS THE YEAR (REC-B07). While the walk goes under inside the year,
+ * THE LINE MONEY OPENS ON, SPLIT BY WHETHER THE MONEY LASTS THE YEAR. While the walk goes under inside the year,
  * the hero says the day and how long it lasts with nothing coming in, so the line says where the money is kept and no
  * more. While it does not, the hero draws no day, and the line says that on what is due the money lasts the year.
  */

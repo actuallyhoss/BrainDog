@@ -58,7 +58,7 @@ export function bookFromAccount(rows, inBook) {
  * Ledger entry that is not void, a bill open or part paid, a repeating line that has not ended, an instalment still
  * open. So the question and the page say one number, and "File them" writes nothing onto a void entry, a bill paid or
  * written off, an ended line or a cancelled part
- * (audit 71 finding 1). A thing handed by a rule or by name is filed whatever its status: somebody wrote it just now.
+ * A thing handed by a rule or by name is filed whatever its status: somebody wrote it just now.
  */
 export default async function run(ctx) {
   const PAGE = 50;

@@ -1,5 +1,5 @@
 /**
- * Cloudflare's script on the sign-up page (LCH-A02): ready, a script error, the limit, and trying again after a failure,
+ * Cloudflare's script on the sign-up page: ready, a script error, the limit, and trying again after a failure,
  * on a stub document, so nothing is fetched. The strings are invented.
  */
 

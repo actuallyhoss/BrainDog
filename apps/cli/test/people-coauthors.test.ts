@@ -1,5 +1,5 @@
 /**
- * Agents meet commit co-authors and every author of a listed repository (scope B35): a `Co-authored-by:` trailer is an
+ * Agents meet commit co-authors and every author of a listed repository: a `Co-authored-by:` trailer is an
  * author too, counted for `MIN_COMMITS` like one, and once a day a folder is read whole since it joined its project,
  * not only for the session's own commits.
  */

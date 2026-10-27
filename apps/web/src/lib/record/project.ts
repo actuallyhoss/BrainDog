@@ -121,8 +121,7 @@ const HANDLE = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
 
 /**
  * THE NAME A THING IT RUNS ON IS SAID BY: its own words, and where they are a handle ("pinwheel-metrics") the same words
- * spaced and capitalised ("Pinwheel metrics"), so no key or tool is drawn in the record's own spelling (the audit of
- * 20 October: five raw key handles on one project page). Words a person wrote with a capital or a space stay as written.
+ * spaced and capitalised ("Pinwheel metrics"), so no key or tool is drawn in the record's own spelling (five raw key handles on one project page). Words a person wrote with a capital or a space stay as written.
  */
 export const thingName = (title: string): string => (HANDLE.test(title) ? humanize(title) : title);
 
@@ -265,7 +264,7 @@ export function spans(blocks: readonly Block[]): Record<string, 1 | 2> {
 export type HeroPart = { text: string; figure?: true; late?: true };
 
 /**
- * One of the hero's three figures (the UI pass of 20 October, proj F7): what it pays, how far along it is as a ring in
+ * One of the hero's three figures (proj F7): what it pays, how far along it is as a ring in
  * the project's colour, and who is on it now. A project that says no progress shows its open work in the middle place.
  */
 export type HeroFigure =
@@ -320,7 +319,7 @@ const stopped = (s: string): string => (/[.!?…]$/u.test(s) ? s : `${s}.`);
  * the red, then three figures. NOT ITS MONEY: the Money tile says the money, so it is said once on the page (proj F1).
  * Never the next step, which the hero's last line says once. Nothing to say is nothing drawn.
  *
- * NEWS, NOT A TAGLINE, SINCE the audit of 22 October (U6, U-B7): the line under the name was what the project is, a
+ * NEWS, NOT A TAGLINE: the line under the name was what the project is, a
  * description that never changes, at headline size ("Cozy bakery idle game inside Discord... A cozy bakery idle game
  * played inside Discord."), with the name small beside it. Now it says what is late and who worked on it last ("1 of 1
  * tasks is late. Claude worked on it 2 days ago."), and what it is only where there is no news, so a page still says

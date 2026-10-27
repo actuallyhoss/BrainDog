@@ -342,7 +342,7 @@ export function runway(
   const refusals: Refusal[] = [];
   const movements: { at: number; currency: string; step: Omit<Step, 'balance'> }[] = [];
   const seen = new Set<string>();
-  /* ONE GROUP HOWEVER IT IS WRITTEN, SINCE THE AUDIT OF 25 OCTOBER (Y1): parts that said "harbourview" beside parts that said
+  /* ONE GROUP HOWEVER IT IS WRITTEN: parts that said "harbourview" beside parts that said
      "Harbourview" were two plans to count in or out, as they were two plans on Plans. A group is its name with no accents, in
      lower case, with one space between words, said as the oldest row read wrote it, which is what Money's plans script
      names the plan after. */

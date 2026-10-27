@@ -1,5 +1,5 @@
 /**
- * Migration 36: a run never heard from here holds no next step unless it ended in `handoff` (AGT-C10, the data step).
+ * Migration 36: a run never heard from here holds no next step unless it ended in `handoff` (the data step).
  *
  * MEASURED BEFORE: on the owner's record 295 runs came in by the import, 291 abandoned, and the import kept whatever
  * step the adapter gave each, so a run written off in the old system could be offered as the next thing to pick up.

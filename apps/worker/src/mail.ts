@@ -394,7 +394,7 @@ const aside = (text: string): string =>
 
 /**
  * THE ONE BUTTON, BULLETPROOF. Everywhere but Outlook for Windows it is a padded link painted as an ink rectangle with
- * the app's 8px corners (the audit of 22 October, U-C16; it was a pill); Outlook draws no padding on a link and no
+ * the app's 8px corners (it was a pill); Outlook draws no padding on a link and no
  * radius on anything, so it gets a VML round rectangle of its own, sized from the label because VML cannot size to its
  * text. Both are one link to the same address, and the whole button is the target.
  */
@@ -738,7 +738,7 @@ export async function sendMail(env: MailEnv, kind: MailKind, to: string, vars: M
  * How one send went: `sent`; `host`, a fault of this deployment's that every letter would meet (no binding, no sender,
  * no link, the service refusing); or `address`, a fault of the one address (not an address, or suppressed).
  *
- * THE DIFFERENCE IS WHAT SIGN-IN MAY SAY (LCH-A04). A host fault says nothing about who has an account, so a run of them
+ * THE DIFFERENCE IS WHAT SIGN-IN MAY SAY. A host fault says nothing about who has an account, so a run of them
  * may be told on the sign-in screen as "mail is not going out". An address fault is about one person, and saying it
  * would tell a stranger whether that mailbox is real, so it is never counted.
  */
@@ -788,7 +788,7 @@ export const isWaitedOn = (kind: MailKind): boolean => WAITED_ON.has(kind);
 
 /**
  * The lines that mail the operator, and nothing else: every other alert is read the next morning. `model` is a model
- * that did not answer (ENG-A01), `night` a nightly walk with a failure or a Directory copy not written (LCH-C01).
+ * that did not answer, `night` a nightly walk with a failure or a Directory copy not written.
  */
 export type OpsKind = 'crash' | 'refuse' | 'model' | 'night';
 

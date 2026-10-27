@@ -123,7 +123,7 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
   await call('undo', { batch, dry: true });
   await call('undo', { batch });
   await call('undo', { batch: 'no-such-batch' });
-  /* WHAT THE RECORD WOULD LINK, A RESOURCE NOW (AGT-B05): its `said` is read with the same eyes as a tool's text. */
+  /* WHAT THE RECORD WOULD LINK, A RESOURCE NOW: its `said` is read with the same eyes as a tool's text. */
   const understood = (await handle({ jsonrpc: '2.0', id: ++n, method: 'resources/read', params: { uri: 'braindog:understand' } }, api, { ...agent })) as Reply;
   assert.ok('result' in understood, JSON.stringify(understood));
   const plan = (understood.result as { contents: { text: string }[] }).contents[0]?.text ?? '';

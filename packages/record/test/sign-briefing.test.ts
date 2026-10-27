@@ -83,7 +83,7 @@ test('GREEN: the step handed is the newest, the queue is the questions open, and
   assert.doesNotMatch([s.said, ...s.facts].join(' '), /github\.com|\/Users\//u, 'a repository by its name, never its address');
 });
 
-test('A STEP TEN DAYS OLD IS NOT HANDED (AGT-C05), so the briefing is true without it, and one that hands a step that old is red', async () => {
+test('A STEP TEN DAYS OLD IS NOT HANDED, so the briefing is true without it, and one that hands a step that old is red', async () => {
   const { sql, api, clock, left, deps } = await record();
   await left('kiln', 'Kerning pass', 'Kern the lowercase pairs');
   const real = (await deps.briefing('kiln'))!;

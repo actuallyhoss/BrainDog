@@ -148,7 +148,7 @@
     void keptWithUndo('contrast', before, on, writers);
   }
 
-  /* ── the look: every one the record holds, one press each (PGS-A21) ── */
+  /* ── the look: every one the record holds, one press each ── */
 
   /* WHAT `boot` SAID OF THE LOOKS, asked again here because the shell keeps neither `looks` nor the person's pick. Until
      it answers, the page's own drawn look stands in, so the preview is true from the first frame. */
@@ -160,7 +160,7 @@
      beside House there is no choice to draw. */
   const choices = $derived(choicesOf(booted, false).filter((c) => c.id !== CONTRAST));
 
-  /* THE DENSITY PREVIEW DRAWS HIS OWN ROWS (U-C7): the first three questions waiting on him, as Today leads with them,
+  /* THE DENSITY PREVIEW DRAWS HIS OWN ROWS: the first three questions waiting on him, as Today leads with them,
      else the names of three of his lists. A made-up studio stood there before. Nothing until the record answers. */
   const previewRows = $derived.by((): string[] => {
     const b = booted as { waiting?: { question?: unknown }[]; registers?: { name?: unknown; kernel?: boolean }[] } | null;
@@ -400,7 +400,7 @@
         <div class="choice">
           <span class="choice-name" id="choice-accent">{copy.accentTitle}</span>
           <span class="choice-line">{copy.accentHint}</span>
-          <!-- A SWATCH PER COLOUR, HOUSE FIRST AND RED LIKE THE OTHERS (2.A.11): the chosen one ringed in red a gap away
+          <!-- A SWATCH PER COLOUR, HOUSE FIRST AND RED LIKE THE OTHERS: the chosen one ringed in red a gap away
                with a tick badge at its corner, and its name under the row. -->
           <div class="swatches" role="group" aria-labelledby="choice-accent">
             <button
@@ -587,7 +587,7 @@
     font-size: var(--fs-meta);
   }
 
-  /* A CHOICE ON A PHONE IS THE COLUMN'S WIDTH, so a full segmented control shares it evenly (2.A.9). The density's
+  /* A CHOICE ON A PHONE IS THE COLUMN'S WIDTH, so a full segmented control shares it evenly. The density's
      three-line picture goes there, so "Comfortable" fits whole beside its two neighbours instead of scrolling. */
   @media (width < 640px) {
     .choice {
@@ -678,7 +678,7 @@
     padding: var(--sp-1);
   }
 
-  /* A SWATCH IS THE COLOUR, 32 ROUND (2.A.11): chosen, a 2px red ring a gap away and a 20px red tick badge at its top end
+  /* A SWATCH IS THE COLOUR, 32 ROUND: chosen, a 2px red ring a gap away and a 20px red tick badge at its top end
      corner, so the state is a shape and never the colour alone. 44 of target under a thumb, the colour still 32. */
   .swatch {
     position: relative;
@@ -724,7 +724,7 @@
     font-size: var(--fs-meta);
   }
 
-  /* UNDER A THUMB THE BUTTON IS 44 SQUARE AND THE COLOUR STAYS 32 (UI pass of 21 October, P39): the colour, its ring
+  /* UNDER A THUMB THE BUTTON IS 44 SQUARE AND THE COLOUR STAYS 32 (P39): the colour, its ring
      and the chosen outline move onto a 32px disc inside, so the target is the button's own box and measures 44. */
   @media (pointer: coarse) {
     .swatches {

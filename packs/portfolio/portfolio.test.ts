@@ -1,6 +1,6 @@
 /**
  * Projects as a file: `portfolio.pack.json` held equal to the module the build still compiles in
- * (`packages/seed/src/modules/portfolio.ts`), so taking the module out is one small change and not a rewrite (SHL-A14).
+ * (`packages/seed/src/modules/portfolio.ts`), so taking the module out is one small change and not a rewrite.
  *
  * WHAT IS HELD. Projects owns its one list and reads one figure it does not own: the card of a project in play draws a
  * line of the work finished on it each week, Work's Done, by week, over Work's tasks. So the records BrainDog makes hold
@@ -208,7 +208,7 @@ test('THE FILE IS ITS OWN: four lists, two pages, twenty-five figures over them,
   const kinds = doc.declarations.map(kindOf);
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    /* TWENTY SINCE 1.17.0 (PGS-C17): `projects-with-health`, what the health split waits on, and `projects-lane-earning`,
+    /* TWENTY SINCE 1.17.0: `projects-with-health`, what the health split waits on, and `projects-lane-earning`,
        the strip's Earning with its nights. THREE LISTS AND TWENTY-TWO FIGURES SINCE 1.19.0: Numbers and the key numbers,
        with how many key numbers are kept and how long since a measure was read. FOUR LISTS AND TWENTY-FIVE SINCE 1.23.0:
        the stages, how many a project has, and which shape its plan is drawn in. TWO PAGES SINCE 1.25.0: Numbers' own. A SECOND RULE AND ITS SCRIPT SINCE 1.24.0
@@ -394,7 +394,7 @@ test('WORK ARRIVING LATER: the project kept before is still there, and the line 
   const id = project(api, 'Larkspur');
   /* WORK AFTER PROJECTS, THE ORDER EVERY RECORD TAKES THEM IN, so a task says which project it is for. */
   said(await put(api, firstPartyDocument('work', { holds: [...OWN, ...workLists()], seeds: [] })));
-  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL (SHL-A08): nothing waits now. */
+  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL: nothing waits now. */
   const again = await planOf(api, file());
   assert.deepEqual(again.waiting, []);
   assert.deepEqual(again.conflicts, []);
@@ -429,7 +429,7 @@ test('THE PROJECT PAGE STAYS IN THE SEED: the file draws no page per project, an
   assert.match(readFileSync(new URL('./README.md', import.meta.url), 'utf8'), /project page/u, 'the README does not say where the project page lives');
 });
 
-/* ── The questions about projects, on Projects (PGS-C18) ───────────────────────────────────────── */
+/* ── The questions about projects, on Projects ───────────────────────────────────────── */
 
 type Laid = { kind: string; heading?: string; lead?: boolean; fold?: boolean; box?: boolean; area?: string; body?: string; where?: string; when?: unknown; limit?: number; tiles?: boolean };
 type Drawn = { kind: string; heading?: string; lead?: boolean; body?: string; drawn?: boolean; values?: Record<string, never>; matched?: number };
@@ -467,7 +467,7 @@ test('PROJECTS ASKS ITS OWN QUESTIONS: a queue of the questions about projects, 
 
 /* FIVE SINCE 1.18.0: the In play and earning strip is gone, so Where they are leads, over How they are going, and the page is at
    the most a page shows before its fold (`calm-pages.test.ts`). */
-/* AND NO OPEN TILE SINCE the UI pass of 20 October (proj F5): What each one earns stands alone under the questions. */
+/* AND NO OPEN TILE (proj F5): What each one earns stands alone under the questions. */
 /* AND THREE SINCE 1.30.0: the board is In play and says where they are and what each earns itself. */
 test('THREE TILES BEFORE THE FOLD AT 1440, how they are going, the board, and the questions under it', () => {
   assert.deepEqual(beforeTheFold(projectsPage()), ['How they are going', 'In play', 'Waiting on you']);

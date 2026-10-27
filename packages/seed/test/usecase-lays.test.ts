@@ -90,9 +90,9 @@ const LAID: Record<string, Laid> = {
     declares: '587379d1d9fe0800',
     history: [
       '2.6.0 lays what 2.5.0 laid, word for word -> 092fe0f5bb736b52',
-      'Folded into the unreleased 2.6.0 (estate-numbers-61, REC-C12; integrate 61): it lays Server and provider numbers on Renewals after Next ninety days -> b7473e7c534ee516',
-      'Folded into the unreleased 2.6.0 (founder-numbers-edge-64, audit 61 claim 5; integrate 64): Server and provider numbers reads no reading dated after today (`at before tomorrow` in its clauses); the list of what is laid is unchanged -> c448e3ee3c366703',
-      'Inside the unreleased 2.6.0 (seen-section-91, ENG-B03): it lays Where it was seen, a section naming panel: seen, after Notes on People\'s pages for an organisation and a person -> 587379d1d9fe0800',
+      'Folded into the unreleased 2.6.0: it lays Server and provider numbers on Renewals after Next ninety days -> b7473e7c534ee516',
+      'Folded into the unreleased 2.6.0: Server and provider numbers reads no reading dated after today (`at before tomorrow` in its clauses); the list of what is laid is unchanged -> c448e3ee3c366703',
+      'Inside the unreleased 2.6.0: it lays Where it was seen, a section naming panel: seen, after Notes on People\'s pages for an organisation and a person -> 587379d1d9fe0800',
     ],
   },
   /* 2.7.0, CUT BESIDE THE FROZEN 2.6.0 FOR `needs` (usecase-needs-102): it lays what 2.6.0 laid, word for word. */
@@ -142,7 +142,7 @@ const LAID: Record<string, Laid> = {
     declares: '192a7f45d2533b26',
     history: ['3.1.0 lays what 3.0.0 laid, word for word -> 192a7f45d2533b26'],
   },
-  /* 3.2.0, PORTFOLIO 1.23.0's STAGES (the thinking scope of 24 October, C18): it lays what 3.1.0 laid, word for word. */
+  /* 3.2.0, PORTFOLIO 1.23.0's STAGES (the thinking scope of 24 October): it lays what 3.1.0 laid, word for word. */
   'founder@3.2.0': {
     lays: [
       'adds page.relation after People: Numbers, 30 days',
@@ -158,7 +158,7 @@ const LAID: Record<string, Laid> = {
     declares: '192a7f45d2533b26',
     history: ["3.2.0 lays what 3.1.0 laid, word for word: it holds Portfolio 1.23.0's stages on its project page -> 192a7f45d2533b26"],
   },
-  /* 3.3.0, THE PROJECT'S SHAPE AS BLOCKS (the thinking scope of 24 October, C28 and C29): it lays what 3.2.0 laid, word for word. */
+  /* 3.3.0, THE PROJECT'S SHAPE AS BLOCKS (the thinking scope of 24 October): it lays what 3.2.0 laid, word for word. */
   'founder@3.3.0': {
     lays: [
       'adds page.relation after People: Numbers, 30 days',

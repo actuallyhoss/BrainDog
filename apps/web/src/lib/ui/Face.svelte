@@ -10,7 +10,7 @@
   which knows what signed the write. A caller that hands a name alone still gets the right face for
   the words `names.ts` itself says (`faceKindOf`), and a monogram for any other name.
 
-  A PERSON IS THEIR SLOT (the UI pass of 20 October, 2.A.5): their hue picks one of the eight category slots, the disc
+  A PERSON IS THEIR SLOT: their hue picks one of the eight category slots, the disc
   is its tint and the letter its colour.
 
   AN INITIAL, NOT A PHOTO. `20 §6` refuses avatar stacks on a business record, and a letter in a
@@ -116,7 +116,7 @@
     border-radius: var(--r-ctl);
   }
 
-  /* A PERSON, A PROJECT OR A RECORD IN ITS SLOT (the UI pass of 20 October, 1.3): the slot's tint for the disc and its
+  /* A PERSON, A PROJECT OR A RECORD IN ITS SLOT: the slot's tint for the disc and its
      colour for the letter, a pair solved to 4.5:1 in light and in dark. */
   .face:is([data-kind='person'], [data-kind='project'], [data-kind='record']) {
     background: var(--ph-tint);

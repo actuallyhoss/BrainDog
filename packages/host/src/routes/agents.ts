@@ -13,9 +13,9 @@
  *
  * `end` IS A DATA WRITE, as `attach` and `handoff` are in `index.ts`: a token's call needing `propose`, the end hook's
  * one write, and the record picks the state. `beat` IS ONE TOO, in the same group for the same caller, though it changes
- * no version and writes no history: a session saying it is still working moves its run's clock in place (AGT-C03).
+ * no version and writes no history: a session saying it is still working moves its run's clock in place.
  *
- * `offered` IS THE AGENT DOOR'S LIST OF RESOURCES IN ONE READ (AGT-B04, `packages/record/src/methods/offered.ts`): what
+ * `offered` IS THE AGENT DOOR'S LIST OF RESOURCES IN ONE READ (`packages/record/src/methods/offered.ts`): what
  * an agent may read, decided by the check each address's own reader asks and never by running the read, so a session
  * starting on a large record lists its resources without drawing a page. It writes nothing.
  *

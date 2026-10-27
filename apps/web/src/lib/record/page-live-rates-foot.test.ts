@@ -126,7 +126,7 @@ test('a block that is not drawn does not ask for the foot', () => {
   assert.equal(page(hidden).length, 1);
 });
 
-/* THE FOOT IS THE PAGE'S OWN AND NO BLOCK OF THE DECLARATION (audit 74, claim 1). Arrange and Change this page count the
+/* THE FOOT IS THE PAGE'S OWN AND NO BLOCK OF THE DECLARATION. Arrange and Change this page count the
    blocks a person declared, and a save is refused when the count is off by the one the reader added. */
 test('the foot says it is not one of the blocks the page declares', () => {
   const blocks = page(tiles(reading({ fx: fx() })));
@@ -167,7 +167,7 @@ test('where the actions could not be read, the foot says its sentence and offers
   assert.equal(foot.synthetic, true);
 });
 
-/* A FIGURE IS OUT OF DATE WHEREVER IT IS DRAWN (audit 77, claim 6): only tiles asked for the foot, so a page whose one
+/* A FIGURE IS OUT OF DATE WHEREVER IT IS DRAWN: only tiles asked for the foot, so a page whose one
    converted figure was a bar, a split or a sentence said nothing at all about the rates under it. */
 const charted = (kind: 'bar' | 'split', r: unknown) =>
   ({ kind, heading: 'Owed by client', source: 'metric.overdue', readings: [{ metric: 'overdue', reading: r }], rows: [], matched: 2, refusals: [] }) as never;
@@ -286,7 +286,7 @@ test('the reader looks for a rates action when rates are out of date, and only t
   assert.equal(current.sent.includes('actions'), false, 'a page with nothing out of date asks nothing more');
 });
 
-/* A BAR OR A SPLIT OVER A LIST'S OWN MONEY IS CONVERTED HERE, NOT BY THE RECORD (audit 80, claim 5): it carries no
+/* A BAR OR A SPLIT OVER A LIST'S OWN MONEY IS CONVERTED HERE, NOT BY THE RECORD: it carries no
    reading and no `values_fx`, so it asked for no foot however old the rates it was drawn with. */
 const HOLDINGS = { id: 'holdings', name: 'Holdings', one: 'holding', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'balance', type: 'money' }] };
 

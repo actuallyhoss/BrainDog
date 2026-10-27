@@ -52,7 +52,7 @@ export const browserSigner: Signer = async (text) => {
 };
 
 export const publishWords = {
-  /* THE STORE, NEVER "THE KENNEL" (E22): the Kennel is what this build calls the service, and Browse is the store a
+  /* THE STORE, NEVER "THE KENNEL": the Kennel is what this build calls the service, and Browse is the store a
      person sees. */
   publish: 'Publish to the store',
   publishing: 'Publishing',

@@ -1,5 +1,5 @@
 /**
- * The rulings page and its tests, held together (SHL-A02).
+ * The rulings page and its tests, held together.
  *
  * `docs/04-PACKS.md` §9 writes each settled question once, with the test that holds it. A ruling written and never
  * built is the risk this gate exists for, and its sign is a ruling whose test is a placeholder or is missing, so:

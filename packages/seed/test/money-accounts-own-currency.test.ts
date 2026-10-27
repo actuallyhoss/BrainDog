@@ -3,8 +3,7 @@
  * account is a part in dollars beside the pound account, never turned into pounds. Cash now itself is still one figure
  * in pounds, the dollars converted at the record's rate.
  *
- * THE HEADLINES ARE THE MONEY A PERSON HAS, NOT THE MONEY THEY ARE DUE OR OWED (`loop/scope/area-record-b.md`:
- * 1755-1760). `cash-by-account` groups by the name each account is called, a text that names no currency, so before
+ * THE HEADLINES ARE THE MONEY A PERSON HAS, NOT THE MONEY THEY ARE DUE OR OWED. `cash-by-account` groups by the name each account is called, a text that names no currency, so before
  * this every account was read in the home currency. A test only: no seed source moves, so money-core's fingerprint
  * stands.
  */

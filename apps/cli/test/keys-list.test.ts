@@ -1,7 +1,7 @@
 /**
  * `braindog keys list [--project <name>] [--everywhere] [--json]`: the Keys index read in pages of fifty and said one
  * line a key: its name, what it opens, where it applies, "sealed" or where it is kept, and the day it expires. Never a
- * value and never the id of the grant a value is sealed in (AGT-D08, RQ-AGT-434).
+ * value and never the id of the grant a value is sealed in.
  *
  * THE HOST IS A STUB ON node:http, as in `signs.test.ts`, because apps never import apps. It answers `schema` and
  * `list` the way the record does: a key's row holds its grant's id under the secret field, and its project as a row id.
@@ -336,7 +336,7 @@ test('A RECORD THAT CANNOT SAY WHICH KEYS ARE PAST is said so once, and each key
   }
 });
 
-/* RED BEFORE (audit 69, finding 7): a host that answers every key was caught only by a key whose day is still to come.
+/* RED BEFORE: a host that answers every key was caught only by a key whose day is still to come.
    With every day today or earlier nothing caught it, and a key whose day is today read "expired". */
 test('AN ANSWER THAT HOLDS EVERY KEY IS NOT BELIEVED when a day in it is too near to be past everywhere, or a key in it has no day', async (t) => {
   const zone = process.env.TZ;
@@ -367,7 +367,7 @@ test('AN ANSWER THAT HOLDS EVERY KEY IS NOT BELIEVED when a day in it is too nea
   assert.deepEqual(three.said, ['2 keys: 2 kept elsewhere.'], 'nothing is said of the clock when the record answered');
 });
 
-/* Audit 70, finding 8: the smallest case of the one above, a record's only key, on the day it ends. A host that
+/* The smallest case of the one above, a record's only key, on the day it ends. A host that
    answers it whatever it was asked says nothing about its day, in the line or in the document a program reads. */
 test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLED EXPIRED', async (t) => {
   const zone = process.env.TZ;
@@ -383,7 +383,7 @@ test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLE
   assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [false]);
   assert.deepEqual(one.said, [unsaid, '1 key: 1 kept elsewhere.']);
 
-  /* THE PRICE THIS USED TO HOLD IS GONE (audit 72, finding 8): the same key on a record that does read the filter, in
+  /* THE PRICE THIS USED TO HOLD IS GONE: the same key on a record that does read the filter, in
      Cairo at 22:30 UTC, where the day is already the 14th. Its true answer is its whole list too. It was judged by
      this machine's date, the 13th, and told it had not answered. Now the opposite question tells it from the host
      above, and its answer stands, in the line and in the document. */
@@ -395,7 +395,7 @@ test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLE
   assert.deepEqual(two.said, ['1 key: 1 kept elsewhere.'], 'nothing is said of the clock when the record answered');
 });
 
-/* RED BEFORE (audit 72, finding 8; seen red against the file as batch 73 left it): a stranger whose only dated key
+/* RED BEFORE: a stranger whose only dated key
    ended yesterday saw the sentence for a record that had answered. The record is asked the opposite question, once,
    and only when its first answer could be either. */
 test('A RECORD WHOSE ONLY DATED KEY ENDED YESTERDAY IS BELIEVED, and the sentence is kept for a record that did not say', async (t) => {
@@ -432,7 +432,7 @@ test('A RECORD WHOSE ONLY DATED KEY ENDED YESTERDAY IS BELIEVED, and the sentenc
   assert.deepEqual(three.said, ['1 key: 1 kept elsewhere.']);
 });
 
-/* RED BEFORE (audit 74, claim 8; seen red against the file as batch 76 left it): the opposite question's true answer
+/* RED BEFORE: the opposite question's true answer
    is no key at all, and no key at all is also what a host gives that takes `after` and reads nothing by it. So an
    empty answer is not believed by itself. The record is asked for the keys whose day is after three days ago, which
    holds the near key in every zone on earth, and is believed only when that answer does hold it. */
@@ -458,7 +458,7 @@ test('AN EMPTY ANSWER TO THE OPPOSITE QUESTION IS NOT BELIEVED BY ITSELF: the re
     for (const s of h.seen) assert.equal(s.headers['x-braindog-session'], undefined);
   }
 
-  /* RED BEFORE BATCH 81 (audit 77, claim 8; seen red against the file as batch 80 left it): a host that compares the
+  /* RED BEFORE BATCH 81: a host that compares the
      word after the field as text answers all three as the honest record does, since a day in digits sorts before
      `today` and after `-3d`. It was believed, and the key whose day is today here read "expired". The fourth question
      leans the other way: no day is before `+3d` as text, so that host names no key and is left to this machine's date. */
@@ -488,7 +488,7 @@ test('AN EMPTY ANSWER TO THE OPPOSITE QUESTION IS NOT BELIEVED BY ITSELF: the re
   assert.deepEqual(deaf.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today', 'expires after today']);
 });
 
-/* RED BEFORE BATCH 70 (seen red against the file as batch 69 left it): today is this machine's day, and the two above
+/* RED BEFORE BATCH 70: today is this machine's day, and the two above
    keep the machine on UTC, where that day and the UTC date are one. West of UTC in the evening they are not: the UTC
    date is already tomorrow, and a rule that believed every day before the UTC date would call today's key expired. */
 test('A KEY WHOSE DAY IS TODAY ON THIS MACHINE IS NOT CALLED EXPIRED BY A HOST THAT IGNORES THE FILTER, after the UTC date has moved on', async (t) => {

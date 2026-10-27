@@ -1,5 +1,5 @@
 /**
- * Held texts run again from their stored bytes (REC-A02): oldest first and two hundred at a time when an answer frees
+ * Held texts run again from their stored bytes: oldest first and two hundred at a time when an answer frees
  * them, at the next text when digits reach an account by hand, and once when the pattern that held them is updated.
  *
  * BEFORE THIS, A HELD TEXT WAS NEVER READ AGAIN (`ingest.ts`'s own comment said so): a fix to a pattern reached only the

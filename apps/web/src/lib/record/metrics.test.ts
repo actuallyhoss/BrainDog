@@ -320,7 +320,7 @@ test('A STALE RATE NAMES WHERE RATES ARE KEPT UP, and asks for no press that is 
   assert.equal(fxNote({ fx: { ...fx, stale: false } }), 'Converted at rates as of 1 Jul 2026.');
 });
 
-/* ── a difference in parts, and against the window before (REC-B19) ──────── */
+/* ── a difference in parts, and against the window before ──────── */
 
 /** 13 October 2026, midday: the clock and the entries of the record's own test, so both readers hold the same answers. */
 const DIFF_NOW = Date.UTC(2026, 9, 13, 12);

@@ -1,5 +1,5 @@
 /**
- * A project's lanes: four, said in words, as taken for him on 8 October (`docs/20-COLLABORATION.md` §1, USE-A02).
+ * A project's lanes: four, said in words, as taken for him on 8 October (`docs/20-COLLABORATION.md` §1).
  *
  * THE QUESTION WAS FOUR OR FIVE. The pack stores four, Building, Earning, Parked and Finished, and an older board drew
  * five (Earning, Shipping, Exploring, Maintain, Retired). Nobody had ruled, so the four lived only because nothing had

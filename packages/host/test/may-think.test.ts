@@ -1,5 +1,5 @@
 /**
- * The consent rule, obeyed (ENG-A09): one switch for all background reading, asked before anything is held or leased.
+ * The consent rule, obeyed: one switch for all background reading, asked before anything is held or leased.
  *
  * OFF, a background ask is refused in a sentence the record reads as "the rules speak", the ledger holds no row for it,
  * not even the turned-away one, and the model pass leases no job. ON, which is the default, the rows return. HIS OWN

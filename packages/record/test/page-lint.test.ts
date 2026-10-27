@@ -1,5 +1,5 @@
 /**
- * A record lints its own pages (PRF-A04): each page it can draw is drawn on its own data, render's rules read it, and
+ * A record lints its own pages: each page it can draw is drawn on its own data, render's rules read it, and
  * the sign `pages-clean` is filed with the findings as its facts. The red record is what his project notes printed on
  * 7 October (`evidence-own-record.md` 2.1): a figure the record has no answer for, a chips figure in braces, a run's
  * handle and an ISO instant, all in one project's note.
@@ -68,7 +68,7 @@ const sign = (api: Awaited<ReturnType<typeof createRecordApi>>) => {
 test('A NOTE THAT PRINTS THREE RAW THINGS IS THREE FINDINGS, named by page and part, and the sign reads red', async () => {
   const { sql, api } = await record(RAW);
   const ran = await api.lintTick();
-  /* THE CHIP WHOSE FIGURE HAS NO ANSWER IS DROPPED BY THE RENDERER NOW (PGS-B02, html.ts `drawnRows`), so its braces are
+  /* THE CHIP WHOSE FIGURE HAS NO ANSWER IS DROPPED BY THE RENDERER NOW (html.ts `drawnRows`), so its braces are
      never printed and are no finding: three, where his 7 October note counted four. */
   assert.deepEqual(ran, { ran: true, state: 'red', findings: 3, pages: 1 });
   const s = sign(api);
@@ -153,7 +153,7 @@ test("A PART IS NAMED IN PLAIN WORDS: a heading's apostrophe is never printed as
   assert.equal(found[0]!.part, "Kiln's notes");
 });
 
-/* ── a table's cells (audit 36-37, finding 1) ───────────────────────────── */
+/* ── a table's cells ───────────────────────────── */
 
 const RAW_AT = '2026-10-06T19:07:01.610Z';
 const tools = (rows: Record<string, unknown>[], extra: Record<string, unknown> = {}) =>
@@ -252,7 +252,7 @@ test("A RUN'S PROJECT IS DRAWN BY ITS NAME, so its spoken id in the cell is no f
   assert.deepEqual(lintAnswer(runs({ title: 'projects#7' }), null, types).map((f) => [f.part, f.rule]), [['Runs, Title', 'raw-id']]);
 });
 
-/* ── what his record showed on 24 October (C38): 20 findings, 12 of them the lint's own ───────────────────────── */
+/* ── what his record showed on 24 October: 20 findings, 12 of them the lint's own ───────────────────────── */
 
 test('A BLOCK NAMES ITS LIST register.<id>, and the cells are typed by the list it names, so a declared time is not raw', () => {
   const byId = (register: string) => (register === 'tools' ? { name: 'text', seen: 'instant' } : null);

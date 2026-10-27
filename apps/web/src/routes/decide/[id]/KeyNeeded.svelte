@@ -1,5 +1,5 @@
 <!--
-  One key an arrangement needs, on its sitting page (REC-A07): its label, what it opens, that a scheduled run uses it,
+  One key an arrangement needs, on its sitting page: its label, what it opens, that a scheduled run uses it,
   whether the record holds it, and a field to put it in without leaving the question.
 
   SEALED AS THE KEYS SCREEN SEALS ONE. The value goes once to `putKey` with `sealed_under: 'connector'`, as the Keys

@@ -1,6 +1,6 @@
 /**
  * The computed sources a digest's section may read, beside a figure and a list: what agents asked, what they did, the
- * steps they left and the runs working now (AGT-C19, "Phone: three alert levels", "digests at 08:00 and 17:00").
+ * steps they left and the runs working now ("Phone: three alert levels", "digests at 08:00 and 17:00").
  *
  * A DIGEST READS THEM AS A PAGE DOES, through the one block read (`readBlock`, handed in as `DigestDeps.block`), so a
  * digest never says a question the Needs you tile would not, nor counts a run the Working tile leaves out. This file

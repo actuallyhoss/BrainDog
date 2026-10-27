@@ -1,5 +1,5 @@
 /**
- * The `form` kind (PGS-A15): a page declares a few fields and a button that adds a row to a list, the install checks
+ * The `form` kind: a page declares a few fields and a button that adds a row to a list, the install checks
  * the form, the read checks it against the list and types each field from it, and a reader who may not write is not
  * sent it. A form over `question.ask` names no list, and its fields are held to the verb's args.
  *

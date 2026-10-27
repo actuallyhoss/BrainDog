@@ -35,7 +35,7 @@ export type OptionVisual =
   | { kind: 'change'; what: string; before: string; after: string }
   | { kind: 'merge'; names: string[]; into: string }
   | { kind: 'filing'; list: string; figure: string }
-  /* MANY ROWS AT ONCE (the thinking scope of 24 October, C20): the rows it adds, by name, or what it moves them to. */
+  /* MANY ROWS AT ONCE (the thinking scope of 24 October): the rows it adds, by name, or what it moves them to. */
   | { kind: 'adds'; list: string; names: string[]; more: number }
   | { kind: 'moves'; list: string; rows: number; moves: { what: string; to: string; n: number }[] };
 
@@ -105,7 +105,7 @@ export function visualOf(q: QueueQuestion, option: { key: string }, ctx: VisualC
   const o = rec(option) ?? {};
   const applies = APPLIES(key);
   const own = !applies;
-  /* AN OPTION THAT SAYS WHAT IT DOES ITSELF (C20): the rows its own patches move, and the money a tail's answer files. */
+  /* AN OPTION THAT SAYS WHAT IT DOES ITSELF: the rows its own patches move, and the money a tail's answer files. */
   if (own) {
     const said = ownSaid(o);
     if (said) return said;
@@ -139,7 +139,7 @@ export function visualOf(q: QueueQuestion, option: { key: string }, ctx: VisualC
   const figure = lone ? money(Math.abs(lone.amount), lone.currency) : nameOrNull(ctx.figure);
   if (applies && list !== null && figure !== null && changes.length === 0) return { kind: 'filing', list, figure };
 
-  /* A LONG TEXT CHANGED, such as a project's note, draws the first line that changed (C20): the whole text is no line. */
+  /* A LONG TEXT CHANGED, such as a project's note, draws the first line that changed: the whole text is no line. */
   const text = applies && changes.length === 1 ? textChange(changes[0]!) : null;
   if (text) return text;
   const line = applies && changes.length > 0 ? shiftLinesOf(q, ctx.home).find((l) => l.said === null) : undefined;
@@ -203,7 +203,7 @@ export function textChange(c: { field: unknown; before: unknown; after: unknown 
 }
 
 /**
- * WHAT AN OPTION SAYS IT DOES ITSELF, drawn (C20): the rows its own patches move, by what they move to, and the money a
+ * WHAT AN OPTION SAYS IT DOES ITSELF, drawn: the rows its own patches move, by what they move to, and the money a
  * bank's tail files in the account it names. `null` when it says neither, or not in names.
  */
 function ownSaid(o: Record<string, unknown>): OptionVisual | null {

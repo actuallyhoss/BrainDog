@@ -1,6 +1,6 @@
 /**
  * `public-clean`: the repository carries no private name or figure, and the files a stranger reads about the licence say
- * what they must (LCH-C11).
+ * what they must.
  *
  *   node tools/gates/public-clean.mjs [root]
  *

@@ -14,7 +14,7 @@
  *     those arrivals from the inbox and asks for a pattern, acked as `{ question, body_kind: 'pattern', body }`;
  *   - a draft with `signal: 'ingest.unmatched'` is the same, its samples found by the shape its `subject` names;
  *   - any other `signal` (`search.empty`, `write.refused`, `query.scan`, dormant) is settled done with no model call,
- *     its sentence kept as a reading, and files no question (ENG-B17): a finding that changes nothing is not asked.
+ *     its sentence kept as a reading, and files no question: a finding that changes nothing is not asked.
  * A digest's prose is acked as `{ text }`, and `''` sends the digest as figures. An embedding is acked as
  * `{ model, dims, vectors }`, one vector for each text the hourly sweep queued, which the kernel writes to `entry_vec`.
  * A doubtful pair is acked as `{ verdicts: [{ hash, same, confidence }] }`, from the cache first (`understand.ts`).
@@ -60,7 +60,7 @@ export const BACKGROUND_JOBS_MONTH = 600;
  * row with purpose `headline`, which is how the meters below tell it from a skill draft, a digest's prose, a pattern or
  * an embedding.
  *
- * NO LONGER A WALL (ENG-A10). It was the most the headlines might spend, and everything else was held out of it: a 31st
+ * NO LONGER A WALL. It was the most the headlines might spend, and everything else was held out of it: a 31st
  * night whose figures moved kept its rules line while the month still had asks nobody was owed. What the headlines may
  * spend now is the plan's answer (`budget-plan.ts`): their floor always, and past it whatever is left once the floors
  * the others have not used are set aside.
@@ -87,7 +87,7 @@ export type AskPurpose = 'headline' | 'understand' | 'look' | 'skill' | 'prose' 
 export type WorkPurpose = Exclude<BudgetPurpose, 'headline' | 'understand' | 'compose'>;
 export type AskSpends = 'person' | 'background' | 'none';
 
-/** The kernel's job for a doubtful pair (`loop/contract-17.md`), migration 23's kind in `OUTBOX_KINDS`. */
+/** The kernel's job for a doubtful pair, migration 23's kind in `OUTBOX_KINDS`. */
 const RESOLVE: OutboxKind = 'infer.resolve';
 
 /** How many arrivals of one shape a finding's pattern is drafted from, the oldest of them, handed over oldest first. */
@@ -201,7 +201,7 @@ export type ModelJobsDeps = {
 };
 
 /**
- * How often a silent model is tried, by one call that leases no job (ENG-A04, `allowed`). Once that call is answered the
+ * How often a silent model is tried, by one call that leases no job (`allowed`). Once that call is answered the
  * pass runs as before; until then every job waits off the ladder with its attempts as they were.
  */
 export const MODEL_TEST_EVERY_MS = 30 * 60_000;
@@ -234,7 +234,7 @@ const warn = (line: string): void => console.error(line);
  * never reached and a failed attempt write `none` and cost the month nothing. An `embed` row is one embedding job, a
  * hundred rows in one call.
  *
- * ONE POOL WITH A FLOOR EACH, AND `share` SAYS WHOSE PART OF IT IS METERED (`budget-plan.ts`, ENG-A10). `headline` is the
+ * ONE POOL WITH A FLOOR EACH, AND `share` SAYS WHOSE PART OF IT IS METERED (`budget-plan.ts`). `headline` is the
  * page headlines and `understand` is reading who is who, each a purpose of its own. `work`, the default and what the
  * model-jobs pass is held to, is everything but the headlines, understanding among it as it always was counted, and it
  * carries understanding's meter, the meter of all the rest together (`REST`), and a meter for each purpose of the rest
@@ -500,7 +500,7 @@ async function samplesOfShape(api: ModelJobsApi, shape: string): Promise<Result<
 }
 
 /**
- * A finding no model is asked about, as the one line the pass logs (ENG-B17).
+ * A finding no model is asked about, as the one line the pass logs.
  *
  * KEPT AS A READING, NEVER FILED AS A QUESTION. It used to be a "Look into it / Not now" question signed by Slash whose
  * two answers changed nothing on the record, so every week asked him to choose between two ways of doing nothing. The
@@ -547,7 +547,7 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
   }
   if (samples.value.length === 0) return { state: 'done' };
 
-  /* NEVER A SEALED FIELD, A KEY OR A FILE'S BYTES (ENG-A09): an arrival holding one is left out whole, and the pattern
+  /* NEVER A SEALED FIELD, A KEY OR A FILE'S BYTES: an arrival holding one is left out whole, and the pattern
      is drafted from the others. With none left there is nothing to draft from, and a retry reads the same arrivals. */
   const clean = samples.value.filter((sample) => neverSent(sample) === null);
   if (clean.length < samples.value.length) {
@@ -556,7 +556,7 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
   }
   if (clean.length === 0) return { state: 'done' };
 
-  /* THE THREE OLDEST OF HOW MANY WAIT (ENG-B07): the engine sends the oldest three by `ts` and names the count; the
+  /* THE THREE OLDEST OF HOW MANY WAIT: the engine sends the oldest three by `ts` and names the count; the
      kernel's payload says `waiting` (`ingest.ts` `propose`), and a shape read here counts its own. */
   /* AND ONLY WHERE SLASH MAY ASK (ENG-B17 job 4): the floor and the brake (`mayPropose`) are asked before the model,
      because what it drafts is filed as Slash's question by the ack. Held, nothing is sent and nothing filed; the pass
@@ -578,7 +578,7 @@ async function settleProse(inference: ModelJobInference, job: OutboxRow, log: (l
   } catch {
     return { state: 'done', result: { text: '' } };
   }
-  /* A DIGEST HOLDING WHAT IS NEVER SENT GOES OUT AS ITS FIGURES (ENG-A09), as one the model refused does. */
+  /* A DIGEST HOLDING WHAT IS NEVER SENT GOES OUT AS ITS FIGURES, as one the model refused does. */
   const held = neverSent(digest);
   if (held !== null) {
     log(`model job ${job.id}: its digest held ${WITHHELD[held]} and was not sent to the model, so it goes out as its figures.`);
@@ -597,7 +597,7 @@ async function settleEmbed(embed: NonNullable<ModelJobEmbed['embed']>, job: Outb
   const texts = payloadOf(job)?.texts;
   /* A JOB NOBODY CAN READ HAS NOTHING TO EMBED, and a retry reads the same bytes: done, with nothing on it. */
   if (!Array.isArray(texts) || texts.length === 0 || !texts.every((t) => typeof t === 'string')) return { state: 'done' };
-  /* A TEXT HOLDING WHAT IS NEVER SENT IS NOT EMBEDDED (ENG-A09): its place is kept by `NOT_SENT_TEXT`, so the rows
+  /* A TEXT HOLDING WHAT IS NEVER SENT IS NOT EMBEDDED: its place is kept by `NOT_SENT_TEXT`, so the rows
      beside it are still indexed and it is found by none of its own words. */
   const sent = (texts as string[]).map((t) => (neverSent(t) === null ? t : NOT_SENT_TEXT));
   const kept = sent.filter((t, i) => t !== texts[i]).length;
@@ -668,7 +668,7 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
 
   if (inference === undefined) return false;
 
-  /* THE CONSENT RULE BEFORE THE QUEUE (ENG-A09). Every job this pass serves spends `background`, so one answer covers
+  /* THE CONSENT RULE BEFORE THE QUEUE. Every job this pass serves spends `background`, so one answer covers
      the drafts, the prose, the pairs, the embeddings and the notes, and it is asked before the meter, the health and
      the model's test, none of which a pass that may not think has any use for. Said once, and again after he turns it
      back on and off. */
@@ -695,7 +695,7 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     return false;
   }
 
-  /* A SILENT MODEL LEASES NO WRITING JOB (ENG-A04): an outage once spent each job's eight attempts in four hours and filed
+  /* A SILENT MODEL LEASES NO WRITING JOB: an outage once spent each job's eight attempts in four hours and filed
      it as a question. Leasing none leaves them `pending` with their attempts as they were, and the notes wait too. The
      embeddings go on: health speaks for the model that writes, and another model embeds. */
   const silent = (await allowed(deps, api.kernel, inference, now, log)) === 'none';
@@ -800,7 +800,7 @@ export function embedRoom(meter: ModelJobMeter, now: number, leased: BudgetSpent
   return own === undefined ? spare : Math.min(spare, own.cap - own.spent(month));
 }
 
-/* ── A search's words as a vector (ENG-B18) ───────────────────────────────────────────────────── */
+/* ── A search's words as a vector ───────────────────────────────────────────────────── */
 
 /**
  * What a search by meaning is handed for its query: the vector, or why there is none. `off` is his switch, `spent` is
@@ -823,7 +823,7 @@ const foldQuery = (q: string): string => q.trim().replace(/\s+/gu, ' ').toLowerC
  * The record's one guarded path from a search's words to a vector, or `undefined` where the host cannot embed.
  *
  * IN THIS ORDER, AND EACH STEP SENDS NOTHING WHEN IT SAYS NO: the query is folded, and empty or past `QUERY_CHARS_MOST`
- * is `failed`; his switch (`mayThink('embed')`, ENG-A09) off, or not readable, is `off`, even for a query kept from
+ * is `failed`; his switch (`mayThink('embed')`) off, or not readable, is `off`, even for a query kept from
  * before; a query asked within the day is answered from memory with no call and no ledger row; no room in the month (`embedRoom`) is `spent`; then one
  * call of one text, and one vector of the width it states is `ok` and is kept. The call goes through the host's
  * engine, which writes its ledger row, so `backgroundMeter` and the vital signs count it as an embedding.

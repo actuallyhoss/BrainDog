@@ -84,7 +84,7 @@ test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
      other records reach for and nowhere here: see `activity.test.ts` for the rest of that comparison.
      `triage` is the sixteenth, the one tool the ceiling was raised for. `undo` is the seventeenth: it takes back one of the
      caller's own writes by the batch its receipt gave, which is what lets an agent put right what it just wrote. `understand` was a seventeenth
-     and is the resource `braindog:understand` now (AGT-B05, "keep the 16"): it takes nothing and writes
+     and is the resource `braindog:understand` now ("keep the 16"): it takes nothing and writes
      nothing, and its words paid for `op_id` on `create` and `update`.
 
      `instructions` CAME AND `schema` AND `history` WENT INTO `record_index` AND `get` (agents and MCP plan §6.1, 12a): what
@@ -880,7 +880,7 @@ test('AND A NAME OFF `Object.prototype` IS NOT A TOOL, it is a refusal', async (
   sql.close();
 });
 
-/* ── what the record would link: a resource, once the seventeenth tool (AGT-B05) ── */
+/* ── what the record would link: a resource, once the seventeenth tool ── */
 
 test('UNDERSTAND IS A RESOURCE THAT READS THE PLAN IN NAMES, held a minute, and passes on nothing that acts', async () => {
   const slice = {

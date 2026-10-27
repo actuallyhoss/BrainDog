@@ -26,7 +26,7 @@ import { EXTRA_ROUTES } from './routes/index.ts';
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveKeychain, servesKeychain, KEYCHAIN_HEADERS, keychainReply, type KeychainAsk, type KeychainDoor, type KeychainGrantSeen, type KeychainTokenAsk } from './keychain.ts';
 export { keysReply, purposeOf, sealedUnderOf, serveKeys, servesKeys, type KeysAsk, type KeysDoor, type SealedUnder } from './keys.ts';
-/* THE SHAPE DOOR (PRF-A13), for the keychain door's reason: both hosts take the whole surface from this one module. */
+/* THE SHAPE DOOR, for the keychain door's reason: both hosts take the whole surface from this one module. */
 export { SHAPE_HEADERS, serveShape, servesShape, type ShapeDoor } from './shape.ts';
 /* `POST /api/slash/read` IS A DOOR AND NOT A ROW IN `ROUTES`, and `slash-ask.ts` carries the measurement: `ROUTES` is the
    record's surface, `tools/gates/guards.mjs` looks for every routed name as a method of `packages/record/src/index.ts`, and
@@ -39,7 +39,7 @@ export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, t
    app imports, so both hosts built the record without it and every press stayed unmetered.
    `apps/worker/test/slash-press-metered.test.ts` is the press on the Worker that shows it wired. */
 export { slashDayStop, slashRecordMeter, type SlashLedgerDeps, type SlashRecordMeter } from './slash-ask.ts';
-/* THE ENGINE'S HEALTH, for the same reason: both hosts build the read and hand it to the record (ENG-A02). */
+/* THE ENGINE'S HEALTH, for the same reason: both hosts build the read and hand it to the record. */
 export { engineHealthRead, type EngineFacts, type EngineHealth, type EngineHealthDeps, type EngineHealthFns, type EngineHealthRead, type EngineSaid } from './engine-health.ts';
 export { engineProbeOf, probeWireOf, NO_MODEL as ENGINE_PROBE_NO_MODEL, type EngineProbe, type EngineProbeCandidate, type EngineProbeDeps } from './engine-probe.ts';
 export { engineLedgerRead, mentionsAttached, type EngineLedger, type EngineLedgerCall, type EngineLedgerDeps } from './engine-ledger.ts';
@@ -146,7 +146,7 @@ export const UNROUTED = [
   /* The key doors' record half: `keychain.ts` calls them after `keychainGrant`, with sealed bytes only. */
   'depositGrant',
   'openForGrant',
-  /* The shape door's record half (PRF-A13): host shape.ts hands it the bearer, and it reads the grant before a row. */
+  /* The shape door's record half: host shape.ts hands it the bearer, and it reads the grant before a row. */
   'shapeGrant',
   'shapeExport',
   /* `operationGrant`, `signingKey`, `restored` AND `mintChild` ARE INTERNAL TOO AND ARE NOT LISTED YET. `router-groups.mjs`
@@ -216,7 +216,7 @@ const NOT_422: Readonly<Record<string, number>> = {
      short with `FORBIDDEN` and the remedy in the sentence, so its row here went with it rather than
      staying on as a status for a code nothing emits. */
   LEVEL_REQUIRED: 403,
-  /* A RUN HE STOPPED OR PAUSED: the same call is refused until he resumes it, so retrying is no answer (plan §2.4). */
+  /* A RUN HE STOPPED OR PAUSED: the same call is refused until he resumes it, so retrying is no answer. */
   RUN_STOPPED: 403,
   RUN_PAUSED: 403,
   /* A KEY SET TO ASK FIRST: the owner has been asked, and the same call opens it once he allows the machine. */
@@ -302,7 +302,7 @@ export type RecordSurface = {
   page(args: never, ctx: never): Promise<Result<unknown>>;
   metric(args: never, ctx: never): Promise<Result<unknown>>;
   figures(ctx: never): Promise<Result<unknown>>;
-  /** OPTIONAL as `scriptTry` is: the agent door's list of resources in one read (AGT-B04). */
+  /** OPTIONAL as `scriptTry` is: the agent door's list of resources in one read. */
   offered?(ctx: never): Promise<Result<unknown>>;
   listGrants(ctx: never): Promise<Result<unknown>>;
   revokeGrant(args: never, ctx: never): Promise<Result<unknown>>;
@@ -558,7 +558,7 @@ export const previewOf = (ctx: unknown): string | null => {
   return typeof as === 'string' && as !== '' ? as : null;
 };
 
-/** The one answer to a change asked while seeing as somebody (sharing plan §3.3). */
+/** The one answer to a change asked while seeing as somebody. */
 export const PREVIEW_READ_ONLY: Refusal = { code: 'FORBIDDEN', fix: "You're seeing the record as somebody else. Exit See as to change things.", at: 'preview' };
 
 /**
@@ -729,7 +729,7 @@ export async function serveApi(
   if (name === READS) return readsAnswer(handler, handlers, args, ctx);
   try {
     const out = await handler(args, ctx);
-    /* THE FIREWALL (sharing plan §2.5 item 6): a field hidden from this caller still on a row of the answer is taken off
+    /* THE FIREWALL: a field hidden from this caller still on a row of the answer is taken off
        here and raised as fault `lens.firewall` naming the method, so a path that forgot to mask is found, never leaked. */
     const held = firewall(ctx, out);
     if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);

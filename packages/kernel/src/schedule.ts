@@ -603,7 +603,7 @@ function fail(sql: Sql, deps: AckDeps, row: Claimed, error: string, attempts: nu
     );
     return;
   }
-  /* THE END OF IT IS A FAULT, NEVER A QUESTION (AGT-C06), the outbox's reason: a scheduled thing that cannot run is an
+  /* THE END OF IT IS A FAULT, NEVER A QUESTION, the outbox's reason: a scheduled thing that cannot run is an
      operator's to fix, and asking the owner to retry it or change what produces it asked him for something he cannot
      do. One `schedule#<kind>` however many rows of the kind fail, cleared when one of the kind next runs. */
   sql.exec("UPDATE schedule SET state = 'failed', attempts = ? WHERE id = ?", attempts, row.id);

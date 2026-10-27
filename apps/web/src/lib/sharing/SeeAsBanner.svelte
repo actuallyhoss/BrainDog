@@ -1,5 +1,5 @@
 <!--
-  The one line over every screen while the record is seen as somebody (sharing plan §3.3): "Seeing as Priya. Nothing
+  The one line over every screen while the record is seen as somebody: "Seeing as Priya. Nothing
   you do here counts. Exit." Exit loads the page again as yourself (`see-as.svelte.ts`).
 
   THE ONE BANNER (`Banner.svelte`, 2.A.17), on the warn fill, as offline is: a mode in which nothing he does counts, which

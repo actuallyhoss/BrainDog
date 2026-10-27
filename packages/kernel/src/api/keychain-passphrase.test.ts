@@ -219,7 +219,7 @@ test('A SLOW CHANGE MADE AGAINST A PASSPHRASE SINCE REPLACED IS A CONFLICT, AND 
 });
 
 test('A RECORD WITH NO KEY OF ITS OWN SAYS LOCKING IS NOT ON THIS BRAINDOG, never that its keys hold no value', async () => {
-  /* AUDIT 25 OCTOBER, X24: the keychain drew "6 keys. 3 have no value yet." over "Keys here have no stored value yet, so
+  /* The keychain drew "6 keys. 3 have no value yet." over "Keys here have no stored value yet, so
      there is nothing to lock", a sentence about the record's own key said as a fact about his. */
   const { x, sql } = await keychain();
   sql.exec("DELETE FROM vault_key WHERE purpose = 'record'");

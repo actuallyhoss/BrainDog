@@ -92,7 +92,7 @@
           <span class="runs-mark">{#if line.agent}<AgentMark kind={agentKindOf(line.agent)} size="s" />{:else}<Icon name={kindIcon(line.kind)} size="s" />{/if}</span>
           {#if line.path}<a class="runs-name" href={at(line.path)} title={line.name}>{line.name}</a>{:else}<span class="runs-name" title={line.name}>{line.name}</span>{/if}
           <span class="runs-end">
-            <!-- ONE FORMAT FOR EVERY ROW (the pass of 27 October): how many times as a chip where it ran more
+            <!-- ONE FORMAT FOR EVERY ROW: how many times as a chip where it ran more
                  than once, its project as a chip, then how it ended and when, in two words. -->
             {#if (line.times ?? 1) + n - 1 > 1}<span class="runs-proj num">{((line.times ?? 1) + n - 1).toLocaleString('en')} times</span>{/if}
             {#if project}<span class="runs-proj">{project}</span>{/if}

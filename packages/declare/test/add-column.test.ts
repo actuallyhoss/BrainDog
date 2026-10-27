@@ -1,5 +1,5 @@
 /**
- * A column one pack adds to another pack's block, read off its manifest (`add-column.ts`, PGS-C29): what reads, and
+ * A column one pack adds to another pack's block, read off its manifest (`add-column.ts`): what reads, and
  * each refusal the reader makes. Invented pages and packs only.
  */
 

@@ -1,5 +1,5 @@
 /**
- * HOW LONG AN OFFER WAITS, ON THE CARD (ENG-B14, "every proposal states a deadline"): an arrangement whose body holds a
+ * HOW LONG AN OFFER WAITS, ON THE CARD ("every proposal states a deadline"): an arrangement whose body holds a
  * real `lapses` day says, in one quiet line, the last day it waits; one without draws what it always drew. It promises
  * no taking back, because nothing takes an offer back by itself yet.
  */

@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 35: the repeats held before their mark was kept get it now (audit-35, finding 3).
+ * The kernel schema, migration 35: the repeats held before their mark was kept get it now (audit-35).
  *
  * A TEXT SKIPPED AS A REPEAT IS MARKED BY ITS `match` LINE: `field: 'repeats'`, the row it repeats as `from_v`, by the
  * pattern that read it as `ingest:<pattern>` (`ingest.ts`'s skip). Before that line was written, a skip kept only its

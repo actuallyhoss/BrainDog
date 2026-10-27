@@ -116,7 +116,7 @@ test('a filed arrangement carries its rank and the day it lapses, and a lapse cl
 
 test('the kernel\'s scale keeps the queue\'s order, and only an arrangement with a day carries it', () => {
   assert.ok(filedRank(TIER.page + WITHIN_MOST) <= FILED_RANK_MOST, 'within what the kernel takes');
-  /* THE SCALE A RANK WAS FILED ON BEFORE THE SHAPE TIER WENT (C11): a page offer reads the same as it did. */
+  /* THE SCALE A RANK WAS FILED ON BEFORE THE SHAPE TIER WENT: a page offer reads the same as it did. */
   assert.equal(filedRank(TIER.page), 664);
   assert.equal(filedRank(TIER.page + WITHIN_MOST), 829);
   assert.ok(filedRank(Number.MAX_SAFE_INTEGER) <= FILED_RANK_MOST);

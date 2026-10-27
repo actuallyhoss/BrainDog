@@ -19,7 +19,7 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
   name: 'Bills and invoices',
   icon: 'obligation',
   /* `bill or invoice`, because half of these are owed to you and half by you: `bill` is wrong for an invoice you sent
-     and `invoice` is wrong for a tax payment. It was `item` until the UI pass of 20 October (P25), and the button said
+     and `invoice` is wrong for a tax payment. It was `item` until the redesign (P25), and the button said
      "Add an item" on a list whose name says what it holds. */
   one: 'bill or invoice',
   holds: 'the bills you are to pay and the invoices you are to be paid, each with a day and a currency',
@@ -124,7 +124,7 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
        it when the row is marked paid (`finished:` above). */
     { id: 'settled', label: 'Paid on', type: 'day' },
     /**
-     * HOW MUCH OF IT IS PAID (REC-B11). "Part paid" was a status with no amount behind it. Money's `settle` script
+     * HOW MUCH OF IT IS PAID. "Part paid" was a status with no amount behind it. Money's `settle` script
      * writes the sum of the payments that name this bill in "Settles", in the bill's own currency, and marks it paid
      * when the sum reaches the amount. Empty on a bill no payment has been matched to. Not indexed: nothing filters on it.
      */

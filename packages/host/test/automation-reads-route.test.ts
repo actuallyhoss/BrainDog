@@ -1,8 +1,8 @@
 /**
- * OPENING AN AUTOMATION SENDS NO WRITE (the audit of 25 October, Z37).
+ * OPENING AN AUTOMATION SENDS NO WRITE.
  *
  * WHAT WAS WRONG. The live look of his record blocked `checkAutomation` three times on an automation's page
- * (`loop/proof/looks/audit-2026-10-25/said.json`, `automations-id`): the page checks the body it draws, the route table
+ * (`automations-id`): the page checks the body it draws, the route table
  * marked the check a write, and a reader seeing as somebody, or a read-only token, was refused it. It installs nothing,
  * as `automationSentence` keeps nothing, so both are reads sent as a POST (`postRead`), as `previewPage` is. A try
  * writes inside its rehearsal, and stays a write.

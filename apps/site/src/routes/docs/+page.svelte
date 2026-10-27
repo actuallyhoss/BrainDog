@@ -23,7 +23,7 @@
 
   const w = docsWords;
 
-  /* THE CARDS IN COLUMNS, so a short card never leaves a hole beside a long one (site F19): Start here across the
+  /* THE CARDS IN COLUMNS, so a short card never leaves a hole beside a long one: Start here across the
      top, then the sections as three columns of about the same height at a desk, each column's cards one under another.
      A section not named here goes in the last column. */
   const COLUMNS: readonly (readonly string[])[] = [['start'], ['use', 'api'], ['agents', 'dialect'], ['packs']];

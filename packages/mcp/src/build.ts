@@ -1,5 +1,5 @@
 /**
- * The oldest `braindog` command this door still works with (AGT-A02), as the day of its build: `YYYY.MM.DD`.
+ * The oldest `braindog` command this door still works with, as the day of its build: `YYYY.MM.DD`.
  *
  * A DAY AND NOT A WHOLE BUILD. A build is `YYYY.MM.DD+<hash>` (`apps/cli/scripts/bundle.mjs`, `TUPLE`), and the day orders
  * two builds where the hash does not. So a command from a day before this one is behind; one built the same day is not,

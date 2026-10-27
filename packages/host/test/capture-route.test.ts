@@ -1,5 +1,5 @@
 /**
- * `capture` (use case 6 step 5, EXP-D10): routed once from `routes/`, DATA beside `create`, a POST handed to the record
+ * `capture` (use case 6 step 5): routed once from `routes/`, DATA beside `create`, a POST handed to the record
  * method of the same name with the body as sent, and answered `NOT_IN_THIS_BUILD` by a record built before it, never a
  * 500. Over HTTP to the method file on a real kernel: three entries come back under one batch, and one Undo takes them.
  */

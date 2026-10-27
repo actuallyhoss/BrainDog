@@ -9,7 +9,7 @@
  *
  * IN PEOPLE, BECAUSE PEOPLE IS THE ADD-ON NEARLY EVERY RECORD HOLDS: onboarding installs it for the person's own row even
  * where the use case names no module (`usecases/student.ts`). Which add-on every record holds is still an open question
- * of the scope (`loop/scope/area-proof-a.md`, its unknowns), and moving the page is one `pack:` and a version.
+ * of the scope (its unknowns), and moving the page is one `pack:` and a version.
  *
  * ONLY BLOCK KINDS THAT EXIST, AND NO LOOK OF ITS OWN (the unit's critic, rule 7): a lead sentence and three groups of
  * cards. The strip of the last seven days, and anything drawn only for Health, wait for a board he has said yes to.
@@ -18,7 +18,7 @@
  * whose red signs link here (`apps/web/src/routes/settings/[area]/health.ts`), and from the page resource agents read.
  *
  * TODAY'S LINE IS NOT DECLARED HERE. One line on Today while a sign is red, gated on `signs-red` above 0, is `signsLine`
- * in `apps/web/src/lib/home/default-home.ts` (`area-proof-a.md`, PRF-A05).
+ * in `apps/web/src/lib/home/default-home.ts` (`area-proof-a.md`).
  */
 
 import type { SeedPage } from './base.ts';

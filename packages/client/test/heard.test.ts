@@ -1,5 +1,5 @@
 /**
- * `client.heard` LEAVES ONE MARK ON THE AGENT DOOR (AGT-B01), as a POST to the record method `heard`, with the mark's
+ * `client.heard` LEAVES ONE MARK ON THE AGENT DOOR, as a POST to the record method `heard`, with the mark's
  * own keys and nothing else.
  *
  * WHY THE KEYS MATTER. The record refuses any key a mark does not have (`packages/record/src/methods/door.ts`), so a

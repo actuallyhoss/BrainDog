@@ -29,7 +29,7 @@ export type SessionHints = {
   client_version?: string | undefined;
   /** The run a subagent works for, by its spoken id, `S5`, as the command line sends it for a run started inside another. */
   parent?: string | undefined;
-  /** The command line's own build, `2026.10.09+abc1234`, as every call it makes says it (AGT-B01). */
+  /** The command line's own build, `2026.10.09+abc1234`, as every call it makes says it. */
   cli?: string | undefined;
   /**
    * How many commits HEAD moved since the last handoff here, `12`, as the start hook counts them: a whole number from 0

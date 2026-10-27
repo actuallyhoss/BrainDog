@@ -1382,7 +1382,7 @@ export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
   if ('written' in d.trigger && d.trigger.written.fields?.length) {
     const w = d.trigger.written;
     const p = writtenParts(w, listSaid);
-    /* ONE FIELD, AND ONE CLAUSE SAYING WHAT IT IS SET TO, IS ONE EVENT (audit B of 25 October, Y14): "When an item in Bills
+    /* ONE FIELD, AND ONE CLAUSE SAYING WHAT IT IS SET TO, IS ONE EVENT: "When an item in Bills
        and invoices is changed, only when Status changes, Status is paid" said it three times. A delete sets nothing. */
     const set = w.fields?.length === 1 && !(w.op ?? []).includes('delete') ? new RegExp(`^${escaped(p.changes)} is (?!not |set$|empty$)([^,]+)$`, 'u').exec(cond) : null;
     if (set && !/\s(?:and|or)\s/u.test(set[1]!)) return `When an item in ${w.register ? (listSaid ?? ((id: string) => id))(w.register) : 'a list'} has its ${p.changes} set to ${set[1]}${p.rules}`;

@@ -1,5 +1,5 @@
 /**
- * The page lint: what a drawn page prints that a person should never read (PRF-A04, scope 2.3).
+ * The page lint: what a drawn page prints that a person should never read (scope 2.3).
  *
  * PURE, AND OVER WHAT WAS DRAWN, not over the source. His project pages printed `{{revenue.monthly}}`
  * from a chips fence and "monthly —" from a stat fence (`evidence-own-record.md` 2.1): two faults in
@@ -22,7 +22,7 @@
  *   row, list item and entity) hold the product's words, not his, and the rules that would flag an
  *   engineer's prose (a commit hash, `user_id` in a sentence) read only the figure slots there.
  *
- * AND THREE THE HOST CAN GIVE, for what the drawn words alone cannot say (EXP-B07):
+ * AND THREE THE HOST CAN GIVE, for what the drawn words alone cannot say:
  * - `heading`: the part is a title or a heading, a name and never a sentence, so a full stop at its end is a finding.
  * - `buttons`: the words of the buttons the part offers beside its HTML (an answer's actions). A `<button>` drawn in
  *   the HTML is read without being given.
@@ -32,7 +32,7 @@
  * THE PRINT RULES OF THE WORDS (EXP-B07 job 3) sit beside the drawing rules. `long-dash` in the scope is `em-dash`
  * here, the rule that was already the page's; it keeps its name, since the sign and the gates already say it.
  *
- * MONEY IS WRITTEN ONE WAY (EXP-B06): `two-spellings` finds one currency drawn by its sign and by its code in one part,
+ * MONEY IS WRITTEN ONE WAY: `two-spellings` finds one currency drawn by its sign and by its code in one part,
  * "E£1,086,213" beside "EGP 1,238,407.62" on his Today, and one amount written with and without its minor digits.
  */
 

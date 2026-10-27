@@ -1,8 +1,8 @@
 /**
- * ENG-B14 job 2: one recommender and one queue (`loop/scope/area-engine-b.md`, decision 5).
+ * ENG-B14 job 2: one recommender and one queue.
  *
  * WHAT THE OWNER'S RECORD SHOWED: "4 suggested" in the rail, seven on the Slash page, two of them for things that already
- * had a page, and offers unanswered for five days. These hold the rules that end it: no navigation shape is offered (C11), a
+ * had a page, and offers unanswered for five days. These hold the rules that end it: no navigation shape is offered, a
  * thing with a page as drawn is never offered one, three arrangement offers wait at most and each says the day it lapses,
  * and an offer turned down stays down until what it rested on moves.
  */

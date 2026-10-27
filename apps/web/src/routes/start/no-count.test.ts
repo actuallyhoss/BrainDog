@@ -1,5 +1,5 @@
 /**
- * No first-run screen counts the build (use case 6, steps 2 to 4; USE-B07): no progress bar, no `.bar`, and no "N of M".
+ * No first-run screen counts the build (use case 6, steps 2 to 4): no progress bar, no `.bar`, and no "N of M".
  * A part left off is not a step behind, and a bar that fills says the person has work left that they do not.
  *
  * Read off the source of every file under `routes/start` and `routes/signup`, and off the words those screens say,

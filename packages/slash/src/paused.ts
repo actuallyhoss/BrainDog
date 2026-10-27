@@ -1,5 +1,5 @@
 /**
- * Whether a route's candidate is passed over, read from its own last rows in Slash's ledger (ENG-A06).
+ * Whether a route's candidate is passed over, read from its own last rows in Slash's ledger.
  *
  * WHY THIS FILE EXISTS. The walk (`call.ts`, `core.run`) asked a model that kept failing first on every ask and waited for
  * it to fail again before it asked the next. A model that keeps failing is now skipped at once: three failures in ten

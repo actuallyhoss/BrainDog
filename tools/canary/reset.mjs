@@ -1,6 +1,6 @@
 /**
  * The canary put back, once a week: the lived `default` profile imported again with replace, through the product's own
- * doors (`loop/scope/area-proof-a.md`, PRF-A09 job 5).
+ * doors (PRF-A09 job 5).
  *
  *   node tools/canary/reset.mjs
  *

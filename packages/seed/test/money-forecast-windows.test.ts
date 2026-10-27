@@ -1,6 +1,6 @@
 /**
  * Cash ahead opens on the next twelve weeks (ten until money-core 3.27.0), on Money and on a book's page, with every longer length one press away
- * (REC-B08, its windows).
+ * (its windows).
  *
  * WHAT WAS WRONG. Money's Cash ahead opened on three months and a book's on a whole year, so the first thing a person
  * saw of a book was a line twelve months long, most of it a plan nobody acts on yet. Ten weeks is the span a person acts

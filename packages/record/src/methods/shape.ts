@@ -1,5 +1,5 @@
 /**
- * The shape copy, the record's half: `shapeGrant` and `shapeExport`, both INTERNAL (PRF-A13, `area-proof-a.md`).
+ * The shape copy, the record's half: `shapeGrant` and `shapeExport`, both INTERNAL (`area-proof-a.md`).
  *
  * WHAT A SHAPE GRANT OPENS IS ONE THING. A device grant of reach `shape`, approved once by the owner with six digits,
  * lives ninety days and is not spent on use (`shapeGrant` in the kernel's `device.ts`). Its bearer is held on

@@ -236,7 +236,7 @@ test('a finder another part registers is run with the rest, and asks at most one
   assert.deepEqual(tidy(deps, [idle]), [{ finder: 'idle-things', stale: 0, did: 0, asked: null }]);
 });
 
-/* ── the hourly pass (AGT-C18, the direction audit's claim 2) ───────────── */
+/* ── the hourly pass (the direction audit's claim 2) ───────────── */
 
 const HOUR = 3_600_000;
 const kept = (sql: NodeSql, finder: string) =>

@@ -1,5 +1,5 @@
 /**
- * WHICH WAY A ROW'S AMOUNT WENT (the audit of 25 October, Y19). On a phone the ledger's amounts carried no sign, so an
+ * WHICH WAY A ROW'S AMOUNT WENT. On a phone the ledger's amounts carried no sign, so an
  * Apple bill, three Amazon lines and a salary paid in read alike. A list's amount says it as Money's page does: money out
  * is "−EGP 279.03" and money in "+EGP 600.00", in the same ink, the sign being a word on the figure and never a colour.
  *

@@ -15,7 +15,7 @@
  * relative `.ts` imports at their sources, `.svelte` imports at their compiled neighbours, and `$lib/launch.ts` at a
  * module that exports the test's copy of `LAUNCH`.
  *
- * WHILE BILLING IS OFF THE PAGE IS THE EARLY ACCESS PAGE (D2, 20 October): one plan at $0, a tile that says paid
+ * WHILE BILLING IS OFF THE PAGE IS THE EARLY ACCESS PAGE (20 October): one plan at $0, a tile that says paid
  * plans come later, and three questions, with no paid plan's name or price. The plans page is what it draws with
  * billing on, and both are rendered here.
  *

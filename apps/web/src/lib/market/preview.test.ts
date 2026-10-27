@@ -1,5 +1,5 @@
 /**
- * A store preview draws an add-on's pages before the record holds its lists (audit C of 25 October, X11): the add-on's
+ * A store preview draws an add-on's pages before the record holds its lists: the add-on's
  * own list declarations are lent to the drawing and taken back, so no part says it "cannot be drawn from the record yet"
  * and no list the record does not hold is left behind for the rest of the tab to offer.
  */

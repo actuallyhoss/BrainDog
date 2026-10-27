@@ -1,5 +1,5 @@
 /**
- * Each floor of the budget's plan holds alone (ENG-A10, budget-plan-86#6, the host's half).
+ * Each floor of the budget's plan holds alone (budget-plan-86#6, the host's half).
  *
  * SIX KINDS OF WORK WERE ONE POOL. A digest's prose, a pattern, an embedding and a skill draft were all written with
  * purpose `look`, so the meters could only hold them as one pool with one floor, and the busiest of them took it: a

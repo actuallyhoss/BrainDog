@@ -1,5 +1,5 @@
 /**
- * `boot`'s `copies`, said as Settings says them (LCH-C03).
+ * `boot`'s `copies`, said as Settings says them.
  *
  * THE SHAPE IS THE RECORD'S AND NOT WRITTEN HERE TWICE: `{ last_copy_at, last_copy_bytes, last_export_at }`, each
  * possibly `null`, as `packages/kernel/src/copies.ts` answers it. The cases are the ones a screen can meet: a copy in
@@ -73,7 +73,7 @@ test('no line carries an em dash or an id', () => {
   for (const line of lines) assert.doesNotMatch(line, /\u2014|#\d|[0-9A-HJKMNP-TV-Z]{26}/, line);
 });
 
-/* THIS HOST'S LAST RESTORE TEST (LCH-C04): `GET /account/drill`, `{ ok, value: { at, pass, record_copies } | { at: null } }`. */
+/* THIS HOST'S LAST RESTORE TEST: `GET /account/drill`, `{ ok, value: { at, pass, record_copies } | { at: null } }`. */
 
 const D = 24 * H;
 /** A door that answers `status` with `body`, and keeps the address it was asked. */

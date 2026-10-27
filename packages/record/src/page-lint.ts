@@ -1,5 +1,5 @@
 /**
- * A record lints its own pages (PRF-A04, scope 2.3): each page it can draw, drawn on its own data, read by render's rules.
+ * A record lints its own pages (scope 2.3): each page it can draw, drawn on its own data, read by render's rules.
  *
  * WHAT THE HOST CAN DRAW. The conversion from an answer to drawn blocks lives in the web app, above the host, so this
  * sees two things and not the app's formatting of an ordinary block (the scope's stated limit): the documents a block
@@ -58,7 +58,7 @@ export type PageLintDeps = {
  * Whether a closed value with no name of its own still reads as a word once the web draws it (`claude`, `daily`,
  * `owed_to_me` as "owed to me"), or is a key a reader cannot read (`vm`, `mrr`, `tier2`): three letters or fewer, or
  * holding a digit. THE WEB SAYS AN UNNAMED VALUE AS ITS WORDS, in lower case as every value mid-line is, so only the
- * second kind prints a key where a name goes (C38: his record's agents, roles and schedules read as words).
+ * second kind prints a key where a name goes (his record's agents, roles and schedules read as words).
  */
 export const unworded = (key: string): boolean => {
   const letters = key.replace(/[_-]+/gu, '');
@@ -146,7 +146,7 @@ const TYPED_FORM = /^(?:date|day|until|ago|money|quantity|pct|ref):(?=[A-Za-z])/
 /**
  * A LEAD NOTE AS THE WEB DRAWS IT (`page-live.ts`): the model's line when the record sent one, else the body with every
  * clause whose figure did not read taken out (`metrics.ts` `leadOf`), so a hole there is never printed. Read whole, a
- * lead counted the holes of the clauses the web drops (C38: Money's "first, first amount, first due" on his record).
+ * lead counted the holes of the clauses the web drops (Money's "first, first amount, first due" on his record).
  */
 export function leadDrawn(body: string, values: BlockResult['values'], modelSaid?: unknown): string {
   if (typeof modelSaid === 'string' && modelSaid.trim() !== '') return modelSaid;
@@ -259,7 +259,7 @@ export function blockCells(b: BlockResult, name: string | null, typesOf?: TypesO
      would read here as raw: the block is not read rather than read wrong. */
   if (!typesOf && !b.types) return { parts: [], read: 0, unread: 0 };
   /* THE LIST BY ITS ID: a block names it `register.<id>` and the record's declarations are keyed by the id, so asked as
-     the block names it every declared instant read as a raw time (C38: ten of the twenty findings on his record). A
+     the block names it every declared instant read as a raw time (ten of the twenty findings on his record). A
      computed source over one list's rows (`sessions.working`) is that list's. */
   const list = listOfBlock(b);
   const declared = list !== null && typesOf ? typesOf(list) : null;
@@ -441,7 +441,7 @@ function lintReading(round: PageLintRound): PagesCleanReading {
 export type KeptFinding = { page: string; slug: string | null; part: string; said: string };
 
 /**
- * THE NIGHT'S WHOLE ROUND, KEPT (C39, "never hide a fault"). The sign carries six facts, because a reading is a few
+ * THE NIGHT'S WHOLE ROUND, KEPT ("never hide a fault"). The sign carries six facts, because a reading is a few
  * lines (`FACTS_MOST`, the kernel's own limit), so a round of twenty findings showed six and said nothing of the rest.
  * The round is kept whole beside it, and Settings › Health lists every finding from it (`textFaults`' `printed`).
  */

@@ -1,5 +1,5 @@
 /**
- * The seven-day hold (PRF-A18, scope 2.7): days in a row to yesterday on which every hold sign read green. Seven green
+ * The seven-day hold (scope 2.7): days in a row to yesterday on which every hold sign read green. Seven green
  * days read 7; a red, a `none` or a missing reading ends the run; a changed threshold ends it at the change; today is
  * never counted; the automation signs never touch it; and the hold's names are the closed list's names.
  */

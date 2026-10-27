@@ -47,7 +47,7 @@ test('rows sit a pitch apart and the values are anchored at the right edge', () 
   assert.equal(g.rows[0]?.value, '9,800');
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z29 (`automations-390-light.png`, Runs this month): held to two fifths, "File a Ledger entry
+/* Held to two fifths, "File a Ledger entry
    in its account's book" ran on under its bar and the bar was drawn over it. A label that does not fit two fifths puts
    every label over its bar, so no bar starts before its label ends. */
 test('A LABEL TOO LONG FOR TWO FIFTHS GOES OVER ITS BAR, so no bar is drawn over its words', () => {

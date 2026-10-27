@@ -4,7 +4,7 @@
  *   node tools/gates/core-names.mjs [root]
  *
  * THE DIRECTION'S WORDS: nothing in `packages/` or `apps/` names one person's bank, their Shortcut or the
- * tools of their own record. The unit is SHL-A01 in `loop/scope/area-shell-a.md`.
+ * tools of their own record. The unit is SHL-A01 in .
  *
  * IT READS THE NAMES, NOT A LIST OF WORDS. `shell-words` holds a list somebody wrote, and a list somebody wrote knows
  * the add-ons of the day it was written: it has `gold` and `mercury`, and nothing for the list an add-on declared last
@@ -172,7 +172,7 @@ const dirs = (dir) => {
   }
 };
 
-/** Where the seed writes its own add-ons in TypeScript, until each is a file under `packs/` (SHL-A13, SHL-A15). */
+/** Where the seed writes its own add-ons in TypeScript, until each is a file under `packs/`. */
 const SEED_ADD_ONS = ['packages/seed/src/modules', 'packages/seed/src/packs'];
 
 /**

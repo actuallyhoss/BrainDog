@@ -67,7 +67,7 @@ export const shell = {
     /** Drawn in place of the start button and "Sign in" once the visitor is signed in (`lib/site/signed-in.ts`). */
     open: 'Open BrainDog',
     signin: 'Sign in',
-    /* THE BUTTON THAT STARTS IT (SF13): "Get early access" while sign-up is by invite, "Start free" once it is open,
+    /* THE BUTTON THAT STARTS IT: "Get early access" while sign-up is by invite, "Start free" once it is open,
        from `LAUNCH.invite`, so one flag turns every start button on the site. */
     start: LAUNCH.invite ? 'Get early access' : 'Start free',
     menu: 'Menu',
@@ -79,7 +79,7 @@ export const shell = {
     lede: 'The address may be mistyped, or the page has moved.',
   },
 
-  /** The early access line: the hero's under its buttons (D1), and the strip that closes an inner page (site F11). */
+  /** The early access line: the hero's under its buttons, and the strip that closes an inner page. */
   early: {
     strong: 'Early access, invite only.',
     rest: "It's free while we open it up.",

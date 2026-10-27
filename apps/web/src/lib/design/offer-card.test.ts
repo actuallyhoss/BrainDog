@@ -1,5 +1,5 @@
 /**
- * The offer on a list's own screen (USE-B03), read against the week offer the record sends for Mariam's Orders
+ * The offer on a list's own screen, read against the week offer the record sends for Mariam's Orders
  * (offer-pattern-45): one card on Orders, none on People, Not now hides it, and Make it keeps it once.
  *
  * THE CARD IS COMPILED HERE, FOR THE SERVER, as `icons-set.test.ts` does, because `node --test` cannot load a `.svelte`

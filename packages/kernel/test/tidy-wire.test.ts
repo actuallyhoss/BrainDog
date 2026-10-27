@@ -77,7 +77,7 @@ test('a record never swept holds no line, and the first sweep keeps one a finder
 test('a step passed over for thirty-one days: the sweep closes it and the steps line says so, and a second sweep inside the hour adds none', async () => {
   const { k, sql } = await record();
   run(sql, 'handoff', 31 * DAY, { next: 'Ship it', next_at: ago(31 * DAY), project: 'PRJ3' });
-  /* A step two days old that a later run in the same place passed over: the sweep closes it too (scope D11). */
+  /* A step two days old that a later run in the same place passed over: the sweep closes it too. */
   run(sql, 'handoff', 2 * DAY, { next: 'Write it up', next_at: ago(2 * DAY), project: 'PRJ1' });
   run(sql, 'done', DAY, { project: 'PRJ1', wrote: 2, started: ago(DAY + 3_600_000), last_seen: ago(DAY) });
   k.purge();

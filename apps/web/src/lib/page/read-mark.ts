@@ -1,5 +1,5 @@
 /**
- * WHEN THE READER'S MARK MOVES, FOR EVERY SCREEN (PGS-C02): a screen that draws what is new since the mark stamps the
+ * WHEN THE READER'S MARK MOVES, FOR EVERY SCREEN: a screen that draws what is new since the mark stamps the
  * mark when the reader leaves, with the newest line it held. Home and Activity both stamp through `stampOf`, so there is
  * one rule: one mark a visit, a mark that did not land may be tried at the next leave, and never a mark below the
  * cursor the record handed over.

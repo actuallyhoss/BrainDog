@@ -5,7 +5,7 @@
  * WHY THIS FILE EXISTS. The marks were held over a stub surface (`packages/mcp/test/heard.test.ts`) and over the record
  * on `node:sqlite` (`packages/record/test/door-heard.test.ts`). The agent door had no test on the Worker's own runtime,
  * and batch 43 moved the door's marks to `doorHeard`, a method no route names, which only the door holding the record
- * itself can reach (audit 38-39 findings 2 and 5). Whether workerd's door reaches it was never watched.
+ * itself can reach. Whether workerd's door reaches it was never watched.
  *
  * WHAT RUNS, AND NOTHING IN THE MIDDLE IS A DOUBLE. Built the way `shortcut-in-do.test.ts` builds it: `src/index.ts`
  * bundled by `wrangler`'s own esbuild with `cloudflare:workers` left for workerd, Miniflare serving both Durable Objects

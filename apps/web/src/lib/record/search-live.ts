@@ -41,7 +41,7 @@ const MEANINGS: readonly unknown[] = ['fused', 'words', 'none', 'off', 'spent', 
 export type Found = { from: 'live'; value: SearchResult; meaning?: Meaning } | { from: 'refused'; fix: string };
 
 /**
- * A ROW FOUND BY MEANING IS MARKED, NOT CAPTIONED (E54). It said "Close in meaning, no word in common" under every such
+ * A ROW FOUND BY MEANING IS MARKED, NOT CAPTIONED. It said "Close in meaning, no word in common" under every such
  * row, which is why a result ranked and nothing a person asked. `meaning` is the mark; `shown.ts` counts the hits that
  * carry it, and the search page says it once, in one quiet line over the list.
  */

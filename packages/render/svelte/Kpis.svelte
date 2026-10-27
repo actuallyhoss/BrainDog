@@ -1,5 +1,5 @@
 <!--
-  `kpis`: a project's numbers, or Today's (loop/plans/kpis-2026-10-21, 2.4 and 2.8). `src/kpis.ts` decides every
+  `kpis`: a project's numbers, or Today's (2.4 and 2.8). `src/kpis.ts` decides every
   figure, word and path; this file lays them out and `packages/skin/kinds/kpis.css` paints them.
 
   TWO FORMS.
@@ -131,7 +131,7 @@
         <span class="kpi-against">{k.when}</span>
       {/if}
       <!-- AN OLD READING SAYS ITS DAY, beside the change it is read against or alone (`aged`, more than a week): a figure
-           with no change line (a target a year out) said nothing of its age (audit P24). -->
+           with no change line (a target a year out) said nothing of its age. -->
       {#if k.aged}<span class="kpi-against" data-old="">{k.aged}</span>{/if}
     </p>
   {/if}

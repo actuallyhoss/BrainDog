@@ -231,7 +231,7 @@ const MAILBOXES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * THE NAME AN ADDRESS GIVES ITS PERSON, or '' (audit C, X4): the first word of its local part, capitalised, where that
+ * THE NAME AN ADDRESS GIVES ITS PERSON, or '': the first word of its local part, capitalised, where that
  * word is letters alone, two or more of them, and not a mailbox's name. "mariam@" is Mariam, which People already calls
  * her; "info@", "j.smith@" and "x7@" give none, and the person is asked for a name where one is needed.
  */
@@ -266,7 +266,7 @@ export function namesHeard(p: { name: string | null; rows: readonly { register: 
   const ours = (r: { register: string }): boolean => list !== null && r.register === list;
   const others = new Set(p.rows.filter((r) => !ours(r)).flatMap((r) => [sameName(r.fields.name), sameName(r.fields.what)].filter((n) => n !== '')));
   const run = p.rows.find((r) => ours(r) && sameName(r.fields.name) !== '' && !others.has(sameName(r.fields.name)));
-  /* WITH NOBODY NAMED, THE TRADE THE RECORD IS CALLED (audit C, X2): "a small ceramics studio" is ceramics-studio, where
+  /* WITH NOBODY NAMED, THE TRADE THE RECORD IS CALLED: "a small ceramics studio" is ceramics-studio, where
      the address was the email's local part. Her own trade, never anybody else's, since `titleOf` reads only "I run". */
   const trade = p.name === null && typeof p.title === 'string' && p.title.trim() !== '' ? p.title.trim() : null;
   return { person: p.name, business: run ? String(run.fields.name).trim() : trade };
@@ -325,20 +325,20 @@ export const SAID_MOST = 2000;
  * link is opened on. Left out (or `null`) when nothing was asked or nothing answered.
  *
  * AND WITH THE BUILD'S OWN KEY (`key`), once a press has gone out: a reload between the call and its answer finds the
- * key here and presses under it again, so the record writes its entries once (audit 53, finding 2). This device's
+ * key here and presses under it again, so the record writes its entries once. This device's
  * only: it is never packed for the link, and one kept before there were keys reads back without it.
  *
  * AND WITH WHAT AN ANSWERED PRESS LEFT (`left`), which a reload sends in place of the whole build.
  *
- * AND WITH THE WHOLE READING THE PERSON KEPT (`reading`, USE-B05): the model's, read once on their press of Next, or the
+ * AND WITH THE WHOLE READING THE PERSON KEPT (`reading`): the model's, read once on their press of Next, or the
  * rules'. The tab the link opens builds from it and never reads again (`readingKept`), so what is made is what was
  * shown. One kept before there were readings has none, and is read again by the rules as it always was.
  */
 export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean; key?: string; left?: Left; reading?: Proposal };
 
 /**
- * WHAT AN ANSWERED PRESS LEFT TO MAKE, kept beside the sentence with the new key its Try again goes out under (audit 59,
- * claim 2): the sentence's entries the record did not write (`rows`), the use case's plan still to make (`plan`, left
+ * WHAT AN ANSWERED PRESS LEFT TO MAKE, kept beside the sentence with the new key its Try again goes out under:
+ * the sentence's entries the record did not write (`rows`), the use case's plan still to make (`plan`, left
  * out when the press carried none), and whether the draft is on Decide already (`filed`).
  *
  * A RELOAD SENDS THIS, NOT THE WHOLE PLAN UNDER THE FIRST KEY. The record passes over only a key it holds, so what a
@@ -440,7 +440,7 @@ function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | unde
  * THE SENTENCE IS NO YOUNGER FOR IT: its day still runs from when it was said. NOTHING KEPT, NOTHING WRITTEN: a key
  * with no sentence builds nothing, so a link opened on a phone (which keeps none) is as it was.
  *
- * THE FIRST KEY STAYS (audit 57, claim 3). A Try again of an answered press goes out under a new key, for what is left
+ * THE FIRST KEY STAYS. A Try again of an answered press goes out under a new key, for what is left
  * alone, and that one is the page's: a reload builds the whole plan from the sentence again, and under a key the record
  * never held it would write every entry a second time. Under the first it passes over what that press wrote. A new
  * sentence is kept without a key (`keepSaid`), and so its build keeps its own first one.

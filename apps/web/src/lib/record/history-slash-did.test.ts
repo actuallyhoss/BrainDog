@@ -1,5 +1,5 @@
 /**
- * What Slash did without asking, on a row's history (ENG-B15): the same sentence Activity says, made by the same
+ * What Slash did without asking, on a row's history: the same sentence Activity says, made by the same
  * function, so a change the ladder let land reads "Slash did this without asking" and its undo "Slash did · Mara undid".
  * Names are invented here, inline.
  */

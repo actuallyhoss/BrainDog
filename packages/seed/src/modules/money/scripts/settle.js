@@ -111,7 +111,7 @@ export function settle(item, payment, opts) {
     /* WITH NO COUNT HANDED there is nothing to write the bill back to: what it holds may or may not have this payment in it. */
     if (!opts || !Number.isSafeInteger(opts.before)) return unpaid;
     const left = opts.before;
-    /* A SUM SOMEBODY TYPED IS LEFT ALONE (audit 62, claim 1). What this script wrote in "Paid so far" is what the cleared
+    /* A SUM SOMEBODY TYPED IS LEFT ALONE. What this script wrote in "Paid so far" is what the cleared
        payments came to: the others alone, or the others and this one while it counted. A sum that is neither was typed
        by hand, and a payment that paid none of it takes none of it away: a bill marked half paid kept its half, and lost
        it the day a pending payment was logged against it. */

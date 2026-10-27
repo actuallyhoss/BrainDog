@@ -1,5 +1,5 @@
 /**
- * `when: { metric, empty: true }` (PGS-C06): a block drawn while its figure has no value and no amount in any currency,
+ * `when: { metric, empty: true }`: a block drawn while its figure has no value and no amount in any currency,
  * so a page can say "No balance has been typed yet" where its sentence about cash would be.
  *
  * WHAT WAS MEASURED BEFORE IT: a figure with no value met none of the comparisons, so a note under one was never drawn,

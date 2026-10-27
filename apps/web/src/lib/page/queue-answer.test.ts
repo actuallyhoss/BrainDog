@@ -21,7 +21,7 @@ test('A QUESTION PUT OFF SAYS WHEN IT COMES BACK, and why, and any other questio
   assert.equal(laterLine({ until: 'someday' }, now), null, 'a day that does not read draws no line');
 });
 
-test('AN ANSWER, ITS REASON AND WHY A QUESTION WAS PUT OFF CARRY NO ADDRESS OR ID (audit 21 #4)', () => {
+test('AN ANSWER, ITS REASON AND WHY A QUESTION WAS PUT OFF CARRY NO ADDRESS OR ID', () => {
   const ways = waysOf({
     options: [
       { key: 'merge', label: 'Merge into joaquin@x.com', because: 'Seen at https://github.com/x/y as 01ARZ3NDEKTSV4RRFFQ69G5FAV', recommended: true },
@@ -154,7 +154,7 @@ test('A COLOUR AND A FIGURE ARE READ AS THEY WERE, with or without a way to a fi
   }
 });
 
-test('A FIGURE THAT IS AN ID OR AN ADDRESS IS NOT DRAWN, and a plain one still is (audit 72 #3)', () => {
+test('A FIGURE THAT IS AN ID OR AN ADDRESS IS NOT DRAWN, and a plain one still is', () => {
   for (const file of [undefined, serves]) {
     for (const figure of ['3 of 5', 'EGP 1,200', '50%', '4.5 GB', '12/10/2026', '2026-10-12', '1,200.50', '  3 of 5  '])
       assert.deepEqual(visualOf({ figure }, file), { figure: figure.trim() }, figure);
@@ -179,7 +179,7 @@ test('A FIGURE THAT IS AN ID OR AN ADDRESS IS NOT DRAWN, and a plain one still i
   }
 });
 
-test('ONLY A PLAIN FIGURE IS DRAWN: a run, a time a machine wrote and a key read by the name (audit 74 #3)', () => {
+test('ONLY A PLAIN FIGURE IS DRAWN: a run, a time a machine wrote and a key read by the name', () => {
   for (const file of [undefined, serves]) {
     /* THE SIX THE AUDIT RAN, each of which `spoken` leaves as it was: an id with a letter no ULID holds, a run's name,
        a machine's time, two keys and a word that says no number. */
@@ -234,7 +234,7 @@ test('THE WAYS TO ANSWER CARRY THE PICTURE ONLY WHERE THE CARD WAS HANDED THE WA
   assert.deepEqual(waysOf(q, serves).map((w) => w.shows), [{ file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } }, { swatch: ['#c9a227'] }]);
 });
 
-test('A RUN THAT ASKED IS NAMED BY THE APP IT RAN IN, never "An agent", once its run is read (scope E37)', () => {
+test('A RUN THAT ASKED IS NAMED BY THE APP IT RAN IN, never "An agent", once its run is read', () => {
   assert.equal(proposer('S42').name, 'An agent', 'before the run is read');
   assert.deepEqual(proposer('S42', null, new Map(), { run: 'S42', agent: 'claude', client: 'claude-code 2.1.4', parent: null }), { name: 'Claude Code', kind: 'agent' });
 });

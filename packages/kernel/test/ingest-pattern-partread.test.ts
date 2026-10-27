@@ -1,5 +1,5 @@
 /**
- * A text a drawn pattern reads only in part waits in the shape's one question, never in one of its own (ENG-B07).
+ * A text a drawn pattern reads only in part waits in the shape's one question, never in one of its own.
  *
  * BEFORE: the header's ceiling held every text a model's pattern read, and each held text opened a `rowset` question of
  * its own, so a shape of thirty texts was thirty questions. Now a text the pattern reads in part, or that its ceiling

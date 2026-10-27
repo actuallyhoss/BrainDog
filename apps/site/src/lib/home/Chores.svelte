@@ -2,9 +2,9 @@
   The red band: "It does the chores. You make the calls." (site 2a section 3). What waits for a person, on a tile,
   beside what got done on its own, on the red itself; under both, the floor no rule and no AI tool can lower.
 
-  THE QUESTIONS HERE ARE NOT THE DESK'S (site F1): the desk's Today already shows Northbound and Dana, so this band
+  THE QUESTIONS HERE ARE NOT THE DESK'S: the desk's Today already shows Northbound and Dana, so this band
   asks the two only a person decides (a merge and a key), from their own store (`asked` in `desk/needs.svelte.ts`).
-  Answer yes and the question moves across with an Undo, a 200ms slide and nothing else (site F25). One question is drawn
+  Answer yes and the question moves across with an Undo, a 200ms slide and nothing else. One question is drawn
   at a time, and a line under it says how many more wait, so the count beside the heading is one a reader can see.
 
   FINISHED WITHOUT SCRIPTING. The HTML holds both questions and all four chores, each with its reason. The answer and
@@ -206,7 +206,7 @@
     font-size: var(--t-site-14);
   }
 
-  /* WHAT GOT DONE, on the red ground itself; each reason on its own line at 13px, full white (site F23). */
+  /* WHAT GOT DONE, on the red ground itself; each reason on its own line at 13px, full white. */
   .done {
     color: var(--on-red);
   }
@@ -324,7 +324,7 @@
       margin-block-start: 24px;
     }
 
-    /* The question says itself on a phone; its reason is the desk's (U-C10). */
+    /* The question says itself on a phone; its reason is the desk's. */
     .why,
     .item:nth-child(n + 3) {
       display: none;

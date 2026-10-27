@@ -3,8 +3,8 @@
  *
  * THE WORDS A USE CASE'S `label_<list>` AND `one_<list>` SETTINGS START FROM ARE A COPY of what each first-party list
  * declares as `name:` and `one:`, because `@braindog/declare` cannot read this package. A copy that drifts puts one word
- * on Settings › Words and another on the list itself, and the only test of the table checked its keys (research audit
- * 11-13). So the two are held equal here, as `MODULE_LISTS` is in `first-party.test.ts`.
+ * on Settings › Words and another on the list itself, and the only test of the table checked its keys.
+ * So the two are held equal here, as `MODULE_LISTS` is in `first-party.test.ts`.
  */
 
 import { test } from 'node:test';

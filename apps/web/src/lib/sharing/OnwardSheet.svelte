@@ -1,5 +1,5 @@
 <!--
-  The Share sheet for sharing on (sharing plan §2.1, the manage rung): somebody who manages part of the record passes it
+  The Share sheet for sharing on (the manage rung): somebody who manages part of the record passes it
   on to somebody else here, at View, Comment or Edit, all of it or one list it reaches, and never past their own share.
   The same sheet, rows and sentence the Share sheet draws (`ShareSheet.svelte`), with four fields instead of six:
   From (their own share, by its sentence, when they hold more than one), With, Can and What.

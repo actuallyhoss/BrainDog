@@ -1,5 +1,5 @@
 /**
- * `braindog export --shape` (PRF-A13) against an in-memory door: a standing shape grant kept beside the login, one
+ * `braindog export --shape` against an in-memory door: a standing shape grant kept beside the login, one
  * request to `POST /api/shape` with no page's `Origin`, and a file that says it is a shape and holds no word of the record.
  *
  * THE FILE IS A REAL SHAPE COPY, the kernel's `shapeBrainl` over a real export of a record whose name and slug are

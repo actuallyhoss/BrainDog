@@ -1,7 +1,7 @@
 /**
  * `braindog tidy [--ask]`: how many things with no place look like they belong to a project and how many lessons two
  * projects learned twice, said a line each under what is stale, and `--ask` putting each clean-up on Decide as one
- * question (AGT-D04 job 6, AGT-D15).
+ * question (AGT-D04 job 6).
  *
  * THE CLIENT IS A STAND-IN, handed to the command as `tidy.test.ts`'s stub host would answer it, because the four calls
  * are this batch's (scope-ask, learning-promote) and the real client refuses a call its route table has no row for

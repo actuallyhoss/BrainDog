@@ -1,5 +1,5 @@
 /**
- * A trial by an agent sends nothing but a read (`src/script-try.ts`, `readOnlyRefused` in `src/script.ts`, SHL-D05).
+ * A trial by an agent sends nothing but a read (`src/script-try.ts`, `readOnlyRefused` in `src/script.ts`).
  *
  * A TOKEN'S TRIAL OPENED NO KEY AND SENT ANY METHOD THE DRAFT ASKED, so a propose token could make the host POST to any
  * public origin a draft named, unapproved, on the owner's plan. The stand-in is the socket itself (`send`): what reaches

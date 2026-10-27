@@ -1,5 +1,5 @@
 /**
- * A balance's age is what the bank last said (REC-B03), and a row's currency comes from its account (REC-B04), as
+ * A balance's age is what the bank last said, and a row's currency comes from its account, as
  * money-core 3.16.0 declares them, read through the kernel on a record that installed Money the way a person does.
  *
  * RED FIRST: with `cash-as-of` back on `{ min: 'as_of' }` and `balances-stale` on `as_of before -7d`, the second test
@@ -117,8 +117,8 @@ test('AN ACCOUNT TYPED THIRTY DAYS AGO IS NAMED, AND LEAVES THE LINE THE DAY A B
   assert.equal(read(k, 'balances-stale'), 0);
   assert.equal(read(k, 'cash-as-of'), epochDay(day(0)));
   assert.equal(read(k, 'statement-oldest-days'), 0);
-  /* THE OLD BALANCE'S LINE GOES WITH IT, and with it its Update balances: the box that took today's balance is off Money
-     since the UI pass of 20 October, and that line opens the same form. */
+  /* THE OLD BALANCE'S LINE GOES WITH IT, and with it its Update balances: the box that took today's balance is off Money,
+    and that line opens the same form. */
   assert.equal(blocksOf(k, 'money').find((b) => String(b.body).startsWith('The oldest balance'))?.drawn, false, 'the old balance is said with nothing old');
   assert.equal(card(), day(0), "the book's card keeps the typed day");
 });

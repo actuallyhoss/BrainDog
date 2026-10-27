@@ -1,5 +1,5 @@
 <!--
-  The page header (2.A.20): the page's name with its icon, its count, the actions at the right of the
+  The page header: the page's name with its icon, its count, the actions at the right of the
   name, and under them the one sentence that says what is true today.
 
   A HEADER, NOT A HERO. The sentence is said once, at 17 in body text, under a 28px name: figures in it a step heavier and
@@ -836,7 +836,7 @@
       min-block-size: var(--tap);
     }
 
-    /* THE PAGE'S "+" IS A STEP SMALLER THAN THE BAR'S SQUARES (UI audit of 22 October, 28): 36 with its 16px glyph, its
+    /* THE PAGE'S "+" IS A STEP SMALLER THAN THE BAR'S SQUARES: 36 with its 16px glyph, its
        hit box still the 44 of `.tap`. A red 44 square beside the title was the loudest thing on the phone's first
        screen, louder than the sentence that says what the page holds. */
     .head-actions :global(.btn[data-weight='primary']:has(.icon)) {

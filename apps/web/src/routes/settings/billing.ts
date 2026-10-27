@@ -37,13 +37,13 @@ import { words as usageWords, type Meter, type MeterKey } from '../../lib/record
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
   notChargedYet: 'BrainDog does not charge for this record yet.',
-  /* SLASH CREDIT PACKS (LCH-A10): the heading over the buttons, each button's own words, and what is left of them. */
+  /* SLASH CREDIT PACKS: the heading over the buttons, each button's own words, and what is left of them. */
   buyCredits: 'Buy credits',
   packButton: (credits: number, price: string) => `${credits.toLocaleString('en-GB')} credits, ${price}`,
   /** The button's whole name for a screen reader, which keeps the words it shows. */
   packSaid: (credits: number, price: string) => `Buy ${credits.toLocaleString('en-GB')} credits, ${price}`,
   creditsLeft: (n: number) => `Credits from packs: ${n.toLocaleString('en-GB')}`,
-  /* A PLAN THAT IS A GIFT (LCH-A12): said where the plan's price is, and when it ends if it does. */
+  /* A PLAN THAT IS A GIFT: said where the plan's price is, and when it ends if it does. */
   gift: (plan: string) => `${plan}, a gift from BrainDog`,
   giftUntil: (day: string) => `Given until ${day}.`,
 };
@@ -99,7 +99,7 @@ export type BilledRecord = {
   deleteOn: number | null;
   /** Slash credits left from packs, `null` from a host older than packs. They do not end with the month. */
   credits: number | null;
-  /** The operator gave this plan (LCH-A12): never charged, nothing at Stripe to manage. */
+  /** The operator gave this plan: never charged, nothing at Stripe to manage. */
   gift: boolean;
 };
 
@@ -229,7 +229,7 @@ export async function paymentPage(
 }
 
 /**
- * Ask for Stripe's page that sells one pack of Slash credits to this record, and answer its address (LCH-A10).
+ * Ask for Stripe's page that sells one pack of Slash credits to this record, and answer its address.
  *
  * THE SAME CHECKOUT DOOR, NAMING A PACK AND NO PLAN, so the Worker starts a one-off payment and no subscription. The
  * credits are added by Stripe's webhook, never by this screen: coming back only reads billing again.
@@ -405,7 +405,7 @@ export function meterBars(meters: readonly Meter[]): { label: string; value: num
   return meters.map((m) => {
     const name = usageWords.meterName[m.key] ?? m.key;
     const note = m.line.startsWith(`${name} `) ? m.line.slice(name.length + 1) : undefined;
-    /* THE FIGURES IN THE LABEL, BESIDE THE BAR (audit 25 October, X22): drawn as the bar's note they sat on the empty
+    /* THE FIGURES IN THE LABEL, BESIDE THE BAR: drawn as the bar's note they sat on the empty
        track of a month that had barely started, and the bar ran behind them. */
     return {
       label: note ? `${name} · ${note}` : name,

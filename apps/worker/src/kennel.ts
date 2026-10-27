@@ -490,7 +490,7 @@ const why = (e: unknown): string => (e instanceof Error ? e.message : String(e))
  *    index lists. A file changed under a published version, or one that is gone, is named.
  * 2. `counts.json` IS YOUNGER THAN 36 HOURS AND EVERY NUMBER IS ONE OF THE FIVE STEPS (`roundCount`).
  * 3. HOW MANY SUBMISSIONS WAIT, AND THE AGE OF THE OLDEST: red past `REVIEW_LATE_MS`.
- * 4. HOW MANY LISTED ADD-ONS HAVE A PUBLISHER THAT IS NOT BRAINDOG, the measure of strangers publishing (RQ-SHL-326).
+ * 4. HOW MANY LISTED ADD-ONS HAVE A PUBLISHER THAT IS NOT BRAINDOG, the measure of strangers publishing.
  *    None is red: it stays the open measure until a stranger's add-on is listed. An unlisted one, the probe's among
  *    them, and one whose every version is yanked are not counted.
  *
@@ -796,7 +796,7 @@ async function submit(request: Request, deps: KennelDeps, now: () => Date): Prom
     };
   /* THE SCRATCH INSTALL, FOR EVERY PUBLISHER, TRUSTED OR NOT, before anything is written: a trusted version is listed by
      this call and a waiting one by a verdict with no install between, so this is the one place a page that does not
-     draw is caught before a record installs it (SHL-B06). IT RUNS ONLY FOR A SUBMISSION THE DOOR TAKES, once its
+     draw is caught before a record installs it. IT RUNS ONLY FOR A SUBMISSION THE DOOR TAKES, once its
      signature is verified, its id is the sender's and the day's cap is counted, so a forged signature or a file the
      door refuses never costs an install, and is told the door's own sentence. Asked once, kept across a race's retry. */
   let undrawn: Promise<Refusal | null> | undefined;

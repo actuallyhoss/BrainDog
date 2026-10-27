@@ -1,5 +1,5 @@
 /**
- * THE NEXT ROWS OF ONE BLOCK, read as the reader reaches the end of what is drawn (PGS-A16).
+ * THE NEXT ROWS OF ONE BLOCK, read as the reader reaches the end of what is drawn.
  *
  * A page's list block opens on its first rows and a cursor; `RowsWindow` draws the ones on screen and its sentinel calls
  * `onmore` near the end, and the page hands that to `moreRows` here, which asks the record for the block's next

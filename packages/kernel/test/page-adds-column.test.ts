@@ -1,5 +1,5 @@
 /**
- * A column one pack adds into another pack's block (PGS-C29), read off the manifests and laid in by `withAdds`: after the
+ * A column one pack adds into another pack's block, read off the manifests and laid in by `withAdds`: after the
  * block's own columns, by the key the block answers, two at most on one block, and a key the page lacks leaving the page
  * as it was. Invented pages and packs only.
  */

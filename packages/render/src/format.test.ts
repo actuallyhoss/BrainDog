@@ -39,7 +39,7 @@ test('SEVERAL AMOUNTS ARE EACH SAID AS A HEADLINE, and what is not money comes b
 test('A LEDGER STAYS EXACT: money, symbolFigure and a sentence not marked as a headline keep every minor unit', () => {
   assert.equal(money(3_385_000, 'GBP'), 'GBP 33,850.00');
   assert.equal(symbolFigure(money(3_385_000, 'GBP')), '£33,850.00');
-  /* Every digit, past sixteen of them: money is placed by slicing its digits, never divided into a float (PGS-B04, and
+  /* Every digit, past sixteen of them: money is placed by slicing its digits, never divided into a float (and
      the edge cases in format-zone.test.ts). */
   assert.equal(money('900719925474099312', 'JPY'), 'JPY 900,719,925,474,099,312');
   assert.equal(symbolFigure(money(900_719_925_474_099_312n, 'GBP')), '£9,007,199,254,740,993.12');
@@ -74,7 +74,7 @@ test('three capitals after a figure are a code only when they are a currency: an
   assert.equal(headlineFigure('£24,000.00 GBP'), '£24,000', 'a real code is still read');
 });
 
-/* ---- One writer (REC-C05): told the home currency, each old function says what `writeAmount` says ---------------- */
+/* ---- One writer: told the home currency, each old function says what `writeAmount` says ---------------- */
 
 const AMOUNTS: [number, string][] = [
   [108_621_341, 'EGP'], [5_818_500, 'EGP'], [-49_726, 'EGP'], [294_795, 'USD'], [-1_200, 'USD'], [480_000, 'USD'],

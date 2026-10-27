@@ -1,5 +1,5 @@
 <!--
-  Settings > Sharing (sharing plan §3.2): who is here and in what role, every share as one sentence grouped by who it is
+  Settings > Sharing: who is here and in what role, every share as one sentence grouped by who it is
   with, the shares still waiting for somebody to accept, the groups, and what ended in the last 30 days, with See as at
   the top.
 
@@ -320,7 +320,7 @@
 {:else if refused !== null}
   <Tile icon="link" title={copy.sharingShared}><Empty kind="error" title={refused} /></Tile>
 {:else if rows !== null}
-  <!-- ONE SHARED CARD, FULL WIDTH (audit 25 October, X19): the shares, then the read-only links to single pages under
+  <!-- ONE SHARED CARD, FULL WIDTH: the shares, then the read-only links to single pages under
        their own small heading once there is one, and "Nothing is shared" said once while there is neither. It hugged
        its empty state at half the width and left a hole beside it at a desk. -->
   <Tile icon="link" data-wide="" title={copy.sharingShared} count={liveCount + linkCount || undefined}>

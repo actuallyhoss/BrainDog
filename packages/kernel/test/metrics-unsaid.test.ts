@@ -1,5 +1,5 @@
 /**
- * A FIGURE OVER A FIELD NOBODY FILLED IS UNSAID, NOT NOUGHT (batch 38's drawn-kernel-web, B5). A figure whose own `where`
+ * A FIGURE OVER A FIELD NOBODY FILLED IS UNSAID, NOT NOUGHT (batch 38's drawn-kernel-web). A figure whose own `where`
  * requires the field it reduces (`amount is set`) and matched no row while the list holds rows reads `unsaid: true`, so
  * `drawn.ts` leaves "Earning £0" out on the record as the web's `overUnsaidField` already did.
  */

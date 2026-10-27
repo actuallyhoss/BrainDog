@@ -222,7 +222,7 @@ forbidding it.)*
 says why. A projection compounds the last complete bucket forward, **capped at 10× with the cap
 reported** — because an uncapped exponential on six points is a number that will be quoted.
 
-*(As built, 13 October 2026, REC-B09.)* **Both are read, in these shapes, and the two drafts above are the published
+*(As built, 13 October 2026.)* **Both are read, in these shapes, and the two drafts above are the published
 idea and not what a declaration writes.**
 
 ```yaml
@@ -281,7 +281,7 @@ The rate table is a dated register, as §3 of [02-DATA-MODEL](02-DATA-MODEL.md) 
 already have, with one new key, `as_of`. *(An earlier draft spelled it `asof` and looked rows up by a
 `pair` the register does not have.)*
 
-**A row's currency comes from its account, and stays (2026-10-09, REC-B04).** Every figure above starts from a code
+**A row's currency comes from its account, and stays (2026-10-09).** Every figure above starts from a code
 each amount carries, so the code has to be right when the row is filed. A money field may declare two keys, each on a
 `money` field only. `currency_from: account.balance` names a link of the same list and a money field of the list it
 points at: an amount written with no code takes the code that field holds on the linked row, so a bare `{ amount:

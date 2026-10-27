@@ -686,7 +686,7 @@ export function revokeGrant(sql: Sql, deps: KeychainDeps, id: string, transactio
 /**
  * Hold a key whose keychain entry names no host to the host an approved action sends it to, from now on.
  *
- * THE APPROVAL THAT FIRST USES IT WRITES THE HOST, and nothing later can (SHL-C05). An entry whose `opens` was "the Oxbow
+ * THE APPROVAL THAT FIRST USES IT WRITES THE HOST, and nothing later can. An entry whose `opens` was "the Oxbow
  * test account" opened no host, so the host had nothing to hold the key to; once an approval sends it to
  * `oxbow.example`, `opens` says `oxbow.example` and the executor refuses every other host with "This key opens
  * oxbow.example only." An entry that already names a host is left as it is, whichever host this names, so a pin never

@@ -1,5 +1,5 @@
 /**
- * What a decided question says it chose, for the card's "Decided 2 Oct: <the choice>" (`decidedHere`, AGT-B09).
+ * What a decided question says it chose, for the card's "Decided 2 Oct: <the choice>" (`decidedHere`).
  *
  * Pure: the record reads each closed question with its close and its decision (`placedDecided`) and hands them here.
  * The words follow the kernel's own memory of an answer (`remembered` in `govern.ts`, which says a no as `said: 'No'`):

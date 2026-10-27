@@ -1,6 +1,6 @@
 /**
  * Services and Renewals as a file: `estate.pack.json` held equal to the module the build still compiles in
- * (`packages/seed/src/modules/estate.ts`), so taking the module out is one small change and not a rewrite (SHL-A13).
+ * (`packages/seed/src/modules/estate.ts`), so taking the module out is one small change and not a rewrite.
  *
  * WHAT IS HELD. For each thing Estate may lean on, which is Projects and nothing else, a record is made with it and one
  * without. The file is read by `normalise`, planned on that record by `plan` (through the record's own `planPack`), and
@@ -226,7 +226,7 @@ test('PROJECTS IS ASKED FOR ONLY WHERE IT IS READ: the Project field and the fig
   assert.deepEqual([project.type, project.to, project.required ?? false], ['ref', PROJECTS, false], 'a part that waits cannot be one every service must have');
   /* AND NOTHING ELSE POINTS OUT OF THE FILE: the one link is the only field that names another list. */
   assert.deepEqual(fields.filter((f) => f.to !== undefined).map((f) => f.id), ['thing']);
-  /* PRICE AND RENEWAL DAY ARE OPTIONAL (SHL-A02), so a service whose day or price nobody has looked up is still kept. */
+  /* PRICE AND RENEWAL DAY ARE OPTIONAL, so a service whose day or price nobody has looked up is still kept. */
   assert.deepEqual(fields.filter((f) => f.required === true).map((f) => f.id), ['name', 'kind', 'cycle', 'state']);
 });
 
@@ -384,7 +384,7 @@ test('PROJECTS ARRIVING LATER: the service kept before it is still there, and th
   said(await put(api, file()));
   const id = add(api, 'services', SERVICE);
   said(await put(api, firstPartyDocument('portfolio', { holds: [PROJECTS], seeds: [] })));
-  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL (SHL-A08): nothing waits now, and both parts are additions. */
+  /* PLANNED AGAIN, AS THE RECORD DOES AFTER AN INSTALL: nothing waits now, and both parts are additions. */
   const again = await planOf(api, file());
   assert.deepEqual(again.waiting, []);
   assert.deepEqual(again.conflicts, []);

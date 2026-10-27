@@ -1,5 +1,5 @@
 /**
- * `signs-red` and `green-days` (PRF-A05): how many vital signs read red now, and how many days in a row, in the record's
+ * `signs-red` and `green-days`: how many vital signs read red now, and how many days in a row, in the record's
  * zone, the kept readings held a sign green and none red. Both say nothing, never nought, with no reading at all: an
  * empty record has no red sign and is not well, and it has no good days either.
  *
@@ -94,4 +94,4 @@ test("SIGNS RED ON A PAST DAY is that day's kept readings, and a day with none k
   assert.equal(read(sql, 'signs-red', { asOfMs: Date.parse('2026-10-04T12:00:00Z') }).value, null);
 });
 
-/* GREEN DAYS IS THE HOLD NOW (PRF-A18, `hold.ts`): its runs, the Auckland case among them, are in figures-health.test.ts. */
+/* GREEN DAYS IS THE HOLD NOW (`hold.ts`): its runs, the Auckland case among them, are in figures-health.test.ts. */

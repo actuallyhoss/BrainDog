@@ -12,7 +12,7 @@
      every row. 11ch of the row's size is room for the longest date the product writes ("2 Sep 2025", ten characters)
      set a step smaller; a date an author wrote longer than that wraps inside the track rather than running into the
      title. The tone travels with the title. */
-  /* ONE LINE AN ENTRY (the money review, F4): the day, the name, then the amount at the end in tabular figures, 44px
+  /* ONE LINE AN ENTRY (the money review): the day, the name, then the amount at the end in tabular figures, 44px
      tall, where the amount stood under the name and every entry was two lines and 64px. A name too long for the line
      ends in an ellipsis; its entry holds the rest. */
   /* THE AMOUNTS END ON THE TILE'S PADDING, as every other column does: a 720px cap ended them 50px short of the edge on a

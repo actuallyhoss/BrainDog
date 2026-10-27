@@ -29,7 +29,7 @@ import * as kpiRank from './kpi-rank.ts';
 import { kpiTrend, type KpiAnswer } from './sources/kpis.ts';
 import { cutActions, type OfferedAction } from './row-actions.ts';
 import { GROUPED_BY_FIELD, applyLook, composeLook, figureSaid, lookOf, mergeLook, type LookBody } from './compose.ts';
-/* A PAGE'S HEAD OVER ITS TITLE (PGS-A16), read and resolved by the file that checks it at install. */
+/* A PAGE'S HEAD OVER ITS TITLE, read and resolved by the file that checks it at install. */
 import { headerBody, resolveHead, type HeadFigure, type ResolvedHead } from './page-head.ts';
 import { listRead, searchClauses, searchWord, type SearchShape } from './page-search.ts';
 import { HANDOFFS_OPEN, KIND_SAID, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
@@ -76,7 +76,7 @@ export type WhenLeaf = { metric: string; empty?: boolean; beyond?: boolean; gt?:
  */
 export type WhenTree = WhenLeaf | WhenReaderLeaf | { all: WhenTree[] } | { any: WhenTree[] };
 
-/** One test of who reads the page (PGS-A17): the reader is one of these words (`block-keys.ts` `WHEN_READERS`). */
+/** One test of who reads the page: the reader is one of these words (`block-keys.ts` `WHEN_READERS`). */
 export type WhenReaderLeaf = { reader: WhenReader | readonly WhenReader[] };
 
 /**
@@ -217,11 +217,11 @@ export type PageBlock = {
    * are on it.
    */
   /* `empty: true` holds while the figure reads with no value and no amount in any currency, and `empty: false` while it
-     has one (PGS-C06): the one test a figure with nothing in it meets. */
+     has one: the one test a figure with nothing in it meets. */
   /* `beyond: true` holds while the reading carries `beyond` (`money-figures.ts` `beyondOf`): a walk to zero that looked
      as far as it walks and never went under, which has no value and so meets no comparison. `all:` is two or more
      leaves, and the block draws only while every one holds; `any:` is two or more, and it draws while one does. Either
-     may hold one join of the other kind, and no deeper (PGS-A13). */
+     may hold one join of the other kind, and no deeper. */
   when?: WhenTree;
   /**
    * A `note`'s sentences, read top to bottom: the first whose `when:` holds is the note's body, its `{{path}}` holes
@@ -339,7 +339,7 @@ export type PageBlock = {
   /** Why a block is not drawn, beside `drawn: false`: `empty`, `unsaid`, `when` or `cannot` (`drawn.ts` `Why`). */
   why?: Why;
   /*
-   * NOT TYPED HERE: `actions` and `row_actions` (PGS-A12). As declared they are JSON nobody has checked, read through
+   * NOT TYPED HERE: `actions` and `row_actions`. As declared they are JSON nobody has checked, read through
    * `declaredActions` as any page key is; as answered they are `BlockResult`'s, cut to the reader.
    */
 };
@@ -362,7 +362,7 @@ export type PageDecl = {
 
 export type BlockResult = PageBlock & {
   /**
-   * What may be pressed on the block itself, and on each of its rows (PGS-A12, `row-actions.ts`): declared, checked
+   * What may be pressed on the block itself, and on each of its rows (`row-actions.ts`): declared, checked
    * against the fields of the block's list, and cut to what this reader may press (`PageDeps.level`), each marked `hard`
    * and `undo`. Absent where nothing is left to press.
    */
@@ -671,7 +671,7 @@ export type QueueOption = {
   shows?: Shows;
   hard?: true;
   /**
-   * WHAT THIS OPTION DOES TO ROWS, IN NAMES (C20, "every open card draws what its options change"), on an option that
+   * WHAT THIS OPTION DOES TO ROWS, IN NAMES ("every open card draws what its options change"), on an option that
    * carries its own patches: the list, how many rows, and the value each field it sets moves them to, a link by the
    * title it points at. The question's `rows_said` is accepting's; this is the option's.
    */
@@ -710,7 +710,7 @@ export type QueueQuestion = {
   list?: string | null;
   /** The list a rowset adds to or changes, which a question whose `about` names no row is on; absent on any other body. */
   rows_on?: string;
-  /** The person handed this question to decide (USE-A13), a person id; absent when nobody was handed it. */
+  /** The person handed this question to decide, a person id; absent when nobody was handed it. */
   decider?: string | null;
   /**
    * On a queue's lead question (`lead: true`): what was proposed, the body's kind, and what accepting it does, one
@@ -721,7 +721,7 @@ export type QueueQuestion = {
   does?: string;
   /** The body of a `pack`, `settings` or `arrange` proposal, so a card says the arrangement in its own summary (web `card.ts` `arrangementOf`, REC-A07 step 3) without opening its page. */
   arranged?: Record<string, unknown>;
-  /** How long it can wait (`weigh.ts` `WAIT_SQL`, AGT-C08): `soon`, `old` or `new`, read in the queue's own query. */
+  /** How long it can wait (`weigh.ts` `WAIT_SQL`): `soon`, `old` or `new`, read in the queue's own query. */
   waits?: Wait;
   /**
    * On a question about who may be one person or organisation (`people.ts`'s cluster question): each name it is about,
@@ -818,7 +818,7 @@ export type PageFilter = {
   label: string;
   control: 'chips' | 'segmented';
   chosen: string | null;
-  /** `hue`, for a link to a row that holds one (a project's own colour, 0 to 359), so a chip wears its dot (E24). */
+  /** `hue`, for a link to a row that holds one (a project's own colour, 0 to 359), so a chip wears its dot. */
   values: { value: string; label: string; count: number; hue?: number }[];
   /** The lists its values were counted and named from, so a host holds the filter from a reader who may not read them. */
   reads: string[];
@@ -829,7 +829,7 @@ export type ActivityEvent = { ts: string; actor: string; kind: string; target: s
 
 /**
  * What a page read made for one reader may hand her of the reads across the whole record: each line of the log, each
- * question and each list asked of her own lens by the host (sharing plan §2.5), so a feed, a queue or what went quiet
+ * question and each list asked of her own lens by the host, so a feed, a queue or what went quiet
  * drawn for a Viewer or an Admin leaves out what `recentHistory` and `governance` leave out for her: the owner's own
  * lists, a personal list, a row her rule does not admit. A line is asked with the row it is about, read once, or `null`
  * for a line about no row or a row gone. Absent, the read hands everything, as it does the owner.
@@ -870,7 +870,7 @@ export type RowEvent = { ts: string; actor: string; kind: string; field: string 
  */
 /**
  * `zone` is the record's own zone (an IANA name) the page was read in, so text drawn off the browser names the same day
- * the record does (PGS-B04): a digest and the app say which zone their "today" is.
+ * the record does: a digest and the app say which zone their "today" is.
  */
 export type PageResult = { page: string; title: string; blocks: BlockResult[]; read_at?: string; zone?: string; look?: LookBody; [key: string]: unknown };
 
@@ -879,7 +879,7 @@ export type PageResult = { page: string; title: string; blocks: BlockResult[]; r
  * ceiling is `FORBIDDEN`, inside it with a level that does not reach `read` is `LEVEL_REQUIRED`.
  *
  * A LIST OF CODES RATHER THAN "ANY REFUSAL AT ALL". A block refused for a misspelt key is a block somebody has to be
- * able to see in order to fix (PGS-A01, H.366).
+ * able to see in order to fix (H.366).
  */
 export const WITHHELD_CODES: readonly string[] = ['FORBIDDEN', 'LEVEL_REQUIRED'];
 
@@ -985,13 +985,13 @@ export type PageDeps = {
    */
   handoffs?: (project: string | null) => readonly OpenStep[];
   /**
-   * What went quiet on this record, the longest quiet first (`openExceptions` in `exceptions.ts`, ENG-B13): a list or a
+   * What went quiet on this record, the longest quiet first (`openExceptions` in `exceptions.ts`): a list or a
    * door that stopped, a feed that missed its time, a row older than its page allows. An `exceptions` block reads them.
    */
   exceptions?: () => readonly Exception[];
   /**
    * One project's scheduled actions that are paused, stopped as failed, or late, each in one sentence (`signs-actions.ts`
-   * `actionsBlocking`, REC-C09): what is in the project's way besides its blockers. An `actions.blocking` block reads them.
+   * `actionsBlocking`): what is in the project's way besides its blockers. An `actions.blocking` block reads them.
    */
   blocking?: (project: string) => readonly ActionBlocking[];
   /**
@@ -1033,7 +1033,7 @@ export type PageDeps = {
   tz?: string;
   /**
    * The entry the text sits on: a template page's row, or the row whose own screen draws a document. A one-word
-   * `{{path}}` is that entry's field when its list declares one, and `<field>.count` counts a list field of it (PGS-B03).
+   * `{{path}}` is that entry's field when its list declares one, and `<field>.count` counts a list field of it.
    * Absent, a path reads as it always has.
    */
   here?: Entry;
@@ -1050,7 +1050,7 @@ export type PageDeps = {
     value: string;
     name?: string;
     unit?: string;
-    /** A money field each reading may hold in place of `value`: minor units and a currency, read whole (REC-C03). */
+    /** A money field each reading may hold in place of `value`: minor units and a currency, read whole. */
     amount?: string;
     /** The sixth column: a field each measure is listed under, answered as a person reads it (a link by its row's name). */
     group?: string;
@@ -1068,7 +1068,7 @@ export type PageDeps = {
   metrics?: () => readonly MetricDecl[];
   /**
    * The installed module or add-on a declaration came with, by the declaration's id (`metric.open-tasks`), or `null` for
-   * one nobody's pack brought: what `<module>.<figure>` asks (PGS-B13). Absent, a declaration's own `pack:` says, and a
+   * one nobody's pack brought: what `<module>.<figure>` asks. Absent, a declaration's own `pack:` says, and a
    * figure that names none is its list's, as a first-party pack places it.
    */
   packOf?: (id: string) => string | null;
@@ -1111,7 +1111,7 @@ export type PageDeps = {
    */
   level?: string;
   /**
-   * WHO READS, for a `when: { reader }` (PGS-A17): the record's owner, a member signed in, an agent on a token, or
+   * WHO READS, for a `when: { reader }`: the record's owner, a member signed in, an agent on a token, or
    * somebody holding a link. Named apart from `reader` above, which is how a reader is held. Absent, no block whose
    * `when` asks who reads is sent, so a host that has not said who reads is never shown what was held for the owner.
    */
@@ -1122,7 +1122,7 @@ export type PageDeps = {
    */
   runs?: ReadonlySet<string>;
   /**
-   * WHAT THE RECORD READS THAT THE KERNEL CANNOT (PGS-A11): a source by its name, such as `lists` or `pages`, or
+   * WHAT THE RECORD READS THAT THE KERNEL CANNOT: a source by its name, such as `lists` or `pages`, or
    * `undefined` for one the host does not hold. Asked only where no registered source answers the name, so a host never
    * shadows one, and never for a list (`register.<id>`). Absent, such a name is a source nobody knows.
    */
@@ -1201,7 +1201,7 @@ export type ListsBeside = {
   hostSources?: (name: string) => HostSource | undefined;
 };
 
-/** The source a block names for one project's actions in its way (REC-C09), which that source holds. */
+/** The source a block names for one project's actions in its way, which that source holds. */
 export { ACTIONS_BLOCKING };
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
@@ -1222,7 +1222,7 @@ export const WHOLE_RECORD = '*';
  * same answer to an agent as "rows and figures", and an agent totalling a bar over a 250-row
  * register was told nothing. The refusal was below, where every consumer got it.
  *
- * AND THE REFUSAL IS GONE WHERE A WHOLE READ IS HANDED (PGS-B05, `handsWhole`), because it made a list past 200 rows
+ * AND THE REFUSAL IS GONE WHERE A WHOLE READ IS HANDED (`handsWhole`), because it made a list past 200 rows
  * undrawable: the Ledger's own chart of where the money went was dead from its 201st row. These kinds now answer
  * `wholeRead`, added up over every row (`wholeOf`), and what bounds them is time (`WHOLE_MS`), with a count far above
  * any list a person keeps (`WHOLE_WALK_ROWS`) for the host whose clock does not move.
@@ -1237,7 +1237,7 @@ export const WHOLE_RECORD = '*';
  */
 export { REDUCES, SUMS };
 /**
- * HOW MANY ROWS RIDE BESIDE A WHOLE READ, and it is no longer a ceiling (PGS-B05). A kind that adds up answers
+ * HOW MANY ROWS RIDE BESIDE A WHOLE READ, and it is no longer a ceiling. A kind that adds up answers
  * `wholeRead`, its parts and its total over every row, and these rows are handed with it so a drawer written before
  * `wholeRead` still draws a list this short as it did. Past them it has only `wholeRead` to draw from.
  */
@@ -1250,7 +1250,7 @@ export const WHOLE_PARTS = 200;
 /** A page of the list a whole read walks when the host hands no grouped read (`PageDeps.whole`). */
 const WHOLE_PAGE = 500;
 /**
- * How many rows that walk reads at most (audit 53, finding 7). TIME IS THE BOUND, AND A CLOCK MAY NOT MOVE: on a host
+ * How many rows that walk reads at most. TIME IS THE BOUND, AND A CLOCK MAY NOT MOVE: on a host
  * whose `performance.now()` stands still through one piece of work the walk never ran late, so a ledger of any length
  * was walked a page at a time on every open of the page. A count holds whatever the clock does, and it is read off
  * the first page's `matched` where the host says one, so a list past it is refused after one page and not after a
@@ -1306,7 +1306,7 @@ export type WholeRow = {
 };
 
 /**
- * What a kind that adds up answers beside its rows (PGS-B05): its parts by label and the total of EVERY row its scope
+ * What a kind that adds up answers beside its rows: its parts by label and the total of EVERY row its scope
  * and `where` admit, added up in the database or over the whole list, never over a page of it.
  */
 export type WholeRead = {
@@ -1648,7 +1648,7 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
       return { ...a, block: found.row ? (fill(block, found.row) as PageBlock) : block };
     }),
   );
-  /* THE HEAD'S SEARCH (PGS-A14). The word under its `search: { param }` is taken out of the choices, so it is never read
+  /* THE HEAD'S SEARCH. The word under its `search: { param }` is taken out of the choices, so it is never read
      as a field, and narrows every list the page draws to the rows that say it (`page-search.ts`). A page whose head
      declares no search reads the same key as any other word the address holds: as nothing. */
   const laidBlocks = laid.map((l) => l.block);
@@ -1673,7 +1673,7 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
       const folded: BlockResult = { ...unacted(shorn(b)), rows: [], matched: 0, refusals: [], drawn: false, why: 'when' };
       return added === undefined ? folded : { ...folded, added };
     }
-    /* THE PAGE'S ROW IS THE ENTRY ITS TEXT SITS ON, so `{{money:price}}` and `{{blockers.count}}` read the row (PGS-B03). */
+    /* THE PAGE'S ROW IS THE ENTRY ITS TEXT SITS ON, so `{{money:price}}` and `{{blockers.count}}` read the row. */
     const on = found.row ? { ...deps, here: found.row } : deps;
     const read = rowNamed(deps, found.row, readBlock(clauses.size > 0 || log ? narrowed(on, b, clauses, log) : on, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
@@ -1751,7 +1751,7 @@ function foundAcross(blocks: readonly BlockResult[], searched: ReadonlyMap<strin
 }
 
 /**
- * THE HEAD OVER A PAGE'S TITLE (PGS-A16), its parts resolved for this read, or `null` when it declares none or none has
+ * THE HEAD OVER A PAGE'S TITLE, its parts resolved for this read, or `null` when it declares none or none has
  * anything to say. A count and a state read their figure as a stat cell does; the action is cut to the reader's level as
  * a block's actions are, and left off when it does not reach.
  */
@@ -2084,7 +2084,7 @@ function readerFilters(
   /* A FILTER OF ITS OWN CHOICES IS NO FIELD'S (`options:`), and is answered beside the fields' filters below. */
   const declared = all.filter((d) => d.options === undefined);
 
-  /* A PAGE THAT DRAWS THE LOG IS FILTERED BY ITS OWN THREE QUESTIONS (PGS-C24): who wrote a line, what kind of change it
+  /* A PAGE THAT DRAWS THE LOG IS FILTERED BY ITS OWN THREE QUESTIONS: who wrote a line, what kind of change it
      was and which list it was on, answered from the log and never from a list's field of the same word. */
   const logged = blocks.some((b) => b !== null && typeof b === 'object' && b.source === 'activity')
     ? logFilters(deps, declared.filter((d) => (LOG_FILTERS as readonly string[]).includes(d.field)), filter)
@@ -2185,7 +2185,7 @@ function readerFilters(
       for (const r of pointed?.ok ? pointed.value.rows : []) {
         if (r.seq === null) continue;
         const t = title && Object.hasOwn(r.fields, title) ? r.fields[title] : null;
-        /* AND ITS HUE, WHEN IT HOLDS ONE, so a project's chip wears the project's colour as the sidebar does (E24). */
+        /* AND ITS HUE, WHEN IT HOLDS ONE, so a project's chip wears the project's colour as the sidebar does. */
         const hue = r.fields['hue'];
         const dot = typeof hue === 'number' && Number.isInteger(hue) && hue >= 0 && hue < 360 ? { hue } : {};
         named.set(r.id, { value: String(r.seq), label: typeof t === 'string' && t.trim() !== '' ? t : `#${r.seq}`, ...dot });
@@ -2256,7 +2256,7 @@ function optionsOf(raw: unknown): Choice[] {
   });
 }
 
-/* ── the sources the record reads (PGS-A11) ──────────────────────────────── */
+/* ── the sources the record reads ──────────────────────────────── */
 
 /** The kinds that draw a host source's rows: a table, cards, and the pack primitives that draw rows. */
 const HOST_ROW_KINDS: ReadonlySet<string> = new Set(['table', 'cards', 'list', 'rows', 'grid']);
@@ -2291,7 +2291,7 @@ function hostBlock(deps: PageDeps, block: PageBlock, host: HostSource, base: Blo
   return { ...base, rows, matched: got.value.matched ?? rows.length, ...cursor };
 }
 
-/* ── the log's own filters (PGS-C24) ─────────────────────────────────────── */
+/* ── the log's own filters ─────────────────────────────────────── */
 
 /** The three questions a page over the log may filter it by: who wrote a line, what kind of change, which list. */
 export const LOG_FILTERS = ['who', 'kind', 'list'] as const;
@@ -2493,7 +2493,7 @@ function leafHolds(deps: PageDeps, when: WhenLeaf): boolean {
      and on a record that holds money it is not empty in any sense a person means. True while the reading carries how
      far it looked, false while it does not. */
   if (when.beyond !== undefined) return when.beyond === (beyondOf(read.value) !== null);
-  /* EMPTY IS THE ONE TEST A FIGURE WITH NO VALUE MEETS (PGS-C06): true while no amount is held in any currency. A sum of
+  /* EMPTY IS THE ONE TEST A FIGURE WITH NO VALUE MEETS: true while no amount is held in any currency. A sum of
      money over no rows reads 0 with no currency, which is no amount at all; 0 EGP typed as a balance is one, and a count
      of nought is a count. A figure that cannot be read, or that nobody declared, still draws nothing, above. */
   if (when.empty !== undefined) return when.empty === (said.length === 0 || (!parts && decl.format === 'money' && !read.value.unit && read.value.value === 0));
@@ -2617,7 +2617,7 @@ export type PageRow = Entry & {
 /** The keys a block answers one to a row, which go with the rows a section does not send. */
 const ALIGNED = ['scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'whens', 'done_now', 'next', 'short_now', 'changes', 'working_now', 'quiet', 'files', 'helpers'] as const;
 
-/** The mark a cut text ends in, so a reader sees there is more (E23). One code point, counted in the cut. */
+/** The mark a cut text ends in, so a reader sees there is more. One code point, counted in the cut. */
 export const CUT_MARK = '…';
 
 /** A text cut at `ROW_TEXT_MOST` code points, its last one `CUT_MARK`, or `null` when it is no longer than that. */
@@ -2649,7 +2649,7 @@ function cutValue(value: Json): Json {
  *
  * THE PROJECTS PAGE ANSWERED 760 KB, AND 723 KB OF IT WAS NOTES NOTHING DREW. "In play", "Parked and finished" and "Not
  * in play" each shipped every project's whole `note` document, up to 71 KB a row, under columns that never read it, and
- * the page reads itself again on every write to the record (`loop/research-real-record.md`, Projects). So a text or a
+ * the page reads itself again on every write to the record (Projects). So a text or a
  * document past `ROW_TEXT_MOST` characters is cut there, as `list` cuts it for an agent, and the row says `clipped`; a
  * row's own page and `get` still answer it whole, and a block that draws a whole document reads it as a `{{path}}`
  * value (`valuesOf`), which this leaves alone.
@@ -2757,7 +2757,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      installed block drawing a hole on the page; nothing here still says a deploy is owed. */
   /* `of:` IS READ BY ONE KIND OVER ONE KIND OF SOURCE, and anywhere else it would be a sentence the block drew
      without, which is the misspelt key above by another route. */
-  /* AND A HEAT OVER A LIST READS ONE TOO (PGS-B05): each day's whole, which its wash is then a share of (`wholeOf`). */
+  /* AND A HEAT OVER A LIST READS ONE TOO: each day's whole, which its wash is then a share of (`wholeOf`). */
   /* ONLY WHERE A WHOLE READ IS HANDED (`handsWhole`): without one nothing reads a heat's `of:`, and it is unread again. */
   const takesOf = block.kind === 'ring' || (block.kind === 'heat' && handsWhole());
   if (block.of !== undefined && !(takesOf && typeof block.source === 'string' && block.source.startsWith('register.')))
@@ -2769,7 +2769,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     });
 
   const base: BlockResult = { ...block, rows: [], matched: 0, refusals: unread };
-  /* WHAT MAY BE PRESSED IS NEVER SENT AS IT WAS DECLARED (PGS-A12): it is cut to this reader below, once the block is
+  /* WHAT MAY BE PRESSED IS NEVER SENT AS IT WAS DECLARED: it is cut to this reader below, once the block is
      drawn, and a block not drawn, or refused, carries none. */
   delete base.actions;
   delete base.row_actions;
@@ -2813,7 +2813,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     }
   }
 
-  /* A NOTE THAT SAYS SEVERAL SENTENCES SAYS ONE (PGS-A13), the first whose `when:` holds, read here and not by each host,
+  /* A NOTE THAT SAYS SEVERAL SENTENCES SAYS ONE, the first whose `when:` holds, read here and not by each host,
      so every reader of the page is said the same sentence: "3 questions wait for you" while they wait, and the calm line
      only when nothing does. Its words become the body before the holes are filled, so they are filled as any body's
      are, and its tone, when it has one, is the block's. A model's line put on a lead as `said` still wins over it, as it
@@ -2940,7 +2940,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const computed = sourceModule(block.source);
   /* A GROUP OF WALKS IS OFFERED WHAT IT MAY SELL BY WALK (`walkSells`), which a source that answers one walk leaves be. */
   if (computed) return walkSells(deps, block, computed.read(deps, block, base, also, sourceKit(deps)));
-  /* A SOURCE THE RECORD READS AND THE KERNEL CANNOT (PGS-A11), such as every list with its count, is asked only after the
+  /* A SOURCE THE RECORD READS AND THE KERNEL CANNOT, such as every list with its count, is asked only after the
      registered ones, so it never shadows one, and never for a list. Its rows come back on the one rows path. */
   const hosted = block.source.startsWith('register.') || block.source.startsWith('metric.') ? undefined : deps.hostSources?.(block.source);
   if (hosted) return hostBlock(deps, block, hosted, base, also);
@@ -2990,10 +2990,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      series a measure over the period and the one before, bucketed by the record's local day or week (`measures.ts`).
      A year of hourly polls is a few hundred numbers on the wire rather than every reading. */
   if ((block.kind === 'stat' || block.kind === 'lines') && deps.readings && (block.columns?.length ?? 0) >= 2) {
-    /* THE FIFTH COLUMN IS THE READING AS MONEY (REC-C03): integer minor units with the reading's own currency, read in
+    /* THE FIFTH COLUMN IS THE READING AS MONEY: integer minor units with the reading's own currency, read in
        place of `value` where a row holds it (`measures.ts` `moneyOf`), so "Monthly revenue" of USD 48.15 is never the
        decimal 4,815 with a unit of text. A reading in another currency is a line of its own, never added to this one. */
-    /* AND THE SIXTH GROUPS THEM (E26): a field each measure is listed under, such as its project, and a grouped `lines`
+    /* AND THE SIXTH GROUPS THEM: a field each measure is listed under, such as its project, and a grouped `lines`
        block lists every measure it draws no line for under its group, the quiet ones too (`measureLines`). */
     const [when, val, name, unit, amount, group] = (block.columns ?? []).map((c) => c.field);
     const missing = [when, val, name, unit, amount, group].filter((f): f is string => f !== undefined && !Object.hasOwn(schema.fields, f));
@@ -3045,7 +3045,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      ask are checked before any query, so a block that cannot say which project draws nothing rather
      than every row of the register. */
   const inherit = block.inherit === true;
-  /* THE LIST OF RUNS SAYS WHERE A RUN APPLIES IN ITS OWN WAY (AGT-C12): a run is placed in a project by that project's
+  /* THE LIST OF RUNS SAYS WHERE A RUN APPLIES IN ITS OWN WAY: a run is placed in a project by that project's
      spoken name, which `projectsOf` reads as the two run sources read it, and no `scope:` field says so. So over that
      list `as: scope` is taken on the run's project and answered below, and it is not a scope this block inherits by. */
   const runs = register === SESSION;
@@ -3250,7 +3250,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
         refusals: also({ code: 'MIXED_CURRENCY', fix: `A row here is in ${other.currency} and ${figure?.id} is in ${unit}, and two currencies are never set against each other. Give the row's ${limitField} in ${unit}, or read a figure in ${other.currency}.`, at: figure?.at ?? 'spent' }),
       };
   }
-  /* A KIND THAT ADDS UP ANSWERS ITS WHOLE (PGS-B05): its parts and its total over every row the scope and the `where`
+  /* A KIND THAT ADDS UP ANSWERS ITS WHOLE: its parts and its total over every row the scope and the `where`
      admit, read here after every check above, so a block refused for a column is never added up first. The rows above
      are the first of them and ride beside it. A BLOCK THAT INHERITS ADDS UP ITS PROJECT'S ROWS AND THE ONES THAT APPLY
      EVERYWHERE, the two sentences its list was read by, as one. */
@@ -3328,7 +3328,7 @@ type StaleDays = { by: string; days: ReadonlyMap<string, string> };
  * its own value of that field.
  *
  * THE TYPED DAY IS NOT THE AGE. A bank message writes a balance on a Ledger row and never the account's typed "As of",
- * so every account on the owner's record read out of date and would go on reading it after messages filed (REC-B03). A
+ * so every account on the owner's record read out of date and would go on reading it after messages filed. A
  * group with no confirmed day says none, and the card keeps the day its row holds.
  */
 function staleDaysOf(deps: PageDeps, register: string, figure: unknown): StaleDays | Refusal {
@@ -3627,7 +3627,7 @@ function whenColumnFault(deps: PageDeps, block: PageBlock): Refusal | null {
 }
 
 /**
- * EACH CARD'S WHEN (W096, REC-C16): the figure its when column names, with `{{field}}` filled from the card's own row,
+ * EACH CARD'S WHEN: the figure its when column names, with `{{field}}` filled from the card's own row,
  * read once a card as the project page's own tile reads it, so "2 days" on a card and "Last worked 2 days" on the
  * project's page are one reading. A card whose figure reads nothing, or is refused, draws no line, never nought.
  */
@@ -4148,7 +4148,7 @@ function wholeShape(deps: PageDeps, block: PageBlock, register: string, schema: 
 }
 
 /**
- * A kind that adds up, over every row its scope and `where` admit (PGS-B05): the parts by label and the total, or
+ * A kind that adds up, over every row its scope and `where` admit: the parts by label and the total, or
  * `null` when its columns name nothing to add up. `whole` is a heat's `of:` as a predicate, `null` when it has none.
  *
  * MONEY IS ADDED UP AS A FIGURE ADDS IT (`fx.ts` `across`): in the home currency at each amount's own day's rate when
@@ -4295,7 +4295,7 @@ function listInherited(
 function metricBlock(deps: PageDeps, block: PageBlock, id: string, base: BlockResult, also: (...r: Refusal[]) => Refusal[]): BlockResult {
   if (block.kind !== 'bar' && block.kind !== 'split')
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: `A ${block.kind} does not read a figure yet; a bar or a split does.`, at: 'source' }) };
-  /* A FIGURE'S PARAMETER IS SPLIT OFF AT THE FIRST COLON, as a figure cell's is (PGS-A04), so a split on a project page
+  /* A FIGURE'S PARAMETER IS SPLIT OFF AT THE FIRST COLON, as a figure cell's is, so a split on a project page
      over `metric.<cost>:{{name}}` draws that project's parts. The refusal names the figure, never the parameter. */
   const colon = id.indexOf(':');
   const name = colon < 0 ? id : id.slice(0, colon);
@@ -5112,7 +5112,7 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
   if (decl.for?.register) named.add(decl.for.register);
   for (const block of decl.blocks ?? []) {
     add(block.source);
-    /* A `where:` THAT HOPS INTO ANOTHER LIST READS THAT LIST (audit 49-50, finding 5). A table over Categories kept to
+    /* A `where:` THAT HOPS INTO ANOTHER LIST READS THAT LIST. A table over Categories kept to
        the ones a transaction points at was held by Categories alone, so a member who may not open Transactions read
        which categories have entries, off a page. A figure's hops were already named (`figureLists`); a block's own
        `where:` and a ring's or a heat's `of:` are named here, by the same walk. */
@@ -5360,7 +5360,7 @@ export function pathsOf(block: PageBlock, figure?: (id: string) => boolean, unfi
  * THE SHAPE ONLY. Which of several readings two words get is the record's to say, in the one order `twoOf` writes down,
  * so this answers the form the words take and `valueAt` and `namedAt` walk the order over it.
  *
- * `<list>#<n>.<field>.<part>` IS ONE STEP INTO A FIELD (PGS-B13): a field of the row a link points at, a money's
+ * `<list>#<n>.<field>.<part>` IS ONE STEP INTO A FIELD: a field of the row a link points at, a money's
  * `amount` or `currency`, or how many a list field holds (`count`). A fourth part is nothing, so a path never walks
  * from row to row to row.
  */
@@ -5384,7 +5384,7 @@ function pathOf(
   const asked = figureAsked(path);
   if (asked) return { metric: asked.id, param: asked.param };
   const parts = path.split('.');
-  /* THE ENTRY THE TEXT SITS ON IS READ FIRST (PGS-B03): one word its list declares is its field, and `<field>.count` over
+  /* THE ENTRY THE TEXT SITS ON IS READ FIRST: one word its list declares is its field, and `<field>.count` over
      one of its list fields is how many that field holds. A word it does not declare reads as it always has. */
   const ownField = (word: string | undefined): boolean => own !== undefined && word !== undefined && Object.hasOwn(own, word);
   if (parts.length === 1 && ownField(path)) return { own: path };
@@ -5393,7 +5393,7 @@ function pathOf(
   if (parts.length === 3) {
     const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(parts[0]!);
     const [, field, then] = parts as [string, string, string];
-    /* `<measure>.<period>.since` IS THE DAY A ROW'S NEWEST READING WAS READ (PGS-B13), on a page with a row. */
+    /* `<measure>.<period>.since` IS THE DAY A ROW'S NEWEST READING WAS READ, on a page with a row. */
     if (!row && then === 'since' && /^[a-z][a-z0-9_-]*$/.test(parts[0]!) && /^[A-Za-z][A-Za-z0-9_-]*$/.test(field)) return { measure: parts[0]!, period: field, since: true };
     return row && /^[a-z][a-z0-9_]*$/.test(then) ? { register: row[1]!, seq: Number(row[2]), field, then } : null;
   }
@@ -5407,7 +5407,7 @@ function pathOf(
      say the same words, and `twoOf`'s order decides between the two. */
   if (tail === 'change' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head };
   /* `<figure>.moved` IS THE SAME MOVE SAID IN WORDS, "6% down" and "8% up", for a sentence that reads on from it: "6% down
-     on a month ago" where `.change` wrote "−6% on a month ago" (the UI pass of 20 October, P20). Nought is `0%` in both. */
+     on a month ago" where `.change` wrote "−6% on a month ago" (P20). Nought is `0%` in both. */
   if (tail === 'moved' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head, words: true };
   /* `<figure>.first`, `.names`, `.more` AND `.since` ARE THE ROWS A FIGURE COUNTS (`rowsValue`), decided between a figure
      and a list's state of that name exactly as `.change` is. */
@@ -5541,7 +5541,7 @@ type PathRule = {
 const listNamed = (deps: PageDeps, head: string): Schema | null => (LIST_ID.test(head) ? deps.schemaOf(head) : null);
 
 /**
- * THE ORDER FOR TWO WORDS, written down here once and walked (PGS-B13, `05 §7.1`). A path two rules could read is read
+ * THE ORDER FOR TWO WORDS, written down here once and walked (`05 §7.1`). A path two rules could read is read
  * by the first that takes it, and never guessed:
  *
  * 1. A list and `count`, or a state its list's state field holds: `tasks.count`, `tasks.open`.
@@ -5793,7 +5793,7 @@ function moduleFigure(src: ModuleReads, module: string, word: string): MetricDec
 }
 
 /**
- * `<list>#<n>.<field>.<part>`: one step into a row's field (PGS-B13), or nothing.
+ * `<list>#<n>.<field>.<part>`: one step into a row's field, or nothing.
  *
  * - A LINK'S ROW: `tasks#1.project.name` is the name of the project the task points at, a field that list declares and
  *   a reader may be shown, and only to a reader of both lists. One step: a link on the far row is not followed.
@@ -6089,7 +6089,7 @@ function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, J
     const v = valueAt(deps, path, how);
     if (v !== undefined) out[path] = v;
     else if (!namedAt(deps, path)) unnamed.push(path);
-    /* AND WHICH RULE READ IT, for every path that holds a value (PGS-B13). */
+    /* AND WHICH RULE READ IT, for every path that holds a value. */
     if (v !== undefined && how.as) as[path] = how.as;
     /* A FIGURE'S CONVERSION GOES OUT BESIDE ITS AMOUNT (rates-foot-note-80), so a sentence can say its rates are old. */
     if (v !== undefined && how.fx) fx[path] = how.fx;

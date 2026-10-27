@@ -10,7 +10,7 @@
  *
  * ONE QUESTION, NEVER ONE A LINE. The run returns the one question with its cause, `money.last-day`, and each answer as
  * the patches it makes, so the host files at most one open question for the cause and picking an answer is the writes
- * (the shell's "a scheduled script may end its run by filing one question": `scope/area-record-a.md`, N6). Handed an
+ * (the shell's "a scheduled script may end its run by filing one question": `scope/area-record-a.md`). Handed an
  * answer as `ctx.input.answer`, by a rule that asked in its own words, the run makes the same writes itself. Once
  * answered, every line it asked about holds days, so the next run finds none and asks nothing.
  *

@@ -1,5 +1,5 @@
 /**
- * WHAT AN AGENT ACTING FOR A COLLEAGUE CAN REACH, IN ONE LINE (sharing plan §2.9, §3): "You act for Sam: Kiln, view;
+ * WHAT AN AGENT ACTING FOR A COLLEAGUE CAN REACH, IN ONE LINE: "You act for Sam: Kiln, view;
  * amounts hidden." `context` says it beside May, so an agent knows before its first read why a list it expected is not
  * there, and that a figure it does not see is hidden from it rather than missing.
  *

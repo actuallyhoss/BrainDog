@@ -1,5 +1,5 @@
 /**
- * A question's cause (AGT-C07): the key a body derives, exact after sorting and never looser.
+ * A question's cause: the key a body derives, exact after sorting and never looser.
  *
  * WHAT WAS MEASURED BEFORE THIS. A proposal had no key at all, so SG89 and SG90 on the owner's record, the same
  * question seven seconds apart, were two cards in "Needs you". These hold the derivation itself: the same ask in any

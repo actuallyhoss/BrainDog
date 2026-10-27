@@ -1,5 +1,5 @@
 /**
- * The walk, held to research-audit-23 item 6: a run question is kept by the whole place its runs worked in, the remote
+ * The walk, held to this: a run question is kept by the whole place its runs worked in, the remote
  * or else the folder, and never by the repository's last name, so one yes about `sam/lantern` never places, or lists on
  * the project, a run in somebody else's `lantern`. Two places of one name are two questions, each said with its owner.
  */
@@ -87,13 +87,13 @@ test('ONE PLACE OF A NAME IS STILL SAID BY ITS NAME, and two folders of one name
     .map((s) => s.question)
     .sort();
 
-  /* A folder called exactly what the project is called places its runs and asks nothing (scope D5); a remote still asks. */
+  /* A folder called exactly what the project is called places its runs and asks nothing; a remote still asks. */
   assert.deepEqual(asked, ['A run worked in kiln. Is that Kiln?']);
   assert.ok(!asked.some((q) => q.includes('/Users') || q.includes('github.com')), 'never a path or a host');
   sql.close();
 });
 
-test('A FOLDER CALLED EXACTLY WHAT A PROJECT IS CALLED PLACES ITS RUNS UNASKED; a part of a name asks once; an import asks nothing (scope D5)', async () => {
+test('A FOLDER CALLED EXACTLY WHAT A PROJECT IS CALLED PLACES ITS RUNS UNASKED; a part of a name asks once; an import asks nothing', async () => {
   const { k, sql, deps, clock } = await record();
   const braindog = value<Entry>(k.create('things', { name: 'BrainDog' }, OWNER));
   value(k.create('things', { name: 'The Studio Brain', repos: ['github.com/sam/brain'] }, OWNER));

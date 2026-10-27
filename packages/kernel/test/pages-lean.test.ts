@@ -3,8 +3,7 @@
  *
  * MEASURED ON THE OWNER'S RECORD: Projects answered 760 KB, and 723 KB of it was notes nothing drew. "In play", the
  * "Parked and finished" heading and "Not in play" each shipped every project's whole `note`, up to 71 KB a row, under
- * columns that never read it, and the page reads itself again on every write (`loop/research-real-record.md`,
- * Projects). So a page's rows carry each long text cut at 280 characters, as `list` cuts it for an agent, with
+ * columns that never read it, and the page reads itself again on every write. So a page's rows carry each long text cut at 280 characters, as `list` cuts it for an agent, with
  * `clipped` on the row; a section, drawn as its count, sends no row at all; and everything else a host acts on a row
  * with is kept, because the docked panel, a tick's Undo and a row's tone read fields no column draws.
  */
@@ -144,7 +143,7 @@ test('A LONG TEXT IS CUT AT 280 CHARACTERS, as list cuts it, and the row says cl
   const row = cards.rows[0] as PageRow;
   assert.equal(row.clipped, true);
   assert.ok([...String(row.fields.note)].length <= ROW_TEXT_MOST);
-  /* EVERY CUT ENDS IN "…" (E23), so a reader sees there is more. */
+  /* EVERY CUT ENDS IN "…", so a reader sees there is more. */
   assert.ok(String(row.fields.note).endsWith('…'), 'the cut is not marked');
   assert.ok(noteOf('Project 01').startsWith(String(row.fields.note).slice(0, -1)), 'the cut is the start of the note');
 

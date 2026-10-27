@@ -1,5 +1,5 @@
 /**
- * RUN A RULE AGAIN OVER WHAT IS ALREADY THERE (SHL-D07: re-run every rule over rows a field is still empty
+ * RUN A RULE AGAIN OVER WHAT IS ALREADY THERE (re-run every rule over rows a field is still empty
  * on). A rule fires on a write, so one written today has never seen what was written before it. The record's
  * `ruleApply` walks it over the rows already there, `dry` first, and the real press is one batch one Undo takes back.
  *
@@ -7,7 +7,7 @@
  * only the record's `dryRun` of the same body says which other rule got to a row first (`takenBy`, by rule name). Both
  * are reads, and nothing here writes until the owner presses Run.
  *
- * AND THE TRY PANEL'S CONTEST (job 6): a dry run of an inline body answers `won`, `lost` and `takenBy`, said here as
+ * AND THE TRY PANEL'S CONTEST: a dry run of an inline body answers `won`, `lost` and `takenBy`, said here as
  * one line each by rule name, never by id.
  *
  * PURE, with the call handed in, so `node --test` drives every branch without a socket.

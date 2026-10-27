@@ -1,5 +1,5 @@
 /**
- * A shared page tells the truth (USE-A07): what `sharedPage` answers for a page with a money table, a figure, a sentence
+ * A shared page tells the truth: what `sharedPage` answers for a page with a money table, a figure, a sentence
  * filled from the record, and blocks a link hides.
  *
  * A money cell arrives whole, as minor units and its own currency, and two currencies are never one sum. A hidden block

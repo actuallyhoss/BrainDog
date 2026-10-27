@@ -139,7 +139,7 @@
               ><span class="what">{familyWords.count(fam.count)}</span>{#if said}<span class="sep">{' · '}</span><span class="said">{said}</span>{/if}</span
             >
           </span>
-          <!-- WHAT ITS SWITCHES SAY, IN THE SWITCHES' COLUMN (UI audit of 22 October, 28): a bare chevron in a column of
+          <!-- WHAT ITS SWITCHES SAY, IN THE SWITCHES' COLUMN: a bare chevron in a column of
                switches read as a row with its switch missing. "All on", then the chevron that opens it. -->
           <span class="aside fold-end">
             {#if ontoggle && familyOn(fam.members)}<span class="fold-on">{familyOn(fam.members)}</span>{/if}
@@ -192,7 +192,7 @@
 
   /* THE NAME WRAPS TO A SECOND LINE BEFORE IT IS CUT: "File what an account holds in the account's book" lost its end
      on a phone, and the end is the part that says which. */
-  /* AND IT IS CUT AT THE SECOND LINE, NEVER DRAWN OVER WHAT IS UNDER IT (the scope of 24 October, E34): a clamp with the
+  /* AND IT IS CUT AT THE SECOND LINE, NEVER DRAWN OVER WHAT IS UNDER IT (the scope of 24 October): a clamp with the
      overflow left visible still painted the third line of "Import the next ready-made skin bundle" over "A clock · Ran
      once" at 390, because under 640 the shared rows let a title's overflow show (`rows.css`). */
   .name {
@@ -272,7 +272,7 @@
     cursor: pointer;
   }
 
-  /* IN THE INK OF EVERY OTHER NAME (the pass of 27 October): a button's own grey made each family read as turned
+  /* IN THE INK OF EVERY OTHER NAME: a button's own grey made each family read as turned
      off, under a heading that said On. */
   .kin .name {
     color: var(--ink);

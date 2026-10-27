@@ -58,7 +58,7 @@ const value = <T>(r: unknown): T => {
   return x.value as T;
 };
 
-/* EACH QUESTION ITS OWN ROW, since the same row proposed again joins the open question (AGT-C07). */
+/* EACH QUESTION ITS OWN ROW, since the same row proposed again joins the open question. */
 const rows = (register: string, question: string) => (register === 'diary' ? [{ body: `Dinner with the auditor: ${question}` }] : [{ what: `Invoice: ${question}`, state: 'open' }]);
 
 async function ask(api: Awaited<ReturnType<typeof createRecordApi>>, register: string, question: string, ctx: CallContext = agent): Promise<string> {

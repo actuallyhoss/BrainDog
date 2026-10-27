@@ -131,7 +131,7 @@
     ground?: Omit<VisualContext, 'now'> | undefined;
   } = $props();
 
-  /* WHO DECIDES THIS ONE, said on the card of a reader it is not named for (USE-A13); nothing for nobody or for her. */
+  /* WHO DECIDES THIS ONE, said on the card of a reader it is not named for; nothing for nobody or for her. */
   const decidesLine = $derived(
     othersLine(
       question as { id: string; decider?: string | null },
@@ -170,7 +170,7 @@
      reads the options once with the page's way to a file (`waysOf` keeps an address of another host off the card).
      Before `inlineOf`, so answers that are pictures are the form's choices and not a row of bare buttons. */
   const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: recordNow(), lead, file: fileAt }));
-  /* WHO ASKED IS A NAME AND THE APP, NEVER THE RUN'S TITLE (the audit of 22 October, U-A7): "Built the big round on master
+  /* WHO ASKED IS A NAME AND THE APP, NEVER THE RUN'S TITLE: "Built the big round on master
      lo…" cut at 24 characters said nothing, and on a phone it wrapped. The run is named on the question's own page. */
   const from = $derived([card.by.app].filter((s): s is string => s !== null));
   /* THE ANSWERS AS A ROW OF BUTTONS, one press each (`inlineOf`), or the form's list to choose from and Decide. */
@@ -233,7 +233,7 @@
   const seeLink = $derived(seeWhole && !(card.lines.length > 0 && card.more === 0 && card.does === ''));
   /* WHETHER THE SIDE SAYS WHAT IT CHANGES: a line of what accepting does, money, or a change from what to what. The
      heading is drawn only over such a line; the link to the whole change alone is drawn alone. */
-  /* THE MONEY AN ANSWER MOVES IS THE LINE OVER THE BUTTONS (the scope of 24 October, E10), and the button says Accept:
+  /* THE MONEY AN ANSWER MOVES IS THE LINE OVER THE BUTTONS (the scope of 24 October), and the button says Accept:
      "Accept EGP 74,092.16 and $9,074.01 USD, can't be undone easily" wrapped to five lines at 390. Where nobody may
      answer, there are no buttons to stand over, and the side says it under what it changes as before. */
   const moneyAbove = $derived(drawn && card.money !== '' && (!card.merge || compact));
@@ -772,8 +772,8 @@
       <!-- COMPACT, WHO ASKED AND HOW LONG IT HAS WAITED ARE ONE QUIET LINE: the kind of thing, who, and when. -->
       {#if compact}<p class="dc-meta" dir="auto">{[card.by.name, ...from, card.when].filter((s) => s !== '').join(' · ')}</p>{/if}
       {#if !compact}
-        <!-- WHO ASKED AND WHEN, one quiet line UNDER the question at every width, so every card starts with its sentence
-             (the audit of 22 October, U-A7): the face and name, and the app it ran in where it has a name. "Asked by" is said to a screen reader, where the eye reads
+        <!-- WHO ASKED AND WHEN, one quiet line UNDER the question at every width, so every card starts with its sentence:
+            the face and name, and the app it ran in where it has a name. "Asked by" is said to a screen reader, where the eye reads
              the line's place. The band is kept here for the keys and the ranking, and said in the answering button's
              words instead. -->
         <p class="queue-by">
@@ -790,7 +790,7 @@
       {/if}
       {#if decidesLine}<p class="qa-later" dir="auto">{decidesLine}</p>{/if}
       {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
-      <!-- HOW LONG IT WAITS (ENG-B14): under why, in the side, where whoever asked wrote one; here, under the question,
+      <!-- HOW LONG IT WAITS: under why, in the side, where whoever asked wrote one; here, under the question,
            where nobody did. -->
       {#if !compact && (!card.why || ladder) && card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
       <!-- WHAT THE QUESTION HOLDS TO LOOK AT, a still or a quiet card under it, opened full width on a press. -->
@@ -882,9 +882,9 @@
           {/if}
           {@render later(inline)}
         </div>
-        <!-- WHAT THE FILLED ANSWER DOES, one line under the row (U-A9), where its answers each carry one: "File them" says
+        <!-- WHAT THE FILLED ANSWER DOES, one line under the row, where its answers each carry one: "File them" says
              what filing does before the press, as its rectangle did. -->
-        <!-- THE CARE A HARD ANSWER ASKS FOR, A LINE UNDER THE ROW (audit Z28): on the button it wrapped to two lines at 390. -->
+        <!-- THE CARE A HARD ANSWER ASKS FOR, A LINE UNDER THE ROW: on the button it wrapped to two lines at 390. -->
         {#if inline && hardLine}<p class="dc-hard" id="{uid}-hard" dir="auto"><span class="dc-hard-word">{hardLine}.</span> {hardReason}</p>{/if}
         {#if inline && !compact && primaryDoes}<p class="dc-does" dir="auto">{primaryDoes}</p>{/if}
       {/if}
@@ -983,7 +983,7 @@
     order: 2;
   }
 
-  /* THE BULK BOX SITS AT THE END OF THE QUESTION'S FIRST LINE, since the question leads the card (U-A7); it sat at the end
+  /* THE BULK BOX SITS AT THE END OF THE QUESTION'S FIRST LINE, since the question leads the card; it sat at the end
      of the by-line while the by-line was the card's first. */
   .dc:has(> .qa-select) > .dc-main > .queue-question {
     grid-row: 1;
@@ -1212,7 +1212,7 @@
     font-weight: var(--fw-medium);
   }
 
-  /* THE CARE A HARD ANSWER ASKS FOR, quiet, under the row of answers (audit Z28). */
+  /* THE CARE A HARD ANSWER ASKS FOR, quiet, under the row of answers. */
   .dc-hard {
     margin: 0;
     color: var(--ink-2);
@@ -1554,7 +1554,7 @@
   }
 
   /* ASK ME LATER (today F11): the clock and its words, quiet, at the end of the row of answers; 44 tall under a thumb.
-     RIGHT AFTER THE LAST ANSWER (U-A7), never pushed to the far edge, where it sat alone on a row of its own. */
+     RIGHT AFTER THE LAST ANSWER, never pushed to the far edge, where it sat alone on a row of its own. */
   .dc-actions > :global(.dc-later) {
     display: inline-flex;
     align-items: center;

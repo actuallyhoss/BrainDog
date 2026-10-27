@@ -1,5 +1,5 @@
 /**
- * What was said survives the link (LCH-A04, the onboarding target's step 4): the page sends the sentence with the start,
+ * What was said survives the link (the onboarding target's step 4): the page sends the sentence with the start,
  * and the tab a link opens on another device reads it back off the fragment, wipes it, and builds from it.
  *
  * THE SAME SAMPLE SENTENCES AS THE HOST'S TEST (`packages/record/test/signup-said.test.ts`), so the page leaves out of
@@ -242,7 +242,7 @@ function record() {
   return { written, setup };
 }
 
-test('PARTIAL, TRY AGAIN GOES IN, RELOAD: nothing is written twice (audit 59, claim 2)', () => {
+test('PARTIAL, TRY AGAIN GOES IN, RELOAD: nothing is written twice', () => {
   const desk = storage();
   const rec = record();
   /* THE BUILD AS THE SENTENCE READS, the same on every load of the page. */

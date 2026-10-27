@@ -3,7 +3,7 @@
  *
  * THE TABLE SAID ALL OF IT AND REACHED NO AGENT. What a kind is for, its cells and its forms were comments beside its
  * entry in `kinds.ts`, and the grammar an agent is handed listed the forty by name and nothing more, so `spec`,
- * the block a page reaches for most, was called the workhorse in a code comment only (PGS-A08). These lines are what
+ * the block a page reaches for most, was called the workhorse in a code comment only. These lines are what
  * the record's `grammar/kinds` says (`packages/record/src/grammar.ts`), one each, short enough to read in a turn.
  *
  * `Record<Kind, ...>` SO A KIND ADDED TO THE TABLE WITHOUT ITS LINE DOES NOT COMPILE, and `kind-lines.test.ts` holds

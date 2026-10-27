@@ -1,5 +1,5 @@
 /**
- * An update that takes away a door the record is using says so, and finds the add-on that takes it over (REC-A16, step 2).
+ * An update that takes away a door the record is using says so, and finds the add-on that takes it over (step 2).
  *
  * Driven on a fresh record as the scope draws it: an add-on, `banky`, holding a text door with a live address and one
  * arrival, and a second door nobody has used. `banky` 1.1.0 drops both. The host offers `teller`, by the same author,

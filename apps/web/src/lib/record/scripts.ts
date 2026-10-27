@@ -254,7 +254,7 @@ const DUE = 'due';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * WHEN A RUN STILL TO COME IS, AGAINST THE RECORD'S CLOCK (`recordNow`, SF3): "today at 18:00", "tomorrow at 06:00" or
+ * WHEN A RUN STILL TO COME IS, AGAINST THE RECORD'S CLOCK (`recordNow`): "today at 18:00", "tomorrow at 06:00" or
  * "5 Sep at 18:00", and `DUE` once that moment has passed, since a next run seven weeks behind the clock is one waiting
  * to go, never one "7w ago".
  */

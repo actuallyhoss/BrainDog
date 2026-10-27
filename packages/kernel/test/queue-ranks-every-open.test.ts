@@ -4,7 +4,7 @@
  *
  * MEASURED BEFORE: `openQuestions` read the twenty newest and ranked those, so an expensive question asked a month ago
  * under twenty-one newer cheap ones never reached a page, and Decide's "two of them for over two weeks" counted the
- * twenty it was handed (`loop/research-audit-11-13.md`, kernel-queue-walk).
+ * twenty it was handed (kernel-queue-walk).
  */
 
 import { test } from 'node:test';
@@ -96,7 +96,7 @@ test('A QUESTION PUT OFF IS NOT COUNTED as waiting, and one asked exactly two we
   sql.close();
 });
 
-test('A QUESTION THAT CANNOT WAIT LEADS (AGT-C08): money asked today goes before an expensive question a month old', async () => {
+test('A QUESTION THAT CANNOT WAIT LEADS: money asked today goes before an expensive question a month old', async () => {
   const sql = openSqlite();
   const clock = fixedClock(NOW - 30 * DAY);
   const k = await openRecord(sql, clock);

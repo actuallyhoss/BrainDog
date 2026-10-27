@@ -123,7 +123,7 @@ export function searchWords(q: string): string[] {
 }
 
 /**
- * A search over one list by `contains`, not the index (sharing plan §2.7): the rows where every word is inside one of
+ * A search over one list by `contains`, not the index: the rows where every word is inside one of
  * `fields`, newest first, and how many there are. For a caller from whom a searchable field of the list is hidden, so
  * the index, which holds that field's words, is never asked and a hit can never say what the hidden field holds. `admit`
  * is the clause her grant and the private rows hold the list to (`admitClause`). The rank is the hit's place.
@@ -337,7 +337,7 @@ export function figuresStillIn(text: string, words: readonly string[], mask: (te
 }
 
 /**
- * THE SAME SEARCH FOR A CALLER FROM WHOM AMOUNTS ARE HIDDEN, when it asks for a figure (sharing plan §2.7, "Hide
+ * THE SAME SEARCH FOR A CALLER FROM WHOM AMOUNTS ARE HIDDEN, when it asks for a figure ("Hide
  * amounts"): a row is a hit, and counted, only when the figure is still in its text once every amount written there is
  * taken out (`mask`, the kernel's `maskMoneyText`). The index holds "Paid £923.47 for clay", so asked for `923.47` it
  * found the row for a guest who is shown "Paid £… for clay", and its title said which row held the figure.

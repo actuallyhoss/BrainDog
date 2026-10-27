@@ -29,14 +29,14 @@
  * NO EXAMPLE ROWS. An update planted on its own writes no row nobody typed, so a document that carries any is sent
  * without them.
  *
- * AND THE AGENTS PACK AND THE USE CASES, AFTER THE FIVE (`loop/research-audit-30.md`, Medium 3). The loop walked
+ * AND THE AGENTS PACK AND THE USE CASES, AFTER THE FIVE (Medium 3). The loop walked
  * `FIRST_PARTY` alone, so Agents 1.8.0 and the founder's and the team's page updates reached no record that already
  * held them: their tests planned and installed by hand, and nothing ran at night. They are BrainDog's own as much as
  * Money is, so they take the same road: Agents once the five are in, since it reads Projects, then each use case the
  * record holds, since a use case's pages read the modules under it. Their documents are built here (`documentOf`),
  * because the port lends a document for the five only.
  *
- * AND BRAINDOG'S OWN ADD-ONS FROM THE CATALOGUE, LAST (the add-ons pass of 27 October). An add-on BrainDog publishes and
+ * AND BRAINDOG'S OWN ADD-ONS FROM THE CATALOGUE, LAST. An add-on BrainDog publishes and
  * lists (Profiles, Setup sync, Pad and the rest) is BrainDog's own as much as a module is, so a newer version reaches a
  * record that holds it on the same terms, with one more: it goes in only when it reaches nothing new as well as losing
  * nothing (`reachesNew`: no service, key or approval it did not have, no script it did not run). Otherwise it is never

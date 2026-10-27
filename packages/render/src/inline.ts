@@ -66,7 +66,7 @@ export type Resolve = (path: string) => string | null | undefined | typeof UNNAM
 export type InlineOptions = {
   resolve?: Resolve;
   now?: number;
-  /** The reader's zone, an IANA name, that "today" is counted in; absent, the browser's own, else UTC (PGS-B04). */
+  /** The reader's zone, an IANA name, that "today" is counted in; absent, the browser's own, else UTC. */
   zone?: string;
   /**
    * The drawing for a glyph name, as SVG path data in a 24 box, or `null` for none.

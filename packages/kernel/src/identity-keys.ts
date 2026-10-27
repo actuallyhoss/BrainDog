@@ -531,7 +531,7 @@ export function bankKey(raw: string, legacy = false): string | null {
 
 /**
  * How long a card network's text runs, its processor's prefix included, before it may have been cut: the merchant's
- * field is twenty characters on the texts the audit of 25 October read (`FAWRY*` and fourteen), and a name whose last
+ * field is twenty characters on the texts a review read (`FAWRY*` and fourteen), and a name whose last
  * letter falls on its end, or a space short of it, cannot be told from one that went on.
  */
 export const CUT_AT = 18;
@@ -540,7 +540,7 @@ export const CUT_AT = 18;
 const STARRED = /^[\p{L}\p{N}][\p{L}\p{N} ]{0,11}\*/u;
 
 /**
- * WHETHER A BANK'S TEXT MAY BE A SHOP'S NAME CUT SHORT (the audit of 25 October, Y2): a card network's text, with a
+ * WHETHER A BANK'S TEXT MAY BE A SHOP'S NAME CUT SHORT: a card network's text, with a
  * processor's prefix or a sub-merchant's star, that runs to `CUT_AT` characters or more and ends on the name itself,
  * with no place, reference or web address after it that would say the name ended first. `FAWRY*QUILLMOOR BAKE` may
  * be cut; `GEIDEA*BRIDGE ST COFFEE 0423 LONDON GB` and `GEIDEA*PELL VINE` are whole.

@@ -60,7 +60,7 @@ const CASE_KEYS = new Set(['gate', 'rule', 'expect', 'findings', 'total', 'skip'
  * THE LIST USED TO LIVE HERE, AND IT COULD NOT SEE A GATE WITH NOTHING IN IT. Eighty-three rows in
  * this file and eighty-three trees beside it, and a check that every tree had a row; nothing asked
  * whether every gate had a tree, so `passkey`, `theme`, `deploy-parity` and `typecheck` had none and
- * the run was green (PRF-B02). The case now travels with its tree, so a tree cannot be added without
+ * the run was green. The case now travels with its tree, so a tree cannot be added without
  * one and a gate is covered by the trees that name it.
  *
  * Nothing here monkey-patches a gate: a gate that needed a special mode to be testable would be a
@@ -654,7 +654,7 @@ function everyGateHasACase(registered, cases) {
  *
  * THE WHOLE PATH, NOT ITS LAST WORD. This compared `.port` against every source here, so four port
  * keys (`keys`, `prefs`, `layout`, `a11y`) passed on `server.address().port` while every browser gate
- * asked the system for a free port and read none of them (PRF-B02). A key is read now when a file
+ * asked the system for a free port and read none of them. A key is read now when a file
  * names its section and reads the key off that section: `budget('S').key`, a binding
  * `const X = budget('S')` and then `X.key`, or `const { key } = budget('S')`.
  *

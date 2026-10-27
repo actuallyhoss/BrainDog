@@ -1,5 +1,5 @@
 /**
- * All or none within the parts taken (REC-A06, the risk the scope names: "an arrangement half applies"). A yes that
+ * All or none within the parts taken (the risk the scope names: "an arrangement half applies"). A yes that
  * stops part way takes back everything it had already done, newest first, so the question reopens holding the whole take
  * with none of it applied, and the next yes starts where the first did.
  *

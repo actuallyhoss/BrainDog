@@ -14,11 +14,11 @@
   BROWSING IS THE STORE, `/addons`. This screen used to list what could still be installed under what was, with a guess at
   what each would add; the plan now comes from the record, so it is read where the listing is.
 
-  THE LOOK (the UI pass of 20 October, agents F8, F22): the name, the sentence saying how many are installed and how
+  THE LOOK (agents F8): the name, the sentence saying how many are installed and how
   many have an update (in ink: an update is never urgent), then Installed | Browse under it, full width on a phone. Any
   updates lead in their own tile; then the add-ons themselves as rows in one tile, each with its own place's glyph
   (`glyph.ts`), its line, what it holds ("12 lists and 4 pages"), its "…" and its switch. What it holds is said by
-  `$lib/market/describe.ts`, as the add-on's own page and the store say it (E21).
+  `$lib/market/describe.ts`, as the add-on's own page and the store say it.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -74,7 +74,7 @@
   const byId = new Map(firstPartyModules().map((p) => [p.id, p]));
   /* AN ADD-ON FROM THE KENNEL is not one of the modules, so its catalogue title names it, and its id only when neither knows it. */
   let catalogueNames = $state.raw<Map<string, string>>(new Map());
-  /* AND ITS LINE, what the catalogue says it is for, where this build's modules do not know it (Z11). */
+  /* AND ITS LINE, what the catalogue says it is for, where this build's modules do not know it. */
   let catalogueSays = $state.raw<Map<string, string>>(new Map());
   /* AND THE ICON ITS CATALOGUE ENTRY CARRIES, unlisted entries too, since an installed add-on is one a record holds by id. */
   let catalogueIcons = $state.raw<Map<string, string>>(new Map());
@@ -571,7 +571,7 @@
   /* ── what they hold ────────────────────────────────────────────────────── */
 
   /**
-   * WHAT EACH INSTALLED ADD-ON HOLDS, SAID AS ITS OWN PAGE AND THE STORE SAY IT (E21): a built-in from its module, a use
+   * WHAT EACH INSTALLED ADD-ON HOLDS, SAID AS ITS OWN PAGE AND THE STORE SAY IT: a built-in from its module, a use
    * case or an add-on from outside from its listing, the one the store reads, so the screens never disagree.
    */
   const listed = $derived(listingsOf({ kennel, counts: null }));
@@ -612,7 +612,7 @@
   onMount(() => {
     /* THE NAMES ARE PART OF THE SCREEN: an installed add-on the build's modules do not know is named and described by the
        Kennel's catalogue, else by the catalogue this build ships, and the screen says it is drawn only once they have
-       landed, so it is never drawn as "Bank hsbc eg" over "Holdings" (the audit of 25 October, Z11). */
+       landed, so it is never drawn as "Bank hsbc eg" over "Holdings". */
     const named = readHostCatalogue(fetch)
       .then(async (got) => {
         kennel = got.ok ? got.index : null;

@@ -1,5 +1,5 @@
 /**
- * AN ASK TURNED AWAY BECAUSE THE MONTH'S ASKS ARE SPENT LEAVES ONE ROW (model-sign-49, audit 40-42 finding 5).
+ * AN ASK TURNED AWAY BECAUSE THE MONTH'S ASKS ARE SPENT LEAVES ONE ROW (model-sign-49).
  *
  * Slash's own `TURNED_AWAY_SQL` (`packages/slash/src/call.ts`), RESTATED because this package may not import that one
  * (`46 §5.1`); `test/slash-turned-away.test.ts` holds the two equal. The host's own month guards (the `byo` guard in

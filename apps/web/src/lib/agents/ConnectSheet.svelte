@@ -1,5 +1,5 @@
 <!--
-  CONNECT AN AGENT (AGT-A07): one sheet, opened from Settings, Agents, with the ways in as flat tiles, one open
+  CONNECT AN AGENT: one sheet, opened from Settings, Agents, with the ways in as flat tiles, one open
   at a time. Each line has its own Copy. The open tile ends in a live row that asks the record every two seconds and
   turns from "Waiting for its first call" to "Connected: Claude Code on MacBook, called 3 seconds ago".
 

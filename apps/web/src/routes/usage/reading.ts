@@ -14,9 +14,9 @@ import { monthWords, shareSaid, words, type Allowed, type Group, type MeterKey, 
 export const said = {
   allowance: "This month's allowance",
   allowanceIn: (month: string) => `${month}'s allowance`,
-  /* OFF THE CLOUD THE TILE IS THE MONTH'S RUNS (X21): a self-host has no allowance to be measured against. */
+  /* OFF THE CLOUD THE TILE IS THE MONTH'S RUNS: a self-host has no allowance to be measured against. */
   monthTitle: (current: boolean, month: string) => (current ? "This month's runs" : `${monthWords(month)}'s runs`),
-  /* THE ACTIONS IN NO PROJECT (X22): "Everywhere" read as a project of that name. */
+  /* THE ACTIONS IN NO PROJECT: "Everywhere" read as a project of that name. */
   noProject: 'Not in a project',
   weeks: words.overTime,
   days: 'Runs by day',
@@ -80,7 +80,7 @@ export function sentenceOf(view: UsageView): Sentence | null {
 }
 
 /**
- * THE MONTH AS A HOST WITH NO ALLOWANCE SHOWS IT (audit 25 October, X21): no meters, no plan and nothing waiting.
+ * THE MONTH AS A HOST WITH NO ALLOWANCE SHOWS IT: no meters, no plan and nothing waiting.
  *
  * A self-host's Directory keeps a ledger, and its record's plan is `hosted` unless `init` said otherwise, so `/usage`
  * drew "This month's allowance · Cloud" with 15,000 runs while Billing said there was nothing to bill. Only the Cloud
@@ -203,7 +203,7 @@ export function heatOf(view: Pick<UsageView, 'month' | 'days' | 'current'>, thro
 /**
  * The line under the heat grid: the busiest day and its runs.
  *
- * BUSIEST ONLY WHEN ONE DAY LEADS (audit 25 October, X22): "Busiest on Tue 1 Sep, with 1 run" stood over three days of
+ * BUSIEST ONLY WHEN ONE DAY LEADS: "Busiest on Tue 1 Sep, with 1 run" stood over three days of
  * one run each. Days that tie are named together, and a month whose every day ran alike says so.
  */
 export function daysSaid(view: Pick<UsageView, 'days'>): string | null {

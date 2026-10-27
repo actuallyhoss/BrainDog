@@ -176,7 +176,7 @@ export const BUILD = /^(?:[0-9]{4}\.[0-9]{2}\.[0-9]{2}|dev)\+[0-9a-f]{7,40}$/;
 declare const __BUILD__: string;
 
 /**
- * This command's build, the one `braindog version` prints. SENT WITH EVERY CALL as `x-braindog-cli` (AGT-B01), so the
+ * This command's build, the one `braindog version` prints. SENT WITH EVERY CALL as `x-braindog-cli`, so the
  * record can say a machine runs a command older than itself: his Mac ran the build of 1 October for a week, and
  * nothing in the record could tell.
  */

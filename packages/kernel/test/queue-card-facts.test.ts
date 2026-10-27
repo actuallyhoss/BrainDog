@@ -226,7 +226,7 @@ test('A CHANGE TO MANY ROWS SAYS WHAT IT MOVES THEM TO, AND NEW ROWS SAY THEIR N
   assert.deepEqual(added?.rows_said, { list: 'Tasks', rows: 2, adds: ['Kiln wash', 'Cones'], more: 0, moves: [] });
 });
 
-test('AN OPTION THAT PATCHES ROWS SAYS WHAT IT MOVES THEM TO, A LINK BY ITS TITLE, AND A TAIL ANSWER THE MONEY IT FILES (C20)', async () => {
+test('AN OPTION THAT PATCHES ROWS SAYS WHAT IT MOVES THEM TO, A LINK BY ITS TITLE, AND A TAIL ANSWER THE MONEY IT FILES', async () => {
   const { k } = await record();
   value(k.create('tasks', { what: 'Bisque', stage: 'to_do' }, OWNER));
   value(k.create('tasks', { what: 'Fire', stage: 'to_do' }, OWNER));

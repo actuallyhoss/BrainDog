@@ -1,5 +1,5 @@
 /**
- * TODAY'S DESK TILES AS BLOCKS OF ITS BODY (C27, 24 October): what is late, who is working and the projects were parts
+ * TODAY'S DESK TILES AS BLOCKS OF ITS BODY (24 October): what is late, who is working and the projects were parts
  * Home drew around the page (`Desk.svelte`, `LateNow` over the board); they are blocks the page declares now
  * (`default-home.ts` `todayHome`), the record answers each, and the one reader draws each in its slot as the desk's own
  * tile (`BlockSlot.svelte` reads `desk` on the block, as it reads `homeRows`).
@@ -41,7 +41,7 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !
  * and the project it is placed in by name (the cell the record said the run's scope in). A row with no number is left
  * out, since the face and the sheet are keyed by the run.
  *
- * NO LENGTH UNTIL `presence` SAYS IT (the audit of 25 October, Z6): the block knows when the run opened, and the Agents
+ * NO LENGTH UNTIL `presence` SAYS IT: the block knows when the run opened, and the Agents
  * page says how long this stretch has gone (`for_s`: since it opened, came back or began writing again). Today said
  * "since 22 Oct" from the one while Agents said "2 h 54 min" from the other, so the time is left out here and Working
  * now says the length `presence` gives, the same as Agents.

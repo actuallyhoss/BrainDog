@@ -1,7 +1,7 @@
 <!--
   Settings > Tidy up (Health until 25 October): what the record found to tidy in itself.
 
-  THE RECORD'S HOUSEKEEPING LIVES HERE AND NOT ON TODAY (the audit of 22 October, U3). It stood under Today's More: what
+  THE RECORD'S HOUSEKEEPING LIVES HERE AND NOT ON TODAY. It stood under Today's More: what
   went stale, who the record matched, what it found wrong in its own pages and notes, what the answers taught, what may
   be one, what has no colour, and the imported automations to keep as filing rules. Today is his desk, and these are the
   record looking after itself; the walk of every page and note held his whole record for about ten seconds on an open.
@@ -26,7 +26,7 @@
 
   let { shell }: AreaProps = $props();
 
-  /* THE OWNER'S, as the record's `understand` is (People & sharing held it until 25 October, X19). */
+  /* THE OWNER'S, as the record's `understand` is (People & sharing held it until 25 October). */
   const s = settingsState(() => shell);
 
   const words = {
@@ -67,7 +67,7 @@
   /** Whether the reads took longer than anyone waits: said in plain words, never left on Reading. */
   let slow = $state(false);
   /**
-   * WHETHER THE QUICK PARTS ARE LATE (the pass of 27 October): eight seconds and some still out. "Reading the record
+   * WHETHER THE QUICK PARTS ARE LATE: eight seconds and some still out. "Reading the record
    * for anything to tidy." stood alone for as long as the slowest of them took on his record, so past eight seconds it
    * says what it has, that the record is slow, and reads on under it.
    */
@@ -137,7 +137,7 @@
           if (here && found && found.rules.length > 0) imported = { found, Part: part.default };
         }),
       /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES: the long walk, kept for the tab (`textFaultsOnce`), and every
-         thing the night's page lint found the pages print raw (`printed`). LAST, SINCE the audit of 25 October (Z36): it
+         thing the night's page lint found the pages print raw (`printed`). LAST: it
          was asked first, and on his record its 11 to 16 seconds held the six quick parts behind it, so Health said
          "Reading the record for anything to tidy." long after it said it was drawn. */
       () =>
@@ -148,7 +148,7 @@
           faults = found && m.anyFound(found) ? { found, Part: part.default } : null;
         }),
     ];
-    /* THE SCREEN IS DRAWN ONCE ITS FIRST PART HAS ANSWERED, and not on the shell alone (Z36): one call is held open until
+    /* THE SCREEN IS DRAWN ONCE ITS FIRST PART HAS ANSWERED, and not on the shell alone: one call is held open until
        then, so `data-screen` waits for it (`screen.svelte.ts`). */
     let first: number | null = opened();
     const drawn = (): void => {

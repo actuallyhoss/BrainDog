@@ -142,7 +142,7 @@
     change?: Change | undefined;
     /** The page the new page row makes or suggests (`new-page.ts`). Only that row carries it. */
     paging?: Paging | undefined;
-    /** Set on the row a plain line makes (EXP-D13), which is ranked after every match. */
+    /** Set on the row a plain line makes, which is ranked after every match. */
     plain?: true | undefined;
     /** How many rows of one title this line stands for, past the first. */
     folded?: number | undefined;
@@ -311,7 +311,7 @@
   const addNamed = $derived(new Map(addLists.map((l) => [l.id, l.name])));
 
   /**
-   * THE LIST A PLAIN LINE GOES INTO (EXP-D13): the one the record's Home page captures into, its first `capture` block.
+   * THE LIST A PLAIN LINE GOES INTO: the one the record's Home page captures into, its first `capture` block.
    * The Home page is the one `Home.svelte` draws: the speaking use case's or the record's own `home` page, read from the
    * record, else Today's body built from what the shell says the record holds. Never a list named here, so a record
    * whose Home captures into Orders is offered "Add as an order", and one whose Home has no capture is offered nothing.
@@ -337,7 +337,7 @@
   }
   $effect(() => {
     if (!open || !isLive) return;
-    /* THE PAGE HOME DRAWS (U1): a page kept by hand, else the desk, and never a use case's own Home page. */
+    /* THE PAGE HOME DRAWS: a page kept by hand, else the desk, and never a use case's own Home page. */
     const slug = homeSlugOf(null, shell.pages ?? []);
     const key = `${apiBase(page.url)} ${slug ?? ''} ${addLists.map((l) => l.id).join(',')}`;
     if (key === intoFor) return;
@@ -404,7 +404,7 @@
   const asking = latest((text: string) => reader().then((r) => r.find(text, RECORD_CAP)), 120);
 
   /**
-   * WHAT THE NAME IN THE BOX IS, FOR THE NAME IT ANSWERS (`about.ts`, ENG-B02): the record's `about` read, asked once the
+   * WHAT THE NAME IN THE BOX IS, FOR THE NAME IT ANSWERS (`about.ts`): the record's `about` read, asked once the
    * typing rests and kept only while the box still says that name. A refusal and an answer of nothing draw the same
    * thing, which is nothing: the search below is what says when nothing matched.
    */
@@ -439,17 +439,17 @@
    * writes and this build stores nothing at all about where a person has been. A heading promising
    * the second and delivering the first is one somebody would notice within a day.
    */
-  /** The phone's way out of the whole-screen palette, said as a word (2.A.15). */
+  /** The phone's way out of the whole-screen palette, said as a word. */
   const words = { cancel: 'Cancel' } as const;
   const FIGURES = 'Figures';
   const OPEN_QUESTION = 'Open question';
   const RECENT = 'Recent';
-  /* THE EMPTY PALETTE'S THREE ASKS, over everything else (E55). */
+  /* THE EMPTY PALETTE'S THREE ASKS, over everything else. */
   const ASK_TODAY = 'Ask';
   /* THE PLACES WITH NOTHING TYPED, under the destinations' own heading, so one heading never means two groups. */
   const GO_TO = copy.destinations;
   const BEST = 'Best match';
-  /** The most rows a group shows before its "Show all" row (2.A.15). */
+  /** The most rows a group shows before its "Show all" row. */
   const GROUP_CAP = 6;
   const showAll = (n: number): string => `Show all ${n.toLocaleString('en')}`;
 
@@ -569,7 +569,7 @@
   });
 
   /**
-   * THE PLAIN LINE'S ROW (EXP-D13), read with its chips: "call the bank tomorrow" is "call the bank", due tomorrow.
+   * THE PLAIN LINE'S ROW, read with its chips: "call the bank tomorrow" is "call the bank", due tomorrow.
    *
    * `held` ARE THE CHIPS TAKEN OUT OF THE FIELD: a `#project`, a `!priority`, an `@name` or an amount leaves the box as a
    * chip when a space follows it. A day stays in the box until the press, because a day is read only at the end and
@@ -645,7 +645,7 @@
     let gone = false;
     const known = lists;
     reader()
-      /* NOT THE ROWS ANYONE CHANGED LAST (E55): on his record that was an import's rows. Recent is what he opened. */
+      /* NOT THE ROWS ANYONE CHANGED LAST: on his record that was an import's rows. Recent is what he opened. */
       .then((r) => r.figures(known))
       .then(
         (figures) => {
@@ -724,7 +724,7 @@
       return want.every((w) => has.some((tok) => tok.startsWith(w)));
     };
     const out: Row[] = [...about];
-    /* NOTHING TYPED IS THREE ASKS AND WHERE HE WAS (E55): asked of the record when a model is behind the ask, else
+    /* NOTHING TYPED IS THREE ASKS AND WHERE HE WAS: asked of the record when a model is behind the ask, else
        the place that answers each; then the places opened last on this device. "Go to" repeats the bar, so it is drawn
        only on a device that has opened nothing yet. Commands, pages, lists, figures and questions wait for a word. */
     const blank = prefix === null && text.trim() === '';
@@ -776,7 +776,7 @@
       if (changing && !live.creation)
         for (const o of live.customise ?? [])
           out.push({ id: o.id, title: o.title, detail: o.detail, href: null, group: changing.group, icon: o.icon, act: changing.act, change: o.change, complete: o.complete });
-      /* THE NEW PAGE ROW (PGS-C30), drawn as `new-page.ts` reads the query. THE SENTENCE GOES ABOVE EVERYTHING, with the
+      /* THE NEW PAGE ROW, drawn as `new-page.ts` reads the query. THE SENTENCE GOES ABOVE EVERYTHING, with the
          add row and for its reason; found only by its words it sits among the commands, after them (below). With no
          name yet a press writes the sentence into the box, so `⇥` does the same. */
       const paged = every.find((c) => c.act === 'page');
@@ -930,7 +930,7 @@
              nothing beside its title says the list it is in, where its number used to stand, because
              a list's name is something a person reads and a number is not. */
           detail: hit.why ?? (hit.detail || hit.kind),
-          /* NEVER WHY IT RANKED (E54): a row found by meaning carries a mark, not a caption, so it says its list. */
+          /* NEVER WHY IT RANKED: a row found by meaning carries a mark, not a caption, so it says its list. */
           href: hit.href,
           group: hit.kind,
           icon: hit.icon,
@@ -979,7 +979,7 @@
      * exist, which is `23 §8`'s absent rather than disabled, and the only way the word Slash reaches this panel.
      */
     const kept = out.slice(0, CAP);
-    /* THE PLAIN LINE'S ROW, LAST, AFTER EVERY MATCH (EXP-D13). It is made out of the query like the sentence's add row,
+    /* THE PLAIN LINE'S ROW, LAST, AFTER EVERY MATCH. It is made out of the query like the sentence's add row,
        so `commands` is asked for it, which is asking the standing rule. Last, so it is never the row Enter runs while
        any place or command matched: "Add as a task" on every line would make Enter a way to file stray tasks. With
        nothing else drawn it is the first row, and Enter adds. It is not a place, so Slash's row may still follow it. */
@@ -1038,7 +1038,7 @@
    * headings costs it nothing a reader can feel.
    */
   const overflow = $derived(rows.find((r) => r.id === 'all'));
-  /* THE ASK'S ROW, FIRST FOR A SENTENCE (E53): three words or a question mark is somebody asking, so it leads. */
+  /* THE ASK'S ROW, FIRST FOR A SENTENCE: three words or a question mark is somebody asking, so it leads. */
   const askRow = $derived(rows.find((r) => r.id === 'slash'));
   const askLeads = $derived(askRow !== undefined && asksFirst(askRow.ask ?? ''));
 
@@ -1168,7 +1168,7 @@
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
-      /* OUT OF ITS BAR (U13): from 900px, where the bar's ask field is drawn, the palette opens over it, its top and end
+      /* OUT OF ITS BAR: from 900px, where the bar's ask field is drawn, the palette opens over it, its top and end
          edge on the field's, and grows down from there; anywhere else it is the centred box. */
       const field = document.querySelector<HTMLElement>('[data-palette-from="bar"]');
       const r = field && field.getClientRects().length > 0 && innerWidth >= 900 ? field.getBoundingClientRect() : null;
@@ -1300,7 +1300,7 @@
   }
 
   /**
-   * THE NEW PAGE ROW, PRESSED (PGS-C30): `new-page.ts` makes the page or files the suggestion, opens what it made and
+   * THE NEW PAGE ROW, PRESSED: `new-page.ts` makes the page or files the suggestion, opens what it made and
    * shows the one receipt. This hands it the screen: the record, the pages `boot` lists, the address bar and the toasts.
    * Undo leaves the page only when the reader is still on it.
    */
@@ -1448,7 +1448,7 @@
     <p class="p-count" role="status">{announced}</p>
     <button type="button" class="p-close tap" onclick={() => (open = false)}>{words.cancel}</button>
   </div>
-  <!-- WHAT THE PLAIN LINE WAS READ AS (EXP-D13): a chip for each, under the field, drawn only while the line makes a row. -->
+  <!-- WHAT THE PLAIN LINE WAS READ AS: a chip for each, under the field, drawn only while the line makes a row. -->
   {#if plainMade && plainMade.chips.length > 0}
     <ul class="p-chips" aria-label={createWords.chips}>
       {#each plainMade.chips as chip, i (i)}
@@ -1479,7 +1479,7 @@
         {#if slashShown.drawn.where !== null}<span class="p-slash-label">{copy.slashWhere}</span> {slashShown.drawn.where}{:else if slashShown.drawn.q !== null}{copy.slashSearched(slashShown.drawn.q)}{/if}
       </p>
     {/if}
-    <!-- LOOKING, AT ONCE (E54): the same frame as the keystroke, where the first answer will land, and gone when it does. -->
+    <!-- LOOKING, AT ONCE: the same frame as the keystroke, where the first answer will land, and gone when it does. -->
     {#if pending && !slashShown}<p class="p-looking" role="status">{copy.looking}</p>{/if}
     <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending || (slashShown !== null && slashShown.drawn === null && slashShown.fix === null)}>
       {#if askRow && askLeads}{@render result(askRow)}{/if}
@@ -1504,7 +1504,7 @@
         <!-- NO ROW IS NOT NOTHING WHEN A FIGURE WAS READ: pass 2 is asked on that figure (`secondPass`), and a line saying
              nothing answers would sit above the answer it gives. -->
         {#if slashShown.drawn.rows.length === 0 && slashShown.second === null}<p class="p-none">{copy.slashNothing}</p>{/if}
-        <!-- PIN THE ANSWER (PGS-B12), loaded only once there is an answer to pin (`PinTo.svelte`). -->
+        <!-- PIN THE ANSWER, loaded only once there is an answer to pin (`PinTo.svelte`). -->
         {#if slashShown.reading}{#await import('./PinTo.svelte') then { default: PinTo }}<PinTo reading={slashShown.reading} asked={slashShown.q} proposal={slashShown.second?.drawn?.text ? slashShown.second.drawn : null} />{/await}{/if}
         <!-- PASS 2, UNDER THE ROWS AND NEVER INSTEAD OF THEM (`23 §7`): the rows were drawn by code before any of this was
              written, which is the only reason the budget sentence below can be true. -->
@@ -1660,7 +1660,7 @@
     display: flex;
   }
 
-  /* OPENED FROM THE BAR'S FIELD (U13): over it, its end edge on the field's, at least 520 wide, growing down. */
+  /* OPENED FROM THE BAR'S FIELD: over it, its end edge on the field's, at least 520 wide, growing down. */
   .palette:global([data-from='bar']) {
     inset-block-start: var(--from-top);
     inset-inline: auto var(--from-end);
@@ -2014,7 +2014,7 @@
   }
 
   /**
-   * ON A PHONE THE PALETTE IS THE SCREEN (2.A.15): a 56px bar holding the field as a 44px well, radius 12, and "Cancel"
+   * ON A PHONE THE PALETTE IS THE SCREEN: a 56px bar holding the field as a 44px well, radius 12, and "Cancel"
    * as a word at its end; the results fill what is left. No scrim to see and no hairline round it.
    *
    * EACH INSET IS PAID HERE, ONCE. The top one is under the bar, because the palette sits in the top

@@ -2,7 +2,7 @@
  * The pad's second opinion as an add-on of its own: one automation on the pad's notes that asks Slash about a note with
  * no reply, and writes the answer back as its reply with `set`.
  *
- * IT WAS THE PAD'S UNTIL PAD 1.2.0 (SHL-A11). The rule is the one 1.1.0 held, word for word and under the same id, so a
+ * IT WAS THE PAD'S UNTIL PAD 1.2.0. The rule is the one 1.1.0 held, word for word and under the same id, so a
  * record that kept the pad and wants its second opinion back gets exactly what it had. It needs the pad, for the
  * notes list it writes to, and a host that answers Slash, because the step that asks is refused anywhere else.
  *

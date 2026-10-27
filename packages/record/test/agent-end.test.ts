@@ -1,5 +1,5 @@
 /**
- * `end`: a closed session's run ended once, through the record (AGT-C04).
+ * `end`: a closed session's run ended once, through the record.
  *
  * What is asserted is what a person reads the next day on the Agents page: a session that closed with nothing left
  * reads Ended and not Abandoned, one that left a fresh next step waits for the next session, its helpers end with it,

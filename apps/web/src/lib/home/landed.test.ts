@@ -90,7 +90,7 @@ test('a handle is said as a name, and no lowercase slug reaches a line on the se
   for (const d of drawn) assert.doesNotMatch(d.name, /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/u, `"${d.name}" reached the landed lines as a slug`);
 });
 
-test('THE READER FILED UNDER HER OWN NAME IS NO ARRIVAL (audit C, X5): a new Today said Arrivals 1, Wenna, You, People', () => {
+test('THE READER FILED UNDER HER OWN NAME IS NO ARRIVAL: a new Today said Arrivals 1, Wenna, You, People', () => {
   /* Invented: the reader's minted id and the name the record holds for her. Sign-up files her as a person of her own
      record, and that row was the only news on her first Today. Somebody she filed, and her name filed by somebody
      else, are still arrivals. */

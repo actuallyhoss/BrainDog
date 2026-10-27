@@ -17,7 +17,7 @@
  * the two would collide on the record.
  *
  * EVERY LINE BELOW IS BUILT FOR THE TEST, AND SAYS SO HERE BECAUSE THE BANK'S OWN PACK HOLDS ONLY ITS OWN WORDING. These
- * two sentences are no bank's: `loop/research-bank-real.md` found none of a hundred real texts written this way, so there
+ * two sentences are no bank's:  found none of a hundred real texts written this way, so there
  * is no real line to scrub. The card digits, the merchants, the amounts and the days are made up, save two public shop
  * names, Chillout and Talabat, whose spellings 1.2.0's test holds. The person named is invented.
  */

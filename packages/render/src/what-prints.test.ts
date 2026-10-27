@@ -1,5 +1,5 @@
 /**
- * What a page prints (PGS-B02): a chip's figure is read and never printed as typed, and a path that names nothing of
+ * What a page prints: a chip's figure is read and never printed as typed, and a path that names nothing of
  * the record (`UNNAMED`) is told apart from a path whose figure has no value yet. Nine chips on his record printed
  * braces and 48 paths drew a word and a dash for a figure that will never come. The Svelte twins are held to the same
  * tree in `parity.test.ts` ("PRINTS THE SAME IN BOTH RENDERERS").

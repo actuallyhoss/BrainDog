@@ -54,7 +54,7 @@ test('A DEPLOYMENT THAT STILL SETS DEMO_RECORD OPENS NOTHING: a GET with no cred
 const fakeAi = () => {
   const ai = {
     calls: 0,
-    /* THE ASK'S OWN SEARCH MAY EMBED ITS WORDS ONCE (ENG-B18), on the background allowance: counted apart, so `calls` is Slash's model. */
+    /* THE ASK'S OWN SEARCH MAY EMBED ITS WORDS ONCE, on the background allowance: counted apart, so `calls` is Slash's model. */
     embeds: 0,
     AI: {
       run: async (model: string) => {

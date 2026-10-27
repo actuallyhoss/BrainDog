@@ -41,7 +41,7 @@ export type SeedRegister = {
    * as Money's accounts declare it (`modules/money/lists/accounts.ts`), and held to that list at install (`declare.ts`).
    */
   delete?: 'refuse_while_referenced';
-  /** The order a read that names none comes back in (PGS-B06): one field that sorts, `desc` highest first (`declare.ts`). */
+  /** The order a read that names none comes back in: one field that sorts, `desc` highest first (`declare.ts`). */
   order?: { field: string; dir: 'asc' | 'desc' };
   /** A list whose rows are steps of another's: the link naming that row, the done flag, and the order they go in. */
   steps?: { of: string; done: string; order?: string };
@@ -306,7 +306,7 @@ export const BASE_PAGES: Record<string, SeedPage> = {
     icon: 'activity',
     pack: 'core',
     layout: { rail: 4 },
-    /* WHO, WHAT KIND AND WHICH LIST, SINCE PGS-C24 (job 3): the three things a person narrows the log by, as chips over
+    /* WHO, WHAT KIND AND WHICH LIST, SINCE PGS-C24: the three things a person narrows the log by, as chips over
        it. A filter is `{ field, control }` (`filtersFault` in the kernel); the log answers them by its own words. */
     filters: [
       { field: 'who', control: 'chips' },

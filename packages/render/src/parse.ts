@@ -65,9 +65,9 @@ export type Block = {
   heading?: string;
   tone?: Tone;
   rows: Row[];
-  /** A declared block's actions, cut by the page read to what this reader may press (PGS-A12). Never parsed: a fence an author typed has none. */
+  /** A declared block's actions, cut by the page read to what this reader may press. Never parsed: a fence an author typed has none. */
   actions?: readonly Action[];
-  /** Each row's declared actions, cut by the page read to what this reader may press (PGS-A12). Never parsed. */
+  /** Each row's declared actions, cut by the page read to what this reader may press. Never parsed. */
   row_actions?: readonly Action[];
   /** A calendar's strip of whole weeks from this one (`weeks:`), set by the page read like `actions`. Never parsed. */
   weeks?: number;

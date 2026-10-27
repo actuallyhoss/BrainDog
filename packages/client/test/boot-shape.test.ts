@@ -1,5 +1,5 @@
 /**
- * What the client is told by `boot` about the shell's one round trip (EXP-D03): its shape, what waits, who is working,
+ * What the client is told by `boot` about the shell's one round trip: its shape, what waits, who is working,
  * the voice and Slash, named by the client's `Boot` so a screen reading them through the client reads what the record
  * said rather than `undefined`.
  *

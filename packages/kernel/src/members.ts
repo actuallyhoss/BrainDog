@@ -91,7 +91,7 @@ export type MemberDeps = {
  * that register and nothing else — which is what makes "invite the bookkeeper to one register"
  * true rather than decorative.
  *
- * THE LENS (sharing plan §2.4, §2.15). With `lens` handed in, the person's shares and their groups' shares are merged
+ * THE LENS. With `lens` handed in, the person's shares and their groups' shares are merged
  * with their role and their legacy list rows through `lensOf`, and `token` (a key's id) brings its narrowing chain from
  * `token_lens`, ANDed into everything. The answer is a superset of the one before: `writes`, `hides`, `nots` and `grant`
  * join `wheres` where they say something. A person holding no share, through a key narrowed to nothing, gets exactly
@@ -398,7 +398,7 @@ export const viewerOfPrincipal = (p: { kind: string; id: string; person?: string
 
 /** Who a read is for: the person looking, or `NOBODY` when it leaves the record (`outbound`), else no one in particular. */
 export const viewerOfRead = (ctx: { principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined; preview?: string | undefined }): string | undefined =>
-  /* SEEING AS SOMEBODY READS AS NOBODY (sharing plan §3.3): the rows they keep private are theirs, not their viewer's. */
+  /* SEEING AS SOMEBODY READS AS NOBODY: the rows they keep private are theirs, not their viewer's. */
   ctx.outbound === true || (typeof ctx.preview === 'string' && ctx.preview !== '') ? NOBODY : viewerOfPrincipal(ctx.principal);
 
 /** The rule a caller's grant holds on one list, or `undefined` when that list is every row to them. */

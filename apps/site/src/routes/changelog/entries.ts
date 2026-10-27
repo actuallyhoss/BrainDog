@@ -1313,7 +1313,7 @@ export const ENTRIES: Entry[] = [
     kind: 'fixed',
     title: 'Five ways scheduled work stopped and reported that it was fine',
     body:
-      'An audit drove the scheduler, the rules and the figures over a day of work. It found five ' +
+      'Testing drove the scheduler, the rules and the figures over a day of work. It found five ' +
       'ways the scheduler stopped while reporting success. It also found four rules acting wrongly ' +
       'unobserved, and four numbers that came out plausible and wrong.',
     commits: ['7f9a53e7', '0b2a00f1', 'cb82e087'],

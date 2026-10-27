@@ -3,7 +3,7 @@
  * accounts, never converted into pounds. Only what is added up across accounts, Cash now itself, is converted.
  *
  * THE HEADLINES ARE THE MONEY HELD, not the money due or owed, and each amount is drawn as it is kept
- * (`loop/scope/area-record-b.md`:1755-1760). The Accounts tile grouped by `name`, a text
+ * The Accounts tile grouped by `name`, a text
  * field that names no currency, so every account was turned into the home currency and "Cash (USD)" read in pounds.
  * Two currencies are never added, and parts in two are never ranked on one axis.
  *
@@ -130,7 +130,7 @@ test('ALL IN THE HOME CURRENCY, every account keeps a plain value, largest first
   sql.close();
 });
 
-test('AN ACCOUNT HOLDING POUNDS AND DOLLARS says each, never one turned into the other and added (the audit of 20 October)', async () => {
+test('AN ACCOUNT HOLDING POUNDS AND DOLLARS says each, never one turned into the other and added', async () => {
   const { k, sql, accounts } = await record('USD');
   /* $100.00 OUT OF THE POUND ACCOUNT after its balance was stated: the pounds it holds and the dollars that left it. */
   assert.ok(k.create('transactions', { what: 'Hosting', account: accounts[CURRENT]!, on: '2026-10-01', amount: money(10_000, 'USD'), direction: 'out' }, OWNER).ok);

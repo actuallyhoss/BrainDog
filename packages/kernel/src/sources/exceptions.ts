@@ -1,5 +1,5 @@
 /**
- * `exceptions`: what went quiet on this record, one row each (ENG-B13).
+ * `exceptions`: what went quiet on this record, one row each.
  *
  * A list that took rows most days and then took none, a door that stopped taking messages, a feed whose clock passed
  * with no run, a row older than the window its page declares (`exceptions.ts`). They belong to no list and name every

@@ -1,6 +1,6 @@
 /**
  * Where the record met one thing: the places the `about` read answers for the row a page is about, as lines a person
- * reads under the page's "Where it was seen" (ENG-B03, over ENG-B02 job 5's read).
+ * reads under the page's "Where it was seen" (over ENG-B02 job 5's read).
  *
  * ASKED BY THE ROW, NEVER BY ITS NAME. `{ row: { register, seq } }` is the one thing the page is drawn for, so no name
  * two things share can put another's places here. An answer that is candidates and no one thing draws nothing: this
@@ -36,7 +36,7 @@ export type Seen = { name: string; also: string[]; places: SeenPlace[]; more: nu
 export type SeenLines = { lines: string[]; also: string | null; more: string | null; none: string | null };
 
 /**
- * How many places are drawn before "and N more". THREE, SINCE the audit of 22 October (U-B12): eight lines at the foot
+ * How many places are drawn before "and N more". THREE: eight lines at the foot
  * of every project's page made a page that should open on its news and end under 1,500px a long one, and the newest
  * three say where it was seen lately.
  */

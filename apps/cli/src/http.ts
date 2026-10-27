@@ -211,7 +211,7 @@ export function clientFor(to: Target, headers: () => Promise<Record<string, stri
     token: to.token,
     fetch: async (input, init) => {
       const sent = new Headers(init?.headers);
-      /* EVERY CALL SAYS THE COMMAND'S BUILD (AGT-B01), the ones that send no session headers too. */
+      /* EVERY CALL SAYS THE COMMAND'S BUILD, the ones that send no session headers too. */
       sent.set('x-braindog-cli', cliBuild());
       for (const [name, value] of Object.entries(await headers())) sent.set(name, value);
       return fetch(input, { ...init, headers: sent, signal, redirect: 'error' });

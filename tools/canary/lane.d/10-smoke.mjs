@@ -1,5 +1,5 @@
 /**
- * The lane's first step: the smoke's signed-in half, on the canary (PRF-A09).
+ * The lane's first step: the smoke's signed-in half, on the canary.
  *
  * ONCE THE CANARY IS NAMED (`SMOKE_SLUG`), `apps/worker/scripts/smoke.mjs production` with the canary's key: `boot`,
  * the two refusals and every first-draw read. Its exit code is this step's, and a line saying the signed-in half was

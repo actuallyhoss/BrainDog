@@ -14,7 +14,7 @@ import type { Level } from './schema.ts';
 import type { Shell } from './boot-live.ts';
 
 /**
- * A level the record may name for a caller: the five, and `comment` (sharing plan §2.15), the rung of a share that reads
+ * A level the record may name for a caller: the five, and `comment`, the rung of a share that reads
  * and comments or suggests and changes nothing. No member row holds it; the record's lens hands it over in `me.levels`.
  * Asked as a need, `comment` is "may comment on or suggest a change to", which every level that proposes does.
  */

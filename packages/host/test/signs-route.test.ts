@@ -1,5 +1,5 @@
 /**
- * `signs`, the record's vital signs (PRF-A01): routed as a READ+ read that writes nothing, handed to the record method of
+ * `signs`, the record's vital signs: routed as a READ+ read that writes nothing, handed to the record method of
  * the same name, and answered `NOT_IN_THIS_BUILD` by a record built before it had one, never a 500.
  *
  * THE GROUP IS WHAT `router-groups` COUNTS (`docs/30-BLUEPRINT.md` §5): READ+, so a token may read it, the route table's

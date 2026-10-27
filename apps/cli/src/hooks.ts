@@ -385,7 +385,7 @@ const dayName = (day: string): string => {
 };
 
 /**
- * THE ONE LINE THAT SAYS THIS COMMAND LINE IS OUT OF DATE (plan §6.6, audit item 5), or `null`. His machines ran the
+ * THE ONE LINE THAT SAYS THIS COMMAND LINE IS OUT OF DATE, or `null`. His machines ran the
  * command of 7 October for thirteen days while the host was on 20 October, and nothing said so: the build address's
  * line waits fourteen days, and the record's card says it only below `min_cli`.
  *
@@ -508,7 +508,7 @@ const countOf = (said: string | null): Moved => {
 export const FAR_BEHIND = 50;
 
 /**
- * THE RECORD'S CARD, DRAWN AGAIN WITH THE COMMITS SINCE THE HANDOFF (AGT-B07). The attach answers before anything here
+ * THE RECORD'S CARD, DRAWN AGAIN WITH THE COMMITS SINCE THE HANDOFF. The attach answers before anything here
  * knows which commit the handoff named, so when the record drew a card and HEAD has moved since that commit, the
  * context is read once more with `x-braindog-ahead` and its Next line can say "12 commits since". It is a read and not an
  * attach, so it opens nothing; one that fails, runs out of time or comes back without a card leaves the attach's card.
@@ -538,14 +538,14 @@ export async function aheadCard(
  *
  *   - `startup`, and `clear`, which empties the conversation: the whole card.
  *   - `compact`: what he told the run that is still open, the stop first, then the Next line. The summary kept the
- *     rest, and the step and his words are what a compaction loses (plan §3.4).
+ *     rest, and the step and his words are what a compaction loses.
  *
  * WHAT HE TOLD THE RUN GOES FIRST in every card it prints (plan §2.3 A), each line the record's own card does not
  * already carry, and seeds the inbox file the prompt and tool hooks read until the bridge's first pulse.
  *   - `resume` within the hour of the same session last being heard from: nothing, because its card is still in the
  *     conversation. A resume after longer gets the whole card.
  *
- * ONE ROUND TRIP BEFORE THE CARD (plan §4.1; the audit of 22 Oct measured 7.9 to 8.05 s for 10 of 12 starts). The
+ * ONE ROUND TRIP BEFORE THE CARD (measured 7.9 to 8.05 s for 10 of 12 starts). The
  * attach answers the context, the card and whether this command is behind its host; the skills sync and the tools scan
  * run after the card in a process of their own, and only when what they read moved (`startOwed` in `session-start.ts`);
  * the time mark rides beside the attach; and the line saying this command line is out of date comes from what the start
@@ -682,7 +682,7 @@ export async function hookStart(io: Io): Promise<void> {
     /* THE STOP, THEN EVERY OPEN INSTRUCTION, NEVER CUT, each in his voice (`toldAtStart`), and the ids they name. */
     const heard = toldAtStart(run.context);
     const ids = [...heard.told.map((t) => t.id), ...(heard.stop === null ? [] : [heard.stop.id || heard.stop.kind])];
-    /* AFTER A COMPACTION, the open instructions again and then Next (plan §3.4): the two things a summary loses. */
+    /* AFTER A COMPACTION, the open instructions again and then Next: the two things a summary loses. */
     if (event.source === 'compact') {
       const line = nextLine(shown, moved);
       const said = [...heard.lines, ...(line === null ? [] : [line])];
@@ -710,7 +710,7 @@ export async function hookStart(io: Io): Promise<void> {
     io.write(`${stale === null ? '' : `${stale}\n`}${above.length === 0 ? '' : `${above.join('\n')}\n`}${card}`);
     mark('card');
     /*
-     * THE START WORK, AFTER THE CARD AND NEVER WAITED FOR (audit of 22 Oct, E2). The skills sync and the tools scan held
+     * THE START WORK, AFTER THE CARD AND NEVER WAITED FOR. The skills sync and the tools scan held
      * every card for up to six seconds, and the card reads neither. Only a session that begins syncs: a compaction or a
      * clear is the same session going on (plan §4.3 step 6). Whether it is owed is read here from the attach's context
      * and this machine's files, with no request, so a start where nothing moved starts no process.
@@ -812,7 +812,7 @@ export type MovedRepo = { dir: string; repo: string; from: string; whole?: true 
 export const peopleDayPath = (env: Env): string => join(dirname(hostsPath(env)), 'people-day.json');
 
 /**
- * THE REPOSITORIES TO READ WHOLE TODAY (scope B35): every author since the repository joined its project, not only this
+ * THE REPOSITORIES TO READ WHOLE TODAY: every author since the repository joined its project, not only this
  * session's, once a day a folder, so somebody who committed between his sessions is met too. The day is written for
  * each one marked, and a file that does not read is no day. Never throws.
  */
@@ -946,7 +946,7 @@ export async function workedIn(here: Position, moved: readonly MovedRepo[]): Pro
  * SessionEnd: the people met in this session's commits, then the run ends, with the branch and commit it
  * stopped at.
  *
- * `end`, AND THE RECORD PICKS THE STATE (AGT-C04). This hook used to write `idle`, and the twelve-hour sweep takes an
+ * `end`, AND THE RECORD PICKS THE STATE. This hook used to write `idle`, and the twelve-hour sweep takes an
  * idle run as abandoned, so about 740 of the owner's 752 runs that closed normally read Abandoned the next day. Now it
  * sends no state at all: a run that left a fresh next step waits as a handoff, and any other is done, its helpers with
  * it. A crashed session still never says it stopped, and the sweep still takes that one. Ending a run that already
@@ -1085,7 +1085,7 @@ export function hookLog(env: Env, line: string): void {
 }
 
 /**
- * The `hook` mark a session file still owes the agent door (AGT-B01): how long the start hook that wrote it took. The
+ * The `hook` mark a session file still owes the agent door: how long the start hook that wrote it took. The
  * next hook of the same session sends it beside the call it makes anyway, the next start's `attach` or the end's `end`,
  * so timing the start hook costs the start hook no request and no wait of its own.
  *

@@ -68,7 +68,7 @@ test('a day is said as a day, never as the record keeps it', () => {
   assert.equal(doesOf('rowset', body, names({ 'tasks#4.due': '2026-10-13' })), 'Changes Due on from 13 October 2026 to 20 October 2026 in Tasks.');
 });
 
-/* AUDIT 79, CLAIM 2. The day was cut off the front of an instant, which is its day in UTC: 22:30 on the 13th there is
+/* The day was cut off the front of an instant, which is its day in UTC: 22:30 on the 13th there is
    the 14th in Cairo, and the line said the 13th. Nothing here knows the reader's zone, so no day is said. */
 test('an instant is not said as a day: its day depends on where the reader is, so its field is named and no more', () => {
   const moved = one('tasks', 'tasks#4', { due: '2026-10-13T22:30:00.000Z' });
@@ -77,7 +77,7 @@ test('an instant is not said as a day: its day depends on where the reader is, s
   assert.equal(doesOf('rowset', one('tasks', 'tasks#4', { due: '2026-10-20T09:00:00+03:00' }), names()), 'Changes Due on in Tasks.');
 });
 
-/* AUDIT 79, CLAIM 1. Only a text that was a handle whole was held back, so an address, a handle inside a title and a
+/* Only a text that was a handle whole was held back, so an address, a handle inside a title and a
    bare host were each quoted to the person, and to an agent reading the queue. */
 test('an address, a handle inside a text and a bare host are never quoted: the field is named and no more', () => {
   const said = (now: string, was: string | null = null) => doesOf('rowset', one('tasks', 'tasks#4', { stage: now }), names(was === null ? {} : { 'tasks#4.stage': was }));
@@ -91,7 +91,7 @@ test('an address, a handle inside a text and a bare host are never quoted: the f
   assert.equal(said('Number 8', 'Number 7'), 'Changes Stage from Number 7 to Number 8 in Tasks.');
 });
 
-/* AUDIT 79, CLAIM 3. What several entries held is never said, and it was read of every one of them for every field. */
+/* What several entries held is never said, and it was read of every one of them for every field. */
 test('several entries are not each read for what they held: one is asked whether the field may be valued, and that is all', () => {
   let reads = 0;
   const counted = names({}, { before: (_at, field) => ((reads += 1), field === 'token' ? undefined : 'Raw') });
@@ -128,7 +128,7 @@ test('a link is said by the title the record reads it as, and never as where it 
   assert.equal(doesOf('rowset', one('things', 'things#1', { folder: 'work/kiln/site' }), names({ 'things#1.folder': 'kiln' })), 'Changes Folder in Projects.');
 });
 
-/* AUDIT 79, CLAIM 6. Any text with a slash in it was held back as a path, so a stage of "Q3/Q4" said no value. */
+/* Any text with a slash in it was held back as a path, so a stage of "Q3/Q4" said no value. */
 test('a path is told by its shape and never quoted, and words with a slash between them are said', () => {
   const said = (now: string, was: string | null = 'Raw') => doesOf('rowset', one('tasks', 'tasks#4', { stage: now }), names(was === null ? {} : { 'tasks#4.stage': was }));
   const PATHS = ['/Users/sam/notes', '~/notes', '~', './build', '../build', 'C:\\Work\\Kiln', 'D:/Work', '\\\\share\\kiln', 'https://example.com/a', 'see ftp://files', 'docs/review.md', 'docs\\review.md', 'src/lib/kiln', 'work/', 'example.com/pricing', '/My Files/plan one'];
@@ -147,7 +147,7 @@ test('a sentence that names a file or a folder is not quoted either, and one wit
   for (const text of WORDS) assert.equal(said(text), `Sets Stage to ${text} in Tasks.`, text);
 });
 
-/* AUDIT 79, CLAIM 4. A field the list lacks was named by its id read as words, "Changes Zzz internal in Tasks.", under
+/* A field the list lacks was named by its id read as words, "Changes Zzz internal in Tasks.", under
    a question whose title left it out. Writing it is refused, so the yes changes nothing there. */
 test('a field the list does not have is not named, and a field it has with no label still is', () => {
   const HAS = new Set(['stage', 'due', 'effort_hours']);

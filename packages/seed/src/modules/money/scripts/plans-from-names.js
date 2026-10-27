@@ -12,8 +12,7 @@
  *   - a plan with no part still open is paid. A plan that reads paid or cancelled stays as it reads, whatever its parts
  *     say: closing one may be a person's word, and opening it again is theirs alone.
  *
- * THE TEXT IS MATCHED WHATEVER ITS CAPITALS, ACCENTS AND SPACES, SINCE money-core 3.22.0 (the audit of 25 October,
- * Y1). It was matched letter for letter, so parts that said "harbourview" beside a plan called "Harbourview" made a second plan
+ * THE TEXT IS MATCHED WHATEVER ITS CAPITALS, ACCENTS AND SPACES, SINCE money-core 3.22.0. It was matched letter for letter, so parts that said "harbourview" beside a plan called "Harbourview" made a second plan
  * of that name, and the plan's page said "1 of 39 paid" over parts numbered 2 to 40. "Desk", "desk " and "Désk" are
  * one plan now, named as its oldest part writes it, and Cash ahead groups them the same way (`forecast.ts`). A blank
  * text is no plan.

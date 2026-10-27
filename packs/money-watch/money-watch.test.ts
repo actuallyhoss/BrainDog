@@ -12,26 +12,26 @@
  * on that row, and the patch starts the script a third time to act: add the Repeating line, and count the no's.
  * Nothing in `packages/` changed for it.
  *
- * 1.1.0, AND WHY (audit of batch 67). "One is a mistake" carried a change to the Ledger entry at the version read on
+ * 1.1.0, AND WHY. "One is a mistake" carried a change to the Ledger entry at the version read on
  * the day of the question, and `askOf` refuses a change with no version, so the void moved into the run the answer
  * starts, which reads the entry that day. Next on a new Repeating line is counted from the newest payment the Ledger
  * holds at the answer. And "Both real" is not a no, so the line that switches the flag off says what was said.
  *
- * STILL 1.1.0, NOT YET RELEASED (audit of batch 71, finding 7). "Both real" was remembered for good, which hid a real
+ * STILL 1.1.0, NOT YET RELEASED. "Both real" was remembered for good, which hid a real
  * double charge a year on, and three of them in a row about any three payees switched the watch off for everyone. It
  * is remembered for about ninety days, and the three in a row are one payee's and switch off that payee alone.
  *
- * 1.2.0, AND WHY (audit of batch 73, the payee cut, here for the two scripts' own reading). A bank line that leads
+ * 1.2.0, AND WHY (the payee cut, here for the two scripts' own reading). A bank line that leads
  * with the card and the terminal, `HSBC CARD 7731 POS 55 KFC`, was read up to the card's number, so every shop paid
  * with that card was the one payee "Hsbc Card". The lead is cut and each shop is its own payee. 1.1.0 is published,
  * so this is a version above it and that file is not touched.
  *
- * 1.3.0, AND WHY (audit of batch 75, claim 7). The name still stopped at the first word holding a digit, so
+ * 1.3.0, AND WHY (claim 7). The name still stopped at the first word holding a digit, so
  * `Studio 54 Cafe` read "Studio" and two shops that start alike were one payee, and `CARD 1234 5678 NETFLIX` read
  * "5678 Netflix". A word ends the name only when it holds three digits or more, and every group of the card's number
  * goes with the card. 1.2.0 is published, so this is a version above it.
  *
- * STILL 1.3.0, NOT YET RELEASED (audit of batch 77, claim 3). A day the bank wrote after the payee, `SPOTIFY 12 OCT`,
+ * STILL 1.3.0, NOT YET RELEASED (claim 3). A day the bank wrote after the payee, `SPOTIFY 12 OCT`,
  * stayed in the name as a short number does, so each month was a payee of its own and nothing ever repeated. A number
  * of one or two digits ends the name when a month or a day with a stroke follows it, and a day with a stroke ends it
  * itself. The live catalogue held no Money watch on 14 October 2026, so 1.3.0 is changed in place.
@@ -86,7 +86,7 @@ test('THE ADD-ON CARRIES twice.js AND repeats.js BYTE FOR BYTE, needs Money, cal
   assert.deepEqual(Object.keys(PACK.requires.packs), ['money-core']);
   for (const id of ['watch_twice', 'watch_repeats']) {
     const s = scriptOf(id);
-    /* A NEW CLEARED LEDGER ENTRY AND ONCE A NIGHT (REC-B21): a rule's step, and a clock of its own. */
+    /* A NEW CLEARED LEDGER ENTRY AND ONCE A NIGHT: a rule's step, and a clock of its own. */
     assert.deepEqual(s.runs, { rule: true, every: '1d' }, id);
     assert.deepEqual([s.egress, s.keys], [[], []], `${id} calls nobody`);
     assert.ok(s.reads.includes('transactions') && s.reads.includes('money_flags'), id);
@@ -95,7 +95,7 @@ test('THE ADD-ON CARRIES twice.js AND repeats.js BYTE FOR BYTE, needs Money, cal
      write to the other's list. */
   assert.deepEqual([...scriptOf('watch_twice').writes].sort(), ['money_flags', 'transactions']);
   assert.deepEqual([...scriptOf('watch_repeats').writes].sort(), ['money_flags', 'recurring']);
-  /* ONE SWITCH A FLAG, and the two that start on (REC-B21, "Needs him", the default). */
+  /* ONE SWITCH A FLAG, and the two that start on ("Needs him", the default). */
   assert.deepEqual(
     Object.entries(PACK.config).map(([key, c]) => [key, c.type, c.default, c.label]),
     [
@@ -343,7 +343,7 @@ test('"BOTH REAL" IS REMEMBERED: the same payee, account and amount is not asked
 });
 
 test('"BOTH REAL" IS REMEMBERED FOR ABOUT NINETY DAYS: a pair inside them is passed over, one after them is asked about again', async () => {
-  /* RED FIRST, MEASURED before the change (audit of batch 71, finding 7): the answer was remembered for good, so the
+  /* RED FIRST, MEASURED before the change: the answer was remembered for good, so the
      pair of 6 Oct opened nothing, fourteen weeks after she had said both were real, and a charge made twice by
      mistake a year on would never have been asked about. */
   const r = await fresh();

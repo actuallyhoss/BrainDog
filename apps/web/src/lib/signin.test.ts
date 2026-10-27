@@ -123,7 +123,7 @@ test('link-sent names the address it was asked for', () => {
   assert.ok((() => { const s = stateOf(seen({ step: { at: 'sent', email: 'ada@example.com' } })); return s.name === 'link-sent' && s.email === 'ada@example.com'; })());
 });
 
-/* THE SECOND LINE (LCH-A04): a minute after the send, and not a moment before, the sent screen says what fixes a letter
+/* THE SECOND LINE: a minute after the send, and not a moment before, the sent screen says what fixes a letter
    that did not come. A send that carries no time never says it, so an older caller draws the one line it always drew. */
 test('the sent screen adds its second line once a minute has passed, and not before', () => {
   const late = (now: number, when?: number) => {

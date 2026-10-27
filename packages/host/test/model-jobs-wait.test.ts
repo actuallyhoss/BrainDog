@@ -1,5 +1,5 @@
 /**
- * The model jobs wait while the model is silent (ENG-A04): a pass whose engine health says `not_answering` leases nothing
+ * The model jobs wait while the model is silent: a pass whose engine health says `not_answering` leases nothing
  * and leaves every job `pending` with its attempts as they were, tries the model every thirty minutes with a call that
  * leases no job, and runs as before once the model answers. Over a real record's outbox, so the attempts read are the
  * kernel's own.

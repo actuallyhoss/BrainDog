@@ -44,7 +44,7 @@ const DAY_MS = 86_400_000;
 const AGENTS = { writes: 10, days: 3 };
 /** Ninety days of silence, from the same rule of three `observe.ts` uses for a dormant declaration. */
 const QUIET_DAYS = 90;
-/** A record used for fewer days than this is watched and not advised: a fortnight of use is not a habit (ENG-B17). */
+/** A record used for fewer days than this is watched and not advised: a fortnight of use is not a habit. */
 const YOUNG_DAYS = PEN_YOUNG_DAYS;
 /** Another use case's lists take this many times the speaking one's new rows, and at least `VOICE.rows`, before the voice is questioned. */
 const VOICE = { ratio: 3, rows: 10 };
@@ -1295,7 +1295,7 @@ const THEM: Readonly<Record<EntityUse['kind'], { them: string; own: string; has:
  * rule read titles and addresses for itself and so missed the first, and two projects with a page were each offered one.
  * What it keeps of its own is whether the address a draft would take is free, which is another question.
  *
- * AND IN THE RECOMMENDER'S ORDER, ONCE A THING (ENG-B14): the drafts follow `recommend`'s offers, strongest first, one
+ * AND IN THE RECOMMENDER'S ORDER, ONCE A THING: the drafts follow `recommend`'s offers, strongest first, one
  * for each key however often the reading carries the thing, and each carries its offer's rank and the day it lapses.
  */
 export function entityDrafts(usage: Usage): SlashDraft[] {
@@ -1378,7 +1378,7 @@ export function entityDrafts(usage: Usage): SlashDraft[] {
   return out;
 }
 
-/* ── the one queue (ENG-B14) ───────────────────────────────────────────── */
+/* ── the one queue ───────────────────────────────────────────── */
 
 /**
  * THE ONE COUNT: every arrangement offer that waits on the person now, the pen's and every open one on Decide whoever
@@ -1475,7 +1475,7 @@ export interface SlashModel {
    */
   headline?(input: HeadlineInput): Promise<unknown>;
   /**
-   * The day's briefing as cards (ENG-B12, `briefing.ts`): `{ cards: [{ h, line }] }` over the facts handed in, by their
+   * The day's briefing as cards (`briefing.ts`): `{ cards: [{ h, line }] }` over the facts handed in, by their
    * handles. OPTIONAL: a model that writes none is asked nothing and the rules' cards stand (`brief-write.ts`). A host
    * passes `@braindog/host`'s `SLASH_BRIEF_INSTRUCTIONS`.
    */
@@ -1585,7 +1585,7 @@ const DESCRIBED_KEPT = 50;
  * which are shared with a person's reads at the palette and an automation's questions.
  *
  * `held` answers why this description is not sent now, or `null`: Decide full, or the same words already filed and still
- * waiting there. `waiting` IS THE ONE COUNT (`waitingCount`, ENG-B14), or Slash's own open questions where those are
+ * waiting there. `waiting` IS THE ONE COUNT (`waitingCount`), or Slash's own open questions where those are
  * more, so the pen's three and Slash's are one three here too, and the sentence keeps its words. The words are compared as typed, less case and spacing. `once` makes presses of one description sent
  * together one ask whose answer they share, since each of them would otherwise pass `held` before the first had filed;
  * `who` keeps two callers held to different reads from sharing an answer drawn from the other's reading.
@@ -1737,7 +1737,7 @@ const OWN_LOOP = [
 const NAMES_PACK: ReadonlySet<string> = new Set(['pack', 'install', 'enable', 'disable']);
 
 /**
- * Why a draft is dropped for reaching Slash's own loop, or `null` (ENG-A14, RQ-ENG-184: "Slash never drafts a change to
+ * Why a draft is dropped for reaching Slash's own loop, or `null` ("Slash never drafts a change to
  * its own loop, thresholds or budget"). Its budget was reached only by the owner's settings door, and nothing failed if a
  * draft named it: a settings line raising `ask_cap`, a rule writing `slash.reads`, a script fetching the settings door.
  * EVERY KEY AND EVERY TEXT of the body is read, its declarations, steps and settings included, as `reachesOut` reads a
@@ -2092,7 +2092,7 @@ function modelDraft(
 /* ── his own words, and the looks he installed ───────────────────────────────── */
 
 /**
- * What the draft path already read, handed to `fromModel` beside the answer (ENG-B20). `usage` is the reading the model
+ * What the draft path already read, handed to `fromModel` beside the answer. `usage` is the reading the model
  * was handed, whose titles a tone draft is held to (`ownWords`) and whose age a look pick waits on (`youngSaid`). `looks`
  * is what `theme-pick.ts` `looksOf` answers for this record, less the one he is drawn in now. `may` is the kernel's
  * governor (`observe.ts` `mayPropose`), and a look pick waits while it says no.
@@ -2153,7 +2153,7 @@ const quoted = (v: unknown): string => {
 };
 
 /**
- * Why a model's `settings` or `pack` draft is dropped for its words, or `null` when every word it sets is his (ENG-B20).
+ * Why a model's `settings` or `pack` draft is dropped for its words, or `null` when every word it sets is his.
  *
  * `reach.ts` `toneKept` IS THE TEST, against `own`: a label (a `label_`, `one_`, `holds_` or `lk_` setting) only in
  * words of his, a voice line (a `voice_` setting, or `body.voice`) only with no digit. ONE WORD OF THE MODEL'S DROPS THE
@@ -2202,7 +2202,7 @@ const looksSaid = (looks: readonly LookOffer[]): string =>
   looks.length <= 3 ? looks.map((l) => l.name).join(', ') : `${looks.slice(0, 3).map((l) => l.name).join(', ')} and ${looks.length - 3} more`;
 
 /**
- * A model's look pick as a draft, or why it is dropped (ENG-B20): A THEME IS PICKED, NEVER DESIGNED. Only an id `looksOf`
+ * A model's look pick as a draft, or why it is dropped: A THEME IS PICKED, NEVER DESIGNED. Only an id `looksOf`
  * answers for this record is offered, and `lookThemeFault` must take it too, so `house` and a theme nobody installed
  * are dropped. The body is `{ look: { theme } }` and nothing else, filed as a `settings` question, which `prepare` passes
  * as it is; his yes sets his own `look.theme` (`lookLanding`). The question is the record's, in the look's name, never
@@ -2446,7 +2446,7 @@ function faultsOf(seen: Result<SlashPreview>, built?: { id: string; blocks: read
     for (const s of t.steps) if (s.state === 'failed') faults.push({ at: `${t.rule}.${s.path}`, fix: s.say });
   /* AND WHAT DRAWS BUT IS NOT A GOOD PAGE, so the same repair that mends a refusal mends a page that opens on nothing,
      leaves a hole in a row, or calls the person's things rows. */
-  /* A PAGE BUILT IN THE BROWSER AND NOT YET HELD (Today, Decide: C25, C26) stood as that body, so it is held only to
+  /* A PAGE BUILT IN THE BROWSER AND NOT YET HELD (Today, Decide: C25) stood as that body, so it is held only to
      faults of a kind the body did not have already: the body is the person's screen, and a draft that adds one calendar
      to it is not asked to mend how many tiles Today opens on. By kind, since the body is measured as written and the
      draft as drawn, so the numbers and the block named in a fault differ between the two. */
@@ -2667,7 +2667,7 @@ export async function describe(deps: {
   drawn: (id: string) => number;
   preview: SlashPreviewer;
   most?: number;
-  /** The body a page not yet held was built as, which the draft is measured against (C25, C26). */
+  /** The body a page not yet held was built as, which the draft is measured against. */
   built?: { id: string; blocks: readonly unknown[] };
   /** Pins the blocks a page change moved, handed in by the record, which holds the page's look. */
   pin?: (to: unknown) => unknown;

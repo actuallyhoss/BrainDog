@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * THE DOOR CHECK (AGT-A01): a real agent app, started the way a stranger starts it, against a real record.
+ * THE DOOR CHECK: a real agent app, started the way a stranger starts it, against a real record.
  *
  * WHY IT EXISTS. Ten thousand tests drove the agent door with a hand-written client, and a tool list Claude Code
  * refused passed every one of them for a week (`packages/mcp/src/rpc.ts:64-70`). A check that agrees with whoever

@@ -1,5 +1,5 @@
 /**
- * The names the frame uses as controls, which a row may never wear as its mark (PGS-A06).
+ * The names the frame uses as controls, which a row may never wear as its mark.
  *
  * THE KERNEL'S COPY of `CONTROLS` in `packages/render/src/glyphs/names.ts`, because the kernel imports no renderer.
  * `tools/gates/closed-lists.mjs` holds the two equal word for word and in order, so a control added to one and not the
@@ -33,7 +33,7 @@ export function isControlMark(name: unknown): boolean {
   return typeof name === 'string' && CONTROL_SET.has(name.trim().toLowerCase());
 }
 
-/* ── the names a mark can be drawn by (REC-C17) ──────────────────────── */
+/* ── the names a mark can be drawn by ──────────────────────── */
 
 /**
  * Every name the set draws, and every word that stands for one: THE KERNEL'S COPY of `GLYPH_NAMES` in

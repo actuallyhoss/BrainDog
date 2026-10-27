@@ -1,5 +1,5 @@
 /**
- * A field written once (SHL-A09): `once: [field ids]` on a list in an add-on.
+ * A field written once: `once: [field ids]` on a list in an add-on.
  *
  * NO KEY NAMED A FIELD WRITTEN ONCE. An add-on's update patches what it declared, and a figure a person corrected on a
  * row the add-on first filled had nothing to say "leave this where it is". The list says it now, beside its fields:

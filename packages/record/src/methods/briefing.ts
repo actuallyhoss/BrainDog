@@ -1,10 +1,10 @@
 /**
- * The briefing, the read: `briefing` (READ+), what Today opens on (ENG-B12, "A model reads the record and says what
+ * The briefing, the read: `briefing` (READ+), what Today opens on ("A model reads the record and says what
  * matters").
  *
  * BEFORE THIS NOTHING ANSWERED IT. Today opened on whatever its page drew first, which on the owner's record was three
  * renewals for the year after next, while a bill late since yesterday and the questions waiting sat lower down or on
- * another screen (`loop/research-direction-audit.md`). The cards and their sentences are `../briefing.ts`'s, which reads
+ * another screen. The cards and their sentences are `../briefing.ts`'s, which reads
  * no table; this file is the reading: it gathers what the record already holds into facts and hands them over.
  *
  * FOUR THINGS ARE GATHERED, EACH FROM WHERE IT IS ALREADY KEPT. What is late and what falls due inside seven days are
@@ -249,7 +249,7 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
     ...dated(ctx, nowMs),
     ...asked(ctx),
     ...steps(ctx, nowMs),
-    /* AND WHAT STOPPED (`exceptionsFor`, ENG-B13), already held to the lists this caller reads whole. */
+    /* AND WHAT STOPPED (`exceptionsFor`), already held to the lists this caller reads whole. */
     ...(exceptionsFor(deps, ctx, nowMs) ?? []).map((e, n, all): BriefFact => ({ h: handle('exception', n), kind: 'exception', title: e.subject, figures: { when: e.since }, row: e.row?.id ?? '', cause: e.cause, rank: BRIEF_RANK.exception + within(n, all.length) })),
   ];
 }
@@ -313,7 +313,7 @@ export function methods(deps: RecordDeps) {
       const facts = kernel.transaction(() => briefFactsFor(deps, ctx, nowMs));
       /* NO MODEL IS ASKED HERE. What one answered at the last write is read out of the model's own prefs, and it stands
          only for the basis it was written from: a moved basis, or another caller's, is answered by the rules. */
-      /* AND ONLY THROUGH THE LENS IT WAS WRITTEN THROUGH (`briefLensOf`, T16): a reader whose facts happen to equal the
+      /* AND ONLY THROUGH THE LENS IT WAS WRITTEN THROUGH (`briefLensOf`): a reader whose facts happen to equal the
          whole record's is still answered the rules, since what a model wrote was written for whoever reads it all. */
       const lens = briefLensOf(ctx, (deps.readsAcross ?? deps.readsEveryList) as ((ctx: never) => boolean) | undefined);
       const kept = keptBrief(kernel.prefsOf(SLASH)[BRIEF_KEPT], facts, lens);

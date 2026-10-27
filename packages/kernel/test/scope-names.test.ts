@@ -1,5 +1,5 @@
 /**
- * A run is placed by what it is, never by what it is called (research audit 14, M1; research understanding 38).
+ * A run is placed by what it is, never by what it is called.
  *
  * A remote is compared whole, `host/owner/name`; a last name alone is a question for the person, one project or
  * several, and never a placing; a run is placed once and never moved; and a repository the record does not know, seen
@@ -109,7 +109,7 @@ test('AN UNKNOWN REPOSITORY IN THREE RUNS IS ONE "START A PROJECT?", with its re
   assert.deepEqual(suggestProjects(runs.slice(0, 2), PROJECTS), []);
 });
 
-test('A TEMP-LIKE FOLDER IS NEVER OFFERED AS A PROJECT, and a repository is offered only once runs worked in it on two days (scope D6)', () => {
+test('A TEMP-LIKE FOLDER IS NEVER OFFERED AS A PROJECT, and a repository is offered only once runs worked in it on two days', () => {
   const seen = (at: string, more: Partial<SeenRun>): SeenRun => ({ at, ...more });
   const temp = ['01', '02', '03', '04'].map((d) => seen(`2026-10-${d}T09:00:00Z`, { repo: 'Temp', cwd: 'C:\\Users\\sam\\Temp' }));
   assert.deepEqual(suggestProjects(temp, PROJECTS), [], '4 runs in Temp suggest nothing');

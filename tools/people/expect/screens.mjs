@@ -1,5 +1,5 @@
 /**
- * The first screens of one walk, drawn and read into the snapshots `first-screen.mjs` judges (audit 71, finding 8).
+ * The first screens of one walk, drawn and read into the snapshots `first-screen.mjs` judges.
  * `first-run.mjs` hands its `shot` the record at two moments, just kept and just told; this draws each as the app's
  * shell would at 1440: the rail (`Sidebar.svelte`, fed as `routes/+layout.svelte` feeds it) and Today inside `main`
  * (the head and the body, `PageHead.svelte` and `PageView.svelte`, fed as `Home.svelte` feeds them), and as a phone

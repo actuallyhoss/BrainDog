@@ -2,7 +2,7 @@
   One page written for one kind of person, `/for/<who>`: what they would say, three things BrainDog does for them, each
   drawn from their example record, the link to the other page shown today, and the early access strip.
 
-  THE UI PASS OF 20 OCTOBER (site F13) took the drawn record window off these pages: it showed an older app (its tabs,
+  THE UI PASS OF 20 OCTOBER took the drawn record window off these pages: it showed an older app (its tabs,
   a Page and Source switch) and drew the first row's chart twice. The home page's desk is the app as it is; each row
   here keeps its own drawing, one segment of the example's page (`copy/for.ts` names which), cut from the page's
   text by its span in the parse and drawn by the renderer a record uses, so no figure here is written twice.
@@ -27,7 +27,7 @@
   const person = $derived(f.who[id]);
   const example = $derived(EXAMPLES.find((c) => c.id === id));
   const here = $derived(w.moreFor[id].href);
-  /* Only the pages a visitor can reach: the others are held (D5), and a link to one would land on the 404. */
+  /* Only the pages a visitor can reach: the others are held, and a link to one would land on the 404. */
   const others = $derived(EXAMPLES.filter((c) => c.id !== id && FOR_SHOWN.includes(w.moreFor[c.id].href)));
 
   /**
@@ -73,7 +73,7 @@
     </article>
   {/each}
 
-  <!-- ── The other page written for someone else (site F13): only its link, the words its name (site 2b) ── -->
+  <!-- ── The other page written for someone else: only its link, the words its name (site 2b) ── -->
   <nav class="others" aria-label={f.others}>
     <ul>
       {#each others as c (c.id)}

@@ -1,6 +1,6 @@
 /**
  * `form`: a few fields a person fills in and one button that writes them, declared by a page and checked by the record
- * (PGS-A15, `loop/scope/area-pages-a.md`, "generated forms", "by a person, without code").
+ * ("generated forms", "by a person, without code").
  *
  * UNTIL THIS KIND EVERY FORM THAT WROTE WAS A SCREEN WRITTEN BY HAND. A row's add form is generated from its list, and
  * `inputs` edits one row, but a page could not say "these four questions, then Add it". A form names its verb, the

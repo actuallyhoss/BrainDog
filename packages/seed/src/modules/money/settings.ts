@@ -17,7 +17,7 @@
  */
 export const MONEY_HOME_SETTING = {
   home_currency: { type: 'text', label: 'Home currency', note: 'The currency money in other currencies is added up in, when there is a rate for it. Held to this as soon as it is saved.' },
-  /* THE DAYS NO MONEY MOVES ON, SINCE money-core 3.16.0 (REC-B13). A repeating line set to move off them goes to the
+  /* THE DAYS NO MONEY MOVES ON, SINCE money-core 3.16.0. A repeating line set to move off them goes to the
      working day before or after (`recurring.weekend`); a line left to keep its day keeps it, which is every line until
      a person says otherwise. SATURDAY AND SUNDAY TO START, AND A RECORD'S OWN AFTER THAT: in Cairo the weekend is Friday
      and Saturday. Day names, one a line, because that is what a person types on the settings screen; the walk reads

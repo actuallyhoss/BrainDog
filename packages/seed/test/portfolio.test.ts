@@ -58,7 +58,7 @@ test('THE PORTFOLIO OVERVIEW DRAWS WHAT THE PROJECTS EARN, in a block over the r
   const draws = (kind: string) => blocks.filter((b) => b.kind === kind && (b.columns ?? []).some((c) => c.field === 'revenue'));
   /* A SPLIT SINCE portfolio 1.6.0, one track cut into each project's share, where it was a bar a project: the same two
      columns over the same rows, drawn as parts of one whole. */
-  /* DECLARED ONCE, ALONE, SINCE the UI pass of 20 October (proj F5): the open and folded headings over it went with what
+  /* DECLARED ONCE, ALONE (proj F5): the open and folded headings over it went with what
      agents hold, what is coming up and the parked and finished, which every card now says. */
   /* AND SINCE portfolio 1.30.0 THE BOARD SAYS IT (`key: board`): what each earning project brings in a month, one line
      each with its share of the whole, from the money linked to it, else its monthly key number, else its year in

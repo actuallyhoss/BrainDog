@@ -11,7 +11,7 @@
  * Decide's (declining Slash's page question writes `page:<list>` into `pen.dismissed`) are other files'. Their cases run
  * as `todo` until those lines land, and then the `todo` comes off.
  *
- * WHAT SLASH LEAVES TO THE PEN WAITS IN THE ONE QUEUE (ENG-B14): three at most are shown, and the rest wait their turn,
+ * WHAT SLASH LEAVES TO THE PEN WAITS IN THE ONE QUEUE: three at most are shown, and the rest wait their turn,
  * asked in no second place (`emergent-queue.test.ts`).
  *
  * USER, THEN ADD-ON, THEN AN OFFER (`29 §6`: "User > pack > derived"). A page the person wrote carries no `pack`, an

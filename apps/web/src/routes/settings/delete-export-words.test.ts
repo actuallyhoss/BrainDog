@@ -1,5 +1,5 @@
 /**
- * Delete and Export say what they are about (the audit of 25 October, Y22).
+ * Delete and Export say what they are about.
  *
  * A RECORD NAMED AFTER ITS OWNER read "Delete Marta" over the delete control, which says deleting her. The title says
  * "this record", and the record's own name stays in the sentence under it. Export named the first three lists the

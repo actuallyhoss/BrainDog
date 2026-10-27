@@ -230,8 +230,7 @@ const DUE_HEAD = 'Due';
  * heading and the day the cell under the Due heading, and cards on a phone, where it is the card's second line less the chip that says where the task belongs.
  * Only what a person can see is read (`checkVisibility`), so a table kept in the document and hidden is not the list.
  *
- * THE TASK IS FOUND BY ITS HEADING, AS THE DAY IS, and never by its place: the picker's box leads the row since the UI
- * pass of 20 October, so the first cell of a row is a checkbox and not the task's name.
+ * THE TASK IS FOUND BY ITS HEADING, AS THE DAY IS, and never by its place: the picker's box leads the row, so the first cell of a row is a checkbox and not the task's name.
  */
 function look({ titleBox, titleHead, dueHead }) {
   const text = (el) => (el?.textContent ?? '').replace(/\s+/gu, ' ').trim();

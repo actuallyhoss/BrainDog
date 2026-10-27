@@ -144,7 +144,7 @@ const MONEY_IN_TEXT = new RegExp(`(?<![\\w.,])(?:([A-Z]{3}) ?(${NUMBER})|([£€
 export const MONEY_MASK = '…';
 
 /**
- * Text with every amount written in it taken out (sharing plan §2.7, "Hide amounts"): "Paid £923.47 for clay" is "Paid
+ * Text with every amount written in it taken out ("Hide amounts"): "Paid £923.47 for clay" is "Paid
  * £… for clay", "GBP 400" is "GBP …" and "400 EUR" is "… EUR". Read by `MONEY_RE`'s own shapes and its own currency
  * check, so what is masked is what a mail's amount is read as; a number with no currency beside it stays.
  */

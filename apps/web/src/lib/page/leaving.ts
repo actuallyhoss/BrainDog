@@ -1,5 +1,5 @@
 /**
- * WHAT A PAGE DRAWS WHILE THE NEXT ONE READS (EXP-D04, "no blank flash, no spinner where a skeleton or the old content
+ * WHAT A PAGE DRAWS WHILE THE NEXT ONE READS ("no blank flash, no spinner where a skeleton or the old content
  * can stay"). Going from one page to another set the answer to nothing and drew bars for the whole read, so every move
  * had an empty frame in it, even one that answered in a tenth of a second.
  *

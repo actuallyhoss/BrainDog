@@ -58,7 +58,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       source: 'forecast.runway',
       opening: { metric: 'book-cash:{{name}}' },
       from: BOOK_LEGS,
-      /* TWELVE WEEKS FIRST, SINCE money-core 3.27.0, as Money's own Cash ahead (ten from 3.17.0, REC-B08): it opened on a
+      /* TWELVE WEEKS FIRST, SINCE money-core 3.27.0, as Money's own Cash ahead (ten from 3.17.0): it opened on a
          year, a span nobody plans a book by. A year and every other length is one press away. */
       horizon: 84,
       /* FIVE YEARS AND TO THE END, SINCE money-core 3.10.0, as Money's own Cash ahead: a load walks two years and a
@@ -107,7 +107,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       ],
       order: [{ field: 'seq', dir: 'asc' }],
       /* A BALANCE OLDER THAN A WEEK IS SAID TO BE OUT OF DATE (25 §9). DATED BY THE BANK'S LAST WORD SINCE money-core
-         3.16.0 (REC-B03), the day `account-ages` says for the card's account, where it was the typed "As of" a bank
+         3.16.0, the day `account-ages` says for the card's account, where it was the typed "As of" a bank
          message never writes (`parts/ages.ts`). */
       stale: CONFIRMED_STALE,
       empty: 'No account is in {{name}} yet. Add one here and it is filed in this book.',

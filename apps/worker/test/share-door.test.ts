@@ -1,5 +1,5 @@
 /**
- * The Worker's half of read-only links (USE-A06): whether it makes them at all (`sharesOf`), and a link's whole life
+ * The Worker's half of read-only links: whether it makes them at all (`sharesOf`), and a link's whole life
  * through the Worker as it ships: opened by the owner, read with no session, closed, and refused when read again.
  *
  * OFF UNLESS SAID. `sharesOf` is yes only with `KEK` bound and `SHARE_LINKS` exactly `on`, which production does not set

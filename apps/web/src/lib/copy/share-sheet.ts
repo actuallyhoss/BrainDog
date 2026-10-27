@@ -1,5 +1,5 @@
 /**
- * The words of the Share sheet (sharing plan §3.1) and of See as (§3.3): the sheet's six fields, its preview, the inline
+ * The words of the Share sheet and of See as (§3.3): the sheet's six fields, its preview, the inline
  * confirm, the link an address is sent, the banner over the record seen as somebody, and the refusal of a change made
  * there.
  *

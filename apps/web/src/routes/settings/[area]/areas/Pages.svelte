@@ -174,7 +174,7 @@
     const bySection = new Map(groups.map(([section, list]) => [section.trim().toLocaleLowerCase(), { section, list }] as const));
     const app = (href: string, own: string, icon: IconName): Listed => ({ href, slug: null, own, icon, inNav: true, row: false, app: true });
     const out: Listed[] = [];
-    /* NEEDS YOU SECOND, AS THE BAR DRAWS IT (Y20): it was ninth, under Activity. */
+    /* NEEDS YOU SECOND, AS THE BAR DRAWS IT: it was ninth, under Activity. */
     for (const item of [...decideSecond(flat.main), ...flat.more]) {
       if (item.key === 'today') out.push(app('/', item.label, 'today'));
       else if (item.key === 'activity') out.push(app('/audit', item.label, 'activity'));
@@ -188,7 +188,7 @@
         for (const p of held.list) {
           const twin = out.some((o) => same(o.own, p.own));
           /* A PAGE NAMED AS ITS SECTION, WHEN THE APP'S SCREEN OF THAT NAME IS ALREADY LISTED, IS NOT LISTED AGAIN (UI pass
-             of 21 October, H34): "Work" then "Work, in Work" was one place said twice. */
+             of 21 October): "Work" then "Work, in Work" was one place said twice. */
           if (twin && same(p.own, held.section)) continue;
           out.push(same(p.own, held.section) && !twin ? p : { ...p, section: held.section });
         }
@@ -244,7 +244,7 @@
     const drawn = new Set(inNav.map((e) => e.href));
     const known = new Map(shell.nav.map((e) => [e.id, e] as const));
     const all = titled ?? shell.pages.map((slug) => ({ slug, title: '', row: known.get(slug)?.row === true, register: null }));
-    /* NOR IS A PAGE LISTED HERE UNDER A NAME THE NAV ALREADY SHOWS (H34): Activity was in both lists. */
+    /* NOR IS A PAGE LISTED HERE UNDER A NAME THE NAV ALREADY SHOWS: Activity was in both lists. */
     const shown = new Set(ordered.map((o) => o.own.trim().toLocaleLowerCase()));
     const listed = all
       .filter((p) => !drawn.has(`/p/${p.slug}`))
@@ -267,7 +267,7 @@
      pages drawn and the pages it adds come to the count over the section. */
   const FOLD = 8;
   let unfolded = $state(false);
-  /* ADD A PAGE FINDS BY NAME (U-C8): typing narrows every page not in the sidebar, folded ones too. */
+  /* ADD A PAGE FINDS BY NAME: typing narrows every page not in the sidebar, folded ones too. */
   let finding = $state('');
   const found = (p: Listed): boolean => finding.trim() === '' || `${navPrefs.labelOf(p.href, p.own)} ${p.own}`.toLowerCase().includes(finding.trim().toLowerCase());
   const othersShown = $derived(finding.trim() !== '' ? others.filter(found) : unfolded ? others : others.filter((p) => !p.row).slice(0, FOLD));
@@ -275,7 +275,7 @@
   const navShown = $derived(ordered.filter((p) => !navPrefs.isHidden(p.href)));
   const hiddenRows = $derived(ordered.filter((p) => navPrefs.isHidden(p.href)));
   const outCount = $derived(hiddenRows.length + others.length);
-  /* WHAT THE FOLD HOLDS, BY KIND (Y20): "Pages of 30 projects, 8 people and every agent run", never "1047 more pages". */
+  /* WHAT THE FOLD HOLDS, BY KIND: "Pages of 30 projects, 8 people and every agent run", never "1047 more pages". */
   const foldLine = $derived.by(() => {
     const drawn = new Set(othersShown.map((p) => p.href));
     return foldSaid(

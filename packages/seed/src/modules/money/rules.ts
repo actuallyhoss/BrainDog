@@ -76,8 +76,8 @@ export const MONEY_RULES: Record<string, SeedRule> = {
   },
   /* A BALANCE MORE THAN A WEEK OLD WAS TOLD BY `cash-stale`, FROM money-core 3.1.0 TO 3.15.0, a note on the account each
      time its typed "As of" passed a week. It read the typed day, which a bank message never writes, so on the owner's
-     record it told of every account and would have gone on telling after messages filed. It goes at money-core 3.16.0
-     (REC-B03): Money's Heads up names how old the oldest balance is from the roll's own day (`cash-as-of`), its Last
+     record it told of every account and would have gone on telling after messages filed. It goes at money-core 3.16.0:
+    Money's Heads up names how old the oldest balance is from the roll's own day (`cash-as-of`), its Last
      confirmed tile dates each account by its newest statement (`account-ages`), and `statement-oldest-days` is the sign. */
   /**
    * THE ONE RULE HERE THAT ACTS, and it acts because there is nothing to decide.
@@ -87,7 +87,7 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * `FENWICK CLOUD` arrives, being asked what it is for is an insult. What the rule cannot reach is what the figure
    * counts, so nothing is hidden by it.
    *
-   * IT LINKS THROUGH `filing_rules`, SINCE money-core 3.17.0 (REC-B10), AND IT LINKED A CATEGORY BY ITS "Matches".
+   * IT LINKS THROUGH `filing_rules`, SINCE money-core 3.17.0, AND IT LINKED A CATEGORY BY ITS "Matches".
    * That link read neither which way the category goes nor anything else about it, so a category for money in was put
    * on money going out. Now the rule found is one that is on, goes the entry's way or either, and names the entry's
    * account or none (`FILED`), and the entry is given that rule's category (`take`). Which rule fits is the record's

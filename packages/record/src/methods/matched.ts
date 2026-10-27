@@ -21,7 +21,7 @@
  * its end as the rules read it, and never an address. Where no shared handle can be read from what the two hold now,
  * the sentence is the reason the batch itself wrote down.
  *
- * AND THE NAMES SLASH PUT ON SOMEBODY ALONE (ENG-B15, "Slash may act on its own", "always undoable"). Once the owner
+ * AND THE NAMES SLASH PUT ON SOMEBODY ALONE ("Slash may act on its own", "always undoable"). Once the owner
  * has let it, an attach Slash is sure of lands with no question: a dated line put on the one a text named, in the part
  * of the list that keeps where somebody was seen. A model writes nothing but what it proposes, so the ladder accepts
  * Slash's question at its rung and the line is written under the ladder's name, in the batch that settles the question

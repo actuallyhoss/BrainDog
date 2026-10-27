@@ -1,5 +1,5 @@
 /**
- * The picks page of the frame (EXP-A02): every open choice of the look on one page, each option drawn on the frame's
+ * The picks page of the frame: every open choice of the look on one page, each option drawn on the frame's
  * specimen at 390 and 1440, dark then light, the recommendation marked, and one press for "yes to every
  * recommendation". It also writes `design/boards/frame/dark.md` and, from the answer, `design/boards/frame/yes.json`.
  *
@@ -188,7 +188,7 @@ export function darkMd(roles) {
 }
 
 /**
- * THE MEASUREMENTS OF `tokens.css` BESIDE THE REFERENCE KIT'S, where both name a number (RQ-EXP-035). Each is read from
+ * THE MEASUREMENTS OF `tokens.css` BESIDE THE REFERENCE KIT'S, where both name a number. Each is read from
  * its file, the token by name and the kit by the sentence it is written in, so neither side is typed here. A side its
  * file no longer says is listed as not found, never dropped.
  */
@@ -302,7 +302,7 @@ export function picksHtml({ slots, drawn = {}, record = 'a copy of your record',
 `;
 }
 
-/** The four boards drawn by hand on 8 October, which the sheet is judged beside (`loop/STATUS.md`). */
+/** The four boards drawn by hand on 8 October, which the sheet is judged beside. */
 export const OCT8 = join('loop', 'design', 'boards-oct8', 'project');
 const OCT8_BOARDS = [
   { file: 'Main.dc.html', name: 'Today, dark', width: 1440 },

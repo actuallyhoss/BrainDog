@@ -1,5 +1,5 @@
 /**
- * `record_index` says who is working (AGT-C20): how many runs were heard from in the last fifteen minutes, and the ones
+ * `record_index` says who is working: how many runs were heard from in the last fifteen minutes, and the ones
  * in the caller's own tree by name with their handle beside it, in one line an agent reads when it opens the record.
  *
  * OVER A REAL RECORD, so the runs are `boot`'s own and `same_repo` is the record's `sameTree`, worked out from the

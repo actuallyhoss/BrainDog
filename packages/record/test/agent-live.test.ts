@@ -1,5 +1,5 @@
 /**
- * Who is live and who is working, by one clock (AGT-C02, the record's part).
+ * Who is live and who is working, by one clock (the record's part).
  *
  * On the owner's record an agent's start card listed six other sessions, four of them dead for hours, and the rail said
  * four were working beside runs last heard from two and four hours before. So `live` answers only runs heard from inside

@@ -1,5 +1,5 @@
 <!--
-  What the store knows of an add-on this record holds, drawn on its one page (the add-ons pass of 27 October): what it
+  What the store knows of an add-on this record holds, drawn on its one page: what it
   reaches outside the record, said even when it is nothing; its versions, newest first, with the one on this record
   marked; and who made it, under what licence, and where it is offered.
 

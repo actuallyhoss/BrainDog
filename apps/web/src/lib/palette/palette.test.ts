@@ -106,7 +106,7 @@ test('A ROW THAT CANNOT RUN RIGHT NOW IS ABSENT, NOT GREYED OUT', () => {
 });
 
 test('THE ROW THAT MAKES SOMETHING is declared, admitted, and there only while the query is a whole sentence', () => {
-  /* TWENTY, with Import a statement; nineteen before it, and sixteen before the three money rows; it was fifteen: `New page` joined the add row and `Customise` (PGS-C30, `new-page.test.ts`). The
+  /* TWENTY, with Import a statement; nineteen before it, and sixteen before the three money rows; it was fifteen: `New page` joined the add row and `Customise` (`new-page.test.ts`). The
      count is exact on purpose, because a row added or lost here is a change to what every screen can reach, and it
      should arrive with the line that says so. */
   assert.equal(COMMANDS.length, 20, `the palette declares ${COMMANDS.length} rows`);

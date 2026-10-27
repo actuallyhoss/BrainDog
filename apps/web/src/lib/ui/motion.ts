@@ -35,7 +35,7 @@ export function swapInPlace(): void {
 }
 
 /**
- * A PLACE'S FIRST DRAW ARRIVES IN ORDER (fluid F6, scope E39): its first tiles rise one after another, `gap` apart
+ * A PLACE'S FIRST DRAW ARRIVES IN ORDER (fluid F6): its first tiles rise one after another, `gap` apart
  * (`--d-stagger`), `most` of them, each over a page's `--d-page`, so the last is still by `by`. The rest are simply
  * there. Never on a way back, and never under reduced motion. Home's sheet writes the same numbers as `nth-child` delays.
  */

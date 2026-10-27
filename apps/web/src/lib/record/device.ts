@@ -52,7 +52,7 @@ export type TokenRow = {
   ended_by?: 'operator';
   /** Whose token this is, for the owner's `listTokens`. Absent on a host older than the field. */
   person_name?: string | null;
-  /** The build of the command behind the key, as its last call said it (AGT-A02). Absent on an older host. */
+  /** The build of the command behind the key, as its last call said it. Absent on an older host. */
   last_build?: string | null;
   /** When the key last made a tool call through the door. Absent on an older host. */
   last_tool_at?: string | null;
@@ -176,7 +176,7 @@ export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((
  * command does not exist on a machine until it is run. `setup` logs in, installs the hooks, registers
  * the MCP server and syncs the skills in one command.
  *
- * AND THE LINES PER APP, for the connect sheet (AGT-A07): `codex` is Codex's own command for an HTTP server, `cursor`
+ * AND THE LINES PER APP, for the connect sheet: `codex` is Codex's own command for an HTTP server, `cursor`
  * the entry its server file takes (`~/.cursor/mcp.json`), and `web` and `other` the address, which is all Claude on the
  * web and any other app are given. Each is the line for doing it by hand; `setup` finds Codex and Cursor itself.
  */

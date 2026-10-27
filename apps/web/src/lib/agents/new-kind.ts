@@ -207,7 +207,7 @@ export const words = {
   open: 'New kind',
   heading: 'New kind',
   parent: 'Agents',
-  /* ONE SENTENCE (24 October, U-A17), where the line was a riddle of three steps. */
+  /* ONE SENTENCE (24 October), where the line was a riddle of three steps. */
   headline: 'Say what the job does, pick how far it may go, and save it.',
   presets: 'How far it may go',
   more: 'More choices: folder, tools and limits',
@@ -275,7 +275,7 @@ export type KindPreset = { id: 'look' | 'code' | 'tidy'; label: string; said: st
 const READ_RECORD = ['record_index', 'context', 'get', 'list', 'search', 'activity'].map((name) => JOB_MCP_PREFIX + name);
 
 /**
- * THREE WAYS TO START (24 October, U-A17), so the tools are picked by what the job is and not one box at a time: one that
+ * THREE WAYS TO START (24 October), so the tools are picked by what the job is and not one box at a time: one that
  * looks and tells, changing nothing; one that works on code in its folder; and one that keeps the record tidy, asking
  * the owner before anything changes. Each only fills in the choices under More, where every one can still be changed.
  */

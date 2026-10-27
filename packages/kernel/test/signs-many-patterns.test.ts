@@ -1,5 +1,5 @@
 /**
- * A list fed by 150 patterns reads its arrivals sign as one fed by one does (audit 36-37, finding 10).
+ * A list fed by 150 patterns reads its arrivals sign as one fed by one does.
  *
  * `readArrivals` bound one value per pattern and per door, and a Durable Object refuses a statement with more than 100
  * bound values, so a record past about 97 patterns into one list threw the night's whole read of signs. `node:sqlite`

@@ -1,5 +1,5 @@
 /**
- * `words`: the house words, held by a check (EXP-B07).
+ * `words`: the house words, held by a check.
  *
  *   node tools/gates/words.mjs [root]
  *
@@ -15,7 +15,7 @@
  * a module's address, a value compared with `===` or matched by `case`, a type's union of literals, an index, and the
  * argument of a method call (`.join(', ')`, `.toLocaleString('en-GB')`). A template is read with each `${…}` as `{}`.
  *
- * AND THE WORDS A SVELTE FILE KEEPS INLINE (U14): a `.svelte` under `apps/web/src` that holds its copy in its own script,
+ * AND THE WORDS A SVELTE FILE KEEPS INLINE: a `.svelte` under `apps/web/src` that holds its copy in its own script,
  * as `const words = { … }` or `const <name>Words = { … }`, is read there, that object and nothing else of the file, by the
  * same lexer, so copy kept in a component rather than in `lib/copy` is still judged. And the `label` of each key the
  * keyboard sheet lists (`lib/a11y/bindings.ts`), whose other values are ids.
@@ -279,7 +279,7 @@ export function copyFiles(root) {
   return files.sort();
 }
 
-/** Files whose `label` values a screen prints beside their code: the keyboard sheet's list of keys (U-C7). */
+/** Files whose `label` values a screen prints beside their code: the keyboard sheet's list of keys. */
 const LABEL_FILES = ['apps/web/src/lib/a11y/bindings.ts'];
 
 /** Where a `const words = {` or `const <name>Words = {` opens, in a Svelte source's scripts. */

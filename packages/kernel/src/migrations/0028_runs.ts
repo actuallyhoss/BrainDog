@@ -1,5 +1,5 @@
 /**
- * The kernel schema, migration 28: a run keeps how its work went and how the step it left closed (AGT-C04).
+ * The kernel schema, migration 28: a run keeps how its work went and how the step it left closed.
  *
  * A RUN HELD ITS STATE AND NOTHING ABOUT HOW IT GOT THERE, so nothing could tell a session that closed from one that
  * crashed, a step left this morning from one left last week, or a subagent from the session it worked for. Nine fields,

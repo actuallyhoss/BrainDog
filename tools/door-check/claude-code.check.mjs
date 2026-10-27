@@ -1,5 +1,5 @@
 /**
- * CLAUDE CODE THROUGH THE DOOR, AS A STRANGER OPENS IT (AGT-A01, `loop/scope/area-agents-a.md`).
+ * CLAUDE CODE THROUGH THE DOOR, AS A STRANGER OPENS IT.
  *
  * (a) The command is installed by the public script from the host, into the fresh home `run.mjs` made. (b) `braindog
  * setup <the record's address>` signs in, writes the hooks and registers the MCP server, exactly as a person's first

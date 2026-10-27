@@ -155,7 +155,7 @@ export type Manifest = {
   config?: Record<string, ConfigDecl>;
   /**
    * What a person calls each list this pack declares, many and one, by list id: `{ things: { name: 'Projects', one:
-   * 'project' } }` (SHL-A09). Absent when it says none.
+   * 'project' } }`. Absent when it says none.
    *
    * THE WORDS A RENAME STARTS FROM, SAID BY THE PACK THAT OWNS THE LIST. They were a table in code for the six modules,
    * so a stranger's add-on could not offer its lists for renaming at all. Only the lists a person would rename are
@@ -343,7 +343,7 @@ export type Installed = {
   /**
    * The webhook doors that hold a live address now, by id (`heldDigest` in `@braindog/record`): the token half of `used`
    * alone. `used` keeps every door that ever filed, so a door whose last text came a year ago and whose address a retire
-   * broke reads as one in use, and an update dropping it was said to stop texts that no longer come (REC-A16).
+   * broke reads as one in use, and an update dropping it was said to stop texts that no longer come.
    *
    * OPTIONAL: a caller that cannot say has `used` read in its place, which marks more doors live and never fewer.
    */
@@ -584,7 +584,7 @@ export type Diff = {
   }[];
   /**
    * Each script this install puts in or changes: its source whole, its size in bytes, and on an update only the lines
-   * that changed (`scriptSources`, SHL-D09). An unchanged script is not here. Empty when the pack carries no script.
+   * that changed (`scriptSources`). An unchanged script is not here. Empty when the pack carries no script.
    */
   scripts: ScriptSource[];
   /**
@@ -600,7 +600,7 @@ export type Diff = {
   /** Rows that would be left under a retired register. Above zero is a refusal at install, unless he pressed it (`InstallOptions`). */
   orphans: number;
   /**
-   * Each list this version retires while it still holds rows, as the step Decide and Add-ons show (SHL-A12): `retire` is
+   * Each list this version retires while it still holds rows, as the step Decide and Add-ons show: `retire` is
    * the list, `rows` how many it holds, `stays` that every one of them stays, and `line` the sentence, "Retires Services.
    * Your 41 items stay, and the list can be put back."
    *
@@ -724,7 +724,7 @@ export type Host = {
   /**
    * The add-on's update going over a row it planted before: the kernel's update of `row` in `register` with these
    * fields, and with `pack: true` in the write, so a field the list says is written `once` stays as the row holds it
-   * (SHL-A09). It answers `ok(null)` for a row that is no longer live: somebody removed it, and it stays removed.
+   * It answers `ok(null)` for a row that is no longer live: somebody removed it, and it stays removed.
    *
    * OPTIONAL, and an install with a host that leaves it out writes over no row at all, as every install did before.
    */
@@ -834,7 +834,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
      money default is minor units and a currency here exactly as it is in a row. */
   const settings = readConfig(doc.config);
   if (!settings.ok) return settings as Result<Pack>;
-  /* WHAT THIS VERSION CHANGED, read where the file is read (SHL-A09), so the note is on the manifest a record keeps. */
+  /* WHAT THIS VERSION CHANGED, read where the file is read, so the note is on the manifest a record keeps. */
   const changes = readChanges(doc.changes);
   if (!changes.ok) return changes as Result<Pack>;
   /* SKILLS THE PACK GIVES ITS AGENTS, with their text: read here so the checksum holds them and the plan names them. */
@@ -949,7 +949,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     if (list !== null && items !== undefined && (!Array.isArray(items) || items.some((item) => !isObject(item))))
       return malformed(`${declId} writes its ${list} as something other than a list of objects.`, `${declId}.${list}`);
 
-    /* `once` NAMES THE FIELDS AN UPDATE NEVER PATCHES ON A ROW THAT ALREADY HOLDS THEM (SHL-A09), and only a list has
+    /* `once` NAMES THE FIELDS AN UPDATE NEVER PATCHES ON A ROW THAT ALREADY HOLDS THEM, and only a list has
        fields to name. It is held to the list's own fields here, where the file is read, so a field the list does not
        have is refused by its name before anything is planned. It stays on the declaration, which is where the update
        path reads it. */
@@ -1782,7 +1782,7 @@ const newer = (a: string, b: string): number => order(parts(a), parts(b));
  * `options.live` IS EVERY DOOR AND PATTERN THE RECORD IS USING, by declaration id (`ingest.<name>`): one that took an
  * arrival in the last 30 days, holds a live address, or reads a door that does (the record's `arrange-retires.ts`). Each
  * one this version retires outright is marked `live: true`. Without it money-core 3.0.0 was planned as four retires and
- * nothing more, and the owner's card texts stopped filing the day he said yes (REC-A16).
+ * nothing more, and the owner's card texts stopped filing the day he said yes.
  */
 export type PlanOptions = { settings?: Readonly<Record<string, unknown>> | undefined; live?: ReadonlySet<string> | undefined };
 
@@ -2225,7 +2225,7 @@ function seedsFor(pack: Pack, adds: readonly { id: string; handed?: true }[]): S
 }
 
 /**
- * WHAT A SEED SAYS INSTEAD OF A VALUE (SHL-A09): `{ day: '+3' }`, a day counted from install day, and `{ ref: 'yard' }`,
+ * WHAT A SEED SAYS INSTEAD OF A VALUE: `{ day: '+3' }`, a day counted from install day, and `{ ref: 'yard' }`,
  * the row another seed of this file made, by that seed's `key`. Each stands where the value would, alone in its object,
  * as a field's value or as one entry of a list.
  *
@@ -3583,7 +3583,7 @@ function faultOf(pack: Pack, diff: Diff, options: InstallOptions = {}): Result<n
      BUT RETIRING TAKES NOTHING: the declaration goes and the rows stay, as an uninstall keeps them, and a
      version that declares the list again puts it back over them. So the plan shows the step
      (`removals`, "Your 41 items stay"), and his press on it (`retireWithRows`, which `--force` is) lifts
-     this one refusal and no other (SHL-A12). */
+     this one refusal and no other. */
   if (diff.orphans > 0 && options.retireWithRows !== true) {
     const at = diff.retires.find((r) => r.rows > 0)!;
     return no<never>(
@@ -3982,7 +3982,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
 
       /* AN UPDATE GOES OVER THE ROWS IT PLANTED BEFORE, AND WRITES ONLY WHAT THE FILE CHANGED (`seedChanges`). The write
          is the add-on's own (`Host.reseed`, the kernel's update with `pack: true`), so a field the list says is written
-         `once` stays as the row holds it: a category a person renamed keeps their name through every update (SHL-A09).
+         `once` stays as the row holds it: a category a person renamed keeps their name through every update.
          Until this, no update touched a planted row at all, and `once` had nothing to be obeyed by.
          A ROW THE RECORD WILL NOT TAKE THE CHANGE ON DOES NOT STOP THE UPDATE. What refuses it is the record's own
          state, a name somebody has since given another row for one, and an example is not worth an add-on left on its

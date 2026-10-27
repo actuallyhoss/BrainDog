@@ -1,5 +1,5 @@
 /**
- * Money's month-end question, end to end (F60): `last_day` is one of Money's automations, the schedule runs it once a
+ * Money's month-end question, end to end: `last_day` is one of Money's automations, the schedule runs it once a
  * day, its one question is filed in Decide, picking an answer writes the line, and the next night asks nothing.
  *
  * THE SCRIPT IS THE PACK'S OWN, RUN AS A HOST RUNS IT: the declaration's `source` imported as a module and handed a

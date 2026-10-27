@@ -1,5 +1,5 @@
 /**
- * A handoff is an object that closes (AGT-C05, `src/handoff.ts`): a step left in a place is offered as `next` while it
+ * A handoff is an object that closes (`src/handoff.ts`): a step left in a place is offered as `next` while it
  * is young and nobody has passed it over, and it closes taken, dropped or expired, its words kept on the run.
  *
  * On the real kernel and `node:sqlite`, with the writes sent through the write path as the record will send them.

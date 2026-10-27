@@ -49,7 +49,7 @@ export async function readVersionPreview(fetcher: Fetcher, kind: EntryKind, id: 
  * One page of a preview as `PageView` draws it: the page's own title, and each block through `blockOf`.
  *
  * THE ADD-ON'S OWN LISTS ARE LENT FOR THE DRAWING (`lists`, its file's list declarations) and taken back after it
- * (audit C of 25 October, X11). `blockOf` labels a list's cells from what this tab knows of it, and a list the record
+ * `blockOf` labels a list's cells from what this tab knows of it, and a list the record
  * does not hold yet drew "This part of the page cannot be drawn from the record yet" on every part of the preview. One
  * the record already holds is never replaced, and none is left behind for the rest of the tab to offer.
  */

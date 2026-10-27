@@ -1,5 +1,5 @@
 /**
- * The share templates (sharing plan §2.11): data only. Each writes its rows as one bundle, and the Share sheet fills
+ * The share templates: data only. Each writes its rows as one bundle, and the Share sheet fills
  * what it asks for, in place of the `$` words: `$project` a project row id, `$list` a list id, `$where` a condition,
  * `$row` a row id. `days` is how long it lasts from the day it is made, and none means until it is revoked.
  *

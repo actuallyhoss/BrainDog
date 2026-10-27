@@ -500,7 +500,7 @@ export const isRecordId = (x: string): boolean => REC_ID.test(x);
  *
  * ONE FUNCTION FOR BOTH DOORS. `Record$.fetch` takes `x-braindog-ctx` as the whole of who is asking,
  * so whatever a caller sent in that header is overwritten rather than trusted, whichever way they
- * came in (A9). And the bearer goes no further: the record has no use for it, and every hop a
+ * came in. And the bearer goes no further: the record has no use for it, and every hop a
  * credential takes is another place it can be logged.
  */
 export function inward(request: Request, ctx: CallContext): Request {
@@ -508,7 +508,7 @@ export function inward(request: Request, ctx: CallContext): Request {
   /* AND WHAT AN AGENT SAYS ABOUT ITS RUN, checked here, on every door: the record reads the hints of a
      token's call and ignores anybody else's, so a person is never a run whichever door they used. */
   const text = JSON.stringify(withSession(ctx, sessionOf(request.headers)));
-  /* A CONTEXT PAST THE CAP IS NOT SENT AT ALL (sharing plan §2.13, T13). Its size rides on its own header, and the
+  /* A CONTEXT PAST THE CAP IS NOT SENT AT ALL. Its size rides on its own header, and the
      record answers it with `CTX_TOO_LARGE` rather than a caller it could not read. */
   const bytes = bytesOf(text);
   if (bytes > CTX_HEADER_MOST) {
@@ -528,7 +528,7 @@ export const CTX_HEADER = 'x-braindog-ctx';
 export const CTX_OVER_HEADER = 'x-braindog-ctx-over';
 
 /**
- * THE MOST BYTES A CALLER'S CONTEXT TAKES ON THE HOP (sharing plan §2.13: at most 8 KB for the largest template set,
+ * THE MOST BYTES A CALLER'S CONTEXT TAKES ON THE HOP (at most 8 KB for the largest template set,
  * refused above 32 KB). Every list a lens names travels in it, with its rule and its hidden fields, so a person held by
  * many narrow shares is the one who reaches it. Past it the record answers this sentence and reads nothing.
  */
@@ -661,7 +661,7 @@ export type CloudIngestDeps = {
   arrives(rec: string, arrival: Omit<IngestArrival, 'rec'>): Promise<Result<unknown>>;
   /** Whole seconds to wait, or `null` to let this one through. */
   spends(ask: { channel: string; key: string }): Promise<number | null>;
-  /** Count one arrival answered 410 at a door switched off on that record (SHL-C13). Absent, the 410 is still answered. */
+  /** Count one arrival answered 410 at a door switched off on that record. Absent, the 410 is still answered. */
   turnsAway?: (rec: string, ingest: string) => Promise<void>;
   /**
    * Which record a forwarded message is for. Absent, and this deployment takes no mail at all.

@@ -1,8 +1,8 @@
 /**
  * The built-in figures batch 47 adds or changes (figures-47): `signs-unread` (health-words-43), `keys-in-text` by name
- * (key-scan-44), `green-days` read by the seven-day hold (PRF-A18), the two night figures `lists-shrunk` and
- * `documents-dead-paths` as words the record answers (REC-A17, REC-A13), and a miss over nothing held being no verdict
- * on the rolled and walked money figures too (audit 38-39, #11). What the night writes is `night-counts.test.ts`'s.
+ * (key-scan-44), `green-days` read by the seven-day hold, the two night figures `lists-shrunk` and
+ * `documents-dead-paths` as words the record answers, and a miss over nothing held being no verdict
+ * on the rolled and walked money figures too. What the night writes is `night-counts.test.ts`'s.
  */
 
 import { test } from 'node:test';

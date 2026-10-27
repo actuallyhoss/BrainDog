@@ -25,7 +25,7 @@ const TAKES = ['asked', 'page', 'body', 'not'] as const;
 type SlashDescribe = (args: { asked: string; page?: string; body?: Record<string, unknown>; not?: SlashDeclined[] }, ctx: CallContext, preview: SlashPreviewer | null) => Promise<Result<SlashDrafted>>;
 
 /**
- * THE BODY A PAGE IS DRAWN FROM WHILE THE RECORD HOLDS NONE (C25, C26): Today and Decide are built in the browser until a
+ * THE BODY A PAGE IS DRAWN FROM WHILE THE RECORD HOLDS NONE: Today and Decide are built in the browser until a
  * first change keeps them, so the sheet hands the body it drew and the draft changes that. A page with blocks, or nothing.
  */
 const builtFault = (body: unknown): string | null =>

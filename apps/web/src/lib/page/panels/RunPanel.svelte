@@ -15,7 +15,7 @@
   what became of it; its helpers; the run whose step it took. A part with nothing true to say is not drawn, heading and
   all, so a run that only started says who and when.
 
-  WHAT THE RUN LEFT (AGT-C05): the next step it handed on, when, and what became of it ("Taken by Claude Code, 2h
+  WHAT THE RUN LEFT: the next step it handed on, when, and what became of it ("Taken by Claude Code, 2h
   later"), read off the run's own row (`api.ts` `stepLeft`). A step nobody has taken yet can be closed here, with a
   reason, through the record's `handoff` `drop`.
 

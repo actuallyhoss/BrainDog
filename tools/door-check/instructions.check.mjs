@@ -241,7 +241,7 @@ export async function asSession(origin, bearer, session, name, args, { signal, f
 }
 
 /**
- * What an agent with no hooks gets (plan §2.3): A, what waits is said at its start; F, `instructions` with nothing
+ * What an agent with no hooks gets: A, what waits is said at its start; F, `instructions` with nothing
  * asked lists it; B, a tool answer carries what is new for it in `_meta.braindog` and a line in the text. `call` is
  * `asSession` bound to the host and the agent's key, `(session, name, args)`. One row a path.
  */

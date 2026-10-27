@@ -1,5 +1,5 @@
 /**
- * `sameOne` through the client (AGT-D05): a POST to the route of its name with the list and the people picked, answered
+ * `sameOne` through the client: a POST to the route of its name with the list and the people picked, answered
  * with the question on Decide as the record answers it; a pick that is not this record's people is refused in the
  * record's own sentence; and a record without the method answers `NOT_IN_THIS_BUILD` as a refusal the screen can say.
  *

@@ -1,5 +1,5 @@
 /**
- * The model checks' rules, apart from the network, so `test/outcomes.test.mjs` can hold them (ENG-A03).
+ * The model checks' rules, apart from the network, so `test/outcomes.test.mjs` can hold them.
  *
  * THREE OUTCOMES AND NO FOURTH. `measured-pass`: the model answered and met its bar. `measured-below`: the model answered
  * and fell under it, or the route table names an id the provider does not serve; the only red. `not-measured`: the

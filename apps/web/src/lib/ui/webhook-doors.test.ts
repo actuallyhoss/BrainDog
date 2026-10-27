@@ -209,7 +209,7 @@ test('NO USE CASE IS SPELLED IN THE SCREEN OR ITS WORDS', () => {
   assert.equal(Object.keys(copy).some((k) => k.startsWith('shortcut')), false, 'a shortcut* key is left in copy');
 });
 
-/* ── on and off (SHL-C13) ─────────────────────────────────────────────── */
+/* ── on and off ─────────────────────────────────────────────── */
 
 const NOW = Date.UTC(2026, 9, 15, 12);
 

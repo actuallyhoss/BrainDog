@@ -1,13 +1,13 @@
 /**
  * The Slash page, and the words of the drawing of Slash that the home card, the desk's bar and this page share.
  *
- * THE WORDS ARE THE PROTOTYPE'S (loop/site-2026-10-17/src/site.html ~:686-756: Slash has a page of its own, made
+ * THE WORDS ARE THE PROTOTYPE'S (Slash has a page of its own, made
  * super readable and neat), with the site's known fix: "Every figure opens what it came from".
  * The questions in the examples, and every name and figure in an answer, are the made-up record's
  * (`demo/maya.ts`), so none is typed here.
  *
  * EVERY COUNT OF ASKS IS `PLAN_TABLE`'S, through `plans.ts`: early access has Free's 20. No plan name or price is
- * said here while BrainDog is in early access (site F15, 20 October): one paragraph and no table.
+ * said here while BrainDog is in early access (20 October): one paragraph and no table.
  *
  * TWO LINES CHECKED AGAINST THE PRODUCT (17 October). "In Settings under Agents": the model key is chosen in
  * `SlashModel`, drawn in the Agents area of Settings (`apps/web/src/routes/settings/[area]/areas/Agents.svelte`), and

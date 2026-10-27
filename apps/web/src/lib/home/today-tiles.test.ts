@@ -58,7 +58,7 @@ test('THE SENTENCE (today F2, polish 7): short sentences, what needs you first a
   assert.deepEqual(sentenceOf({ needYou: 0, late, agents: 2 }), { text: 'Nothing needs you. £7,200 owed to you is late. 2 agents are working.', needs: '£7,200 owed to you is late' });
   /* SOMETHING IN THE INBOX AND NO QUESTION: never "Nothing needs you". */
   assert.deepEqual(sentenceOf({ needYou: 0, agents: 0, inbox: 4 }), { text: '4 things wait in your inbox.', needs: '' });
-  /* NO WORD BESIDE A FIGURE (SF14). */
+  /* NO WORD BESIDE A FIGURE. */
   for (const n of [1, 7, 8, 12, 26]) assert.doesNotMatch(sentenceOf({ needYou: n, agents: n }).text, /\b(one|two|three|seven|eight|twelve)\b/iu);
 });
 

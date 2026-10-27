@@ -18,7 +18,7 @@ const kin = (key: string, fired: number | undefined, lastAt: string | null = nul
   family: family === null ? undefined : { key: family, list: 'Parcels', did: family === KEY ? ['Shelf'] : ['Tag'] },
 });
 
-/* THE AUDIT OF 25 OCTOBER, Z31 (`automations-390-light-full.png`): "Rules on Ledger" twice in On, 6 rules and 58, two
+/* "Rules on Ledger" twice in On, 6 rules and 58, two
    record keys whose rules set nothing a name says. Two families called the same are one. */
 test('TWO FAMILIES CALLED THE SAME ARE ONE ROW, where the first of them was', () => {
   const ledger = (key: string, family: string, fired: number): Kin => ({ key, fired, lastAt: null, family: { key: family, list: 'Ledger', did: [] } });

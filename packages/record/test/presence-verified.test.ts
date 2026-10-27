@@ -1,5 +1,5 @@
 /**
- * AGENT NAMES SAY "verified" WHEN THE APP PROVES IT (H19 of the 24 October scope).
+ * AGENT NAMES SAY "verified" WHEN THE APP PROVES IT.
  *
  * A run whose key `braindog setup` made for Claude Code ("MacBook · Claude Code", approved by the owner) reads
  * "Claude Code · MacBook · verified" and its presence row says `verified`; a run on the machine's own login

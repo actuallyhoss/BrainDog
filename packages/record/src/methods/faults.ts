@@ -79,7 +79,7 @@ export function methods(deps: RecordDeps) {
           since: f.first_at,
           last: f.last_at,
           ...(raw && f.error !== '' ? { error: f.error } : {}),
-          /* A FAILED NIGHT'S REASON IN PLAIN WORDS (A22), to everybody who reads the fault: never the raw error. */
+          /* A FAILED NIGHT'S REASON IN PLAIN WORDS, to everybody who reads the fault: never the raw error. */
           ...(f.cause === NIGHT_FAULT && f.error !== '' ? { why: nightWhy(f.error) } : {}),
         }),
       );

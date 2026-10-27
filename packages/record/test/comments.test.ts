@@ -1,6 +1,6 @@
 /**
  * Comments at the record: who may say something about a thing, who signs it, how long it may be, who resolves it, and
- * one thread for a question and the decision that settled it (USE-A14, `docs/20-COLLABORATION.md` §5).
+ * one thread for a question and the decision that settled it (`docs/20-COLLABORATION.md` §5).
  *
  * THE KERNEL'S TEST (`packages/kernel/src/api/comments.test.ts`) SAYS WHO MAY SEE A THING "IS NOT ASKED HERE". This is
  * where it is asked: every case goes through `createRecordApi` as a person or a token, so `sightOf`, `guard` and the

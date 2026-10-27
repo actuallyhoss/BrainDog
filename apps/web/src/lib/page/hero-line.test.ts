@@ -1,8 +1,8 @@
 /**
- * A project's hero says the model's line when the record kept one (the thinking scope of 24 October, C4): the lead note
+ * A project's hero says the model's line when the record kept one (the thinking scope of 24 October): the lead note
  * comes with the line (`page-live.ts` `modelLine`), the page hands it to the shape (`modelLineOf`, `PageView.svelte`),
  * and the hero says it in place of its rules' line, marked on hover as written by BrainDog (`ProjectPart.svelte`).
- * Kept through the shape becoming declared blocks (C28, C29).
+ * Kept through the shape becoming declared blocks.
  */
 
 import { test } from 'node:test';

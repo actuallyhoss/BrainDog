@@ -17,7 +17,7 @@
  *   - stop: the turn may not end, once per instruction, while the run holds something he told it and has not answered.
  *     And once a run, the first time it would end after it committed (`committed`, which the bridge reads from git),
  *     it is asked whether a later session would get anything wrong, to keep as learnings with their skill's topic
- *     (scope B31: 904 runs and no learning). Never when Claude Code says a Stop hook already continued this turn
+ *     (904 runs and no learning). Never when Claude Code says a Stop hook already continued this turn
  *     (`stop_hook_active`), so neither can loop.
  *
  * EVERY HOOK FAILS OPEN. No file, a file that does not read, a file older than two minutes (the bridge is gone or the
@@ -94,7 +94,7 @@ export const inboxEntryIn = (scripts: string): string => (existsSync(join(script
 export const inboxPath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.inbox.json`);
 export const flagsPath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.inbox.flags`);
 export const statePath = (env: Env, id: string): string => join(sessionsDir(env), `${fileId(id)}.hooks.json`);
-/** What a hook with work prints, made ready before it runs (H23): `.ready`, and beside it `.ready.state` and `.ready.flags`. */
+/** What a hook with work prints, made ready before it runs: `.ready`, and beside it `.ready.state` and `.ready.flags`. */
 export const readyPath = (env: Env, id: string, which: 'prompt' | 'tool' | 'stop'): string => join(sessionsDir(env), `${fileId(id)}.inbox.${which}.ready`);
 
 /* ── what the files hold ───────────────────────────────────────────────── */
@@ -242,7 +242,7 @@ export function stopSaid(inbox: Inbox): string | null {
   if (own !== undefined) return own.line;
   const why = inbox.stop.said.trim() === '' ? '' : `: "${inbox.stop.said.replace(/\s+/gu, ' ').trim()}"`;
   const id = inbox.stop.id === '' ? '' : ` (${inbox.stop.id})`;
-  /* "THE PERSON", NOT "HE" (audit D, W17): the record is anybody's, and these lines go to every agent on every record. */
+  /* "THE PERSON", NOT "HE": the record is anybody's, and these lines go to every agent on every record. */
   return inbox.stop.kind === 'stop' ? `The person stopped this run in BrainDog${id}${why}. Reply with instructions, then end.` : `The person paused this run in BrainDog${id}${why}. Wait until it is resumed.`;
 }
 
@@ -306,7 +306,7 @@ export function toolFor(inbox: Inbox, state: HookState, event: HookEvent): { rea
 const owed = (inbox: Inbox, state: HookState): Told[] =>
   inbox.stop !== null ? [] : inbox.pending.filter((t) => ANSWERED.has(t.kind) && (t.taken || (t.to === 'run' && state.shown[t.id] !== undefined)) && !state.blocked.includes(t.id));
 
-/** The one question a run that committed is asked before it ends, once (scope B31). */
+/** The one question a run that committed is asked before it ends, once. */
 export const LEARNING_ASK =
   'You committed in this run. Is there anything a later session would get wrong without knowing it? If so, create learnings with topic set to the skill it bears on and the failure in because, then end. If not, end.';
 
@@ -531,7 +531,7 @@ export function runHook(which: Which, stdin: string, env: Env, now: number = Dat
 export const WATCH_MS = 600_000;
 
 /**
- * The async Stop watcher (plan §2.3, "optional"): after a turn ends it waits up to ten minutes for something he tells
+ * The async Stop watcher ("optional"): after a turn ends it waits up to ten minutes for something he tells
  * the run that no prompt has shown, and answers it, as a prompt's hook would, so the hook can exit 2 and Claude Code
  * wakes the idle session with it (`asyncRewake`). `null` when nothing came, or the event names no session. It reads the
  * two files once a second and nothing else.

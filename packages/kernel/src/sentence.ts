@@ -94,7 +94,7 @@ const GENERIC = /^(?:row|entry|item|thing|record|something|anything|line)s?$/u;
  * The list a noun names, by its name, its singular or its id; the last word counts when the whole does not; and last,
  * any one word of the list's name, so "bill" finds "Bills and invoices". `null` for none or two.
  *
- * A NAME'S OWN WORDS, SINCE THE UI PASS OF 20 OCTOBER (agents F3): the box's own example, "When a bill is due in 3 days",
+ * A NAME'S OWN WORDS (agents F3): the box's own example, "When a bill is due in 3 days",
  * was refused on the record it was shown on, because no list there is called Bills. "and", "of" and the like are no
  * list's word.
  */

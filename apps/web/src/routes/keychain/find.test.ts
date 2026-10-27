@@ -1,5 +1,5 @@
 /**
- * A Keychain of 176 keys is found by typing (the audit of 25 October, Y26): one list 22,900 px long on a phone, no search,
+ * A Keychain of 176 keys is found by typing: one list 22,900 px long on a phone, no search,
  * "Kept elsewhere" under every row, and the keys Health calls "here twice" unmarked. A box finds a key as it is typed,
  * each project's keys fold under its name, the twins wear a mark, and a word every row shares is said once.
  */

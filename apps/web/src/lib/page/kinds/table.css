@@ -51,7 +51,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* AN EMPTY CELL IS EMPTY (money F10, F13): the record's missing mark, an em dash, stood in every cell a row had not
+  /* AN EMPTY CELL IS EMPTY (money F10): the record's missing mark, an em dash, stood in every cell a row had not
      answered, a column of dashes down People's Last spoke. The cell keeps its box; a screen reader meets a blank cell. */
   .td > .missing {
     display: none;

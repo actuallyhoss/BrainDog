@@ -67,7 +67,7 @@ const BANK_STAMP = /^\d{1,2}(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\
 const TILL = /(?<![\p{L}\p{N}])(\p{Lu}{3,})\d{1,4}(?![\p{L}\p{N}])/gu;
 
 /**
- * A BANK'S CODES LEFT OFF ITS LINE (the audit of 25 October, Z13): the Ledger tile reads who was paid, and where nobody
+ * A BANK'S CODES LEFT OFF ITS LINE: the Ledger tile reads who was paid, and where nobody
  * is known, the bank's line, and that line drew "22OCT26 Phone Banking Transfer" and a shop's name ending in a till
  * number. The day is the column beside it, and the number a till adds to a shop's name is no part of the name. Only a
  * stamp with words after it, and only a number run onto a word in capitals, which a person does not type; the line as
@@ -86,7 +86,7 @@ export const rowsCell = (text: string | undefined, now?: number): string =>
   text === undefined ? '' : zeroFigure(text, true) ? '' : dayThisYear(text, now);
 
 /**
- * EVERY ROW'S THIRD CELL, AS A SET (the UI pass of 20 October, H16): each said by `timelineCell`, and where one amount
+ * EVERY ROW'S THIRD CELL, AS A SET: each said by `timelineCell`, and where one amount
  * carries pence, every amount of its currency does, as a chart's figures are (`barFigures`). The Ledger read "−£2,500 …
  * −£964 −£39.61", whole pounds beside pence down one column. A cell that is no figure is left as it is said.
  */

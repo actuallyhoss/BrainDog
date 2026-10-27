@@ -1,5 +1,5 @@
 /**
- * A key inside its own scope, and the approval saying who opens it (SHL-C05, jobs 2 and 3).
+ * A key inside its own scope, and the approval saying who opens it (jobs 2 and 3).
  *
  * AT DECLARATION an action in project P may name a key kept for P or for every project, and no other
  * (`keyOutOfScope`). The project a key is kept for is read from the row holding its keychain entry (`keyScopeOf`). The

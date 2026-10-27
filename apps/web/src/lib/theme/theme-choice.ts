@@ -1,5 +1,5 @@
 /**
- * The looks Appearance offers, and the other scheme of the one picked (PGS-A21).
+ * The looks Appearance offers, and the other scheme of the one picked.
  *
  * `boot` ANSWERS `looks` BESIDE `theme`: the record's own look and one for each add-on that carries a theme, in the
  * order they are listed (`looksOf` in `@braindog/record`). The app's two come first, House and High contrast, so a
