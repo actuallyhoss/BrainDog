@@ -6,10 +6,6 @@
 # different kind of change from one under `apps/web/src/routes/`.
 #
 # Ordering is last-match-wins, so the general rule is first and the sharp edges are last.
-#
-# NOTE: replace @actuallyhoss with the maintainer's GitHub handle before committing. CODEOWNERS is silently
-# inert when it names a handle that cannot review the repository, which is the same failure mode as
-# a gate that passes by examining nothing.
 
 *                                   @actuallyhoss
 

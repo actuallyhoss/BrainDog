@@ -1,14 +1,14 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability — privately
-    url: https://github.com/actuallyhoss/braindog/security/advisories/new
+    url: https://github.com/actuallyhoss/BrainDog/security/advisories/new
     about: >
       Never in a public issue. This record holds credentials, and a public report is a working
       exploit handed to everybody before there is a fix. Private reporting gives us a fork to fix in
       and an advisory to publish from. Scope, timelines and safe harbour are in SECURITY.md.
 
   - name: The security model, before you report
-    url: https://github.com/actuallyhoss/braindog/blob/master/docs/12-SECURITY.md
+    url: https://github.com/actuallyhoss/BrainDog/blob/master/docs/12-SECURITY.md
     about: >
       The threat model, the key hierarchy, and the list of things this project deliberately does not
       do — the operator can read a Cloud record with the vault passphrase off, the rows are not
@@ -16,13 +16,13 @@ contact_links:
       oversight.
 
   - name: Ask a question, or argue with a decision
-    url: https://github.com/actuallyhoss/braindog/discussions
+    url: https://github.com/actuallyhoss/BrainDog/discussions
     about: >
       Questions, half-formed ideas, and cases against an ADR belong in a discussion. Issues are for
       defects and for specified work.
 
   - name: Read the design first
-    url: https://github.com/actuallyhoss/braindog/tree/master/docs
+    url: https://github.com/actuallyhoss/BrainDog/tree/master/docs
     about: >
-      54 numbered documents that decide what BrainDog is. Most questions are answered there, and a
+      The numbered documents that decide what BrainDog is. Most questions are answered there, and a
       request that cites the document it belongs in gets a far better answer.

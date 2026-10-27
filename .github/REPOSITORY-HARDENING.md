@@ -23,9 +23,8 @@ Ordering is by what a compromise actually costs, not by GitHub's menu order.
 - [ ] **Update `security@brain.dog` and `conduct@brain.dog`** to real addresses that
       reach a person, and check that a message to each arrives. A disclosure address that bounces is
       worse than no address, because the reporter believes they reported it.
-- [ ] **Update `OWNER` in `.github/ISSUE_TEMPLATE/config.yml` and `.github/CODEOWNERS`.** Contact
-      links need absolute URLs, and `CODEOWNERS` is silently inert when it names a handle that cannot
-      review the repository.
+- [x] **`OWNER` replaced in `.github/ISSUE_TEMPLATE/config.yml` and `.github/CODEOWNERS`** with
+      `actuallyhoss`.
 
 ## 2 · The default branch
 

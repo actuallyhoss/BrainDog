@@ -44,13 +44,9 @@ on unmodified `master` before reporting.
 
 **Do not open a public issue, a discussion, or a pull request that demonstrates the defect.**
 
-> **While this repository is private, use the email in 2.** GitHub's private vulnerability
-> reporting is a public-repository feature (the endpoint answers `404` on a private repo), so the
-> button described in 1 is not there yet. This note goes when the repository does, and not before:
-> a reporting procedure whose first step does not exist is worse than one step shorter.
-
-1. **Preferred: GitHub private vulnerability reporting.** Repository → **Security** → **Report a
-   vulnerability**. It gives us a private fork to fix in and an advisory to publish from, and it
+1. **Preferred: GitHub private vulnerability reporting.**
+   [Report a vulnerability](https://github.com/actuallyhoss/BrainDog/security/advisories/new)
+   (Repository → **Security** → **Report a vulnerability**). It gives us a private fork to fix in and an advisory to publish from, and it
    keeps the report attached to the code.
 2. **Fallback: email `security@brain.dog`.** Use this if private reporting is unavailable to
    you, or if the defect is in the hosted service rather than in the source. Encrypt if you want to;
@@ -294,7 +290,8 @@ or a discussion), but it is not a vulnerability report.
 
 The repository's own hardening (branch protection, required reviews, signed commits, secret
 scanning, push protection) is a checklist in
-[`.github/REPOSITORY-HARDENING.md`](.github/REPOSITORY-HARDENING.md). Two secrets exist in CI and no
-more: a deploy-scoped Cloudflare API token in the `production` environment, and the npm OIDC identity
-in `release.yml`. There is no npm token and no long-lived credential anywhere in this repository
-(`12 §8`, `52 §8`).
+[`.github/REPOSITORY-HARDENING.md`](.github/REPOSITORY-HARDENING.md). CI on pushes and pull requests
+uses no secret at all. Secrets live in the `production` environment and reach only the workflows a
+maintainer starts by hand from `master` (the deploy and the checks after it). Publishing to npm uses
+OIDC trusted publishing in `tag.yml`, so there is no npm token and no long-lived publishing
+credential in this repository (`12 §8`, `52 §8`).

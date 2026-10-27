@@ -47,7 +47,7 @@ is deliberate supply-chain quarantine, not a broken install.
 |---|---|
 | `pnpm typecheck` | `tsc -b` over every package and app, under `exactOptionalPropertyTypes` and `erasableSyntaxOnly` |
 | `pnpm test` | every package's `node --test` over `.ts` source, one workspace at a time |
-| `pnpm gates` | the nineteen gates below, in order, from the repository root |
+| `pnpm gates` | every gate, in registry order, from the repository root (`pnpm gates -- --list` prints them) |
 | `pnpm dev` | the web app at `http://localhost:5183` |
 | `pnpm build` | every package and app that has a build |
 | `pnpm shots` | screenshots of every route, both schemes, into `apps/web/shots/` |
@@ -55,15 +55,24 @@ is deliberate supply-chain quarantine, not a broken install.
 **Do not run `pnpm gates` and a dev server at once** — `layout` and `a11y` drive a real browser and
 bind a port.
 
-A full gate run is about **19 minutes**. `pnpm gates -- --only <name>` is not wired yet; run a single
-gate directly, `node tools/gates/<name>.mjs`, while you iterate.
+A full gate run takes about half an hour, most of it `layout` and `a11y`. Run one gate with
+`pnpm gates -- --only <name>`, or directly with `node tools/gates/<name>.mjs`, while you iterate.
+
+### What CI runs
+
+`.github/workflows/ci.yml` runs on every push and pull request to `master`, on GitHub's hosted
+runners and with no secrets: the typecheck and tests in four legs, every gate that needs no build,
+and the app, site and CLI builds with every gate that reads them. The two browser gates, `layout`
+and `a11y`, run in `gates.yml`, which a maintainer starts by hand; label a pull request `full-gates`
+to ask for them and for the Windows leg.
 
 ---
 
-## The nineteen gates
+## The gates
 
-Every change lands with `pnpm test` and `pnpm gates` green. They run in this order, and the order is
-argued in `tools/gates/run.mjs` — read the comments there, they are the specification.
+Every change lands with `pnpm test` and `pnpm gates` green. The table is the core of the list;
+`tools/gates/run.mjs` registers every gate and argues the order, and its comments are the
+specification.
 
 | # | Gate | Holds |
 |---:|---|---|
@@ -190,37 +199,22 @@ Three rules, and they are enforced at review:
 
 ## Commit messages
 
-They are unusual and the shape is deliberate. Read `git log` before writing one.
+One commit is one plain sentence and nothing else. The `commits` gate holds every commit a push to
+`master` carries to it:
 
-**The subject is a full declarative sentence naming the defect**, in the past tense, from the
-reader's point of view. Not imperative, not a noun phrase, no Conventional Commits prefix, no scope,
-no ticket id. Sentence case, no trailing full stop. 60–90 characters is typical and going over is
-fine.
+- a subject of at most 72 characters, one sentence, sentence case, no trailing full stop;
+- no body, no trailer of any kind (`Co-Authored-By:`, `Signed-off-by:`), no URL, no em dash;
+- no merge commits: `master` is linear.
 
 ```
-The refusal registry had ninety-nine codes and no list
-A metric was checked by nothing, and the gate I wrote to catch that had the same fault
-access() failed open, and eleven settings areas were measured by nothing
-The Text setting moved zero pixels, and no gate had ever asked whether it moved any
-Opening a form put the caret on its Close button
+Money reads ages and currencies on the payments page
+Opening a form puts the caret on its first field
 ```
 
-**The body argues it.** Markdown prose, hard-wrapped at about 80 columns:
-
-- What the document says, quoted, with its `NN §N` citation.
-- What the code actually did, and why that is a real defect rather than a cosmetic one — usually
-  with the measurement that shows it: *"412 of 1,200 day counts disagreed with the table"*.
-- What the fix is, and what would now catch it.
-- Additional findings get `## ` subheadings, written as continuations of the subject and usually
-  opening with "And " — `## And the same screen said what four people may do and nothing about
-  whether any had been`. A tail of smaller ones goes under `## Four smaller ones, all the same
-  shape`, each bullet opening with the defect in bold.
-- The last line before any trailers is the status: `1,308 tests and 19 gates green.`
-
-The one short form is housekeeping — `Refresh the backlog: the phone findings` — which has no body.
-
-A commit body and a file header comment are the same document written at two different times. Neither
-ever describes what the code does without saying what going wrong looked like.
+Pull requests are squash-merged, so the commits inside one are yours to shape; the pull request's
+title becomes the commit, and it follows the same rules. The reasoning a longer message would carry
+belongs in the pull request description and, where it outlives the change, in a comment beside the
+code.
 
 ---
 

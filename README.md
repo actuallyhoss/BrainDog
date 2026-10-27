@@ -5,6 +5,9 @@
 
 # Give your business a memory
 
+**BrainDog is an open-source record of your projects, money, people, keys and decisions that you and
+every AI agent you use read and write together, over MCP, with a history nobody can rewrite.**
+
 A company knows a great deal that never reaches its codebase. What it is owed and by whom. What
 renews on Tuesday. Which key opens which account. Who decided the thing nobody can remember
 deciding. That knowledge usually lives in one person's head, six spreadsheets and a Slack thread.
@@ -30,14 +33,15 @@ Ask what the record said last Tuesday and it will tell you.
 
 ## Two ways to run it
 
-**Hosted, at [brain.dog](https://brain.dog).** One record per customer, on Cloudflare. Nothing to
-install but the command line, if you want your agents on it.
+**Hosted, at [app.brain.dog](https://app.brain.dog/app).** One record per customer, on Cloudflare.
+Sign-up is by invitation for now; [brain.dog](https://brain.dog) has the details. Nothing to install
+but the command line, if you want your agents on it.
 
 **On your own machine.** The same packages run as one Node process over `node:sqlite`. You need
 Node 24.13 or later and pnpm:
 
 ```sh
-git clone https://github.com/actuallyhoss/braindog
+git clone https://github.com/actuallyhoss/BrainDog braindog
 cd braindog
 pnpm install
 pnpm --filter @braindog/web build
@@ -50,11 +54,9 @@ setting the server reads.
 
 ### The container
 
-The short way is [apps/selfhost/README.md](apps/selfhost/README.md): `cp selfhost.env.example .env`, then `docker compose up -d`.
-By hand:
-
 The self-host also builds as one image, the server and the app it serves, with the record in a
-volume:
+volume. The short way is `cp selfhost.env.example .env`, then `docker compose up -d`
+([apps/selfhost/README.md](apps/selfhost/README.md)). By hand:
 
 ```sh
 docker build -f apps/selfhost/Dockerfile -t braindog .

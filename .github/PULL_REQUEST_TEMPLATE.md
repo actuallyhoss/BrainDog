@@ -1,6 +1,6 @@
 <!--
-The title of this pull request is the commit subject: a declarative sentence naming the defect, in
-the past tense. Not "fix table paging" — "Every list rendered every row it held".
+The title of this pull request becomes the squashed commit: one plain sentence of at most 72
+characters, with no prefix and no trailing full stop. "Every list pages its rows", not "fix: paging".
 Read CONTRIBUTING.md before filling this in.
 -->
 
@@ -37,7 +37,7 @@ fixture. If nothing catches it, say so — that is a finding, not an omission to
 
 - [ ] `pnpm typecheck` green
 - [ ] `pnpm test` green — **N tests**
-- [ ] `pnpm gates` green — **19 of 19**, no skips
+- [ ] `pnpm gates` green, no skips
 - [ ] Every new assertion was **broken on purpose** after it went green, and went red.
 
 ## The rules this repository actually enforces
