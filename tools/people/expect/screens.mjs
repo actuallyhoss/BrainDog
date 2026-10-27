@@ -218,8 +218,8 @@ export async function screensOf(shot) {
   }
 
   /* THE PHONE: Today over the tab bar, which holds the rail's first places (`tabsOf`, as the shell feeds `TabBar`). */
-  const { tabsOf } = await web('lib/nav.ts');
-  const bar = await markupOf('lib/shell/TabBar.svelte', { tabs: tabsOf(props.places), more: false }, { data: shell, path: home });
+  const { MENU, tabsOf } = await web('lib/nav.ts');
+  const bar = await markupOf('lib/shell/TabBar.svelte', { tabs: tabsOf(props.places), menu: MENU }, { data: shell, path: home });
   out.push({ path: home, width: PHONE, ...readMarkup(`<main>${today.markup}</main>${bar}`), counts, behind, places, ...signs, owner, drew: today.why === null ? 'Today and the tab bar' : `the tab bar (${today.why})` });
   return out;
 }
