@@ -75,7 +75,7 @@ test('NOTES AND COINS ARE ADDED UP, AND THE DIFFERENCE IS FILED AS LINES AND THE
             account: till.id,
             on: '2026-10-05',
             denominations: { currency: 'EGP', notes: { '200': 3, '50': 2, '0.25': 4 } },
-            reconcile: 'lines',
+            filed: 'lines',
             lines: [
               { what: 'Taxi', amount: 100, category: 'Tips' },
               { what: 'Coffee', amount: 40 },
@@ -100,7 +100,7 @@ test('NOTES AND COINS ARE ADDED UP, AND THE DIFFERENCE IS FILED AS LINES AND THE
 
     /* ALL OF IT AS DISCREPANCY, against the check the first count wrote. */
     const b = said<{ id: string }>(
-      await api.create({ register: 'cash_counts', fields: { account: till.id, on: '2026-10-06', counted: { amount: 69_000, currency: 'EGP' }, reconcile: 'discrepancy' } }, owner),
+      await api.create({ register: 'cash_counts', fields: { account: till.id, on: '2026-10-06', counted: { amount: 69_000, currency: 'EGP' }, filed: 'discrepancy' } }, owner),
     );
     await settle();
 
@@ -117,7 +117,7 @@ test('NOTES AND COINS ARE ADDED UP, AND THE DIFFERENCE IS FILED AS LINES AND THE
     /* A NOTE THAT IS NOT IN THE CURRENCY'S SET, lines above the difference, and a total that disagrees with the notes: each said on the count, nothing filed. */
     const odd = said<{ id: string }>(await api.create({ register: 'cash_counts', fields: { account: till.id, on: '2026-10-08', denominations: { currency: 'EGP', notes: { '500': 1 } } } }, owner));
     const over = said<{ id: string }>(
-      await api.create({ register: 'cash_counts', fields: { account: till.id, on: '2026-10-08', counted: { amount: 60_000, currency: 'EGP' }, reconcile: 'lines', lines: [{ what: 'Rent', amount: 5_000 }] } }, owner),
+      await api.create({ register: 'cash_counts', fields: { account: till.id, on: '2026-10-08', counted: { amount: 60_000, currency: 'EGP' }, filed: 'lines', lines: [{ what: 'Rent', amount: 5_000 }] } }, owner),
     );
     const apart = said<{ id: string }>(
       await api.create({ register: 'cash_counts', fields: { account: till.id, on: '2026-10-08', counted: { amount: 1, currency: 'EGP' }, denominations: { currency: 'EGP', notes: { '10': 1 } } } }, owner),

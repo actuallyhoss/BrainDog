@@ -51,7 +51,7 @@ test('the row carries the total, the notes, and the way the difference is record
     denominations: { currency: 'EGP', notes: { '200': 2 } },
   });
   const out = countFields({ ...base, out: true, reconcile: 'lines', lines: [{ what: 'Taxi', amount: 10 }] });
-  assert.equal(out.reconcile, 'lines');
+  assert.equal(out.filed, 'lines');
   assert.deepEqual(out.lines, [{ what: 'Taxi', amount: 10 }]);
   assert.equal(countFields({ ...base, out: true, reconcile: 'discrepancy' }).lines, undefined);
 });

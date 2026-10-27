@@ -44,7 +44,7 @@
     notes: 'Notes and coins',
     totalOnly: 'Total counted',
     totalHelp: 'This currency has no set of notes here, so type what the box holds.',
-    total: 'Counted',
+    total: 'Amount counted',
     expected: 'Expected',
     typedBalance: 'Expected is the balance typed on the account; the record has no later figure for it.',
     out: 'Out by',
@@ -53,7 +53,7 @@
     less: 'less than expected',
     next: 'Next',
     save: 'Save count',
-    saving: 'Saving',
+    saving: 'Saving the count',
     back: 'Back to the count',
     how: 'Record the difference',
     asLines: 'As lines',
@@ -78,8 +78,11 @@
 
   const base = $derived(apiBase(page.url));
   const lists = $derived((page.data as { lists?: { id: string; kernel?: true }[] } | undefined)?.lists ?? []);
-  const counter = read(() => (lists.length === 0 ? null : `${base} ${lists.length}`), async (): Promise<Result<Loaded>> => {
-    const got = await loadCounter(base, lists);
+  /* THE LIST IS NAMED BY THE LINK THAT OPENS THE COUNTER (`?list=`), which the add-on declares, so this screen holds no list's name. */
+  const into = $derived(page.url.searchParams.get('list'));
+  const counter = read(() => (lists.length === 0 ? null : `${base} ${lists.length} ${into ?? ''}`), async (): Promise<Result<Loaded>> => {
+    if (into === null) return { ok: false, refusal: { code: 'UNREACHABLE', fix: 'Open the counter from Count the cash on Money.' } };
+    const got = await loadCounter(base, lists, into);
     return got.ok ? { ok: true, value: got.value } : { ok: false, refusal: { code: 'UNREACHABLE', fix: got.fix } };
   });
 
@@ -148,7 +151,7 @@
     /* A CURRENCY WITHOUT NOTES IS COUNTED BY ITS TOTAL ALONE. */
     if (!byNotes) delete fields.denominations;
     fields.counted = { amount: counted, currency };
-    const wrote = await writeCount(base, fields);
+    const wrote = await writeCount(base, into ?? '', fields);
     saving = false;
     if (wrote.ok) {
       step = 'done';
@@ -395,7 +398,7 @@
     background: var(--tile-2);
     color: var(--ink);
     font: inherit;
-    font-size: 22px;
+    font-size: var(--fs-figure);
     line-height: 1;
     cursor: pointer;
   }
@@ -453,7 +456,7 @@
   .cc-sum {
     position: sticky;
     inset-block-end: 0;
-    z-index: 2;
+    z-index: var(--z-raise);
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);

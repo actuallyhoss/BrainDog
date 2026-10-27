@@ -55,7 +55,7 @@
  * names both a total and notes must agree. A count with no notes is read exactly as before, so every older count stays
  * readable and nothing about it changes.
  *
- * THE DIFFERENCE, RECORDED ONE OF TWO WAYS (2.0.0). `reconcile` is `discrepancy`, the whole difference as one entry
+ * THE DIFFERENCE, RECORDED ONE OF TWO WAYS (2.0.0). `filed` is `discrepancy`, the whole difference as one entry
  * under the Discrepancy category, or `lines`, where the person has said what part of it was what in `lines`
  * (`[{ what, amount, category?, note? }]`, amounts in the main unit) and whatever is left becomes one Discrepancy entry.
  * A count that says neither is filed as it always was, as one "Cash count difference" entry.
@@ -301,7 +301,7 @@ export default async function run(ctx) {
   /* HOW THE DIFFERENCE IS RECORDED. Unsaid is the single entry an older count always got. */
   let filedAs = FILED;
   if (difference !== 0) {
-    if (count.fields.reconcile === 'lines') {
+    if (count.fields.filed === 'lines') {
       const split = linesOf(count.fields.lines ?? [], difference);
       if (split.why !== undefined) {
         ctx.log(`The lines for this count's difference could not be used: ${split.why}`);
@@ -312,7 +312,7 @@ export default async function run(ctx) {
       if (split.rest > 0) ctx.write('transactions', entry(DISCREPANCY, split.rest, await categoryId(ctx, DISCREPANCY), fromCount));
       const n = split.entries.length;
       filedAs = n === 0 ? 'Filed as Discrepancy in the Ledger.' : split.rest > 0 ? `Filed as ${n} ${n === 1 ? 'line' : 'lines'} and the rest as Discrepancy in the Ledger.` : `Filed as ${n} ${n === 1 ? 'line' : 'lines'} in the Ledger.`;
-    } else if (count.fields.reconcile === 'discrepancy') {
+    } else if (count.fields.filed === 'discrepancy') {
       ctx.write('transactions', entry(DISCREPANCY, Math.abs(difference), await categoryId(ctx, DISCREPANCY), fromCount));
       filedAs = 'Filed as Discrepancy in the Ledger.';
     } else {

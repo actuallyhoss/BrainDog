@@ -130,7 +130,7 @@ export function countFields(input: {
     denominations: { currency: input.currency, notes },
   };
   if (input.out) {
-    fields.reconcile = input.reconcile;
+    fields.filed = input.reconcile;
     if (input.reconcile === 'lines' && input.lines.length > 0) fields.lines = input.lines;
   }
   return fields;
