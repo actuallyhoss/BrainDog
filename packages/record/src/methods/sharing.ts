@@ -118,6 +118,9 @@ export const MONEY_SAID_MOST = 2;
  */
 export type ShareActivityLine = { who: string; via: string; said: string };
 
+/** The longest a share may run and still count as one that ends: the longest template, ninety days, and a day over. */
+const ENDS_WITHIN_MS = 91 * 86_400_000;
+
 /** How far back "Seen and changed" reads by default, and at most, in days: the read counters are kept 400. */
 export const SHARE_ACTIVITY_DAYS = 30;
 export const SHARE_ACTIVITY_DAYS_MOST = 400;
@@ -352,7 +355,9 @@ export function methods(deps: RecordDeps) {
   const unconfirmed = (ctx: CallContext, s: Share): Refusal | null => {
     if (s.effect !== 'allow' || ctx.confirmable !== true) return null;
     const outsider = s.who.kind === 'email' && (s.can === 'edit' || s.can === 'manage');
-    const endless = s.when?.until === undefined;
+    /* AN END PAST THE LONGEST A TEMPLATE RUNS IS NO END: a share dated to the year 9999 lasts as long as one with none. */
+    const until = s.when?.until;
+    const endless = until === undefined || !(Date.parse(until) - clock.now() <= ENDS_WITHIN_MS);
     if (!outsider && !endless) return null;
     if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt <= FRESH) return null;
     return { code: 'NEEDS_BROWSER_SESSION', fix: "Confirm it's you, then share again. Nothing was shared yet.", at: 'confirm' };

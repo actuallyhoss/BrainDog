@@ -231,6 +231,9 @@ test('a share that widens asks somebody with a passkey to confirm, and only them
   value(await api.share(endless, { ...owner, confirmable: true, provedAt: NOW - 60_000 }));
   value(await api.share({ share: { ...endless.share, who: { kind: 'person', id: 'p_sam' } } }, { ...owner, confirmable: false, provedAt: NOW - 60 * 60_000 }));
   value(await api.share({ share: { ...endless.share, who: { kind: 'person', id: 'p_pri' }, when: { until } } }, { ...owner, confirmable: true, provedAt: NOW - 60 * 60_000 }));
+  /* AN END NOBODY WILL LIVE TO SEE IS NO END, so it asks as a share with none does. */
+  const forever = { share: { ...endless.share, who: { kind: 'person', id: 'p_adm' }, can: 'edit', when: { until: '9999-12-31T00:00:00.000Z' } } };
+  refused(await api.share(forever as never, { ...owner, confirmable: true, provedAt: NOW - 60 * 60_000 }), 'NEEDS_BROWSER_SESSION', 'confirm');
 });
 
 test('sharePreview says the sentence and the rows each list holds for it now, and keeps nothing', async () => {
