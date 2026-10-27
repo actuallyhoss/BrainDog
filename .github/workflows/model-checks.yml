@@ -120,6 +120,6 @@ jobs:
           echo "::error title=model checks::$ALARM running; read model-checks.json in this run's artifacts"
           if [ -n "$ALERT_KEY" ]; then
             body=$(node -e "process.stdout.write(JSON.stringify({op:'model',model:'model checks',why:process.env.ALARM}))")
-            curl -fsS -X POST https://brain.dog/account/ops/alert -H "authorization: Bearer $ALERT_KEY" -H 'content-type: application/json' --data "$body" >/dev/null || echo "::warning title=model checks::the operator mail was not sent"
+            curl -fsS -X POST https://app.brain.dog/account/ops/alert -H "authorization: Bearer $ALERT_KEY" -H 'content-type: application/json' --data "$body" >/dev/null || echo "::warning title=model checks::the operator mail was not sent"
           fi
           exit 1

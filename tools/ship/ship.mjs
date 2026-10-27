@@ -37,14 +37,14 @@ const deploy = step('deploy', process.execPath, ['tools/ship/deploy.mjs']);
 console.log(tail(deploy.out, /FAIL|WRONG|rollback:|rolled back/i, 8));
 if (!deploy.ok) done(false, 'the deploy went red and rolled back (lines above)');
 
-const health = step('live', 'curl', ['-s', 'https://brain.dog/healthz']);
+const health = step('live', 'curl', ['-s', 'https://app.brain.dog/healthz']);
 const app = /"app":"([^"]+)"/.exec(health.out)?.[1] ?? 'unknown';
 const head = readFileSync(join(ROOT, '.ship', 'pass.json'), 'utf8').match(/"sha": "(\w{7})/)?.[1] ?? '';
-/* THE OLD HOST STILL SENDS A BROWSER ON (the scope of 24 October, E47): app.brain.dog answers a page with 308 to
-   brain.dog/app/ while `LEGACY_HOSTS` keeps it, and a deploy that broke that would leave a saved tab on nothing. */
-const legacy = step('legacy', 'curl', ['-s', '-o', '/dev/null', '-w', '%{http_code} %{redirect_url}', '-H', 'Accept: text/html', 'https://app.brain.dog/']);
-const moved = /^308 https:\/\/brain\.dog\/app\/?$/u.test(legacy.out.trim());
+/* THE OLD HOST STILL SENDS A BROWSER ON (the scope of 24 October, E47): brain.dog/app/ answers a page with 308 to
+   app.brain.dog/app/ while `LEGACY_HOSTS` keeps it, and a deploy that broke that would leave a saved tab on nothing. */
+const legacy = step('legacy', 'curl', ['-s', '-o', '/dev/null', '-w', '%{http_code} %{redirect_url}', '-H', 'Accept: text/html', 'https://brain.dog/app/']);
+const moved = /^308 https:\/\/app\.brain\.dog\/app\/?$/u.test(legacy.out.trim());
 done(
   app.endsWith(head) && moved,
-  `live app ${app}${app.endsWith(head) ? '' : `, but HEAD is ${head}`}${moved ? '' : `; app.brain.dog/ answered "${legacy.out.trim()}", not 308 to brain.dog/app/`}`,
+  `live app ${app}${app.endsWith(head) ? '' : `, but HEAD is ${head}`}${moved ? '' : `; brain.dog/app/ answered "${legacy.out.trim()}", not 308 to app.brain.dog/app/`}`,
 );

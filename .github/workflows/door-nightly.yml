@@ -68,7 +68,7 @@ jobs:
         run: node --test tools/door-check/test/run.test.mjs
       - name: Real agent apps through the door
         env:
-          DOOR_HOST: ${{ inputs.host || 'https://brain.dog' }}
+          DOOR_HOST: ${{ inputs.host || 'https://app.brain.dog' }}
           DOOR_RECORD: ${{ inputs.record || vars.DOOR_RECORD }}
           # THE KEYS GO ONLY TO PRODUCTION. A dispatch that names another host, or a record by an address of its own,
           # runs with none of them, so the host it names is never handed a key (`run.mjs` drops them as well).

@@ -28,10 +28,26 @@ const INTO_RECORD = /^\/app\/([^/]+)\/$/;
 
 type Mode = 'secure' | 'local';
 
-const set = (value: string, mode: Mode): string =>
-  `${SIGNED_IN}=${value}; Path=/; Max-Age=${MAX_AGE}; ${mode === 'secure' ? 'Secure; ' : ''}SameSite=Lax`;
+/**
+ * `Domain=` WHEN THE APP IS ON A SUBDOMAIN OF THE NAME THE SITE IS ON. The session cookie is `__Host-`, so it never
+ * leaves `app.brain.dog`; this one exists to be read by the site on `brain.dog`, which a host-only cookie set on
+ * `app.brain.dog` is not. `parent` is the Worker's `RP_ID` and it is used only when `host` is a proper subdomain of it,
+ * so a self-host, which has no parent, keeps the host-only cookie it always had. Set and cleared with the same Domain,
+ * because a cookie is cleared only by the name, domain and path it was set with.
+ */
+export function cookieDomain(host: string | undefined, parent: string | undefined): string | null {
+  const h = (host ?? '').trim().toLowerCase();
+  const p = (parent ?? '').trim().toLowerCase();
+  return p.includes('.') && h.endsWith(`.${p}`) ? p : null;
+}
 
-const clear = (mode: Mode): string => `${SIGNED_IN}=; Path=/; Max-Age=0; ${mode === 'secure' ? 'Secure; ' : ''}SameSite=Lax`;
+const domained = (domain: string | null): string => (domain === null ? '' : `Domain=${domain}; `);
+
+const set = (value: string, mode: Mode, domain: string | null): string =>
+  `${SIGNED_IN}=${value}; Path=/; ${domained(domain)}Max-Age=${MAX_AGE}; ${mode === 'secure' ? 'Secure; ' : ''}SameSite=Lax`;
+
+const clear = (mode: Mode, domain: string | null): string =>
+  `${SIGNED_IN}=; Path=/; ${domained(domain)}Max-Age=0; ${mode === 'secure' ? 'Secure; ' : ''}SameSite=Lax`;
 
 /** What the answer does to the session: `set` with a value, `clear` at age zero, or nothing. */
 function sessionMove(answer: Response): { move: 'set' | 'clear'; mode: Mode } | null {
@@ -85,17 +101,18 @@ function adding(answer: Response, cookie: string): Response {
  * Four rules. A session `Set-Cookie` with a value adds `bd_in` holding the address the answer redirects into, else the
  * one the request's `bd_in` holds, else `1`. `GET /app` answering its 302 into a record for a request carrying a session
  * (no rotation, so no session cookie in the answer) adds `bd_in` with that address, so the cookie learns it. A cleared
- * session clears `bd_in`. Anything else, and always a 101 or an answer holding a WebSocket, is the answer itself.
+ * session clears `bd_in`. With a `domain` (`cookieDomain`) the cookie is written for that parent name, so the site on
+ * `brain.dog` reads one set by the app on `app.brain.dog`. Anything else, and always a 101 or an answer holding a WebSocket, is the answer itself.
  */
-export function withSignedIn(answer: Response, request: Request): Response {
+export function withSignedIn(answer: Response, request: Request, domain: string | null = null): Response {
   if (answer.status === 101 || (answer as Response & { webSocket?: unknown }).webSocket) return answer;
   const moved = sessionMove(answer);
-  if (moved?.move === 'clear') return adding(answer, clear(moved.mode));
+  if (moved?.move === 'clear') return adding(answer, clear(moved.mode, domain));
   const into = addressOf(answer, request);
-  if (moved?.move === 'set') return adding(answer, set(into ?? heldAddress(request) ?? '1', moved.mode));
+  if (moved?.move === 'set') return adding(answer, set(into ?? heldAddress(request) ?? '1', moved.mode, domain));
   if (into === null || request.method !== 'GET') return answer;
   const path = new URL(request.url).pathname;
   if (path !== '/app' && path !== '/app/') return answer;
   const mode: Mode | null = readSid(request, 'secure') !== undefined ? 'secure' : readSid(request, 'local') !== undefined ? 'local' : null;
-  return mode === null ? answer : adding(answer, set(into, mode));
+  return mode === null ? answer : adding(answer, set(into, mode, domain));
 }

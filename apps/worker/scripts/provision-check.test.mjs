@@ -37,7 +37,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import provisionCheck, { DOORS, applyPush, environmentOf, guardsKeylessRecords, plan, pushes, readBuild, readMethods, readProvision, siteBinding, wranglerConfig } from './provision-check.mjs';
-import { unflipped } from './flip-fixture.mjs';
+import { flipped, unflipped } from './flip-fixture.mjs';
 import { SITE_DOORS, UNBOUND, boundSite } from './site-fixture.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -55,7 +55,7 @@ test('the host a person names decides which environment, which bucket and which 
   const production = environmentOf(config, 'app.brain.dog', UNBOUND);
   assert.equal(production?.name, 'production');
   assert.equal(production?.bucket, 'braindog-blobs');
-  assert.equal(production?.vars.PUBLIC_HOST, 'brain.dog');
+  assert.equal(production?.vars.PUBLIC_HOST, 'app.brain.dog');
   assert.equal(environmentOf(config, 'https://app.brain.dog/', UNBOUND)?.name, 'production');
   assert.equal(environmentOf(config, 'app.brain.dog')?.name, 'production');
 
@@ -65,7 +65,7 @@ test('the host a person names decides which environment, which bucket and which 
   const alpha = environmentOf(config, 'app.alpha.brain.dog', UNBOUND);
   assert.equal(alpha?.name, 'alpha');
   assert.equal(alpha?.bucket, 'braindog-blobs-alpha');
-  assert.equal(alpha?.vars.PUBLIC_HOST, 'alpha.brain.dog');
+  assert.equal(alpha?.vars.PUBLIC_HOST, 'app.alpha.brain.dog');
   assert.equal(environmentOf(config, 'alpha.brain.dog', UNBOUND), null);
 
   /* `brain.dog` IS THE SITE'S UNTIL THE SITE HANDS IT THE DOORS, so beside an unbound site it is a host this file does
@@ -80,7 +80,11 @@ test('the host a person names decides which environment, which bucket and which 
 test('once the site hands this app its doors, the site\'s name is that environment\'s too, and only through its own environment', () => {
   /* B1 IS NO LONGER IN THE LADDER, so it is the file with production's flip taken back out (`flip-fixture.mjs`), which is
      also what a rollback of push 4 lands on behind push 3's site. */
-  const staged = { ...Object.fromEntries(pushes(root).map((p) => [p.name, p.config])), B1: unflipped(wranglerConfig(root), ['production']) };
+  const staged = {
+    ...Object.fromEntries(pushes(root).map((p) => [p.name, p.config])),
+    B1: unflipped(flipped(wranglerConfig(root)), ['production']),
+    B2: flipped(wranglerConfig(root)),
+  };
   const both = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' });
   for (const push of Object.keys(staged)) {
     const config = staged[push];
@@ -99,6 +103,7 @@ test('once the site hands this app its doors, the site\'s name is that environme
   }
   assert.equal(environmentOf(staged.B1, 'brain.dog', both)?.vars.PUBLIC_HOST, 'app.brain.dog');
   assert.equal(environmentOf(staged.B2, 'brain.dog', both)?.vars.PUBLIC_HOST, 'brain.dog');
+  assert.equal(environmentOf(staged.C, 'brain.dog', both)?.vars.PUBLIC_HOST, 'app.brain.dog');
 
   /* PUSH 1'S SITE: alpha's name is alpha's, and `brain.dog` is still only the site's. */
   const first = boundSite({ alpha: 'braindog-alpha' });

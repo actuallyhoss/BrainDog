@@ -93,7 +93,7 @@ import { consume, pump } from './pump.ts';
 import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
-import { withSignedIn } from './signed-in.ts';
+import { cookieDomain, withSignedIn } from './signed-in.ts';
 import { isAdminHost, serveAdmin } from './admin.ts';
 import { applyDoor, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
 import { seenDoor, servesSeen } from './seen.ts';
@@ -3202,7 +3202,7 @@ export default {
           : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
     }
     /* SIGNED IN, THE SITE SAYS SO: the readable `bd_in` cookie follows the session (`signed-in.ts`). */
-    answer = withSignedIn(answer, request);
+    answer = withSignedIn(answer, request, cookieDomain(env.PUBLIC_HOST, env.RP_ID));
     /* ONE POINT PER REQUEST, CRASHES INCLUDED, AFTER THE ANSWER (`51 §5.18`, `telemetry.ts`). Inside `waitUntil` so the
        caller never waits on a count, and it does nothing at all while `TELEMETRY` is unbound. */
     ctx.waitUntil(telemetry(env, request, answer, Date.now() - began));

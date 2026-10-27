@@ -22,6 +22,20 @@ export const BEFORE_FLIP = Object.freeze({
 });
 
 /**
+ * Each environment's two vars as the one-domain move left them (push B2): the Worker's public host the shared name,
+ * and the app's own name a legacy host. The file went back to the app's own name after it (push C), so this shape is
+ * the one a later move to the shared name would land on, and the checks still carry a branch for it.
+ */
+export const AFTER_FLIP = Object.freeze({
+  production: Object.freeze({ PUBLIC_HOST: 'brain.dog', LEGACY_HOSTS: 'app.brain.dog' }),
+  alpha: Object.freeze({ PUBLIC_HOST: 'alpha.brain.dog', LEGACY_HOSTS: 'app.alpha.brain.dog' }),
+});
+
+/** `config` with the flips of `envs` put in, the shared name public. A copy; the config handed in is not touched. */
+export const flipped = (config, envs = Object.keys(AFTER_FLIP)) =>
+  applyPush(config, Object.fromEntries(envs.map((env) => [env, { vars: { ...AFTER_FLIP[env] } }])));
+
+/**
  * `config` with the flips of `envs` taken out: `['production']` is B1, push 4 rolled back, and both is push A. A copy;
  * the config handed in is not touched.
  */

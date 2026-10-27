@@ -26,35 +26,25 @@
      =========================================================================================== */
 
   /* ===========================================================================================
-     THE MOVE TO ONE DOMAIN: THIS FILE IS PUSH B2. Both environments have flipped: the app lives on
-     the name its site holds, under `/app`, and the names it lived on before are legacy hosts.
-     Each push has a runbook with its checks and its rollback order; this block is the part of them
-     that is config, kept here so it is parsed and tested rather than remembered. `pushes()` reads
-     the file's own name from the first sentence of this paragraph and any `STAGE` fragment from
-     below, and the tests beside it hold each.
+     THE APP IS BACK ON ITS OWN NAME: THIS FILE IS PUSH C. It reverses the one-domain move's last
+     step and nothing else. The app lives on `app.brain.dog` (alpha: `app.alpha.brain.dog`), still
+     under `/app`, and `brain.dog` and `alpha.brain.dog` are legacy hosts again.
 
-     PUSH B2, PRODUCTION HERE: `PUBLIC_HOST` is `brain.dog` and `LEGACY_HOSTS` is `app.brain.dog`, and
-     no route changed. `brain.dog` is the site's Custom Domain and reaches this Worker only through
-     the site's binding (push 3), so B2 is live the moment this Worker deploys, and it is the move:
-     every cookie-authenticated write must now carry `Origin: https://brain.dog`, so everybody signs
-     in once more. It can only follow push 3, and `test/wrangler-routes.test.ts` fails this file
-     against the real site, or against push 1's site, if it does not: until production's site binds
-     this Worker, `brain.dog/app/` is the site's 404 page. The repository variable `DEPLOY_HOST` has
-     to be `brain.dog` before this push deploys, so the Parity step asks the name the app lives on.
-     These vars were measured through `wrangler dev -c site -c app`: sign-in on `brain.dog`, 403
-     at `origin` from `app.brain.dog`, both passkey ceremonies under `brain.dog`, and a device
-     start on the old name refused.
+     PUSH C, PRODUCTION HERE: `PUBLIC_HOST` is `app.brain.dog` and `LEGACY_HOSTS` is `brain.dog`, and
+     no route changed. `app.brain.dog` has stayed this Worker's Custom Domain throughout, so C is live
+     the moment this Worker deploys: every cookie-authenticated write must now carry
+     `Origin: https://app.brain.dog`, so everybody signs in once more (the `__Host-` cookie is bound to
+     the name that set it). A page load on `brain.dog/app/...` reaches this Worker through the site's
+     binding and is a 308 to `https://app.brain.dog/app/...`, path and query kept, and `/api/*`, `/mcp`
+     and `/in/*` on `brain.dog` are served and never redirected, so tokens and `/in/` addresses handed
+     out there keep working. A device start on `brain.dog` is refused and names `app.brain.dog`.
+     Passkeys keep `RP_ID` `brain.dog`, which is a registrable suffix of `app.brain.dog`, so none is
+     stranded. The repository variable `DEPLOY_HOST` has to be `app.brain.dog` before this push deploys,
+     so the Parity step asks the name the app lives on. ROLLBACK is a version rollback of this Worker,
+     or the four values swapped back.
 
-     PUSH B1, ALPHA HERE: `PUBLIC_HOST` is `alpha.brain.dog` and `LEGACY_HOSTS` is
-     `app.alpha.brain.dog`, and no route changed. The new name is the alpha site's Custom Domain and
-     reaches this Worker only through that site's binding (push 1), so B1 is live the moment this
-     Worker deploys, with no site deploy, and is broken for everyone if push 1's site is not.
-     Measured through `wrangler dev -c site -c app` on a clone of push 2: a claim redeemed with
-     `Origin: https://alpha.brain.dog` set `__Host-bd_s`, the same redeem and a cookie write from `app.alpha.brain.dog` were 403 at
-     `origin`, both passkey ceremonies named `alpha.brain.dog`, a device start on the new name
-     answered `verification_uri` `https://alpha.brain.dog/app/acme/settings/agents` and on the old one
-     403, and every page load on the old name was a 308 to `https://alpha.brain.dog/app/...` while
-     `/api/*`, `/mcp` and `/in/*` there were served.
+     PUSH C, ALPHA HERE: the same on alpha's names, `PUBLIC_HOST` `app.alpha.brain.dog` and
+     `LEGACY_HOSTS` `alpha.brain.dog`.
 
      THE SHARED NAME REACHES THIS WORKER THROUGH THE SITE'S SERVICE BINDING, AND NOTHING IN THIS FILE
      CHANGES FOR IT. The site keeps `brain.dog` (and `alpha.brain.dog`) as its Custom Domain, runs its
@@ -354,11 +344,11 @@
          — rather than an undefined binding. It is a var 51 §4.1's `Env` does not list; adding it
          is an amendment, and `/api/version` cannot answer without it. */
       "vars": {
-        "PUBLIC_HOST": "alpha.brain.dog",
+        "PUBLIC_HOST": "app.alpha.brain.dog",
         /* THE OLD NAME, A CUSTOM DOMAIN IN `routes` ABOVE, or nothing reaches the Worker to redirect. A page
            load there is a 308 to `https://alpha.brain.dog/app<path>`, and `/api/*`, `/mcp` and `/in/*` are
            served, never redirected, for the reasons production's comment gives. */
-        "LEGACY_HOSTS": "app.alpha.brain.dog",
+        "LEGACY_HOSTS": "alpha.brain.dog",
         /* THE PASSKEY'S RELYING PARTY, the parent of the host from the first deploy, so a passkey made on
            `app.alpha.brain.dog` is offered on `alpha.brain.dog` after B1: both ceremonies named
            `alpha.brain.dog` in the clone of push 2. Production's comment says why it never moves. */
@@ -557,23 +547,13 @@
        ----------------------------------------------------------------------------------------- */
     "production": {
       /* THE APP IS UNDER `/app` ON `brain.dog`, WHICH IS THE SITE'S CUSTOM DOMAIN AND NOT THIS WORKER'S.
-         The owner asked for the app to leave `app.brain.dog`, and the one-domain design splits
-         `brain.dog` between two Workers: the site keeps
-         it as its Custom Domain, unchanged, and this Worker takes only the paths it answers. The site
-         hands those paths to this Worker through its `APP` service binding, which lives in
-         `apps/site/wrangler.jsonc` and not here, and the top block says why it is a binding.
-
-         A CUSTOM DOMAIN CARRIES EVERY PATH ("Other parts (path, query parameters) of the URL are not
-         considered", developers.cloudflare.com/workers/configuration/routing/custom-domains), so in
-         push A, before the flip, `app.brain.dog/app/...` was the app, `/api/*`, `/mcp` and `/in/*` were
-         where they always were, and a page load anywhere else was the Worker's 308 into `/app` on the
-         same name. A rollback of B2 puts that shape back behind the same binding.
-
-         SINCE B2, `app.brain.dog` STAYS A CUSTOM DOMAIN OF THIS WORKER as the legacy host: a browser
-         navigation is a 308 to `https://brain.dog/app<path>`, and `/api/*`, `/mcp` and `/in/*` are
-         served and never redirected, because the CLI refuses redirects, a webhook sender does not
-         follow one, and a 301 or 302 turns a POST into a GET. It stays for at least the 90 days a token
-         lives and until every `/in/` address handed out on it is re-minted.
+         `app.brain.dog` IS THIS WORKER'S CUSTOM DOMAIN AND THE APP'S ADDRESS. `brain.dog` stays the site's
+         Custom Domain, and the site hands the app's doors to this Worker through its `APP` service binding
+         (`apps/site/wrangler.jsonc`), where a page load is a 308 to `https://app.brain.dog/app<path>`
+         and `/api/*`, `/mcp` and `/in/*` are served and never redirected, because the CLI refuses
+         redirects, a webhook sender does not follow one, and a 301 or 302 turns a POST into a GET.
+         `brain.dog` stays a legacy host for at least the 90 days a token lives and until every `/in/`
+         address handed out on it is re-minted.
 
          `admin.brain.dog` IS THE OWNER'S ADMIN PAGE (`src/admin.ts`), its own Custom Domain, made by
          the next deploy once the owner chose it; Cloudflare Access can be put in front of it later with no code change. */
@@ -584,17 +564,17 @@
 
       "vars": {
         /* THE CSRF ORIGIN, THE MAGIC LINK'S ORIGIN AND THE DEVICE FLOW'S HOST, ALL AT ONCE, and
-           `brain.dog` from push B2 on. This is the change that makes everybody sign in once more: every
-           cookie-authenticated write must now carry `Origin: https://brain.dog`, so a session cookie
-           minted on `app.brain.dog` is useless here by construction. That is the `__Host-` cookie doing
-           its job. `POST /auth/device` on `app.brain.dog` answers 403 "This BrainDog signs devices in
-           at https://brain.dog, so start there" (measured with these vars),
+           `app.brain.dog` from push C on. This is the change that makes everybody sign in once more: every
+           cookie-authenticated write must now carry `Origin: https://app.brain.dog`, so a session cookie
+           minted on `brain.dog` is useless here by construction. That is the `__Host-` cookie doing
+           its job. `POST /auth/device` on `brain.dog` answers 403 "This BrainDog signs devices in
+           at https://app.brain.dog, so start there",
            so the CLI's login example names this host, and `apps/cli/test/login.test.ts` reads it from
            here. */
-        "PUBLIC_HOST": "brain.dog",
+        "PUBLIC_HOST": "app.brain.dog",
         /* THE NAMES THIS WORKER STILL ANSWERS AND NO LONGER LIVES ON, separated by commas. Each one must
            also be a Custom Domain in `routes` above, or nothing reaches the Worker to redirect. */
-        "LEGACY_HOSTS": "app.brain.dog",
+        "LEGACY_HOSTS": "brain.dog",
         /* THE PASSKEY'S RELYING PARTY IS THE PARENT FROM PUSH A ON, AND THE REASON IT IS NOT SIMPLY
            `PUBLIC_HOST`. A passkey is offered only where its RP ID is the host or a registrable suffix
            of it, so one made under RP ID `app.brain.dog` would never be offered on `brain.dog` after B2;

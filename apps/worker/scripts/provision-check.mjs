@@ -1,7 +1,7 @@
 /**
  * `provision-check`: is this host ready to be provisioned, and what is missing.
  *
- *   node apps/worker/scripts/provision-check.mjs brain.dog     (app.brain.dog, the legacy host since push B2, reads as production too)
+ *   node apps/worker/scripts/provision-check.mjs app.brain.dog     (brain.dog, the legacy host since push C, reads as production too)
  *   node apps/worker/scripts/provision-check.mjs http://localhost:8787 --no-account
  *
  * THIS IS THE PROVISIONING REHEARSAL TURNED INTO A COMMAND. The rehearsal walked the whole of

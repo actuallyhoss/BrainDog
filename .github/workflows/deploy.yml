@@ -308,16 +308,11 @@ jobs:
       # `--allow-skip` here: this is the one job where the gate skipping means the deploy went
       # unchecked, so a missing `DEPLOY_HOST` has to be red rather than quiet.
       #
-      # `DEPLOY_HOST` IS A REPOSITORY VARIABLE, AND IT STAYS `app.brain.dog` UNTIL PRODUCTION'S SITE
-      # BINDS THIS WORKER, the binding step of the one-domain move (the comment at the top of
-      # `apps/worker/wrangler.jsonc`). The gate asks
-      # `/app/`, `/app/_app/version.json` and the build id; on `app.brain.dog` none of the three is
-      # redirected before the flip, and through the site's binding all three answered the app's own
-      # bytes when measured locally. It becomes `brain.dog` after the binding is green and before the
-      # flip is pushed, when both names answer the three the same way. Set before the binding, every
-      # deploy goes red here against the site's 404 page; set after the flip's job starts, the flip goes
-      # red here already live. After the flip the old value turns red too, because `app.brain.dog/app/` is then
-      # a 308 and this asks with `redirect: 'manual'`.
+      # `DEPLOY_HOST` IS A REPOSITORY VARIABLE, AND IT IS `app.brain.dog`, THE NAME THE APP LIVES ON
+      # (the comment at the top of `apps/worker/wrangler.jsonc`, push C). The gate asks `/app/`,
+      # `/app/_app/version.json` and the build id there, where none of the three is redirected. It must be
+      # set to `app.brain.dog` before the push that makes it `PUBLIC_HOST` deploys: on `brain.dog` the
+      # same asks are a 308 now, and this asks with `redirect: 'manual'`, so the old value turns red.
       - name: Parity
         id: parity
         run: pnpm gates -- --only deploy-parity

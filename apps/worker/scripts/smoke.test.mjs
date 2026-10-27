@@ -30,7 +30,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { pushes, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
-import { unflipped } from './flip-fixture.mjs';
+import { flipped, unflipped } from './flip-fixture.mjs';
 import { UNBOUND, boundSite } from './site-fixture.mjs';
 import { FIRST_DRAW } from '../../web/src/lib/record/first-draw.ts';
 import smoke, { argsFor, canary, checks, judge, migrationCount, readCheck, refusals } from './smoke.mjs';
@@ -40,18 +40,16 @@ import { FILE_HEADERS, FILE_MOST as WORKER_MOST, agrees, sniff } from '../src/fi
 const html = { 'content-type': 'text/html; charset=utf-8' };
 const json = { 'content-type': 'application/json' };
 const answer = (status, headers = {}, text = '') => ({ status, headers: new Headers(headers), text });
-const staged = (name) => {
-  const push = pushes().find((p) => p.name === name);
-  assert.ok(push, `no push ${name}`);
-  return push.config;
-};
+/* THE SHARED NAME PUBLIC, which is push B2's shape. The file is push C (the app on its own name) and these tests are about
+   the checks' answers to the shared-name shape, so it is built from the file with that flip put in. */
+const staged = () => flipped(wranglerConfig());
 const asked = (list) => list.map((c) => `${c.method} ${c.url}`);
 
 /* THE SITE AFTER PUSH 1 (alpha bound) AND AFTER PUSH 3 (both). */
 const ALPHA_BOUND = boundSite({ alpha: 'braindog-alpha' });
 const BOTH_BOUND = boundSite({ alpha: 'braindog-alpha', production: 'braindog-production' });
 /* B1: ALPHA FLIPPED AND PRODUCTION NOT, which the file was from push 2 to push 4 and a rollback of push 4 lands on. */
-const B1 = unflipped(wranglerConfig(), ['production']);
+const B1 = unflipped(flipped(wranglerConfig()), ['production']);
 
 test('production in push A\'s shape beside a site that does not bind it asks the app on its own name, and asks nothing of brain.dog, which is still only the site', () => {
   assert.deepEqual(asked(checks(B1, 'production', UNBOUND)), [
@@ -99,6 +97,34 @@ test('each flip is asked the five answers of the design and /healthz, on the two
     'GET https://app.brain.dog/r/x',
     'POST https://app.brain.dog/in/anything',
   ]);
+});
+
+test('the file as it deploys (push C): the app on its own name, and the shared name asked for the move off it', () => {
+  const config = wranglerConfig();
+  assert.deepEqual(asked(checks(config, 'production', BOTH_BOUND)), [
+    'GET https://app.brain.dog/app/',
+    'GET https://app.brain.dog/api/boot',
+    'GET https://app.brain.dog/healthz',
+    'GET https://brain.dog/slash',
+    'GET https://brain.dog/app/',
+    'GET https://brain.dog/api/boot',
+    'GET https://brain.dog/healthz',
+    'GET https://brain.dog/app/r/x',
+    'POST https://brain.dog/in/anything',
+  ]);
+  const list = checks(config, 'production', BOTH_BOUND);
+  const front = list.find((c) => c.url === 'https://brain.dog/app/');
+  assert.equal(front.headers?.accept, 'text/html', 'a page load says it wants a page, or the Worker rightly leaves it alone');
+  assert.equal(judge(front, answer(308, { location: 'https://app.brain.dog/app/' })), null);
+  /* THE SHELL SERVED ON THE OLD NAME to a browser, or the site's own 404 page, is not the move. */
+  assert.ok(judge(front, answer(200, html)));
+  assert.match(judge(front, answer(404, html)) ?? '', /does not hand \/app\/\*/);
+  const moved = list.find((c) => c.url === 'https://brain.dog/app/r/x');
+  assert.equal(judge(moved, answer(308, { location: 'https://app.brain.dog/app/r/x' })), null);
+  assert.ok(judge(moved, answer(308, { location: 'https://brain.dog/app/r/x' })));
+  const door = list.find((c) => c.url === 'https://brain.dog/in/anything');
+  assert.equal(judge(door, answer(404, json)), null);
+  assert.ok(judge(door, answer(308, { location: 'https://app.brain.dog/app/in/anything' })));
 });
 
 test('each check refuses the answer the wrong Worker would give', () => {
@@ -164,7 +190,7 @@ test('a public host nothing reaches is refused before anything is asked, and the
   assert.throws(() => checks(config, 'production', UNBOUND), /app\.brain\.dog/);
   /* B1 BESIDE A SITE THAT DOES NOT BIND ALPHA: push 2 landing before push 1, which is every door on `alpha.brain.dog`
      answering the alpha site's 404 page. */
-  assert.throws(() => checks(wranglerConfig(), 'alpha', UNBOUND), /alpha\.brain\.dog .*env\.alpha has no main/);
+  assert.throws(() => checks(flipped(wranglerConfig()), 'alpha', UNBOUND), /alpha\.brain\.dog .*env\.alpha has no main/);
   /* B2 BESIDE PUSH 1'S SITE: production's flip before production's site is bound, which is every door on `brain.dog`
      answering the site's 404 page. */
   assert.throws(() => checks(staged('B2'), 'production', ALPHA_BOUND), /brain\.dog .*env\.production has no main/);
@@ -198,8 +224,8 @@ test('the real files: the deploy step reads the site by default, and asks a site
     const list = asked(checks(config, name));
     assert.deepEqual(list, asked(checks(config, name, site)), `${name}: checks() without a site is not the real site`);
     const host = config.env[name].vars.PUBLIC_HOST;
-    for (const on of binding.names.filter((n) => n !== host)) assert.ok(list.includes(`GET https://${on}/pricing`), `${name}: ${on} is the app's through the site and is not asked`);
-    if (binding.names.length === 0) assert.ok(!list.some((c) => c.endsWith('/pricing')), `${name}: a site that does not bind this app is asked for /pricing`);
+    for (const on of binding.names.filter((n) => n !== host)) assert.ok(list.includes(`GET https://${on}/slash`), `${name}: ${on} is the app's through the site and is not asked`);
+    if (binding.names.length === 0) assert.ok(!list.some((c) => c.endsWith('/slash')), `${name}: a site that does not bind this app is asked for /pricing`);
   }
 });
 

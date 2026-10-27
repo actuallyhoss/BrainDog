@@ -295,3 +295,25 @@ test('THE WORKER ASKS ABOUT THE OLD HOST FIRST, then reads /app, and serves a sl
   assert.match(SOURCE, /directory\.auth\(\{ flow: 'session', sid, \.\.\.\(slug === undefined \? \{\} : \{ slug \}\) \}\)/u, 'the Directory is not asked about the slug');
   assert.match(SOURCE, /relyingParty\(`https:\/\/\$\{host\}`, this\.env\.RP_ID\)/u, 'RP_ID is not read');
 });
+
+/* THE APP BACK ON ITS OWN NAME (push C): `app.brain.dog` is the public host and `brain.dog` the legacy one. A page load on
+   `brain.dog/app/...` reaches this Worker through the site's binding and is a 308 to `app.brain.dog`, path and query
+   kept; `/api/*`, `/mcp` and `/in/*` there are served; and the app's own name is never sent anywhere. */
+test('a page load under /app on the site\'s name goes to the app\'s own name, keeping path and query', () => {
+  const html = { accept: 'text/html' };
+  const site = (path: string, init: RequestInit = {}) => new Request(`https://brain.dog${path}`, init);
+  const home = 'app.brain.dog';
+  assert.equal(legacyRedirect(site('/app', { headers: html }), 'brain.dog', home)?.headers.get('location'), 'https://app.brain.dog/app');
+  assert.equal(legacyRedirect(site('/app/', { headers: html }), 'brain.dog', home)?.headers.get('location'), 'https://app.brain.dog/app/');
+  const moved = legacyRedirect(site('/app/acme/r/tasks?new=1', { headers: html }), 'brain.dog', home);
+  assert.equal(moved?.status, 308);
+  assert.equal(moved?.headers.get('location'), 'https://app.brain.dog/app/acme/r/tasks?new=1');
+  assert.equal(legacyRedirect(site('/app/signin?next=%2Fr%2Ftasks', { headers: html }), 'brain.dog', home)?.headers.get('location'), 'https://app.brain.dog/app/signin?next=%2Fr%2Ftasks');
+  assert.equal(legacyRedirect(site('/app/acme/r/tasks', { method: 'HEAD', headers: html }), 'brain.dog', home)?.status, 308);
+  /* THE DOORS ARE SERVED THERE, NEVER MOVED: a CLI refuses a redirect and a webhook sender does not follow one. */
+  for (const path of ['/api/boot', '/mcp', '/in/email/abc', '/app/acme/api/boot', '/auth/methods', '/account/billing/webhook'])
+    assert.equal(legacyRedirect(site(path, { headers: html }), 'brain.dog', home), null, path);
+  assert.equal(legacyRedirect(site('/app/acme/r/tasks', { method: 'POST', headers: html }), 'brain.dog', home), null);
+  /* AND THE APP'S OWN NAME STAYS WHERE IT IS. */
+  assert.equal(legacyRedirect(new Request('https://app.brain.dog/app/acme/r/tasks', { headers: html }), 'brain.dog', home), null);
+});

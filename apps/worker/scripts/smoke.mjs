@@ -126,9 +126,14 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
   const legacy = String(vars.LEGACY_HOSTS ?? '').split(/[\s,]+/).map((h) => h.toLowerCase()).filter((h) => h.length > 0)[0] ?? null;
   const old = legacy ?? (own.has(host) ? host : null);
 
+  const legacyNames = new Set(String(vars.LEGACY_HOSTS ?? '').split(/[\s,]+/).map((h) => h.toLowerCase()).filter((h) => h.length > 0));
   const list = [];
   for (const on of new Set([host, ...handed])) {
     const shared = handed.has(on);
+    /* A SHARED NAME THAT IS A LEGACY HOST (the shared name after the app went back to its own): the site hands it the
+       doors, so its page loads reach this Worker and are sent on, and its API doors are served. `/slash` is still the
+       site's, and `/app/` asked as a browser asks is the 308 to the app's name. */
+    const sentOn = shared && legacyNames.has(on) && on !== host;
     if (shared)
       list.push({
         method: 'GET',
@@ -140,7 +145,18 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
           : `answered ${a.status}, so the site did not deploy, or ${on} is not its Custom Domain`,
       });
     list.push(
-      {
+      sentOn ?
+        {
+          method: 'GET',
+          url: `https://${on}/app/`,
+          headers: { accept: 'text/html' },
+          expects: `308 to https://${host}/app/`,
+          judge: (a) =>
+            a.status === 308 && a.headers.get('location') === `https://${host}/app/` ? null
+            : a.status === 404 && isHtml(a) ? `answered the site's 404 page: the deployed site on ${on} does not hand /app/* to this Worker, so every saved link there is dead`
+            : `answered ${a.status}${a.headers.get('location') ? ` to ${a.headers.get('location')}` : ''} where a 308 to https://${host}/app/ was expected. Is LEGACY_HOSTS in the deployed vars?`,
+        }
+      : {
         method: 'GET',
         url: `https://${on}/app/`,
         expects: '200, the app shell',
@@ -184,11 +200,14 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
   }
   if (!old) return list;
 
+  /* A LEGACY NAME THE SITE HOLDS has no page outside `/app` that reaches this Worker (the site answers those), so the
+     page load asked is one under `/app`, which keeps its own path. */
   const target = `https://${host}/app/r/x`;
+  const askedPath = handed.has(old) ? '/app/r/x' : '/r/x';
   list.push(
     {
       method: 'GET',
-      url: `https://${old}/r/x`,
+      url: `https://${old}${askedPath}`,
       headers: { accept: 'text/html' },
       expects: `308 to ${target}`,
       judge: (a) => {

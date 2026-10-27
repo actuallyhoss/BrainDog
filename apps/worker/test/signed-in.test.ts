@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { clearCookie, sessionCookie } from '@braindog/host/auth';
 
-import { SIGNED_IN, withSignedIn } from '../src/signed-in.ts';
+import { SIGNED_IN, cookieDomain, withSignedIn } from '../src/signed-in.ts';
 
 const SID = 'sid_7b1f0c2e9a4d4e1b8c3a5f6d2e0b9a71';
 const ORIGIN = 'https://brain.dog';
@@ -140,4 +140,21 @@ test('a 101 and an answer holding a WebSocket pass through, whatever they carry'
   const socket = answer(200, [['set-cookie', clearCookie('secure')]]);
   Object.defineProperty(socket, 'webSocket', { value: {} });
   assert.equal(withSignedIn(socket, ask('/mcp')), socket);
+});
+
+/* THE APP ON A SUBDOMAIN OF THE SITE'S NAME: the cookie is written for the parent, so `brain.dog` reads what
+   `app.brain.dog` set, and cleared for the same parent, or the browser keeps it. */
+test('on a subdomain of the parent the cookie carries the parent Domain, set and cleared alike', () => {
+  assert.equal(cookieDomain('app.brain.dog', 'brain.dog'), 'brain.dog');
+  assert.equal(cookieDomain('app.alpha.brain.dog', 'alpha.brain.dog'), 'alpha.brain.dog');
+  assert.equal(cookieDomain('brain.dog', 'brain.dog'), null, 'the host itself keeps a host-only cookie');
+  assert.equal(cookieDomain('app.brain.dog', undefined), null);
+  assert.equal(cookieDomain('app.brain.dog', ''), null);
+  assert.equal(cookieDomain('evilbrain.dog', 'brain.dog'), null);
+  assert.equal(cookieDomain('localhost', 'localhost'), null);
+
+  const set = withSignedIn(answer(302, [['location', '/app/maya-okafor/'], ['set-cookie', sessionCookie(SID, 'secure')]]), ask('/auth/verify'), 'brain.dog');
+  assert.deepEqual(inOf(set), ['bd_in=maya-okafor; Path=/; Domain=brain.dog; Max-Age=2592000; Secure; SameSite=Lax']);
+  const gone = withSignedIn(answer(200, [['set-cookie', clearCookie('secure')]]), ask('/auth/logout', 'bd_in=1', 'POST'), 'brain.dog');
+  assert.deepEqual(inOf(gone), ['bd_in=; Path=/; Domain=brain.dog; Max-Age=0; Secure; SameSite=Lax']);
 });

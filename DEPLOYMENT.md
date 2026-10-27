@@ -12,24 +12,27 @@ One label per surface, with the environment in front of it.
 
 | Host | What runs there | Deployed by | State |
 |---|---|---|---|
-| **`brain.dog`** | `apps/site`, the marketing site; and the app, `apps/worker`, under `/app` and on the doors `run_worker_first` lists in `apps/site/wrangler.jsonc`, handed over by the site's `APP` service binding | `.github/workflows/deploy.yml`, after a green `ci` on `master` and the reviewer's press | **live** |
+| **`brain.dog`** | `apps/site`, the marketing site; and the app's old address, handed to `apps/worker` on the doors `run_worker_first` lists in `apps/site/wrangler.jsonc` by the site's `APP` service binding: a page load under `/app` is a 308 to `app.brain.dog`, and `/api/*`, `/mcp` and `/in/*` are served where they stand | `.github/workflows/deploy.yml`, after a green `ci` on `master` and the reviewer's press | **live** |
 | **`www.brain.dog`** | nothing: a 301 to the apex | a Redirect Rule, not a Worker | live |
-| **`app.brain.dog`** | the production app Worker as the legacy host: a page load is a 308 to `brain.dog/app`, and `/api/*`, `/mcp` and `/in/*` are served where they stand | the same `deploy.yml` run, since it is a Custom Domain of that Worker | live, legacy |
+| **`app.brain.dog`** | the production app Worker, `apps/worker` with `apps/web`'s `build/` as its asset directory; the app is at `app.brain.dog/app` | the same `deploy.yml` run, since it is a Custom Domain of that Worker | **live** |
 | **`mcp.brain.dog`** | reserved | nothing | not claimed |
-| **`alpha.brain.dog`** | `apps/site`, the same bytes; and alpha's app under `/app` and on its doors, through the alpha site's `APP` binding | `deploy.yml`'s alpha steps when the variable `DEPLOY_ALPHA` is `true`, otherwise by hand | live |
-| **`app.alpha.brain.dog`** | alpha's app Worker, built as **BrainDog Alpha**, as the legacy host, the same way | the same | live, legacy |
+| **`alpha.brain.dog`** | `apps/site`, the same bytes; and alpha's app's old address, handed over by the alpha site's `APP` binding the same way | `deploy.yml`'s alpha steps when the variable `DEPLOY_ALPHA` is `true`, otherwise by hand | live |
+| **`app.alpha.brain.dog`** | alpha's app Worker, built as **BrainDog Alpha** | the same | live |
 | **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
 
-**The app lives on `brain.dog` since the one-domain move.** The site keeps `brain.dog` as its Custom Domain and runs its
-script first on the app's doors, which it hands to `braindog-production` through a service binding,
-so no zone route is written. `PUBLIC_HOST` is `brain.dog`, so sign-in, the CSRF origin and the device
-flow are all there; `app.brain.dog` stays the app Worker's Custom Domain for the tokens and `/in/`
-addresses handed out on it, for at least the 90 days a token lives (to about 23 December 2026) and
-until every `/in/` address handed out there is re-minted. A device start there is refused. Alpha is
-the same on its own names.
+**The app lives on `app.brain.dog`** (alpha: `app.alpha.brain.dog`), under `/app`, as it did before the one-domain
+move and again since push C. `PUBLIC_HOST` is `app.brain.dog`, so sign-in, the CSRF origin and the device flow are
+all there, and `LEGACY_HOSTS` is `brain.dog`: the site keeps `brain.dog` as its Custom Domain and runs its script first
+on the app's doors, which it hands to `braindog-production` through a service binding, so no zone route is written.
+A page load on `brain.dog/app/...` is a 308 to `https://app.brain.dog/app/...` with the path and query kept, and
+`/api/*`, `/mcp` and `/in/*` on `brain.dog` are served and never redirected, so a token or an `/in/` address handed out
+there keeps working for at least the 90 days a token lives and until every `/in/` address is re-minted. A device start on
+`brain.dog` is refused and names `app.brain.dog`. Everybody signs in once more after the push, because a session cookie
+belongs to the name that set it. Passkeys keep `RP_ID` `brain.dog`, so none is stranded. A self-host sets its own
+`PUBLIC_HOST` and no `LEGACY_HOSTS`, and none of this reaches it.
 
 `mcp.*` is deliberately unclaimed, and both names resolve to nothing. The MCP door is
-`https://brain.dog/mcp`, a path on the app's own host like every other door, so there is no service
+`https://app.brain.dog/mcp`, a path on the app's own host like every other door, so there is no service
 for a second name to point at. `mcp.brain.dog` used to answer 525: a `*.brain.dog` CNAME was claiming
 it, and every other name in the zone with it. A wildcard means no name is ever unclaimed. It is gone.
 
@@ -140,7 +143,7 @@ token reaches this one job and no other workflow.
 |---|---|---|---|
 | `CLOUDFLARE_API_TOKEN` | secret | environment `production` | a token scoped to deploy Workers on the account and nothing else (12 §8) |
 | `CLOUDFLARE_ACCOUNT_ID` | variable | repository | the account; empty, and `deploy` is skipped rather than red |
-| `DEPLOY_HOST` | variable | repository | `brain.dog`, the host Parity and Smoke ask; empty, and `deploy` is skipped |
+| `DEPLOY_HOST` | variable | repository | `app.brain.dog`, the host Parity and Smoke ask; empty, and `deploy` is skipped |
 | `SMOKE_TOKEN` | secret | environment `production` | a token on the canary record, `propose` or above; unset, the signed-in half of Smoke and the sandbox smoke say they were skipped |
 | `SMOKE_SLUG` | variable | repository | the canary record's slug, the same record `OPS_RECORD` names |
 | `DEPLOY_ALPHA` | variable | repository | `true` deploys alpha after production; anything else leaves alpha alone |
@@ -165,7 +168,7 @@ key fails the first deploy of an environment while the secret is unset.
 | `KEK` | secret, or a Secrets Store binding of the same name | `/api/vault/*` answers `NOT_IN_THIS_BUILD`, and `/auth/provision` refuses rather than make a keyless record | 32 bytes as 64 hex characters or base64url. During a rotation it holds two keys, the new one, a space, and the old one (53 §5.6). There is no `KEK_PREV` |
 | `VAPID_PRIVATE` | secret | Web Push stays `pending` | the private half of `VAPID_PUBLIC` |
 | `STRIPE_SECRET_KEY` | secret | every billing door answers `NOT_IN_THIS_BUILD` naming it | `sk_test_...` while `BILLING` is `test`, `sk_live_...` only once the owner says so |
-| `STRIPE_WEBHOOK_SECRET` | secret | the webhook refuses | the `whsec_...` Stripe shows for the endpoint `https://brain.dog/account/billing/webhook` |
+| `STRIPE_WEBHOOK_SECRET` | secret | the webhook refuses | the `whsec_...` Stripe shows for the endpoint `https://app.brain.dog/account/billing/webhook` |
 | `TURNSTILE_SECRET` | secret | sign-up runs on the Directory's lockouts alone | the secret half of `TURNSTILE_SITE_KEY`; `signup.start` checks the widget's answer with it |
 | `BILLING` | variable | `''`: billing is off, sign-up says it is not open, nothing is charged or capped | `test` or `live`, and it must agree with `STRIPE_SECRET_KEY`'s prefix or every billing door refuses, naming both |
 | `STRIPE_PRICE_HOSTED`, `STRIPE_PRICE_PLUS` | variables | that plan is not sold | the `price_...` of Hosted ($12 a month) and of Cloud Plus, from the same Stripe mode as the key |
@@ -176,7 +179,7 @@ key fails the first deploy of an environment while the secret is unset.
 | `SUPPORT_ADDRESS` | variable, not yet in `wrangler.jsonc` | every mail's footer says to contact whoever runs this BrainDog | the address support mail reaches, named in every mail's footer |
 | `OPS_ALERT_TO` | variable, production only | no mail on a `crash` or `refuse` line | where those lines are mailed, once a kind in 15 minutes ("Alerts" below) |
 | `AGE_RECIPIENT` | variable | the walk refuses every record's copy and says why | the age recipient every nightly copy is sealed to; its identity lives outside Cloudflare (53 §8) |
-| `PUBLIC_HOST`, `RP_ID`, `LEGACY_HOSTS` | variables | no cookie origin, no passkeys, no legacy host | `brain.dog`, `brain.dog`, `app.brain.dog` |
+| `PUBLIC_HOST`, `RP_ID`, `LEGACY_HOSTS` | variables | no cookie origin, no passkeys, no legacy host | `app.brain.dog`, `brain.dog`, `brain.dog` |
 | `PROVISION_WITHOUT_KEYS` | variable | a record is never made without keys | `yes` lets `/auth/provision` make a keyless record on purpose |
 | `VAPID_PUBLIC` | variable | no push | Web Push's public key, handed to every browser that subscribes |
 | `SLASH_INCLUDED`, `SLASH_INCLUDED_MONTH_NEURONS`, `AI_GATEWAY` | variables | no included model | the included Slash model, one record's monthly ceiling in neurons, and the AI Gateway id |
@@ -230,10 +233,10 @@ Durable Object migrations are in `wrangler.jsonc` and apply themselves on deploy
 ## Checking a deployment without opening a browser
 
 ```
-curl -s -o /dev/null -w '%{http_code}\n' https://brain.dog/app/           # 200, the shell
-curl -s https://brain.dog/healthz                                          # {"ok":true,"app":...,"format":...,"kernel":...,"primitives":...}
-curl -s https://brain.dog/api/health                                       # a typed refusal, not a 500
-curl -s -H 'authorization: Bearer rec_0000000000000000000000000.x' https://brain.dog/api/boot
+curl -s -o /dev/null -w '%{http_code}\n' https://app.brain.dog/app/           # 200, the shell
+curl -s https://app.brain.dog/healthz                                      # {"ok":true,"app":...,"format":...,"kernel":...,"primitives":...}
+curl -s https://app.brain.dog/api/health                                       # a typed refusal, not a 500
+curl -s -H 'authorization: Bearer rec_0000000000000000000000000.x' https://app.brain.dog/api/boot
 ```
 
 The API answering `{"ok":false,"refusal":{"code":"UNAUTHORIZED","fix":"…"}}` with a 401 is the
@@ -282,7 +285,7 @@ refused), find the version that served before and put it back:
 cd apps/worker
 pnpm exec wrangler deployments list --env production
 pnpm exec wrangler rollback <version-id> --env production --message "<why>"
-curl -s https://brain.dog/healthz                  # "app" names the sha you rolled back to
+curl -s https://app.brain.dog/healthz              # "app" names the sha you rolled back to
 ```
 
 The same two commands in `apps/site` roll the marketing site back. Three things to know first:
@@ -301,7 +304,7 @@ that sees a migration refusing real rows, and the sandbox smoke runs one script 
 only witness that the Worker Loader is bound. Both are off until the operator sets up the canary
 once: make a record for it (for example `ops`), put its `rec_...` id in `OPS_RECORD` in
 `env.production.vars` (the nightly note goes there too), mint a token on it with
-`braindog token create --name smoke --scope propose --host https://brain.dog/app/ops` (`propose`,
+`braindog token create --name smoke --scope propose --host https://app.brain.dog/app/ops` (`propose`,
 because the sandbox smoke's `scriptTry` refuses a read token), and store the token as the GitHub
 secret `SMOKE_TOKEN` and the record's slug as the variable `SMOKE_SLUG`. Unset, each prints that it
 was skipped. A token that expires turns Smoke red with a 401 that names `SMOKE_TOKEN`, and that red
@@ -319,7 +322,7 @@ goes like this.
    deploys without a press.
 2. Run the restore drill against last night's copy of the live record, so "restore from last night"
    below is known to work: `node apps/cli/scripts/restore-drill.mjs --record <rec_id> --directory
-   --identity-cmd "<a command that prints the age identity>" --report https://brain.dog`, with
+   --identity-cmd "<a command that prints the age identity>" --report https://app.brain.dog`, with
    `PROVISION_KEY` in that command's environment. It fetches the sealed copies with wrangler, opens and
    restores them in a temp folder, and posts the counts to `/account/ops/drill`, where the Directory
    keeps the host's last drill. After that it is monthly (`--print-timer` prints the launchd file),
@@ -333,7 +336,7 @@ goes like this.
    `gates.yml` run there, and it is fixed there until both are green. Nothing deploys from a branch.
 2. If anything under `packages/kernel/src/migrations/` changed, rehearse it on last night's copy of
    the live record against the deployed sha, which is the tail of
-   `curl -s https://brain.dog/.well-known/braindog-build`:
+   `curl -s https://app.brain.dog/.well-known/braindog-build`:
    `node apps/cli/scripts/migration-rehearsal.mjs <night.brainl.age> --identity <file> --deployed <sha>`.
    FAIL stops the merge.
 3. Take a restore point: Settings > Backups > "Back up now" on the live record, and
@@ -418,7 +421,7 @@ three months.
   the rest of this document exists because a setting that lives only in a dashboard is a setting
   nobody can review. Its terms: `https://www.*` to `https://${1}`, 301, query string preserved.
 - **The Stripe endpoint is made in Stripe's dashboard.** Developers > Webhooks > Add endpoint,
-  `https://brain.dog/account/billing/webhook`, in the same mode as `STRIPE_SECRET_KEY`; its signing
+  `https://app.brain.dog/account/billing/webhook` (an endpoint made earlier on `brain.dog` still works, because the doors there are served), in the same mode as `STRIPE_SECRET_KEY`; its signing
   secret is `STRIPE_WEBHOOK_SECRET`. One per mode and per environment.
 - **The restore drill and the KEK rotation are a person's.** The Worker holds no age identity, so
   nothing but the monthly drill ever opens a production copy, and the walk cannot know when that
