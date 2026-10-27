@@ -72,7 +72,8 @@ test('a dollar amount on a record kept in Egyptian pounds draws a bar whose note
   const rows = rowsOf(toSegments({ ...read, fx: { home: 'EGP', rates: egp } }));
   assert.deepEqual(rows, [
     ['Personal', 'EGP 702,318.00', ''],
-    ['Harbour', 'EGP 147,397.50', 'converted from USD'],
+    /* SAID IN WHOLE POUNDS, as a converted amount is an estimate at the day's rate: 147,397.50 would put cents on every bar. */
+    ['Harbour', 'EGP 147,398.00', 'converted from USD'],
   ]);
 });
 

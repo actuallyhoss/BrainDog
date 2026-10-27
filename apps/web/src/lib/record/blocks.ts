@@ -42,7 +42,7 @@ import { daySaid } from '@braindog/where';
 import { day as longDay, money, parse, since, sinceWords, workingCell, WORKING_MARK, type Block } from 'braindog-render';
 import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type KindSpec, type SectionTone } from 'braindog-render';
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
-import { isPictureMime } from 'braindog-render';
+import { exponentOf, isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
 import { decl as fieldDecl, display, homeCurrency, labelOf, ROW_ID, unnamed, walkTable, type BlockResult } from './api.ts';
 /* WHO ASKED A QUEUE'S QUESTION, in the words the card that answers it uses. */
@@ -176,8 +176,13 @@ function barRows(block: BlockResult): string[] {
   const link = block.linked ? linkOf(block.register ?? null, of) : null;
   const valuesOf = (v: unknown): unknown[] =>
     link ? (Array.isArray(v) ? v.map((id) => block.linked?.[String(id)]).filter((m) => m !== undefined) : []) : [v];
-  const written = (sum: Total): string | null =>
-    link ? display(link.to, link.money, asMoney(sum.amount, sum.currency)) : display(block.register ?? '', of, asMoney(sum.amount, sum.currency));
+  /* A BAR THAT HOLDS A CONVERTED AMOUNT IS SAID IN WHOLE UNITS (`converted`): it is an estimate at a day's rate, and its
+     cents put two decimals on every bar of the block ("EGP 88,000.00" beside "EGP 9,039.60"). A bar of home money alone
+     keeps its cents, so bars that were never converted still add to the total to the penny. */
+  const written = (sum: Total, converted = false): string | null => {
+    const amount = converted && sum.currency !== null ? Math.round(sum.amount / 10 ** exponentOf(sum.currency)) * 10 ** exponentOf(sum.currency) : sum.amount;
+    return link ? display(link.to, link.money, asMoney(amount, sum.currency)) : display(block.register ?? '', of, asMoney(amount, sum.currency));
+  };
   const grouped = new Map<string, unknown[]>();
   /* `matched`, NOT `entries`. The block draws the first `limit:` rows and it ADDS UP all of them:
      summing the page instead of the answer is a figure that is wrong by however many rows did not
@@ -240,15 +245,16 @@ function barRows(block: BlockResult): string[] {
        `effort` in days printed `GBP 0.02` — the total was 2.4 days, run through a money formatter
        that reads its input as minor units. A block that can be bound to any register cannot assume
        the thing it is adding up is currency. */
+    const was = from(key, kept);
     const shown = sum.mixed.length
       ? mixedFix(sum.mixed)
-      : (written(sum) ?? String(sum.amount));
+      : (written(sum, was.length > 0) ?? String(sum.amount));
     const colour = tints.get(key);
-    return `${escapeCell(key)} | ${escapeCell(shown)} | ${convertedNote(from(key, kept))}${colour ? ` | ${colour}` : ''}`;
+    return `${escapeCell(key)} | ${escapeCell(shown)} | ${convertedNote(was)}${colour ? ` | ${colour}` : ''}`;
   });
   if (!block.unset || unset.length === 0 || !block.register) return drawn;
   const sum = total(unset);
-  const shown = sum.mixed.length ? mixedFix(sum.mixed) : (written(sum) ?? String(sum.amount));
+  const shown = sum.mixed.length ? mixedFix(sum.mixed) : (written(sum, fromOf(unset).length > 0) ?? String(sum.amount));
   return [...drawn, unsetRow(block.unset, registerHref(block.register, joined(block.where, `${by} is empty`)), shown) + convertedNote(fromOf(unset))];
 }
 
