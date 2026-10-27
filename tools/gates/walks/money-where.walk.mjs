@@ -1,5 +1,5 @@
 /**
- * Money's Where it went, walked in a real browser: open Money on a fresh record, find the folded heading, open it.
+ * Money's Where it went, walked in a real browser: open Money's Reports on a fresh record, find the folded heading, open it.
  *
  *   node tools/gates/walks/money-where.walk.mjs
  *
@@ -9,7 +9,8 @@
  * every one of those tests, and the first person to find it would be the person whose money it is.
  *
  * WHAT IT WALKS, in PGS-C20's own words: on a fresh record with Money, one account and twelve entries this month, five
- * of them with no category from two payees, open Money. The heading Where it went is on the page, shut: what is under it
+ * of them with no category from two payees, open Money's Reports, where the folded heading has sat since money-core
+ * 3.29.0 gave Money's home a board of tiles. The heading Where it went is on the page, shut: what is under it
  * is not in sight. Pressed, it opens on This month, by category and No category yet, by who was paid. At the phone's
  * width and the desk's. The desk is the gates' own (`WIDTHS` says why it is 1512 and not the 1440 the scope names).
  *
@@ -233,8 +234,8 @@ export default async function moneyWhere(root = join(import.meta.dirname, '..', 
       const seen = { width, heading: false, before: {}, after: {} };
       let opened = null;
       try {
-        opened = await openPage(browser, `${ORIGIN}${APP_BASE}/p/money`, { width, record, ready, waitUntil: 'networkidle' });
-        const unmeasured = ready.check(`money-where /p/money at ${width}`, '/p/money', opened.state);
+        opened = await openPage(browser, `${ORIGIN}${APP_BASE}/p/money-reports`, { width, record, ready, waitUntil: 'networkidle' });
+        const unmeasured = ready.check(`money-where /p/money-reports at ${width}`, '/p/money-reports', opened.state);
         if (unmeasured) findings.push(unmeasured);
         await walk(opened.page, seen, budget('ready').settleTimeoutMs);
         for (const e of opened.errors.filter((e) => e.kind === 'uncaught')) findings.push(`${width}: the page threw while it was walked: ${e.text.split('\n')[0]}`);

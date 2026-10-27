@@ -1,6 +1,7 @@
 /** Reports: money in and out by month, spending by category and who was paid most. */
 
 import type { SeedPage } from '../../base.ts';
+import { WHERE_IT_WENT } from './parts/where-it-went.ts';
 
 /** What moved, as every figure of the Ledger counts it: cleared and not between a person's own accounts. */
 const MOVED = 'state is cleared, transfer is false';
@@ -158,5 +159,8 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       when: { metric: 'spent-by-category-month', gt: 0 },
       empty: 'Nothing spent this month or last has a category yet.',
     },
+    /* WHERE IT WENT, FOLDED AT THE END since money-core 3.29.0 gave Money's home a board of tiles: this month by category,
+       and who was paid in what nobody has filed, the bar that says where filing starts. */
+    ...WHERE_IT_WENT,
   ],
 };

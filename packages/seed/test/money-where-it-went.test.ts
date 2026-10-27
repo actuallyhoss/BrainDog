@@ -1,7 +1,7 @@
 /**
  * WHERE IT WENT (PGS-C20 job 3): this month as shares of what it was for, and who was paid in what nobody has filed, read
  * off the declaration and then off each block a fresh record draws. Money's home no longer places them (money-core
- * 3.29.0: its Spent this month carries the part nobody filed); the file stays for the pages that do.
+ * 3.29.0: its Spent this month carries the part nobody filed); Reports places them, folded at its end.
  *
  * Unfiled entries grouped by merchant, with bars and each one's share. RED FIRST, against money.ts before this change: no
  * block on Money was headed Where it went, and nothing on any page drew the entries with no category by who was paid.
