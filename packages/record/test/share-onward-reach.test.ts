@@ -109,3 +109,20 @@ test('A PLAIN ONWARD SHARE STILL GOES THROUGH', async () => {
   const parent = value<{ id: string }>(await api.share({ share: { who: { kind: 'person', id: 'p_lee' }, what: { lists: ['tasks'] }, can: 'manage', when: { until } } }, owner));
   value(await api.shareOnward({ from: parent.id, who: 'p_sam', can: 'view' }, own(api, 'p_lee')));
 });
+
+test('A MANAGER HELD TO LESS TAKES WHAT THEY SHARED ON WITH THEM, and a share that only runs longer leaves it', async () => {
+  const { api } = await record();
+  const lee = { who: { kind: 'person' as const, id: 'p_lee' }, what: { lists: ['tasks'] }, can: 'manage' as const, when: { until } };
+  const parent = value<{ id: string }>(await api.share({ share: lee }, owner));
+  value(await api.shareOnward({ from: parent.id, who: 'p_sam', can: 'edit' }, own(api, 'p_lee')));
+  assert.ok((await titles(api, own(api, 'p_sam'))).includes('Done secret'), 'the onward share never reached the tasks, so this case proves nothing');
+
+  /* RUNNING LONGER IS NOT LESS: the onward share stays. */
+  value(await api.share({ id: parent.id, share: { ...lee, when: { until: at(NOW + 60 * DAY) } } } as never, owner));
+  assert.ok((await titles(api, own(api, 'p_sam'))).includes('Done secret'), 'a share made to run longer ended what was shared on from it');
+
+  /* HELD TO VIEWING THE TASKS IN REVIEW, the manager can hand on nothing, and what they did hand on goes. */
+  value(await api.share({ id: parent.id, share: { ...lee, what: { list: 'tasks', where: { field: 'stage', is: 'Review' } }, can: 'view' } } as never, owner));
+  assert.deepEqual(await titles(api, own(api, 'p_lee')), ['Open thing']);
+  assert.ok(!(await titles(api, own(api, 'p_sam')).catch((): string[] => [])).includes('Done secret'), 'the onward share kept its old reach');
+});

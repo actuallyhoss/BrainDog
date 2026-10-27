@@ -419,8 +419,34 @@ export function putShare(deps: ShareWriteDeps, by: string, input: ShareInput): {
   }
   const parent = was === null ? (input.parent_id ?? null) : was.parent_id;
   shareEvent(deps, by, 'access.grant', id, granteeOf(input), was === null ? null : said(was), said({ ...input, id, parent_id: parent }), input.note ?? null);
+  /* A SHARE CHANGED SO IT REACHES LESS ENDS WHAT WAS SHARED ONWARD FROM IT. Each onward share was checked against this
+     one as it was, and the lens reads every share on its own, so a manager held to less kept handing on what they had
+     before. Only a change that keeps everything and at most runs longer leaves them be. */
+  if (was !== null && !onlyLonger(was, input))
+    for (const child of deps.sql.all<{ id: string }>('SELECT id FROM share WHERE parent_id = ? AND revoked_at IS NULL ORDER BY id', id))
+      revokeShare(deps, by, child.id, `ended when ${id} changed`);
   bumpEpoch(deps.sql);
   return { id, version };
+}
+
+/** Whether a change to a share keeps everything it gave, and at most moves its end later or takes it away. */
+function onlyLonger(was: ShareKept, now: ShareInput): boolean {
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const before = was.when ?? {};
+  const after = now.when ?? {};
+  const later = after.until === undefined || (before.until !== undefined && after.until >= before.until);
+  return (
+    was.effect === now.effect &&
+    same(was.who, now.who) &&
+    same(was.what, now.what) &&
+    was.can === now.can &&
+    same(was.caps, now.caps) &&
+    same(was.hide, now.hide) &&
+    same(before.from, after.from) &&
+    same(before.hours, after.hours) &&
+    (before.once ?? false) === (after.once ?? false) &&
+    later
+  );
 }
 
 /**
