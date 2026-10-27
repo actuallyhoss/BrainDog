@@ -471,6 +471,8 @@ importers:
 
   packs/project-brief: {}
 
+  packs/property: {}
+
   packs/rates-poll: {}
 
   packs/reading-list: {}
