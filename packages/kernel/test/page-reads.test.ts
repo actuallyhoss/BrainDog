@@ -255,6 +255,66 @@ test('A FILTER MAY BE ITS OWN CHOICES, each a sentence of the rows it keeps, cou
   sql.close();
 });
 
+/* A LIST WHOSE ROWS ARE DONE BY STATE AND STILL DRAWN: a ledger line is `cleared` once it has moved. */
+const LINES: Declaration = {
+  id: 'register.lines',
+  kind: 'register',
+  body: {
+    id: 'lines',
+    name: 'Lines',
+    title: 'what',
+    state: 'state',
+    done: ['cleared', 'void'],
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'state', type: 'enum', values: ['pending', 'cleared', 'void'] },
+      { id: 'kind', type: 'enum', values: ['food', 'rent'] },
+      { id: 'project', type: 'ref', to: 'projects' },
+    ],
+  } as never,
+};
+
+test('A CHIP COUNTS THE ROWS ITS PAGE WOULD SHOW where a block draws finished rows among open ones, and open rows elsewhere', async () => {
+  const { k, sql } = await record();
+  value(await k.install([LINES]));
+  const made = (fields: Record<string, unknown>) => value(k.create('lines', fields, OWNER));
+  made({ what: 'Bread', state: 'cleared' });
+  made({ what: 'Milk', state: 'cleared', kind: 'food' });
+  made({ what: 'March', state: 'cleared', kind: 'rent' });
+  made({ what: 'Tea', state: 'pending', kind: 'food' });
+  made({ what: 'Typo', state: 'void', kind: 'food' });
+  const unfiled = { field: 'show', control: 'chips', options: [{ value: 'unfiled', label: 'Not filed yet', where: 'kind is empty' }, { value: 'food', label: 'Food', where: 'kind is food' }] };
+  const page = (blocks: unknown[]): Declaration => ({
+    id: 'page.ledger',
+    kind: 'page',
+    body: { page: 'ledger', title: 'Ledger', requires: ['register.lines', 'register.tasks', 'register.notes', 'register.projects'], filters: [{ field: 'kind', control: 'chips' }, unfiled], blocks } as never,
+  });
+
+  /* EVERY LINE BUT A VOID ONE IS DRAWN, so every line but a void one is counted, cleared or not. */
+  value(await k.install([page([table('lines', 'what', { where: 'state is not void' })])]));
+  const all = value<{ filters?: PageFilter[]; blocks: BlockResult[] }>(k.page('ledger'));
+  assert.equal(titles(all.blocks[0], 'what').length, 4);
+  assert.deepEqual(filterOf(all, 'kind').values.map((v) => [v.value, v.count]), [['food', 2], ['rent', 1], ['', 1]]);
+  assert.deepEqual(filterOf(all, 'show').values.map((v) => [v.value, v.count]), [['unfiled', 1], ['food', 2]]);
+
+  /* TWO BLOCKS ARE COUNTED AS ONE PAGE: what either would draw, each row once. */
+  value(await k.install([page([table('lines', 'what', { where: 'state is not void, kind is food' }), table('lines', 'what', { where: 'state is pending' })])]));
+  const two = value<{ filters?: PageFilter[] }>(k.page('ledger'));
+  assert.deepEqual(filterOf(two, 'kind').values.map((v) => [v.value, v.count]), [['food', 2]]);
+
+  /* A BLOCK OF FINISHED ROWS ALONE, BESIDE THE OPEN ONES, is a "done this week" and leaves the chips on the open rows. */
+  value(await k.install([page([table('lines', 'what', { where: 'state is pending' }), table('lines', 'what', { where: 'state is cleared' })])]));
+  const apart = value<{ filters?: PageFilter[] }>(k.page('ledger'));
+  assert.deepEqual(filterOf(apart, 'kind').values.map((v) => [v.value, v.count]), [['food', 1]]);
+
+  /* A BLOCK THAT SAYS NOTHING OF THE STATE STILL COUNTS THE OPEN ROWS ALONE, as a list of things to do is counted. */
+  value(await k.install([page([table('lines', 'what', { where: 'kind is food' })])]));
+  const open = value<{ filters?: PageFilter[] }>(k.page('ledger'));
+  assert.deepEqual(filterOf(open, 'kind').values.map((v) => [v.value, v.count]), [['food', 1]]);
+  assert.deepEqual(filterOf(open, 'show').values.map((v) => [v.value, v.count]), [['unfiled', 0], ['food', 1]]);
+  sql.close();
+});
+
 test('A PAGE WITH NO FILTERS ANSWERS NONE, and a lone block read is never narrowed', async () => {
   const { k, sql } = await record();
   const plain: Declaration = { id: 'page.plain', kind: 'page', body: { page: 'plain', title: 'Plain', requires: REQUIRES, blocks: [table('tasks', 'what')] } as never };

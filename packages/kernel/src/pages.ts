@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
-import type { Leaf, Predicate, Schema } from '@braindog/where';
+import { evaluate, type Leaf, type Predicate, type Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { ScriptRow } from './script-rows.ts';
@@ -1978,6 +1978,67 @@ function openOn(deps: PageDeps, register: string, schema: Schema): Predicate[] {
   return schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
 }
 
+/**
+ * Whether a predicate could hold of a row whose `field` is `value`, whatever its other fields hold (`certain` false), or
+ * must (`certain` true). A test of another field, or a hop to another list, is a maybe.
+ */
+function could(where: Predicate, field: string, value: string, schema: Schema, certain: boolean): boolean {
+  const group = where as { all?: Predicate[]; any?: Predicate[]; none?: Predicate[] };
+  if (Array.isArray(group.all)) return group.all.every((k) => could(k, field, value, schema, certain));
+  if (Array.isArray(group.any)) return group.any.some((k) => could(k, field, value, schema, certain));
+  if (Array.isArray(group.none)) return !group.none.some((k) => could(k, field, value, schema, !certain));
+  if (!('field' in where) || (where as Leaf).field !== field || (where as Leaf).via !== undefined) return !certain;
+  return evaluate(where, { [field]: value }, schema);
+}
+
+/**
+ * The rows a chip counts on one list: the open ones (`openOn`), because a chip saying 40 over a list of 3 things to do
+ * counts what is finished; UNLESS A BLOCK OVER IT DRAWS FINISHED ROWS AMONG OPEN ONES, and then THE ROWS THE PAGE'S BLOCKS
+ * WOULD SHOW, each block's own `where:` ORed with the others'.
+ *
+ * A LEDGER LINE IS `cleared` ONCE IT HAS MOVED, which is `done` on its list, and the Ledger draws every line that is not
+ * void in one list. Counted as open only, "Not filed yet" read 0 beside nineteen unfiled lines and the account and
+ * category chips were not offered at all. Work's "Done this week" is a block of finished tasks alone, beside the open
+ * ones, and does not make Work's chips count finished work.
+ */
+function shownOn(deps: PageDeps, register: string, schema: Schema, blocks: readonly PageBlock[]): Predicate[] {
+  const open = openOn(deps, register, schema);
+  const state = schema.state;
+  const done = deps.lists?.().find((l) => l.id === register)?.done ?? [];
+  const values = state === undefined ? [] : (schema.fields[state]?.values ?? []);
+  const said: (Predicate | undefined)[] = [];
+  for (const b of blocks) {
+    if (listRead(b) !== register) continue;
+    const where = b.where as Predicate | string | undefined;
+    /* A HOLE STILL IN IT, OR A SENTENCE THE LIST CANNOT READ, IS A BLOCK THAT DRAWS NOTHING (`readBlock`). */
+    if (typeof where === 'string' && /\{\{\w+\}\}/.test(where)) continue;
+    const got = predicateOf(where, schema, deps.ctx);
+    if (got.bad.length === 0) said.push(got.predicate);
+  }
+  if (state === undefined || open.length === 0) return open;
+  const mixes = (p: Predicate | undefined): boolean =>
+    p !== undefined &&
+    values.some((v) => done.includes(v) && could(p, state, v, schema, false)) &&
+    values.some((v) => !done.includes(v) && could(p, state, v, schema, false));
+  if (!said.some(mixes)) return open;
+  /* A BLOCK THAT SAYS NOTHING OF THE STATE IS STILL ITS OPEN ROWS. */
+  const each = said.map((p): Predicate[] => {
+    const own = p === undefined ? [] : [p];
+    return p !== undefined && names(p, state) ? own : [...open, ...own];
+  });
+  if (each.some((p) => p.length === 0)) return [];
+  if (each.length === 1) return each[0]!;
+  return [{ any: each.map((p) => (p.length === 1 ? p[0]! : { all: p })) }];
+}
+
+/** Whether a predicate tests `field` on its own list: a leaf on it, at any depth. A hop to another list does not. */
+function names(where: Predicate, field: string): boolean {
+  const group = where as { all?: Predicate[]; any?: Predicate[]; none?: Predicate[] };
+  const kids = group.all ?? group.any ?? group.none;
+  if (Array.isArray(kids)) return kids.some((k) => names(k, field));
+  return 'field' in where && (where as Leaf).field === field && (where as Leaf).via === undefined;
+}
+
 /** How many rows the predicate admits by their value in `field`, from `tally` when the host has it, else every row. */
 function tallied(deps: PageDeps, register: string, field: string, where: Predicate | undefined): Map<string, number> {
   const out = new Map<string, number>();
@@ -2001,7 +2062,8 @@ function tallied(deps: PageDeps, register: string, field: string, where: Predica
  *
  * EACH COUNT IS UNDER THE OTHER CHOICES and not its own, as a strip of chips is read: with Kiln chosen, the counts of
  * whose work it is are Kiln's, and the counts of the projects are still every project's. Only open rows are counted,
- * because a chip saying 40 over a list of 3 things to do counts what is finished.
+ * because a chip saying 40 over a list of 3 things to do counts what is finished, unless a block draws a list's
+ * finished rows among its open ones, and then the rows the blocks would show are (`shownOn`).
  */
 function readerFilters(
   deps: PageDeps,
@@ -2034,6 +2096,11 @@ function readerFilters(
   const readable = (r: string): boolean => deps.ctx.reads === undefined || deps.ctx.reads(r);
   const lists = [...new Set(blocks.map(listRead).filter((r): r is string => r !== null && readable(r)))];
   const schemas = new Map(lists.map((r) => [r, deps.schemaOf(r)] as const));
+  /* WHAT EACH LIST'S BLOCKS SHOW, which is what a chip over it counts (`shownOn`). */
+  const showing = new Map(lists.map((r) => {
+    const s = schemas.get(r);
+    return [r, s ? shownOn(deps, r, s, blocks) : []] as const;
+  }));
 
   /* A CHOICE STANDS WHEN THE FIELD'S FIRST LIST CAN HOLD IT, and is then made on every list that has the field. A link
      is answered by the number of the row it points at, however it was chosen, so the chip it lights is the one drawn. */
@@ -2102,7 +2169,7 @@ function readerFilters(
       const other = s.fields[field]!;
       if (other.type !== spec.type || other.to !== spec.to) continue;
       reads.push(r);
-      const parts = [...openOn(deps, r, s), ...clausesOn(r, field)];
+      const parts = [...(showing.get(r) ?? []), ...clausesOn(r, field)];
       const where: Predicate | undefined = parts.length === 0 ? undefined : parts.length === 1 ? parts[0] : { all: parts };
       for (const [v, n] of tallied(deps, r, field, where)) counts.set(v, (counts.get(v) ?? 0) + n);
     }
@@ -2163,7 +2230,7 @@ function readerFilters(
       const sentences = d.options.map((c) => sentenceOn(r, c.where));
       if (sentences.every((p) => p === null)) continue;
       reads.push(r);
-      const base = [...openOn(deps, r, s), ...clausesOn(r, d.field)];
+      const base = [...(showing.get(r) ?? []), ...clausesOn(r, d.field)];
       sentences.forEach((p, i) => {
         if (p === null) return;
         const parts = [...base, p];
