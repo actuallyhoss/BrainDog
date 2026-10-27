@@ -403,7 +403,8 @@ export function display(
        */
       return since(String(value), now);
     case 'int':
-      return integer(Number(value));
+      /* A WHOLE NUMBER DECLARED TO SIT BETWEEN 1000 AND 9999 IS A YEAR, NOT A COUNT: "2026", never "2,026". */
+      return typeof f.min === 'number' && typeof f.max === 'number' && f.min >= 1000 && f.max <= 9999 ? String(Math.trunc(Number(value))) : integer(Number(value));
     case 'duration': {
       /* SECONDS IN, THE DECLARED UNIT OUT. The record holds one unit and the field says how to say
          it, which is the only arrangement in which two durations can be added: `0.2` on its own is

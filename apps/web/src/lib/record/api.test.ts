@@ -17,6 +17,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Kernel } from '@braindog/kernel';
@@ -1381,4 +1382,9 @@ test('two templates over one list are two capped headings, not one heading and n
   const drawn = (section: string) => s.shell.nav.filter((n) => n.section === section).length;
   assert.equal(drawn('Clients'), 5, 'the second template over the same list got no rail entry at all');
   assert.equal(drawn('Projects'), 6, 'five projects and the overview somebody wrote');
+});
+
+test('A WHOLE NUMBER DECLARED BETWEEN 1000 AND 9999 IS PRINTED AS A YEAR, NOT WITH A THOUSANDS SEPARATOR', () => {
+  const src = readFileSync(new URL('./api.ts', import.meta.url), 'utf8');
+  assert.match(src, /f\.min >= 1000 && f\.max <= 9999 \? String\(Math\.trunc\(Number\(value\)\)\)/u);
 });

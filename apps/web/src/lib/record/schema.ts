@@ -84,6 +84,9 @@ export type FieldDecl = {
   transitions?: Readonly<Record<string, { to: readonly string[]; requires?: readonly string[]; by?: 'decide' }>>;
   /** What a new row holds when nobody says, as the record fills it on create. An enum's form opens on it. */
   default?: unknown;
+  /** `int` and `decimal`: the bounds the declaration gives, which also say that a whole number between 1000 and 9999 is a year. */
+  min?: number;
+  max?: number;
   /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */
   index?: boolean;
   /**
