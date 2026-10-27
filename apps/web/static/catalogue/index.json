@@ -380,8 +380,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "f4df2505dc322ff650a892eac3f689d522a1f50b92909056bd70b697268521b9",
+          "bytes": 24048,
+          "published_at": "2026-10-27T14:13:45.905Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shows what each certificate will be worth when it matures, and Cash ahead walks that value as the money coming back.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "736cfc1e3929403a554cc1a0147b097c73715e728cffb5b4f337027a14c24c91",
@@ -1492,8 +1519,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "cdedfe0400fc78b240a6cb003018b46b94d02a29fc6351f17be78def91b6b403",
+          "bytes": 35346,
+          "published_at": "2026-10-27T14:13:45.905Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Draws the insurer's year-by-year illustration as a table and a three-line chart on each policy, with the age for each year.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "3fc640504dabdac3e5473ca8166bf1cb21e6e0c98aa4c0478fae15a3c9bf69dc",
@@ -5027,8 +5082,35 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "31719a216e80d8e645397735824bff5ba1146070879243016e02c7f948d7660e",
+          "bytes": 15557,
+          "published_at": "2026-10-27T14:13:45.905Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Trips"
+            ],
+            "pages": [
+              "Trips",
+              "{{name}}"
+            ],
+            "rules": [
+              "File the Ledger's lines of a trip's days into it"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "When a trip's dates change, the lines it filed that now fall outside them are taken out again.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "10b3db11fa2f8b8125ffeb5a6492045325e50bf3a3f2dca44bd4ddc312418f42",
