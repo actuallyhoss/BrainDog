@@ -8221,6 +8221,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * refused is named with its sentence and the rest stay written. Only rowsets and options go in a group: a kind that
    * installs, applies or merges lands its own way, so it is answered on its own.
    */
+  /**
+   * Whether accepting a rowset question would write a list past the level the caller holds on it: `append` for a row it
+   * adds, `write` for a row it changes, on the list each row is in. The refusal, or `null`.
+   *
+   * THE QUESTION'S OWN DOOR IS `decide`, RECORD-WIDE, and nothing asked the list's: an Admin the owner held to read on
+   * Tasks could not write a task, nor propose one, and could still accept a question that wrote three.
+   */
+  const rowsetHeld = (ctx: CallContext, target: Record<string, unknown> | null | undefined): Refusal | null => {
+    if (!target || target.body_kind !== 'rowset' || target.body === null || typeof target.body !== 'object') return null;
+    const body = target.body as Record<string, unknown>;
+    if (typeof body.register !== 'string') return null;
+    for (const r of Array.isArray(body.rows) ? body.rows : []) {
+      if (r === null || typeof r !== 'object') continue;
+      const row = r as Record<string, unknown>;
+      const list = typeof row.register === 'string' ? row.register : body.register;
+      const stop = guard(ctx, 'at' in row ? 'write' : 'append', list);
+      if (stop) return stop;
+    }
+    return null;
+  };
+
   const answerMany = (
     args: { ids?: unknown; decide?: { option?: unknown; reason?: unknown; rows?: unknown; parts?: unknown }; defer?: unknown; resolved_as?: unknown },
     ctx: CallContext,
@@ -8256,7 +8277,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         kernel.prefsOf(SELF_HOLDER)[SELF_MARKED] === id ||
         kernel.prefsOf(SELF_HOLDER)[id] !== undefined ||
         kernel.prefsOf(KEPT_HOLDER)[id] !== undefined;
-      const fix = stop?.fix ?? handed ?? (special ? alone : null);
+      const held = verdict.option === 'accept' ? rowsetHeld(ctx, target as Record<string, unknown>) : null;
+      const fix = stop?.fix ?? handed ?? held?.fix ?? (special ? alone : null);
       if (fix !== null) refused.push({ id: given, fix });
       else asked.push({ given, id });
     }
@@ -13062,6 +13084,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args.decide?.option === 'accept') {
         const asked = kernel.governanceRow('suggestion', String(args.id));
         const kind = asked?.body_kind;
+        const held = rowsetHeld(ctx, asked as Record<string, unknown> | null);
+        if (held) return { ok: false as const, refusal: held };
         if ((kind === 'pack' || kind === 'settings' || kind === 'arrange') && ctx.onWord === undefined) {
           const owner = admin(ctx, 'accept a change to what this record is');
           if (owner) return { ok: false as const, refusal: owner };
