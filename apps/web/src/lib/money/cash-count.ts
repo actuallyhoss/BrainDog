@@ -10,6 +10,8 @@
  * them is 100. A face value is a string, as the pack keeps it (`"0.5"`), so it never becomes a float on the way.
  */
 
+import { exponentOf } from 'braindog-render';
+
 import SETS from '../../../../../packs/count-cash/note-sets.json' with { type: 'json' };
 
 const NOTE_SETS: Readonly<Record<string, readonly string[]>> = SETS;
@@ -22,14 +24,11 @@ export function noteSet(currency: string): readonly string[] {
   return NOTE_SETS[currency.toUpperCase()] ?? [];
 }
 
-/** The digits after the point a currency is written with: two for most, none for yen. A currency it cannot name has two. */
-export function exponentOf(currency: string): number {
-  try {
-    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    return 2;
-  }
-}
+/**
+ * The digits after the point a currency is stored with: two for most, none for yen. The renderer's ISO 4217 table, the
+ * one the record divides by, so a counted total is never written in a unit the ledger reads differently.
+ */
+export { exponentOf };
 
 /** A total typed in the main unit, as whole minor units of its currency: "1,250.5" in a currency of two digits is 125050. */
 export function typedTotalOf(text: string, currency: string): number {
