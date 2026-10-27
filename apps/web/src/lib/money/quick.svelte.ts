@@ -10,6 +10,8 @@
  * carries this file and nothing behind it.
  */
 
+import { untrack } from 'svelte';
+
 import type { Ledger } from './ledger.ts';
 import type { Way } from './quick.ts';
 
@@ -31,16 +33,24 @@ class Quick {
     return this.ledger !== null && this.#hosts.length > 0;
   }
 
-  /** A host mounting: it is answered a ticket, and `leads` says whether it is the one that draws. */
+  /**
+   * A host mounting: it is answered a ticket, and `leads` says whether it is the one that draws.
+   *
+   * IT READS THE LIST UNTRACKED. A host calls this from an `$effect`, and a read of `#hosts` there made the effect
+   * depend on the list it writes, so it ran again, joined again and never settled (`effect_update_depth_exceeded` on
+   * every page that mounts a host).
+   */
   join(): number {
     const t = ++this.#next;
-    this.#hosts = [...this.#hosts, t];
+    const held = untrack(() => this.#hosts);
+    this.#hosts = [...held, t];
     return t;
   }
 
   leave(t: number): void {
-    this.#hosts = this.#hosts.filter((h) => h !== t);
-    if (this.#hosts.length === 0) this.open = false;
+    const kept = untrack(() => this.#hosts).filter((h) => h !== t);
+    this.#hosts = kept;
+    if (kept.length === 0) this.open = false;
   }
 
   leads(t: number): boolean {
