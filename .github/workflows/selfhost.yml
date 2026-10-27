@@ -52,7 +52,9 @@ jobs:
           EOF
 
       - name: From a clean clone, outbound blocked after the install
-        run: sg braindog-offline -c 'node apps/selfhost/test/from-clean.mjs --after-install "$RUNNER_TEMP/offline.sh"'
+        run: |
+          # shellcheck disable=SC2016 # expanded by the shell sg starts, as the group
+          sg braindog-offline -c 'node apps/selfhost/test/from-clean.mjs --after-install "$RUNNER_TEMP/offline.sh"'
 
   container:
     runs-on: ubuntu-latest
@@ -88,5 +90,6 @@ jobs:
 
       - name: The container from a clean clone, outbound blocked after the image is built
         run: |
+          # shellcheck disable=SC2016 # expanded by the shell sg starts, as the group
           sg braindog-offline -c 'docker info >/dev/null || { echo "docker does not answer as the group braindog-offline, so the container run would only be skipped." >&2; exit 1; }
           node apps/selfhost/test/from-clean.mjs --container --after-install "$RUNNER_TEMP/offline.sh"'

@@ -60,12 +60,16 @@ jobs:
           echo "The ${{ matrix.leg }} leg:$filters"
           echo "FILTERS=$filters" >> "$GITHUB_ENV"
 
-      - run: pnpm -r $FILTERS run typecheck
+      - run: |
+          # shellcheck disable=SC2086 # FILTERS is a list of --filter flags, split on purpose
+          pnpm -r $FILTERS run typecheck
 
       - if: matrix.browser
         run: pnpm exec playwright install --with-deps chromium
 
-      - run: pnpm -r --workspace-concurrency=1 $FILTERS run test
+      - run: |
+          # shellcheck disable=SC2086 # FILTERS is a list of --filter flags, split on purpose
+          pnpm -r --workspace-concurrency=1 $FILTERS run test
       - if: matrix.links
         run: node --test docs/test/*.test.mjs
 
