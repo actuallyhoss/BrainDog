@@ -31,7 +31,7 @@ export const HERO: Record<string, unknown>[] = [
     span: 12,
     cells: [
       { metric: 'cash-now', label: 'Cash now', trend: '12w', ahead: 'runway-days', note: CASH_NOW_SAID },
-      { ...ON_WHAT_IS_DUE, label: 'Lasts to', note: 'With what is due and expected, in {{runway-days}}' },
+      { ...ON_WHAT_IS_DUE, label: 'Lasts', note: 'With what is due and expected, in {{runway-days}}' },
       { ...LASTS_SAID, label: 'If nothing comes in' },
       { metric: 'arriving-30d', label: 'Coming in, 30 days' },
       { metric: 'leaving-30d', label: 'Going out, 30 days', note: 'Bills, what repeats and parts of plans' },

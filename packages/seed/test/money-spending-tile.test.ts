@@ -2,9 +2,11 @@
  * Money's tile "Spent this month" (REC-B19 job 3), read through the kernel on a record that installed Money the
  * way a person does and then kept two months of spending in four categories.
  *
- * WHAT IS HELD HERE: `parts/spending.ts` gives one block under that heading over `spent-vs-last-month`, it is drawn
- * only while this month has spending, nothing in it or in what it answers is an id where a name goes, and a category
- * whose two months do not compare is answered a difference and no change.
+ * WHAT IS HELD HERE: `parts/spending.ts` gives one block under that heading over `spent-by-category-month`, it is drawn
+ * only while this month has spending, nothing in it or in what it answers is an id where a name goes, and each category
+ * is drawn at what it spent this month, never at its difference from last month: a bar draws a part's value and nothing
+ * of its two halves, so over `spent-vs-last-month` rent paid both months read nought under "Spent this month". The
+ * difference and its gate are `spent-vs-last-month`'s, held in `money-spend-vs-last.test.ts`.
  *
  * The clock is 18 September 2026, as in `money-spend-vs-last.test.ts`, whose figures this tile reads.
  *
@@ -96,12 +98,12 @@ const tile = (k: Kernel): Tile => k.block(SPENDING[0] as never) as unknown as Ti
 /** The tile's part for one category. */
 const part = (t: Tile, category: Entry): Part | undefined => t.readings?.[0]?.reading.groups?.find((g) => g.key === category.id);
 
-test("ONE BLOCK, HEADED 'Spent this month', over this month against last by category", () => {
+test("ONE BLOCK, HEADED 'Spent this month', over this month by category", () => {
   assert.equal(SPENDING.length, 1);
   const block = SPENDING[0]!;
   assert.equal(block.heading, 'Spent this month');
-  assert.equal(block.source, 'metric.spent-vs-last-month');
-  assert.ok(METRICS['spent-vs-last-month'], 'Money no longer declares the figure the tile reads');
+  assert.equal(block.source, 'metric.spent-by-category-month');
+  assert.ok(METRICS['spent-by-category-month'], 'Money no longer declares the figure the tile reads');
   /* A TILE WEARS A GLYPH AND NAMES NO WIDTH, so the app pairs it on Money's board (money-core 3.29.0). */
   assert.equal(typeof block.icon, 'string');
   assert.equal(block.span, undefined);
@@ -122,7 +124,7 @@ test('DRAWN ONLY WHILE THIS MONTH HAS SPENDING: last month alone draws nothing, 
   const after = tile(r.k);
   assert.notEqual(after.drawn, false, 'the first payment of the month draws no tile');
   assert.deepEqual(after.refusals, []);
-  assert.equal(after.readings?.[0]?.metric, 'spent-vs-last-month');
+  assert.equal(after.readings?.[0]?.metric, 'spent-by-category-month');
 });
 
 test('AND SPENDING NOBODY GAVE A CATEGORY DRAWS IT TOO, because it is this month\'s spending all the same', async () => {
@@ -150,25 +152,13 @@ test('IT NAMES NO ID: the block is written in names, and every category it answe
   }
 });
 
-test('A CATEGORY WHOSE COMPARISON GATE FAILS SHOWS NO CHANGE, and the ones that pass show theirs', async () => {
+test('EACH CATEGORY IS WHAT IT SPENT THIS MONTH, not its difference from last: rent paid both months is the rent', async () => {
   const r = await fresh();
   twoMonths(r);
   const got = tile(r.k);
-  assert.ok(Math.abs((part(got, r.outing)?.delta ?? 0) - 0.4) < 1e-12, 'Outing is up 40% and the tile does not say so');
-  assert.ok(Math.abs((part(got, r.groceries)?.delta ?? 0) + 0.5) < 1e-12, 'Groceries is down by half');
-  assert.equal(part(got, r.rent)?.delta, 0);
-  /* SOFTWARE HAD NOTHING BY THE 18TH OF AUGUST, so its E£90.00 is a difference and no change. */
+  assert.equal(part(got, r.rent)?.value, 500_000, 'rent paid in both months read as its difference');
+  assert.equal(part(got, r.outing)?.value, 28_000);
+  assert.equal(part(got, r.groceries)?.value, 30_000, 'a category spent less in than last month read a minus');
   assert.equal(part(got, r.software)?.value, 9_000);
-  assert.equal(part(got, r.software)?.delta, null, 'a category new this month was shown a change');
-  assert.notEqual(part(got, r.software)?.why, '');
-
-  /* THREE ENTRIES THIS MONTH AGAINST FORTY LAST MONTH IS NO CHANGE EITHER (REC-B19, "Done when"). */
-  const gifts = value<Entry>(r.k.create('categories', { name: 'Gifts', direction: 'out', state: 'live' }, OWNER));
-  for (let d = 1; d <= 10; d += 1) for (let n = 0; n < 4; n += 1) spent(r, `2026-08-${String(d).padStart(2, '0')}`, 500, gifts);
-  for (const on of ['2026-09-01', '2026-09-02', '2026-09-03']) spent(r, on, 500, gifts);
-  const after = tile(r.k);
-  assert.equal(part(after, gifts)?.value, 1_500 - 20_000);
-  assert.equal(part(after, gifts)?.delta, null, 'three entries against forty was shown a change');
-  assert.notEqual(part(after, gifts)?.why, '');
-  assert.ok(Math.abs((part(after, r.outing)?.delta ?? 0) - 0.4) < 1e-12, "another category's entries moved Outing's change");
+  for (const g of got.readings?.[0]?.reading.groups ?? []) assert.ok((g.value ?? 0) >= 0, `${g.label} read below nought`);
 });

@@ -20,13 +20,19 @@ export const SPENDING: Record<string, unknown>[] = [
        SPENT THIS MONTH, ON MONEY'S HOME SINCE money-core 3.29.0: the first tile under the hero, beside Coming up, and
        how this month's spending stands against last month's is the health figure it carries. NO WIDTH OF ITS OWN, so
        the app pairs it with its neighbour into two even columns, and gives it the whole row when it stands alone.
-       WHAT NOBODY FILED IS "Not filed yet", the part a person can still do something about. */
+       WHAT NOBODY FILED IS "Not filed yet", the part a person can still do something about.
+
+       THE MONTH ITSELF, NOT ITS DIFFERENCE. Drawn over `spent-vs-last-month` the bars were each category's difference
+       from last month to the same day, under a heading that says spent: rent paid on the 2nd read EGP 0, as last month's
+       was the same, and a category spent less in than last month read a minus. A bar draws a part's value and nothing of
+       its two halves, so the tile reads the month as it is, and the difference stays on Reports, folded under its own
+       name. */
     kind: 'bar',
     heading: 'Spent this month',
     icon: 'chart-bar',
-    source: 'metric.spent-vs-last-month',
+    source: 'metric.spent-by-category-month',
     unset: 'Not filed yet',
     when: { metric: 'spent-by-category-month', gt: 0 },
-    empty: 'Nothing spent this month or last has a category yet.',
+    empty: 'Nothing spent this month has a category yet.',
   },
 ];

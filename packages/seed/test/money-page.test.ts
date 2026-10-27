@@ -95,7 +95,7 @@ test('MONEY OPENS ON ITS LINE AND ITS HERO, then one board, then Heads up, with 
   /* THE HERO IS THE ONE LEAD STAT, WHOLE ROW, and its first cell is Cash now with the walk ahead. */
   const hero = BLOCKS.find((b) => b.kind === 'stat' && b.lead === true)!;
   assert.deepEqual(hero.when, { metric: 'cash-accounts', gt: 0 });
-  assert.deepEqual(hero.cells!.map((c) => c.label), ['Cash now', 'Lasts to', 'If nothing comes in', 'Coming in, 30 days', 'Going out, 30 days']);
+  assert.deepEqual(hero.cells!.map((c) => c.label), ['Cash now', 'Lasts', 'If nothing comes in', 'Coming in, 30 days', 'Going out, 30 days']);
   assert.deepEqual([hero.cells![0]!.metric, (hero.cells![0] as { ahead?: string }).ahead], ['cash-now', 'runway-days']);
   assert.ok(at('Heads up') > at('Instalments') && at('Instalments') > at('Accounts'), 'Heads up does not close the board');
   assert.deepEqual(['Coming up', 'Spent this month', 'Accounts', 'Ledger', 'Instalments'].filter((h) => at(h) < 0), [], 'a tile of the board is missing');

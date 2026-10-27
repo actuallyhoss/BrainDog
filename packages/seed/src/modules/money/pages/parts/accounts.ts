@@ -5,8 +5,12 @@ export const ACCOUNTS_TILE: Record<string, unknown>[] = [
     /* WHERE THE MONEY IS, SINCE money-core 3.3.0: Cash now cut into the accounts that hold it, each named as the
        record names it, one track whose parts add up to the headline (`cash-by-account`). Drawn on every record with
        an account, one book or several, because "which account is it in" is asked of three accounts as much as of two
-       books. What each account last said and when is on its row, a tap away. */
-    kind: 'split',
+       books. What each account last said and when is on its row, a tap away.
+
+       A ROW AN ACCOUNT, NOT ONE STRIPED TRACK, SINCE THE MONEY SECTION'S LOOK: a split painted each account a category
+       hue, so a savings account wore the blue that means a category on the next tile, and a currency with one account
+       drew a whole track to say 100%. Rows grouped by currency, the bars in ink, as the Accounts page draws them. */
+    kind: 'bar',
     heading: 'Accounts',
     icon: 'landmark',
     /* NO WIDTH OF ITS OWN, SINCE money-core 3.29.0, where it stood in a side column from 3.11.0: Money's home is one

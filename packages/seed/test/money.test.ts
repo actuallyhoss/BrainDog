@@ -806,7 +806,7 @@ test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and its home is the hero and o
       ['stat', undefined, undefined],
       ['timeline', 'Coming up', undefined],
       ['bar', 'Spent this month', undefined],
-      ['split', 'Accounts', undefined],
+      ['bar', 'Accounts', undefined],
       ['timeline', 'Ledger', undefined],
       ['progress', 'Instalments', undefined],
     ],

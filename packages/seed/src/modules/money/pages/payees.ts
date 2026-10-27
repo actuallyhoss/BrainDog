@@ -67,6 +67,8 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       span: 12,
       source: 'metric.paid-times-by-payee-90d',
       unset: 'No name yet',
+      /* THE TEN PAID MOST OFTEN, as Paid most is cut: uncut, a record with thirty payees drew thirty bars of ones and twos. */
+      limit: 10,
       when: { metric: 'payees-paid-90d', gt: 0 },
       empty: 'Nobody was paid in the last 90 days.',
     },

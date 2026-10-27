@@ -45,7 +45,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       lead: true,
       span: 12,
       body:
-        'Cash ahead, with every pay, premium and part of a plan on its day and everyday spending at its three-month average. ' +
+        'Cash ahead, with every pay, bill and part of a plan on its day and everyday spending at its three-month average. ' +
         'If all money in stopped, it lasts to {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due.',
     },
     CASH_AHEAD,
@@ -79,7 +79,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       columns: [
         { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
         { field: 'due', label: 'Due', width: '12ch', align: 'end' },
-        { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+        { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
       ],
       order: [{ field: 'due', dir: 'asc' }],
       limit: 12,
@@ -100,7 +100,8 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
         { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
         { field: 'every', label: 'Every', width: '12ch' },
         { field: 'next_due', label: 'Next', width: '12ch', align: 'end' },
-        { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
+        /* SIGNED BY THE WAY IT GOES, as Coming up says the same lines: a salary and the rent read alike without it. */
+        { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
       ],
       order: [{ field: 'next_due', dir: 'asc' }],
       limit: 12,

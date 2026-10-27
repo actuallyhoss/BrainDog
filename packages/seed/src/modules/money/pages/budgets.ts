@@ -114,18 +114,15 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       empty: 'Nothing was spent last month.',
     },
     {
-      /* THE CATEGORIES WITH NO BUDGET, each a press from its page, where a most a month is typed by hand. */
+      /* THE CATEGORIES WITH NO BUDGET, each a press from its page, where a most a month is typed by hand. THE NAME
+         ALONE: a column for the most a month on the rows that have none was empty on every row, by its own `where`. */
       kind: 'table',
       heading: 'No budget yet',
       icon: 'tag',
       span: 12,
       source: 'register.categories',
       where: 'state is live, direction is out, budget is empty',
-      columns: [
-        { field: 'name', label: 'Category', width: 'minmax(14ch,1fr)' },
-        { field: 'budget', label: 'Most a month', width: '16ch', align: 'end' },
-        { field: 'budget_alert', label: 'Warn at percent', width: '14ch', align: 'end' },
-      ],
+      columns: [{ field: 'name', label: 'Category', width: 'minmax(14ch,1fr)' }],
       order: [{ field: 'name', dir: 'asc' }],
       limit: 30,
       when: { metric: 'budgets-unset', gt: 0 },
