@@ -90,21 +90,24 @@ blocked. So a person asking ChatGPT what BrainDog is gets an answer and a person
 not, on the marketing site of a product whose argument is that your agents can read your record.
 
 It is one switch and it is a decision about training data as well as about assistants, which makes
-it the owner's rather than this repository's. The per-crawler toggles cannot be used while the
+it the maintainer's rather than this repository's. The per-crawler toggles cannot be used while the
 zone-level setting is on: the dashboard says so in a tooltip on every row it governs.
 
 ## How a change reaches production
 
-**One route, and it is `.github/workflows/deploy.yml`.** Nothing else deploys production: not a
-laptop, not a Workers Builds project, not a push to a branch. The route, in order:
+**One route, and it is the steps of `.github/workflows/deploy.yml`.** They run either on GitHub, started
+by hand from `master`, or from a maintainer's machine through `pnpm ship:deploy` (`tools/ship`), which
+reads and runs the same steps and refuses unless HEAD is `origin/master` and a full local CI passed on
+it. Nothing else deploys production: not a Workers Builds project, not a push to a branch. The route,
+in order:
 
 1. A change lands on `master` by a merged pull request (a workflow's changes come as one, labelled
    `full-gates`; "Pushing a workflow" below).
-2. `ci` runs on `master`. `deploy.yml` starts off `ci`'s completion (`workflow_run`) and only when it
-   succeeded, at the commit `ci` measured rather than at the head of `master`.
+2. `ci` runs on the push to `master`. The deploy is then started by hand, and its job runs only when
+   the ref is `master` in this repository.
 3. The `deploy` job names the `production` environment, so it waits there for the required
    reviewer's press (below). Deploys queue one at a time and are never cancelled half way.
-4. On the runner (`vars.CI_RUNNER`, self-hosted by default), in order: the shell is built; "Record
+4. On the runner, in order: the shell is built; "Record
    what is live" saves the live version ids and sha for a rollback; Deploy (`wrangler deploy --env
    production --var BRAINDOG_BUILD:<id>`); Parity (`deploy-parity` against the live host); the
    marketing site is built and deployed; Smoke, with its signed-in half when `SMOKE_TOKEN` is set;
@@ -118,7 +121,7 @@ laptop, not a Workers Builds project, not a push to a branch. The route, in orde
 build token. They are not how anything deploys now, and a build project left connected would deploy
 past `ci` and past the reviewer on its own branch. In the dashboard, Workers & Pages >
 `braindog-production` and `braindog-alpha` > Settings > Build: the Git connection should read
-**not connected**. If either still shows a repository, disconnect it. That check is the owner's,
+**not connected**. If either still shows a repository, disconnect it. That check is the maintainer's,
 because it cannot be read from this repository.
 
 **`BRAINDOG_ENV=alpha` is the whole of alpha's identity.** `apps/web/vite.config.ts` reads it,
@@ -132,8 +135,8 @@ that loses its `define` renders the shipped product rather than a half-labelled 
 
 The `production` environment carries a required reviewer, so no merge deploys without a person
 pressing Approve. It is set once: the repository's Settings > Environments > `production` > Required
-reviewers, the owner's account, and "Prevent self-review" left off so the owner can approve his own
-merge. The `deploy` job then shows "Waiting" until the press, and a run nobody approves within 30
+reviewers, the maintainer's account, and "Prevent self-review" left off so a maintainer can approve
+their own merge. Deployment branches: `master` only. The `deploy` job then shows "Waiting" until the press, and a run nobody approves within 30
 days expires without deploying. The environment is also where `CLOUDFLARE_API_TOKEN` lives, so the
 token reaches this one job and no other workflow.
 
@@ -147,8 +150,6 @@ token reaches this one job and no other workflow.
 | `SMOKE_TOKEN` | secret | environment `production` | a token on the canary record, `propose` or above; unset, the signed-in half of Smoke and the sandbox smoke say they were skipped |
 | `SMOKE_SLUG` | variable | repository | the canary record's slug, the same record `OPS_RECORD` names |
 | `DEPLOY_ALPHA` | variable | repository | `true` deploys alpha after production; anything else leaves alpha alone |
-| `CI_RUNNER` | variable | repository | the runner label for `ci`, `gates` and `deploy`; unset is `self-hosted` |
-| `WINDOWS_RUNNER` | variable | repository | the Windows leg's runner (`windows.yml`); unset is `windows-latest` |
 | `IMAGE_PUSH` | variable | repository | `true` lets `image.yml` push the self-host image to ghcr.io |
 
 ## The Worker's secrets, variables and bindings
