@@ -1,14 +1,14 @@
 {
   "pack": "retainer-hours",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "icon": "clock",
   "title": "Agency",
   "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
-  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+  "changes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
-  "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <4.0.0" } },
+  "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <5.0.0" } },
   "words": { "client_retainers": { "name": "Retainers", "one": "retainer" }, "timesheets": { "name": "Timesheets", "one": "timesheet" } },
   "declarations": [
     {

@@ -1,10 +1,10 @@
 {
   "pack": "setup-sync",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "icon": "refresh-cw",
   "title": "Setup sync",
   "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, locked on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
-  "changes": "Listed in the store, under Agents, beside Profiles. Nothing it keeps changed.",
+  "changes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -12,7 +12,7 @@
     "primitives": 1,
     "packs": {
       "profiles": "^1.0.0",
-      "people": ">=3.3.0 <4.0.0"
+      "people": ">=3.3.0 <5.0.0"
     }
   },
   "declarations": [

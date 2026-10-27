@@ -1,10 +1,10 @@
 {
   "pack": "profiles",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "icon": "people",
   "title": "Profiles",
   "summary": "Each setup your agents run under: the app, the account it signs in as, how it is paid for and the projects it serves, with every machine it is on and whether each copy still matches. Kept for you alone, so nobody you share with sees it.",
-  "changes": "Listed in the store, under Agents, beside Setup sync. Nothing in it changed.",
+  "changes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -12,7 +12,7 @@
     "primitives": 1,
     "packs": {
       "agents": "^1.13.0",
-      "people": ">=3.3.0 <4.0.0"
+      "people": ">=3.3.0 <5.0.0"
     }
   },
   "extends": {

@@ -122,8 +122,8 @@ test('BEFORE THE ADD-ON: no Carry, Bundles or Drills, and the command line finds
 
 test('THE FILE: setup-sync 1.0.2 on Profiles and People, three personal lists, one figure, two automations, a page and eight starter things', () => {
   const doc = file() as { pack: string; version: string; requires: { packs: unknown }; declarations: Decl[]; seeds: { register: string; fields: Record<string, unknown> }[] };
-  assert.deepEqual([doc.pack, doc.version], ['setup-sync', '1.0.4']);
-  assert.deepEqual(doc.requires.packs, { profiles: '^1.0.0', people: '>=3.3.0 <4.0.0' });
+  assert.deepEqual([doc.pack, doc.version], ['setup-sync', '1.0.5']);
+  assert.deepEqual(doc.requires.packs, { profiles: '^1.0.0', people: '>=3.3.0 <5.0.0' });
   const listed = doc.declarations.filter((d) => d.register !== undefined && d.rule === undefined);
   assert.deepEqual(
     listed.map((d) => [d.register, d.personal]),

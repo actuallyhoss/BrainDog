@@ -1890,8 +1890,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "206eedb012ea0d39e109ba65e04d4b491318db9f78c5d7792001e30b3db6b289",
+          "bytes": 14444,
+          "published_at": "2026-10-27T14:28:59.603Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Properties",
+              "Tenancies",
+              "Rent received",
+              "Repairs"
+            ],
+            "pages": [
+              "Lettings",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "b84c38111e6e72d51b4f1b5fe10d466bcb664c19b1eb64ca414ed98bffc4a703",
@@ -3183,8 +3211,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "92bbc808969d5d18d609e41a9a5815040fd62e241de91d44f1156c2bb98767dd",
+          "bytes": 11010,
+          "published_at": "2026-10-27T14:28:59.603Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Shoots",
+              "Deliverables",
+              "Gear"
+            ],
+            "pages": [
+              "Shoots",
+              "Due",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "9d9e8a89649f54b807c74d3d662edd96af4a96c744b2169d225c36ae79aee169",
@@ -3429,8 +3485,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.3",
+      "latest": "1.2.4",
       "versions": [
+        {
+          "version": "1.2.4",
+          "checksum": "518a58fa6239be282caf358f47625b096f621dcd61a1fc7d880b57a96f35f259",
+          "bytes": 12155,
+          "published_at": "2026-10-27T14:28:59.603Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed."
+        },
         {
           "version": "1.2.3",
           "checksum": "334c711c5687a4e709ea5924305ff1c8a4becab17a87f240868a2ce8b3dfd313",
@@ -4099,8 +4183,38 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "2d49b945b6bd5b105bc4416aa49b89b46b17c4847e730a6449645ed7b3ac887b",
+          "bytes": 11980,
+          "published_at": "2026-10-27T14:28:59.603Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Retainers",
+              "Timesheets"
+            ],
+            "pages": [
+              "Clients",
+              "Timesheets",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "waits": [
+              "things"
+            ]
+          },
+          "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "030796dd75fd27b8b2462f082ec6cb4d861b37e7006062bd7d8b0f4c188cfe9a",
@@ -4505,8 +4619,37 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.4",
+      "latest": "1.0.5",
       "versions": [
+        {
+          "version": "1.0.5",
+          "checksum": "f4ecfda41da4c93557390acb436e4bda6063bc34f292651d2606b14bb69e5414",
+          "bytes": 15068,
+          "published_at": "2026-10-27T14:28:59.603Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "profiles",
+              "people"
+            ],
+            "lists": [
+              "Carry",
+              "Bundles",
+              "Drills"
+            ],
+            "pages": [
+              "Setup sync"
+            ],
+            "rules": [
+              "Ask about a machine that has sent nothing in seven days",
+              "Ask for a restore drill when the last one is over thirty days old"
+            ],
+            "examples": 8,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed."
+        },
         {
           "version": "1.0.4",
           "checksum": "fe4a4f07489863349f603377411c65513c9b3a576515f183ae252502ad277551",
