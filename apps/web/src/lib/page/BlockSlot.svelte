@@ -1036,6 +1036,15 @@
     margin-block-end: var(--sp-4);
   }
 
+  /* ONE HEAD FOR EVERY TILE OF ROWS (Money's tiles): the name at the left, the total or the door to the list at the right,
+     and a hairline under it, so a run of tiles reads as one grammar. Only over a tile of rows, cards, a split or a bar; a
+     ledger's rows (`data-rich`) already carry theirs. */
+  :global(.block-slot:has(> .block-bar):has(> .block :is(.cards-grid, .split, .list[data-kind='timeline']:not(:has(> .item[data-rich])), .bar, .progress)) > .block-bar) {
+    padding-block-end: var(--sp-3);
+    margin-block-end: var(--sp-2);
+    border-block-end: 1px solid var(--rule);
+  }
+
   .block-name {
     min-inline-size: 0;
     margin: 0;

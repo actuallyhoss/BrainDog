@@ -54,6 +54,8 @@
     min-inline-size: 0;
     padding: var(--sp-4) 0;
     border-block-start: 1px solid var(--rule);
+    /* EVERY ROW OF A TILE IS AS TALL AS THE NEXT: a card is never shorter than a row. */
+    min-block-size: var(--row-h);
   }
 
   /* A RUN OF CARDS THAT ARE EACH ONLY A NAME IS A LIST OF NAMES, SET CLOSE: Projects drew eleven of them as eleven

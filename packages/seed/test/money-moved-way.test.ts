@@ -29,7 +29,7 @@ type Row = { fields: Record<string, unknown> };
 type Drawn = Declared & { refusals: readonly unknown[]; rows?: readonly Row[] };
 
 /** How many cells a timeline draws: the day, the name and one detail. */
-const TIMELINE_CELLS = 3;
+const TIMELINE_CELLS = 6;
 
 /** Every place money-core lists what moved: [where a person reads it, the block]. */
 const MOVED: [string, Declared][] = [
