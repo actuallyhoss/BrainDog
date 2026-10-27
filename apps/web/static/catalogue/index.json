@@ -911,6 +911,57 @@
     },
     {
       "kind": "pack",
+      "id": "goals",
+      "title": "Goals",
+      "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "8094b806dfdcd659c8314675a8b35b3c2370f4cc4f4ec38c6e15af81c883c9f1",
+          "bytes": 16020,
+          "published_at": "2026-10-27T11:40:51.992Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Goals"
+            ],
+            "pages": [
+              "Goals"
+            ],
+            "rules": [
+              "goals_pace",
+              "goals_pace_on_balance"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "unlisted": true,
+      "icon": "star"
+    },
+    {
+      "kind": "pack",
       "id": "harbour-look",
       "title": "Harbour look",
       "summary": "A sea blue-green in place of the house red, on a cooler grey, in light and in dark.",
