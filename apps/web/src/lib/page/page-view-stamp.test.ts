@@ -45,8 +45,8 @@ test('the page stamps through the one stamp, and sends the mark nowhere else', (
   assert.equal(view.scripts.split('stampOf(').length - 1, 1, 'one stamp a page visited');
   const effect = flat(effectWith('stampOf('));
   /* IMPORTED WITH THE SCREEN, never inside the leave: a closing tab does not wait for a module. */
-  assert.match(view.scripts, /import \{ markAll \} from '\$lib\/record\/news-live\.ts';/u);
-  assert.doesNotMatch(view.scripts, /import\('\$lib\/record\/news-live\.ts'\)/u);
+  assert.match(view.scripts, /import \{ markAll \} from '\$lib\/record\/mark-read\.ts';/u);
+  assert.doesNotMatch(view.scripts, /import\('\$lib\/record\/(news-live|mark-read)\.ts'\)/u);
   assert.match(effect, /stampOf\(\(upTo\) => markAll\(base, upTo\)\)/u);
   assert.equal(view.scripts.split('markAll(').length - 1, 1, 'the mark is sent by the stamp alone');
   assert.doesNotMatch(view.scripts, /\bmarkRead\(/u);

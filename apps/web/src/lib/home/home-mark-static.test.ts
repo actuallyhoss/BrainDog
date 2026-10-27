@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stampOf } from '../page/read-mark.ts';
 import { forget } from '../record/boot-live.ts';
-import { markAll } from '../record/news-live.ts';
+import { markAll } from '../record/mark-read.ts';
 
 const BASE = 'https://record.test';
 
@@ -22,8 +22,8 @@ const home = readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8')
   .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 
 test('Home imports markAll with the screen, never inside the leave', () => {
-  assert.match(home, /^\s*import \{[^}]*\bmarkAll\b[^}]*\} from '\$lib\/record\/news-live\.ts';$/mu);
-  assert.doesNotMatch(home, /import\(\s*'\$lib\/record\/news-live\.ts'\s*\)/u, 'the mark waits on a module again');
+  assert.match(home, /^\s*import \{[^}]*\bmarkAll\b[^}]*\} from '\$lib\/record\/mark-read\.ts';$/mu);
+  assert.doesNotMatch(home, /import\(\s*'\$lib\/record\/(news-live|mark-read)\.ts'\s*\)/u, 'the mark waits on a module again');
   assert.match(home, /stampOf\(\(upTo\) => markAll\(base, upTo\)\)/u);
   assert.equal(home.split('markAll(').length - 1, 1, 'the mark is sent by the stamp alone');
 });
@@ -61,7 +61,7 @@ test('a send that waits on a module first has sent nothing when the leave return
     sent.push(String(url));
     return new Response(JSON.stringify({ ok: true, value: { upTo: 9, seen_at: null } }), { status: 200 });
   }) as typeof fetch;
-  const late = stampOf((upTo) => import('../record/news-live.ts').then((m) => m.markAll(BASE, upTo, io)));
+  const late = stampOf((upTo) => import('../record/mark-read.ts').then((m) => m.markAll(BASE, upTo, io)));
   const landing = late.leave(9);
   assert.equal(sent.length, 0);
   await landing;
