@@ -1537,6 +1537,62 @@ function fileRecordId(lines: readonly string[]): string | null {
  * BY COLUMN NAME, FOR `fileRecordId`'s REASON. A line that is not a JSON array is skipped rather than refused, because
  * `checkBrainl` has already passed every line against the manifest and this only counts what is there.
  */
+/** What a field id or a list id may be: the grammar `declare.ts` holds every installed one to. */
+const SOUND_ID = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
+/** What a field a declaration names elsewhere may be: an id, or ids joined by dots. */
+const SOUND_REF = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/;
+
+/**
+ * The first declaration in a file whose ids could not have been installed, as a sentence, or `null`.
+ *
+ * AN ID BECOMES SQL. A list's id, its title and each field's id are written into JSON paths and index names when the
+ * record reads them, and an install refuses any that is not an id; a file's declarations arrived without that check,
+ * so a handed-over file could carry a field id that was a piece of SQL, run on every later write. Only the ids are
+ * read here, so an older file whose declarations a later build words differently still imports.
+ */
+function declarationFault(lines: readonly string[]): string | null {
+  const kinds = fileColumn(lines, 'declaration', 'kind') ?? [];
+  const bodies = fileColumn(lines, 'declaration', 'body') ?? [];
+  const ids = fileColumn(lines, 'declaration', 'id') ?? [];
+  for (let i = 0; i < bodies.length; i++) {
+    const said = String(ids[i] ?? 'A declaration');
+    let body: unknown;
+    try {
+      body = typeof bodies[i] === 'string' ? JSON.parse(bodies[i] as string) : bodies[i];
+    } catch {
+      return `${said} in this file is not JSON.`;
+    }
+    if (body === null || typeof body !== 'object') return `${said} in this file has no body.`;
+    const b = body as Record<string, unknown>;
+    if (kinds[i] === 'register') {
+      if (typeof b.id !== 'string' || !SOUND_ID.test(b.id)) return `${said} in this file names its list with something that is not an id.`;
+      if (b.title !== undefined && (typeof b.title !== 'string' || !SOUND_ID.test(b.title))) return `${said} in this file names its title with something that is not a field id.`;
+      for (const f of Array.isArray(b.fields) ? b.fields : [])
+        if (f === null || typeof f !== 'object' || typeof (f as { id?: unknown }).id !== 'string' || !SOUND_ID.test((f as { id: string }).id))
+          return `${said} in this file has a field whose id is not one.`;
+    }
+    const walk = (v: unknown): string | null => {
+      if (Array.isArray(v)) {
+        for (const x of v) {
+          const found = walk(x);
+          if (found !== null) return found;
+        }
+        return null;
+      }
+      if (v === null || typeof v !== 'object') return null;
+      for (const [k, x] of Object.entries(v)) {
+        if (k === 'field' && typeof x === 'string' && !SOUND_REF.test(x)) return `${said} in this file names a field with something that is not a field id.`;
+        const found = walk(x);
+        if (found !== null) return found;
+      }
+      return null;
+    };
+    const found = walk(b);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 function fileColumn(lines: readonly string[], table: string, column: string): unknown[] | null {
   const at = lines.findIndex((l) => l.startsWith(`#table ${table} `));
   if (at < 0) return null;
@@ -4818,8 +4874,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const restoring = deleting && patch.deleted_at === null && current?.deleted_at !== null;
         if (value !== undefined && f.unique && (touched.includes(f.id) || restoring)) {
           const clash = sql.one<{ seq: number | null; id: string }>(
-            `SELECT seq, id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${f.id}') = ? AND id <> ?`,
+            'SELECT seq, id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, ?) = ? AND id <> ?',
             register,
+            jsonPath(f.id),
             value as never,
             current?.id ?? '',
           );
@@ -11676,6 +11733,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const all = [...lines];
       const sound = await checkBrainl(all, { shape: allowShape });
       if (!sound.ok) return sound;
+      const unsound = declarationFault(all);
+      if (unsound !== null) return no<ImportReport>('DECLARATION_INVALID', `${unsound} Nothing was imported.`, { at: 'declaration' });
 
       if (opts.replace !== true) {
         const out = importBrainl(sql, transaction, all, { shape: allowShape });
