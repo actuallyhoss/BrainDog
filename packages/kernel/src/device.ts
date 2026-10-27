@@ -180,7 +180,18 @@ export async function deviceStart(
   }
 
   const id = b64url(deps.random(32));
-  const userCode = sixDigits(deps.random);
+  /* A CODE NO OTHER PENDING GRANT HOLDS: anyone may start a grant, so a code shared with a stranger's would hand them
+     the approval the owner gave their own terminal. */
+  const now = instant(deps.nowMs);
+  const others = deps.sql.all<{ id: string; code_hash: string }>("SELECT id, code_hash FROM device_grant WHERE status = 'pending' AND expires > ?", now);
+  let userCode = sixDigits(deps.random);
+  for (let tries = 0; tries < 20; tries++) {
+    let taken = false;
+    for (const row of others) if (same(await deps.digest(`${row.id}:${userCode}`), row.code_hash)) taken = true;
+    if (!taken) break;
+    if (tries === 19) return no('RATE_LIMITED', 'Too many devices are waiting to be approved on this record. Try again in a few minutes.');
+    userCode = sixDigits(deps.random);
+  }
   const expires = instant(deps.nowMs + CODE_MS);
   deps.sql.exec(
     `INSERT INTO device_grant (id, code_hash, status, reach, scope, label, ua, tries, expires)
@@ -213,7 +224,14 @@ export async function deviceApprove(deps: TokenDeps, person: string, args: { use
 
   /* EVERY ROW IS HASHED, a match or not, so the time taken says nothing about which row was close. */
   let hit: Stored | undefined;
-  for (const row of pending) if (same(await deps.digest(`${row.id}:${code}`), row.code_hash) && !hit) hit = row;
+  let hits = 0;
+  for (const row of pending)
+    if (same(await deps.digest(`${row.id}:${code}`), row.code_hash)) {
+      hits += 1;
+      hit ??= row;
+    }
+  /* TWO GRANTS UNDER ONE CODE ARE NEITHER APPROVED: which terminal the person meant cannot be told. */
+  if (hits > 1) hit = undefined;
 
   if (hit) {
     const at = instant(deps.nowMs);

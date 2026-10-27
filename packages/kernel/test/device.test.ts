@@ -307,3 +307,25 @@ test('NO USER CODE AND NO BEARER IS IN ANY TABLE, only their hashes', async () =
   for (const secret of said) assert.equal(everything.includes(secret), false, 'a code or a bearer was stored in the clear');
   sql.close();
 });
+
+/* ── one code, one waiting device ────────────────────────────────────────── */
+
+test('A CODE IS NEVER SHARED BY TWO WAITING DEVICES: a draw that matches one is drawn again, and the owner approves only their own', async () => {
+  const { deps } = await setup();
+  /* EVERY FOUR-BYTE DRAW IS ZERO UNTIL TOLD OTHERWISE, so the second device first draws the code the first holds. */
+  let fresh = false;
+  const fixed = (): TokenDeps => ({
+    ...deps(),
+    random: (size: number) => (size === 4 && !fresh ? new Uint8Array(4) : crypto.getRandomValues(new Uint8Array(size))),
+  });
+  const stranger = value(await deviceStart(fixed(), { reach: 'login', label: 'not yours' }));
+  assert.equal(stranger.user_code, '000000');
+  let draws = 0;
+  const second = value(
+    await deviceStart({ ...fixed(), random: (size: number) => (size === 4 && draws++ === 0 ? new Uint8Array(4) : crypto.getRandomValues(new Uint8Array(size))) }, { reach: 'login', label: 'my terminal' }),
+  );
+  assert.notEqual(second.user_code, stranger.user_code, 'the second device was handed a code another waiting device holds');
+  fresh = true;
+  assert.equal(value(await deviceApprove(deps(), OWNER, { user_code: second.user_code })).label, 'my terminal');
+  assert.equal((value(await devicePoll(deps(), { device_code: stranger.device_code })) as { pending?: boolean }).pending, true);
+});
