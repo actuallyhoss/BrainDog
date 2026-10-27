@@ -244,6 +244,47 @@
         ],
         "limit": 1
       }
+    },
+    {
+      "page": "page.money",
+      "after": "Heads up",
+      "note": "A way into the full-screen counter from Money, always drawn, since cash is counted when a person decides to and not only when a balance is old.",
+      "block": {
+        "kind": "link",
+        "heading": "Count cash",
+        "icon": "money",
+        "span": 12,
+        "area": "main",
+        "authored": [
+          {
+            "cells": [
+              "Count the cash by note and coin",
+              "/count-cash",
+              "Pick the account, count each note, and say how any difference is recorded"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "page": "page.money-account",
+      "after": "Last moves",
+      "note": "The same counter from an account's page, opened on that account.",
+      "block": {
+        "kind": "link",
+        "heading": "Count cash",
+        "icon": "money",
+        "span": 12,
+        "authored": [
+          {
+            "cells": [
+              "Count this account's cash",
+              "/count-cash?account={{seq}}",
+              "Note by note, then the difference"
+            ]
+          }
+        ]
+      }
     }
   ]
 }
