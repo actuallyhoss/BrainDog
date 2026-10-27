@@ -179,6 +179,8 @@ const without = (doc: Body): Body => {
 };
 
 const USE_CASE_PACK = /^usecase-(.+)$/u;
+/** The first-party document every record holds: the pages that are not any add-on's. */
+const CORE = 'core';
 const isFirstParty = (id: string): boolean => (FIRST_PARTY as readonly string[]).includes(id);
 
 /** A day for a document's example rows to be counted from. They are taken off before it is planned, so any day does. */
@@ -264,7 +266,12 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
   /** One pack, planned against the record as it is now: what happened to it, or nothing when there is nothing newer. */
   const attempt = async (id: string): Promise<QuietStep | null> => {
     waits.delete(id);
-    const held = await heldOf(id);
+    /* CORE GOES TO EVERY RECORD THAT HOLDS PEOPLE, which is where its four pages lived until People 4.0.0, so a record
+       that does not hold it yet is planned for it at no version. It goes in once the pages are not People's to give (People
+       hands them in the plan that updates People), and until then it says nothing: People's own step is what a person
+       reads, and core waits for it (`waits`, below). */
+    const unheld = id === CORE && (await heldOf(id)) === undefined && (await heldOf('people')) !== undefined;
+    const held = unheld ? { id, version: '0.0.0', on: true } : await heldOf(id);
     const to = shippedVersion(id);
     if (!held || to === undefined || compareVersions(held.version!, to) >= 0) return null;
     const step = { pack: id, from: held.version!, to };
@@ -281,6 +288,7 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     const blocked = unready(diff);
     if (blocked !== null) {
       if (diff.conflicts.length > 0) waits.set(id, new Set(diff.conflicts.map((c) => c.pack)));
+      if (unheld) return null;
       return { ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked };
     }
     if (lose.length === 0) {
@@ -297,7 +305,8 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     return asked.ok ? { ...step, did: 'asked', lose } : { ...step, did: 'refused', lose, why: fixOf(asked) };
   };
 
-  const order = [...FIRST_PARTY, AGENTS_PACK.manifest.id, ...USE_CASE_PACKS];
+  /* CORE AFTER THE MODULES THAT MAY STILL HOLD ITS PAGES: People hands them to it in the plan that updates People. */
+  const order = [...FIRST_PARTY.filter((id) => id !== CORE), CORE, AGENTS_PACK.manifest.id, ...USE_CASE_PACKS];
   for (const id of order) {
     const step = await attempt(id);
     if (step) out.push(step);

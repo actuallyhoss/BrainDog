@@ -26,7 +26,7 @@ import { withoutLegs } from './modules/held-legs.ts';
 import { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument } from './packs/agents.ts';
 
 export { AGENTS_METRICS, AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, agentsPackDocument, type PackManifest } from './packs/agents.ts';
-export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
+export { CORE_PAGES, FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, firstPartyManifest, type DocumentOptions, type FirstPartyId } from './packs/first-party.ts';
 export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashPoints, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';

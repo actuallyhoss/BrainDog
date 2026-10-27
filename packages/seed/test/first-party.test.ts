@@ -74,6 +74,7 @@ const byId = (list: readonly Body[]): [string, string][] => list.map((d) => [idO
 test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages and figures point at', async () => {
   const requires = Object.fromEntries(FIRST_PARTY.map((id) => [id, firstPartyManifest(id).requires]));
   assert.deepEqual(requires, {
+    core: [],
     portfolio: [],
     people: [],
     'money-core': ['register.things'],
@@ -83,6 +84,7 @@ test('EACH FIRST-PARTY PACK IS A LEGAL PACK, and needs what its fields, pages an
   /* PEOPLE ONLY LINKS TO PROJECTS AND MONEY: "Met in" is left out of a record that holds no Projects (`LINKS`), and an
      organisation's page draws its projects and what moved with it only where the record holds those lists. */
   assert.deepEqual(Object.fromEntries(FIRST_PARTY.map((id) => [id, firstPartyManifest(id).links])), {
+    core: [],
     portfolio: [],
     people: ['register.things', 'register.transactions'],
     /* MONEY ONLY LINKS TO PEOPLE'S LISTS since 3.0.0: who a row is with is left out of a record without them. A ledger
@@ -207,6 +209,7 @@ test("THE LISTS A SHARED USE CASE MAY NOT DECLARE ARE THE MODULES' OWN, as their
   /* AND ITS STAGES SINCE 1.23.0, for the same reason. */
   const unlisted: Partial<Record<string, readonly string[]>> = { portfolio: ['datapoints', 'stages'] };
   for (const id of FIRST_PARTY) {
+    if (id === 'core') continue;
     const provided = firstPartyManifest(id).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
     assert.deepEqual([...MODULE_LISTS[id].lists].sort(), provided.filter((l) => !(unlisted[id] ?? []).includes(l)).sort(), id);
   }

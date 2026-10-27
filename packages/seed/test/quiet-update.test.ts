@@ -17,8 +17,9 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { losses, shippedVersion, updateFirstParty, type QuietPort, type QuietQuestion } from '@braindog/seed/packs/quiet';
 import type { Result } from '@braindog/ports';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
+import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 
-import { AGENTS_PACK, FIRST_PARTY_VERSIONS, NOW, agentsPackDocument, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
+import { AGENTS_PACK, CORE_PAGES, FIRST_PARTY_VERSIONS, NOW, agentsPackDocument, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { keptLists, modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { peopleBefore3 } from './people-before-3.ts';
@@ -1885,6 +1886,8 @@ test('THE NIGHT UPDATES THE AGENTS PACK AND THE USE CASE A RECORD HOLDS, after i
       [
         /* PROJECTS FIRST ON A FOUNDER'S RECORD, SINCE portfolio 1.19.0: it takes Numbers over from the use case before it. */
         ...(id === 'founder' ? [{ pack: 'portfolio', from: '1.18.0', to: FIRST_PARTY_VERSIONS.portfolio, did: 'updated' }] : []),
+        /* CORE FOR A RECORD THAT HOLDS PEOPLE, which is where its four pages used to live. */
+        { pack: 'core', from: '0.0.0', to: FIRST_PARTY_VERSIONS.core, did: 'updated' },
         { pack: 'agents', from: '1.7.0', to: AGENTS_PACK.manifest.version, did: 'updated' },
         { pack, from: USECASE_BEFORE[id]!.version, to: u.version, did: 'updated' },
       ],
@@ -1968,5 +1971,59 @@ test('TAKING CASH STALE AWAY IS ASKED: a record on money-core 3.13.0 that holds 
     { pack: 'money-core', from: '3.13.0', to: FIRST_PARTY_VERSIONS['money-core'], did: 'asked', lose: ['take away Cash stale'] },
     JSON.stringify(steps),
   );
+  sql.close();
+});
+
+/* ── people 4.0.0: Health, Scripts, Calendar and Activity leave for core ─────────────────────────────────────────── */
+
+test('A RECORD ON PEOPLE 3.x UPDATES TO PEOPLE 4.0.0 AND CORE ON ITS OWN, keeps its navigation order and what it hid, and all four pages still open', async () => {
+  const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
+  const now = { at: Date.UTC(2026, 9, 27, 3) };
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: { now: () => now.at } as never });
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+
+  /* PEOPLE AS 3.9.0 SHIPPED IT: this build's document with the four pages it still declared, under its own name, and no hand-over. */
+  const core = firstPartyDocument('core', { seeds: [] })! as { declarations: Body[] };
+  const people = firstPartyDocument('people', { holds: [], seeds: [] })! as Body & { declarations: Body[] };
+  const before = { ...people, version: '3.9.0', declarations: [...people.declarations, ...core.declarations.map((d) => ({ ...d, pack: 'people' }))] };
+  delete before.hands;
+  const planned = value<{ diff: { planHash: string; approve?: string[] } }>(await api.planPack({ doc: before, source: { kind: 'local' } }, owner));
+  value(await api.installPack({ doc: before, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
+  const held = (id: string): string | undefined => api.kernel.packStates().find((p) => p.id === id)?.version ?? undefined;
+  const ownerOf = (id: string): string | null | undefined => (api.kernel.declarations() as { id: string; pack_id: string | null }[]).find((d) => d.id === `page.${id}`)?.pack_id;
+  assert.equal(held('people'), '3.9.0');
+  assert.equal(held('core'), undefined);
+  for (const page of CORE_PAGES) assert.equal(ownerOf(page), 'people', `${page} starts as People's`);
+
+  /* HIS OWN ORDER AND ONE PAGE HE HID, kept by address, which names the page and not the pack that holds it. */
+  const order = ['/p/people', '/p/activity', '/p/health', '/p/calendar', '/p/scripts'];
+  value(await api.setPref({ key: 'nav.order', value: order }, owner));
+  value(await api.setPref({ key: 'nav.hidden', value: ['/p/scripts'] }, owner));
+  value(api.kernel.create('people', { name: 'Mara Lindqvist', email: 'mara@halden.example' }, OWNER));
+
+  await api.slashTick();
+
+  assert.equal(held('people'), FIRST_PARTY_VERSIONS.people);
+  assert.equal(FIRST_PARTY_VERSIONS.people, '4.0.0');
+  assert.equal(held('core'), FIRST_PARTY_VERSIONS.core);
+  const kept = api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] };
+  assert.deepEqual(kept.steps, [`People was updated to ${FIRST_PARTY_VERSIONS.people}.`, `BrainDog was updated to ${FIRST_PARTY_VERSIONS.core}.`]);
+  assert.deepEqual(api.kernel.openSuggestions().ok ? (api.kernel.openSuggestions() as { value: unknown[] }).value : [], [], 'nothing was lost, so nothing was asked');
+
+  /* HANDED, NOT LOST: every page is live, under core now, and none was retired along the way. */
+  for (const page of CORE_PAGES) {
+    assert.equal(ownerOf(page), 'core', `${page} is core's`);
+    const opened = value<{ blocks: unknown[] }>(api.kernel.page(page));
+    assert.ok(opened.blocks.length > 0, `${page} opens`);
+  }
+  const prefs = api.kernel.prefsOf('p_1') as Record<string, unknown>;
+  assert.deepEqual(prefs['nav.order'], order, 'his order is as he left it');
+  assert.deepEqual(prefs['nav.hidden'], ['/p/scripts'], 'what he hid is still hidden');
+
+  /* AND THE NEXT NIGHT HAS NOTHING TO DO. */
+  now.at += 86_400_000;
+  await api.slashTick();
+  assert.deepEqual((api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] }).steps, []);
   sql.close();
 });

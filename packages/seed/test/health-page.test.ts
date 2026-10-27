@@ -78,7 +78,7 @@ test('IT READS ONLY THE NAMES IT DECLARES: the signs source and its two figures'
 });
 
 test('NOTHING THE GRAMMAR REFUSES: the page installs as a declaration', () => {
-  const decl = (body: unknown): Declaration => ({ id: 'page.health', kind: 'page', body: body as never, pack: 'people' });
+  const decl = (body: unknown): Declaration => ({ id: 'page.health', kind: 'page', body: body as never, pack: 'core' });
   /* UNTIL THE KERNEL'S INSTALL CHECK KNOWS `signs` (`COMPUTED_SOURCES` in `declare.ts`, a line this unit hands on), the
      one refusal allowed is that one, at a block reading it. Once it knows the source, the page must install whole. */
   const probe = validateDeclaration(decl({ page: 'health', title: 'Health', blocks: [{ kind: 'cards', source: HEALTH_SOURCE, columns: [{ field: 'name', as: 'title' }] }] }));

@@ -55,7 +55,7 @@ async function put(k: Kernel, doc: unknown): Promise<{ ok: boolean }> {
 
 test('THE MODULES A USE CASE MAY NAME ARE THE FIRST-PARTY PACKS, in install order', () => {
   assert.deepEqual([...MODULES], [...MODULE_ORDER]);
-  assert.deepEqual(MODULE_ORDER.filter((id) => id !== 'agents'), [...FIRST_PARTY]);
+  assert.deepEqual(MODULE_ORDER.filter((id) => id !== 'agents'), FIRST_PARTY.filter((id) => id !== 'core'));
 });
 
 test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its example rows and its voice', async () => {

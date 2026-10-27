@@ -215,6 +215,13 @@ async function furnish(rec: Rec): Promise<void> {
   await take(rec, READINGS, 'the readings list');
 }
 
+/**
+ * THE MODULES A RECORD HELD BEFORE `core` EXISTED, and the order an update takes them in: People first, which hands its
+ * four pages to core, and core after it, which takes them over (people 4.0.0). Core first would meet the pages under
+ * People and be refused, which is also what the night does, so it asks again after People is in.
+ */
+const BEFORE_CORE: readonly string[] = FIRST_PARTY.filter((id) => id !== 'core');
+
 /** The packs a document needs that are not modules, each before the one that needs it. */
 function needs(id: string, pick: (id: string) => Doc, seen: string[] = []): string[] {
   for (const dep of Object.keys(pick(id).requires?.packs ?? {})) {
@@ -228,7 +235,7 @@ function needs(id: string, pick: (id: string) => Doc, seen: string[] = []): stri
 /** The order a record takes things in: the five modules, what the subject needs, then the subject when it is a pack. */
 const order = (subject: string, pick: (id: string) => Doc): string[] => {
   const isModule = (FIRST_PARTY as readonly string[]).includes(subject);
-  return [...FIRST_PARTY, ...needs(subject, pick), ...(isModule ? [] : [subject])];
+  return [...BEFORE_CORE, 'core', ...needs(subject, pick), ...(isModule ? [] : [subject])];
 };
 
 /** The lists a subject's rows go in: the ones its document declares, the ones it lays a field on, and the ones a door of its writes into. */
@@ -431,7 +438,7 @@ async function journey(subject: string, from: Doc, o: { to?: Doc; plant?: Plant 
   const api = await createRecordApi({ sql, clock, answersSlash: true });
   const rec: Rec = { api, k: api.kernel, sql, clock };
   const old = (id: string): Doc => (id === subject ? ready(from) : released(id));
-  for (const id of FIRST_PARTY) await take(rec, old(id), `${subject} as released`);
+  for (const id of BEFORE_CORE) await take(rec, old(id), `${subject} as released`);
   await furnish(rec);
   for (const id of order(subject, old).filter((x) => !(FIRST_PARTY as readonly string[]).includes(x))) await take(rec, old(id), `${subject} as released`);
 

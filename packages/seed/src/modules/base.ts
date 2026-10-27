@@ -285,7 +285,7 @@ export const BASE_PAGES: Record<string, SeedPage> = {
     page: 'calendar',
     title: 'Calendar',
     icon: 'calendar',
-    pack: 'people',
+    pack: 'core',
     blocks: [
       { kind: 'note', lead: true, span: 12, body: 'Everything with a day it is due, this month and the next two.' },
       {
@@ -304,7 +304,7 @@ export const BASE_PAGES: Record<string, SeedPage> = {
     page: 'activity',
     title: 'Activity',
     icon: 'activity',
-    pack: 'people',
+    pack: 'core',
     layout: { rail: 4 },
     /* WHO, WHAT KIND AND WHICH LIST, SINCE PGS-C24 (job 3): the three things a person narrows the log by, as chips over
        it. A filter is `{ field, control }` (`filtersFault` in the kernel); the log answers them by its own words. */

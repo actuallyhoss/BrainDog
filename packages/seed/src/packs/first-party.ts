@@ -27,10 +27,10 @@ import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
 import { estateTargetConfig } from '../modules/estate.ts';
 import type { PackManifest } from './agents.ts';
 
-export type FirstPartyId = 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
+export type FirstPartyId = 'core' | 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
 
 /** Dependencies first: every other list points at a project, and Money points at People. */
-export const FIRST_PARTY: readonly FirstPartyId[] = ['portfolio', 'people', 'money-core', 'estate', 'work'];
+export const FIRST_PARTY: readonly FirstPartyId[] = ['core', 'portfolio', 'people', 'money-core', 'estate', 'work'];
 
 /**
  * THE ICON EACH PACK WEARS in the store and the installed list, a name from the app's icon set. Kept apart from the
@@ -38,6 +38,7 @@ export const FIRST_PARTY: readonly FirstPartyId[] = ['portfolio', 'people', 'mon
  * change without a new version.
  */
 export const FIRST_PARTY_ICONS: Readonly<Record<FirstPartyId, string>> = {
+  core: 'heart-pulse',
   portfolio: 'projects',
   people: 'people',
   'money-core': 'money',
@@ -46,6 +47,7 @@ export const FIRST_PARTY_ICONS: Readonly<Record<FirstPartyId, string>> = {
 };
 
 const SUMMARIES: Record<FirstPartyId, string> = {
+  core: 'The pages every record has: Health, Scripts, Calendar and Activity.',
   portfolio: 'The things you run, and the plan for each.',
   people: 'Clients, contractors and accountants, the organisations they are with, and where each one was seen.',
   'money-core': 'Cash, what comes in and what goes out, with a date and a currency.',
@@ -64,6 +66,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
  * are clients. "track" is in none, since "I track a few side projects" is a verb about projects and not a Work list.
  */
 const SIGNALS: Record<FirstPartyId, readonly string[]> = {
+  core: [],
   portfolio: [
     'project', 'projects', 'side project', 'side projects', 'side-project', 'side-projects', 'product', 'products', 'app', 'apps',
     'studio', 'shop', 'store', 'brand', 'brands', 'game', 'games', 'agency', 'foundry', 'website', 'websites',
@@ -775,10 +778,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   they are under the name, with the projects they are on and when you last spoke; and the shops a card text named are
  *   one line under Organisations, counted by the new `metric.organisations-from-card-texts`, where they were listed as
  *   organisations. A figure added and nothing taken away, so a minor step.
+ * - people 4.0.0 and core 1.0.0: Health, Scripts, Calendar and Activity leave People for `core`, the document every record
+ *   holds (`CORE_PAGES`), under the same page ids, so the navigation order and hides that name them stay as they are.
+ *   People hands the four to core in the same plan (`hands`), which the quiet updater reads as not lost. A page leaves, so
+ *   People's step is a major one. Core is 1.0.0, and a record that never held it takes it in the same pass.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
+  core: '1.0.0',
   portfolio: '1.30.0',
-  people: '3.9.0',
+  people: '4.0.0',
   'money-core': '3.29.0',
   estate: '2.5.0',
   work: '1.19.0',
@@ -894,6 +902,12 @@ export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides:
   const links = [...any].filter((r) => !needs.has(r)).sort();
   return { id, version: FIRST_PARTY_VERSIONS[id], requires: [...needs].sort(), provides: mine.map(idOf).sort(), links, signals: SIGNALS[id] };
 }
+
+/** The pages that live in `core` and no longer in People, handed over by People from 4.0.0 under the ids they always had. */
+export const CORE_PAGES = ['health', 'scripts', 'calendar', 'activity'] as const;
+
+/** What People hands on, by declaration id: each of the four pages to `core`. */
+const PEOPLE_HANDS: Record<string, string> = Object.fromEntries(CORE_PAGES.map((p) => [`page.${p}`, 'core']));
 
 /** The block kinds whose first column is what they group by, so they say nothing once it is gone. */
 const GROUPED = new Set(['bar', 'split']);
@@ -1070,6 +1084,7 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     author: 'BrainDog',
     license: 'MIT',
     requires: { format: 1, primitives: 1, packs: {} },
+    ...(id === 'people' ? { hands: PEOPLE_HANDS } : {}),
     declarations: pack.declarations,
     ...(pack.seeds.length > 0 ? { seeds: pack.seeds } : {}),
     /* THE SETTINGS ITS FIGURES' TARGETS ARE HELD TO (`MONEY_TARGET_SETTINGS`), which a person changes later, and Money's

@@ -128,7 +128,17 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
         'A project page leads with the questions waiting on it, shows what changed, draws its plan on a time axis when its tasks have days and its money month by month. Every money figure is in your own currency, and its target is a setting.',
     },
   ],
+  core: [
+    {
+      version: '1.0.0',
+      notes: 'Health, Scripts, Calendar and Activity now come with BrainDog itself and no longer with People. They are the same pages with the same names, so your sidebar order and anything you hid stay as you left them.',
+    },
+  ],
   people: [
+    {
+      version: '4.0.0',
+      notes: 'Health, Scripts, Calendar and Activity moved out of People into the pages BrainDog itself keeps. Nothing you see changes, and your sidebar order and hides stay as they were.',
+    },
     {
       version: '3.9.0',
       notes:

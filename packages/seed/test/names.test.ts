@@ -18,7 +18,9 @@ test('a use case this build does not ship is named from its id', () => {
 });
 
 test('every first-party module has a name, and a use case pack is named as its use case', () => {
-  assert.deepEqual(Object.keys(MODULE_NAMES).sort(), [...MODULES].sort());
+  /* CORE IS NAMED BESIDE THE MODULES: the pages every record holds are not a module a use case may name. */
+  assert.deepEqual(Object.keys(MODULE_NAMES).filter((id) => id !== 'core').sort(), [...MODULES].sort());
+  assert.equal(moduleName('core'), 'BrainDog');
   assert.equal(moduleName('money-core'), 'Money');
   assert.equal(moduleName('usecase-team'), 'Team board');
   assert.equal(moduleName('garden-log'), 'Garden log');

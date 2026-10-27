@@ -23,6 +23,7 @@ export const useCaseName = (id: string): string =>
  * where every other screen says Money. `names.test.ts` holds this to the modules the use cases name.
  */
 export const MODULE_NAMES: Readonly<Record<string, string>> = {
+  core: 'BrainDog',
   /* PROJECTS, AS EVERY SCREEN CALLS IT: the store and Installed said Portfolio, the id, beside a sidebar saying Projects. */
   portfolio: 'Projects',
   people: 'People',

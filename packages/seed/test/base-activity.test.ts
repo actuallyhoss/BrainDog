@@ -26,7 +26,7 @@ const PAGE = BASE_PAGES.activity!;
 const ALL = PAGE.blocks as Record<string, unknown>[];
 const MAIN = ALL.filter((b) => b.area !== 'rail');
 const RAIL = ALL.filter((b) => b.area === 'rail');
-const DECL: Declaration = { id: 'page.activity', kind: 'page', body: PAGE as never, pack: 'people' };
+const DECL: Declaration = { id: 'page.activity', kind: 'page', body: PAGE as never, pack: 'core' };
 
 /** The three side tiles, each with the figure it is drawn over. */
 const TILES: [string, string][] = [['Who worked', 'activity-by-who'], ['What changed', 'activity-by-kind'], ['Busy hours', 'activity-by-hour']];
@@ -135,7 +135,7 @@ test('EVERY BLOCK HAS A KEY OF ITS OWN, so a tile moved in Edit layout, or by a 
 test('IT LEANS ON NO LIST AND IS NOT ON THE RAIL, so every record can hold it and the seven places stay seven', () => {
   assert.equal(PAGE.requires, undefined);
   assert.equal(PAGE.nav, undefined);
-  assert.equal(PAGE.pack, 'people');
+  assert.equal(PAGE.pack, 'core');
   assert.equal(PAGE.for, undefined);
 });
 

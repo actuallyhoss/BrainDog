@@ -22,7 +22,7 @@ const PAGE = BASE_PAGES.calendar!;
 const ALL = PAGE.blocks as Record<string, unknown>[];
 /* THE PAGE'S LINE COMES FIRST (every page opens on one); what is read below is the calendar under it. */
 const BLOCKS = ALL.filter((b) => b.kind === 'calendar');
-const DECL: Declaration = { id: 'page.calendar', kind: 'page', body: PAGE as never, pack: 'people' };
+const DECL: Declaration = { id: 'page.calendar', kind: 'page', body: PAGE as never, pack: 'core' };
 
 const day = (n: number): string => new Date(NOW + n * 86_400_000).toISOString().slice(0, 10);
 

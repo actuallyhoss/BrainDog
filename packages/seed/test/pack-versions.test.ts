@@ -2153,6 +2153,20 @@ const DECLARED: Record<string, Version> = {
       "`metric.organisations-from-card-texts` counts the shops a card text named, which `metric.organisations-count` and `page.people`'s Organisations leave out, and a line under it says; and Everyone is one line a person -> 45015e6b8ce9d2d4",
     ],
   },
+  /* HEALTH, SCRIPTS, CALENDAR AND ACTIVITY LEAVE FOR `core` (the add-ons proposal, step 2). A page leaves, so a major. */
+  'people@4.0.0': {
+    holds: `
+      metric.organisations-count metric.organisations-from-card-texts metric.people-count metric.people-in-touch-12w
+      metric.people-in-touch-30d metric.people-in-touch-90d metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '227130b05c177df0',
+    history: [
+      '`page.health`, `page.scripts`, `page.calendar` and `page.activity` are no longer declared here: People hands the four to `core` under the same ids, and `page.people` and the rest are as they were -> 227130b05c177df0',
+    ],
+  },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
     holds: `

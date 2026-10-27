@@ -60,7 +60,7 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
     page: 'health',
     title: 'Health',
     icon: 'heart-pulse',
-    pack: 'people',
+    pack: 'core',
     blocks: [
       /* THE PAGE'S ONE LINE, from `signs-red`. Three notes on the one figure, so exactly one of them draws, and the count
          reads as a person says it: "One thing ... needs", "3 things ... need". `signs-red` reads nothing at all while no

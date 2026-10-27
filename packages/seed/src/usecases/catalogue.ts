@@ -102,7 +102,8 @@ export function before(requires: readonly string[]): string[] {
 
 /** The first-party packs, each with no example rows, and the use cases that carry a pack of their own. */
 export function seedCatalogue(): SeedCatalogueEntry[] {
-  const modules: SeedCatalogueEntry[] = FIRST_PARTY.map((id) => {
+  /* CORE IS NEVER OFFERED: it is on every record that holds People, and is not an add-on. */
+  const modules: SeedCatalogueEntry[] = FIRST_PARTY.filter((id) => id !== 'core').map((id) => {
     const bare = firstPartyDocument(id, { seeds: [] });
     return {
       id,

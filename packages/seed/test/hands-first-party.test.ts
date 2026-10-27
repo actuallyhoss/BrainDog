@@ -78,7 +78,7 @@ function recordFor(giver: Pack, packs: readonly Pack[]): Installed {
 test('EVERY FIRST-PARTY PACK THAT HANDS A PATTERN ON HANDS ITS DOOR TO THE SAME PACK, and installFault refuses none', async () => {
   const packs = await packsOf(DOCS);
   const giving = packs.filter((p) => Object.keys(p.manifest.hands ?? {}).length > 0);
-  assert.deepEqual(giving.map((p) => p.manifest.pack), [], 'the packs this build ships that hand anything on');
+  assert.deepEqual(giving.map((p) => p.manifest.pack), ['people'], 'the packs this build ships that hand anything on: People, its four pages to core');
   const shipped = value<Pack>(await normalise(handingMoney(), { kind: 'local' }));
   let doors = 0;
   for (const giver of [...giving, shipped]) {
