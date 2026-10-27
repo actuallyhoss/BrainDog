@@ -117,8 +117,32 @@ const scriptJson = (v: unknown): string => JSON.stringify(v).replace(/</gu, '\\u
  * THE BRIDGE, the one script the host writes into every drawn document, before the author's: `braindog.data`,
  * `braindog.theme`, `braindog.on(fn)` (called now and on every change), `braindog.open(ref)`, the theme painted onto the
  * root as CSS variables, and the height said to the host whenever the body changes size.
+ *
+ * AND FIRST IT TAKES AWAY THE ONE WAY OUT THE POLICY DOES NOT CLOSE. No browser enforces a policy on a peer connection
+ * (`connect-src` does not cover one, and `webrtc 'block'` is in no engine), and a component's ICE servers are hosts it
+ * names: measured, Chromium sent UDP to a TURN server the code named, from a frame under `DRAWN_POLICY`. So the
+ * constructors are gone from the window for good, and a frame the component makes, whose window would hold fresh ones,
+ * is taken out again before any task can run in it; a shadow root or a second document, where that watch cannot see,
+ * is refused. Navigating the frame is held by the page around it, whose
+ * `frame-src` names only BrainDog and the embed providers.
  */
 const BRIDGE = `(function () {
+  ['RTCPeerConnection', 'webkitRTCPeerConnection', 'mozRTCPeerConnection'].forEach(function (n) {
+    try { Object.defineProperty(window, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+  });
+  var FRAMES = 'iframe,frame,object,embed';
+  function unframe(n) {
+    if (!n || n.nodeType !== 1) return;
+    if (n.matches(FRAMES)) n.remove();
+    else n.querySelectorAll(FRAMES).forEach(function (f) { f.remove(); });
+  }
+  new MutationObserver(function (records) {
+    records.forEach(function (r) { r.addedNodes.forEach(unframe); });
+  }).observe(document, { childList: true, subtree: true });
+  function refuse() { throw new Error('A drawn component draws in its own page, with no shadow root and no second document.'); }
+  [[Element.prototype, 'attachShadow'], [Element.prototype, 'setHTMLUnsafe'], [window.ShadowRoot && ShadowRoot.prototype, 'setHTMLUnsafe'], [Document, 'parseHTMLUnsafe'], [Document.prototype, 'write'], [Document.prototype, 'writeln'], [document, 'write'], [document, 'writeln']].forEach(function (at) {
+    if (at[0] && at[1] in at[0]) Object.defineProperty(at[0], at[1], { value: refuse, writable: false, configurable: false });
+  });
   var start = JSON.parse(document.getElementById('braindog-start').textContent);
   var root = document.documentElement;
   var handlers = [];
