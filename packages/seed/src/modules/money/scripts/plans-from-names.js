@@ -151,7 +151,7 @@ export default async function run(ctx) {
     for (;;) {
       /* IN ROW NUMBER ORDER: a list answers in its own order, and `seq` below the lowest of a page skips rows. */
       const tests = [...(where ? [where] : []), ...(after === null ? [] : [{ field: 'seq', gt: after }])];
-      const page = await ctx.record.list(list, tests.length === 0 ? null : tests.length === 1 ? tests[0] : { all: tests }, { order: 'seq' });
+      const page = await ctx.record.list(list, tests.length === 0 ? undefined : tests.length === 1 ? tests[0] : { all: tests }, { order: 'seq' });
       for (const r of page) rows.push({ list, id: r.id, spoken: `${list}#${r.seq}`, version: r.version, fields: r.fields });
       if (page.length < PAGE) return rows;
       after = Math.max(...page.map((r) => r.seq));

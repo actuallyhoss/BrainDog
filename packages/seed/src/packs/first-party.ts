@@ -756,6 +756,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   counts the accounts the Accounts tile lists, and Every month says what goes out in the next thirty days as Today
  *   does (`metric.leaving-30d`), parts of plans with it. 3.26.0 is master's. Two figures added and nothing taken away, so a
  *   minor step.
+ * - money-core 3.27.1: `script.book_from_account` and `script.plans_from_names` read each list in row number order
+ *   (`{ order: 'seq' }`), where a list in its own order (the Ledger by day) lost the rows between two pages and a record
+ *   with more than fifty lines or parts was booked and counted short. Two scripts' sources changed, no id added or taken
+ *   away, so a patch step. 3.27.0 is released.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and
@@ -772,7 +776,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.29.0',
   people: '3.8.0',
-  'money-core': '3.27.0',
+  'money-core': '3.27.1',
   estate: '2.5.0',
   work: '1.19.0',
 };
