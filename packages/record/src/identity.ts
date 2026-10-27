@@ -1452,19 +1452,11 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           return true;
         });
         if (!held) return { status: 200, body: { needs: 'code' } satisfies SignupNeeds };
-        /* A CODE MAILED TO THIS ADDRESS PROVES IT: the code is 32 random bytes that only reached the inbox it was sent to
-           (an application's invitation, or an invitation mailed to the address), so a second mail to the same inbox
-           proves nothing more. The proof is handed back to the page, which spends it at once, and nothing is sent. */
-        if (
-          code !== null &&
-          sql.one(
-            `SELECT 1 AS n FROM dir_apply WHERE email = ?1 AND invite_ref = substr(?2, 1, 12)
-             UNION SELECT 1 FROM dir_invite WHERE code_hash = ?2 AND note = ?3`,
-            email,
-            code,
-            `invite: ${email}`,
-          ) !== undefined
-        )
+        /* A CODE MAILED TO THIS ADDRESS PROVES IT: the code is 32 random bytes that only reached the inbox it was sent to,
+           so a second mail to the same inbox proves nothing more. The proof is handed back to the page, which spends it
+           at once, and nothing is sent. ONLY A CODE THE HOST SAYS IT MAILED THERE: a code the operator was shown to pass
+           on by hand, when the letter failed, reached whoever it was handed to, and proves no mailbox. */
+        if (code !== null && sql.one('SELECT 1 AS n FROM dir_invite_mailed WHERE code_hash = ? AND email = ?', code, email) !== undefined)
           return { status: 200, body: { proof: token } satisfies SignupProof };
         /* THE SENTENCE AFTER THE PROOF, in the fragment the Worker puts the proof in (`#verify=<proof>&said=<words>`),
            so the tab the link opens, on any device, builds from it. Only the letter that makes a record carries it: a

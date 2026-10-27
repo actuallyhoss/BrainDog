@@ -224,7 +224,7 @@ export const ADMIN_JS = String.raw`'use strict';
     place.textContent = '';
     place.classList.remove('bad');
     if (mailed) { place.appendChild(el('p', '', 'Invited, the link is mailed.')); return; }
-    place.appendChild(el('p', '', 'The mail could not go, so send this link yourself.'));
+    place.appendChild(el('p', '', 'The mail could not go, so send this link yourself, to that address only. Signing up with it mails them a check first.'));
     var pair = el('div', 'copy');
     var field = el('input');
     field.type = 'text';

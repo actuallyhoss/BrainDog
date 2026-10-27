@@ -157,6 +157,15 @@ test('A LETTER THAT COULD NOT GO STILL ANSWERS THE LINK, with mailed false', asy
     assert.equal(status, 200, JSON.stringify(out));
     assert.equal(out.value?.['mailed'], false);
     assert.match(String(out.value?.['link']), /#code=/);
+
+    /* THE LINK THE OPERATOR WAS SHOWN PROVES NO MAILBOX: whoever it is handed to gets no proof back to spend. */
+    const start = await c.ask('/auth/signup/start', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'dana@example.test', slug: 'dana-books', code: codeIn(String(out.value?.['link'])) }),
+      headers: { 'cf-connecting-ip': '198.51.100.249' },
+    });
+    assert.equal(start.status, 200, await start.clone().text());
+    assert.equal((JSON.parse(await start.clone().text()) as { value?: { proof?: string } }).value?.proof, undefined, 'an unmailed code proved the mailbox');
   } finally {
     await c.close();
   }

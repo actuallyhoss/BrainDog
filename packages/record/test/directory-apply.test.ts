@@ -156,7 +156,8 @@ test('AN INVITATION MINTS ONE CODE THAT SIGNS THEM UP, AND ONLY ITS HASH IS KEPT
   assert.equal(codeOf(await d.applications({ flow: 'apply.decide', id: 'nothing', decision: 'decline' })), 'OUT_OF_BOUNDS');
   assert.equal((await d.invites({ flow: 'invite.list' })).length, 1);
 
-  /* SPENT THROUGH SIGN-UP BY INVITATION, as directory-invite.test.ts does. */
+  /* SPENT THROUGH SIGN-UP BY INVITATION, as directory-invite.test.ts does, once the host says its letter went. */
+  assert.deepEqual(await d.applications({ flow: 'apply.mailed', code, email }), { ok: true, value: { kept: true } });
   const start = (await d.auth({ flow: 'signup.start', email, slug: 'dana-studio', ip: nextIp(), checked: true, invite: true, code } as never)) as AuthResult;
   assert.equal(start.status, 200);
   /* THE CODE WAS MAILED TO THIS ADDRESS, SO IT PROVES IT: no second mail, the proof comes back to spend. */
@@ -165,6 +166,21 @@ test('AN INVITATION MINTS ONE CODE THAT SIGNS THEM UP, AND ONLY ITS HASH IS KEPT
   assert.ok(link);
   assert.equal((await d.auth({ flow: 'signup.verify', token: link, ip: nextIp() })).status, 200);
   assert.equal((await d.invites({ flow: 'invite.list' }))[0]?.state, 'spent');
+});
+
+test('A CODE WHOSE LETTER NEVER WENT PROVES NO MAILBOX: whoever holds it is mailed a proof like anybody else', async () => {
+  const { d } = setup();
+  await submit(d, { name: 'Ceo Victim', email: 'ceo@victim.example' });
+  const [row] = await list(d);
+  assert.ok(row);
+  const out = await d.applications({ flow: 'apply.decide', id: row.id, decision: 'invite' });
+  assert.ok(out.ok && 'code' in out.value, JSON.stringify(out));
+  const { code, email } = out.value as { code: string; email: string };
+  /* THE OPERATOR WAS SHOWN THE LINK, the letter failed, and the link went to somebody else. */
+  const start = (await d.auth({ flow: 'signup.start', email, slug: 'victim-co', ip: nextIp(), checked: true, invite: true, code } as never)) as AuthResult;
+  assert.equal(start.status, 200);
+  assert.equal(start.status === 200 ? (start.body as { proof?: string }).proof : 'refused', undefined, 'an unmailed code was taken as proof of the mailbox');
+  assert.equal(start.status === 200 ? start.mail?.to : undefined, email, 'nothing was mailed to the address to prove it');
 });
 
 test('AN INVITATION TAKES DAYS, AND REFUSES DAYS IT CANNOT KEEP', async () => {

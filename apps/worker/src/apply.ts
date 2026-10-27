@@ -211,6 +211,7 @@ export async function opsApplications(request: Request, deps: OpsApplyDeps): Pro
   const vars = { link, ...(out.value.name ? { name: out.value.name } : {}) };
   const left = daysOf(out.value.ends_at, deps.now());
   const mailed = await deps.mail(out.value.email, left === undefined ? vars : { ...vars, days: left });
+  if (mailed) await deps.applications({ flow: 'apply.mailed', code: out.value.code, email: out.value.email });
   return json({ ok: true, value: { link, mailed } }, 200);
 }
 
@@ -266,5 +267,6 @@ export async function opsInvite(request: Request, deps: OpsApplyDeps): Promise<R
     ...(name ? { name } : {}),
   });
   await deps.applications({ flow: 'apply.invited', email: to, ref: await refOf(code) });
+  if (mailed) await deps.applications({ flow: 'apply.mailed', code, email: to });
   return json({ ok: true, value: { links, ends_at: out.value.ends_at, mailed } }, 200);
 }

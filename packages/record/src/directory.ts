@@ -345,6 +345,15 @@ CREATE TABLE IF NOT EXISTS dir_invite (
   held_until INTEGER                        -- epoch ms, while a proof sent with it is still live
 );
 
+-- A code the host mailed, and the address it reached: the one fact that lets the code stand for proof of that
+-- mailbox at sign-up. A code the operator was handed to pass on by hand has no row here, so its holder is mailed a
+-- proof like anybody else. A NEW TABLE AND NOT A COLUMN, as dir_apply below, and left out of every copy as dir_invite is.
+CREATE TABLE IF NOT EXISTS dir_invite_mailed (
+  code_hash TEXT PRIMARY KEY,               -- the dir_invite row it was mailed for
+  email     TEXT NOT NULL,                  -- lower-cased, trimmed: the address the mail went to
+  at        INTEGER NOT NULL                -- epoch ms
+);
+
 -- An application: somebody who asked for an invitation while sign-up is by invitation (POST /auth/apply), waiting
 -- for the operator to invite or decline them (applications(), apply.decide). One per address, lower-cased and
 -- trimmed. A NEW TABLE AND NOT A COLUMN, for the reason dir_inbound gives above: created on the next open,
@@ -848,7 +857,7 @@ export const CARRIED = [
  * absent from `CARRIED`, so a table added to `SCHEMA` later has to be put in one list or the other: the test reads
  * `sqlite_master` and fails for a table in neither.
  */
-export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite', 'dir_left'] as const;
+export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite', 'dir_invite_mailed', 'dir_left'] as const;
 
 type Carried = (typeof CARRIED)[number];
 
@@ -1170,7 +1179,8 @@ export type ApplyCall =
   | { flow: 'apply.submit'; name: string; email: string; use?: string; link?: string; ip: string; checked: boolean }
   | { flow: 'apply.list' }
   | { flow: 'apply.decide'; id: string; decision: 'invite' | 'decline'; days?: number }
-  | { flow: 'apply.invited'; email: string; ref: string };
+  | { flow: 'apply.invited'; email: string; ref: string }
+  | { flow: 'apply.mailed'; code: string; email: string };
 
 /** An application as the operator's list shows it. */
 export type ApplyRow = {
@@ -1194,6 +1204,7 @@ export type ApplyAnswers = {
   'apply.list': ApplyRow[];
   'apply.decide': Result<ApplyDecided>;
   'apply.invited': Result<{ marked: boolean }>;
+  'apply.mailed': Result<{ kept: boolean }>;
 };
 
 const APPLY_COLUMNS = 'id, name, email, use, link, made_at, updated_at, state, decided_at, invite_ref';
@@ -2968,6 +2979,19 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         const marked =
           sql.all<{ id: string }>("UPDATE dir_apply SET state = 'invited', decided_at = ?, invite_ref = ? WHERE email = ? AND state = 'waiting' RETURNING id", now, ref, email).length > 0;
         return ok({ marked }) as A;
+      }
+      /* THE HOST SAYS A CODE'S LETTER WENT, and to whom: only then does the code prove that mailbox at sign-up. */
+      if (call.flow === 'apply.mailed') {
+        const email = typeof call.email === 'string' ? call.email.trim().toLowerCase() : '';
+        if (typeof call.code !== 'string' || call.code === '' || !EMAIL_ADDRESS.test(email)) return no('VALUE_MALFORMED', 'apply.mailed takes the code and the address it was mailed to.', { at: 'code' }) as A;
+        const hash = await codeHash(call.code);
+        const kept = sql.all<{ code_hash: string }>(
+          'INSERT OR REPLACE INTO dir_invite_mailed (code_hash, email, at) SELECT code_hash, ?, ? FROM dir_invite WHERE code_hash = ? RETURNING code_hash',
+          email,
+          now,
+          hash,
+        ).length > 0;
+        return ok({ kept }) as A;
       }
       if (call.flow === 'apply.decide') {
         const found = typeof call.id === 'string' ? sql.one<ApplyRow>(`SELECT ${APPLY_COLUMNS} FROM dir_apply WHERE id = ?`, call.id) : undefined;
