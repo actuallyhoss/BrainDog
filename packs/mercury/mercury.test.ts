@@ -182,7 +182,7 @@ for (const [name, set, want] of [
  * A vault entry as a row: a label and the host it opens, and no bytes, because a test's `openKey` is the key store.
  *
  * NEEDED SINCE THE LEDGER: install refuses a script whose key is not in the vault ("Add the key called ... to the
- * vault, then install.").
+ * keychain, then install.").
  *
  * SEALED UNDER 'connector' AND NOT THE DEFAULT: this key is opened by the ledger script's own scheduled run, never
  * by a person at a screen. `sealed_under` defaults to `'record'`
@@ -229,13 +229,13 @@ const LEDGER_LINES = [
 ];
 
 
-test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the key is in the vault and the owner approves the call out and the ledger script', async () => {
+test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the key is in the keychain and the owner approves the call out and the ledger script', async () => {
   const { sql, plan, put, close } = await withMoney();
   /* THE FILE AS IT SHIPS, settings and all: the record's door fills them with their defaults. */
   const doc = template();
   /* NOT BEFORE THE KEY IS IN THE VAULT: a script naming a key is refused at install. */
   const early = await put(doc, true);
-  assert.equal(early.ok, false, 'installed with no key in the vault');
+  assert.equal(early.ok, false, 'installed with no key in the keychain');
   assert.equal(fixOf(early as never), 'Add the key called "Mercury (read only)" to the keychain, then install.');
   grantFor(sql, 'Mercury (read only)');
   /* THE SCRIPT'S LINES AND NOTHING ELSE. Before 1.2.0 a line for the balances pull came first, and it read that the
