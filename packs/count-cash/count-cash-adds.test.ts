@@ -97,7 +97,7 @@ const ledger = (sql: Sql): { what: string; direction: string; amount: { amount: 
 test('1.4.1 ADDS TWO BLOCKS TO MONEY WITH HEADS UP, IN THE MAIN COLUMN, and a way into the counter on Money and on an account, and the plan finds the pages on a record holding money-core', async () => {
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(file.value.pack.manifest.version, '2.0.0');
+  assert.equal(file.value.pack.manifest.version, '2.0.1');
   const adds = shipped().adds as { page: string; after: string; block: { kind: string; heading: string; area?: string; when?: unknown; where?: string } }[];
   assert.deepEqual(
     adds.map((a) => [a.page, a.after, a.block.kind, a.block.heading, a.block.area]),
@@ -105,7 +105,7 @@ test('1.4.1 ADDS TWO BLOCKS TO MONEY WITH HEADS UP, IN THE MAIN COLUMN, and a wa
       ['page.money', 'Heads up', 'capture', COUNT, 'main'],
       ['page.money', 'Heads up', 'cards', LAST, 'main'],
       ['page.money', 'Heads up', 'link', 'Count cash', 'main'],
-      ['page.money-account', 'Last moves', 'link', 'Count cash', undefined],
+      ['page.money-account', 'What moved', 'link', 'Count cash', undefined],
     ],
   );
   /* THE BOX IS DRAWN WHILE A BALANCE IS OLD, the same while as Money's own balance check beside it; the last count is

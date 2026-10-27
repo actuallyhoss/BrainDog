@@ -1,6 +1,6 @@
 {
   "pack": "count-cash",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "hand-coins",
   "title": "Count the cash",
   "summary": "Count the cash note by note and coin by coin, or by its total, and the record keeps it as a balance check and files the difference from what it thought was there, as lines you describe or as Discrepancy.",
@@ -268,7 +268,7 @@
     },
     {
       "page": "page.money-account",
-      "after": "Last moves",
+      "after": "What moved",
       "note": "The same counter from an account's page, opened on that account.",
       "block": {
         "kind": "link",
