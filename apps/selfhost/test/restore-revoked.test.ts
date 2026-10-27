@@ -156,3 +156,25 @@ test('AN INVITATION WITHDRAWN AFTER THE COPY DOES NOT OPEN AGAIN WHEN THE COPY I
     await s.close();
   }
 });
+
+test('A LINK CLOSED AFTER THE COPY STAYS CLOSED WHEN THE COPY IS PUT BACK', async () => {
+  const s = await stack();
+  try {
+    const reg = { id: 'register.notes', kind: 'register' as const, body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never };
+    const page = { id: 'page.board', kind: 'page' as const, body: { page: 'board', title: 'Board', requires: ['register.notes'], blocks: [{ kind: 'table', source: 'register.notes', span: 12 }] } as never };
+    assert.ok((await s.api.kernel.install([reg, page])).ok);
+    const opened = await s.api.openShare({ slug: 'board' }, s.owner);
+    assert.ok(opened.ok, JSON.stringify(opened));
+    const id = (opened.value as unknown as { id: string }).id;
+
+    const night = await s.copy();
+    assert.ok((await s.api.closeShare({ id }, s.owner)).ok);
+
+    await s.restore(night);
+    const links = await s.api.shares({}, s.owner);
+    assert.ok(links.ok, JSON.stringify(links));
+    assert.notEqual(links.value.find((l) => l.id === id)?.closed_at ?? null, null, 'the closed link is open again after the restore');
+  } finally {
+    await s.close();
+  }
+});

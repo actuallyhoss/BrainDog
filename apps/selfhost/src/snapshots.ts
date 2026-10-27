@@ -243,6 +243,9 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
           /* READ BEFORE THE TABLES ARE EMPTIED, in the same transaction, so nothing ends a credential between the read
              and the copy and is then lost. */
           const ended = CARRIED.filter((c) => tables.includes(c.table)).map((c) => ({ c, rows: sql.all<Record<string, Param>>(c.read) }));
+          /* A SHARED LINK CLOSED IS ENDED TOO, and it is two events rather than a row, so it is carried as its event:
+             the live `share.close`, written again over a copy that still holds the link open. */
+          const closed = tables.includes('event') ? sql.all<Record<string, Param>>("SELECT * FROM main.event WHERE kind = 'share.close'") : [];
           /* A TABLE THE COPY DOES NOT HOLD ENDS EMPTY. The migrations agree, so such a table is one the record made for
              itself after the copy was taken (`tidy_line`, made by the hourly pass on first use). The copy held nothing
              of it, so the restored record holds nothing of it: the live rows are not kept, and the copy is not refused. */
@@ -257,6 +260,14 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
             sql.exec(`INSERT INTO main."${name}" (${cols}) SELECT ${cols} FROM snap."${name}"`);
           }
           for (const { c, rows } of ended) for (const row of rows) sql.exec(c.write, ...c.columns.map((col) => row[col] ?? null), row.id ?? null);
+          for (const row of closed) {
+            const target = row.target ?? null;
+            const open = sql.one("SELECT 1 AS n FROM main.event WHERE target = ? AND kind = 'share.open'", target);
+            const shut = sql.one("SELECT 1 AS n FROM main.event WHERE target = ? AND kind = 'share.close'", target);
+            if (!open || shut) continue;
+            const cols = Object.keys(row);
+            sql.exec(`INSERT OR IGNORE INTO main.event (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, ...cols.map((c) => row[c] ?? null));
+          }
           sql.exec('COMMIT');
         } catch (e) {
           sql.exec('ROLLBACK');
