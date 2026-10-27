@@ -521,6 +521,12 @@
       min-block-size: var(--tap);
       font-size: var(--fs-body);
     }
+
+    /* A LIST GROUP OPENS ON ITS LINE, so the line is a thumb's height. */
+    summary.label {
+      align-content: center;
+      min-block-size: var(--tap);
+    }
   }
 
   /* A PHONE'S PRESS IS FULL WIDTH, the primary first. */

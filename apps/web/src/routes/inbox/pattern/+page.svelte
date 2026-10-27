@@ -831,4 +831,19 @@
       border: 1px solid CanvasText;
     }
   }
+
+  /* A THUMB NEEDS 44px on every press: the menus, and the way back to the Inbox under no message picked yet. */
+  @media (pointer: coarse) {
+    .paste,
+    .input,
+    .select {
+      min-block-size: var(--tap);
+    }
+
+    .note a {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
 </style>

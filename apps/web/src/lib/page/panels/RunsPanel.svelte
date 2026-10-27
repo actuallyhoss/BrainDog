@@ -300,6 +300,15 @@
       }
     }
 
+    /* ON A PHONE THE NAME WRAPS TO THREE LINES, so the box grows by padding rather than by centring one line. */
+    @container (width < 560px) {
+      a.runs-name {
+        min-block-size: 44px;
+        padding-block: 11px;
+        margin-block: -11px;
+        box-sizing: border-box;
+      }
+    }
   }
 
   /* THE THREE FOOT ACTIONS ARE SEPARATE BUTTONS on a phone: a fill each, 40px tall, the list door first. */

@@ -171,9 +171,12 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* AND THE ASIDE WRAPS WHEN IT CANNOT HOLD ITS OWN CONTROLS: a menu, Lock now and Add a key on a 320px phone. */
   .tile-aside {
     display: flex;
     flex: 0 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     min-inline-size: 0;
     max-inline-size: 100%;
     align-items: center;
