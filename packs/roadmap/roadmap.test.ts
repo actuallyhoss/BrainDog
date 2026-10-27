@@ -1,5 +1,9 @@
 /**
- * A Roadmap page over dated tasks, as a pack.
+ * THE ROADMAP IS WORK'S TIMELINE NOW (work 1.20.0), and this pack is what a record that held it still has: nothing to
+ * draw, and the page handed to Work (`hands`). Its carry-over on a record that held it is driven in
+ * `packages/seed/test/merges-carry.test.ts`.
+ *
+ * WHAT FOLLOWS IS THE ORIGINAL ACCOUNT of why the page exists, kept because it is why Work has it.
  *
  * THE KIND EXISTED AND NO PAGE DREW IT. `roadmap` has been a block kind since the renderer's arithmetic landed, and the
  * record accepts it (`packages/kernel/src/declare.ts`), but no module, pack or use case declared a page with one, so a
@@ -83,42 +87,22 @@ function seed(api: Api): void {
 
 async function roadmapOf(api: Api): Promise<Answered> {
   const page = said<{ title: string; blocks: Answered[] }>(await api.page({ slug: 'roadmap' }, owner));
-  assert.equal(page.title, 'Roadmap');
+  assert.equal(page.title, 'Timeline');
   const block = page.blocks.find((b) => b.kind === 'roadmap');
-  assert.ok(block, 'the Roadmap page has no roadmap block');
+  assert.ok(block, 'the Timeline page has no roadmap block');
   assert.deepEqual(block.refusals, [], `${block.heading} was refused`);
   return block;
 }
 
-test('BEFORE THE PACK: a record with Work and dated tasks has no Roadmap page to open', async () => {
+test('WORK DRAWS THE TIMELINE ON ITS OWN: in the nav under Work, every task in play that has a due day, soonest first', async () => {
   const { api, close } = await work();
   seed(api);
-  assert.ok(!said<{ slug: string }[]>(await api.pages(owner)).some((p) => p.slug === 'roadmap'));
-  const r = (await api.page({ slug: 'roadmap' }, owner)) as Out;
-  assert.equal(r.ok, false, 'a roadmap page answered before the pack was installed');
-  close();
-});
-
-test('the plan adds one page, lays nothing on Work, and asks nobody to press anything', async () => {
-  const { api, close } = await work();
-  const diff = await planOf(api, pack());
-  assert.deepEqual(diff.approve, [], 'a page over a list the record already has needs no approval');
-  assert.deepEqual(diff.conflicts, []);
-  assert.equal((pack() as { extends?: unknown }).extends, undefined, 'a roadmap reads the fields a task has; it adds none');
-  close();
-});
-
-test('installed, the Roadmap is in the nav under Work, and draws every task in play that has a due day, soonest first', async () => {
-  const { api, close } = await work();
-  said(await put(api, pack()));
-  seed(api);
-  assert.ok(said<{ slug: string }[]>(await api.pages(owner)).some((p) => p.slug === 'roadmap'), 'the Roadmap page is not listed');
-  /* THE NAV IS READ OFF THE DECLARATION, because `pages` answers a slug and a title and nothing else (measured). */
+  assert.ok(said<{ slug: string }[]>(await api.pages(owner)).some((p) => p.slug === 'roadmap'), 'the Timeline page is not listed');
   const declared = api.kernel.declarations().find((d) => d.id === 'page.roadmap');
   assert.equal((JSON.parse(declared!.body) as { nav?: { section?: string } }).nav?.section, 'Work');
   const block = await roadmapOf(api);
-  /* DONE OR DROPPED WORK AND WORK WITH NO DAY ARE NOT ON IT: the first two are behind the person and the last has
-     nowhere on an axis to go. The backlog is, because work kept for later that has a date is still work somebody has put on the calendar. */
+  /* DONE OR DROPPED WORK AND WORK WITH NO DAY ARE NOT ON IT; the backlog is, because work kept for later that has a date
+     is still work somebody has put on the calendar. */
   assert.deepEqual(
     block.rows.map((r) => r.fields.what),
     ['Glaze test, second firing', 'Cut the specimen page', 'Kiln delivery', 'Price list for the winter fair'],
@@ -128,28 +112,21 @@ test('installed, the Roadmap is in the nav under Work, and draws every task in p
 
 test('THE COLUMNS ARE THE ORDER THE KIND READS: title, due day, effort, which is what the drag writes back', async () => {
   const { api, close } = await work();
-  said(await put(api, pack()));
   seed(api);
   const block = await roadmapOf(api);
-  const columns = ((pack().declarations as { blocks: { columns: { field: string }[] }[] }[])[0]!.blocks[0]!.columns).map((c) => c.field);
-  assert.deepEqual(columns, ['what', 'by', 'effort']);
-  /* Read as the drawer reads a row: an effort in days, as the web shows it, and the due day. Three windows and one date,
-     none skipped, so a page that answered and drew nothing would fail here. */
+  assert.deepEqual((block.columns ?? []).map((c) => c.field), ['what', 'by', 'effort']);
   const rows = block.rows.map((r) =>
     roadmapRow(String(r.fields.what), String(r.fields.by), typeof r.fields.effort === 'number' ? `${r.fields.effort / DAY_SECONDS} d` : ''),
   );
   const plan = roadmapPlan(rows, '2026-09-24');
   assert.deepEqual(plan.skipped, []);
   assert.deepEqual([plan.bars.length, plan.stems.length], [3, 1]);
-  /* THE SPAN STARTS JUST BEFORE THE FIRST THING ON IT AND ENDS A FEW DAYS AFTER THE LAST, and on neither month edge
-     (`roadmapPlan`). */
   assert.deepEqual([plan.from, plan.to], ['2026-09-22', '2026-11-23']);
   close();
 });
 
-test('a task moved on the record moves on the roadmap, because the page reads the list and holds no copy of it', async () => {
+test('a task moved on the record moves on the timeline, because the page reads the list and holds no copy of it', async () => {
   const { api, close } = await work();
-  said(await put(api, pack()));
   seed(api);
   const kiln = api.kernel.get('tasks#3')!;
   said(api.kernel.update('tasks', 'tasks#3', { by: '2026-09-25' }, { actor: 'p_1', version: kiln.version }));
@@ -157,23 +134,31 @@ test('a task moved on the record moves on the roadmap, because the page reads th
   close();
 });
 
-test('on a record without Work the plan is refused, naming the module to install first', async () => {
-  const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
-  const r = (await api.planPack({ doc: pack(), source: { kind: 'local' } } as never, owner)) as Out;
-  assert.equal(r.ok, false);
-  assert.match(`${r.refusal?.code} ${r.refusal?.fix}`, /work/u);
-  sql.close();
+test('THE OLD ID IS STILL INSTALLABLE, says it is part of Work, declares nothing and hands the page to Work', async () => {
+  const file = pack() as { summary: string; declarations: unknown[]; hands: Record<string, string>; version: string; unlisted?: boolean };
+  assert.match(file.summary, /^Now part of Work/u);
+  assert.equal(file.version, '2.0.0');
+  assert.deepEqual(file.declarations, []);
+  assert.deepEqual(file.hands, { 'page.roadmap': 'work' });
+  const { api, close } = await work();
+  const diff = await planOf(api, pack());
+  assert.deepEqual(diff.approve, []);
+  assert.deepEqual(diff.conflicts, []);
+  said(await put(api, pack()));
+  assert.equal(((await roadmapOf(api)) as { heading: string }).heading, 'In play', 'installing the retired add-on took the page away');
+  close();
 });
 
-test('uninstalling it takes the page away and leaves every task where it was', async () => {
-  const { api, close } = await work();
-  said(await put(api, pack()));
-  seed(api);
-  said(await api.uninstallPack({ id: 'roadmap' } as never, owner));
-  assert.ok(!said<{ slug: string }[]>(await api.pages(owner)).some((p) => p.slug === 'roadmap'));
-  assert.equal(api.kernel.get('tasks#1')!.fields.by, '2026-10-02');
-  close();
+test('on a record without Work the plan says Work is needed first, and install is refused', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const planned = said<{ diff: { planHash: string; approve: unknown[]; requires: { packs: { id: string; ok: boolean }[] } } }>(
+    await api.planPack({ doc: pack(), source: { kind: 'local' } } as never, owner),
+  ).diff;
+  assert.deepEqual(planned.requires.packs.filter((p) => !p.ok).map((p) => p.id), ['work']);
+  const r = (await api.installPack({ doc: pack(), source: { kind: 'local' }, planHash: planned.planHash, approve: planned.approve } as never, owner)) as Out;
+  assert.equal(r.ok, false);
+  sql.close();
 });
 
 test('the same file passes as an add-on somebody opens from disk', async () => {

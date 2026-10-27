@@ -3,7 +3,7 @@
   "version": "1.19.0",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "A thread has six states, its moves and a day it aims for. A follow-up takes its parent's project, thread and owner where it left them empty, and its agent when that agent made it. The Board has the line to add work. A project with nothing written on its tasks for thirty days is marked quiet. Work answers your questions about tasks, lists work with no project, shows Late, Waiting on you, This week and With an agent, narrows to yours or the agents', and folds what has not moved in three months.",
+  "changes": "The Roadmap add-on is a page of Work now, the Timeline. A thread has six states, its moves and a day it aims for. A follow-up takes its parent's project, thread, owner and agent where it left them empty. The Board has the line to add work. Work answers your questions about tasks, lists work with no project, shows Late, Waiting on you, This week and With an agent, narrows to yours or the agents', and folds what has not moved in three months.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -396,6 +396,32 @@
       ]
     },
     {
+      "page": "roadmap",
+      "title": "Timeline",
+      "nav": { "section": "Work", "order": 30 },
+      "icon": "calendar",
+      "requires": [ "register.tasks" ],
+      "pack": "work",
+      "blocks": [
+        { "kind": "note", "lead": true, "span": 12, "body": "Your dated tasks on one time axis. Drag one to move its day." },
+        {
+          "kind": "roadmap",
+          "heading": "In play",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "by is set, state is not done or dropped",
+          "columns": [
+            { "field": "what", "label": "What" },
+            { "field": "by", "label": "Due" },
+            { "field": "effort", "label": "Effort" }
+          ],
+          "order": [ { "field": "by", "dir": "asc" } ],
+          "limit": 200,
+          "empty": "No task in play has a due day yet."
+        }
+      ]
+    },
+    {
       "metric": "project-open",
       "name": "Open",
       "source": "register.tasks",
@@ -768,6 +794,7 @@
       "writes": [ "tasks" ],
       "source": "export default async function run(ctx) {\n  const task = await ctx.record.get(ctx.input.id);\n  if (!task || !task.fields.parent) return;\n  const parent = await ctx.record.get(task.fields.parent);\n  if (!parent) return;\n  const patch = {};\n  for (const field of ['thing', 'track', 'owner'])\n    if (!task.fields[field] && parent.fields[field]) patch[field] = parent.fields[field];\n  const name = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');\n  const by = ctx.input.made_by;\n  const maker = by !== null && typeof by === 'object' ? name(by.agent) : '';\n  if (!task.fields.agent && maker !== '' && maker !== 'other' && maker === name(parent.fields.agent)) patch.agent = parent.fields.agent;\n  if (Object.keys(patch).length > 0) ctx.update('tasks#' + task.seq, patch, task.version);\n}"
     }
+
   ],
   "seeds": [
     {

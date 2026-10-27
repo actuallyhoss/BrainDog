@@ -250,13 +250,13 @@ function unplaced(pack: Pack, holds: readonly string[]): Pack {
 const SCRIPTS: Readonly<Record<string, string>> = { close_follow_ups: './close-follow-ups.js', start_with_parent: './start-with-parent.js' };
 const source = (script: string): string => readFileSync(new URL(SCRIPTS[script]!, import.meta.url), 'utf8');
 
-test('THE FILE IS WORK AND ONLY WORK: three lists, two pages, twenty-eight figures over its own lists, two rules, two scripts', () => {
+test('THE FILE IS WORK AND ONLY WORK: three lists, three pages, twenty-eight figures over its own lists, two rules, two scripts', () => {
   const doc = file();
   assert.equal(doc.pack, 'work');
   const kinds = doc.declarations.map((d) => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else');
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 3, page: 2, metric: 28, rule: 2, script: 2 },
+    { register: 3, page: 3, metric: 28, rule: 2, script: 2 },
   );
   assert.ok(!kinds.includes('ingest') && !kinds.includes('something else'), 'the file declares something that is none of the five');
   assert.deepEqual(doc.declarations.flatMap((d) => (typeof d.register === 'string' && d.rule === undefined ? [d.register] : [])), [...OWN]);
@@ -458,7 +458,7 @@ const TASK = { what: 'Proof the spring catalogue', state: 'open', by: '2026-03-1
 const THREAD = { name: 'Spring catalogue', state: 'open' };
 
 for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-seven parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-eight parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, moduleDoc(holds, [])));
@@ -466,7 +466,7 @@ for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
     const mine = stored(filed.api);
     const theirs = stored(built.api);
     const work = (await read(file())).declarations.map((d) => d.id);
-    assert.equal(work.length, 37);
+    assert.equal(work.length, 38);
     for (const id of work) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

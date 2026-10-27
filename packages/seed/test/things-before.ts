@@ -17,6 +17,8 @@ const EVERYONE_LINES = [
 const PAGES_ADDED: Readonly<Record<string, ReadonlySet<string>>> = {
   'money-core': new Set(['money-account', 'money-bill']),
   estate: new Set(['service']),
+  /* AND WORK'S TIMELINE, the page the Roadmap add-on handed to Work in the add-ons pass of 27 October. */
+  work: new Set(['roadmap']),
 };
 
 /** A page over every project as a use case declared it before 24 October: only those building or earning had one. */

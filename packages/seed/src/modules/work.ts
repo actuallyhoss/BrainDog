@@ -1214,4 +1214,37 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       },
     ],
   },
+
+  /**
+   * THE TIMELINE, SINCE work 1.19.0: the dated tasks on one time axis, an effort as a window and a due day as a line, and
+   * either dragged to a new date. It was the Roadmap add-on, one page over Work's own list, and is a page of Work now. THE
+   * PAGE ID IS THE ADD-ON'S (`roadmap`), so a record holding Roadmap is handed the page, its changes and where it is
+   * pinned (`packs/roadmap`, `hands`), and the add-on retires.
+   */
+  roadmap: {
+    page: 'roadmap',
+    title: 'Timeline',
+    nav: { section: 'Work', order: 30 },
+    icon: 'calendar',
+    requires: ['register.tasks'],
+    pack: 'work',
+    blocks: [
+      { kind: 'note', lead: true, span: 12, body: 'Your dated tasks on one time axis. Drag one to move its day.' },
+      {
+        kind: 'roadmap',
+        heading: 'In play',
+        span: 12,
+        source: 'register.tasks',
+        where: 'by is set, state is not done or dropped',
+        columns: [
+          { field: 'what', label: 'What' },
+          { field: 'by', label: 'Due' },
+          { field: 'effort', label: 'Effort' },
+        ],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 200,
+        empty: 'No task in play has a due day yet.',
+      },
+    ],
+  },
 };

@@ -558,6 +558,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   one figure and two blocks added, nothing taken away. And the Board reads every task in play before any done one,
  *   its line says what is kept for later, and Everything open goes from under it (audit B of 25 October, Y8, inside
  *   the unreleased step): one block taken from a page that is there, no id added or taken away.
+ * - work 1.19.0, the Timeline (the add-ons pass of 27 October, inside the unreleased step): the dated tasks on one time axis
+ *   are a page of Work, `page.roadmap`, which the Roadmap add-on hands over (`hands`, so a record holding Roadmap keeps the
+ *   page and Roadmap retires). A page added, nothing taken away, no version of its own.
  * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
  *   pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`,
  *   pairs-fx-61); two figures over who made each Ledger entry, `filed-for-you-30d` and `filed-today`, read from
