@@ -392,7 +392,7 @@ test('A KEY NAMED BUT NOT IN THE VAULT IS REFUSED AT INSTALL, so nothing is ever
   const put = await r.put(fillFeed(template(), { ...EXAMPLE, ...PROJECT }));
   assert.equal(put.ok, false);
   assert.equal(put.refusal?.code, 'REQUIRED_MISSING');
-  assert.equal(put.refusal?.fix, `Add the key called "${LABEL}" to the vault, then install.`);
+  assert.equal(put.refusal?.fix, `Add the key called "${LABEL}" to the keychain, then install.`);
   const net = address();
   const out = await r.run(net.send, async () => KEY);
   assert.deepEqual([net.seen, out.ran, r.readings()], [[], 0, []]);

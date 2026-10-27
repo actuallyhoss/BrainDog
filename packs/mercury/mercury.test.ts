@@ -236,7 +236,7 @@ test('INSTALLED THROUGH THE RECORD’S OWN DOOR, once the key is in the vault an
   /* NOT BEFORE THE KEY IS IN THE VAULT: a script naming a key is refused at install. */
   const early = await put(doc, true);
   assert.equal(early.ok, false, 'installed with no key in the vault');
-  assert.equal(fixOf(early as never), 'Add the key called "Mercury (read only)" to the vault, then install.');
+  assert.equal(fixOf(early as never), 'Add the key called "Mercury (read only)" to the keychain, then install.');
   grantFor(sql, 'Mercury (read only)');
   /* THE SCRIPT'S LINES AND NOTHING ELSE. Before 1.2.0 a line for the balances pull came first, and it read that the
      pull sent no key while every run sent one; with the pull gone, every line he approves names the key it sends. */
