@@ -22,8 +22,8 @@ import type { Json } from './coerce.ts';
 import { clearFault, raiseFault } from './fault.ts';
 import { restDaysOf } from './forecast.ts';
 import { backoffMs, type AckDeps } from './outbox.ts';
-import { ABANDON_MS } from './presence.ts';
-import { SESSION, isHelper, leftFreshStep } from './session.ts';
+import { ABANDON_MS, quietRuns } from './presence.ts';
+import { isHelper, leftFreshStep } from './session.ts';
 import { resolveDay } from '@braindog/where';
 
 const DAY_MS = 86_400_000;
@@ -660,14 +660,8 @@ export function sweepSessions(
   move: (id: string, to: 'abandoned' | 'handoff', note: string) => boolean,
   limit = 100,
 ): number {
-  const quiet = sql.all<{ id: string; fields: string }>(
-    `SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND state IN ('active', 'idle')
-     AND coalesce(json_extract(fields, '$.last_seen'), updated_at) < ?
-     ORDER BY coalesce(json_extract(fields, '$.last_seen'), updated_at) LIMIT ?`,
-    SESSION,
-    iso(nowMs - ABANDON_MS),
-    Math.max(0, Math.floor(limit)),
-  );
+  /* HEARD OR PULSED, read by the one clock (`quietRuns`): a window open on a question pulses and calls nothing. */
+  const quiet = quietRuns(sql, nowMs, ABANDON_MS, limit);
   let n = 0;
   for (const row of quiet) {
     const fields = JSON.parse(row.fields) as Record<string, Json>;

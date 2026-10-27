@@ -534,7 +534,8 @@ function readOldest(sql: Sql, nowMs: number, tz: string): SignReading {
 /* RUNS ARE THE RECORD'S OWN BOOKKEEPING (agents' sessions, counted for health): owner-level by design, no private-row clause. */
 function readRuns(sql: Sql, nowMs: number): SignReading {
   const since = new Date(nowMs - RUNS_WINDOW_DAYS * DAY).toISOString();
-  const HEARD = "coalesce(json_extract(fields, '$.last_seen'), updated_at)";
+  /* HEARD OR PULSED, as the sweep reads it (`quietRuns` in `presence.ts`): a window open on a question is not silent. */
+  const HEARD = "max(coalesce(json_extract(fields, '$.last_seen'), updated_at), coalesce(json_extract(fields, '$.pulse_at'), ''))";
   const AGENT = "coalesce(json_extract(fields, '$.client'), json_extract(fields, '$.agent'))";
   /* A WEEK OF RUNS IS RUNS HEARD FROM HERE THIS WEEK, by `last_seen` alone. A run never heard from here (`presenceOf`'s
      `before`: one carried in from another system, all of them written off there) has no `last_seen`, and read by its

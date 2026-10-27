@@ -69,3 +69,30 @@ test('THIRTEEN HOURS ON: a run that left a fresh step waits as a handoff, a help
   assert.equal(k.get('S6')!.state, 'active');
   sql.close();
 });
+
+/* A WINDOW LEFT OPEN ON A QUESTION calls nothing for hours and its bridge keeps pulsing. Read by its calls alone, the
+   sweep wrote it off as abandoned thirteen seconds after a pulse, and every such window counted on runs-true as a run
+   whose end was lost. A pulse is heard; a run whose pulse stopped too is written off as before. */
+test('A RUN WHOSE BRIDGE STILL PULSES IS NOT WRITTEN OFF, however long since its last call; one whose pulse stopped is', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const k = await openRecord(sql, clock);
+  ok(await k.install([TASKS]));
+
+  ok(k.create('tasks', { what: 'Asked him a question' }, as({ client_id: 'open' })));
+  ok(k.create('tasks', { what: 'Closed without an end' }, as({ client_id: 'shut' })));
+  /* Both pulse for an hour, then only the first keeps on: its window is still open. */
+  clock.advance(HOUR);
+  assert.ok(k.pulseRun('S1', clock.now()));
+  assert.ok(k.pulseRun('S2', clock.now()));
+  clock.advance(12 * HOUR + MIN);
+  assert.ok(k.pulseRun('S1', clock.now()));
+
+  sql.exec(
+    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('01J00000000000000000000002', ?, 'purge', 'sweep', '{}', 'pending', 0)",
+    iso(clock.now()),
+  );
+  assert.ok((await k.drain()).done >= 1);
+  assert.deepEqual(['S1', 'S2'].map((s) => k.get(s)!.state), ['active', 'abandoned']);
+  sql.close();
+});

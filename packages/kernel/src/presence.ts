@@ -204,11 +204,35 @@ export function unheardRuns(sql: Sql, nowMs: number, olderMs: number, states: re
   const before = new Date(nowMs - olderMs).toISOString();
   const row = sql.one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM entry WHERE register = '${RUNS}' AND deleted_at IS NULL AND state IN (SELECT value FROM json_each(?))
-       ${also === '' ? '' : `AND ${also} `}AND coalesce(json_extract(fields, '$.last_seen'), updated_at) < ?`,
+       ${also === '' ? '' : `AND ${also} `}AND ${HEARD_OR_OPEN_SQL} < ?`,
     JSON.stringify(states),
     before,
   );
   return row?.n ?? 0;
+}
+
+/**
+ * When a run was last heard from or last said it was open: the later of its `last_seen` (else its last change) and its
+ * `pulse_at`. What the sweep writes off by, and what `unheardRuns` counts by, so both read one clock.
+ *
+ * A PULSE IS HEARD FOR THE SWEEP. A Claude Code window left open on a question for twelve hours calls nothing, and the
+ * bridge keeps saying it is open; read by `last_seen` alone the sweep wrote it off as abandoned thirteen seconds after
+ * a pulse, and the runs-true sign counted every such window as a run whose end was lost.
+ */
+const HEARD_OR_OPEN_SQL =
+  "max(coalesce(json_extract(fields, '$.last_seen'), updated_at), coalesce(json_extract(fields, '$.pulse_at'), ''))";
+
+/**
+ * The open runs, active or idle, neither heard from nor pulsed in `olderMs`, oldest first, at most `limit`: what the
+ * hourly sweep writes off (`sweepSessions` in `schedule.ts`).
+ */
+export function quietRuns(sql: Sql, nowMs: number, olderMs: number, limit: number): { id: string; fields: string }[] {
+  return sql.all<{ id: string; fields: string }>(
+    `SELECT id, fields FROM entry WHERE register = '${RUNS}' AND deleted_at IS NULL AND state IN ('active', 'idle')
+       AND ${HEARD_OR_OPEN_SQL} < ? ORDER BY ${HEARD_OR_OPEN_SQL} LIMIT ?`,
+    new Date(nowMs - olderMs).toISOString(),
+    Math.max(0, Math.floor(limit)),
+  );
 }
 
 /**

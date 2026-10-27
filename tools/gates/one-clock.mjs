@@ -51,8 +51,6 @@ export const isTest = (rel) => /\.test\.[cm]?[jt]s$/u.test(rel) || /(?:^|\/)test
 export const ALLOWED = {
   /* `workingAt`: the web's own 15 minutes, for a page's mark on the row an agent is on. */
   'apps/web/src/lib/record/api.ts': 1,
-  /* The sweep's twelve hours, in SQL: `ABANDON_MS` is presence's, the comparison is not yet. */
-  'packages/kernel/src/schedule.ts': 1,
   /* The ladder's 45 minutes, twice in SQL: the run a write that names none is adopted into. */
   'packages/kernel/src/session.ts': 2,
   /* The runs-true sign: a week of runs, and the runs still open long after they were heard from. */
