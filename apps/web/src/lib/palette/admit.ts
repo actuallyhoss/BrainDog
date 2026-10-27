@@ -380,7 +380,7 @@ export const COMMANDS: readonly Command[] = [
     href: '/count-cash',
     group: copy.destinations,
     icon: 'money',
-    aliases: ['till', 'notes', 'coins'],
+    aliases: ['till', 'banknotes', 'coins'],
     when: (live) => live.cashCount === true,
   },
   /* AND THE THREE THAT ADD MONEY (`create.ts` `MONEY_ADDS`), offered while the record keeps a ledger. */

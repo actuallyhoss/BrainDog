@@ -19,6 +19,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
+import { KEEP_RATES_AT } from '@braindog/declare';
 import type { Bars, FxRead, MeasureSeries, Part, QueueQuestion, TargetIn } from '@braindog/kernel';
 import { COSTS, isBucket, isQuiet } from '@braindog/kernel/constants';
 import { KPIS_KIND, MISSING, UNNAMED, dateSaid, datesIn, exponentOf, integer, slugWords, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
@@ -122,7 +123,7 @@ export const footWords = {
 export type RatesWay = 'none' | 'held' | 'unread';
 
 /** The rates action, filled in and waiting for a yes. Record-relative: the renderer's `href` puts the record in front. */
-const RATES_PRESET = '/addons/money-core#keep-rates';
+const RATES_PRESET = KEEP_RATES_AT;
 
 /** Where a scheduled action is listed with its state and its way back on. An action has no address of its own. */
 const RATES_HELD = '/automations?tab=scheduled';

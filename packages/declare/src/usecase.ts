@@ -82,6 +82,9 @@ export type Audience = string;
 export const MODULES = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'] as const;
 export type ModuleId = (typeof MODULES)[number];
 
+/** Where Money's own switch for keeping rates current is, on its add-on page: said once, for every screen that points at it. */
+export const KEEP_RATES_AT = '/addons/money-core#keep-rates';
+
 /**
  * THE CORE: the parts of BrainDog itself, which every starter needs, agents read and write on every record, and other lists
  * point at. Projects, People, Work and Agents. They are never offered as add-ons, have no off switch on a screen and

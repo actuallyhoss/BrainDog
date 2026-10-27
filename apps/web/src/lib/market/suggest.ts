@@ -17,6 +17,7 @@
  * PURE, so `node --test` reads it.
  */
 
+import { KEEP_RATES_AT } from '@braindog/declare';
 import type { PackState } from '../record/packs.ts';
 import { actionOf, type Listing } from './listing.ts';
 import { shelfOf } from './shelves.ts';
@@ -36,7 +37,7 @@ export const suggestWords = {
   ratesLine: 'Fetches what one dollar is worth in each currency you hold, once a day. A setting in Money.',
   ratesCue: 'Set up',
   /** Where the rates feed is set up: the scheduled action for rates, filled in. */
-  ratesAt: '/addons/money-core#keep-rates',
+  ratesAt: KEEP_RATES_AT,
   asked: (question: string): string => `Needs you asks: "${question}"`,
   add: 'Add',
 } as const;

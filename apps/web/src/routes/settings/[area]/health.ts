@@ -15,6 +15,7 @@
  * nothing of them, and never "healthy" in their place. With nothing read there is no sentence at all.
  */
 
+import { KEEP_RATES_AT } from '@braindog/declare';
 import type { MeterKey } from '../../../lib/record/actions.ts';
 
 /**
@@ -84,7 +85,7 @@ export type More = {
 /** The word of the link when the newest exchange rate is old. */
 export const KEEP_RATES = 'Keep rates current';
 /** Money's switch for it (`routes/addons/[id]/rates-switch.ts`). */
-const KEEP_RATES_AT = '/addons/money-core#keep-rates';
+
 export const OPEN_THEM = 'Open the inbox';
 
 /** The sign that counts messages waiting to be filed. */

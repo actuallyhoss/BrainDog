@@ -7,6 +7,7 @@
  * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE.
  */
 
+import { KEEP_RATES_AT } from '@braindog/declare';
 import { ratesSpecFor } from '@braindog/pack-rates-poll/fill';
 import type { PackState } from '../../../lib/record/packs.ts';
 
@@ -20,7 +21,7 @@ export const ratesFeedOf = (packs: readonly PackState[]): PackState | null => pa
 export const ratesKept = (feed: Pick<PackState, 'disabled_at'> | null): boolean => feed !== null && feed.disabled_at === null;
 
 /** Where the switch is, for Health and the foot of a page to link to. */
-export const KEEP_RATES_AT = '/addons/money-core#keep-rates';
+export { KEEP_RATES_AT };
 
 /** Where the switch goes when the feed is not installed yet: the rates action, filled in, which asks for the address. */
 export const KEEP_RATES_ASK = '/automations?new=action&preset=rates';
