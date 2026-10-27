@@ -101,6 +101,7 @@ export function visualPage(html: string, names: ReadonlySet<string>): { page: st
   const tag = TAGS.exec(page);
   if (tag) return { fault: TAG_SAID[tag[1]!.toLowerCase()] ?? OTHER_TAG };
   if (/@import\b/iu.test(page)) return { fault: 'it imports a stylesheet, and a visual loads nothing. Write the styles in it.' };
+  if (/\bshadowroot(?:mode|clonable|delegatesfocus|serializable)\b/iu.test(page)) return { fault: 'it opens a shadow root, and a visual draws in its own page. Write the markup as it is.' };
   /* THE MARKUP AND ITS STYLES ARE READ FOR ADDRESSES WITHOUT ITS SCRIPTS, where `src = …` is a variable and not a tag's. */
   const markup = page.replace(SCRIPTS, '');
   for (const m of markup.matchAll(ADDRESSED))

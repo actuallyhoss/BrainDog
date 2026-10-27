@@ -95,15 +95,16 @@ test('THE THEME KEEPS ONLY VALUES THAT CANNOT END THEIR DECLARATION, and names r
   assert.equal(theme.tokens.tile, undefined);
 });
 
-test('THE DOCUMENT CARRIES THE POLICY, THEN THE START DATA, THEN THE BRIDGE, THEN THE CODE', () => {
+test('THE DOCUMENT CARRIES THE POLICY, THEN THE GUARD, THEN THE START DATA, THEN THE BRIDGE, THEN THE CODE', () => {
   const doc = drawnDocument('<p id="mine">hi</p>', { data: { list: 'tasks', columns: [], rows: [{ ref: 'tasks#1', fields: { title: '</script><script>alert(1)</script>' } }] }, theme: { mode: 'light', tokens: {} } });
   const policy = doc.indexOf(DRAWN_POLICY);
+  const guard = doc.indexOf('RTCPeerConnection');
   const start = doc.indexOf('id="braindog-start"');
   const bridge = doc.indexOf('window.braindog');
   const code = doc.indexOf('<p id="mine">');
-  assert.ok(policy > 0 && policy < start && start < bridge && bridge < code, 'out of order');
+  assert.ok(policy > 0 && policy < guard && guard < start && start < bridge && bridge < code, 'out of order');
   /* A VALUE CANNOT CLOSE THE START DATA'S SCRIPT TAG. */
-  assert.equal(doc.split('</script>').length - 1, 2, 'a value closed a script tag');
+  assert.equal(doc.split('</script>').length - 1, 3, 'a value closed a script tag');
   assert.match(DRAWN_POLICY, /default-src 'none'/u);
   assert.doesNotMatch(DRAWN_POLICY, /connect-src (?!'none')/u);
 });

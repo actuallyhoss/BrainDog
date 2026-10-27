@@ -87,3 +87,14 @@ test('A SHADOW ROOT WRITTEN IN THE MARKUP IS REFUSED AT INSTALL, where the watch
   assert.equal(drawnCodeFault(code), drawnFault(code));
   assert.equal(drawnFault('<div class="shadow">root</div>'), null);
 });
+
+test('A VISUAL IS DRAWN UNDER THE SAME GUARD, BEFORE ITS PAGE, AND ITS SHADOW ROOTS ARE REFUSED TOO', async () => {
+  const { visualDocument } = await import('./visual.ts');
+  const { DRAWN_GUARD } = await import('./drawn.ts');
+  const { visualPage } = await import('../../kernel/src/visual.ts');
+  const doc = visualDocument('<p>mine</p>', {}, { mode: 'light', tokens: {} });
+  assert.ok(doc.includes(DRAWN_GUARD), 'a visual is drawn with no guard');
+  assert.ok(doc.indexOf(DRAWN_GUARD) < doc.indexOf('<p>mine</p>'));
+  assert.ok('fault' in visualPage('<div><template shadowrootmode="open"><p>x</p></template></div>', new Set()));
+  assert.ok(!('fault' in visualPage('<div><p>a shadow root is a word here</p></div>', new Set())));
+});

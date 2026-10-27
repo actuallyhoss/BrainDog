@@ -3,7 +3,7 @@
  * the file door, so the frame stays without network. Whole width, scrolling inside itself.
  */
 
-import { DRAWN_POLICY, type DrawnTheme } from './drawn.ts';
+import { DRAWN_GUARD, DRAWN_POLICY, type DrawnTheme } from './drawn.ts';
 
 /** The places a page names a picture: an attribute's value, each `srcset` candidate, and a CSS `url()`. */
 const ATTRIBUTE = /(\s(?:src|href|poster|xlink:href|background)\s*=\s*)("([^"]*)"|'([^']*)'|([^\s"'>]+))/giu;
@@ -72,6 +72,7 @@ export function visualDocument(page: string, pictures: Readonly<Record<string, s
     `<meta http-equiv="content-security-policy" content="${DRAWN_POLICY}">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<style>${BASE_STYLE}</style>`,
+    `<script>${DRAWN_GUARD}</script>`,
     `<script type="application/json" id="braindog-theme">${scriptJson(theme)}</script>`,
     `<script>${BRIDGE}</script>`,
     '</head><body>',

@@ -115,19 +115,17 @@ export function drawnTheme(mode: 'light' | 'dark', read: (name: string) => strin
 const scriptJson = (v: unknown): string => JSON.stringify(v).replace(/</gu, '\\u003c');
 
 /**
- * THE BRIDGE, the one script the host writes into every drawn document, before the author's: `braindog.data`,
- * `braindog.theme`, `braindog.on(fn)` (called now and on every change), `braindog.open(ref)`, the theme painted onto the
- * root as CSS variables, and the height said to the host whenever the body changes size.
+ * THE GUARD, written before anything else into every document drawn in the frame, a drawn block's and a visual's: it
+ * takes away the ways out the policy does not close, before any author's script runs.
  *
- * AND FIRST IT TAKES AWAY THE ONE WAY OUT THE POLICY DOES NOT CLOSE. No browser enforces a policy on a peer connection
- * (`connect-src` does not cover one, and `webrtc 'block'` is in no engine), and a component's ICE servers are hosts it
- * names: measured, Chromium sent UDP to a TURN server the code named, from a frame under `DRAWN_POLICY`. So the
- * constructors are gone from the window for good, and a frame the component makes, whose window would hold fresh ones,
- * is taken out again before any task can run in it; a shadow root or a second document, where that watch cannot see,
- * is refused. Navigating the frame is held by the page around it, whose
- * `frame-src` names only BrainDog and the embed providers.
+ * No browser enforces a policy on a peer connection (`connect-src` does not cover one, and `webrtc 'block'` is in no
+ * engine), and a component's ICE servers are hosts it names: measured, Chromium sent UDP to a TURN server the code named,
+ * from a frame under `DRAWN_POLICY`, and so did a `srcdoc` frame the code made, whose window holds constructors of its
+ * own. So the constructors are gone from the window for good, a frame the code makes is taken out again before any task
+ * can run in it, and a shadow root or a second document, where that watch cannot see, is refused. Navigating the frame
+ * is held by the page around it, whose `frame-src` names only BrainDog and the embed providers.
  */
-const BRIDGE = `(function () {
+export const DRAWN_GUARD = `(function () {
   ['RTCPeerConnection', 'webkitRTCPeerConnection', 'mozRTCPeerConnection'].forEach(function (n) {
     try { Object.defineProperty(window, n, { value: undefined, writable: false, configurable: false }); } catch (e) {}
   });
@@ -144,6 +142,14 @@ const BRIDGE = `(function () {
   [[Element.prototype, 'attachShadow'], [Element.prototype, 'setHTMLUnsafe'], [window.ShadowRoot && ShadowRoot.prototype, 'setHTMLUnsafe'], [Document, 'parseHTMLUnsafe'], [Document.prototype, 'write'], [Document.prototype, 'writeln'], [document, 'write'], [document, 'writeln']].forEach(function (at) {
     if (at[0] && at[1] in at[0]) Object.defineProperty(at[0], at[1], { value: refuse, writable: false, configurable: false });
   });
+})();`;
+
+/**
+ * THE BRIDGE, the one script the host writes into every drawn document after the guard and before the author's:
+ * `braindog.data`, `braindog.theme`, `braindog.on(fn)` (called now and on every change), `braindog.open(ref)`, the
+ * theme painted onto the root as CSS variables, and the height said to the host whenever the body changes size.
+ */
+const BRIDGE = `(function () {
   var start = JSON.parse(document.getElementById('braindog-start').textContent);
   var root = document.documentElement;
   var handlers = [];
@@ -183,14 +189,15 @@ const BRIDGE = `(function () {
 const BASE_STYLE = `html,body{margin:0;padding:0;background:transparent}body{display:flow-root;overflow-x:hidden;color:var(--ink);font:15px/1.45 var(--font,system-ui,sans-serif)}*{box-sizing:border-box}`;
 
 /**
- * The whole document a component is drawn as: the policy, the base style, the start data, the bridge and the author's
- * code, in that order. The code was checked by `drawnFault` before it got here; the frame's policy holds either way.
+ * The whole document a component is drawn as: the policy, the base style, the guard, the start data, the bridge and the
+ * author's code, in that order. The code was checked by `drawnFault` before it got here; the frame's policy holds either way.
  */
 export function drawnDocument(code: string, start: { data: DrawnData; theme: DrawnTheme }): string {
   return [
     '<!doctype html><html><head><meta charset="utf-8">',
     `<meta http-equiv="content-security-policy" content="${DRAWN_POLICY}">`,
     `<style>${BASE_STYLE}</style>`,
+    `<script>${DRAWN_GUARD}</script>`,
     `<script type="application/json" id="braindog-start">${scriptJson(start)}</script>`,
     `<script>${BRIDGE}</script>`,
     '</head><body>',
