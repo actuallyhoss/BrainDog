@@ -61,3 +61,12 @@ export function recordMidnight(now: number = Date.now()): number {
   const guess = day - aheadAt(now);
   return day - aheadAt(guess);
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/** A calendar day in full, as a sentence about one day carries it: `Wed 30 Sep`. The day is a date and has no zone to move it. */
+export function weekdayDaySaid(day: string): string {
+  const at = new Date(`${day.slice(0, 10)}T00:00:00Z`);
+  return `${WEEKDAYS[at.getUTCDay()]} ${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
+}

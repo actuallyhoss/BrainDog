@@ -52,7 +52,7 @@ import { USE_CASES, keptLists, useCaseDocument } from '../usecases/index.ts';
 import { moduleName, namesSaid } from '../usecases/names.ts';
 import { AGENTS_PACK, agentsPackDocument } from './agents.ts';
 import { ADDON_LEG_LISTS } from '../modules/held-legs.ts';
-import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from './first-party.ts';
+import { CORE_CAME_FROM, FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from './first-party.ts';
 
 type Body = Record<string, unknown>;
 
@@ -270,7 +270,7 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
        that does not hold it yet is planned for it at no version. It goes in once the pages are not People's to give (People
        hands them in the plan that updates People), and until then it says nothing: People's own step is what a person
        reads, and core waits for it (`waits`, below). */
-    const unheld = id === CORE && (await heldOf(id)) === undefined && (await heldOf('people')) !== undefined;
+    const unheld = id === CORE && (await heldOf(id)) === undefined && (await heldOf(CORE_CAME_FROM)) !== undefined;
     const held = unheld ? { id, version: '0.0.0', on: true } : await heldOf(id);
     const to = shippedVersion(id);
     if (!held || to === undefined || compareVersions(held.version!, to) >= 0) return null;

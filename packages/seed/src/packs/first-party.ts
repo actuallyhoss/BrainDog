@@ -32,6 +32,9 @@ export type FirstPartyId = 'core' | 'portfolio' | 'people' | 'money-core' | 'est
 /** Dependencies first: every other list points at a project, and Money points at People. */
 export const FIRST_PARTY: readonly FirstPartyId[] = ['core', 'portfolio', 'people', 'money-core', 'estate', 'work'];
 
+/** The first-party pack core's pages and lists were cut out of: a record that holds it and not core is owed core. */
+export const CORE_CAME_FROM: FirstPartyId = 'people';
+
 /**
  * THE ICON EACH PACK WEARS in the store and the installed list, a name from the app's icon set. Kept apart from the
  * declarations on purpose: `test/pack-versions.test.ts` fingerprints declarations and settings, so a pack's icon can
@@ -83,7 +86,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
   ],
   estate: [
     'domain', 'domains', 'hosting', 'server', 'servers', 'subscription', 'subscriptions', 'saas', 'licence', 'licences', 'license',
-    'licenses', 'certificate', 'certificates', 'renewal', 'renewals',
+    'licenses', 'certificate', 'renewal', 'renewals',
   ],
   work: ['task', 'tasks', 'todo', 'todos', 'to-do', 'to-dos', 'deadline', 'deadlines', 'sprint', 'sprints', 'backlog', 'roadmap', 'milestone', 'milestones'],
 };

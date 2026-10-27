@@ -67,8 +67,7 @@ import { liveOf } from '../ui/face.ts';
 import { sourceRows } from './source-rows.ts';
 import { scriptOf } from './scripts.ts';
 import { noteWithoutLeftovers } from './brief.ts';
-import { learnZone, recordToday } from './zone.ts';
-import { daySaid } from '../page/page-writes.ts';
+import { learnZone, recordToday, weekdayDaySaid } from './zone.ts';
 import { pathOf } from '../ui/icons.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
@@ -897,7 +896,7 @@ export function tileOf(
   const trend = Array.isArray(cell.trend) && cell.trend.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))) ? (cell.trend as (number | null)[]) : undefined;
   /* A TREND AHEAD IS THE WALK FROM TODAY (`cells[].ahead`), and its note says the lowest it reaches and on which day. */
   const ahead = trend ? aheadOf((cell as { ahead?: unknown }).ahead) : null;
-  const lowest = ahead ? copy.cashLowest(aboutMoney(ahead.low.value, ahead.currency), daySaid(ahead.low.day)) : '';
+  const lowest = ahead ? copy.cashLowest(aboutMoney(ahead.low.value, ahead.currency), weekdayDaySaid(ahead.low.day)) : '';
   return {
     id: cell.metric,
     label,

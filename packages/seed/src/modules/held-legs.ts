@@ -1,3 +1,7 @@
+import { CASH_LEGS } from './money/legs.ts';
+import { MODULE_LISTS } from './lists.ts';
+import { MONEY_REGISTERS } from './money/lists/index.ts';
+
 /**
  * A DECLARATION WITH EVERY FORECAST LEG OVER A LIST THE RECORD DOES NOT HOLD TAKEN OFF, as `firstPartyDocument` does for
  * a pack and `legsKept` does for an install. The cash walk names the lists an add-on holds (Certificates), and a record
@@ -20,4 +24,4 @@ export function withoutLegs<T>(body: T, keep: (register: string) => boolean): T 
 }
 
 /** THE LISTS ONLY AN ADD-ON HOLDS THAT THE CASH WALK NAMES, which the sample and the light figures table leave out. */
-export const ADDON_LEG_LISTS: ReadonlySet<string> = new Set(['certificates']);
+export const ADDON_LEG_LISTS: ReadonlySet<string> = new Set(CASH_LEGS.map((leg) => leg.register).filter((register) => !Object.hasOwn(MONEY_REGISTERS, register) && !Object.values(MODULE_LISTS).some((held) => held.includes(register))));

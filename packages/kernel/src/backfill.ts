@@ -328,10 +328,13 @@ const PROCESSOR_PREFIX = /^(?:pos\s+|(?:pos|paymob|fawry|kashier|paytabs|sumup|p
  * a person is named by: `Prime`, `Ride`, `Energy`, `Media`, `Mobile`, `Fee` and `Interest` are each somebody's surname,
  * and "SAM PRIME" on three lines is a question (research-audit-22 L3).
  */
+/** The word for an insurer in any of its forms, which a business is called by and a person never is. */
+const INSURER = /^insur(?:ance|er|ers)$/u;
+
 const MERCHANT_WORDS = new Set([
   'coffee', 'cafe', 'café', 'restaurant', 'kitchen', 'bakery', 'grill', 'pizza', 'burger', 'market', 'supermarket', 'hypermarket', 'mart',
   'marketplace', 'mktplace', 'store', 'stores', 'shop', 'pharmacy', 'hotel', 'hotels', 'telecom', 'cloud', 'hosting', 'online',
-  'bank', 'insurance', 'assurance', 'airlines', 'airways', 'travel', 'motors', 'studio', 'studios', 'labs', 'software',
+  'bank', 'assurance', 'airlines', 'airways', 'travel', 'motors', 'studio', 'studios', 'labs', 'software',
   'systems', 'digital', 'services', 'developments', 'properties', 'trip', 'rides', 'recharge', 'subscription', 'premium',
   'fees', 'payout', 'purchase', 'instalment', 'installment',
 ]);
@@ -347,7 +350,7 @@ export function soundsLikeBusiness(said: string): boolean {
   /* A LEGAL FORM ENDS A NAME, never starts it: `AB OKONKWO` and `AG SMITH` are a person's initials. One of two letters
      only as the very last word. */
   const last = words.length - 1;
-  return words.some((w, i) => (i > 0 && COMPANY_FORMS.has(w) && (i === last || !SHORT_FORM.test(w))) || MERCHANT_WORDS.has(w));
+  return words.some((w, i) => (i > 0 && COMPANY_FORMS.has(w) && (i === last || !SHORT_FORM.test(w))) || MERCHANT_WORDS.has(w) || INSURER.test(w));
 }
 
 /** "Payee: Amazon." in a note, up to the end of its sentence. */
