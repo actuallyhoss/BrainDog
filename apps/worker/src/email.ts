@@ -124,13 +124,19 @@ function tokenOf(to: string): string | null {
  * record's erasure and the nightly sweep already look. The name the sender gave is not part of the key.
  */
 export const fileKeeper =
-  (blobs: FileBucket | undefined): NonNullable<IngestDoor['keep']> =>
+  (blobs: FileBucket | undefined, spend?: (record: string, bytes: number) => Promise<unknown>): NonNullable<IngestDoor['keep']> =>
   async ({ rec, bytes }) => {
     if (blobs === undefined || bytes.byteLength === 0 || bytes.byteLength > FILE_MOST) return null;
     const mime = sniff(bytes);
     if (mime === null) return null;
     const sha256 = await sha256Of(bytes);
-    await blobs.put(fileKey(rec, sha256), bytes, { httpMetadata: { contentType: mime } });
+    const key = fileKey(rec, sha256);
+    if ((await blobs.head(key)) === null) {
+      /* NEW BYTES SPEND THE RECORD'S DAY (`ABUSE.uploadDay`) as an upload does: a mailbox anyone can write to is no way
+         round what the bucket costs. Over it, the file is not kept and the message still is. */
+      if (spend !== undefined && (await spend(rec, bytes.byteLength)) !== null) return null;
+      await blobs.put(key, bytes, { httpMetadata: { contentType: mime } });
+    }
     return { sha256, mime };
   };
 

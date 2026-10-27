@@ -3254,7 +3254,7 @@ export default {
       await message.forward(target);
       return;
     }
-    await takeMail(message, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS) });
+    await takeMail(message, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) });
   },
 };
 
@@ -3452,7 +3452,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        returns for everything it does not recognise, and before the app shell, which would answer a bank's
        webhook with `index.html` and a 200 that its retry logic reads as delivered. `serveIngest` holds the
        whole order from here, including the 404 for the shape this host does not serve. */
-    if (servesIn(url.pathname)) return serveIngest(request, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS) });
+    if (servesIn(url.pathname)) return serveIngest(request, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS, (record, n) => abusive(env, 'uploadDay', record, n)) });
     /* THE KEY DOORS, before any door is asked: their bearer is a keychain grant, no cookie may reach them, and a login
        token reaches only the deposit door, to add a new key (`keyDoor`). */
     if (servesKeychain(url.pathname)) return keyDoor(request, env);
