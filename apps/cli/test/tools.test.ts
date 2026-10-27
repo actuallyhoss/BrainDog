@@ -20,6 +20,7 @@ import { hostKey, hostsPath, saveHosts } from '../src/http.ts';
 import { connect, thisMachine, type AgentIo } from '../src/skills.ts';
 import { depositor, looksLikeKey, renderEntry, scanTools, tools, writeTools, type ClaudeRunner } from '../src/tools.ts';
 import { connectedOf, type ListRunner } from '../src/clients/connected.ts';
+import { keepPin, pinOf, pinsFile } from '../src/pins.ts';
 
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-7b3c'].join('.');
 const SCOPE = '01JZ8QK3F7R2M9V4XN6TCB5HAE';
@@ -164,9 +165,12 @@ async function setup(t: After, o: { project?: boolean; grant?: boolean; register
     calls.push({ args, cwd });
     return code;
   };
-  const write = async (s: { scope?: 'user' | 'project'; dryRun?: boolean } = {}) => {
+  /* EVERY ENTRY IS APPROVED here unless a test says otherwise: these tests are about what is written, and the pins
+     that approve a program on a machine have their own test. */
+  const write = async (s: { scope?: 'user' | 'project'; dryRun?: boolean; asked?: boolean } = {}) => {
     const c = await at();
-    const said = await writeTools({ client: c.client, context: c.context, top, cwd: top, home, scope: s.scope ?? null, dryRun: s.dryRun === true, cli: CLI, claude });
+    const approve = s.asked === false ? {} : { approve: async () => ({ ok: true, line: null }) };
+    const said = await writeTools({ client: c.client, context: c.context, top, cwd: top, home, scope: s.scope ?? null, dryRun: s.dryRun === true, cli: CLI, claude, ...approve });
     lines.push(...said);
     return said;
   };
@@ -555,6 +559,19 @@ test('WRITE --scope user applies through claude mcp add-json, records the lock, 
     'Tool kiln-deploy at user scope was changed by hand since BrainDog wrote it, so it is left. Remove it with claude mcp remove kiln-deploy --scope user to take the record\'s.',
   ]);
   assert.equal(h.calls.length, 1);
+});
+
+test('A TOOL THAT RUNS A PROGRAM IS WRITTEN ONLY WHEN THIS MACHINE PINNED IT, when the caller asks nothing', async (t) => {
+  const h = await setup(t);
+  h.add(DEPLOY);
+  h.add(DOCS);
+  const left = (name: string) => `Tool ${name} was not written, because it runs a program not approved on this machine. braindog env apply shows it and asks.`;
+  assert.deepEqual((await h.write({ scope: 'user', asked: false })).slice(1), [left('kiln-deploy'), left('docs')]);
+  assert.equal(h.calls.length, 0, 'a program nobody here approved reached claude');
+
+  keepPin(pinsFile(h.home), pinOf('tool', 'kiln-deploy', deployEntry), { name: 'kiln-deploy', kind: 'tool', profile: 'default', now: NOW });
+  assert.deepEqual((await h.write({ scope: 'user', asked: false })).slice(1), ['Tool kiln-deploy added at user scope.', left('docs')]);
+  assert.deepEqual(h.calls.map((c) => c.args[2]), ['kiln-deploy']);
 });
 
 test('AN ENTRY THE SCAN READ, HOLDING A KEY IN ITS ENV, is replaced by one that holds none, and the key is never printed or passed', async (t) => {

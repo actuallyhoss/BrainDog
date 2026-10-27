@@ -18,6 +18,9 @@ import type { Brief, Client as BrainDog, Context } from '@braindog/client';
 import { CLIENTS, clientOf, DEFAULT_CLIENT, foreignPath, onPath } from '../src/clients/index.ts';
 import { looksLikeKey, writeTools, type ClaudeRunner } from '../src/tools.ts';
 
+/* Every entry approved: these tests are about the writer; what a machine has not approved is `tools.test.ts`'s. */
+const ALL = async () => ({ ok: true, line: null });
+
 type After = { after: (fn: () => void) => void };
 type Fields = { [k: string]: unknown };
 
@@ -173,7 +176,7 @@ test('THE WRITER changes only BrainDog\'s entries, keeps a copy before its first
   const before = readFileSync(m.claudeJson, 'utf8');
   const rec = record([{ fields: KILN }, { fields: DOCS }, { fields: GONE }, { fields: WINDOWS }, { fields: ELSEWHERE }]);
   const fake = fakeClaude(m);
-  const write = (dryRun = false) => writeTools({ ...rec, top: null, cwd: m.top, home: m.home, scope: 'user', dryRun, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin' });
+  const write = (dryRun = false) => writeTools({ ...rec, top: null, cwd: m.top, home: m.home, scope: 'user', dryRun, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin', approve: ALL });
 
   assert.deepEqual(await write(), ['Tool kiln added at user scope.', 'Tool docs added at user scope.', ...SKIPPED]);
   assert.deepEqual(fake.calls.map((c) => c.slice(0, 3)), [['mcp', 'add-json', 'kiln'], ['mcp', 'add-json', 'docs']]);
@@ -202,7 +205,7 @@ test('A DRY RUN plans every line and writes nothing: no file, no copy, no lock, 
   writeFileSync(m.claudeJson, JSON.stringify({ mcpServers: {} }));
   const fake = fakeClaude(m);
   const rec = record([{ fields: KILN }, { fields: GONE }]);
-  assert.deepEqual(await writeTools({ ...rec, top: null, cwd: m.top, home: m.home, scope: null, dryRun: true, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin' }), [
+  assert.deepEqual(await writeTools({ ...rec, top: null, cwd: m.top, home: m.home, scope: null, dryRun: true, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin', approve: ALL }), [
     `+ kiln at user scope: ${JSON.stringify(kilnEntry)}`,
     SKIPPED[0],
     'Nothing was changed. Run braindog tools write --scope user for the global tools, or --scope project for this repository.',
@@ -221,7 +224,7 @@ test('A PROJECT TOOL goes into the repository\'s file; an entry the scan read is
   writeFileSync(m.mcpJson, JSON.stringify({ mcpServers: { kiln: { command: 'kiln-mcp', args: ['--quiet'], env: { KILN_REGION: 'north' } }, glaze: { command: 'glaze-mcp' } } }));
   const first = readFileSync(m.mcpJson, 'utf8');
   const fake = fakeClaude(m);
-  const write = (rows: Fields[]) => writeTools({ ...record(rows.map((fields) => ({ fields, scope: 'project' }))), top: m.top, cwd: m.top, home: m.home, scope: 'project', dryRun: false, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin' });
+  const write = (rows: Fields[]) => writeTools({ ...record(rows.map((fields) => ({ fields, scope: 'project' }))), top: m.top, cwd: m.top, home: m.home, scope: 'project', dryRun: false, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin', approve: ALL });
 
   assert.deepEqual(await write([KILN]), ['Tool kiln replaced at project scope.']);
   assert.deepEqual(fake.calls.map((c) => [c[1], c[2], c.at(-1)]), [['remove', 'kiln', 'project'], ['add-json', 'kiln', 'project']]);
@@ -240,7 +243,7 @@ test('CLAUDE NOT FOUND stops the run in one line, and the copy made for it goes 
   writeFileSync(m.claudeJson, JSON.stringify({ mcpServers: {} }));
   const fake = fakeClaude(m, () => -1);
   const rec = record([{ fields: KILN }, { fields: DOCS }]);
-  assert.deepEqual(await writeTools({ ...rec, top: null, cwd: m.top, home: m.home, scope: 'user', dryRun: false, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin' }), ['claude was not found, so nothing was applied.']);
+  assert.deepEqual(await writeTools({ ...rec, top: null, cwd: m.top, home: m.home, scope: 'user', dryRun: false, cli: CLI, claude: fake.run, env: m.env, platform: 'darwin', approve: ALL }), ['claude was not found, so nothing was applied.']);
   assert.equal(fake.calls.length, 1);
   assert.deepEqual(readdirSync(m.home).sort(), ['.braindog', '.claude.json']);
   assert.deepEqual(readdirSync(join(m.home, '.braindog')), ['tools-lock.json']);

@@ -25,6 +25,8 @@ import { hostKey, readHosts, saveHosts, target } from '../src/http.ts';
 import { HOOK_STATUS, keepCopy } from '../src/install.ts';
 import { logout } from '../src/logout.ts';
 import { agentKindOf, agentTokens, profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
+import { keepPin, pinOf, pinsFile } from '../src/pins.ts';
+import { renderEntry } from '../src/tools.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-setup-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -254,6 +256,17 @@ function snapshot(dir: string, into: Record<string, string> = {}): Record<string
   return into;
 }
 
+/** The record's two runnable tools for everywhere, approved on this machine the way `env apply` pins them. */
+function pinTools(home: string, cli: string): void {
+  for (const [name, fields] of [
+    ['search', { transport: 'stdio', command: 'node', args: ['search.js'] }],
+    ['mail', { transport: 'stdio', command: 'node', args: ['mail.js'], needs: ['MAIL_KEY=credentials#4'] }],
+  ] as const) {
+    const entry = renderEntry(name, fields, cli).entry;
+    keepPin(pinsFile(home), pinOf('tool', name, entry), { name, kind: 'tool', profile: 'default', now: Date.now() });
+  }
+}
+
 /* The issuers' shapes `looksLikeToken` names first in install.ts, asked of each word of a written file. */
 const TOKEN = /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-][A-Za-z0-9]{6,}/i;
 const tokensIn = (text: string) => text.split(/[^A-Za-z0-9_-]+/).filter((word) => TOKEN.test(word));
@@ -286,6 +299,7 @@ test('apply registers the server in both profiles and the other app, keeps a .pr
   const host = await stubRecord();
   const m = home2(true);
   const before = { claudeJson: readFileSync(join(m.home, '.claude.json'), 'utf8'), fake: readFileSync(join(m.home, '.fakeapp', 'mcp.json'), 'utf8') };
+  pinTools(m.home, m.io.cli);
   assert.equal(await setup([host, '--yes', '--profile', m.work], m.io), 0, m.out.join('\n'));
   const text = m.out.join('\n');
 
@@ -393,6 +407,7 @@ test('with Claude Desktop and VS Code on the machine, each gets the server in it
   }
   mkdirSync(code, { recursive: true });
   const titles = [...(desktop !== null ? ['Claude Desktop'] : []), 'VS Code'];
+  pinTools(m.home, m.io.cli);
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
   for (const title of titles) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
   const vs = JSON.parse(readFileSync(join(code, 'mcp.json'), 'utf8')) as { servers: Record<string, { args: string[] }> };

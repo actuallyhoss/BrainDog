@@ -52,6 +52,7 @@ import { serversFileOf } from './install.ts';
 import { connectedOf, runClaudeList, type ConnectedList, type ListRunner } from './clients/connected.ts';
 import { HEADER_NAME, keys } from './keys.ts';
 import { decideLink } from './links.ts';
+import { pinOf, pinsFile, readPins } from './pins.ts';
 import { asking, causeOf, connect, fixOf, isObject, joinedSaid, QUESTION, readLock, samePath, sha256, spokenOf, Stopped, thisMachine, valueOf, writeLock, type AgentIo } from './skills.ts';
 
 type Env = Record<string, string | undefined>;
@@ -940,7 +941,7 @@ export type ToolWrite = {
   profile?: string | undefined;
   /**
    * Asked of each entry about to be written, and of each a dry run shows: `ok` false leaves it out, and `line`, when
-   * there is one, is said under it either way. Nothing is asked when none is given.
+   * there is one, is said under it either way. With none, an entry that runs a program goes in only when pinned here.
    */
   approve?: ((name: string, entry: Record<string, unknown>) => Promise<{ ok: boolean; line: string | null }>) | undefined;
 };
@@ -960,8 +961,24 @@ function deadOrForeign(name: string, fields: Record<string, unknown>, env: Clien
   return `Tool ${name} was not written, because its program ${program} is neither on this machine's path nor a file here.`;
 }
 
+/** Whether an entry runs a program on this machine: a stdio command, or an HTTP server's headers helper. */
+const runsProgram = (entry: Record<string, unknown>): boolean => entry.type === 'stdio' || typeof entry.command === 'string' || typeof entry.headersHelper === 'string';
+
+/**
+ * WHAT IS ASKED WHEN THE CALLER ASKS NOTHING: an entry that runs a program goes in only when this machine pinned it.
+ * The record says what every machine runs, and anyone who can add a tool row can say it, so only the person at a
+ * machine says what runs on it; `env apply` is where they are asked.
+ */
+export const pinnedOnly =
+  (home: string) =>
+  async (name: string, entry: Record<string, unknown>): Promise<{ ok: boolean; line: string | null }> => {
+    if (!runsProgram(entry) || readPins(pinsFile(home))?.[pinOf('tool', name, entry)] !== undefined) return { ok: true, line: null };
+    return { ok: false, line: `Tool ${name} was not written, because it runs a program not approved on this machine. braindog env apply shows it and asks.` };
+  };
+
 /** Render every tool, apply the ones in the named scope, and the lines that say what changed or would. */
 export async function writeTools(s: ToolWrite): Promise<string[]> {
+  const approve = s.approve ?? pinnedOnly(s.home);
   const reg = s.context.registers.find((r) => r.id === 'tools');
   if (!reg) return [];
   const lines: string[] = [];
@@ -1033,15 +1050,15 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
       const plan = app.plan({ name, scope, entry, replace: action === 'replace', home: s.home, top: s.top, cwd: s.cwd, profile: s.profile });
       if (!apply) {
         /* AN ENTRY THE CALLER REFUSES IS NOT SHOWN, only why, since it may be refused for what it holds. */
-        const said = s.approve === undefined ? null : await s.approve(name, entry);
-        if (said === null || said.ok) lines.push(...plan.lines);
-        if (said !== null && said.line !== null) lines.push(said.line);
+        const said = await approve(name, entry);
+        if (said.ok) lines.push(...plan.lines);
+        if (said.line !== null) lines.push(said.line);
         continue;
       }
-      /* ASKED BEFORE IT IS WRITTEN, when the caller asks (`env apply`): an entry that runs a program is approved on
-         this machine first, and one left out says why. */
-      if (s.approve !== undefined) {
-        const ok = await s.approve(name, entry);
+      /* ASKED BEFORE IT IS WRITTEN: an entry that runs a program is approved on this machine first (`env apply` asks,
+         every other caller takes only what is pinned), and one left out says why. */
+      {
+        const ok = await approve(name, entry);
         if (ok.line !== null) lines.push(ok.line);
         if (!ok.ok) continue;
       }
