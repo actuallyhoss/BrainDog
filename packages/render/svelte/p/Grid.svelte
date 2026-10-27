@@ -20,6 +20,7 @@
   import { valueWord } from '../../src/format.ts';
   import { written } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
+  import { statChange } from '../../src/hero.ts';
   import { drawnRows, emptied } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
@@ -526,8 +527,13 @@
   <!-- A FIGURE WITH NO VALUE IS NOT DRAWN (`drawnRows`) and the tiles are counted after, as `toHTML` counts them. Each
        keeps its place in the block, which is what `cellHref` is keyed by. -->
   <div class="grid" style="--cells:{shown.length}">
-    {#each shown as { row, at: i }}
+    {#each shown as { row, at: i }, n}
       {@const to = opts.cellHref?.(i) ?? null}
+      <!-- THE SAME FIGURE IN THE HOME CURRENCY under one in another (`opts.approx`), and the lead figure's change as a
+           chip in front of the rest of its note (`statChange`), as `html.ts` draws them. -->
+      {@const approx = row.cells[1] && opts.approx ? opts.approx(row.cells[1].trim()) : null}
+      {@const note = row.cells[2] ? symbolText(row.cells[2], true, opts.home) : ''}
+      {@const change = block.form === 'lead' && n === 0 ? statChange(note) : null}
       {@const href = to === null ? null : hrefFor(opts, to)}
       <!-- THE CURRENCY CODE IS PRESENT AND QUIET. A figure the size of this one read "GBP" as loudly
            as the number, three capitals in front of every headline on the screen. The code stays,
@@ -562,8 +568,11 @@
               {opts}
             />{/if}
         </span>
+        {#if approx}<span class="cell-approx num">{approx}</span>{/if}
         <Trend cls="cell-trend" label={row.cells[0] ?? ''} value={row.cells[3] ?? ''} {opts} />
-        <span class="cell-note"><Text nodes={inline(symbolText(row.cells[2] ?? '', true, opts.home), opts)} {opts} /></span>
+        {#if change}<span class="cell-note"
+            ><span class="cell-change num" data-dir={change.dir}>{change.change}</span>{#if change.rest}{' '}<Text nodes={inline(change.rest, opts)} {opts} />{/if}</span
+          >{:else}<span class="cell-note"><Text nodes={inline(note, opts)} {opts} /></span>{/if}
         {#if row.tone}
           <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
         {/if}

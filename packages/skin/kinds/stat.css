@@ -112,6 +112,51 @@
     font-size: var(--fs-meta);
   }
 
+  /* THE SAME FIGURE IN THE HOME CURRENCY, under a figure in another one, quiet and a step smaller (`approx`, the host's):
+     a guide to read it by, never a second figure. Its line is in the cell only while it is drawn. */
+  .cell-approx {
+    grid-area: approx;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cell:has(> .cell-approx) {
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'approx approx'
+      'note note';
+  }
+
+  .cell:has(> .cell-approx):has(> :is(.cell-trend, .cell-trend-ahead)) {
+    grid-template-areas:
+      'label glyph trend'
+      'figure figure figure'
+      'approx approx approx'
+      'note note note';
+  }
+
+  /* THE LEAD FIGURE'S CHANGE (`statChange`), a chip at the head of its note: up on the good tint, down in the quiet
+     fill and the ink, because less money is a thing to know and not the danger colour. */
+  .cell-change {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: calc(var(--fs-meta) + var(--sp-2));
+    margin-inline-end: var(--sp-1);
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-round);
+    background: var(--tile-2);
+    color: var(--ink-2);
+    font-weight: var(--fw-semi);
+    white-space: nowrap;
+  }
+
+  .cell-change[data-dir='up'] {
+    background: var(--good-tint);
+    color: var(--good);
+  }
+
   /* A FIGURE IS INK, even when it is off its target. The dot beside the label says so and the note
      under the figure says why; a red number is the loudest thing on a page and says the least. */
   .cell[data-intent] .cell-figure {
@@ -226,24 +271,101 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (a figure is
-     read beside its heading, never shouted over it), and the others stay the size
-     they are, so the lead reads as the answer and the rest as its detail. IT STEPS DOWN INSIDE ITS OWN CELL rather than
-     running into the next one: a balance in the millions, in pounds with its code, is wider than a quarter of the page
-     at the lead size. */
+  /**
+   * `stat lead` IS THE PAGE'S HERO: the first figure alone across the tile, up to twice a page name's size, its currency
+   * code quiet in front of it, its trend beside it at the right, the same figure in the home currency and its change
+   * under it; then the figures after it in one row under a hairline, each parted from the next by a rule, so the lead
+   * reads as the answer and the rest as its detail. IT STEPS DOWN INSIDE ITS OWN CELL rather than running past it: a
+   * balance in the millions with its code is wider than a phone at the hero size.
+   */
+  .block[data-kind='stat'][data-form='lead'] > .grid:has(> .cell) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+
   .block[data-form='lead'] .cell:first-child {
     container-type: inline-size;
   }
 
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child {
+    flex: 1 1 100%;
+    padding-block-end: var(--sp-4);
+  }
+
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child:has(> :is(.cell-trend, .cell-trend-ahead)) {
+    grid-template-areas:
+      'label glyph trend'
+      'figure figure trend'
+      'approx approx trend'
+      'note note trend';
+    grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+  }
+
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > .cell-trend {
+    align-self: center;
+    inline-size: min(320px, 38cqi);
+    block-size: calc(var(--row-h-2) + var(--sp-2));
+  }
+
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > .cell-trend-ahead {
+    align-self: center;
+    inline-size: min(320px, 38cqi);
+  }
+
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > .cell-trend-ahead > .cell-trend {
+    block-size: calc(var(--row-h-2) + var(--sp-2));
+  }
+
   .block[data-form='lead'] .cell:first-child .cell-figure {
-    font-size: clamp(var(--fs-figure), 10cqi, var(--fs-page));
-    letter-spacing: -0.02em;
+    margin-block: var(--sp-1);
+    font-size: clamp(var(--fs-figure), 12cqi, calc(var(--fs-page) * 2));
+    letter-spacing: -0.025em;
+    line-height: 1;
+  }
+
+  /* THE CODE IN FRONT OF THE HERO, faint and under half its size, so the number is what is read. */
+  .block[data-form='lead'] .cell:first-child .cell-figure .amount-code {
+    margin-inline-end: 0.1em;
+    font-size: 0.4em;
+    vertical-align: 0.35em;
   }
 
   /* A LONG LEAD ALSO TAKES THE FIT EVERY LONG FIGURE TAKES (no stat figure is ever cut): the smaller of the
      two, and never past either. No floor, unlike the fit below: only a figure too long for its cell steps down. */
   .block[data-form='lead'] .cell:first-child .cell-figure[data-fit] {
-    font-size: min(clamp(var(--fs-figure), 10cqi, var(--fs-page)), calc(100cqi / (var(--chars) * 0.64)));
+    font-size: min(clamp(var(--fs-figure), 12cqi, calc(var(--fs-page) * 2)), calc(100cqi / (var(--chars) * 0.64)));
+  }
+
+  .block[data-form='lead'] .cell:first-child .cell-approx {
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+  }
+
+  .block[data-form='lead'] .cell:first-child .cell-note {
+    margin-block-start: var(--sp-1);
+  }
+
+  /* THE FIGURES AFTER THE LEAD: one row across the tile's whole width under a hairline, a rule between each. */
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+    flex: 1 1 0;
+    min-inline-size: min(100%, 9rem);
+    padding: var(--sp-4) var(--sp-5) 0;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(2) {
+    margin-inline-start: calc(-1 * var(--tile-pad));
+    padding-inline-start: var(--tile-pad);
+  }
+
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child):last-child {
+    margin-inline-end: calc(-1 * var(--tile-pad));
+    padding-inline-end: var(--tile-pad);
+  }
+
+  .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(n + 3) {
+    border-inline-start: 1px solid var(--rule);
   }
 
   /* A FIGURE LONGER THAN ITS CELL STEPS DOWN INSIDE IT, rather than running into the next one: a balance in two or three
@@ -361,6 +483,23 @@
       align-self: center;
     }
 
+    /* THE AMOUNT IN THE HOME CURRENCY sits under the figure, at the row's end, quiet, and the note under both. */
+    .block[data-kind='stat'] .cell:has(> .cell-approx) {
+      grid-template-areas:
+        'label glyph figure'
+        '. . approx'
+        'note note note';
+    }
+
+    .block[data-kind='stat'] .cell > .cell-approx {
+      grid-area: approx;
+      justify-self: end;
+    }
+
+    .block[data-kind='stat'][data-form='lead'] .cell:first-child > .cell-approx {
+      justify-self: start;
+    }
+
     .block[data-kind='stat'] .cell-figure {
       justify-self: end;
       font-size: var(--fs-head);
@@ -386,6 +525,31 @@
     .block[data-kind='stat'][data-form='lead'] .cell:first-child .cell-figure {
       justify-self: start;
       text-align: start;
+    }
+
+    /* THE HERO'S FIGURES AFTER IT ARE ROWS TOO, each the whole width, with the hairline every row draws and no rule
+       beside it. Its trend goes under the figure, the width of the tile. */
+    .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+      flex-basis: 100%;
+      margin-inline: 0;
+      padding-inline: 0;
+      padding-block: var(--sp-3);
+      border-inline-start: 0;
+    }
+
+    .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child:has(> :is(.cell-trend, .cell-trend-ahead)) {
+      grid-template-areas:
+        'label glyph'
+        'figure figure'
+        'approx approx'
+        'note note'
+        'trend trend';
+      grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    }
+
+    .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > :is(.cell-trend, .cell-trend-ahead) {
+      inline-size: 100%;
+      margin-block-start: var(--sp-3);
     }
   }
 }
