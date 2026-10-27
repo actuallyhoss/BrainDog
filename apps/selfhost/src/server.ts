@@ -57,7 +57,7 @@ import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
 import { blobsFolder, eraseFile, keepAttachment, serveFiles, servesFiles } from './files.ts';
 import { diskSealed } from './sealed.ts';
-import { diskVisuals } from './visuals.ts';
+import { diskVisuals, pagesFolder } from './visuals.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
 import { badSlug, createDirectory, leavesAsked, leftBy, switcherAsk, type Directory } from '@braindog/record/directory';
 import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
@@ -1621,8 +1621,10 @@ export async function start(options: {
            the file is this process's own, not a transport's, so the self-host deletes it itself, as the Worker's
            `deliver.ts` does for its bucket. */
         if (job.kind === 'erase.r2') {
-          const payload = JSON.parse(job.payload) as { key?: unknown };
-          eraseFile(blobsFolder(options.file), typeof payload.key === 'string' ? payload.key : '');
+          const payload = JSON.parse(job.payload) as { key?: unknown; page?: unknown };
+          const folder = blobsFolder(options.file);
+          /* A VISUAL'S PAGE IS KEPT BESIDE THE FILES, under `pages/`, and an erasure that read it names it so. */
+          eraseFile(payload.page === true && folder !== null ? pagesFolder(folder) : folder, typeof payload.key === 'string' ? payload.key : '');
         } else await options.deliver(job, postKeys(api, options.keys, job));
         sent = true;
       } catch (e) {

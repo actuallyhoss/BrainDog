@@ -125,6 +125,18 @@ test('AN ERASURE DELETES THE FILE IT NAMES BY ITS HASH, and a key that is not on
   assert.deepEqual(deleted, [sha]);
 });
 
+test('AN ERASED VISUAL PAGE IS DELETED AS A PAGE, not looked for among the files', async () => {
+  const deleted: [string, boolean | undefined][] = [];
+  const deliver = makeDeliver({ erase: async (sha, page) => void deleted.push([sha, page]) });
+  const sha = 'd'.repeat(64);
+  await deliver(job('erase.r2', { erase: 'e1', key: sha, page: true }));
+  await deliver(job('erase.r2', { erase: 'e1', key: sha }));
+  assert.deepEqual(deleted, [
+    [sha, true],
+    [sha, false],
+  ]);
+});
+
 test('and a payload nobody can read, or a transport nobody configured, fails rather than throws past', async () => {
   const none: Transports = {};
   assert.match(await threw(() => makeDeliver(none)(job('notify.email', { to: 'a@b.c', subject: 'x' }))), /no email transport/);

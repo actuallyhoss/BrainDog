@@ -71,9 +71,10 @@ export type Transports = {
   /**
    * Deletes one of this record's files by its SHA-256, for an `erase.r2` job: `BLOBS.delete(fileKey(record, sha256))`
    * on the Worker (`files.ts`). Absent when the deployment has no bucket, and then an erasure dead-letters saying so,
-   * because a file an erasure named and nobody deleted is exactly what must not pass as done.
+   * because a file an erasure named and nobody deleted is exactly what must not pass as done. `page` names a visual's
+   * page instead, kept beside the files under `pages/`.
    */
-  erase?: ((sha256: string) => Promise<void>) | undefined;
+  erase?: ((sha256: string, page?: boolean) => Promise<void>) | undefined;
 };
 
 /**
@@ -433,7 +434,7 @@ export function makeDeliver(transports: Transports): Deliver {
       if (!transports.erase) throw new Error('this deployment has no bucket to delete the file from: bind BLOBS');
       const key = text(payload.key);
       if (!/^[0-9a-f]{64}$/.test(key)) throw new Error('an erase.r2 names the file it deletes by its SHA-256, and this one does not');
-      await transports.erase(key);
+      await transports.erase(key, payload.page === true);
       return;
     }
 

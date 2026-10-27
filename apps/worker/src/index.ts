@@ -78,7 +78,7 @@ import { readAsk as readRestorePoint, restorePoint, sayTally, type PointAnswer }
 import { drillAnswer, drillNote, olderDrill, readDrill } from './drill-door.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { cloudSealed } from './sealed.ts';
-import { cloudVisuals } from './visuals.ts';
+import { cloudVisuals, pagesPrefix } from './visuals.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
@@ -2819,10 +2819,10 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
     ...(env.BLOBS === undefined
       ? {}
       : {
-          erase: async (sha256: string) => {
+          erase: async (sha256: string, page?: boolean) => {
             const recId = await record.recId();
             if (recId === null) throw new Error('This record could not say its own id, so nothing was deleted.');
-            await env.BLOBS!.delete(fileKey(recId, sha256));
+            await env.BLOBS!.delete(page === true ? `${pagesPrefix(recId)}${sha256}` : fileKey(recId, sha256));
           },
         }),
     /* THE KEY A POST NAMES, OPENED UNDER ITS LEASE BY THE RECORD AND UNWRAPPED HERE. `KEK` is read only when a post

@@ -572,7 +572,7 @@ export { EVENT_KINDS, isEventKind } from './events.ts';
 export type { EventKind } from './events.ts';
 export { OUTBOX_KINDS, backoffMs, retryDead, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
-export { ERASED } from './erase.ts';
+export { ERASED, subjectsOf } from './erase.ts';
 export type { EraseReport, EraseRequest } from './erase.ts';
 export { PUSH_OPEN, ownersPushSubs, pushOpenOf } from './push.ts';
 export type { PushJob, PushSettled, PushTarget } from './push.ts';
@@ -11797,7 +11797,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      *
      * `personId` ADDS THE PERSON'S OWN EMAIL AND NAME to the subjects, and removes their `member` rows.
      */
-    async erase(req: EraseRequest, actor: string): Promise<Result<EraseReport>> {
+    async erase(req: EraseRequest, actor: string, pages: readonly string[] = []): Promise<Result<EraseReport>> {
       const refused = schemaRefusal(state);
       if (refused) return refused;
       const given: unknown = (req as { subjects?: unknown } | undefined)?.subjects;
@@ -11837,7 +11837,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const at = instant(clock.now());
       return ok(
         transaction(() =>
-          eraseSubjects({ sql, mint, at, actor, enqueue: (payload) => void enqueue(sql, mint, clock.now(), 'erase.r2', payload) }, matched, people, basis, hashes),
+          eraseSubjects({ sql, mint, at, actor, pages: new Set(pages), enqueue: (payload) => void enqueue(sql, mint, clock.now(), 'erase.r2', payload) }, matched, people, basis, hashes),
         ),
       );
     },

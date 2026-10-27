@@ -40,7 +40,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
+import { BLOCK_INSTALLS, NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
@@ -2415,6 +2415,36 @@ export async function createRecordApi(deps: RecordDeps) {
 
 function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
+  /**
+   * The visual pages whose text names whoever an erasure is for, by their SHA-256. A page is kept outside the file, so
+   * the kernel's scan of every column never reads it; it is read here, before the erasure's transaction, as the
+   * subjects' hashes are. A host with no page store has no pages to read.
+   */
+  const pagesNaming = async (args: EraseRequest | undefined): Promise<string[]> => {
+    const store = deps.visuals;
+    if (store === undefined || args === undefined || !Array.isArray(args.subjects)) return [];
+    const given = args.subjects.filter((s): s is string => typeof s === 'string');
+    if (typeof args.personId === 'string') {
+      const p = sql.one<{ email: string | null; name: string | null }>('SELECT email, name FROM person WHERE id = ?', args.personId);
+      for (const v of [p?.email, p?.name]) if (typeof v === 'string' && v.trim().length >= 3) given.push(v);
+    }
+    const subjects = subjectsOf(given).filter((s) => s.length >= 3);
+    if (subjects.length === 0) return [];
+    const pages = new Set<string>();
+    for (const line of sql.all<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'note' AND field LIKE 'visual:%' AND to_v IS NOT NULL")) {
+      let page: unknown;
+      try {
+        page = (JSON.parse(line.to_v) as { page?: unknown }).page;
+      } catch {
+        continue;
+      }
+      if (typeof page !== 'string' || !/^[0-9a-f]{64}$/.test(page) || pages.has(page)) continue;
+      const bytes = await store.getPage(page);
+      const text = bytes === null ? '' : new TextDecoder().decode(bytes).toLowerCase();
+      if (subjects.some((s) => text.includes(s))) pages.add(page);
+    }
+    return [...pages];
+  };
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
   /**
@@ -14278,7 +14308,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['subjects', 'personId', 'basis']);
       if (extra) return { ok: false as const, refusal: extra };
-      const erased = await kernel.erase(args ?? ({} as EraseRequest), actorOf(ctx));
+      const erased = await kernel.erase(args ?? ({} as EraseRequest), actorOf(ctx), await pagesNaming(args));
       /* THE KEPT FAULTS NAME ROWS, so an erasure puts them away and the next alarm walks again. */
       if (erased.ok) {
         dropTextFaults({ kernel });

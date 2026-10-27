@@ -199,3 +199,17 @@ test('EACH VERSION NAMES THE WRITE IT WAS MADE IN, so the app undoes the newest 
   const plan = value<{ hash: string; steps: unknown[] }>(await api.undo({ batch: read.versions[1]!.batch!, dry: true }, owner));
   assert.equal(plan.steps.length, 1);
 });
+
+test('AN ERASURE READS THE PAGES TOO: a page naming the person is no longer served, and its bytes are queued to go', async () => {
+  const { sql, api, ticket } = await record();
+  const named = value<Attached>(await api.attachVisual({ on: ticket, page: '<h1>Call notes</h1><p>Mara Quill, 07700 900123, mara.quill@example.com</p>', title: 'Call notes' }, owner));
+  const other = value<Attached>(await api.attachVisual({ on: ticket, page: PAGE, pictures: [{ name: 'img/shot.png', sha256: SHOT }] }, owner));
+  value(await api.erase({ subjects: ['Mara Quill'], basis: 'Article 17 request' }, owner));
+
+  const read = (await api.visual({ id: named.visual }, owner)) as Out;
+  assert.ok(!read.ok || !JSON.stringify(read.value).toLowerCase().includes('quill'), 'the page still names the person after the erasure');
+  const queued = sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'erase.r2'").map((r) => JSON.parse(r.payload) as { key: string; page?: boolean });
+  assert.equal(queued.filter((q) => q.page === true).length, 1, JSON.stringify(queued));
+  /* AND A PAGE THAT NAMES NOBODY ERASED IS LEFT AS IT WAS. */
+  assert.ok(value<{ page: string }>(await api.visual({ id: other.visual }, owner)).page.includes('<h1>Upload audit</h1>'));
+});
