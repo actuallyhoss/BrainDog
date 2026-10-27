@@ -35,6 +35,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import { titleOf } from '$lib/title.ts';
   import ReadState from '$lib/ui/ReadState.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
 
@@ -177,6 +178,8 @@
 
   const signed = (minor: number): string => `${minor > 0 ? '+' : '−'}${money(Math.abs(minor), currency)}`;
 </script>
+
+<svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
 <PageHead icon="money" title={words.title} sentence={words.sentence} kicker="Money" back={at('/p/money', page.url.pathname)} />
 <div class="cc-page">

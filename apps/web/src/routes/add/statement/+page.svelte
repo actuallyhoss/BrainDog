@@ -22,6 +22,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import { titleOf } from '$lib/title.ts';
   import ReadState from '$lib/ui/ReadState.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
 
@@ -135,6 +136,8 @@
   const say = (minor: number): string => money(minor, account?.currency ?? '');
   const sample = (column: string | null): string => (column && exp ? (exp.entries.find((e) => (e[column] ?? '').trim() !== '')?.[column] ?? '') : '');
 </script>
+
+<svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
 <PageHead icon="upload" title={words.title} sentence={words.sentence} kicker="Money" back={home} />
 <div class="st-page">
