@@ -314,35 +314,56 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
 
   /* AGAIN, IN THE SAME ORDER, UNTIL NONE IS FREED. It ends: a module is planned again only after a pack went in, and
      each pack goes in once. What the later plan met takes the place of the refusal, so the night says one thing. */
-  for (let id = order.find((p) => freed.has(p)); id !== undefined; id = order.find((p) => freed.has(p))) {
-    freed.delete(id);
-    const step = await attempt(id);
-    const at = out.findIndex((s) => s.pack === id);
-    if (step && at >= 0) out[at] = step;
-  }
+  const again = async (): Promise<void> => {
+    for (let id = order.find((p) => freed.has(p)); id !== undefined; id = order.find((p) => freed.has(p))) {
+      freed.delete(id);
+      const step = await attempt(id);
+      const at = out.findIndex((s) => s.pack === id);
+      if (step && at >= 0) out[at] = step;
+    }
+  };
+  await again();
 
   /* BRAINDOG'S OWN ADD-ONS, after the modules and use cases they stand on: in when the plan loses nothing and reaches
      nothing new, else said and left for the Updates card. Never asked about here, and never a community or private one. */
-  for (const a of (await port.addons?.()) ?? []) {
-    const held = await heldOf(a.id);
-    if (!held || held.version !== a.from || compareVersions(a.from, a.to) >= 0) continue;
+  const addons = (await port.addons?.()) ?? [];
+  /** The add-ons a conflict held back, with the packs that held them: planned again once one of those has gone in. */
+  const heldBack = new Map<string, ReadonlySet<string>>();
+  const gone = new Set<string>();
+  const addon = async (a: QuietAddon): Promise<QuietStep | null> => {
+    heldBack.delete(a.id);
+    const there = await heldOf(a.id);
+    if (!there || there.version !== a.from || compareVersions(a.from, a.to) >= 0) return null;
     const step = { pack: a.id, title: a.title, from: a.from, to: a.to };
     const doc = without(a.doc);
     const planned = await port.plan(doc);
-    if (!planned.ok) {
-      out.push({ ...step, did: 'refused', why: fixOf(planned) });
-      continue;
-    }
+    if (!planned.ok) return { ...step, did: 'refused', why: fixOf(planned) };
     const diff = planned.value;
     const lose = [...losses(diff, nameOf, tookOff), ...reachesNew(diff)];
     const blocked = unready(diff);
     if (blocked !== null || lose.length > 0) {
-      out.push({ ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked ?? `Updating it would ${lostSaid(lose)}, so it waits for you in Add-ons.` });
-      continue;
+      if (diff.conflicts.length > 0) heldBack.set(a.id, new Set(diff.conflicts.map((c) => c.pack)));
+      return { ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked ?? `Updating it would ${lostSaid(lose)}, so it waits for you in Add-ons.` };
     }
     const put = await port.install(doc, diff.planHash);
-    out.push(put.ok ? { ...step, did: 'updated' } : { ...step, did: 'refused', why: fixOf(put) });
+    if (!put.ok) return { ...step, did: 'refused', why: fixOf(put) };
+    gone.add(a.id);
+    /* AND A MODULE OR ADD-ON THIS ONE WAS IN THE WAY OF, AGAIN: Roadmap hands its page to Work, and Work, planned before it,
+       was refused for taking a page Roadmap held. Planned once more now Roadmap has handed it over. */
+    for (const [waiting, holders] of waits) if (holders.has(a.id)) freed.add(waiting);
+    return { ...step, did: 'updated' };
+  };
+  for (const a of addons) {
+    const step = await addon(a);
+    if (step) out.push(step);
   }
+  for (const a of addons) {
+    if (!heldBack.has(a.id) || ![...heldBack.get(a.id)!].some((holder) => gone.has(holder))) continue;
+    const step = await addon(a);
+    const at = out.findIndex((s) => s.pack === a.id);
+    if (step && at >= 0) out[at] = step;
+  }
+  await again();
 
   for (const id of FIRST_PARTY) {
     const held = await heldOf(id);

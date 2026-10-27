@@ -860,9 +860,9 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(skills.value.length === 0 ? {} : { skills: skills.value }),
   };
 
-  /* A PACK WHOSE ONLY CONTENT IS `extends` OR `adds` CHANGES SOMETHING, so it has no declarations to list and is not
+  /* A PACK WHOSE ONLY CONTENT IS `extends`, `adds` OR `hands` CHANGES SOMETHING (a pack that hands everything it had to another, Roadmap 2.0.0, is the add-on that is part of Work now), so it has no declarations to list and is not
      refused for it here. Whether it lays or adds anything is asked once those are read, below. */
-  const reaches = doc.extends !== undefined || doc.adds !== undefined;
+  const reaches = doc.extends !== undefined || doc.adds !== undefined || doc.hands !== undefined;
   const raw = doc.declarations ?? (reaches ? [] : undefined);
   if (!Array.isArray(raw) || (raw.length === 0 && !reaches))
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
@@ -1016,7 +1016,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     if (!read.ok) return read as Result<Pack>;
     if (read.value.length > 0) manifest.adds = read.value;
   }
-  if (declarations.length === 0 && manifest.extends === undefined && manifest.adds === undefined)
+  if (declarations.length === 0 && manifest.extends === undefined && manifest.adds === undefined && manifest.hands === undefined)
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
 
   /**
@@ -1975,9 +1975,10 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
        and gets everything handed as before. */
     /* AND TO AN INSTALLED PACK WHEN THE RECORD CAN SAY WHAT WAS HANDED (`Installed.handed`): that pack's plans then leave
        the list where it is until a version of it declares the list, so the handover no longer locks it. */
-    /* A PAGE IS ALWAYS HANDED: it holds no rows and opens no door, and the receiver's navigation order and hides name it by
-       id, so a page that went to another pack under the same id is kept, where a retire would take it off the sidebar. */
-    const inUse = installed.used === undefined || rows > 0 || decl.kind === 'page' || installed.used.includes(decl.id);
+    /* A PAGE, A JOB, A RULE OR A FIGURE IS ALWAYS HANDED: it holds no rows and files no arrival, so "used" cannot tell
+       whether somebody relies on it, and retiring it would drop a page they arranged or a kind of job they approved only
+       for the receiver to declare it afresh (Roadmap's page to Work, Slash's job to Starter jobs). */
+    const inUse = installed.used === undefined || rows > 0 || installed.used.includes(decl.id) || !/^(register|ingest)\./u.test(decl.id);
     const takes = (to: string): boolean => installed.handed !== undefined || !installed.packs.some((p) => p.id === to);
     const to = Object.hasOwn(hands, decl.id) && inUse && takes(hands[decl.id]!) ? hands[decl.id] : undefined;
     const body = to === undefined ? null : handedBody(decl.body, to);

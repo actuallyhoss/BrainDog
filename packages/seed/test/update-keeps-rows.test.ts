@@ -235,6 +235,10 @@ function needs(id: string, pick: (id: string) => Doc, seen: string[] = []): stri
 /** The order a record takes things in: the five modules, what the subject needs, then the subject when it is a pack. */
 const order = (subject: string, pick: (id: string) => Doc): string[] => {
   const isModule = (FIRST_PARTY as readonly string[]).includes(subject);
+  /* A PACK THAT HANDS A DECLARATION TO A MODULE (Roadmap's page to Work) GOES IN BEFORE THE MODULE, which would otherwise
+     take a page the pack still holds: the order the night keeps (`updateFirstParty` plans the module again once the add-on is in). */
+  const hands = Object.values((pick(subject) as { hands?: Record<string, string> }).hands ?? {}).some((to) => (FIRST_PARTY as readonly string[]).includes(to));
+  if (!isModule && hands) return [...needs(subject, pick).filter((x) => !(FIRST_PARTY as readonly string[]).includes(x) && x !== 'core'), subject, ...BEFORE_CORE, 'core'];
   return [...BEFORE_CORE, 'core', ...needs(subject, pick), ...(isModule ? [] : [subject])];
 };
 
