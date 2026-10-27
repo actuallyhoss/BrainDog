@@ -26,7 +26,7 @@ test('with no Kennel, the shipped catalogue names HSBC Egypt alerts and says wha
   assert.ok(index, 'the shipped catalogue did not read');
   assert.equal((await catalogueTitles(index)).get('bank-hsbc-eg'), 'HSBC Egypt alerts');
   const line = (await catalogueLines(index)).get('holdings') ?? '';
-  assert.match(line, /^What you hold rather than spend/u);
+  assert.match(line, /^What you own beyond cash/u);
   assert.notEqual(line, 'Holdings');
 });
 

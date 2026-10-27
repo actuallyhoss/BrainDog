@@ -376,7 +376,7 @@ test('A USE CASE TAKEN BESIDE ANOTHER CLAIMS ITS WORDS: a student with a small s
   const p = propose("I'm a student and I run a small shop", CTX);
   assert.equal(p.usecase, 'student');
   assert.deepEqual(p.also, ['shop']);
-  assert.deepEqual(linesOf(p), ['student > Courses, Assignments and Study sessions', 'a small shop > Orders and Products']);
+  assert.deepEqual(linesOf(p), ['student > Courses, Assignments, Study sessions and Reading list', 'a small shop > Orders and Products']);
   for (const name of ['Orders', 'Products']) assert.equal(p.places.find((x) => x.name === name)?.phrase, 'a small shop', `${name} says the words that turned it on`);
   assert.equal(p.places.find((x) => x.id === 'portfolio'), undefined, 'the shop holds the phrase, so it asks for no Projects');
 });
