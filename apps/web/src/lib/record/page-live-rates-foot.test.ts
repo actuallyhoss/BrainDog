@@ -15,7 +15,7 @@ import { copy } from '../copy.ts';
 import { ratesPreset } from './action-draft.ts';
 import { REGISTERS } from './api.ts';
 import { toSegments } from './blocks.ts';
-import { blockOf, footWords, footed, pageReader, ratesActionOf, tileOf, type Fetch, type LiveBlock } from './page-live.ts';
+import { blockOf, footWords, footed, onceATile, pageReader, ratesActionOf, tileOf, type Fetch, type LiveBlock } from './page-live.ts';
 
 const NOW = Date.parse('2026-10-13T09:00:00Z');
 
@@ -84,6 +84,13 @@ test('a tile converted at current rates says their day once, under the last figu
   const [block] = page(tiles(reading({ fx: current }), reading({ fx: current }), reading()));
   const notes = (block!.metrics ?? []).map((m) => m.note ?? '');
   assert.deepEqual(notes.map((n) => /Converted at rates as of 28 Sep 2026\.$/u.test(n)), [false, true, false]);
+});
+
+test('a tile whose other figure already names the rate says its day under none', () => {
+  const said = copy.figureConverted('28 Sep 2026');
+  const tile = (note: string) => ({ id: 'x', label: 'X', value: '1', note });
+  const got = onceATile([tile("EGP 5,000 and $100 USD at 28 Sep's rate, 1 day old"), tile(`Bills due · ${said}`)]);
+  assert.deepEqual(got.map((m) => m.note), ["EGP 5,000 and $100 USD at 28 Sep's rate, 1 day old", 'Bills due']);
 });
 
 test('a page with no out of date rate gains nothing', () => {

@@ -801,17 +801,21 @@ function backsOf(r: Reading): { backs?: string[] } {
  * A TILE'S FIGURES SAY THE DAY OF THEIR RATES ONCE, under the last that was converted at them: Today's money tile said
  * "Converted at rates as of 28 Sep 2026." under each of its three figures. A sentence about a rate that is missing is
  * the figure's own, and stays under it.
+ *
+ * AND NOT AT ALL WHERE ANOTHER FIGURE OF THE TILE ALREADY NAMES THE RATE: Cash now says "at 2 Sep's rate, 1 day old"
+ * with its Update, and "Converted at rates as of 2 Sep 2026." under Going out beside it said the same day twice.
  */
-function onceATile(metrics: Metric[]): Metric[] {
+export function onceATile(metrics: Metric[]): Metric[] {
   const RATED = /(?:^| · )(Converted at rates as of [^·]*?\.)$/u;
   const last = new Map<string, number>();
   metrics.forEach((m, i) => {
     const said = RATED.exec(m.note ?? '')?.[1];
     if (said) last.set(said, i);
   });
+  const named = metrics.some((m) => /\brates?\b/iu.test((m.note ?? '').replace(RATED, '')));
   return metrics.map((m, i) => {
     const said = RATED.exec(m.note ?? '')?.[1];
-    if (!said || last.get(said) === i) return m;
+    if (!said || (!named && last.get(said) === i)) return m;
     return { ...m, note: (m.note ?? '').slice(0, -said.length).replace(/ · $/u, '') };
   });
 }
