@@ -382,3 +382,17 @@ test('OVER THE REAL DIRECTORY: the paid session twice adds 100 once, a refund ta
   assert.equal(await deliver(w, 'evt_late_refund', 'charge.refunded', { id: 'ch_2', customer: 'cus_ada', payment_intent: 'pi_late' }), 200);
   sql.close();
 });
+
+test('AN ENDED SUBSCRIPTION\'S LAST INVOICE, PAID, BRINGS NO LAPSED RECORD BACK; ONE STRIPE SAYS IS ACTIVE DOES', async () => {
+  const w = world();
+  w.rows.set('rec_ada', { record: 'rec_ada', person: WHO.person, customer: 'cus_ada', subscription: 'sub_old', price: null, state: 'lapsed', period_end: null, lapsed_at: START, told: '', updated_at: START, slug: 'ada' });
+  w.answers.set('GET /v1/subscriptions/sub_old', { id: 'sub_old', object: 'subscription', customer: { id: 'cus_ada' }, status: 'canceled', items: { data: [] } });
+  assert.equal(await deliver(w, 'evt_late_1', 'invoice.paid', { id: 'in_old', customer: 'cus_ada', subscription: 'sub_old' }), 200);
+  assert.equal(w.rows.get('rec_ada')?.state, 'lapsed', 'a paid invoice of a canceled subscription made the record active');
+  assert.deepEqual(w.lapses, []);
+
+  w.answers.set('GET /v1/subscriptions/sub_old', { id: 'sub_old', object: 'subscription', customer: { id: 'cus_ada' }, status: 'active', items: { data: [] } });
+  assert.equal(await deliver(w, 'evt_late_2', 'invoice.paid', { id: 'in_new', customer: 'cus_ada', subscription: 'sub_old' }), 200);
+  assert.deepEqual(w.lapses, [['rec_ada', false]]);
+  assert.equal(w.rows.get('rec_ada')?.state, 'active');
+});

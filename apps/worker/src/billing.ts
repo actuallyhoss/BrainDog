@@ -1047,8 +1047,15 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     return state ?? before.state;
   };
 
-  /** An invoice paid: a lapsed record paid for by its subscription is active again. Any other row is left as it is. */
-  const invoicePaid = async (invoice: StripeObject): Promise<string> => {
+  /**
+   * An invoice paid: a lapsed record paid for by its subscription is active again, while that subscription is. Any other
+   * row is left as it is.
+   *
+   * THE SUBSCRIPTION IS ASKED, NOT THE INVOICE. Stripe leaves an ended subscription's last invoice open, and paying it
+   * from the hosted page sends `invoice.paid` for a subscription that stays canceled; taken on its own word, one paid
+   * month brought a record back for good. Asked and not answered, nothing moves: the subscription's own event says it.
+   */
+  const invoicePaid = async (invoice: StripeObject, stripe: Stripe): Promise<string> => {
     const customer = idAt(invoice, 'customer');
     /* WHERE THE SUBSCRIPTION IS DEPENDS ON STRIPE'S API VERSION: on the invoice itself until March 2025, and under
        `parent.subscription_details` after. Both are read. */
@@ -1057,6 +1064,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (customer === '' || subscription === '') return 'ignored';
     const before = (await deps.billing({ op: 'byCustomer', customer })).find((r) => r.subscription === subscription && !isGift(r));
     if (before === undefined || before.state !== 'lapsed') return 'unchanged';
+    const sub = await subscriptionOf(stripe, subscription, planPrices(env));
+    if (sub === null || (sub.status !== 'active' && sub.status !== 'trialing')) return 'unchanged';
     await lapseSwitch(before, before.record, 'active');
     await setRow({ record: before.record, state: 'active' });
     const email = textAt(invoice, 'customer_email');
@@ -1126,7 +1135,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     try {
       const did =
         type === 'invoice.paid'
-          ? await invoicePaid(object)
+          ? await invoicePaid(object, stripe)
           : type === 'charge.refunded'
             ? await refunded(object, stripe)
             : type.startsWith('checkout.session.')
