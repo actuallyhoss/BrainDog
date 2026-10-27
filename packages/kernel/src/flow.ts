@@ -1638,6 +1638,14 @@ export function advance(deps: FlowDeps, id: string): number | null {
 
       if (op.verb === 'script') {
         const started = startScript(deps, run.rule, step, i, read(), paths());
+        /* A PAUSED SCRIPT ENDS THE RUN AS A SWITCHED-OFF RULE DOES, cancelled with its sentence: the pause is the fault,
+           and `scripts-paused` already names it once. Failed, every write that fired the rule while it was paused was one
+           more failed automation on `automations-failed`, the same cause told twice. */
+        if (!started.ok && started.paused) {
+          finish(deps, { ...run, step: i }, 'cancelled', started.say, vars);
+          record(deps, id, i, op.verb, 'skipped', null);
+          return null;
+        }
         if (!started.ok) return fail(i, op.verb, started.say);
         /* THE JOB ID TAKES THE NAME OFF WHATEVER IT HELD, as an answer does in `answerStep`. Left in `kept` and
            `sealedVars`, a name first set from a secret still read as one: measured, `set_var: job` from `pin`, then
@@ -1834,7 +1842,7 @@ function startScript(
   n: number,
   row: Entry | null,
   by: RunFill,
-): { ok: true; job: string } | { ok: false; say: string } {
+): { ok: true; job: string } | { ok: false; say: string; paused?: true } {
   const spec = step.script as { id?: unknown; input?: unknown };
   const name = typeof spec?.id === 'string' ? spec.id : '';
   const found = deps.sql.one<{ version: number; body: string }>(
@@ -1849,11 +1857,17 @@ function startScript(
       say: `rule.${rule} starts script.${name} at step ${n + 1}, and script.${name} does not say runs: { rule: true }, so no rule may start it. Nothing was queued.`,
     };
   const paused = deps.sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'script' AND key = ?", name)?.state === 'paused';
-  if (paused)
+  /* THE SENTENCE SAYS WHAT HAPPENS TO THIS ROW, which is nothing: a resume starts it for rows written after it, and a
+     run that ended here is never taken again. A script that also runs on a clock reaches this row on its next run. */
+  if (paused) {
+    const clock = typeof (JSON.parse(found.body) as { runs?: { every?: unknown } }).runs?.every === 'string';
+    const after = clock ? 'Its next run on its clock after it is resumed reaches this row too.' : 'Once it is resumed, a rule starts it for rows written after that, not for this one.';
     return {
       ok: false,
-      say: `rule.${rule} starts script.${name} at step ${n + 1}, and script.${name} is paused, so nothing was queued. It starts again once somebody resumes it; the steps before it were taken.`,
+      paused: true,
+      say: `rule.${rule} starts script.${name} at step ${n + 1}, and script.${name} is paused, so nothing was queued and the run stopped there; the steps before it were taken. ${after}`,
     };
+  }
   const handed = handOn(isObject(spec.input) ? spec.input : {}, by, false);
   if (handed.secret !== null)
     return {

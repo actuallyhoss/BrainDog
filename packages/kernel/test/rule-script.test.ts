@@ -131,13 +131,27 @@ test('A SCRIPT THAT DOES NOT SAY runs: { rule: true } IS NOT STARTED BY A RULE, 
    (`drainSchedule` fires only a pending one), and a rule is a second way in, so it reads the same row. The row is
    paused in SQL here because what pauses it is `pauseAfterRefusals` in `script-run.ts`, which `script-run.test.ts`
    measures; this file measures who honours it. */
-test('A PAUSED SCRIPT IS NOT STARTED BY A RULE, the run says so, and once it is resumed a rule starts it again', async () => {
+test('A PAUSED SCRIPT THAT ALSO RUNS ON A CLOCK says its next run there reaches the row', async () => {
+  const { k, sql } = await record(script('close_children', { rule: true, every: '1d' }), onDone('close_children', 'close_children'));
+  sql.exec("UPDATE schedule SET state = 'paused' WHERE kind = 'script' AND key = 'close_children'");
+  await done(k, item(k, { what: 'Ship the specimen page' }));
+  const [run] = runs(sql, 'close_children');
+  assert.equal(run?.state, 'cancelled');
+  assert.match(run?.say ?? '', /Its next run on its clock after it is resumed reaches this row too\.$/);
+  sql.close();
+});
+
+test('A PAUSED SCRIPT IS NOT STARTED BY A RULE, the run is cancelled and says so, and once it is resumed a rule starts it again', async () => {
   const { k, sql } = await record(script('close_children', { rule: true }), onDone('close_children', 'close_children'));
   sql.exec("UPDATE schedule SET state = 'paused' WHERE kind = 'script' AND key = 'close_children'");
   await done(k, item(k, { what: 'Ship the specimen page' }));
   const [run] = runs(sql, 'close_children');
-  assert.equal(run?.state, 'failed');
+  /* CANCELLED, NOT FAILED: the pause is one fault, which `scripts-paused` names. Failed, each write that fired the rule
+     while it was paused was one more failed automation, the same cause told again on `automations-failed`. */
+  assert.equal(run?.state, 'cancelled');
   assert.match(run?.say ?? '', /script\.close_children is paused/);
+  assert.match(run?.say ?? '', /not for this one\.$/, 'the sentence promised a start the run never gets');
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM automation_run WHERE state = 'failed'")?.n, 0);
   assert.equal(queued(sql).length, 0, 'a paused script was queued by a rule');
 
   const resumed = k.resumeScript('close_children', 'p_1');
