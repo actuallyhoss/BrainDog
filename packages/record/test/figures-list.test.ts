@@ -81,9 +81,10 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      3.17.0's lasts-no-income, how many days the cash lasts with no income (money-lasts-no-income-95), made it 114, and portfolio's projects-lane-earning and projects-with-health, the earning lane and the projects saying
      how they are going (projects-lanes-lines-101), made it 116, and money-core's three of the next unpaid part of each plan (the day, what is left and what is left after it; the UI pass of 20 October) made it 119, and portfolio 1.19.0's kpis-held and kpi-stale, the key numbers kept and the days since a measure was read, made it 121, and money-core 3.18.0's installments-late, the parts whose day has gone (the audit of 22 October, U4), made it 122, and portfolio 1.22.0's project-staged, project-plan-path and project-plan-roadmap, a project's stages and the shape its plan is kept in, made it 125, and money-core 3.20.0's card-to-pay and card-to-pay-on, what the card has
      to pay and as of when, made it 127, and people 3.9.0's organisations-from-card-texts, the shops a card text named,
-     made it 128. The number is
+     made it 128, and money-core 3.27.0's in-ahead-by-month and out-ahead-by-month, what the cash walk moves in each
+     month ahead, made it 130. The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 128);
+  assert.equal(declared.length, 130);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
@@ -175,7 +176,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 128);
+  assert.equal(listed.length, 130);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });
