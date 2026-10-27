@@ -21,7 +21,7 @@ const SCRIPT = [...TEMPLATE.matchAll(/<script>([\s\S]*?)<\/script>/gu)].map((m) 
 
 test('the template asks for boot early, and knows the app’s own words as `APP_WORDS` does', () => {
   assert.ok(SCRIPT !== '', 'app.html no longer asks for boot before the app arrives');
-  const words = /'( [a-z_ ]+ )'\.indexOf/u.exec(SCRIPT)?.[1]?.trim().split(' ') ?? [];
+  const words = /'( [a-z_ -]+ )'\.indexOf/u.exec(SCRIPT)?.[1]?.trim().split(' ') ?? [];
   assert.deepEqual([...words].sort(), [...APP_WORDS].sort(), "the template's words drifted from APP_WORDS");
 });
 
