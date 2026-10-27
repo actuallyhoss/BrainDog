@@ -847,7 +847,7 @@
         {question}
         file={opts.file}
         onanswered={() => {}}
-        pick={block.queue.length > 1 ? pick : null}
+        pick={block.queue.length > 1 && (!compact || inPlace) ? pick : null}
         lead={(block as { lead?: unknown }).lead === true && n === 0}
         {n}
         {compact}

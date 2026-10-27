@@ -727,7 +727,7 @@
     {/if}
     {#if fix || bulkFix}<p class="qa-fix dr-fix" role="status">{fix || bulkFix}</p>{/if}
     {#if !compact}<p class="dr-asked" dir="auto">{askedLine}</p>{/if}
-    {#if pick && drawn && !compact}
+    {#if pick && drawn}
       <button type="button" role="checkbox" class="queue-select qa-select tap dr-select" aria-checked={chosenForAll} aria-label={pageWords.pick(card.question)} aria-disabled={kept ? 'true' : undefined} onclick={kept ? undefined : () => pick?.toggle(question)}
         ><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
       >
@@ -742,7 +742,7 @@
     data-side={side ? '' : undefined}
     bind:this={cardEl}
   >
-    {#if pick && drawn && !compact}
+    {#if pick && drawn}
       <!-- THE BOX THE RENDERER'S QUEUE DRAWS FOR A BULK ANSWER, named for the question alone. `x` presses it from the
            keyboard (`PageBody.svelte`). -->
       <button

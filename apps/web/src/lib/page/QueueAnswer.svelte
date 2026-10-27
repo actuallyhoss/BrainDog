@@ -73,10 +73,10 @@
   class="qa"
   data-row="q:{question.id}"
   data-open={at(`/decide/${encodeURIComponent(question.id)}`)}
-  data-picking={pick && pick.chosen.size > 0 && !compact ? '' : undefined}
+  data-picking={pick && pick.chosen.size > 0 ? '' : undefined}
 >
   {#if DecisionCard}
-    <DecisionCard {question} {onanswered} pick={compact ? null : pick} lead={lead && !compact} keys={lead && !compact} {n} {compact} />
+    <DecisionCard {question} {onanswered} {pick} lead={lead && !compact} keys={lead && !compact} {n} {compact} />
   {/if}
 </div>
 
