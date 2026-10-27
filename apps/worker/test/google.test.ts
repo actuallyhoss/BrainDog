@@ -214,6 +214,13 @@ test('THE WINDOW SWAPS THE CODE FOR THE COOKIE, with the verifier that made the 
   assert.deepEqual(asked.at(-1), { flow: 'magic.redeem', linkToken: LINK, ip: '203.0.113.9' });
 });
 
+test('NO PART OF A CODE IS THE LINK, which is a sign-in on its own without the verifier', async () => {
+  const { code, res } = await handedCode();
+  const location = res.headers.get('location') ?? '';
+  assert.ok(!location.includes(LINK), 'the link token travels readable in the address');
+  for (const part of code.split('.')) assert.notEqual(part, LINK, 'a segment of the code is the link token');
+});
+
 test('A CODE IS REFUSED with another verifier, another origin, a forged seal or after two minutes', async () => {
   const { d, code } = await handedCode();
   const refused = async (res: Response) => {

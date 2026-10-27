@@ -99,20 +99,71 @@ async function seal(secret: string, text: string): Promise<string> {
   return b64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`desktop-code|${text}`))));
 }
 
-/** A one-time code for the app: the link token, the challenge it is bound to, when it dies, and the seal over those. */
+/** The key a code's link token is sealed under, drawn from the session secret for this one use. */
+async function boxKey(secret: string): Promise<Awaited<ReturnType<typeof crypto.subtle.deriveKey>>> {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new TextEncoder().encode('braindog/desktop-code') },
+    base,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+const bytesOf = (b64: string): Uint8Array | null => {
+  try {
+    return Uint8Array.from(atob(b64.replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
+  } catch {
+    return null;
+  }
+};
+
+/* THE LINK TOKEN TRAVELS SEALED, NOT IN CLEAR. It is a sign-in on its own at /auth/magic/redeem, so a code that
+   carried it readable would let anyone who saw the redirect sign in without the app's verifier. Sealed, it opens
+   only here, after the verifier has matched the challenge it was bound to. */
+async function box(secret: string, linkToken: string, aad: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const sealed = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(aad) }, await boxKey(secret), new TextEncoder().encode(linkToken)),
+  );
+  const out = new Uint8Array(iv.length + sealed.length);
+  out.set(iv);
+  out.set(sealed, iv.length);
+  return b64url(out);
+}
+
+async function unbox(secret: string, boxed: string, aad: string): Promise<string | null> {
+  const bytes = bytesOf(boxed);
+  if (bytes === null || bytes.length < 12 + 16) return null;
+  try {
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: bytes.slice(0, 12), additionalData: new TextEncoder().encode(aad) },
+      await boxKey(secret),
+      bytes.slice(12),
+    );
+    return new TextDecoder().decode(plain);
+  } catch {
+    return null;
+  }
+}
+
+/** A one-time code for the app: the sealed link token, the challenge it is bound to, when it dies, and the seal over those. */
 export async function desktopCode(secret: string, linkToken: string, challenge: string, now: number): Promise<string> {
   const exp = String(now + CODE_LIFE_MS);
-  return `${linkToken}.${challenge}.${exp}.${await seal(secret, `${linkToken}.${challenge}.${exp}`)}`;
+  const sealed = await box(secret, linkToken, `${challenge}.${exp}`);
+  return `${sealed}.${challenge}.${exp}.${await seal(secret, `${sealed}.${challenge}.${exp}`)}`;
 }
 
 /** The link token inside a code, or null for one that is forged, expired or whose verifier is not the one that asked. */
 export async function openDesktopCode(secret: string, code: string, verifier: string, now: number): Promise<string | null> {
-  const [link, challenge, exp, mac, ...extra] = code.split('.');
-  if (!link || !challenge || !exp || !mac || extra.length > 0 || !CHALLENGE.test(challenge) || !/^\d{1,15}$/.test(exp)) return null;
+  const [sealed, challenge, exp, mac, ...extra] = code.split('.');
+  if (!sealed || !challenge || !exp || !mac || extra.length > 0 || !CHALLENGE.test(challenge) || !/^\d{1,15}$/.test(exp)) return null;
   if (Number(exp) <= now || Number(exp) - now > CODE_LIFE_MS) return null;
-  if (!(await sameKey(mac, await seal(secret, `${link}.${challenge}.${exp}`)))) return null;
+  if (!(await sameKey(mac, await seal(secret, `${sealed}.${challenge}.${exp}`)))) return null;
   const mine = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
-  return (await sameKey(mine, challenge)) ? link : null;
+  if (!(await sameKey(mine, challenge))) return null;
+  return unbox(secret, sealed, `${challenge}.${exp}`);
 }
 
 const stateCookie = (value: string, mode: CookieMode, age: number): string =>
