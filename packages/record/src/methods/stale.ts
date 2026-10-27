@@ -56,6 +56,7 @@ import {
 } from '../scope-propose.ts';
 import type { RecordDeps } from './index.ts';
 import { fadeOf } from '../agent-lists.ts';
+import { hiddenOf } from '../sight.ts';
 
 /** One kind of stale thing as a person or an agent reads it. `clear` is the one call that clears it, in words. */
 export type StaleLine = { kind: string; said: string; count: number; clear: string };
@@ -224,6 +225,10 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
     /* THE DAY FIELD A LIST FADES BY, as `context` finds it too (`agent-lists.ts` `fadeOf`), whatever it is called. */
     const FADES = fadeOf(decl)?.field;
     if (FADES === undefined || readable(ctx, id) !== null) continue;
+    /* A LIST WHOSE FADE DAY, OR STATE, A SHARE HIDES FROM THE READER IS LEFT OUT: how long since a thing was confirmed
+       is that day, said in other words. */
+    const hidden = hiddenOf(ctx, id);
+    if (hidden.has(FADES) || (decl.state !== undefined && hidden.has(decl.state))) continue;
     const held: Json[] = decl.state !== undefined && decl.done !== undefined && decl.done.length > 0 ? [{ field: decl.state, not_in: [...decl.done] }] : [];
     const unconfirmed: Json = {
       any: [{ field: FADES, before: cutDay }, { all: [{ field: FADES, empty: true }, { field: 'created_at', before: new Date(cutMs).toISOString() }] }],

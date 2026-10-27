@@ -48,6 +48,7 @@ import { scrubbed } from '../scrub.ts';
 import { exceptionsFor } from './exceptions.ts';
 import { WRITTEN_KEPT, WRITTEN_STATE, writtenFailed, writtenShown, type WrittenRead } from '../written-brief.ts';
 import type { RecordDeps } from './index.ts';
+import { hiddenOf } from '../sight.ts';
 
 /**
  * What `briefing` answers: the cards, when they were worked out, the hash of the facts they were worked out from, and
@@ -110,14 +111,18 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
       if (readable(ctx, list.id) !== null) continue;
       const schema = kernel.schemaOf(list.id);
       if (!schema) continue;
-      const days = Object.keys(schema.fields).filter((f) => schema.fields[f]!.deadline === true && schema.fields[f]!.type === 'day');
+      /* A FIELD A SHARE HIDES FROM THE READER IS NO DATE TO TELL THEM: "Water is 3 days late" says the day it holds. And
+         a hidden state is not read to tell finished from open, which would answer what it holds the same way. */
+      const hidden = hiddenOf(ctx, list.id);
+      const days = Object.keys(schema.fields).filter((f) => schema.fields[f]!.deadline === true && schema.fields[f]!.type === 'day' && !hidden.has(f));
       const done = list.done ?? [];
       /* NOT FINISHED IS THE LIST'S OWN `done` STATES, as the `deadlines` source reads it. A row with no state is open. */
-      const open = schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
+      const open = schema.state !== undefined && done.length > 0 && !hidden.has(schema.state) ? [{ field: schema.state, not_in: [...done] }] : [];
       for (const field of days) {
         const got = kernel.list(
           { register: list.id, where: { all: [{ field, lte: last }, ...open] }, limit: READ_MOST, order: [{ field, dir: 'desc' }] },
           kernel.scope(ctx, list.id),
+          [...hidden],
         );
         /* A LIST THAT CANNOT BE READ SAYS NOTHING, and the others are still said. */
         if (!got.ok) continue;
