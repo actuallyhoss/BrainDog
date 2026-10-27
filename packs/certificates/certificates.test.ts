@@ -189,7 +189,8 @@ test('A RECORD THAT HOLDS CERTIFICATES WALKS THEIR PAYOUTS AND THE PRINCIPAL INT
   assert.ok(JSON.stringify(api.kernel.metricDecl('arriving-30d')).includes('certificates'), 'Money does not walk Certificates for a record that holds them');
   assert.equal(arriving(), 150_000 + 10_000_000, 'the 20 October payout and the principal on 10 November; the payout after that is past the day it matures');
   assert.equal(version(), before, 'no version moved');
-  assert.equal(api.kernel.suggestions?.().length ?? 0, 0, 'nothing was asked');
+  const open = api.kernel.openSuggestions();
+  assert.deepEqual(open.ok ? open.value : open, [], 'nothing was asked');
   /* TAKEN OUT AGAIN, NOTHING REFUSES AND THE WALK STOPS NAMING THE LIST. */
   said(await api.uninstallPack({ id: 'certificates' }, owner));
   assert.equal(JSON.stringify(api.kernel.metricDecl('arriving-30d')).includes('certificates'), false, 'Money walks a list the record no longer holds');
