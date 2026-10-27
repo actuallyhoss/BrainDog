@@ -242,7 +242,7 @@
   .ln[data-done] .ln-tick {
     border-color: var(--good);
     background: var(--good);
-    color: var(--on-red, #fff);
+    color: var(--on-red);
   }
 
   @media (pointer: coarse) {

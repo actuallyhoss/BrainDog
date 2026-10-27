@@ -267,7 +267,8 @@
 
   /** A glyph name only from the set; anything else draws the tag. */
   const glyph = (name: string | null | undefined, or: IconName): IconName => (name && /^[a-z]+(?:-[a-z]+)*$/u.test(name) ? (name as IconName) : or);
-  const hue = (c: string | null | undefined): string | undefined => (c && HUES.has(c) ? `--chip: var(--cat-${c}); --chip-tint: var(--cat-${c}-tint)` : undefined);
+  const chipOf = (c: string | null | undefined): string | undefined => (c && HUES.has(c) ? `var(--cat-${c})` : undefined);
+  const tintOf = (c: string | null | undefined): string | undefined => (c && HUES.has(c) ? `var(--cat-${c}-tint)` : undefined);
   const KIND: Readonly<Record<string, IconName>> = { bank: 'landmark', cash: 'banknote', card: 'credit-card' };
   const accountGlyph = (a: Option | undefined): IconName => (a?.kind && KIND[a.kind]) || 'wallet';
 
@@ -371,7 +372,7 @@
                 data-lit={lit === i ? '' : undefined}
                 onpointerdown={(e) => (e.preventDefault(), pick(p))}
               >
-                <span class="qa-chipglyph" style={hue(c?.colour)}><Icon name={glyph(c?.icon, 'tag')} size="s" /></span>
+                <span class="qa-chipglyph" style:--chip={chipOf(c?.colour)} style:--chip-tint={tintOf(c?.colour)}><Icon name={glyph(c?.icon, 'tag')} size="s" /></span>
                 <span class="qa-grow"><span class="qa-t">{p.name}</span><span class="qa-d">{words.usual(p.count, c?.name ?? null)}</span></span>
                 {#if lit === i}<kbd class="qa-kbd">↵</kbd>{/if}
               </div>
@@ -408,7 +409,7 @@
                   usualFrom = null;
                 }}
               >
-                <span class="qa-chipglyph" style={hue(c.colour)}><Icon name={glyph(c.icon, 'tag')} size="s" /></span>
+                <span class="qa-chipglyph" style:--chip={chipOf(c.colour)} style:--chip-tint={tintOf(c.colour)}><Icon name={glyph(c.icon, 'tag')} size="s" /></span>
                 <span class="qa-catname">{c.name}</span>
               </button>
             {/each}

@@ -498,7 +498,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: 24px;
+    font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 30px;
@@ -621,7 +621,7 @@
     }
 
     .h-head {
-      font-size: 30px;
+      font-size: var(--fs-page);
       line-height: 36px;
     }
   }
@@ -749,7 +749,7 @@
 
   .st-dot {
     position: relative;
-    z-index: 1;
+    z-index: var(--z-raise);
     box-sizing: border-box;
     inline-size: 12px;
     block-size: 12px;
@@ -878,7 +878,7 @@
   .n-fig {
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 28px;

@@ -1473,13 +1473,13 @@
     inset-inline: 0;
     margin-inline: auto;
     inline-size: max-content;
-    z-index: 5;
+    z-index: var(--z-raise);
     padding: 4px 12px;
     border-radius: var(--r-round);
     background: var(--tile);
     border: 1px solid var(--rule);
     color: var(--ink-2);
-    font-size: 0.8rem;
+    font-size: var(--fs-cap);
     pointer-events: none;
   }
 </style>

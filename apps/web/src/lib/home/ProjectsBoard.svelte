@@ -214,7 +214,7 @@
     margin: 10px 0 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: 25px;
+    font-size: var(--fs-page);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 30px;
@@ -223,7 +223,7 @@
 
   @media (width >= 640px) {
     .b-head {
-      font-size: 34px;
+      font-size: var(--fs-hero);
       line-height: 40px;
     }
   }
@@ -306,7 +306,7 @@
   .e-total {
     margin: 12px 0 0;
     font-family: var(--font-display);
-    font-size: 40px;
+    font-size: var(--fs-hero);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 44px;
@@ -408,7 +408,7 @@
     gap: 0 8px;
     margin: 0;
     font-family: var(--font-display);
-    font-size: 28px;
+    font-size: var(--fs-page);
     font-weight: 600;
     line-height: 32px;
   }
@@ -611,7 +611,7 @@
 
   .n-fig {
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: 26px;
   }
@@ -670,7 +670,7 @@
     border-radius: 50%;
     background: var(--tile-2, var(--hover));
     color: var(--ink-3);
-    font-size: 11px;
+    font-size: var(--fs-cap);
   }
 
   .w-words {
