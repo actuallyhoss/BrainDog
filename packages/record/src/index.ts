@@ -3317,7 +3317,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         held: () => kernel.packStates().map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
         document: (id) => {
           const own = firstPartyManifest(id as Parameters<typeof firstPartyManifest>[0]).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
-          return moduleDocument(u ?? null, id, { today: dayOf(clock.now()), holds: new Set([...[...kernel.registers()].map(([list]) => list), ...own]) });
+          const doc = moduleDocument(u ?? null, id, { today: dayOf(clock.now()), holds: new Set([...[...kernel.registers()].map(([list]) => list), ...own]) });
+          /* WHAT THE INSTALLED FILE HANDS ON GOES IN AGAIN WITH IT. Put in from the shipped file alone, money-core lost the
+             `hands` that gave `register.holdings` to Work, and every update of Work after was `WOULD_ORPHAN`
+             (`declare` `handover.test.ts`). A file that declares one of them again is refused by its plan, and left alone. */
+          const was = handedOf(sql.all<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', id).map((r) => r.manifest));
+          return doc && Object.keys(was).length > 0 ? { ...doc, hands: { ...was, ...((doc.hands as Record<string, string> | undefined) ?? {}) } } : doc;
         },
         plan: async (doc) => {
           const got = await planned(doc);
@@ -3387,7 +3392,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       waiting: queued?.waiting.length ?? 0,
     };
     const busy = usage.agents.length > 0;
-    const offered: Offered[] = catalogue.map((e) => {
+    const offered: Offered[] = catalogue.filter((e) => e.offered !== false).map((e) => {
       let shows = false;
       if (busy && e.kind === 'pack')
         try {

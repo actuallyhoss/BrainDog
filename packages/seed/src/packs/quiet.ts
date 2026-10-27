@@ -433,6 +433,9 @@ export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' 
     if (!held) continue;
     const given = await port.document(id);
     if (!given) continue;
+    /* AT THE VERSION IT HOLDS AND NO OTHER: a newer document is the night's update to ask about (`updateFirstParty`), so a
+       record holding money-core 2.0.0 was put on 3.29.0 here, unasked, by an add-on coming in. */
+    if (given.version !== held.version) continue;
     const doc = without(given);
     const planned = await port.plan(doc);
     if (!planned.ok) continue;
