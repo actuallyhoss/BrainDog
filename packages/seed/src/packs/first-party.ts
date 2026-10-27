@@ -21,7 +21,8 @@
  * `index.ts`: a constant computed here would run before the declarations it reads exist.
  */
 
-import { packDocument } from '../index.ts';
+import { wholeDocument } from '../index.ts';
+import { ADDON_LEG_LISTS } from '../modules/held-legs.ts';
 import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
 import { estateTargetConfig } from '../modules/estate.ts';
 import type { PackManifest } from './agents.ts';
@@ -848,7 +849,7 @@ type Split = {
 };
 
 function split(): Split {
-  const doc = packDocument() as { declarations: Body[]; seeds: Body[] };
+  const doc = wholeDocument() as { declarations: Body[]; seeds: Body[] };
   const known = new Set<string>(FIRST_PARTY);
   const owner = new Map<string, FirstPartyId>();
   for (const d of doc.declarations)
@@ -997,11 +998,19 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
      without. Such a record's tiles leave its subscriptions out until the pack is installed again for it. */
   const held = options.holds === undefined ? null : new Set(options.holds);
   const own = new Set(whole.declarations.flatMap((d) => (typeof d.register === 'string' ? [d.register] : [])));
+  /* A LEG OVER A LIST ONLY AN ADD-ON HOLDS (Certificates) IS KEPT ONLY WHERE THE RECORD SAYS IT HOLDS IT, in a block as in
+     a figure: no record is known to hold an add-on's list, and a block with a leg over a list that is not there is refused
+     when it is read. */
   const walked = (from: Body[], unsaid: boolean): Body[] =>
-    from.filter((leg) => typeof leg.register !== 'string' || own.has(leg.register) || (held === null ? unsaid : held.has(leg.register)));
+    from.filter(
+      (leg) =>
+        typeof leg.register !== 'string' ||
+        own.has(leg.register) ||
+        (ADDON_LEG_LISTS.has(leg.register) ? held !== null && held.has(leg.register) : held === null ? unsaid : held.has(leg.register)),
+    );
   const legs = (d: Body): Body => {
     if (Array.isArray(d.legs)) return { ...d, legs: walked(d.legs as Body[], false) };
-    if (held === null || !Array.isArray(d.blocks)) return d;
+    if (!Array.isArray(d.blocks)) return d;
     return { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: walked(b.from as Body[], true) } : b)) };
   };
   /* A CARD'S TREND OVER ANOTHER MODULE'S FIGURE IS LEFT OUT when the record will not hold the list that figure reads, as

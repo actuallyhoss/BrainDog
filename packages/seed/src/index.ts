@@ -170,16 +170,18 @@ export const ROWS: Record<string, readonly Fields[]> = {
 
 /* ── the metrics it ships with ──────────────────────────────────── */
 /* Built in `metrics.ts` from the five modules' own tables, so a screen can read them without this file (`@braindog/seed/packs/metrics`). */
-import { METRICS } from './modules/metrics.ts';
+import { ALL_METRICS, METRICS } from './modules/metrics.ts';
 export { METRICS };
 
 
 
 /* ── the pages it ships with ────────────────────────────────────── */
 
-export const PAGES: Record<string, SeedPage> = Object.fromEntries(
-  Object.entries({ ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES, ...SCRIPTS_PAGES, ...BASE_PAGES }).map(([id, body]) => [id, heldLegs(body)]),
-);
+/** EVERY PAGE AS ITS MODULE DECLARES IT, the walk's legs over an add-on's list included: what the pack documents are cut from. */
+const ALL_PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES, ...SCRIPTS_PAGES, ...BASE_PAGES };
+
+/** THE SAMPLE'S PAGES, without a leg over a list the sample does not hold (`heldLegs`). */
+export const PAGES: Record<string, SeedPage> = Object.fromEntries(Object.entries(ALL_PAGES).map(([id, body]) => [id, heldLegs(body)]));
 
 /* ── installing it ────────────────────────────────────────────────────────── */
 
@@ -327,6 +329,16 @@ export function forWrite(register: string, fields: Fields): Record<string, unkno
  * demonstration, which is `installSeed`'s job and a different thing.
  */
 export function packDocument(): Record<string, unknown> {
+  return heldLegs(wholeDocument());
+}
+
+/**
+ * THE STARTER AS EVERY MODULE DECLARES IT, with the walk's legs over lists an add-on holds still in it. It is what the
+ * first-party documents are cut from (`split` in `packs/first-party.ts`), and each of those leaves out a leg over a list
+ * its record will not hold (`firstPartyDocument`); `packDocument()` is this with every such leg taken off, for the
+ * starter installed whole, which holds no add-on.
+ */
+export function wholeDocument(): Record<string, unknown> {
   return {
     pack: 'braindog-starter',
     version: '1.0.0',
@@ -341,8 +353,8 @@ export function packDocument(): Record<string, unknown> {
         const { id, ...rest } = withTags(body) as { id: string } & Record<string, unknown>;
         return { register: id, ...rest };
       }),
-      ...Object.values(PAGES),
-      ...Object.values(METRICS),
+      ...Object.values(ALL_PAGES),
+      ...Object.values(ALL_METRICS),
       ...Object.values(RULES),
       /* A PATTERN IS SPREAD AS IT STANDS, where a register had to be respelled: `normalise` reads a
          declaration's kind off its FIRST key, and a pattern in `INGESTS` writes `ingest:` first, so
@@ -354,8 +366,8 @@ export function packDocument(): Record<string, unknown> {
     /* THE SETTINGS MONEY'S TARGETS ARE HELD TO, which a person changes later, and the currency it adds up in. */
     config: {
       ...MONEY_HOME_SETTING,
-      ...targetConfigOf(Object.values(METRICS) as unknown as Record<string, unknown>[]),
-      ...estateTargetConfig(Object.values(METRICS) as unknown as Record<string, unknown>[]),
+      ...targetConfigOf(Object.values(ALL_METRICS) as unknown as Record<string, unknown>[]),
+      ...estateTargetConfig(Object.values(ALL_METRICS) as unknown as Record<string, unknown>[]),
     },
     /* A REGISTER WHOSE REQUIRED FIELD IS A REF CANNOT BE SEEDED BY A PACK. A pack's seeds are one
        row per register with no order between them, so a `ref` in one would resolve against whatever

@@ -27,5 +27,8 @@ const FIGURES: readonly { pack: string; metrics: Record<string, SeedMetric> }[] 
   { pack: 'people', metrics: PEOPLE_METRICS },
 ];
 
-/** WITHOUT A LEG OVER A LIST ONLY AN ADD-ON HOLDS: the sample holds none, and a figure over the walk would be refused it. A record that holds the add-on gets the leg from the pack's own document. */
-export const METRICS: Record<string, SeedMetric> = withoutLegs(Object.assign({}, ...FIGURES.map((f) => f.metrics)), (register) => !ADDON_LEG_LISTS.has(register));
+/** EVERY FIGURE AS ITS MODULE DECLARES IT, with the walk's legs over the lists an add-on holds: what the pack documents are cut from. */
+export const ALL_METRICS: Record<string, SeedMetric> = Object.assign({}, ...FIGURES.map((f) => f.metrics));
+
+/** THE SAMPLE'S FIGURES: without a leg over a list only an add-on holds, which the sample does not, and a figure over the walk would be refused it. */
+export const METRICS: Record<string, SeedMetric> = withoutLegs(ALL_METRICS, (register) => !ADDON_LEG_LISTS.has(register));
