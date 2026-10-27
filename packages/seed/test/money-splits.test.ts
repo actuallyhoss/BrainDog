@@ -147,7 +147,7 @@ test('THE REPORTS SPLIT BY CATEGORY ADDS UP THE PARTS TOO, as the page reads it'
   const r = await fresh();
   value(spent(r, '2026-09-02', 500_000, { category: r.rent.id }));
   shopRun(r);
-  const declared = MONEY_REPORTS_PAGE.blocks.find((b) => (b as { heading?: string }).heading === 'Spending by category')!;
+  const declared = (MONEY_REPORTS_PAGE.blocks as unknown[]).find((b) => (b as { heading?: string }).heading === 'Spending by category')!;
   const got = r.k.block(declared as unknown as PageBlock) as unknown as { refusals: unknown[]; wholeRead?: { rows: { label: unknown; value: number }[]; total: number } };
   assert.deepEqual(got.refusals, []);
   const rows = new Map((got.wholeRead?.rows ?? []).map((w) => [w.label, w.value]));
