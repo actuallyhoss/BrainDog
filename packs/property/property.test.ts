@@ -73,15 +73,18 @@ type Row = { id: string; register: string; seq: number; fields: Record<string, J
 const row = (id: string, register: string, seq: number, fields: Record<string, Json>, version = 1): Row => ({ id, register, seq, fields, version, updated_at: NOW });
 const egp = (pounds: number) => ({ amount: Math.round(pounds * 100), currency: 'EGP' });
 
-type Leaf = { field: string; is?: Json };
+type Leaf = { field?: string; is?: Json; lt?: number; all?: Leaf[] };
+const flat = (w: Leaf | null | undefined): Leaf[] => (w ? (w.all ? w.all.flatMap(flat) : [w]) : []);
 const hostOf = (input: Row, rows: Row[]): CtxHost => ({
   fetch: async () => {
     throw new Error('property fetches nothing');
   },
   get: async (spoken) => ([input, ...rows].find((r) => r.id === spoken) ?? null) as unknown as Json,
   list: async (register, where) => {
-    const leaves = ((where as { all?: Leaf[] } | null)?.all ?? []) as Leaf[];
-    return rows.filter((r) => r.register === register && leaves.every((l) => r.fields[l.field] === l.is)) as unknown as Json[];
+    /* A script's list is one page of fifty, newest first, and takes no cursor; `seq lt n` is how a script asks for the next. */
+    const leaves = flat(where as Leaf | null);
+    const has = (r: Row, l: Leaf) => (l.lt !== undefined ? r.seq < l.lt : r.fields[l.field!] === l.is);
+    return rows.filter((r) => r.register === register && leaves.every((l) => has(r, l))).sort((a, b) => b.seq - a.seq).slice(0, 50) as unknown as Json[];
   },
   now: () => NOW,
   tz: 'UTC',
@@ -190,6 +193,13 @@ test('SUMS: paid, left and equity, the running total on each paid part, a cancel
   const settled = rows.map((r) => (r.seq === 1 ? { ...r, fields: { ...r.fields, paid_to_date: egp(100) } } : r.seq === 2 ? { ...r, fields: { ...r.fields, paid_to_date: egp(250) } } : r));
   const again = plan({ value: egp(1000), price: egp(700), paid: egp(250), left: egp(450), equity: egp(550) });
   assert.deepEqual(writesOf(await runInQuickJs(decl('property_sums'), hostOf(again, [again, ...settled]))), []);
+});
+
+test('SUMS: A PLAN OF MORE THAN FIFTY PARTS IS SUMMED WHOLE, not on its first page', async () => {
+  const rows = Array.from({ length: 130 }, (_, i) => part(i + 1, `2026-01-${String((i % 28) + 1).padStart(2, '0')}`, 10, i < 70 ? 'paid' : 'open'));
+  const p = plan({ value: egp(5000) });
+  const w = writesOf(await runInQuickJs(decl('property_sums'), hostOf(p, [p, ...rows])));
+  assert.deepEqual(planPatch(w), { paid: egp(700), left: egp(600), equity: egp(4400) });
 });
 
 test('SUMS: a paid part put back to open loses its running total, and a plan with no money on it is left alone', async () => {

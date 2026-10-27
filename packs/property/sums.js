@@ -9,7 +9,7 @@
  * currency is left out, since two currencies are never added. A mortgage's monthly amount and the interest over its
  * years are worked out the same way Generate a plan works them.
  *
- * It writes a field only where it would change, so it starts nothing again. A script reads one page of fifty plans.
+ * It writes a field only where it would change, so it starts nothing again. Plans and parts are read a page at a time, past fifty.
  */
 function mortgage(principal, rate, n) {
   const r = rate / 100 / 12;
@@ -28,11 +28,25 @@ function mortgage(principal, rate, n) {
 const money = (m) => m && typeof m === 'object' && typeof m.amount === 'number' && typeof m.currency === 'string';
 const same = (a, b) => (a === undefined || a === null ? b === null : money(a) && b !== null && a.amount === b.amount && a.currency === b.currency);
 
+/* A script's list is one page of fifty with no cursor, so each is read a page at a time, each next page asking for numbers below the lowest one read. */
+async function every(ctx, register, where) {
+  const rows = [];
+  let below = null;
+  for (let reads = 0; reads < 40; reads++) {
+    const asked = below === null ? where : where ? { all: [where, { field: 'seq', lt: below }] } : { field: 'seq', lt: below };
+    const page = await ctx.record.list(register, asked);
+    rows.push(...page);
+    if (page.length < 50) break;
+    below = Math.min(...page.map((r) => r.seq));
+  }
+  return rows;
+}
+
 async function work(ctx, plan) {
   const f = plan.fields;
   const mine = new Map();
-  for (const p of await ctx.record.list('installments', { all: [{ field: 'plan_row', is: plan.id }] })) mine.set(p.id, p);
-  for (const p of await ctx.record.list('installments', { all: [{ field: 'plan', is: f.name }] })) mine.set(p.id, p);
+  for (const p of await every(ctx, 'installments', { all: [{ field: 'plan_row', is: plan.id }] })) mine.set(p.id, p);
+  for (const p of await every(ctx, 'installments', { all: [{ field: 'plan', is: f.name }] })) mine.set(p.id, p);
   const parts = [...mine.values()].filter((p) => p.fields.state !== 'cancelled' && money(p.fields.amount));
   const base = [f.value, f.price, f.mortgage_principal].find(money) || (parts[0] && parts[0].fields.amount);
   if (!base) return;
@@ -82,7 +96,7 @@ export default async function run(ctx) {
       const found = typeof link === 'string' && link !== '' ? [await ctx.record.get(link)] : typeof text === 'string' ? await ctx.record.list('plans', { all: [{ field: 'name', is: text }] }) : [];
       plans = found.filter((p) => p && p.register === 'plans');
     } else return;
-  } else plans = await ctx.record.list('plans');
+  } else plans = await every(ctx, 'plans', null);
   for (const plan of plans) {
     const f = plan.fields;
     if (money(f.value) || money(f.price) || money(f.mortgage_principal)) await work(ctx, plan);
