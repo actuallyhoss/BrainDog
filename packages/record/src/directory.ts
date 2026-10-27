@@ -78,7 +78,7 @@ const RESERVED = new Set([
   'api', 'auth', 'mcp', 'a', 'p', 's', 'in', 'r', 'ws',
   /* And the words a name would read as the platform's rather than somebody's. */
   'admin', 'app', 'assets', 'static', 'www', 'new',
-  /* AND EVERY TOP-LEVEL WORD THE APP ROUTES, because the app now lives at `brain.dog/app/<slug>/…` and the first
+  /* AND EVERY TOP-LEVEL WORD THE APP ROUTES, because the app now lives at `app.brain.dog/app/<slug>/…` and the first
      segment after `/app/` is a page or a record's name by this set alone. A record called `settings` would make
      `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue` are the static folders served under
      `/app` beside the pages. `test/directory.test.ts` reads the app's route and static folders and fails for any this
@@ -108,7 +108,7 @@ export function badSlug(slug: string): string | null {
   if (!SLUG.test(slug))
     return `${slug} is not a name: it starts with a letter, is two to thirty-two characters of lower-case letters, digits and hyphens, and does not end with one.`;
   if (RESERVED.has(slug)) return `${slug} is a name the platform uses for something else.`;
-  if (SPOKEN.test(slug)) return `${slug} reads as a spoken id, like D41, and brain.dog/app/${slug} opens that item rather than a record.`;
+  if (SPOKEN.test(slug)) return `${slug} reads as a spoken id, like D41, and app.brain.dog/app/${slug} opens that item rather than a record.`;
   return null;
 }
 

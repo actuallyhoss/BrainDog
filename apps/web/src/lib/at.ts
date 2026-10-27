@@ -1,7 +1,7 @@
 /**
  * Where the app lives, and which record an address names.
  *
- * THE APP IS `brain.dog/app` AND THE RECORD IS THE NEXT SEGMENT. `/app/acme/r/tasks` is acme's tasks, checked by the
+ * THE APP IS `app.brain.dog/app` AND THE RECORD IS THE NEXT SEGMENT. `/app/acme/r/tasks` is acme's tasks, checked by the
  * Directory before any id is used; `/app/r/tasks` is the record the session is on, which is what the app meant by every
  * address before the move and what a legacy redirect lands on, because the redirect cannot know the slug.
  *

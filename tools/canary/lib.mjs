@@ -28,7 +28,7 @@ import { forward, forwards, IDENTITY, serverKeyFor, startRecord } from '../gates
 export const SELF_HOST_ONLY = 'self-host only';
 
 /** The live canary's host when `CANARY_ORIGIN` does not name another. */
-export const LIVE_ORIGIN = 'https://brain.dog';
+export const LIVE_ORIGIN = 'https://app.brain.dog';
 
 /** A record's name as the Directory hands one out. */
 export const SLUG = /^[a-z][a-z0-9-]{0,61}[a-z0-9]$/u;

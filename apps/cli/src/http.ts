@@ -121,7 +121,7 @@ export const inTheClear = (url: URL): boolean => url.protocol === 'http:' && !LO
  * in the log of every agent session.
  *
  * `/app/<slug>` IS KEPT AS `/<slug>`. The app moved to
- * `brain.dog/app/<slug>` and its connect screen prints that address, so it is what people paste; before
+ * `app.brain.dog/app/<slug>` and its connect screen prints that address, so it is what people paste; before
  * this line the whole of `app/acme` went to the Directory as the slug and the sign-in was refused. `app`
  * is a reserved slug (`packages/record/src/directory.ts`), so a first segment of `app` is always the
  * prefix and never a record. It is done here and not in `login` because `logout` and `target` key by
@@ -135,10 +135,10 @@ export function hostKey(raw: string): string {
   try {
     url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`);
   } catch {
-    throw new Error('The BrainDog host is not an address. Write it as https://brain.dog/app/<slug>.');
+    throw new Error('The BrainDog host is not an address. Write it as https://app.brain.dog/app/<slug>.');
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:')
-    throw new Error('The BrainDog host is not an https address. Write it as https://brain.dog/app/<slug>.');
+    throw new Error('The BrainDog host is not an https address. Write it as https://app.brain.dog/app/<slug>.');
   if (url.username || url.password)
     throw new Error('The BrainDog host address carries a name or a password. A token goes in the hosts file or BRAINDOG_TOKEN, never in an address.');
   return `${url.origin}${url.pathname.replace(/\/+$/, '').replace(/^\/app(?=\/|$)/, '')}`;
@@ -246,7 +246,7 @@ export function runnerTarget(flag: string | undefined, env: Env, file: string, n
     throw new Error(
       enrolled.length > 1
         ? 'This machine is enrolled as a runner on more than one BrainDog. Name one with --host.'
-        : 'This machine is not enrolled as a runner. Run braindog runner enrol https://brain.dog/app/<slug>.',
+        : 'This machine is not enrolled as a runner. Run braindog runner enrol https://app.brain.dog/app/<slug>.',
     );
   const key = hostKey(named);
   const url = new URL(key);

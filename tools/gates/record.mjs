@@ -273,7 +273,7 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
     now: NOW,
     pollMs: 0,
     sessionKey: new Uint8Array(randomBytes(32)),
-    /* NO PUBLIC KENNEL. Left to the environment, the record read `https://brain.dog/api/kennel/v1/` for every catalogue
+    /* NO PUBLIC KENNEL. Left to the environment, the record read `https://app.brain.dog/api/kennel/v1/` for every catalogue
        index and preview, so a screen waited on another host for up to five seconds a file: `/packs/browse` asks for a
        preview of every add-on, missed `networkidle` while the Kennel was slow, and `a11y`'s seeded run died on that
        timeout before it could name a single seed, which `self-test` read as four negatives passed. A gate measures

@@ -181,7 +181,7 @@ test('a dispatched host runs with no key, and says so in one line', () => {
   assert.equal(r.code, 0);
   assert.match(r.out, /^ok\s+sees: keys: none$/m);
   assert.equal(r.err.split('\n').filter((l) => /No key is handed/.test(l)).length, 1);
-  assert.match(r.err, /No key is handed to https:\/\/other\.example: only https:\/\/brain\.dog gets them, so this run has none\./);
+  assert.match(r.err, /No key is handed to https:\/\/other\.example: only https:\/\/app\.brain\.dog gets them, so this run has none\./);
 });
 
 test('a record named by an address on another host is handed no key either', () => {
@@ -199,7 +199,7 @@ test('a record named by an address on another host is handed no key either', () 
 test('production keeps its keys, and says nothing about them', () => {
   const dir = mkdtempSync(join(tmpdir(), 'door-sees-'));
   writeFileSync(join(dir, 'sees.check.mjs'), SEES);
-  const r = runner(['--dir', dir], keyed, 'https://brain.dog');
+  const r = runner(['--dir', dir], keyed, 'https://app.brain.dog');
   rmSync(dir, { recursive: true, force: true });
   assert.match(r.out, new RegExp(`^ok\\s+sees: keys: ${KEYS.join(' ')}$`, 'm'));
   assert.doesNotMatch(r.err, /No key is handed/);

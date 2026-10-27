@@ -432,7 +432,7 @@ const shaOf = (p: Pinned): string =>
 
 /* ── enrol ───────────────────────────────────────────────────────────────── */
 
-const ENROL_USAGE = 'braindog runner enrol takes one host, as in braindog runner enrol https://brain.dog/app/<slug>, and nothing else.';
+const ENROL_USAGE = 'braindog runner enrol takes one host, as in braindog runner enrol https://app.brain.dog/app/<slug>, and nothing else.';
 
 /**
  * `braindog runner enrol <host>`: six digits approved in the app, and the runner's bearer kept in the hosts file.

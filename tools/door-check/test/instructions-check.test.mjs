@@ -151,8 +151,8 @@ test('a client with no hooks: what waits is said at its start, listed when asked
   }
 });
 
-test('never on brain.dog, and not without the seed key or a model, each said', () => {
-  assert.match(notRun({ host: 'https://brain.dog', env: { DOOR_SEED_KEY: 'x', ANTHROPIC_API_KEY: 'y' } }), /only he tells a run on brain\.dog/u);
+test('never on app.brain.dog, and not without the seed key or a model, each said', () => {
+  assert.match(notRun({ host: 'https://app.brain.dog', env: { DOOR_SEED_KEY: 'x', ANTHROPIC_API_KEY: 'y' } }), /only he tells a run on app\.brain\.dog/u);
   assert.match(notRun({ host: 'http://localhost:1', env: { ANTHROPIC_API_KEY: 'y' } }), /DOOR_SEED_KEY/u);
   assert.match(notRun({ host: 'http://localhost:1', env: { DOOR_SEED_KEY: 'x' } }), /DOOR_CLAUDE_PROFILE/u);
   assert.equal(notRun({ host: 'http://localhost:1', env: { DOOR_SEED_KEY: 'x', DOOR_CLAUDE_PROFILE: '/p' } }), null);

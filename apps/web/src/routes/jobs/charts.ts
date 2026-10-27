@@ -475,7 +475,7 @@ export const words = {
 /* ── the address a machine enrols at ────────────────────────────────────── */
 
 /** Where a hosted record is opened, which is the address its runners enrol at (`apps/cli/src/runner.ts`, `ENROL_USAGE`). */
-const HOSTED_ORIGIN = 'https://brain.dog';
+const HOSTED_ORIGIN = 'https://app.brain.dog';
 
 /**
  * Whether an address is this machine's own and nobody else's: `localhost` and any name under it, the loopback numbers
@@ -500,7 +500,7 @@ export function isLoopback(address: string): boolean {
  * address is that for a self-host, whatever it is, a `localhost` included: the runner is then on the same machine or
  * the owner knows their own host. FOR A HOSTED RECORD IT IS NEVER `localhost`. The app drawn from a machine's own port
  * over a hosted record (a preview, a build under test) printed `braindog runner enrol http://localhost:5190`, which
- * enrols nothing anywhere else; a hosted record is named by its own address, `https://brain.dog/app/<its name>`, and
+ * enrols nothing anywhere else; a hosted record is named by its own address, `https://app.brain.dog/app/<its name>`, and
  * with no name to put there the command is not printed with an address at all.
  */
 export function enrolAddress(here: string, hosted: boolean, slug: string | null): string | null {

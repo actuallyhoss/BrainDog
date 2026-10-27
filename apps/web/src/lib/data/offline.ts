@@ -70,7 +70,7 @@ export type Route = 'pass' | 'out' | 'read' | 'write' | 'door' | 'shell' | 'asse
 export type Asked = { url: string; method: string; mode: string; authorised: boolean };
 
 /**
- * Which kind of request this is, for the worker registered at `scope` (the app's root, `https://brain.dog/app/`).
+ * Which kind of request this is, for the worker registered at `scope` (the app's root, `https://app.brain.dog/app/`).
  *
  * THE RECORD ANSWERS AT TWO KINDS OF ADDRESS (`apiBase` in `lib/at.ts`): `/api/<method>` for the session's record and
  * `/app/<slug>/api/<method>` for a named one. A controlled page's requests reach the worker wherever they go, so the

@@ -12,10 +12,10 @@ import { CANARY, ENVIRONMENT, handOver, opsLine, parse, planOf, recordIdOf, said
 const PASSKEY = 'eyJjcmVkZW50aWFsSWQiOiJub3QtcmVhbCJ9';
 const BEARER = 'rec_01J8Z3N4W5X6Y7Z8A9B0C1D2E3.not-a-real-secret-but-a-long-one';
 
-test('it takes --dry, --slug and --origin, defaults to ops on brain.dog, and refuses the rest', () => {
-  assert.deepEqual(parse([]), { dry: false, slug: CANARY, origin: 'https://brain.dog' });
+test('it takes --dry, --slug and --origin, defaults to ops on app.brain.dog, and refuses the rest', () => {
+  assert.deepEqual(parse([]), { dry: false, slug: CANARY, origin: 'https://app.brain.dog' });
   assert.equal(CANARY, 'ops');
-  assert.deepEqual(parse(['--dry', '--slug=canary-two']), { dry: true, slug: 'canary-two', origin: 'https://brain.dog' });
+  assert.deepEqual(parse(['--dry', '--slug=canary-two']), { dry: true, slug: 'canary-two', origin: 'https://app.brain.dog' });
   assert.throws(() => parse(['--token', 'x']), /--dry, --slug and --origin/u);
   assert.throws(() => parse(['--slug', 'Not A Name']), /not a record's name/u);
   assert.throws(() => parse(['--origin', 'http://brain.dog']), /not https/u);

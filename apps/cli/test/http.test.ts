@@ -124,9 +124,9 @@ test('THE APP\'S OWN ADDRESS FOR A RECORD, /app/<slug>, IS THE SAME HOST AS /<sl
   assert.deepEqual(target('https://brain.dog/app/acme', {}, file), { key: 'https://brain.dog/acme', base: 'https://brain.dog', token: TOKEN });
 });
 
-test('THE EXAMPLE IN A REFUSAL IS THE ADDRESS THE APP LIVES AT NOW, brain.dog/app/<slug>', () => {
-  assert.throws(() => hostKey('not a host'), { message: 'The BrainDog host is not an address. Write it as https://brain.dog/app/<slug>.' });
-  assert.throws(() => hostKey('ftp://a.example'), { message: 'The BrainDog host is not an https address. Write it as https://brain.dog/app/<slug>.' });
+test('THE EXAMPLE IN A REFUSAL IS THE ADDRESS THE APP LIVES AT NOW, app.brain.dog/app/<slug>', () => {
+  assert.throws(() => hostKey('not a host'), { message: 'The BrainDog host is not an address. Write it as https://app.brain.dog/app/<slug>.' });
+  assert.throws(() => hostKey('ftp://a.example'), { message: 'The BrainDog host is not an https address. Write it as https://app.brain.dog/app/<slug>.' });
 });
 
 test('nothing to reach is one sentence, and none of them carries a token', (t) => {

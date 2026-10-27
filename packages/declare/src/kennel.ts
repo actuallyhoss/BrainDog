@@ -54,7 +54,7 @@ import { isSignature, keyIdOf, REASON_MOST, revocationOf, rotatedFrom, verifiedS
 export const KENNEL_BASE = '/api/kennel/v1/';
 export const KENNEL_FORMAT = 1;
 /** The public Kennel a self-host reads when its operator names no other. */
-export const DEFAULT_KENNEL = 'https://brain.dog/api/kennel/v1/';
+export const DEFAULT_KENNEL = 'https://app.brain.dog/api/kennel/v1/';
 
 /** The most a submitted file may weigh: what the file's own door allows, so the Kennel refuses nothing a record would take for size. */
 export const SUBMIT_MOST_BYTES = PACK_FILE_MOST_BYTES;

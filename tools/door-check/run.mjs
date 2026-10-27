@@ -6,7 +6,7 @@
  * refused passed every one of them for a week (`packages/mcp/src/rpc.ts:64-70`). A check that agrees with whoever
  * wrote it cannot see that. Each `*.check.mjs` beside this file runs one real app and says what it saw.
  *
- *   node tools/door-check/run.mjs --host https://brain.dog --record <slug> [--only claude-code] [--report <file>]
+ *   node tools/door-check/run.mjs --host https://app.brain.dog --record <slug> [--only claude-code] [--report <file>]
  *
  * THE CONTRACT A CHECK KEEPS, so a later unit adds a file and never edits this one:
  *
@@ -37,7 +37,7 @@ const SAW_MOST = 300;
 
 const { values: args } = parseArgs({
   options: {
-    host: { type: 'string', default: process.env.DOOR_HOST || 'https://brain.dog' },
+    host: { type: 'string', default: process.env.DOOR_HOST || 'https://app.brain.dog' },
     record: { type: 'string', default: process.env.DOOR_RECORD || '' },
     only: { type: 'string' },
     /* WHERE THE CHECKS ARE: this folder, unless a test plants its own. */
@@ -68,7 +68,9 @@ const withheld = (s) => SECRETS.reduce((text, secret) => text.split(secret).join
  * another host, is run with none of them: its rows read "not run", or fail where they need no key. Taken out of this
  * process's environment after `SECRETS` read them, so a value echoed back is still withheld.
  */
-const PRODUCTION = 'https://brain.dog';
+const PRODUCTION = 'https://app.brain.dog';
+/** The old name still answers the same Worker's doors, so a key never goes there either. */
+const PRODUCTION_ORIGINS = new Set([PRODUCTION, 'https://brain.dog']);
 const KEYS = ['DOOR_TOKEN', 'DOOR_TOKEN_2', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY', 'CURSOR_API_KEY'];
 const originOf = (s) => {
   try {
@@ -77,7 +79,7 @@ const originOf = (s) => {
     return '';
   }
 };
-const elsewhere = [args.host, /^https?:\/\//.test(args.record) ? args.record : PRODUCTION].map(originOf).find((o) => o !== PRODUCTION);
+const elsewhere = [args.host, /^https?:\/\//.test(args.record) ? args.record : PRODUCTION].map(originOf).find((o) => !PRODUCTION_ORIGINS.has(o));
 if (elsewhere !== undefined) {
   for (const name of KEYS) delete process.env[name];
   console.error(`No key is handed to ${elsewhere || args.host}: only ${PRODUCTION} gets them, so this run has none.`);

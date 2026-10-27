@@ -29,7 +29,7 @@ const inlineHashes = (tag) =>
 const TURNSTILE = 'https://challenges.cloudflare.com';
 const EMBEDS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'];
 
-/* THE APP LIVES AT `brain.dog/app`, AND ITS FILES LIVE AT `build/app`. The Worker's
+/* THE APP LIVES AT `app.brain.dog/app`, AND ITS FILES LIVE AT `build/app`. The Worker's
    asset directory stays `build/`, so `/app/_app/x.js` is `build/app/_app/x.js` and the marketing site's own `/_app/*`
    never reaches the product. `lib/at.ts` holds the same word as `BASE`, and a test holds the two equal. */
 const BASE = '/app';

@@ -1,6 +1,6 @@
 # BrainDog for Mac
 
-A thin Tauri 2 window around `https://brain.dog/app` (plan: `docs/55-DESKTOP-APP.md`). The web app is the product; this
+A thin Tauri 2 window around `https://app.brain.dog/app` (plan: `docs/55-DESKTOP-APP.md`). The web app is the product; this
 shell only adds what a tab cannot do:
 
 - Option+Space from anywhere brings the window forward and opens Slash.
@@ -25,7 +25,7 @@ cargo install tauri-cli --version "^2" --locked
 
 cd apps/desktop/src-tauri
 cargo tauri icon icons/icon.png   # makes the full icon set from the web app's 512 px icon
-cargo tauri dev                   # opens the window on brain.dog/app
+cargo tauri dev                   # opens the window on app.brain.dog/app
 BRAINDOG_URL=http://localhost:5173/app cargo tauri dev   # a debug build only: against a local web app
 cargo tauri build --target universal-apple-darwin        # Apple silicon and Intel; needs both rust targets
 # Build outside the tree (CARGO_TARGET_DIR): an in-tree target/ is 1.6 GB the repo's gates would read file by file.

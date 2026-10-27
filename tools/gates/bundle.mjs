@@ -96,7 +96,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
   const APP = join(root, 'apps/web');
   const CLIENT = join(APP, '.svelte-kit/output/client');
   const MANIFEST = join(CLIENT, '.vite/manifest.json');
-  /* THE APP'S OWN FOLDER OF THE BUILD. Since the app moved under `brain.dog/app` the adapter writes the shell and the
+  /* THE APP'S OWN FOLDER OF THE BUILD. Since the app moved under `app.brain.dog/app` the adapter writes the shell and the
      fonts to `build/app/` (`svelte.config.js`), and `build/` holds only that folder and `_headers`, so a gate still
      reading `build/index.html` would report every build as unfinished. */
   const BUILD = join(APP, 'build', 'app');

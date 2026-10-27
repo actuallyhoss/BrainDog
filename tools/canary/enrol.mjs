@@ -2,7 +2,7 @@
  * The canary's sitting: the one time a person makes the credentials the lane after a deploy signs in with
  * (`loop/scope/area-proof-a.md`, PRF-A09 job 1).
  *
- *   node tools/canary/enrol.mjs            on his Mac, by him, once: brain.dog, the record `ops`
+ *   node tools/canary/enrol.mjs            on his Mac, by him, once: app.brain.dog, the record `ops`
  *   node tools/canary/enrol.mjs --dry      every step against a fresh local self-host, and what it would set
  *
  * RUN BY THE OWNER, NEVER BY AN AGENT. No agent mints anything: every credential here is made in the owner's sitting,
@@ -12,7 +12,7 @@
  * WHAT HAPPENS, IN ORDER:
  *   1. Chromium opens with a virtual authenticator, as the passkey gate's does (`tools/gates/passkey.mjs`), so the
  *      passkey it makes can be read back and stored, which a real device's never can.
- *   2. He signs up for the free record `ops` on brain.dog in that window, with an address he reads, and pastes the
+ *   2. He signs up for the free record `ops` on app.brain.dog in that window, with an address he reads, and pastes the
  *      one link the mail brings into the same tab (the authenticator belongs to that tab). The script waits until the
  *      host says he owns `ops`. Under `--dry` the self-host's server key stands in for the mail.
  *   3. Through Settings, Recovery, "Add a passkey", the app adds the canary's one passkey; the script reads it back

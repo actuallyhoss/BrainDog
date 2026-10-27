@@ -14,7 +14,7 @@ use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
-const HOME: &str = "https://brain.dog/app";
+const HOME: &str = "https://app.brain.dog/app";
 /// Set once Cmd+Q (or any exit) starts, so a close that arrives during quitting is not turned into a hide.
 static QUITTING: AtomicBool = AtomicBool::new(false);
 

@@ -4,7 +4,7 @@
  *
  * A SELF-HOST KEEPS NO KENNEL OF ITS OWN. It answers from two places, in this order: the operator's catalogue folder
  * (`BRAINDOG_CATALOGUE`, or the one bundled in the built shell, `catalogueFolder`), then the public Kennel that
- * `BRAINDOG_KENNEL` names, `https://brain.dog/api/kennel/v1/` when it names none. The folder comes first, so an id the
+ * `BRAINDOG_KENNEL` names, `https://app.brain.dog/api/kennel/v1/` when it names none. The folder comes first, so an id the
  * operator publishes there is theirs on this host whatever the public Kennel lists under it (`mergeIndexes`).
  *
  * THE PUBLIC KENNEL'S INDEX AND COUNTS ARE KEPT FOR `KENNEL_KEEP_MS`, and one that does not answer is served from what
@@ -256,7 +256,7 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
   const base = kennelBase(deps.kennel);
   if (base === null && deps.kennel !== undefined && deps.kennel.trim().toLowerCase() !== 'off' && !unreadTold) {
     unreadTold = true;
-    console.error('kennel: BRAINDOG_KENNEL is not an http or https address, such as https://brain.dog/api/kennel/v1/, so this host reads its own folder alone until it is corrected.');
+    console.error('kennel: BRAINDOG_KENNEL is not an http or https address, such as https://app.brain.dog/api/kennel/v1/, so this host reads its own folder alone until it is corrected.');
   }
   switch (asked.ask) {
     case 'index': {

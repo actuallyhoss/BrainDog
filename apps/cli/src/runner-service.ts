@@ -322,7 +322,7 @@ export async function service(args: string[], io: ServiceIo): Promise<number> {
        pasted in the wrong place, and the unit is a file anyone on this machine can read. */
     if (rest.length === 2 && rest[0] === '--host') {
       const host = anAddress(rest[1]);
-      if (host === null) return (io.say('braindog runner service on --host takes the address of your BrainDog, such as https://brain.dog/app/<slug>.'), REFUSED);
+      if (host === null) return (io.say('braindog runner service on --host takes the address of your BrainDog, such as https://app.brain.dog/app/<slug>.'), REFUSED);
       return serviceOn({ ...io, paths: { ...io.paths, host } });
     }
     if (rest.length === 0) return serviceOn(io);

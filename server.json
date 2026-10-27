@@ -8,7 +8,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://brain.dog/mcp"
+      "url": "https://app.brain.dog/mcp"
     }
   ]
 }

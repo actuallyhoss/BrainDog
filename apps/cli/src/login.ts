@@ -71,10 +71,10 @@ export function loginCommand(host: string): string {
 /**
  * What to type when no host is known at all: the address the app prints, with the slug left for the person.
  *
- * ON `brain.dog`, for the reason at `signIn` in `main.ts`: the old name refuses a device start, so an
- * agent that passed on `app.brain.dog` would be handing the person a login that answers 403.
+ * ON `app.brain.dog`, for the reason at `signIn` in `main.ts`: only production's `PUBLIC_HOST` starts a device, so an
+ * agent that passed `brain.dog` would be handing the person a login that answers 403.
  */
-export const ANY_HOST = 'https://brain.dog/app/<slug>';
+export const ANY_HOST = 'https://app.brain.dog/app/<slug>';
 
 /**
  * The host the next command will reach and the expiry of the login this machine keeps for it, found as `target` finds
@@ -277,7 +277,7 @@ async function approve(host: { key: string; url: URL }, asked: Asked, label: str
   const { again } = words;
   const now = io.now ?? Date.now;
   /* THE KEY'S PATH IS THE SLUG, and `hostKey` has already taken `/app` off the front of it, so the address the app
-     prints, `brain.dog/app/acme`, posts `acme` and not `app/acme`. */
+     prints, `app.brain.dog/app/acme`, posts `acme` and not `app/acme`. */
   const slug = url.pathname.replace(/^\/+/, '');
   const where = slug ? { slug } : {};
 

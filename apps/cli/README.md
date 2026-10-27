@@ -30,7 +30,7 @@ folder goes on your PATH if it is not there already: on Windows in your user PAT
 shell's startup file, so a new terminal finds it. Nothing needs an administrator. Run the same line again to update.
 
 To sign this machine in to your record, run `braindog login` with the record's address, as in
-`braindog login https://brain.dog/app/<your record>`, and approve the six digits it prints in the app.
+`braindog login https://app.brain.dog/app/<your record>`, and approve the six digits it prints in the app.
 
 To remove it, delete the `.braindog` folder in your home folder and the PATH line the install added.
 

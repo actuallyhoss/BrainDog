@@ -556,7 +556,7 @@ test('THE PUBLIC ADD-ON REGISTRY IS READ WITH THE SWITCH OFF: it answers to BRAI
     const fetch = async (url: string) => (asked.push(url), new Response('{"id":"check"}', { status: 200 }));
     const answer = await kennelAnswer('GET', `${KENNEL_BASE}packs/check/1.0.0.pack.json`, undefined, { kennel: undefined, fetch, now: () => NOON });
     assert.equal(answer.status, 200);
-    assert.deepEqual(asked, ['https://brain.dog/api/kennel/v1/packs/check/1.0.0.pack.json']);
+    assert.deepEqual(asked, ['https://app.brain.dog/api/kennel/v1/packs/check/1.0.0.pack.json']);
     /* AND ITS OWN SWITCH IS THE ONE THAT STOPS IT, whatever outbound says. */
     assert.equal(kennelBase('off'), null);
     process.env.BRAINDOG_OUTBOUND = 'on';

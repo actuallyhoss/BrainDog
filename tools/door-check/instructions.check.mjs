@@ -377,7 +377,7 @@ export function streamSession(bin, args, { env, cwd, signal }) {
  * so the check would be telling his own agents things on his record. It runs against a seed host.
  */
 export function notRun({ host, env = process.env }) {
-  if (host === 'https://brain.dog') return 'only he tells a run on brain.dog, so this runs against a seed host (seed-host.mjs)';
+  if (host === 'https://app.brain.dog' || host === 'https://brain.dog') return 'only he tells a run on app.brain.dog, so this runs against a seed host (seed-host.mjs)';
   if (!env.DOOR_SEED_KEY) return 'no key for the seed, DOOR_SEED_KEY: start it with seed-host.mjs';
   if (!env.ANTHROPIC_API_KEY && !env.DOOR_CLAUDE_PROFILE) return 'no key for the model, and no signed-in profile named by DOOR_CLAUDE_PROFILE';
   return null;

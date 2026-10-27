@@ -74,7 +74,7 @@ needs Node 24.13 or later.
 ```sh
 curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux
 irm https://brain.dog/cli/install.ps1 | iex          # Windows, in PowerShell
-braindog setup https://brain.dog/app/<your record>
+braindog setup https://app.brain.dog/app/<your record>
 ```
 
 `setup` signs in, adds the Claude Code hooks, places the Agent Skill and registers the MCP server.
@@ -83,7 +83,7 @@ braindog setup https://brain.dog/app/<your record>
 ### For agents
 
 [skills/braindog/SKILL.md](skills/braindog/SKILL.md) is the Agent Skill: what BrainDog is to an
-agent, how it connects (`https://brain.dog/mcp` with a token, or `braindog mcp`), what to read first,
+agent, how it connects (`https://app.brain.dog/mcp` with a token, or `braindog mcp`), what to read first,
 the rules it keeps, and the refusals it will meet. `braindog install` places it in each Claude Code
 profile.
 

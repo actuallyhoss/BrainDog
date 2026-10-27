@@ -9,15 +9,15 @@ BrainDog is one person's record: their work, projects, money and decisions, shar
 
 ## Connect
 
-- **In any app that takes an MCP address:** add `https://brain.dog/mcp`, or the self-hosted address they give you.
+- **In any app that takes an MCP address:** add `https://app.brain.dog/mcp`, or the self-hosted address they give you.
   The app opens a sign-in and the person allows it in BrainDog, so no token is copied anywhere.
-- **On their machine:** `braindog setup https://brain.dog/app/<slug>` signs in, adds the hooks and this skill, and
+- **On their machine:** `braindog setup https://app.brain.dog/app/<slug>` signs in, adds the hooks and this skill, and
   registers `braindog mcp`, which serves the record with the sign-in the command keeps.
 - **From a script:** a token they make in the app, or with `braindog token create --scope read|propose|write`, in the
   `Authorization` header:
 
   ```json
-  { "type": "http", "url": "https://brain.dog/mcp", "headers": { "Authorization": "Bearer <token>" } }
+  { "type": "http", "url": "https://app.brain.dog/mcp", "headers": { "Authorization": "Bearer <token>" } }
   ```
 
 Never put a token in a row, a note, a commit or a message.
