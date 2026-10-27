@@ -1475,10 +1475,10 @@
     inline-size: max-content;
     z-index: 5;
     padding: 4px 12px;
-    border-radius: 999px;
-    background: var(--surface, #fff);
-    border: 1px solid var(--line, #ddd);
-    color: var(--ink-2, #555);
+    border-radius: var(--r-round);
+    background: var(--tile);
+    border: 1px solid var(--rule);
+    color: var(--ink-2);
     font-size: 0.8rem;
     pointer-events: none;
   }

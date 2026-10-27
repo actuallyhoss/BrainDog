@@ -553,9 +553,9 @@
     align-items: center;
     gap: var(--sp-3);
     min-block-size: 68px;
-    padding-inline: var(--sp-4);
+    padding-inline: calc(var(--sp-4) - 1.5px);
+    border: 1.5px solid var(--ink);
     border-radius: var(--r-pop);
-    box-shadow: inset 0 0 0 1.5px var(--ink);
     cursor: text;
   }
 
@@ -620,11 +620,10 @@
 
   .qa-chip {
     min-block-size: 32px;
-    padding-inline: var(--sp-3);
-    border: 0;
+    padding-inline: calc(var(--sp-3) - 1px);
+    border: 1px solid var(--rule);
     border-radius: var(--r-round);
     background: var(--tile);
-    box-shadow: inset 0 0 0 1px var(--rule);
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
@@ -640,7 +639,7 @@
     overflow: hidden;
     border-radius: var(--r-pop);
     background: var(--tile);
-    box-shadow: 0 0 0 1px var(--rule);
+    border: 1px solid var(--rule);
   }
 
   .qa-opt {
@@ -675,9 +674,9 @@
   }
 
   .qa-kbd {
-    padding-inline: 5px;
+    padding-inline: 4px;
+    border: 1px solid var(--rule);
     border-radius: var(--r-xs);
-    box-shadow: inset 0 0 0 1px var(--rule);
     color: var(--ink-3);
     font: var(--fw-medium) var(--fs-cap) var(--font-mono);
   }
@@ -705,18 +704,18 @@
     justify-items: center;
     gap: 6px;
     min-inline-size: 0;
-    padding: 10px 4px 9px;
-    border: 0;
+    padding: 9px 3px 8px;
+    border: 1px solid var(--rule);
     border-radius: var(--r-pop);
     background: none;
-    box-shadow: inset 0 0 0 1px var(--rule);
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-cap);
   }
 
   .qa-cat[data-on] {
-    box-shadow: inset 0 0 0 2px var(--ink);
+    padding: 8px 2px 7px;
+    border: 2px solid var(--ink);
     color: var(--ink);
     font-weight: var(--fw-semi);
   }
@@ -814,7 +813,7 @@
 
     .qa-big {
       justify-content: center;
-      box-shadow: none;
+      border-color: transparent;
       min-block-size: 64px;
     }
 
