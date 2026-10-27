@@ -2,7 +2,7 @@
  * The cash counter's sums: the notes and coins a currency has, the total of what was counted, how far that is from what
  * the record expected, and the row a count is written as.
  *
- * PURE, so a test imports it and the screen draws from it. The note sets are read from `packs/count-cash/note-sets.json`,
+ * PURE, so a test imports it and the screen draws from it. The note sets are a copy of `packs/count-cash/note-sets.json`,
  * the same file the pack's test holds the count script to, so the counter and the script cannot disagree about which
  * notes a currency has.
  *
@@ -12,7 +12,9 @@
 
 import { exponentOf } from 'braindog-render';
 
-import SETS from '@braindog/pack-count-cash/note-sets.json' with { type: 'json' };
+/* THE APP'S COPY OF THE PACK'S SETS: the app never imports a pack, so `packs/count-cash/note-sets.test.ts` holds the
+   two files to each other, byte for byte. */
+import SETS from './note-sets.json' with { type: 'json' };
 
 const NOTE_SETS: Readonly<Record<string, readonly string[]>> = SETS;
 

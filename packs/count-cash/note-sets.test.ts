@@ -1,5 +1,5 @@
 /**
- * The notes and coins of each currency are said in one file, `note-sets.json`, which the cash counter in the app reads.
+ * The notes and coins of each currency are said in one file, `note-sets.json`, which the cash counter in the app reads a copy of.
  * The count script carries them inside its own source (a script has no imports), so this holds the two to each other: a
  * set changed in one place and not the other fails here.
  */
@@ -16,6 +16,10 @@ test('THE SETS IN THE SCRIPT ARE THE SETS IN note-sets.json, currency for curren
   assert.ok(found, 'count.js no longer declares NOTE_SETS');
   const inScript = new Function(`return ${found[1]}`)() as Record<string, string[]>;
   assert.deepEqual(inScript, SETS);
+});
+
+test("THE APP'S COUNTER READS THE SAME SETS, its own copy of this file byte for byte, since the app never imports a pack", () => {
+  assert.equal(readFileSync(new URL('../../apps/web/src/lib/money/note-sets.json', HERE), 'utf8'), readFileSync(new URL('note-sets.json', HERE), 'utf8'));
 });
 
 test('every set runs from the largest note to the smallest coin, with none twice', () => {
