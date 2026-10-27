@@ -690,8 +690,77 @@ const NO_DELETE: Refusal = {
   at: 'host',
 };
 
-/** `restore`: the copy the record went back to, and the copy of what it was just before. */
-export type Restored = { bookmark: string; at: string; kept: string | null };
+/**
+ * `restore`: the copy the record went back to, and the copy of what it was just before. `ended` only from a port that
+ * reopens the object, for the host to hand back to `restored`.
+ */
+export type Restored = { bookmark: string; at: string; kept: string | null; ended?: Ended };
+
+/**
+ * The credentials the live record has ended, read just before a reopening restore arms, for `restored` to end again on
+ * the object PITR brings back: the Cloud's half of the self-host's `CARRIED` (`apps/selfhost/src/snapshots.ts`).
+ *
+ * A REWIND TAKES EVERY TABLE, AND A REVOCATION IS IN ONE. Without this a token revoked after the copy answered again once
+ * the copy was put back, an operation grant spent since could be spent twice, a withdrawn invitation opened, and a
+ * shared link closed since was open. Only what has no inverse is here, so the live row is the later truth.
+ */
+export type Ended = { [table: string]: Record<string, string | number | null>[] };
+
+/** Each ended table, the rows of it the record has ended, and the columns that say so. A row the copy lacks is left out. */
+const ENDED: readonly { table: string; read: string; columns: readonly string[]; write: string }[] = [
+  {
+    table: 'token',
+    read: 'SELECT id, revoked_at FROM token WHERE revoked_at IS NOT NULL',
+    columns: ['revoked_at'],
+    write: 'UPDATE token SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL',
+  },
+  {
+    table: 'device_grant',
+    read: "SELECT id, status, expires, last_used FROM device_grant WHERE status IN ('expired', 'denied', 'revoked')",
+    columns: ['status', 'expires', 'last_used'],
+    write: "UPDATE device_grant SET status = ?, expires = ?, last_used = ? WHERE id = ? AND status IN ('pending', 'approved', 'active')",
+  },
+  {
+    table: 'invitation',
+    read: 'SELECT id, accepted_at, accepted_by, revoked_at FROM invitation WHERE accepted_at IS NOT NULL OR revoked_at IS NOT NULL',
+    columns: ['accepted_at', 'accepted_by', 'revoked_at'],
+    write: 'UPDATE invitation SET accepted_at = ?, accepted_by = ?, revoked_at = ? WHERE id = ? AND accepted_at IS NULL AND revoked_at IS NULL',
+  },
+];
+
+/** The ended rows of every table this record has, and its `share.close` events under `closed`. */
+function endedOf(sql: Sql): Ended {
+  const has = new Set(sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'").map((t) => t.name));
+  const out: Ended = {};
+  for (const e of ENDED) if (has.has(e.table)) out[e.table] = sql.all<Record<string, string | number | null>>(e.read);
+  out.closed = sql.all<Record<string, string | number | null>>("SELECT * FROM event WHERE kind = 'share.close'");
+  return out;
+}
+
+/**
+ * `endedOf`'s rows written over the record PITR brought back. Each write only ends what the copy still holds open, so a
+ * row named twice or one the copy never had changes nothing; a shared link is closed again only where the copy has it
+ * open, with the live `share.close` event as it was.
+ */
+function endAgain(sql: Sql, ended: unknown): void {
+  if (ended === null || typeof ended !== 'object') return;
+  const scalar = (v: unknown): v is string | number | null => v === null || typeof v === 'string' || typeof v === 'number';
+  const rowsOf = (key: string): Record<string, string | number | null>[] => {
+    const rows = (ended as Record<string, unknown>)[key];
+    return Array.isArray(rows)
+      ? rows.filter((r): r is Record<string, string | number | null> => r !== null && typeof r === 'object' && Object.values(r as object).every(scalar))
+      : [];
+  };
+  for (const e of ENDED) for (const row of rowsOf(e.table)) if (typeof row.id === 'string') sql.exec(e.write, ...e.columns.map((c) => row[c] ?? null), row.id);
+  const columns = new Set(sql.all<{ name: string }>("SELECT name FROM pragma_table_info('event')").map((c) => c.name));
+  for (const row of rowsOf('closed')) {
+    if (row.kind !== 'share.close' || typeof row.target !== 'string') continue;
+    const cols = Object.keys(row).filter((c) => columns.has(c));
+    if (!sql.one("SELECT 1 AS n FROM event WHERE target = ? AND kind = 'share.open'", row.target)) continue;
+    if (sql.one("SELECT 1 AS n FROM event WHERE target = ? AND kind = 'share.close'", row.target)) continue;
+    sql.exec(`INSERT OR IGNORE INTO event (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, ...cols.map((c) => row[c] ?? null));
+  }
+}
 
 /** The `restore.pitr` event's note, one sentence for both the restore that writes it and the `restored` that does. */
 const restoredNote = (bookmark: string, who: string, kept: string | null): string =>
@@ -14301,6 +14370,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('OUT_OF_BOUNDS', `${args.bookmark} is not one of the copies this record keeps.`, { at: 'bookmark', allowed: kept.map((s) => s.id) });
 
       const before = await snapshots.take('before-restore');
+      /* READ BEFORE THE PORT ARMS, for a port that reopens: nothing on this object is written after the arm. */
+      const reopening = 'reopens' in snapshots && snapshots.reopens === true;
+      const ended = reopening ? endedOf(sql) : undefined;
       try {
         await snapshots.restore(chosen.id);
       } catch (e) {
@@ -14309,7 +14381,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A PORT THAT REOPENS THE OBJECT HAS ENDED THIS ONE. Its rows are the ones PITR is about to put back over, so the
          event written here would be the first thing lost, and the tail would arm an alarm on an object about to go.
          The host calls `restored` on the object it reopens, which writes the same event there. */
-      if ('reopens' in snapshots && snapshots.reopens === true) return ok({ bookmark: chosen.id, at: chosen.at, kept: before.id });
+      if (reopening) return ok({ bookmark: chosen.id, at: chosen.at, kept: before.id, ...(ended === undefined ? {} : { ended }) });
       kernel.reload();
       kernel.rebuildFts();
       const who = actorOf(ctx);
@@ -14324,10 +14396,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * replaced. The host that performed the restore knows who asked and what was kept, and says so; the event is the
      * one `restore` writes on a host whose restore puts rows back in place, word for word.
      */
-    async restored(args: { bookmark: string; kept: string | null; by?: string }): Promise<Result<{ event: string }>> {
+    async restored(args: { bookmark: string; kept: string | null; by?: string; ended?: unknown }): Promise<Result<{ event: string }>> {
       if (typeof args?.bookmark !== 'string' || args.bookmark === '')
         return no('REQUIRED_MISSING', 'Which copy was the record restored to? Name it as the list of backups does.', { at: 'bookmark' });
       if (args.kept !== null && typeof args.kept !== 'string') return no('VALUE_MALFORMED', 'kept is the id of the copy taken before, or null.', { at: 'kept' });
+      /* WHAT THE RECORD HAD ENDED BEFORE THE REWIND IS ENDED AGAIN FIRST, in one transaction, and the record reread. */
+      if (args.ended !== undefined) {
+        kernel.transaction(() => endAgain(sql, args.ended));
+        kernel.reload();
+      }
       const who = typeof args.by === 'string' && args.by !== '' ? args.by : 'system';
       const event = kernel.lifecycle('restore.pitr', who, restoredNote(args.bookmark, who, args.kept), args.bookmark);
       return tail(ok({ event }));

@@ -266,7 +266,9 @@ test('A PORT THAT REOPENS THE OBJECT WRITES NO restore.pitr ITSELF, AND restored
 
   const out = (await r.api.restore({ bookmark: kept.id }, owner)) as Out;
   assert.ok(out.ok, JSON.stringify(out));
-  assert.deepEqual(out.value, { bookmark: kept.id, at: kept.at, kept: 'before-restore-2026-09-23' });
+  const { ended, ...said } = out.value as { ended?: unknown };
+  assert.deepEqual(said, { bookmark: kept.id, at: kept.at, kept: 'before-restore-2026-09-23' });
+  assert.ok(ended !== null && typeof ended === 'object', 'a reopening restore carried nothing it had ended');
   assert.deepEqual(asked, [kept.id]);
   assert.equal(r.count('restore.pitr'), 0, 'the object PITR is about to replace was written to');
 

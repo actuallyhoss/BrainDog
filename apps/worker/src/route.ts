@@ -178,8 +178,11 @@ export const pollAsked = (method: string, pathname: string): boolean => (method 
 /** `POST /api/restore`, the one method whose answer the Worker acts on after the record has given it. */
 export const restoreAsked = (method: string, pathname: string): boolean => method === 'POST' && /^\/+api\/+restore\/*$/.test(pathname);
 
-/** What was restored, as the record's `restored` takes it: the copy, the copy of what it was, and who asked. */
-export type Restored = { bookmark: string; kept: string | null; by: string };
+/**
+ * What was restored, as the record's `restored` takes it: the copy, the copy of what it was, and who asked, and what the
+ * record had ended before the rewind, which `restored` ends again on the object that comes back.
+ */
+export type Restored = { bookmark: string; kept: string | null; by: string; ended?: unknown };
 
 /**
  * `51 D15`'s second half, after the record has answered a restore: reset the object, then write `restore.pitr` on the
@@ -214,7 +217,23 @@ export async function afterRestore(
     /* The object ended, which is what was asked of it. */
   }
   if (reset && args !== null) await written(args, o.restored);
-  return out;
+  return withoutEnded(out);
+}
+
+/**
+ * The record's answer as the owner reads it, without the `ended` it carried for `restored`: that list is for the object
+ * that comes back, and the answer is the one a restore that puts rows back in place gives.
+ */
+async function withoutEnded(out: Response): Promise<Response> {
+  const said = (await out
+    .clone()
+    .json()
+    .catch(() => null)) as { ok?: unknown; value?: Record<string, unknown> } | null;
+  if (said?.ok !== true || said.value === null || typeof said.value !== 'object' || !('ended' in said.value)) return out;
+  const { ended: _, ...value } = said.value;
+  const headers = new Headers(out.headers);
+  headers.delete('content-length');
+  return new Response(JSON.stringify({ ...said, value }), { status: out.status, statusText: out.statusText, headers });
 }
 
 /**
@@ -230,7 +249,8 @@ export async function restoredOf(out: Response, by: string): Promise<Restored | 
     .json()
     .catch(() => null)) as Result<{ bookmark?: unknown; kept?: unknown }> | null;
   if (out.status !== 200 || said?.ok !== true || typeof said.value.bookmark !== 'string') return null;
-  return { bookmark: said.value.bookmark, kept: typeof said.value.kept === 'string' ? said.value.kept : null, by };
+  const ended = (said.value as { ended?: unknown }).ended;
+  return { bookmark: said.value.bookmark, kept: typeof said.value.kept === 'string' ? said.value.kept : null, by, ...(ended === undefined ? {} : { ended }) };
 }
 
 /**
