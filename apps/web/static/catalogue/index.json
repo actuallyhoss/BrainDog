@@ -539,8 +539,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "3.0.1",
+      "latest": "3.0.2",
       "versions": [
+        {
+          "version": "3.0.2",
+          "checksum": "0f5a0027eda634953e3d319982367865c78b5e4292425314a1139fa85b0b57ba",
+          "bytes": 28523,
+          "published_at": "2026-10-27T15:55:15.219Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Reconcile is now filed. A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. The Cash counts page now opens with a line saying what a count is.",
+          "preview": true
+        },
         {
           "version": "3.0.1",
           "checksum": "ac0a8180d7711f9f60a98a91c9342272ce0340664befa96c76ce8dafdc2991de",
@@ -5639,8 +5665,35 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "version": "2.0.1",
+          "checksum": "2a3c57c58d896bd5ebcff8544d9265373a3773b203a6e3a0c0d0dfad6ea10d47",
+          "bytes": 15502,
+          "published_at": "2026-10-27T15:55:15.219Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Trips"
+            ],
+            "pages": [
+              "Trips",
+              "{{name}}"
+            ],
+            "rules": [
+              "File the Ledger's lines of a trip's days into it"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Says a trip's days as words.",
+          "preview": true
+        },
         {
           "version": "2.0.0",
           "checksum": "8cbe236fd2755c42eb72eacebc09fbc8bf935fb34775036c100ec78da6f70336",

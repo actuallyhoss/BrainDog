@@ -105,7 +105,7 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
      longer needs a typed total. Fields added and one made optional, so a major.
      2.0.1 BESIDE THE PUBLISHED 2.0.0: the way into the counter on an account's page follows What moved, the table the
      page now has where it had Last moves. One word in an add, so a patch. */
-  assert.equal(file.value.pack.manifest.version, '3.0.1');
+  assert.equal(file.value.pack.manifest.version, '3.0.2');
   assert.match(PACK.changes, /A count can now be made by note and coin/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'denominations', 'filed', 'lines', 'difference', 'said', 'note']);

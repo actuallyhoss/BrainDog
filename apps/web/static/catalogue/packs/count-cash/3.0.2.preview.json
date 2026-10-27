@@ -1,0 +1,91 @@
+{
+  "format": 1,
+  "made_at": "2026-10-27T15:55:15.219Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Each count is the notes and coins you counted in a box, set against what the account says. Any difference is filed in the Ledger, so the balance matches the box.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Counted on",
+              "width": "13ch"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "counted",
+              "label": "Counted",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "difference",
+              "label": "Out by",
+              "width": "15ch"
+            },
+            {
+              "field": "filed",
+              "label": "Recorded",
+              "width": "14ch"
+            },
+            {
+              "field": "said",
+              "label": "What happened",
+              "width": "minmax(18ch,2fr)"
+            }
+          ],
+          "empty": "Nothing has been counted yet. Add a count with the notes and coins in the box, or just its total, and the difference goes into the ledger.",
+          "heading": "Counts",
+          "kind": "table",
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.cash_counts",
+          "span": 12,
+          "key": "k02ah0bg",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "empty"
+        }
+      ],
+      "icon": "money",
+      "nav": {
+        "order": 40,
+        "section": "Money"
+      },
+      "page": "cash-counts",
+      "requires": [
+        "register.cash_counts"
+      ],
+      "title": "Cash counts",
+      "read_at": "2026-10-27T15:55:15.219Z",
+      "zone": "UTC",
+      "look": {
+        "look": "cash-counts",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}
