@@ -48,9 +48,89 @@
  *
  * A COUNT THAT FILES SAYS WHERE IT WENT (1.4.0). Money shows the newest count, how far out it was and What happened,
  * so a count whose difference went into the Ledger says so there. A count that agrees files nothing and says nothing.
+ *
+ * COUNTED BY NOTE AND COIN (2.0.0). A count may carry `denominations`, `{ currency, notes: { "200": 3, "0.25": 4 } }`, the
+ * note or coin's face value in the currency's main unit and how many of it were counted. The total is worked out here
+ * from the sets below, and a value outside the currency's set is refused in words rather than guessed at. A count that
+ * names both a total and notes must agree. A count with no notes is read exactly as before, so every older count stays
+ * readable and nothing about it changes.
+ *
+ * THE DIFFERENCE, RECORDED ONE OF TWO WAYS (2.0.0). `reconcile` is `discrepancy`, the whole difference as one entry
+ * under the Discrepancy category, or `lines`, where the person has said what part of it was what in `lines`
+ * (`[{ what, amount, category?, note? }]`, amounts in the main unit) and whatever is left becomes one Discrepancy entry.
+ * A count that says neither is filed as it always was, as one "Cash count difference" entry.
  */
 
 const WHAT = 'Cash count difference';
+/** The name of the category the unexplained part of a difference is filed under. */
+const DISCREPANCY = 'Discrepancy';
+
+/**
+ * The notes and coins each currency has, by face value in its main unit (2.0.0). A currency not listed is counted by
+ * typing its total, as before.
+ */
+const NOTE_SETS = {
+  EGP: ['200', '100', '50', '20', '10', '5', '1', '0.5', '0.25'],
+  USD: ['100', '50', '20', '10', '5', '2', '1', '0.5', '0.25', '0.1', '0.05', '0.01'],
+  EUR: ['500', '200', '100', '50', '20', '10', '5', '2', '1', '0.5', '0.2', '0.1', '0.05', '0.02', '0.01'],
+  GBP: ['50', '20', '10', '5', '2', '1', '0.5', '0.2', '0.1', '0.05', '0.02', '0.01'],
+  SAR: ['500', '200', '100', '50', '20', '10', '5', '2', '1', '0.5', '0.25', '0.1', '0.05'],
+  AED: ['1000', '500', '200', '100', '50', '20', '10', '5', '1', '0.5', '0.25'],
+};
+/** Every currency in the sets counts in hundredths. */
+const MINOR = 100;
+const minor = (main) => Math.round(Number(main) * MINOR);
+
+/** What a count whose notes cannot be read says under What happened, with the way out. */
+const BAD_NOTES = (why) => `The notes and coins could not be read, so nothing was filed: ${why} Count again.`;
+const BAD_LINES = (why) => `The lines for the difference could not be used, so nothing was filed: ${why} Count again.`;
+
+/**
+ * The total of a count's notes and coins in hundredths, with how it reads, or the reason it cannot be read.
+ * `{ total, currency, said }` or `{ why }`.
+ */
+function totalOf(denominations, fallback) {
+  if (denominations === null || typeof denominations !== 'object' || Array.isArray(denominations)) return { why: 'they are not a list of values and numbers.' };
+  const currency = typeof denominations.currency === 'string' && denominations.currency !== '' ? denominations.currency : fallback;
+  const set = NOTE_SETS[currency];
+  const notes = denominations.notes;
+  if (notes === null || typeof notes !== 'object' || Array.isArray(notes)) return { why: 'there are no notes in them.' };
+  if (set === undefined) return { why: `${currency} has no set of notes here, so type its total.` };
+  let total = 0;
+  const parts = [];
+  for (const key of Object.keys(notes).sort((x, y) => minor(y) - minor(x))) {
+    const n = notes[key];
+    if (!set.some((v) => minor(v) === minor(key))) return { why: `${key} is not a ${currency} note or coin.` };
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) return { why: `${n} of ${key} is not a whole number.` };
+    if (n === 0) continue;
+    total += n * minor(key);
+    parts.push(`${n} × ${Number(key)}`);
+  }
+  return { total, currency, said: parts.length === 0 ? 'No notes or coins.' : `Counted ${parts.join(', ')}.` };
+}
+
+/** The lines of a difference, as entries, and what is left, or the reason they cannot be used. */
+function linesOf(lines, difference) {
+  if (!Array.isArray(lines)) return { why: 'they are not a list.' };
+  const out = [];
+  let sum = 0;
+  for (const l of lines) {
+    if (l === null || typeof l !== 'object' || typeof l.what !== 'string' || l.what.trim() === '') return { why: 'every line needs words for what it was.' };
+    const amount = minor(l.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return { why: `${l.what} needs an amount above nothing.` };
+    sum += amount;
+    out.push({ what: l.what.trim(), amount, category: typeof l.category === 'string' ? l.category : '', note: typeof l.note === 'string' ? l.note : '' });
+  }
+  if (sum > Math.abs(difference)) return { why: 'together they are more than the difference.' };
+  return { entries: out, rest: Math.abs(difference) - sum };
+}
+
+/** The id of the category with this name, or nothing. */
+async function categoryId(ctx, name) {
+  if (name === '') return null;
+  const rows = await ctx.record.list('categories', { all: [{ field: 'name', is: name }] });
+  return rows.length === 0 ? null : rows[0].id;
+}
 /**
  * What a count says when its account was not compared, and the way out (1.3.1): a balance typed on the account after
  * the entry is a newer statement, so the next count rolls from it and is compared. The balance to type is the one the
@@ -147,45 +227,98 @@ export default async function run(ctx) {
     return;
   }
   const name = String(account.fields.name);
-  const counted = count.fields.counted;
   const held = account.fields.balance;
   const day = String(count.fields.on);
+  const heldCurrency = held !== null && typeof held === 'object' ? held.currency : 'EGP';
+
+  /* NOTES AND COINS, when the count has them: the total is theirs, and a total typed beside them must agree. */
+  let counted = count.fields.counted;
+  let breakdown = '';
+  const has = count.fields.denominations !== undefined && count.fields.denominations !== null;
+  if (has) {
+    const read = totalOf(count.fields.denominations, counted !== null && typeof counted === 'object' ? counted.currency : heldCurrency);
+    if (read.why !== undefined) {
+      ctx.log(`The notes and coins of this count could not be read: ${read.why}`);
+      ctx.update(`cash_counts#${count.seq}`, { said: BAD_NOTES(read.why) }, count.version);
+      return;
+    }
+    if (counted !== null && typeof counted === 'object' && (counted.currency !== read.currency || counted.amount !== read.total)) {
+      const why = 'the total typed is not what the notes and coins add up to.';
+      ctx.log(`The notes and coins of this count do not match its total, so nothing was written.`);
+      ctx.update(`cash_counts#${count.seq}`, { said: BAD_NOTES(why) }, count.version);
+      return;
+    }
+    counted = { amount: read.total, currency: read.currency };
+    breakdown = read.said;
+  }
+  if (counted === null || typeof counted !== 'object') {
+    ctx.log('This count has neither a total nor notes and coins, so nothing was written.');
+    ctx.update(`cash_counts#${count.seq}`, { said: BAD_NOTES('there is no total and no notes.') }, count.version);
+    return;
+  }
+  const countedNow = has ? { counted } : {};
+  const say = (text) => (breakdown === '' ? text : text === undefined ? breakdown : `${breakdown} ${text}`);
 
   if (held !== null && typeof held === 'object' && counted.currency !== held.currency) {
     ctx.log(`This count is counted in ${counted.currency} and ${name} is held in ${held.currency}, and two currencies are not subtracted, so no difference was written.`);
-    ctx.update(`cash_counts#${count.seq}`, { said: otherCurrency(counted.currency, held.currency) }, count.version);
+    ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(otherCurrency(counted.currency, held.currency)) }, count.version);
     return;
   }
   if (typeof account.fields.as_of === 'string' && account.fields.as_of > day) {
     ctx.log(`${name}'s balance is from ${account.fields.as_of}, after this count of ${day}, so the count is kept and nothing else was written.`);
+    if (has) ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(undefined) }, count.version);
     return;
   }
 
   const rolled = await rolledOn(ctx, account, day, counted.currency);
   if (rolled.foreign === true) {
     ctx.log(`${name} holds an entry in another currency than ${counted.currency} since it was last stated, so this count was not compared and no difference was written.`);
-    ctx.update(`cash_counts#${count.seq}`, { said: NOT_COMPARED }, count.version);
+    ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(NOT_COMPARED) }, count.version);
     return;
   }
   if (rolled.amount === undefined) {
     ctx.log(`This count is counted in ${counted.currency} and ${name} was last said to hold ${rolled.currency}, and two currencies are not subtracted, so no difference was written.`);
-    ctx.update(`cash_counts#${count.seq}`, { said: otherCurrency(counted.currency, rolled.currency) }, count.version);
+    ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(otherCurrency(counted.currency, rolled.currency)) }, count.version);
     return;
   }
 
   const book = typeof account.fields.book === 'string' && account.fields.book !== '' ? { book: account.fields.book } : {};
   const difference = counted.amount - rolled.amount;
-  if (difference !== 0)
-    ctx.write('transactions', {
-      what: WHAT,
-      on: day,
-      direction: difference > 0 ? 'in' : 'out',
-      amount: { amount: Math.abs(difference), currency: counted.currency },
-      account: account.id,
-      state: 'cleared',
-      note: `From the cash count of ${day}.`,
-      ...book,
-    });
+  const direction = difference > 0 ? 'in' : 'out';
+  const entry = (what, amount, category, note) => ({
+    what,
+    on: day,
+    direction,
+    amount: { amount, currency: counted.currency },
+    account: account.id,
+    state: 'cleared',
+    note,
+    ...(category === null ? {} : { category }),
+    ...book,
+  });
+  const fromCount = `From the cash count of ${day}.`;
+
+  /* HOW THE DIFFERENCE IS RECORDED. Unsaid is the single entry an older count always got. */
+  let filedAs = FILED;
+  if (difference !== 0) {
+    if (count.fields.reconcile === 'lines') {
+      const split = linesOf(count.fields.lines ?? [], difference);
+      if (split.why !== undefined) {
+        ctx.log(`The lines for this count's difference could not be used: ${split.why}`);
+        ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(BAD_LINES(split.why)) }, count.version);
+        return;
+      }
+      for (const l of split.entries) ctx.write('transactions', entry(l.what, l.amount, await categoryId(ctx, l.category), l.note === '' ? fromCount : l.note));
+      if (split.rest > 0) ctx.write('transactions', entry(DISCREPANCY, split.rest, await categoryId(ctx, DISCREPANCY), fromCount));
+      const n = split.entries.length;
+      filedAs = n === 0 ? 'Filed as Discrepancy in the Ledger.' : split.rest > 0 ? `Filed as ${n} ${n === 1 ? 'line' : 'lines'} and the rest as Discrepancy in the Ledger.` : `Filed as ${n} ${n === 1 ? 'line' : 'lines'} in the Ledger.`;
+    } else if (count.fields.reconcile === 'discrepancy') {
+      ctx.write('transactions', entry(DISCREPANCY, Math.abs(difference), await categoryId(ctx, DISCREPANCY), fromCount));
+      filedAs = 'Filed as Discrepancy in the Ledger.';
+    } else {
+      ctx.write('transactions', entry(WHAT, Math.abs(difference), null, fromCount));
+    }
+  }
   ctx.write('balances', {
     account: account.id,
     balance: { amount: counted.amount, currency: counted.currency },
@@ -193,6 +326,6 @@ export default async function run(ctx) {
     source: `Cash count of ${day}`,
     ...book,
   });
-  const filed = difference === 0 ? {} : { said: FILED };
-  ctx.update(`cash_counts#${count.seq}`, { difference: { amount: difference, currency: counted.currency }, ...filed }, count.version);
+  const filed = difference === 0 ? (breakdown === '' ? {} : { said: breakdown }) : { said: say(filedAs) };
+  ctx.update(`cash_counts#${count.seq}`, { ...countedNow, difference: { amount: difference, currency: counted.currency }, ...filed }, count.version);
 }

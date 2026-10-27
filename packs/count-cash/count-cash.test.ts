@@ -83,7 +83,7 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
   assert.deepEqual(SCRIPT.runs, { rule: true });
   assert.deepEqual([SCRIPT.egress, SCRIPT.keys], [[], []], 'counting cash calls nobody');
   /* 1.1.0 READS WHAT CASH NOW ROLLS FROM AND WRITES A CHECK, and no longer writes over the account's own balance. */
-  assert.deepEqual([...SCRIPT.reads].sort(), ['accounts', 'balances', 'cash_counts', 'transactions']);
+  assert.deepEqual([...SCRIPT.reads].sort(), ['accounts', 'balances', 'cash_counts', 'categories', 'transactions']);
   assert.deepEqual([...SCRIPT.writes].sort(), ['balances', 'cash_counts', 'transactions']);
   /* A NEW COUNT, NOT AN EDITED ONE. An edited count run again would subtract against the balance the count itself
      already set, so a correction is a new count, which is also what leaves a trail. */
@@ -100,11 +100,13 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
      1.4.0 BESIDE THE PUBLISHED 1.3.3: Money gains a box to count the cash in and the newest count, by adds, and a count
      that files says so. A block and a sentence added, so a minor.
      1.4.1 BESIDE THE PUBLISHED 1.4.0: the two blocks follow Heads up, in the main column, where they followed What it
-     holds today, which Money no longer has. Where two blocks stand, nothing added or taken away, so a patch. */
-  assert.equal(file.value.pack.manifest.version, '1.4.2');
-  assert.match(PACK.changes, /The box to count the cash in and the last count now go with Heads up on Money/);
+     holds today, which Money no longer has. Where two blocks stand, nothing added or taken away, so a patch.
+     2.0.0 BESIDE THE PUBLISHED 1.4.2: a count can carry notes and coins, say how its difference is recorded, and no
+     longer needs a typed total. Fields added and one made optional, so a major. */
+  assert.equal(file.value.pack.manifest.version, '2.0.0');
+  assert.match(PACK.changes, /A count can now be made by note and coin/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
-  assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);
+  assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'denominations', 'reconcile', 'lines', 'difference', 'said', 'note']);
 });
 
 /* ── The script, in QuickJS ────────────────────────────────────────────────────────────────────── */
