@@ -770,6 +770,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `metric.payees-paid-90d` and the rest). The cash walk names Certificates' list, and a record without that add-on
  *   installs Money with the leg left out (`ADDON_LEG_LISTS`). Figures and a script added and nothing taken away, so the
  *   step stays minor and stays 3.29.0, since no record was given it.
+ * - money-core 3.27.1: `script.book_from_account` and `script.plans_from_names` read each list in row number order
+ *   (`{ order: 'seq' }`), where a list in its own order (the Ledger by day) lost the rows between two pages and a record
+ *   with more than fifty lines or parts was booked and counted short. Two scripts' sources changed, no id added or taken
+ *   away, so a patch step. 3.27.0 is released.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and

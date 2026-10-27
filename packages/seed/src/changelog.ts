@@ -200,6 +200,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
       notes: 'Answering "It went through" about a repeating line marks its open bill for the same money paid as well, where the bill stayed open and read late on Today.',
     },
     {
+      version: '3.27.1',
+      notes: 'Nothing is skipped now when Money files lines in the book of their account or counts the parts of a plan, however many there are.',
+    },
+    {
       version: '3.27.0',
       notes: 'Answering "It went through" about a repeating line marks its open bill for the same money paid as well, where the bill stayed open and read late on Today.',
     },
