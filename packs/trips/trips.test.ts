@@ -84,9 +84,9 @@ function ledger(api: Api): { account: string; food: string; hotel: string; lines
   return { account, food, hotel, lines };
 }
 
-test('THE FILE: trips 1.0.0 on money-core, one list, a rule and its script, two pages, and a trip field on the Ledger with no index', () => {
+test('THE FILE: trips 1.1.0 on money-core, one list, a rule and its script, two pages, and a trip field on the Ledger with no index', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['trips', '1.0.0', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['trips', '1.1.0', 'Apache-2.0']);
   assert.equal(doc.seeds, undefined, 'no example rows');
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), ['trips']);
@@ -118,6 +118,21 @@ test('SAVING A TRIP FILES THE LEDGER LINES OF ITS DAYS, and leaves void lines, o
   assert.deepEqual(['hotel', 'dinner', 'lunch', 'refund'].map(inTrip), [trip, trip, earlier, trip]); /* the weekend trip, written first, filed the lunch of its one day */
   assert.deepEqual(['before', 'after', 'void'].map(inTrip), [null, null, null]);
   assert.equal(fieldsOf(api, ferry).trip, earlier, 'a line already in a trip stays there');
+  close();
+});
+
+test('WHEN A TRIP\'S DATES SHRINK, THE LINES IT FILED OUTSIDE THEM COME OUT; a line put in by hand from outside its days stays', async () => {
+  const { api, close } = await fresh();
+  const { lines, account } = ledger(api);
+  const trip = make(api, 'trips', { name: 'Harbour week', from: '2026-10-06', to: '2026-10-10', colour: 'blue' });
+  await settle(api);
+  const inTrip = (k: string) => fieldsOf(api, lines[k]!).trip ?? null;
+  assert.deepEqual(['hotel', 'dinner', 'lunch', 'refund'].map(inTrip), [trip, trip, trip, trip]);
+  const kept = make(api, 'transactions', { what: 'Booked ahead', on: '2026-09-20', direction: 'out', amount: gbp(700), account, state: 'cleared', trip });
+  said(api.kernel.update('trips', trip, { to: '2026-10-07' } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.deepEqual(['hotel', 'dinner', 'lunch', 'refund'].map(inTrip), [trip, trip, null, null], 'the lines after the new last day are un-filed');
+  assert.equal(fieldsOf(api, kept).trip, trip, 'a line outside the days the trip filed stays where it was put');
   close();
 });
 

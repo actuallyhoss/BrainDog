@@ -12,8 +12,13 @@
  * A BUSY RANGE IS READ WHOLE. The record answers a page of fifty at a time with no cursor, so the lines are asked for
  * by number, halves of the range cut again while they come back full; past sixty reads it files what it has and says so.
  *
- * IT WRITES THE LINE'S TRIP AND NOTHING ELSE, and the automation watches only the trip's own list, so it does not
- * start itself again.
+ * WHEN THE DATES MOVE, THE LINES THE TRIP FILED THAT NOW FALL OUTSIDE THEM ARE TAKEN OUT AGAIN. The trip remembers the days
+ * it last filed (`filed_from` and `filed_to`), so a line is taken out only when it sits in this trip and on a day that
+ * was inside what the trip last filed but is outside its dates now. A line a person put in the trip from outside those
+ * days stays, and so does one in another trip. A trip that has filed nothing yet takes nothing out.
+ *
+ * IT WRITES THE LINE'S TRIP AND THE TRIP'S OWN REMEMBERED DAYS, and the automation watches only the trip's `from` and
+ * `to`, so it does not start itself again.
  */
 
 const DAY_MS = 86_400_000;
@@ -80,9 +85,22 @@ export default async function run(ctx) {
     ctx.log(`${String(trip.fields.name)} has no usable dates, so nothing was filed.`);
     return;
   }
+  const before = typeof trip.fields.filed_from === 'string' && typeof trip.fields.filed_to === 'string' ? [trip.fields.filed_from.slice(0, 10), trip.fields.filed_to.slice(0, 10)] : null;
+  let out = 0;
+  if (before !== null && (before[0] < from || before[1] > to)) {
+    const held = await every(ctx, 'transactions', { all: [{ field: 'trip', is: trip.id }, { field: 'on', gte: before[0] }, { field: 'on', lte: before[1] }] });
+    for (const r of held) {
+      const on = typeof r.fields.on === 'string' ? r.fields.on.slice(0, 10) : '';
+      if (on !== '' && (on < from || on > to)) {
+        ctx.update(`transactions#${r.seq}`, { trip: null }, r.version);
+        out += 1;
+      }
+    }
+  }
   const rows = await allIn(ctx, dayOf(from), to);
   const short = rows.short === true;
   for (const r of rows) ctx.update(`transactions#${r.seq}`, { trip: trip.id }, r.version);
-  ctx.log(`Filed ${rows.length} lines into ${String(trip.fields.name)}.`);
+  if (before === null || before[0] !== from || before[1] !== to) ctx.update(`trips#${trip.seq}`, { filed_from: from, filed_to: to }, trip.version);
+  ctx.log(`Filed ${rows.length} lines into ${String(trip.fields.name)}${out > 0 ? ` and took ${out} outside its days out` : ''}.`);
   if (short) ctx.log(`There are more unfiled lines in those dates than one run reads, so ${rows.length} were filed. Save the trip again to file more.`);
 }
