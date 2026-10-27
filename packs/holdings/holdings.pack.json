@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Renames fields: a gold rate's current is live, symbol is code, and a buy's holding is item. Every buy, gold rate and holding is read, however many there are, where the page and the figures stopped at fifty.",
+  "changes": "Words the gain figure as a percent of cost.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -1011,7 +1011,7 @@
             },
             {
               "field": "gain_pct",
-              "label": "Gain %",
+              "label": "Gain on cost, %",
               "as": "fact"
             }
           ],
@@ -1137,7 +1137,7 @@
             },
             {
               "field": "gain_pct",
-              "label": "Gain %",
+              "label": "Gain on cost, %",
               "as": "fact"
             }
           ],
