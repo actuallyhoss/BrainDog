@@ -77,13 +77,20 @@ export async function portfolioBands(ctx) {
   return [red(ctx, name, `one turn wrote no band: ${last?.say ? `“${last.say}”` : 'the script left no word'}`)];
 }
 
-/** `roadmap`: installed, each page the file adds is read by the record, and no block on it answers a fault. */
+/**
+ * `roadmap`: installed, each page the file adds is read by the record, and no block on it answers a fault. A version that
+ * hands its page to another add-on (2.0.0 gives `roadmap` to Work, as its Timeline) is read at the page it handed.
+ */
 export async function roadmap(ctx) {
   const name = 'roadmap';
   const put = await installFromCatalogue(ctx, 'roadmap');
   if (!put.pass) return [red(ctx, name, put.said)];
-  const pages = (put.doc.declarations ?? []).filter((x) => typeof x?.page === 'string').map((x) => ({ slug: x.page, title: x.title ?? x.page }));
-  if (pages.length === 0) return [red(ctx, name, `${put.version} adds no page.`)];
+  const declared = (put.doc.declarations ?? []).filter((x) => typeof x?.page === 'string').map((x) => ({ slug: x.page, title: x.title ?? x.page }));
+  const handed = Object.entries(put.doc.hands ?? {})
+    .filter(([key]) => key.startsWith('page.'))
+    .map(([key, to]) => ({ slug: key.slice('page.'.length), title: `${key.slice('page.'.length)} (now ${to}'s)` }));
+  const pages = declared.length > 0 ? declared : handed;
+  if (pages.length === 0) return [red(ctx, name, `${put.version} adds no page and hands none on.`)];
   for (const p of pages) {
     const read = await api(ctx, 'page', { slug: p.slug });
     if (read.said?.ok !== true) return [red(ctx, name, `the ${p.title} page did not draw: “${read.said?.refusal?.fix ?? read.status}”`)];
