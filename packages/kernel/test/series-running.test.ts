@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { barsOf } from '../src/series.ts';
-import type { MetricDecl } from '../src/metrics.ts';
+import type { Group, MetricDecl } from '../src/metrics.ts';
 
 const PAID: MetricDecl = {
   metric: 'paid-by-quarter',
@@ -23,7 +23,7 @@ const PAID: MetricDecl = {
 };
 
 /** A reading in pounds, one group a quarter, the clock in the fourth quarter of 2026. */
-const reading = (groups: { key: string; value: number }[]) => () => ({ ok: true as const, value: { groups, current: '2026-Q4', unit: 'EGP' } });
+const reading = (groups: { key: string; value: number }[]) => () => ({ ok: true as const, value: { groups: groups as Group[], current: '2026-Q4', unit: 'EGP' } });
 const metric = (id: string) => (id === PAID.metric ? PAID : null);
 
 test('each bar is the total so far, a quarter with nothing of its own stands at the total before it', () => {
