@@ -22,7 +22,10 @@
   import { apiBase, at as inApp } from '../at.ts';
   import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
-  import { EMPTY_KEEP, KPIS_KIND, inline, text } from 'braindog-render';
+  import { EMPTY_KEEP, KPIS_KIND, inline, moneyWhole, readFigure, text } from 'braindog-render';
+  import { approxOf } from '$lib/money/rates.ts';
+  import { held as heldRates } from '$lib/money/rates.svelte.ts';
+  import { recordToday } from '$lib/record/zone.ts';
   import { kpiHref, kpisIn } from './kpis-in.ts';
   import QueueAnswer from './QueueAnswer.svelte';
   import { compactOf, queueWords } from './queue-answer.ts';
@@ -265,6 +268,17 @@
     /* THE RECORD'S HOME CURRENCY, so every amount the drawers write is the one writer's (`money.ts`): `null` on a
        record with none. */
     home: homeCurrency(),
+    /* A FOREIGN AMOUNT RESTATED IN THE HOME CURRENCY, `≈ EGP 51,744`, at the record's own rates (`approxOf`); nothing where
+       the amount is at home or no rate reaches it. The rates are asked of the record the first time one is wanted. */
+    approx: (figure: string): string | null => {
+      const home = homeCurrency();
+      const f = home ? readFigure(figure) : null;
+      if (!home || !f) return null;
+      heldRates.ask();
+      const at = approxOf(Number(f.minor), f.currency, home, heldRates.rates, recordToday());
+      const said = at ? moneyWhole(at.minor, at.currency, home)?.text : null;
+      return said ? `≈ ${said}` : null;
+    },
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,
     /* AND A LENGTH PAST THE WALK'S REACH, which the record is asked to walk (`walkFor`). */
