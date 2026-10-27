@@ -1,10 +1,10 @@
 {
   "pack": "job-starter",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "icon": "list-todo",
-  "changes": "Draws its own icon in the store and in the installed list. Nothing in it changed.",
-  "title": "Starter jobs",
-  "summary": "Three kinds of job to run on your own machine: a review of your week, a sort of what arrived, and where a repository stands. Each one only reads and proposes, and you approve each kind once before it can run.",
+  "changes": "Composing a page on your machine is one of its kinds now; it was the Slash on your machine add-on. Starter jobs is called Jobs on your machine. A record that held Slash on your machine keeps that job, still approved.",
+  "title": "Jobs on your machine",
+  "summary": "Four kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, and composing a page of this record. Each one only reads and proposes, and you approve each kind once before it can run.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -61,6 +61,29 @@
       "turns": 12,
       "permission": "dontAsk",
       "writes": false
+    },
+    {
+      "job": "slash-desk",
+      "title": "Compose a page on your machine",
+      "prompt": "You are composing one page of this record for its owner, and you change nothing yourself.\n\n1. Read the brief with the context tool: who this record is for, what leads and what waits on them.\n2. Read the page %page% (its address on this record) and what it reads, through the record's own tools: find its lists and figures with record_index, then read them with list, get, search and schema. Read only; never create, update, log or hand off.\n3. Propose one arrangement of that page with the propose tool: what it leads with, the order of what follows, what it hides and the one next action, each with a short reason a person reads on a phone. Say names, never ids.\n\nWrite nothing else: no entry, no note, no file. The owner decides in Decide. If the page is not there, propose nothing and say so in one line.",
+      "args": [
+        {
+          "id": "page",
+          "label": "Page",
+          "max": 64
+        }
+      ],
+      "tools": [
+        "mcp__braindog__context",
+        "mcp__braindog__record_index",
+        "mcp__braindog__schema",
+        "mcp__braindog__list",
+        "mcp__braindog__get",
+        "mcp__braindog__search",
+        "mcp__braindog__propose"
+      ],
+      "turns": 30,
+      "permission": "dontAsk"
     }
   ]
 }

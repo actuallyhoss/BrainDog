@@ -1,10 +1,11 @@
 {
   "pack": "slash-desk",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "icon": "slash",
   "title": "Slash on your machine",
-  "summary": "Hands the heavy thinking of composing a page to your own machine. You press it on Slash, one job runs on a machine you enrolled, and what it would change waits for you in Decide. It writes nothing itself.",
-  "changes": "The first version. Now draws its own icon.",
+  "summary": "Now part of Jobs on your machine (Starter jobs): the job that composes a page on your machine is one of its kinds. Install that add-on for it.",
+  "changes": "Now part of Jobs on your machine. A record that held this keeps the same job, still approved, now from there.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -14,29 +15,8 @@
       "agents": "^1.0.0"
     }
   },
-  "declarations": [
-    {
-      "job": "slash-desk",
-      "title": "Compose a page on your machine",
-      "prompt": "You are composing one page of this record for its owner, and you change nothing yourself.\n\n1. Read the brief with the context tool: who this record is for, what leads and what waits on them.\n2. Read the page %page% (its address on this record) and what it reads, through the record's own tools: find its lists and figures with record_index, then read them with list, get, search and schema. Read only; never create, update, log or hand off.\n3. Propose one arrangement of that page with the propose tool: what it leads with, the order of what follows, what it hides and the one next action, each with a short reason a person reads on a phone. Say names, never ids.\n\nWrite nothing else: no entry, no note, no file. The owner decides in Decide. If the page is not there, propose nothing and say so in one line.",
-      "args": [
-        {
-          "id": "page",
-          "label": "Page",
-          "max": 64
-        }
-      ],
-      "tools": [
-        "mcp__braindog__context",
-        "mcp__braindog__record_index",
-        "mcp__braindog__schema",
-        "mcp__braindog__list",
-        "mcp__braindog__get",
-        "mcp__braindog__search",
-        "mcp__braindog__propose"
-      ],
-      "turns": 30,
-      "permission": "dontAsk"
-    }
-  ]
+  "hands": {
+    "job.slash-desk": "job-starter"
+  },
+  "declarations": []
 }

@@ -38,12 +38,13 @@ type Decl = Record<string, unknown> & { job: string; prompt: string; tools: stri
 
 /** The file as it ships, read fresh each time so no test can hand the next one a copy it changed. */
 const PACK_FILE = new URL('./slash-desk.pack.json', import.meta.url);
-const file = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
+/** THE KIND LIVES IN JOBS ON YOUR MACHINE NOW (`job-starter` 1.1.0); this add-on is the old id, which hands it there. */
+const HOME = new URL('../job-starter/job-starter.pack.json', import.meta.url);
+const file = (): Record<string, unknown> => JSON.parse(readFileSync(HOME, 'utf8')) as Record<string, unknown>;
+const retired = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
 const kind = (): Decl => {
-  const decls = file().declarations as Record<string, unknown>[];
-  assert.equal(decls.length, 1, 'the add-on ships one declaration, its one kind');
-  const decl = decls[0] as Decl;
-  assert.equal(typeof decl.job, 'string');
+  const decl = (file().declarations as Record<string, unknown>[]).find((d) => d.job === 'slash-desk') as Decl | undefined;
+  assert.ok(decl, 'Jobs on your machine ships the kind');
   return decl;
 };
 
@@ -73,16 +74,19 @@ async function record(withPack = true): Promise<{ api: Api; sql: NodeSql }> {
   return { api, sql };
 }
 
-test('the add-on says what it is, needs Agents, and ships one kind', () => {
+test('the kind is one of Jobs on your machine, and the old id says it is part of it and hands the job there', () => {
   const doc = file();
-  assert.equal(doc.pack, 'slash-desk');
-  assert.equal(doc.version, '1.0.1');
-  assert.equal(doc.title, 'Slash on your machine');
-  assert.deepEqual((doc.requires as { packs: Record<string, string> }).packs, { agents: '^1.0.0' });
+  assert.equal(doc.pack, 'job-starter');
+  assert.equal(doc.title, 'Jobs on your machine');
   const decl = kind();
-  assert.equal(decl.job, 'slash-desk');
   assert.equal(decl.title, 'Compose a page on your machine');
   assert.deepEqual(decl.args, [{ id: 'page', label: 'Page', max: 64 }]);
+  const old = retired();
+  assert.equal(old.pack, 'slash-desk');
+  assert.equal(old.version, '2.0.0');
+  assert.match(String(old.summary), /^Now part of Jobs on your machine/u);
+  assert.deepEqual(old.declarations, []);
+  assert.deepEqual(old.hands, { 'job.slash-desk': 'job-starter' });
 });
 
 test("the kernel's own lint passes the kind", () => {
