@@ -1,41 +1,7 @@
+# Verifies a tagged tree, and publishes braindog-render and the CLI to npm through trusted publishing.
+
 name: tag
 
-# A TAG IS THE WHOLE MECHANISM, AND THERE ARE NO GITHUB RELEASES.
-#
-# This workflow used to cut a Release for every app tag: a tarball of the built browser client,
-# notes generated from the commit subjects, and `contents: write` to create it. That is gone, on
-# the owner's decision, and the decision is a good one. A Release is a second place a version
-# exists, with its own notes that drift from the changelog page the site already keeps by hand, and
-# an asset nobody asked for: `apps/web/build` is a static SPA that anybody can produce from the tag
-# in one command, and a tarball of it is a copy of the repository with a shorter shelf life.
-#
-# So the tag is the version. `git tag` is the record, `git log` is the notes, and
-# `apps/site/src/routes/changelog` is the page a person reads. One of each.
-#
-# 52 §5.6 decides what a tag may be, and the app has no semver. Its version is a date and a commit,
-# because nothing about a record served from one deployment is promised by a minor number and there
-# is no consumer to promise it to. Only the packages that go on a registry carry semver, and their
-# lines are independent of each other and of every app tag.
-#
-#   v2026.09.08          the app: the browser client, the site, the hosts. A second one on the same
-#                        day is `v2026.09.08.2`.
-#   render-v0.1.0        `braindog-render` on npm. Semver, because a dependent's build depends on it
-#   cli-v0.1.0           `braindog` on npm, the command line (`apps/cli`, `braindog-cli` in this
-#                        workspace). The same
-#
-# NOTHING IS PUBLISHED UNTIL HE PUSHES ONE OF THOSE TWO TAGS, and only once npm's trusted publishing
-# names this repository and this file for both packages.
-#
-# WHAT IS LEFT HERE IS THE PART THAT WAS ALWAYS THE POINT. A tag can be cut from any commit,
-# including one `ci.yml` never saw, so the tagged tree is tested and gated before the tag is allowed
-# to mean anything. And a registry publish is not a Release: `packages` still runs, because npm is a
-# place a version genuinely has to be pushed to.
-#
-# THIS FILE NEEDS NO WRITE PERMISSION AT ALL NOW, which is the other thing the change bought. The
-# only `contents: write` in this repository's workflows was the job that created the Release.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
 
@@ -43,62 +9,32 @@ permissions:
   contents: read
 
 concurrency:
-  # NEVER CANCEL. A tag push is a decision somebody made once, and killing it half-way leaves a tag
-  # nothing has checked, or a registry with a version this workflow did not verify.
   group: tag-${{ github.ref_name }}
   cancel-in-progress: false
 
-# BASH ON EVERY RUNNER. A Windows self-hosted runner runs a step without a named shell in PowerShell,
-# where $BRAINDOG_BUILD is an empty PowerShell variable, and the first deploy from one shipped a
-# Worker that did not know its build.
 defaults:
   run:
     shell: bash
 
 jobs:
-  # A TAG CAN BE CUT FROM ANY COMMIT, including one `ci.yml` never saw. Cheap insurance: the suite
-  # and the source gates, on the tagged tree. The browser gates are not here; `gates.yml` owns them,
-  # and nineteen minutes of them on a tag is nineteen minutes nobody waits for.
   verify:
-    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
-    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      # THE WHOLE HISTORY, for the two source gates below that read it: `catalogue-immutable` reads the catalogue of the
-      # released commit (SHL-B03) and `commits` counts what the tag reaches (WAY-B02). Both are red on a shallow checkout.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - run: pnpm test
-      # `typecheck` is NOT excluded here as it is in `ci.yml`: `run.mjs` runs it first, and this job
-      # has no separate typecheck step to duplicate.
-      #
-      # THE REST IS `ci.yml`'s `gates` LIST, AND UNTIL 22 SEPTEMBER IT WAS THAT LIST AS IT STOOD
-      # BEFORE THE 21ST. This job does not build, so under CI `passkey` and `queue` are refused for
-      # want of `web-build`, `deploy-parity` for want of `DEPLOY_HOST`, and `self-test` exits red
-      # without a build: four red gates on every tag, by construction, found by reading rather than
-      # by a tag push. When `ci.yml`'s list changes, this one does.
       - run: pnpm gates -- --except bundle,keys,prefs,layout,a11y,passkey,queue,row-drawer,perf,self-test,deploy-parity
 
-  # AND THE APP TAG STILL HAS TO BUILD. Not to produce an asset, which is what this job used to be
-  # for, but because a tag that does not build is a tag nobody can act on, and the check costs two
-  # minutes on the one tree where it is cheapest to find out.
-  #
-  # 52 §5.6's version tuple is set here, `app <YYYY.MM.DD>+<sha7>`. Nothing reads it yet: no source
-  # file mentions `BRAINDOG_BUILD`, so the build ignores it. It is set because the tuple is
-  # specified, because this is the only place the date and the commit are both known, and because
-  # the alternative is discovering on the day `/api/version` is built that no tag ever carried it.
   app:
     needs: verify
     if: startsWith(github.ref_name, 'v')
-    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
-    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
 
       - name: the build tuple
@@ -108,38 +44,22 @@ jobs:
 
       - run: pnpm --filter @braindog/web build
 
-      # The build regenerates `tokens.css` and the favicons. See `ci.yml`. A tag is the last place
-      # to carry a palette a person has not reviewed.
       - run: git diff --exit-code
 
   packages:
     needs: verify
     if: startsWith(github.ref_name, 'render-v') || startsWith(github.ref_name, 'cli-v')
-    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
-    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
-      # NO NPM TOKEN ANYWHERE, which is 52 §8's rule and 31 §6's decision. npm's trusted publishing
-      # exchanges this short-lived OIDC identity for the right to publish these two names from this
-      # repository and this workflow file; provenance is then automatic and needs no flag. A classic
-      # token would be a long-lived secret whose blast radius is the package name for ever.
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
         with:
           registry-url: https://registry.npmjs.org
 
-      # THE PRECONDITIONS, EACH REFUSING WITH THE FACT IT CHECKED, so a tag cut before its version
-      # commit, or a package that would ship something no consumer can run, stops here and says
-      # which, rather than after a build or on the registry.
-      #
-      # TWO NAMES PER PACKAGE, AND FOR THE CLI THEY DIFFER. `name` is the workspace's, which pnpm
-      # filters by; `npm` is the registry's. The CLI is `braindog` on npm, and the workspace cannot
-      # call it that because the root manifest already does, so the workspace says `braindog-cli`
-      # and the manifest npm reads is renamed below, in this job's checkout only.
       - name: preflight
         id: preflight
         env:
@@ -158,21 +78,10 @@ jobs:
           name="$(node -p "require('./$manifest').name")"
           version="$(node -p "require('./$manifest').version")"
 
-          # THE TAG AND THE MANIFEST HAVE TO AGREE (52 §2, release step 4). They disagree when a
-          # release is tagged before the version commit, and the registry then holds a version no
-          # tag points at.
           [ "$version" = "$semver" ] || { echo "  $TAG says $semver; $manifest says $version."; exit 1; }
 
-          # `private: true` is npm's own refusal, and hitting it after a build is a worse place to
-          # find out than here.
           node -e "if (require('./$manifest').private) { console.error('  $name is private and cannot be published.'); process.exit(1) }"
 
-          # AND THE PACKAGE HAS TO SHIP SOMETHING A CONSUMER CAN RUN. `exports` pointing at `.ts` is
-          # this workspace talking to itself through type-stripping; on a registry it is a package
-          # that fails to import for everyone who is not this repository. So what is read is what
-          # npm will get: `publishConfig.exports` when the manifest has one (the renderer keeps
-          # `exports` on its sources for the workspace), and `bin` beside it (the CLI's bundle). A
-          # `.d.ts` is a declaration file a consumer's compiler reads, and it is not source.
           node -e "
             const m = require('./$manifest');
             const e = JSON.stringify([m.publishConfig?.exports ?? m.exports ?? {}, m.bin ?? {}]);
@@ -183,8 +92,6 @@ jobs:
 
           node -e "if (!(require('./$manifest').scripts ?? {}).build) { console.error('  $name has no build script, and a publish must build what it ships.'); process.exit(1) }"
 
-          # TRUSTED PUBLISHING IS npm 11.5.1's. An older npm has no OIDC exchange, finds no token,
-          # and fails at the registry with an answer that names neither.
           node -e "
             const [a, b, c] = process.argv[1].split('.').map(Number);
             if (a < 11 || (a === 11 && (b < 5 || (b === 5 && c < 1)))) {
@@ -199,13 +106,8 @@ jobs:
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
-      # `apps/cli/scripts/bundle.mjs` for the CLI and `tsc -p tsconfig.build.json` for the
-      # renderer, each as its own `build` script. There is no second bundler.
       - run: pnpm --filter ${{ steps.preflight.outputs.name }} run build
 
-      # WHAT THE MANIFEST PROMISES HAS TO BE THERE. Every file `publishConfig.exports` (or
-      # `exports`) and `bin` name is looked for after the build, because npm publishes a package
-      # whose entry is missing without a word, and its first consumer finds out.
       - name: the files the manifest names
         working-directory: ${{ steps.preflight.outputs.dir }}
         run: |
@@ -222,11 +124,6 @@ jobs:
               process.exit(1);
             }"
 
-      # THE MANIFEST npm READS, WRITTEN IN THIS CHECKOUT AND NOWHERE ELSE. `npm publish` honours
-      # none of `publishConfig`'s field overrides (that is pnpm's), so `publishConfig.exports` is
-      # put where `exports` was; the registry name goes in; and the devDependencies go, because
-      # they are `workspace:*` lines that mean nothing off this tree, and the CLI's bundle already
-      # holds every one of them.
       - name: the published manifest
         working-directory: ${{ steps.preflight.outputs.dir }}
         env:
@@ -243,14 +140,9 @@ jobs:
             delete m.devDependencies;
             fs.writeFileSync('package.json', JSON.stringify(m, null, 2) + String.fromCharCode(10));"
 
-      # `npm publish` AND NOT `pnpm publish`: the OIDC exchange that makes trusted publishing work
-      # is npm's, and pnpm does not perform it. Run from the package directory, which is what npm
-      # treats as the publish root.
       - run: npm publish
         working-directory: ${{ steps.preflight.outputs.dir }}
 
-      # THE REGISTRY IS ASKED, RATHER THAN THE EXIT CODE TRUSTED (52 §2, release step 8), the same
-      # principle every gate in this repository is built on: check the thing itself.
       - run: |
           set -euo pipefail
           found="$(npm view "${NAME}@${VERSION}" version)"

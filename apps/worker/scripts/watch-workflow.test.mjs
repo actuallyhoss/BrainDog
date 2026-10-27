@@ -64,7 +64,8 @@ test('IT MAY READ AND NOTHING ELSE: contents and actions, both read', () => {
 test("NODE ONLY, ON GITHUB'S MACHINES: a checkout, Node 24.13.0, and the one command, with no install", () => {
   assert.match(watch, /^ {4}runs-on: ubuntu-latest$/m, 'a self-hosted runner is his machine, not outside');
   const uses = [...watch.matchAll(/uses: (\S+)/g)].map((m) => m[1]);
-  assert.deepEqual(uses, ['actions/checkout@v4', 'actions/setup-node@v4']);
+  assert.deepEqual(uses.map((u) => u.split('@')[0]), ['actions/checkout', 'actions/setup-node']);
+  for (const u of uses) assert.match(u, /@[0-9a-f]{40}$/, `${u} is not pinned to a commit`);
   assert.match(watch, /node-version: 24\.13\.0/);
   const runs = [...watch.matchAll(/^\s+run: (.+)$/gm)].map((m) => m[1]);
   assert.deepEqual(runs, ['node tools/watch/launch.mjs', 'node tools/watch/settings.mjs']);

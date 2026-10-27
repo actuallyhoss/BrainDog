@@ -103,7 +103,7 @@ test('a commit that is not on master, from a fork or a branch run by hand, is re
   assert.equal(origin.id, 'origin');
   assert.equal(origin.if, null, 'the refusal can be skipped');
   assert.doesNotMatch(origin.body, /continue-on-error|\$\{\{ secrets\./);
-  assert.equal(at('Only master\'s own commits'), all.findIndex((s) => s.uses === 'actions/checkout@v4') + 1, 'something runs between the checkout and the refusal');
+  assert.equal(at('Only master\'s own commits'), all.findIndex((s) => /^actions\/checkout@[0-9a-f]{40}\b/.test(s.uses ?? '')) + 1, 'something runs between the checkout and the refusal');
   for (const later of ['Whether the canary is set', 'The lane']) assert.ok(at(later) > at('Only master\'s own commits'), `${later} runs before the refusal`);
   assert.ok(all.findIndex((s) => s.uses === './.github/actions/setup') > at('Only master\'s own commits'), 'the checked-out setup action runs before the refusal');
 

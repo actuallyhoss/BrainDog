@@ -1,22 +1,12 @@
+# Builds the self-host container image, and pushes it to ghcr.io only when IMAGE_PUSH is 'true'.
+
 name: image
 
-# THE SELF-HOST IMAGE, BUILT BY HAND OR ON AN APP TAG, AND PUSHED ONLY WHEN THE OWNER SAYS SO.
-#
-# `apps/selfhost/Dockerfile` over the whole workspace. It is built on every run, so a tag whose image does not build is
-# known on the day it is cut. It goes to ghcr.io only when the repository variable IMAGE_PUSH is 'true', which is his
-# call (H7): an image on a public registry is a release somebody may pull and run, and nothing in CI decides that.
-#
-# THE TAG IS `<date>-<sha>` (docs/53 section 3), and `latest` beside it when pushed from a tag, because the app has no
-# semver and a date and a commit are what a self-hoster reads to know what they run.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
-  # Only used when IMAGE_PUSH is 'true'; the login step below does not run otherwise.
   packages: write
 
 concurrency:
@@ -29,12 +19,10 @@ defaults:
 
 jobs:
   image:
-    # A HOSTED LINUX RUNNER, because the image is a Linux image and the self-hosted runner is Windows. It runs only by
-    # hand and on an app tag, so it costs a few minutes a release.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Name the image
         id: name
@@ -45,18 +33,18 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then tags="${tags},${repo}:latest"; fi
           echo "tags=${tags}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Sign in to ghcr.io
         if: ${{ vars.IMAGE_PUSH == 'true' }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build, and push when IMAGE_PUSH is 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: apps/selfhost/Dockerfile
@@ -64,8 +52,6 @@ jobs:
           load: ${{ vars.IMAGE_PUSH != 'true' }}
           tags: ${{ steps.name.outputs.tags }}
 
-      # THE IMAGE IS HEALTHY WITH NOTHING GIVEN TO IT, which is the loopback-only container a tokenless run makes. Only
-      # when it was loaded here, since a pushed image is not in this runner's store.
       - name: Say whether it starts healthy
         if: ${{ vars.IMAGE_PUSH != 'true' }}
         run: |

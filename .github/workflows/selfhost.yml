@@ -1,28 +1,7 @@
+# The self-host from a clean clone, with outbound network blocked after install: plain Node and the container.
+
 name: selfhost
 
-# THE SELF-HOST FROM A CLEAN CLONE, EVERY WEEK AND ON A CHANGE TO IT (LCH-C13 jobs 1 and 2, "The software stays
-# self-hostable", D33.45).
-#
-# `apps/selfhost/test/from-clean.mjs` reads README.md's own self-host lines and runs them in a copy of this commit made
-# with `git archive`: install, build, `init` with an invented record and owner, start. Then the real `braindog` command,
-# built from the same commit, signs in with a token, boots, writes a row, reads it, exports, verifies, restores into a
-# second folder with `init --from`, and reads the row there. The container job does the same through `docker build` and
-# `docker run`, with the image's health check healthy.
-#
-# OUTBOUND CALLS ARE BLOCKED ONCE WHAT NEEDS THE NETWORK IS IN (the scope's risk): the install for the plain run, and the
-# image build too for the container. A run that fails after that line needed the Cloud by accident, a font or a
-# catalogue fetch, and the step it failed at says which. Loopback and the runner's own Docker bridge stay open; a name
-# asked of the runner's resolver on loopback is refused.
-#
-# ONLY THE RUN IS BLOCKED, NEVER THE RUNNER. The check runs as the group `braindog-offline` (`sg`), and every rule matches
-# that group's packets alone. A rule for everybody cut the runner's own calls to GitHub too: no log upload, no step
-# finished, and both jobs sat to their ceiling with no log at all. `offline.sh` refuses to run outside the group, so the
-# rules can never block nothing.
-#
-# NOTHING IS PUSHED, DEPLOYED OR SIGNED IN AS ANYBODY. The image is built and thrown away; no secret is read.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
 
@@ -42,15 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24.13.0
 
-      # THE PARSER AND THE STEP LIST FIRST, which install nothing: a README the check cannot place fails here in seconds.
       - name: The README lines and the steps
         run: |
           node --test apps/selfhost/test/from-clean.test.mjs
@@ -80,16 +58,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24.13.0
 
-      # THE CONTAINERS' OWN CALLS GO THROUGH FORWARD, NOT OUTPUT, so Docker's DOCKER-USER chain blocks them, and the
-      # runner's calls into a container over its bridge stay open.
       - name: Write the outbound block
         run: |
           sudo groupadd braindog-offline
@@ -110,7 +86,6 @@ jobs:
           sudo -n iptables -I DOCKER-USER 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
           EOF
 
-      # DOCKER MUST ANSWER AS THE GROUP TOO, or the run would say `skipped: no docker` and pass having checked nothing.
       - name: The container from a clean clone, outbound blocked after the image is built
         run: |
           sg braindog-offline -c 'docker info >/dev/null || { echo "docker does not answer as the group braindog-offline, so the container run would only be skipped." >&2; exit 1; }

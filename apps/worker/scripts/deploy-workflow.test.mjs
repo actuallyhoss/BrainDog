@@ -69,7 +69,7 @@ test('the rollback follows Smoke under failure(), and reads which of Parity and 
   assert.equal(decide.id, 'rollback');
   assert.match(decide.if ?? '', /^failure\(\) && \(steps\.parity\.outcome == 'failure' \|\| steps\.smoke\.outcome == 'failure'\)$/);
   assert.match(decide.body, /node apps\/worker\/scripts\/rollback\.mjs decide/);
-  assert.match(decide.body, /HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(decide.body, /HEAD_SHA: \$\{\{ github\.sha \}\}/);
 
   for (const [name, output] of [['Roll the app back', 'app'], ['Roll the site back', 'site']]) {
     const roll = step(name);
@@ -113,7 +113,7 @@ test('a restore point is asked before Deploy, after what is live is recorded, be
   assert.doesNotMatch(point.body, /continue-on-error/, 'a failed copy cannot stop the deploy');
   assert.match(point.body, /PROVISION_KEY: \$\{\{ secrets\.PROVISION_KEY \}\}/);
   assert.match(point.body, /DEPLOY_HOST: \$\{\{ vars\.DEPLOY_HOST \}\}/);
-  assert.match(point.body, /HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(point.body, /HEAD_SHA: \$\{\{ github\.sha \}\}/);
   assert.match(point.body, /\/account\/ops\/restore-point/);
   assert.match(point.body, /not run: no key/, 'no key fails the deploy instead of saying it did not run');
 });

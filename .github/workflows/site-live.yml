@@ -1,27 +1,7 @@
+# Opens every page of the live site at two widths, light and dark, and checks a few bounds on each.
+
 name: site-live
 
-# THE LIVE SITE, LOOKED AT EVERY DAY AT BOTH WIDTHS (LCH-B02). The skin moved under the site on 7 October and
-# no one knew, because every check read the checkout and nothing read brain.dog. This opens every page the live
-# sitemap names in a real browser at 1440 and 390, light and dark, and keeps the pictures on one sheet a person
-# scrolls. It also reads a few facts off each page and fails when one is out of bounds: the home page taller
-# than its bound, a link or the main button in a colour that is not the site's red or its ink, a script from
-# another site, a cookie. The bounds are `apps/site/scripts/live-bounds.json`, and the reader is
-# `apps/site/scripts/shot.mjs`, whose own test runs first so a broken reader is never read as a clean site.
-#
-# EVERY DAY AT 05:43, AND BY HAND. Minute 43, off the hour, where GitHub's scheduler is least late. Not after a
-# deploy: `after-deploy.yml` already holds a deploy to its smoke, and this is the look nobody asked for.
-#
-# IT USES NO SECRET AND NAMES NONE. It reads what any stranger is served, signed in as no one. The checkout
-# keeps no credential and the job can only read the repository.
-#
-# A RED RUN SAYS WHY IN ITS LOG AND AT THE TOP OF THE SHEET, one plain sentence a fact. Three red runs in a row
-# with no commit that answers them means nobody is reading it, and that is the fault to fix first.
-#
-# A FORCED FAILURE: run it by hand with `origin` set to any other https site. Its links are not this site's
-# red and its home page has no bound it meets, so the run is red and the sheet shows that site.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
     inputs:
@@ -41,10 +21,9 @@ concurrency:
 jobs:
   look:
     runs-on: ubuntu-latest
-    # SOME SIXTY PAGES, FOUR CAPTURES EACH, a few seconds a capture: a quarter of an hour on a slow day.
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
@@ -55,20 +34,15 @@ jobs:
       - name: Install the browser
         run: pnpm exec playwright install --with-deps chromium
 
-      # `--all`: every page and not one a template, because a cookie can sit on one page of forty. `--scale 1`:
-      # some two hundred and fifty full-page pictures have to fit in one upload.
-      # THE ORIGIN ARRIVES AS AN ENVIRONMENT VALUE and never inside the script's text, so what is typed into the
-      # box is an argument and not a command.
       - name: Look at the site
         env:
           SITE_ORIGIN: ${{ inputs.origin || 'https://brain.dog' }}
         working-directory: apps/site
         run: node scripts/shot.mjs --origin "$SITE_ORIGIN" --all --scale 1 --out "$RUNNER_TEMP/site-live"
 
-      # RED OR GREEN, the sheet is what a person opens: `sheet.html` with its pictures beside it, and `facts.json`.
       - name: Keep the sheet
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: site-live-sheet
           path: ${{ runner.temp }}/site-live

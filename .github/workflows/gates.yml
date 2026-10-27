@@ -1,69 +1,8 @@
+# Every gate, including the browser gates (layout, a11y) that are too slow for every push.
+# Runs by hand; shards the browser gates over three jobs.
+
 name: gates
 
-# EVERY GATE, AND WHEN THEY RUN.
-#
-# Every gate `run.mjs` registers, which is why this names no count: the count this line carried
-# went stale twice. The "nineteen minutes" below is the argument as it was first made, on the PC.
-#
-# MEASURED ON THE HOSTED RUNNER (28 September and 1 October), nearly all of a run is two gates
-# driving a headless browser over a built app: `layout` was about 1450 page-runs (every route, at
-# both sides of every breakpoint the stylesheets declare, plus the floor widths; about 1,800 since
-# the floor became six widths on 2 October, 1512 and 1728 among them) and took 21 to 27
-# minutes; `a11y` is about 370 axe audits (every route, two schemes, two widths, plus the site) and
-# took 11. `self-test`, `keys`, `typecheck` and `prefs` are a minute or three each, and the rest are
-# seconds. Back to back in one job that is past the 35-minute ceiling, so from 2 October the run is
-# split into parts that share one build: see `jobs:` below.
-#
-# THE CHOICE, MADE EXPLICITLY: every gate on a weekly schedule, on demand, and on a pull request
-# only when it carries the `full-gates` label; and `layout` and `a11y` alone on a push to master
-# that touches what those two read. This workflow ran on every merge to master until 16 September
-# 2026, and on none from then until the CI split.
-#
-#   - NOT EVERY PULL REQUEST. Nineteen minutes on every push to every branch is a queue, and a
-#     queue is where `continue-on-error` gets added. The measurable cost of not doing it is that a
-#     layout or contrast regression is found after the merge rather than before; on a repository
-#     with one committer and no release, that is a red master for the length of one fix, which is
-#     the cheaper of the two prices.
-#   - NOT EVERY GATE ON EVERY MERGE TO MASTER, AND THIS IS A BUDGET DECISION RATHER THAN A DESIGN
-#     ONE. The argument for it stands and is worth keeping: master is the tree everything else is
-#     measured against, and a green master is the claim this workflow exists to keep true. What
-#     broke it was pushing several times a day. Each push cancelled the run the previous
-#     push had started, so on 16 September nine runs began and five were cancelled partway, which
-#     spends most of eighteen to thirty minutes each time and proves nothing at all. The owner
-#     said the Actions minutes were running short, and a check that is killed before it finishes
-#     is the worst thing to spend them on.
-#   - BUT `layout` AND `a11y` ON A PUSH TO MASTER THAT TOUCHES WHAT THEY READ. Without it
-#     a layout or contrast regression on master was found by the Monday run, by somebody
-#     dispatching this by hand, or not until it was in front of a person. Every other gate already
-#     runs on that push, in `ci.yml` or, for `deploy-parity`, in `deploy.yml`, so these two are the
-#     whole of what master went without. The `paths` list below is what keeps it cheap: a push
-#     that changes none of their inputs cannot change their answer. A newer push still cancels an
-#     older one's run, which is right here, because the newest master is the tree worth measuring;
-#     and `deploy.yml` follows `ci` alone, so this run never holds a deploy back.
-#
-#     Run every gate with `gh workflow run gates.yml` before anything that depends on master being
-#     green on all of them.
-#   - THE LABEL IS THE ESCAPE HATCH, and it is a considered part of the answer rather than a
-#     hedge. A change to `apps/web/src`, `packages/skin` or `tools/gates` is exactly the change
-#     whose breakage these gates catch, and putting `full-gates` on that pull request buys the
-#     nineteen minutes back before the merge. `labeled` is in the trigger list so adding the label
-#     starts the run rather than waiting for the next push.
-#   - AND WEEKLY, BECAUSE TWO OF THESE GATES MEASURE SOMETHING THAT MOVES ON ITS OWN. Chromium and
-#     axe-core decide what `a11y` reports and a runner image decides what `layout` measures. None
-#     of those arrive as a commit, so nothing above would ever notice them; Monday morning is
-#     early enough to find out before the week's work is stacked on top.
-#
-# NO `paths:` FILTER ON THE FULL RUN, AND THAT IS NOT AN OVERSIGHT. A docs-only commit looks
-# skippable and is not: `event-kinds`, `closed-lists` and `refusals` read the design documents as
-# a SOURCE (the CHECK in the migration, the table in `30-BLUEPRINT`, and the prose around it must
-# all count the same kinds), so `paths-ignore: docs/**` would be a hole precisely where the corpus
-# contradicts itself. The push trigger is the one with a filter, because it runs two gates whose
-# inputs are known: their own files and their imports, the two builds they measure and everything
-# those builds read. `apps/worker/scripts/gates-workflow.test.mjs` walks those imports and is red
-# when one of them falls outside the list.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
 
@@ -71,98 +10,29 @@ permissions:
   contents: read
 
 concurrency:
-  # THE EVENT IS IN THE KEY, so a push to master cancels only an older push's run. Keyed on the ref
-  # alone, the push trigger's two gates would cancel the Monday run or a hand dispatch of every
-  # gate on master, which is the one run of all of them master gets.
   group: gates-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  # CANCELS SUPERSEDED MASTER RUNS TOO, which is the less obvious half. Three pushes in ten minutes
-  # would otherwise queue three browser runs to report on two trees that no longer exist; the last
-  # one is the tree, and it is the one worth the runner.
   cancel-in-progress: true
 
-# BASH ON EVERY RUNNER. A Windows self-hosted runner runs a step without a named shell in PowerShell,
-# where $BRAINDOG_BUILD is an empty PowerShell variable, and the first deploy from one shipped a
-# Worker that did not know its build.
 defaults:
   run:
     shell: bash
 
 jobs:
-  # ONE BUILD, A MATRIX OF PARTS, AND ONE CHECK THAT IS STILL CALLED `gates`.
-  #
-  # `gates-build` builds the app and the site once and hands them on as an artifact. Each
-  # `gates-shard` downloads that build and runs one part of the selection (`run.mjs --shard N/M`).
-  # `gates` waits for both and is red unless every one of them was green, which is what keeps the
-  # check's name: a branch rule or a person reading this workflow's `gates` check gets one answer,
-  # as before the split. `deploy.yml` follows `ci` by name and reads nothing here.
-  #
-  # PARTS AND NOT A LONGER CEILING, because the minutes are the owner's money. `CI_RUNNER` names
-  # `ubuntu-latest`, so every job here is a hosted machine billed by the minute. From 1 October
-  # every push ran into the 35-minute ceiling and was cancelled, which is 35 minutes spent to prove
-  # nothing; a longer ceiling buys the same minutes on every run and a cancelled push still pays
-  # for all of them. Parts side by side finish sooner and a superseded run is cancelled having
-  # spent less. What a part costs on top is its own checkout, install and browser, about two
-  # minutes, and that is why the build is made once rather than in every part.
-  #
-  # THREE PARTS, AND THE WORKFLOW NAMES HOW MANY AND NEVER WHICH GATES. `run.mjs` cuts the selection
-  # by measured cost and puts every gate in exactly one part, so a gate added tomorrow is in one of
-  # them; a list per job would be the list `--except` argues against. `layout` declares `slices = 2`,
-  # so it is cut by width into two halves that count as two gates here. A push's parts are then
-  # `layout` 1 of 2, `layout` 2 of 2 and `a11y`; every other trigger's are each half of `layout`
-  # with a few of the smaller gates beside it, and `a11y` with the rest. Every part is about 13 to
-  # 18 minutes. `node tools/gates/run.mjs --shard 2/3 --list` prints what a part holds.
-  #
-  # ON THE SELF-HOSTED FALLBACK (`CI_RUNNER` unset) the parts queue on the one machine, each under
-  # its own ceiling, and since every browser gate takes port 0 two of them on one machine would not
-  # collide either.
   gates-build:
-    # A pull request runs this only when it is asked to. Written as "not a pull request, or
-    # labelled" so a push, a schedule and a manual dispatch need no clause of their own: a new
-    # trigger added above is included by default rather than silently skipped. The parts need this
-    # job, so they are skipped with it.
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-gates')
-    # NOT `build`, which is `ci.yml`'s job and its check. Two checks of one name on one commit is a
-    # branch rule that cannot say which one it means.
     name: gates build
-    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
-    # Self-hosted minutes are free. The repository variable CI_RUNNER names the hosted image instead.
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
-    # A cold install and two Vite builds, measured at under two minutes on the hosted runner.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
 
-      # THE BUILD IS A PREREQUISITE, NOT A STEP, AND BOTH ROOTS MATTER. `bundle` refuses a build
-      # older than the newest source; `layout` and `a11y` measure `apps/web/build` over the gates'
-      # seeded record and over its variant records (`tools/gates/record.mjs`: the Cloud's half of
-      # every host branch, a record with machines and keys connected, and one with enough decisions
-      # to overflow a search group), and `apps/site/build`, which is the first page a stranger sees.
-      # The variants were three more Vite builds until they became records; they
-      # differed only in the sample's constants, which no live screen reads, so they drew the same
-      # screens as the main build and the branches they were for went unmeasured.
-      #
-      # A missing root is not a quiet loss of coverage: the gate exits 3, `run.mjs` calls that a
-      # skip, and a skip under CI is red.
       - run: pnpm --filter @braindog/web build
       - run: pnpm --filter @braindog/site build
 
-      # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE, the same line as `ci.yml`'s build job,
-      # and here it is load-bearing rather than tidy. Both builds start with
-      # `pnpm --filter @braindog/skin theme`, which WRITES `tokens.css` and the favicons; the
-      # `theme` gate is `theme.mjs --check`. Without this line the build regenerates the palette and
-      # a committed palette that has drifted from its generator ships in the build the parts measure.
-      # The parts check out the committed file and never build, so their `theme` reads it as committed.
       - run: git diff --exit-code
 
-      # WHAT THE GATES READ OF THE BUILD, and `.svelte-kit/output/client` is the half that is easy to
-      # miss: `bundle` reads Vite's manifest there, beside the shell in `build/app`. It is a hidden
-      # folder, and upload-artifact leaves hidden files out unless told. The three paths share
-      # `apps/` as their root, so that is where each part puts them back. ONE DAY, because the build
-      # is this run's and no other run reads it, and stored artifacts are billed too. `overwrite`
-      # because a re-run is the same run: the first attempt's `builds` is still there, and v4 refuses
-      # a second artifact of one name in one run rather than replacing it.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: builds
           overwrite: true
@@ -177,104 +47,49 @@ jobs:
   gates-shard:
     needs: gates-build
     name: gates ${{ matrix.part }} of ${{ strategy.job-total }}
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
-    # 52 §7 BUDGETS THIS AT 5 MINUTES AND THAT NUMBER IS FROM BEFORE THE GATES MOVED. The spec put
-    # the rendered-box work in Playwright specs under `ci.yml`'s `pnpm test:browser` and left
-    # `gates.yml` holding scripts alone; the tree instead drives the browser from inside
-    # `layout.mjs`, `a11y.mjs`, `keys.mjs` and `prefs.mjs`, so these parts are the whole pyramid
-    # above the unit tests. 35 minutes is well over the longest part, about 18 since `layout` was cut
-    # in two, plus about two of setup and the first-run browser download on a cold cache. It is a
-    # ceiling for a hang, not a budget, and it was NOT raised for the split: 52 §7's real budget
-    # belongs in `budgets.json`, and there is no `ci` section there to hold it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     strategy:
-      # EVERY PART RUNS TO THE END, for the reason `run.mjs` reports every failure rather than the
-      # first: a run that names one problem when there are four costs four runs.
       fail-fast: false
       matrix:
         part: [1, 2, 3]
     steps:
-      # THE WHOLE HISTORY, as `ci.yml`'s `gates` job takes it and for its two reasons: `catalogue-immutable` reads the
-      # catalogue of the released commit (SHL-B03) and `commits` counts what HEAD reaches (WAY-B02). A shallow checkout
-      # holds neither, and both gates are red on it by design: a base that cannot be read is never a skip.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup
 
-      # KEYED ON THE BROWSER'S VERSION, NOT THE LOCKFILE. Chromium is ~150 MB and changes when
-      # `@playwright/test` changes; `pnpm-lock.yaml` changes whenever anything does, so a lockfile
-      # key would throw the browser away most weeks for a reason that has nothing to do with it.
-      # `node -p` reads the resolved version out of the installed package, so the key cannot drift
-      # from what `pnpm exec playwright` is about to run. The path is relative rather than a bare
-      # specifier: a package's `exports` map is free to hide its own manifest, and this needs no
-      # resolver's permission to read a file.
       - id: browser
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
-      # ON A HOSTED IMAGE ONLY. `~/.cache/ms-playwright` is where Playwright keeps browsers on Linux;
-      # on Windows it is %LOCALAPPDATA%\ms-playwright, so on the self-hosted runner this step never once hit (the
-      # 21 September run logged `Cache not found for input keys: ms-playwright-Windows-1.62.1`).
-      # Pointing it at the Windows path would be no better: the self-hosted runner is a PC whose
-      # browser is already installed and persists between runs, and the install below found it in
-      # one second, so a cache there would restore 150 MB from GitHub to overwrite files that were
-      # already on disk. The cache is for a hosted image, where every job starts empty.
       - if: runner.environment == 'github-hosted'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: browser-cache
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-chromium-webkit-${{ runner.os }}-${{ steps.browser.outputs.version }}
 
-      # CHROMIUM AND WEBKIT: layout and a11y run both (the Mac app draws with Safari's engine); firefox
-      # is not opened (52 §10 records the ceiling). A skipped
-      # cache step has no `cache-hit` output, so on the self-hosted runner this is the step that runs.
       - if: steps.browser-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium webkit
 
-      # The cache holds the browser, never the system libraries it links against: those live in
-      # the image, and a restored cache with no `install-deps` is a browser that exits before it
-      # renders a page.
       - if: steps.browser-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium webkit
 
-      # THE ONE BUILD, AFTER THE CHECKOUT, AND THE ORDER IS LOAD-BEARING. `run.mjs` and `bundle`
-      # refuse a build older than the newest source by file time, so the build has to be newer than
-      # every file the checkout wrote. Downloaded before it, the checkout's clean would delete it.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: builds
           path: apps
 
-      # AND ITS TIMES ARE NOW, whatever the zip carried. A file time kept from the build job is
-      # older than this job's checkout, and `bundle` reads Vite's manifest's own time, so the build
-      # this run made from this commit would be refused as stale. The freshness check is for a desk
-      # whose build may be last week's; here the build is this commit's by construction.
       - run: find apps/web/build apps/web/.svelte-kit/output/client apps/site/build -exec touch {} +
 
-      # A PUSH TO MASTER RUNS THE TWO BROWSER GATES AND NOTHING ELSE. `ci` ran every other gate on
-      # the same commit, so running them again here spends the runner to learn nothing, and the
-      # `paths` list above is written against these two alone.
       - if: github.event_name == 'push'
         run: pnpm gates -- --only layout,a11y --shard ${{ matrix.part }}/${{ strategy.job-total }}
 
-      # EVERY OTHER TRIGGER RUNS ALL OF THEM, across the parts. No `--only`, no `--except`: these
-      # are the jobs that have every prerequisite, so a skip here is a fact about the build and is
-      # correctly red. `--allow-skip deploy-parity` AND NOT AN EXCLUSION, which is the difference
-      # between "this job does not ask" and "this job asks and accepts one answer". 52 §5 writes it
-      # this way on purpose: the gate still runs here, still prints the sentence naming what it
-      # lacks, and is still red if it fails for any reason other than having no live host to
-      # measure. Excluding it would also hide the day it stops being able to run at all.
       - if: github.event_name != 'push'
         run: pnpm gates -- --allow-skip deploy-parity,rule-sheet --shard ${{ matrix.part }}/${{ strategy.job-total }}
 
-      # THE A11Y GATE'S OWN RUN, which it writes to `.a11y.log`: the per-route, per-scheme detail
-      # behind a summary line that names counts. It is an ARTEFACT FOR A PERSON and never an
-      # assertion (22 §10); nothing reads it back. Named by part, because two artifacts of one name
-      # in one run is an upload that fails, and only the part holding `a11y` writes one. `overwrite`
-      # for the re-run of a failed part, which is the same run and still holds the first attempt's log.
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: a11y-log-${{ matrix.part }}
           overwrite: true
@@ -283,12 +98,8 @@ jobs:
 
   gates:
     needs: [gates-build, gates-shard]
-    # `!cancelled()` AND NOT `always()`, so a run a newer push superseded stays cancelled instead of
-    # spending a runner to report it. A failed build or part still reaches this job, which is the
-    # point of it: without it a red part would leave this check skipped, and a skipped check reads
-    # as passed. The label clause is the build's, so an unlabelled pull request skips all three.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-gates')) }}
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - env:

@@ -1,32 +1,8 @@
+# Checks that ask a real model: the routed names and the scored cases against tools/model-checks/baseline.json.
+# Runs by hand; needs MODEL_CHECK_TOKEN.
+
 name: model-checks
 
-# CHECKS THAT ASK A REAL MODEL, RUN BY THEMSELVES (ENG-A03). The included model, through Workers
-# AI's own address with a token: every routed name asked once (`--routes`), and Slash's questions
-# and the record's descriptions scored against the bars in `tools/model-checks/baseline.json`.
-#
-# THE ROUTES AND EIGHT CASES EVERY NIGHT, EVERYTHING ON SUNDAY, AND BY HAND. Minute 43, off the
-# hour, where GitHub's scheduler is least late. A night is about 3 cents; the ceiling is 20,000
-# neurons (22 cents) on a night and 100,000 ($1.10) on a full run, and the runner stops asking
-# before it would pass it.
-#
-# THREE OUTCOMES. `measured-pass` is green. `measured-below` is red, and the only red. `not-measured`
-# is yellow: one warning line and exit 0, when the provider gave no answer after three tries or
-# when there is no token. NO TOKEN IS THE DEFAULT (DIRECTION 42) until the owner sets the secret
-# `MODEL_CHECK_TOKEN` and the variable `MODEL_CHECK_ACCOUNT`; the run then says so in one line.
-#
-# THE ALARM. Each report carries the nights before it, read from the last scheduled run's report.
-# Two nights below the bar running, or three nights a provider that was asked gave no answer, turn
-# the run red, which GitHub mails, and post the `model` kind to the Worker's operator mail when
-# `MODEL_ALERT_KEY` is set. A night with no token is never counted: it is the owner's hands.
-#
-# THE TOKEN TRAVELS IN THE ENVIRONMENT AND NOWHERE ELSE. The runner never prints it, cuts it and the
-# account out of every message it keeps, and `model-checks.json` holds neither.
-#
-# A FORCED RED: run it by hand on a branch whose `MODELS` in `apps/worker/src/inference.ts` names
-# an id Workers AI does not serve. The route reads `measured-below` and the run is red.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
     inputs:
@@ -55,10 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      # THE INSTALL IS FOR THE HARNESSES: they run the shipped engine, which imports the workspace.
       - uses: ./.github/actions/setup
       - name: The runner's own tests
         run: node --test tools/model-checks/test/outcomes.test.mjs tools/model-checks/test/describe-live.test.mjs
@@ -89,9 +64,6 @@ jobs:
           if [ "$SET_BASELINE" = true ]; then args+=(--set-baseline); fi
           node tools/model-checks/run.mjs "${args[@]}" --history previous/model-checks.json --out model-checks.json
           code=$?
-          # THE SIXTEEN DESCRIPTIONS THROUGH THE HOST'S OWN DOOR, ON A NIGHT (ENG-B11): red under 13 clean on the first
-          # ask. It reads the same two names, and with neither it says not measured and exits 0. Its asks are its own,
-          # about 12,400 neurons at the very worst (14 cents), and are not counted against --max-neurons.
           live=0
           if [ "$EVENT" = schedule ]; then
             node tools/model-checks/describe-live.mjs --bar 13 --out describe-live.json
@@ -102,7 +74,7 @@ jobs:
           exit $(( code > live ? code : live ))
       - name: Keep the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: model-checks
           path: |

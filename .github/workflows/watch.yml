@@ -1,35 +1,7 @@
+# An outside check of the production host from GitHub's machines, and a monthly restore drill on the canary.
+
 name: watch
 
-# THE WATCH FROM OUTSIDE (LCH-C01): brain.dog asked once an hour from GitHub's machines, which are
-# outside Cloudflare, so a day with the app down at Cloudflare's edge or a night with no copy turns
-# a run red and GitHub mails him. The only watchdog before this ran inside Cloudflare, in the site's
-# Worker, and could not see Cloudflare itself down.
-#
-# SEVEN QUESTIONS, ONE LINE EACH, EVERY MISS PRINTED (`tools/watch/launch.mjs` says them): http to
-# https, `/healthz` ok, the live build is the last green deploy, `security.txt` not expiring,
-# each old name answers, last night's copies all taken, and sign-up as the config switches it.
-#
-# HOURLY FROM GITHUB AND NO STATUS PAGE are the defaults (DIRECTION 42), until he picks an outside
-# monitor with a one-minute beat. Minute 7, off the hour, because GitHub's own scheduler is
-# busiest on it and runs late there. A run GitHub skips is not the product down: the next run
-# prints how long ago the one before it started.
-#
-# NODE ONLY, NO INSTALL. The script reads `apps/worker/wrangler.jsonc` and asks with `fetch`, so a
-# run is a checkout and one command, and a broken lock file cannot turn the watch red.
-#
-# `actions: read` IS FOR THE LAST GREEN DEPLOY, read with the workflow's own token, and for when
-# this workflow last ran. Nothing here writes.
-#
-# AND ONCE A MONTH, GOING BACK IS DONE ON THE CANARY (LCH-C05), in a job of its own below. The watch asks whether
-# the product answers; this asks whether a record put back to a copy comes back whole, which nothing proved until
-# somebody needed it. It is the one job here that holds secrets and signs in, so it is kept apart from the hourly
-# job: its own machine, its own environment, its own limit of minutes, and the hourly job reads none of its secrets.
-#
-# A FORCED MISS: run it by hand with `host` set to a name that answers 503, and the run is red.
-# The input reaches the script through the environment, never pasted into the command.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
     inputs:
@@ -57,10 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24.13.0
       - name: Ask production from outside
@@ -68,40 +40,23 @@ jobs:
           WATCH_HOST: ${{ inputs.host }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node tools/watch/launch.mjs
-      # THE REPOSITORY'S SETTINGS, ONCE A DAY AND BY HAND (`tools/watch/settings.mjs`, LCH-C12): the rules on master,
-      # secret scanning, private reporting, `CI_RUNNER`, runners, wiki, Discussions, the description, the production
-      # reviewers and open high alerts, each against `.github/settings.expected.json`. A READ-ONLY FINE-GRAINED TOKEN,
-      # because the workflow's own token cannot read alerts: `WATCH_TOKEN`, a repository secret he makes. Without it the
-      # step says skipped and is green. Asked even when the step above missed, so one red does not hide the other.
       - name: Hold the repository's settings to what was decided
         if: ${{ !cancelled() && (github.event.schedule == '41 5 * * *' || github.event_name == 'workflow_dispatch') }}
         env:
           WATCH_TOKEN: ${{ secrets.WATCH_TOKEN }}
         run: node tools/watch/settings.mjs
 
-  # GOING BACK, PROVEN ON THE CANARY (`apps/worker/scripts/go-back.mjs`). Three entries, a copy, three more and an
-  # invitation; the record goes back to the copy and must answer within a minute with its log ending at the copy plus
-  # one `restore.pitr`; then it goes back to `before-restore` and the three must return. It prints PASS or the step
-  # that failed, and a red run mails him as the watch's does.
-  #
-  # ON THE CANARY AND NOTHING ELSE. The script refuses any record but the one production's `OPS_RECORD` names, so a
-  # mistyped variable cannot point it at a person's record. UNTIL THE CANARY IS NAMED (`SMOKE_SLUG`) IT IS "not run"
-  # with why, and a warning on the run. Once it is named, a missing passkey is red, not a skip.
-  #
-  # AS THE CANARY'S OWNER, SIGNED IN THE WAY THE LANE SIGNS IN (`tools/canary/lane.d/20-signin-live.mjs`, the canary's
-  # own passkey in a real browser). The session is kept in the runner's temporary folder, ended by the script, and
-  # its file removed whatever happened.
   go-back:
     if: github.event.schedule == '23 4 1 * *' || (github.event_name == 'workflow_dispatch' && inputs.go_back)
     environment: production
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       SMOKE_SLUG: ${{ vars.SMOKE_SLUG }}
       DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
       CANARY_ORIGIN: https://${{ vars.DEPLOY_HOST }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: Whether there is a canary
@@ -119,7 +74,6 @@ jobs:
             exit 1
           fi
           echo "canary=live" >> "$GITHUB_OUTPUT"
-          # WHERE THE SESSION IS KEPT, said here and not in the job's `env`, which cannot read the runner's folder.
           echo "CANARY_SESSION=$RUNNER_TEMP/go-back-session.json" >> "$GITHUB_ENV"
       - uses: ./.github/actions/setup
         if: steps.canary.outputs.canary == 'live'

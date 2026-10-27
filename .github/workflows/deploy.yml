@@ -1,27 +1,8 @@
+# Production deploy to Cloudflare: build, record what is live, deploy the app and the site, check parity,
+# smoke-test, and roll back on a red. Runs by hand from master only, behind the production environment.
+
 name: deploy
 
-# 52 §2's `deploy.yml`, which the corpus has specified since the operations spec was written and
-# which did not exist until now. `53 §5.2` reads "from `deploy.yml`, never by hand for a forward
-# deploy", and every deploy to date has been by hand, so the procedure that was written down was
-# not the procedure being followed, which is the failure mode a written procedure exists to prevent.
-#
-# IT RUNS OFF `ci`'s COMPLETION RATHER THAN OFF THE PUSH. `workflow_run` is the only trigger that
-# can say "master is green, now deploy it": a `push` trigger races the checks it is supposed to
-# wait for. The guard below is the other half of that: `workflow_run` fires on failure too.
-#
-# WHAT IT DOES NOT WAIT FOR IS `gates`, AND THAT IS A DECISION. `gates` is nineteen minutes of
-# browser work; `ci` is five. Blocking the deploy on both means master sits undeployed for twenty
-# minutes after every commit, and the two gates that take the time (`layout` and `a11y`) measure
-# rendering rather than correctness. A contrast regression reaching production for the length of
-# one fix is the cheaper of the two prices, and it is the same trade `gates.yml` already argues for
-# at the top of its own file. `deploy-parity` at step 6 is what actually guards this deploy.
-#
-# ONE AT A TIME, AND NEVER CANCELLED. `cancel-in-progress: true` on a deploy is a `wrangler deploy`
-# killed between uploading a version and activating it. The queue is the correct behaviour here
-# even though it is the wrong behaviour for `ci`.
-
-# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
-# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
 
@@ -32,109 +13,44 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
-# BASH ON EVERY RUNNER. A Windows self-hosted runner runs a step without a named shell in PowerShell,
-# where $BRAINDOG_BUILD is an empty PowerShell variable, and the first deploy from one shipped a
-# Worker that did not know its build.
 defaults:
   run:
     shell: bash
 
 jobs:
   deploy:
-    # `workflow_run` FIRES ON FAILURE, CANCELLATION AND TIMEOUT TOO, so the first clause is what
-    # keeps the workflow that exists to deploy green masters from deploying every master.
-    #
-    # AND THE SECOND CLAUSE IS ABOUT WHAT AN ABSENT CREDENTIAL SHOULD LOOK LIKE. Without it this
-    # job runs on every green `ci`, reaches `wrangler deploy`, and fails with "it's necessary to
-    # set a CLOUDFLARE_API_TOKEN", which it did, the first time this workflow existed. A red run
-    # on every push, for a reason nobody can act on from inside the repository, is worse than no
-    # signal: it is the failure everybody learns to scroll past, and the day a real deploy breaks
-    # it looks exactly the same. Skipped is the honest state for "not configured yet", and the day
-    # the variables are set the job starts running with no further change here.
-    #
-    # THE TEST IS ON THE VARIABLES, NOT THE SECRET, because GitHub does not expose `secrets` to a
-    # job-level `if`. `CLOUDFLARE_ACCOUNT_ID` and `DEPLOY_HOST` are set in the same sitting as the
-    # token, so they stand in for it; a token missing while both variables exist still fails at the
-    # step, loudly, which is correct.
-    #
-    # AND ONLY A PUSH TO THIS REPOSITORY'S OWN master. ci.yml also runs on `pull_request`, so a fork's pull request from
-    # a branch named master finished ci with head_branch master and matched `branches: [master]` above: without these
-    # two lines its code would be deployed with the production token.
     if: >-
-      github.event.workflow_run.conclusion == 'success'
-      && github.event.workflow_run.head_repository.full_name == github.repository
-      && github.event.workflow_run.event == 'push'
+      github.ref == 'refs/heads/master'
+      && github.repository == 'actuallyhoss/BrainDog'
       && vars.CLOUDFLARE_ACCOUNT_ID != ''
       && vars.DEPLOY_HOST != ''
+    environment:
+      name: production
+      url: https://app.brain.dog
 
-    # THE ENVIRONMENT IS WHERE THE TOKEN LIVES, and naming it here is what scopes the secret to
-    # this job rather than to the repository. It is also the place a required reviewer goes if this
-    # ever needs to stop being automatic.
-    environment: production
-
-    # Pinned for the reason `ci.yml` gives: `ubuntu-latest` rolls silently, and a deploy is the
-    # worst place to learn that the image changed.
-    # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
-    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
-    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
-      # AT THE COMMIT `ci` MEASURED, not at the head of master. Between `ci` starting and this
-      # running, master may have moved; deploying the head would ship a commit nothing has checked
-      # and attribute the result to the one that was.
-      #
-      # WITH THE WHOLE HISTORY, BECAUSE A ROLLBACK HAS TO READ IT. After a red Parity or Smoke,
-      # `rollback.mjs` runs `git diff` between the sha that was live and this one to learn whether a
-      # migration shipped, and a checkout one commit deep holds neither the live commit nor the
-      # files at it. Without them every red deploy would hold rather than roll back.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
 
-      # THE BUILD TUPLE IS THE WHOLE POINT OF STEP 6. `33 §4` has the Worker answer this string at
-      # `/.well-known/braindog-build`, and `deploy-parity` compares it against this exact value, so
-      # the build and the check have to be given the same one: it is computed once here and read
-      # from the environment twice below rather than recomputed.
-      #
-      # THE CHECK READS IT THERE AND NOT AT `/api/version`, WHICH IS A REPAIR RATHER THAN A
-      # PREFERENCE. `/api/version` is a record route and takes a bearer; this job holds none, so the
-      # first deploy that ran end to end went red at Parity with a 401 from it. The build id is a
-      # fact about the Worker version and not about any record, so it is served where reading it
-      # opens nothing, and the record boundary stays exactly where it was.
       - name: The build id this deploy is
         run: echo "BRAINDOG_BUILD=$(date -u +%Y.%m.%d)+$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
 
       - name: Build the shell
         run: pnpm --filter ./apps/web build
 
-      # THE CLI, BUILT FROM THIS COMMIT AND SERVED BY THE SITE.
-      # `apps/cli/scripts/bundle.mjs` makes `apps/cli/dist/braindog.mjs`, its `.sha256` and its
-      # `.build` (the one line `braindog update` reads first), stamped with the `BRAINDOG_BUILD`
-      # above so `braindog --version` names the same build as the Worker, and all three are copied
-      # into the site's `static/cli/` beside `install.ps1` and `install.sh`. The site builds below
-      # carry them all to `/cli/`: production's to `brain.dog/cli/`, and alpha's, when it deploys, to
-      # the same path on alpha's own name.
-      #
-      # BEFORE ANYTHING DEPLOYS, because a CLI that does not build should stop the run with nothing
-      # live changed, rather than after the Worker, where it would leave a new app beside an old site.
-      # The two copies are untracked, and the next checkout's clean removes them; nothing commits them.
       - name: Build the CLI for the site
         run: |
           pnpm --filter braindog-cli build
           mkdir -p apps/site/static/cli
           cp apps/cli/dist/braindog.mjs apps/cli/dist/braindog.mjs.sha256 apps/cli/dist/braindog.mjs.build apps/site/static/cli/
 
-      # WHAT IS LIVE, WRITTEN DOWN BEFORE IT STOPS BEING LIVE. A rollback needs the version ids of the
-      # app and the site that served before this deploy, and the sha that app was built from, and
-      # after `wrangler deploy` none of them can be asked for any more. `rollback.mjs record`
-      # reads the two `deployments status` answers saved here and the live build id at
-      # `/.well-known/braindog-build`, and writes `APP_PREVIOUS`, `SITE_PREVIOUS` and `LIVE_SHA`
-      # into the job's environment. `continue-on-error`, because a deploy is not refused for want
-      # of a rollback: whatever it could not learn is empty, and a red run later holds instead.
       - name: Record what is live
         continue-on-error: true
         run: |
@@ -146,8 +62,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
 
-      # AND KEPT FOR `after-deploy.yml`, which runs after this job has ended and can learn what was live only from an
-      # artefact: the three names `rollback.mjs record` wrote, and nothing else.
       - name: Keep what was live for the lane
         if: always()
         continue-on-error: true
@@ -155,7 +69,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/live-before"
           printf 'APP_PREVIOUS=%s\nSITE_PREVIOUS=%s\nLIVE_SHA=%s\n' "$APP_PREVIOUS" "$SITE_PREVIOUS" "$LIVE_SHA" > "$RUNNER_TEMP/live-before/live-before.env"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         continue-on-error: true
         with:
@@ -163,39 +77,6 @@ jobs:
           path: ${{ runner.temp }}/live-before/live-before.env
           retention-days: 7
 
-      # A RESTORE POINT BEFORE A DEPLOY THAT CHANGES THE STORED FORMAT (LCH-C06). The Worker's operator door
-      # `/account/ops/restore-point` (`apps/worker/src/restore-point.ts`) walks every record somebody wrote in the last
-      # seven days. In `check` mode it opens each one with the live build and copies nothing; for real, each takes a
-      # `before-deploy-<commit>` copy through the same port its own copies go through, kept seven days. This step always
-      # asks `check`, and asks for real only when a migration file changed between the live sha `Record what is live`
-      # wrote and this commit, or when that sha is unknown, which is the case a copy is for.
-      #
-      # A COPY THAT FAILED STOPS THE DEPLOY WITH NOTHING CHANGED: `failed` above zero is a 500 from the door and a red
-      # step here. A failed `check` before the deploy is a warning and not a stop, because it measures the build that is
-      # live, and a fix for a record that build cannot open has to be able to ship.
-      #
-      # NO KEY, NO RESTORE POINT, AND RED WHEN ONE WAS NEEDED (audit 45-46, finding 1). `PROVISION_KEY` is a secret of
-      # the `production` environment, set by hand. A runner with no key used to be said "not run" and passed, on every
-      # deploy, so the one deploy a copy is for went out with none and a green tick. Now the diff is read first: a
-      # migration file changed since the live sha and the runner holds no key, and the step is red with nothing
-      # deployed. With no migration changed, or a live sha nobody could read, it is "not run" with why, and the deploy
-      # goes on. `RESTORE_POINT_NEEDED` carries the answer to `Check the records open`.
-      #
-      # A 404 FROM THE DOOR BEFORE THE DEPLOY IS "NOT RUN", NEVER RED (audit 51, finding 1). The live build answers 404
-      # when it has no such door, which is the build before the one that first ships it, or no operator key of its own.
-      # Red there stopped this job with nothing deployed, and this job is the only thing that can ship the door: the
-      # workflow runs off `ci` with no input and no way round, so the deploy would never run again. So a 404 is said
-      # plainly, as a warning when a migration changed, and the deploy goes on with no copy taken. That is the door
-      # being absent, and only that: a refused key (401), a failed copy (500) and a host that did not answer are red
-      # as before. AFTER THE DEPLOY THE SAME 404 IS RED once a migration shipped (`Check the records open` passes
-      # `after`): the build that is live then has the door, so a 404 there is a Worker with no operator key, and
-      # nothing was opened.
-      #
-      # NOBODY ASKED IS NOT A PASS. The door answers how many records it asked. A walk that asked none, on a host
-      # whose canary is named (`SMOKE_SLUG`), is red: the list of records came back empty and nothing was opened.
-      # With no canary named it is "not checked" and a warning. The answer is counts only, never a name.
-      #
-      # THE SCRIPT IS WRITTEN TO THE RUNNER ONCE and `Check the records open` asks it again after the deploy.
       - name: Take a restore point
         run: |
           cat > "$RUNNER_TEMP/restore-point.mjs" <<'JS'
@@ -280,71 +161,21 @@ jobs:
         env:
           PROVISION_KEY: ${{ secrets.PROVISION_KEY }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_SHA: ${{ github.sha }}
           RECORDS_KNOWN: ${{ vars.SMOKE_SLUG }}
 
-      # `51`'s `assets` CARRIES `apps/web/build` INTO THE WORKER VERSION, so this one command ships
-      # the shell and the code as one thing. That is what lets step 6 compare a live byte against a
-      # local one and mean it: two deploys could differ for a minute and the gate would be
-      # measuring a race.
-      #
-      # `--env production` BECAUSE `apps/worker/wrangler.jsonc` SPLITS `alpha` AND `production`.
-      # 52 §96 writes this step as a bare `wrangler deploy`, which predates that split; a bare
-      # deploy against a file with named environments does not deploy either of them.
-      # AND THE BUILD ID HAS TO BE HANDED TO `wrangler`, NOT MERELY EXPORTED. The step above puts the
-      # tuple in the environment, and the Parity step below reads it from there, so both halves of the
-      # comparison looked correct while the deployed Worker answered `null`. `wrangler` takes `vars` from
-      # `wrangler.jsonc`, where `BRAINDOG_BUILD` is declared empty on purpose, and never from the shell.
-      # So every deploy this workflow has ever made shipped a Worker that did not know its own build, and
-      # nothing could report it while the check that would have was locked out behind a 401.
       - name: Deploy
         run: pnpm --filter ./apps/worker exec wrangler deploy --env production --var BRAINDOG_BUILD:"$BRAINDOG_BUILD"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
-      # AND THEN ASK THE INTERNET WHETHER ANY OF THAT LANDED. `wrangler deploy` exits 0 while the
-      # host serves the previous version's assets; 51 §5.17 records three occasions. No
-      # `--allow-skip` here: this is the one job where the gate skipping means the deploy went
-      # unchecked, so a missing `DEPLOY_HOST` has to be red rather than quiet.
-      #
-      # `DEPLOY_HOST` IS A REPOSITORY VARIABLE, AND IT IS `app.brain.dog`, THE NAME THE APP LIVES ON
-      # (the comment at the top of `apps/worker/wrangler.jsonc`, push C). The gate asks `/app/`,
-      # `/app/_app/version.json` and the build id there, where none of the three is redirected. It must be
-      # set to `app.brain.dog` before the push that makes it `PUBLIC_HOST` deploys: on `brain.dog` the
-      # same asks are a 308 now, and this asks with `redirect: 'manual'`, so the old value turns red.
       - name: Parity
         id: parity
         run: pnpm gates -- --only deploy-parity
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
 
-      # AND THE MARKETING SITE, WHICH NOTHING HERE HAS EVER DEPLOYED. `apps/site` is the one surface
-      # that is not a property of the Worker version: `apps/worker/wrangler.jsonc` carries
-      # `apps/web/build` into the Worker, so the app under `/app` ships with the code, while
-      # `brain.dog` and `alpha.brain.dog` are a separate deployment with their own file. Once an
-      # environment's site binds the app (push 1 for alpha, push 3 for production), the two share a
-      # hostname: the site holds it as a Custom Domain, runs its script first on the app's doors and
-      # hands those requests to the app through its `APP` service binding. That script and that
-      # binding are part of the site's version, uploaded here with the same token as today and no
-      # route written, so no Zone permission is needed (read from the configs, not asked of
-      # Cloudflare; push 1 on alpha is the measurement). The binding calls whichever version of the
-      # app is live, so an app deploy is visible on `brain.dog` at once with no site deploy. This step
-      # redeploys the site on every run, whether its files changed or not, so a hand `wrangler
-      # rollback` of the site lasts only until the next run, and `git revert` is what keeps one.
-      # Until this step existed that deployment was only ever made by hand, which is why on the day it
-      # was written the apex was serving a build an hour older than the app and nobody had been told.
-      #
-      # AFTER THE PARITY CHECK RATHER THAN BEFORE IT. The Worker is the critical path and the gate
-      # above is the thing that proves it landed. If the app did not deploy, publishing a new
-      # marketing site that describes it is the wrong order, and a site failure from here costs the
-      # apex one update and nothing else.
-      #
-      # THE SITE HAS NO PARITY CHECK OF ITS OWN, and that is a debt rather than an oversight.
-      # `deploy-parity` compares the live host against `apps/web/build`, which is the Worker's asset
-      # directory and not this one, so checking the apex needs the gate to take the build directory
-      # it measures as an argument. Until it does, this step trusts `wrangler`, which `51 §5.17`
-      # records three occasions of being wrong.
       - name: Build the marketing site
         run: pnpm --filter ./apps/site build
 
@@ -354,27 +185,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
-      # AND THEN ASK WHICH WORKER ANSWERED EACH PATH, BECAUSE TWO SHARE `brain.dog` ONCE THE SITE
-      # BINDS THE APP. Parity above proves the Worker's bytes landed on one name; it does not prove
-      # the site hands every door over, and a door the site keeps looks like the site's 404 page
-      # answering `/api/boot`, a healthy response from the wrong Worker. `apps/worker/scripts/smoke.mjs`
-      # reads the names from `apps/worker/wrangler.jsonc` and the binding from
-      # `apps/site/wrangler.jsonc` rather than from `DEPLOY_HOST`, so it asks the names the deploys
-      # claimed, and what it asks follows the push. Push A asks `app.brain.dog` for the shell at
-      # `/app/`, a 401 at `/api/boot`, `/healthz`, a 308 from `/r/x` to `/app/r/x` on the same name,
-      # and a POST to an `/in/` door that is served rather than redirected; `brain.dog` is not asked,
-      # because the site does not hand it this Worker's doors yet. Once production's site binds this
-      # Worker it adds `brain.dog`'s `/slash`, `/app/`, `/api/boot` and `/healthz`, and after the
-      # flip it is the design's answers and `/healthz`.
-      #
-      # AFTER THE SITE, because `/slash` is the site's answer and asking it before the site deploys
-      # measures the previous site. It writes nothing. It asks `/healthz` on every name the app is on,
-      # and holds its `kernel` to the migration files in this checkout.
-      #
-      # AND ONE SIGNED-IN QUESTION WHEN THE OPERATOR HAS MADE A CANARY RECORD: `SMOKE_TOKEN`, a read
-      # token, and `SMOKE_SLUG`, its record, and then `boot` on that record must answer 200. It is the
-      # only question here that opens a record, so the only one that sees a migration refusing real
-      # rows. Both unset, the step says the half was skipped and asks the rest.
       - name: Smoke
         id: smoke
         run: node apps/worker/scripts/smoke.mjs production
@@ -382,21 +192,6 @@ jobs:
           SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
           SMOKE_SLUG: ${{ vars.SMOKE_SLUG }}
 
-      # AND THEN ONE SCRIPT, RUN IN THE CLOUD SANDBOX ON THE OPERATOR'S CANARY RECORD. Every question above is
-      # answered the same by a Worker with no `LOADER` binding, and such a Worker meters every script run "no sandbox"
-      # and runs nothing, so a deploy that dropped `worker_loaders` from `wrangler.jsonc` was green here while every
-      # person's scripts stopped. This asks `scriptTry` for a fixture that only logs one sentence, and goes red unless
-      # that sentence comes back: a "no sandbox" answer, a refusal or any other status all fail the deploy. A trial
-      # writes nothing to the record and is metered as one run on its plan.
-      #
-      # THE CANARY IS `OPS_RECORD`, READ FROM PRODUCTION'S VARS IN `apps/worker/wrangler.jsonc`, AND NO SECOND VARIABLE
-      # NAMES IT. Empty, the step says the smoke was skipped and passes, which is the state until the owner makes one.
-      # Set, `SMOKE_TOKEN` must be a token on that record at `propose` or above, since `scriptTry` refuses a read token;
-      # a token on any other record fails here and says so, rather than trying the script somewhere else.
-      #
-      # NO ROLLBACK FOLLOWS IT. The version before this one ran on the same config, so putting it back would not bring a
-      # sandbox back; the run goes red and the fix is the binding. It prints the CPU time the loader reported, when it
-      # reported any, which is the one witness that the tail in `apps/worker/src/script.ts` is heard on the platform.
       - name: Sandbox smoke
         run: |
           node --input-type=module <<'JS'
@@ -438,41 +233,22 @@ jobs:
           SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
 
-      # AND AFTER THE DEPLOY, EVERY RECORD IN USE OPENED ONCE WITH THE NEW BUILD (LCH-C06): the same door in `check`
-      # mode, so a build that cannot open a lived-in record turns the run red here instead of a person finding out.
-      # It copies nothing. Smoke opens one named record at most; this asks every record somebody wrote in the last
-      # seven days, the owner's among them only because he uses it. No key or no door, it says "not run" and why,
-      # unless a migration shipped (`RESTORE_POINT_NEEDED`, from the step above): then it is red, a 404 too, since
-      # the build now live has the door (`after`). So is a walk that asked nobody while the canary is named.
-      #
-      # A RED CHECK HERE IS RED AND NOT A ROLLBACK: `Decide whether to roll back` reads Parity and Smoke only.
       - name: Check the records open
         run: node "$RUNNER_TEMP/restore-point.mjs" check "Check the records open" after
         env:
           PROVISION_KEY: ${{ secrets.PROVISION_KEY }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_SHA: ${{ github.sha }}
           RECORDS_KNOWN: ${{ vars.SMOKE_SLUG }}
 
-      # A RED PARITY OR SMOKE PUTS BACK WHAT WAS LIVE, UNLESS PUTTING IT BACK WOULD BREAK MORE. Before
-      # this, a red step left the bad version serving every record. `rollback.mjs decide` reads what
-      # `Record what is live` kept and the diff from that sha to this one, and holds when a kernel
-      # migration, a Durable Object class migration or a `DIRECTORY_VERSION` change shipped, or when
-      # anything it needs is unknown: after any of those the version before cannot serve what this one
-      # wrote. Otherwise it names the app's version to put back, and the site's after a red Smoke
-      # (Parity runs before the site deploys, so after a red Parity the live site is still the old one).
-      # It prints what it decided and why. The run stays red either way, because the step that failed
-      # already made it so, and a deploy that was undone is still a deploy that did not work.
       - name: Decide whether to roll back
         id: rollback
         if: failure() && (steps.parity.outcome == 'failure' || steps.smoke.outcome == 'failure')
         run: node apps/worker/scripts/rollback.mjs decide
         env:
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_SHA: ${{ github.sha }}
           FAILED_AT: ${{ steps.smoke.outcome == 'failure' && 'smoke' || 'parity' }}
 
-      # THE COMMAND IS HERE AND THE DECISION IS NOT, so a test can hold the decision and the token
-      # stays in the one step that needs it. `--yes` because nobody is at a prompt in a runner.
       - name: Roll the app back
         if: failure() && steps.rollback.outputs.app != ''
         run: |
@@ -493,9 +269,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
-      # ALPHA, LAST, AND OFF UNTIL THE OWNER SETS `DEPLOY_ALPHA` TO `true`. Its own build in alpha's
-      # palette (`build-alpha`), after every production step, and `continue-on-error` so an alpha
-      # failure can never turn a production deploy red.
       - name: Build the alpha shell
         if: vars.DEPLOY_ALPHA == 'true'
         continue-on-error: true
@@ -526,7 +299,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
-      # THE SAME QUESTIONS ON ALPHA'S NAMES, read from its own block in `wrangler.jsonc`.
       - name: Smoke alpha
         if: vars.DEPLOY_ALPHA == 'true'
         continue-on-error: true
