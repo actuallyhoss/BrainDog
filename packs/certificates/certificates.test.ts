@@ -70,7 +70,7 @@ test('THE PACK CARRIES ITS TWO SCRIPTS AS THEIR SOURCE, byte for byte; neither f
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'certificates');
-  assert.equal(file.value.pack.manifest.version, '1.0.0');
+  assert.equal(file.value.pack.manifest.version, '1.1.0');
 });
 
 test('THE SCRIPT STEPS A PAYOUT BY THE WALK’S OWN LEG, written into its source as data', () => {
@@ -88,7 +88,7 @@ test('MONEY WALKS A CERTIFICATE TWICE: EACH PAYOUT TO ITS END, AND THE PRINCIPAL
     mine.map((l) => [l.on, l.amount, l.every === undefined ? 'once' : 'repeats']),
     [
       ['next_payout', 'payout', 'repeats'],
-      ['ends', 'principal', 'once'],
+      ['ends', 'at_maturity', 'once'],
     ],
   );
   for (const l of mine) assert.deepEqual(l.incoming, { field: 'direction', is: 'in' });
@@ -139,6 +139,18 @@ test('A CERTIFICATE ADDED WITH ONLY ITS TERMS IS WORKED OUT: when it matures, wh
   /* 106 days of 18% on EGP 100,000.00 by 15 October: 5,227.40 */
   assert.deepEqual(f.accrued, { amount: Math.round((10_000_000 * 18 * 106) / 36_500), currency: 'EGP' });
   assert.deepEqual(f.interest, { amount: 1_800_000, currency: 'EGP' });
+  assert.deepEqual(f.at_maturity, { amount: 10_000_000, currency: 'EGP' }, 'one that pays its interest out gets the principal back');
+  close();
+});
+
+test('A CERTIFICATE THAT COMPOUNDS IS WORTH ITS PRINCIPAL GROWN OVER THE TERM ON THE DAY IT MATURES', async () => {
+  const { api, sql, close } = await fresh();
+  await put(api, shipped());
+  await add(api, { term: 12, compound: true });
+  await settle(api);
+  const f = fieldsOf(sql, 1);
+  assert.equal(f.at_maturity.amount, 10_000_000 + f.interest.amount);
+  assert.ok(f.at_maturity.amount > 11_800_000, 'compounding grows past simple interest');
   close();
 });
 
@@ -180,8 +192,8 @@ test('A RECORD THAT HOLDS CERTIFICATES WALKS THEIR PAYOUTS AND THE PRINCIPAL INT
   };
   assert.equal(JSON.stringify(api.kernel.metricDecl('arriving-30d')).includes('certificates'), false, 'a record without the add-on walks a list it does not hold');
   await put(api, shipped());
-  /* A PAYOUT ON THE 20TH EVERY MONTH, AND THE PRINCIPAL BACK ON 10 NOVEMBER: both fall in the next 30 days. */
-  await add(api, { start: '2026-09-20', term: 2, ends: '2026-11-10', payout: { amount: 150_000, currency: 'EGP' }, next_payout: '2026-10-20' });
+  /* A PAYOUT ON THE 20TH EVERY MONTH, AND THE VALUE BACK ON 10 NOVEMBER: both fall in the next 30 days. */
+  await add(api, { start: '2026-09-20', term: 2, ends: '2026-11-10', at_maturity: { amount: 10_000_000, currency: 'EGP' }, payout: { amount: 150_000, currency: 'EGP' }, next_payout: '2026-10-20' });
   /* THE ADD-ON ALONE IS ENOUGH: installing it puts Money in again for the lists the record holds, quietly, with no
      update of Money to wait for. */
   const version = (): string | null => api.kernel.packStates().find((p) => p.id === 'money-core')?.version ?? null;

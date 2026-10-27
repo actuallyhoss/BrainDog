@@ -7,6 +7,9 @@
  * principal: simple unless the certificate compounds, when it is added to the principal every month. It is counted from
  * the start to today, and never past the day it matures.
  *
+ * `at_maturity` is the value the certificate has on the day it matures: the principal, grown at its rate over the whole
+ * term when it compounds. It is always written, because Cash ahead walks it as the money coming back.
+ *
  * WHAT IS WORKED OUT ONLY WHEN IT IS EMPTY, so a person's own word always wins. `ends` is the start and the term in
  * months. `payout` is one cycle's interest on a certificate that pays it out (not one that compounds). `next_payout` is
  * one cycle after the start, and never after the day it matures. Each amount is in the principal's currency.
@@ -66,6 +69,9 @@ export function levelled(fields, today) {
   if (stop !== null) {
     const whole = { amount: interestOver(principal.amount, fields.rate, (stop - start) / DAY, compound), currency: principal.currency };
     if (!same(fields.interest, whole)) out.interest = whole;
+    /* WHAT COMES BACK ON THE DAY IT MATURES: the principal, and for one that compounds the interest grown into it. */
+    const back = { amount: principal.amount + (compound ? whole.amount : 0), currency: principal.currency };
+    if (!same(fields.at_maturity, back)) out.at_maturity = back;
   }
   return out;
 }

@@ -1,10 +1,10 @@
 {
   "pack": "certificates",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icon": "landmark",
   "title": "Certificates",
   "summary": "Bank certificates and fixed deposits: the rate, what each has earned so far, when it pays next and when it matures. Its payouts and the principal coming back are walked into Cash ahead.",
-  "changes": "First version.",
+  "changes": "Shows what each certificate will be worth when it matures, and Cash ahead walks that value as the money coming back.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -151,6 +151,11 @@
           "type": "money"
         },
         {
+          "id": "at_maturity",
+          "label": "Value at maturity",
+          "type": "money"
+        },
+        {
           "id": "account",
           "label": "Pays into",
           "type": "ref",
@@ -209,7 +214,7 @@
       "writes": [
         "certificates"
       ],
-      "source": "/**\n * What each certificate has earned and when it pays: the interest so far written into `accrued`, the interest over the\n * whole term into `interest`, and whatever the row left empty and could be worked out from the rest.\n *\n * STARTED WITH A ROW'S ID when a certificate is added or its principal, rate, term, start, cadence or maturity changes;\n * started with no id, once a day, it brings every live certificate up to today. Interest is the rate a year on the\n * principal: simple unless the certificate compounds, when it is added to the principal every month. It is counted from\n * the start to today, and never past the day it matures.\n *\n * WHAT IS WORKED OUT ONLY WHEN IT IS EMPTY, so a person's own word always wins. `ends` is the start and the term in\n * months. `payout` is one cycle's interest on a certificate that pays it out (not one that compounds). `next_payout` is\n * one cycle after the start, and never after the day it matures. Each amount is in the principal's currency.\n */\nconst DAY = 86_400_000;\n\nconst dayOf = (text) => {\n  const m = typeof text === 'string' ? /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(text) : null;\n  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;\n};\n\nconst written = (ms) => new Date(ms).toISOString().slice(0, 10);\n\nconst monthsOn = (text, n) => {\n  const at = dayOf(text);\n  if (at === null) return null;\n  const d = new Date(at);\n  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n + 1, 0)).getUTCDate();\n  return written(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, Math.min(d.getUTCDate(), last)));\n};\n\nconst CYCLE = { monthly: 1, quarterly: 3, yearly: 12 };\n\n/** Interest on `principal` (minor units) over `days`, at `rate` percent a year; compounded monthly when asked. */\nexport function interestOver(principal, rate, days, compound) {\n  if (!(days > 0) || !(rate > 0)) return 0;\n  if (!compound) return Math.round((principal * rate * days) / 36_500);\n  const months = days / 30.4375;\n  return Math.round(principal * (Math.pow(1 + rate / 1200, months) - 1));\n}\n\n/** What to write onto one certificate to bring it level, as a patch; empty when it is level already. */\nexport function levelled(fields, today) {\n  const money = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';\n  const same = (a, b) => money(a) && a.amount === b.amount && a.currency === b.currency;\n  const out = {};\n  const principal = fields.principal;\n  if (!money(principal) || typeof fields.rate !== 'number') return out;\n  const start = dayOf(fields.start);\n  if (start === null) return out;\n  let ends = fields.ends;\n  if (!dayOf(ends) && typeof fields.term === 'number' && fields.term > 0) {\n    ends = monthsOn(fields.start, Math.round(fields.term));\n    out.ends = ends;\n  }\n  const compound = fields.compound === true;\n  const step = CYCLE[fields.every];\n  if (!money(fields.payout) && !compound && step) out.payout = { amount: interestOver(principal.amount, fields.rate, (step * 365) / 12, false), currency: principal.currency };\n  if (!dayOf(fields.next_payout) && step) {\n    const first = monthsOn(fields.start, step);\n    out.next_payout = dayOf(ends) !== null && dayOf(first) > dayOf(ends) ? ends : first;\n  }\n  const stop = dayOf(ends);\n  const until = Math.max(start, Math.min(dayOf(today), stop === null ? Infinity : stop));\n  const accrued = { amount: interestOver(principal.amount, fields.rate, (until - start) / DAY, compound), currency: principal.currency };\n  if (!same(fields.accrued, accrued)) out.accrued = accrued;\n  if (stop !== null) {\n    const whole = { amount: interestOver(principal.amount, fields.rate, (stop - start) / DAY, compound), currency: principal.currency };\n    if (!same(fields.interest, whole)) out.interest = whole;\n  }\n  return out;\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('certificates', { field: 'state', is: 'live' });\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  for (const row of rows) {\n    if (!row) continue;\n    const next = levelled(row.fields, today);\n    if (Object.keys(next).length === 0) continue;\n    ctx.update('certificates#' + row.seq, next, row.version);\n  }\n}\n"
+      "source": "/**\n * What each certificate has earned and when it pays: the interest so far written into `accrued`, the interest over the\n * whole term into `interest`, and whatever the row left empty and could be worked out from the rest.\n *\n * STARTED WITH A ROW'S ID when a certificate is added or its principal, rate, term, start, cadence or maturity changes;\n * started with no id, once a day, it brings every live certificate up to today. Interest is the rate a year on the\n * principal: simple unless the certificate compounds, when it is added to the principal every month. It is counted from\n * the start to today, and never past the day it matures.\n *\n * `at_maturity` is the value the certificate has on the day it matures: the principal, grown at its rate over the whole\n * term when it compounds. It is always written, because Cash ahead walks it as the money coming back.\n *\n * WHAT IS WORKED OUT ONLY WHEN IT IS EMPTY, so a person's own word always wins. `ends` is the start and the term in\n * months. `payout` is one cycle's interest on a certificate that pays it out (not one that compounds). `next_payout` is\n * one cycle after the start, and never after the day it matures. Each amount is in the principal's currency.\n */\nconst DAY = 86_400_000;\n\nconst dayOf = (text) => {\n  const m = typeof text === 'string' ? /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(text) : null;\n  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;\n};\n\nconst written = (ms) => new Date(ms).toISOString().slice(0, 10);\n\nconst monthsOn = (text, n) => {\n  const at = dayOf(text);\n  if (at === null) return null;\n  const d = new Date(at);\n  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n + 1, 0)).getUTCDate();\n  return written(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, Math.min(d.getUTCDate(), last)));\n};\n\nconst CYCLE = { monthly: 1, quarterly: 3, yearly: 12 };\n\n/** Interest on `principal` (minor units) over `days`, at `rate` percent a year; compounded monthly when asked. */\nexport function interestOver(principal, rate, days, compound) {\n  if (!(days > 0) || !(rate > 0)) return 0;\n  if (!compound) return Math.round((principal * rate * days) / 36_500);\n  const months = days / 30.4375;\n  return Math.round(principal * (Math.pow(1 + rate / 1200, months) - 1));\n}\n\n/** What to write onto one certificate to bring it level, as a patch; empty when it is level already. */\nexport function levelled(fields, today) {\n  const money = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';\n  const same = (a, b) => money(a) && a.amount === b.amount && a.currency === b.currency;\n  const out = {};\n  const principal = fields.principal;\n  if (!money(principal) || typeof fields.rate !== 'number') return out;\n  const start = dayOf(fields.start);\n  if (start === null) return out;\n  let ends = fields.ends;\n  if (!dayOf(ends) && typeof fields.term === 'number' && fields.term > 0) {\n    ends = monthsOn(fields.start, Math.round(fields.term));\n    out.ends = ends;\n  }\n  const compound = fields.compound === true;\n  const step = CYCLE[fields.every];\n  if (!money(fields.payout) && !compound && step) out.payout = { amount: interestOver(principal.amount, fields.rate, (step * 365) / 12, false), currency: principal.currency };\n  if (!dayOf(fields.next_payout) && step) {\n    const first = monthsOn(fields.start, step);\n    out.next_payout = dayOf(ends) !== null && dayOf(first) > dayOf(ends) ? ends : first;\n  }\n  const stop = dayOf(ends);\n  const until = Math.max(start, Math.min(dayOf(today), stop === null ? Infinity : stop));\n  const accrued = { amount: interestOver(principal.amount, fields.rate, (until - start) / DAY, compound), currency: principal.currency };\n  if (!same(fields.accrued, accrued)) out.accrued = accrued;\n  if (stop !== null) {\n    const whole = { amount: interestOver(principal.amount, fields.rate, (stop - start) / DAY, compound), currency: principal.currency };\n    if (!same(fields.interest, whole)) out.interest = whole;\n    /* WHAT COMES BACK ON THE DAY IT MATURES: the principal, and for one that compounds the interest grown into it. */\n    const back = { amount: principal.amount + (compound ? whole.amount : 0), currency: principal.currency };\n    if (!same(fields.at_maturity, back)) out.at_maturity = back;\n  }\n  return out;\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('certificates', { field: 'state', is: 'live' });\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  for (const row of rows) {\n    if (!row) continue;\n    const next = levelled(row.fields, today);\n    if (Object.keys(next).length === 0) continue;\n    ctx.update('certificates#' + row.seq, next, row.version);\n  }\n}\n"
     },
     {
       "rule": "certificates_payout",
@@ -319,6 +324,22 @@
       "compare": "none"
     },
     {
+      "metric": "certificates-maturity",
+      "name": "Worth at maturity",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live",
+      "value": {
+        "sum": "at_maturity"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "metric": "certificates-next-payout",
       "name": "Next payout",
       "pack": "certificates",
@@ -367,7 +388,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{certificates-count}} certificates hold {{certificates-principal}}. They have earned {{certificates-accrued}} so far, the next payout is on {{certificates-next-payout}} and the next to mature on {{certificates-next-matures}}.",
+          "body": "{{certificates-count}} certificates hold {{certificates-principal}}. They have earned {{certificates-accrued}} so far and will be worth {{certificates-maturity}} when they mature, the next payout is on {{certificates-next-payout}} and the next to mature on {{certificates-next-matures}}.",
           "when": {
             "metric": "certificates-count",
             "gt": 0
@@ -400,6 +421,10 @@
             {
               "metric": "certificates-interest",
               "label": "Interest over the terms"
+            },
+            {
+              "metric": "certificates-maturity",
+              "label": "Worth at maturity"
             },
             {
               "metric": "certificates-next-payout",
@@ -455,6 +480,12 @@
             {
               "field": "ends",
               "width": "13ch"
+            },
+            {
+              "field": "at_maturity",
+              "label": "Worth at maturity",
+              "width": "16ch",
+              "align": "end"
             }
           ],
           "order": [
@@ -518,6 +549,12 @@
             {
               "field": "ends",
               "width": "13ch"
+            },
+            {
+              "field": "at_maturity",
+              "label": "Worth at maturity",
+              "width": "16ch",
+              "align": "end"
             }
           ],
           "order": [

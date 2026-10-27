@@ -104,10 +104,10 @@ const DATED: Leg[] = [
     ends: 'ends',
   },
   {
-    /* AND THE PRINCIPAL COMING BACK, once, on the day it matures. No `every`: the row has one maturity day. */
+    /* AND THE VALUE COMING BACK (the principal, grown when it compounds), once, on the day it matures. No `every`: the row has one maturity day. */
     register: 'certificates',
     on: 'ends',
-    amount: 'principal',
+    amount: 'at_maturity',
     where: 'state is live, ends is set',
     incoming: { field: 'direction', is: 'in' },
   },
