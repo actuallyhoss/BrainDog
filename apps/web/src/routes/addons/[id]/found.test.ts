@@ -43,7 +43,7 @@ test('A PRIVATE ADD-ON IS FOUND FROM THE SHIPPED CATALOGUE, offered by link only
 
 test('BRAINDOG’S OWN PARTS ARE PART OF BRAINDOG, and a starter is found by its pack id', () => {
   const core = foundListing({ kennel: null, shipped: null, counts: null, id: CORE_PARTS[0]!, kind: 'module' });
-  assert.equal(core?.tier, 'core');
+  assert.equal(core?.tier, 'builtin');
   const found = foundListing({ kennel: null, shipped: null, counts: null, id: `usecase-${starter}`, kind: null });
   assert.equal(found?.listing.kind, 'usecase');
   assert.equal(found?.listing.id, starter);

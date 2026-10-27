@@ -10,6 +10,7 @@
  * `.svelte.ts` file, so the state and the reading of a refusal live here and the screen only assigns.
  */
 
+import { CORE_PACK } from '@braindog/declare';
 import { exponentOf } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -178,7 +179,7 @@ export async function moduleUpdates(states: readonly PackState[]): Promise<{ id:
   return states.flatMap((s) => {
     const to = shipped.get(s.id);
     /* CORE IS PART OF BRAINDOG, not an add-on: it is kept current by the night and never offered as an update. */
-    return s.id !== 'core' && to !== undefined && s.version !== null && s.disabled_at === null && compareVersions(s.version, to) < 0 ? [{ id: s.id, from: s.version, to }] : [];
+    return s.id !== CORE_PACK && to !== undefined && s.version !== null && s.disabled_at === null && compareVersions(s.version, to) < 0 ? [{ id: s.id, from: s.version, to }] : [];
   });
 }
 

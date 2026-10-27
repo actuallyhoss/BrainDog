@@ -89,6 +89,12 @@ export type ModuleId = (typeof MODULES)[number];
  * turn off.
  */
 export const CORE = ['portfolio', 'people', 'work', 'agents'] as const satisfies readonly ModuleId[];
+/**
+ * THE FIRST-PARTY PACK THAT HOLDS BRAINDOG'S OWN PAGES: every record installs it, and no list of add-ons offers, counts or
+ * updates it. Its id is said here once, so a screen that has to leave it out names this and not a word of its own.
+ */
+export const CORE_PACK = 'core';
+
 /** Whether a pack id is one of the core parts (`CORE`). */
 export const isCore = (id: string): boolean => (CORE as readonly string[]).includes(id);
 

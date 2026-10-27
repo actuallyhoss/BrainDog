@@ -44,7 +44,7 @@
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { handsOf, holderFirst, inOrder, marked, orderWords } from '$lib/market/update-order.ts';
   import { words as market } from '$lib/market/words.ts';
-  import { isCore, speakingPack } from '@braindog/declare';
+  import { CORE_PACK, isCore, speakingPack } from '@braindog/declare';
   import { baseTurnedOn } from '$lib/market/shelves.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -585,7 +585,7 @@
   const starter = $derived(starterId === null ? null : (listed.find((l) => l.installedId === starterId) ?? null));
   const coreHeld = $derived(installed.filter((s) => isCore(s.id)));
   /* THE PAGES BRAINDOG KEEPS FOR EVERY RECORD (`core`) ARE NO ADD-ON'S: not a row, and not named in the folded line. */
-  const addons = $derived(installed.filter((s) => !isCore(s.id) && s.id !== 'core' && s.id !== starterId));
+  const addons = $derived(installed.filter((s) => !isCore(s.id) && s.id !== CORE_PACK && s.id !== starterId));
   /** Why an update waits, in one line: what its version says it changes, or that one is there. */
   const reasonOf = (u: { id: string; kind: ListingKind; to: string; entry: CatalogueEntry | null }): string => {
     const l = listed.find((x) => x.installedId === u.id || (x.kind === u.kind && x.id === u.id));

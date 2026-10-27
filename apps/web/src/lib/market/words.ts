@@ -45,7 +45,7 @@ export const words = {
     madeBy: 'Made by',
     author: 'Author',
     listedAt: 'Offered',
-    tiers: { core: 'Part of BrainDog', store: 'In the store', unlisted: 'By its name only', link: 'By link only' },
+    tiers: { builtin: 'Part of BrainDog', store: 'In the store', unlisted: 'By its name only', link: 'By link only' },
     onHere: 'On this record',
     partOf: 'Part of BrainDog',
     on: (version: string): string => `On · ${version}`,

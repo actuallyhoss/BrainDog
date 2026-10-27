@@ -21,7 +21,7 @@
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screen only calls it.
  */
 
-import { MODULE_WORDS } from '@braindog/declare';
+import { CORE_PACK, MODULE_WORDS } from '@braindog/declare';
 import { AGENTS_PACK } from '@braindog/seed/packs';
 import { moduleOfList } from '@braindog/seed/packs/modules';
 import { alongside, listsOf as caseLists, modulesFor, payDayRow, useCase, USE_CASES, type UseCase } from '@braindog/seed/usecases';
@@ -197,7 +197,7 @@ function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean,
   /* AND MONEY SAID IS MONEY KEPT, whoever claims the word (the audit of 22 October, U-C2): "we send invoices in naira"
      made an agency's record whose use case keeps hours and no money, and Money was nowhere on its first Today. A part
      that keeps money and that the words pointed at comes when nothing the use cases bring keeps money. */
-  const chosen = u ? [...modulesFor(u, heard).filter((id) => id !== 'core'), ...beside.flatMap((b) => b.modules)] : heard;
+  const chosen = u ? [...modulesFor(u, heard).filter((id) => id !== CORE_PACK), ...beside.flatMap((b) => b.modules)] : heard;
   const money = read.packs.find((p) => p.why.length > 0 && keepsMoney(p.id) && !chosen.includes(p.id));
   const keeps = chosen.some((id) => keepsMoney(id));
   /* A CATALOGUE PACK THE SENTENCE ASKED FOR IS KEPT beside the use case's modules, since `modulesFor` keeps any pack. */
@@ -1035,7 +1035,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
      the words are the brief Slash drafts from (`outsideCatalogue`), as before there was a model. */
   if (u === null && asked.length === 0 && (reply.draft ?? '').trim() === '') return { ...rules, fell: 'PROPOSAL_EMPTY' };
   const named = name !== null && !asked.includes(PEOPLE) ? [...asked, PEOPLE] : asked;
-  const modules = closeOver(u ? [...modulesFor(u, named).filter((id) => id !== 'core'), ...beside.flatMap((b) => b.modules)] : named, offers);
+  const modules = closeOver(u ? [...modulesFor(u, named).filter((id) => id !== CORE_PACK), ...beside.flatMap((b) => b.modules)] : named, offers);
 
   /* THE RULES' CURRENCY WAS TYPED where it is not the device's; the device's is weighed again over the model's modules. */
   const ruled = rules.currencyBy === 'device' ? null : rules.currency;

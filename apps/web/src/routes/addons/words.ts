@@ -5,6 +5,7 @@
  *
  * PLAIN NODE LOADS THIS FILE, because `sharing.ts` reads it and a test reads `sharing.ts`.
  */
+import { CORE_PACK } from '@braindog/declare';
 
 /** "a", "a and b", "a, b and c". */
 const joined = (parts: readonly string[]): string =>
@@ -17,7 +18,7 @@ const counted = (n: number, one: string, many: string): string => `${n.toLocaleS
  * are already in your BrainDog", counting only the installed ones the catalogue lists, while Installed said "9 add-ons
  * installed" over every one the record holds. Both say the record's own list. `null` until the record answers.
  */
-export const installedCount = (states: readonly unknown[] | null): number | null => (states === null ? null : states.filter((s) => (s as { id?: unknown }).id !== 'core').length);
+export const installedCount = (states: readonly unknown[] | null): number | null => (states === null ? null : states.filter((s) => (s as { id?: unknown }).id !== CORE_PACK).length);
 
 export const words = {
   tabsLabel: 'Add-ons',

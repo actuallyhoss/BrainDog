@@ -13,10 +13,10 @@ import { compareVersion, latestOf, listingKey, listingsOf, unlistedListing, type
 import type { PackState } from '../../../lib/record/packs.ts';
 
 /**
- * Where an add-on is offered: `core` is part of BrainDog and never an add-on to choose, `store` is listed, `unlisted`
+ * Where an add-on is offered: `builtin` is part of BrainDog and never an add-on to choose, `store` is listed, `unlisted`
  * installs by its id and is in no listing, and `link` is private, installed by its link alone.
  */
-export type Tier = 'core' | 'store' | 'unlisted' | 'link';
+export type Tier = 'builtin' | 'store' | 'unlisted' | 'link';
 
 export const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
 
@@ -48,7 +48,7 @@ export function foundListing(input: {
   if (!shipped) return null;
   const entry = [input.kennel, input.shipped].flatMap((i) => i?.entries ?? []).find((e) => e.kind === shipped.kind && e.id === shipped.id);
   const tier: Tier =
-    shipped.kind === 'module' && (CORE as readonly string[]).includes(shipped.id) ? 'core' : entry?.private === true ? 'link' : listed === undefined && shipped.source !== 'bundled' ? 'unlisted' : 'store';
+    shipped.kind === 'module' && (CORE as readonly string[]).includes(shipped.id) ? 'builtin' : entry?.private === true ? 'link' : listed === undefined && shipped.source !== 'bundled' ? 'unlisted' : 'store';
   return { listing: shipped, tier, shippedOnly: hosted === null };
 }
 

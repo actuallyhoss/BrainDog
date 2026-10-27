@@ -55,7 +55,7 @@ export { LARGE_SOURCE_BYTES, SHOWN_LINES, changedLines, scriptSources, type Chan
 export { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { takesHold, takesHoldAll, type TakesHold } from './takes-hold.ts';
 export { CARDS_FOLD, CARDS_FOLD_MOST, cardsFault } from './cards.ts';
-export { AUDIENCES, CORE, isCore, MODULE_SHELVES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, MODULE_WORDS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, overHidden, overSettings, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, wordsOf, type AddonWords, type Audience, type ExampleLink, type ListWords, type ModuleId, type Over, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
+export { AUDIENCES, CORE, CORE_PACK, isCore, MODULE_SHELVES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, MODULE_WORDS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, overHidden, overSettings, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, wordsOf, type AddonWords, type Audience, type ExampleLink, type ListWords, type ModuleId, type Over, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 

@@ -21,7 +21,7 @@
  */
 
 import { isNoSuchCall, type createClient, type SetupAnswer, type SetupBody } from '@braindog/client';
-import type { Diff } from '@braindog/declare';
+import { CORE_PACK, type Diff } from '@braindog/declare';
 import { losses } from '@braindog/seed/packs/quiet';
 import { listsOf as caseLists, modulesFor, useCase, type UseCase } from '@braindog/seed/usecases';
 import { moduleName } from '@braindog/seed/usecases/names';
@@ -155,7 +155,7 @@ const fixOf = (r: Wire<unknown>, otherwise: string): string => (!r.ok && 'refusa
  * THE MODULES A USE CASE IS INSTALLED WITH: core first, which every record holds, then every one it stands on, and the ones the person kept beside them, in the
  * order each list a later one points at comes first (`modulesFor`).
  */
-export const withNeeds = (u: UseCase | null, kept: readonly string[]): string[] => (u ? modulesFor(u, kept) : ['core', ...kept.filter((id) => id !== 'core')]);
+export const withNeeds = (u: UseCase | null, kept: readonly string[]): string[] => (u ? modulesFor(u, kept) : [CORE_PACK, ...kept.filter((id) => id !== CORE_PACK)]);
 
 /**
  * THE USE CASE AS A SHARED FILE, WITH NOTHING IN IT BUT WHAT THE PERSON ASKED FOR.
