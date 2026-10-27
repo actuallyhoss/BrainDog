@@ -211,5 +211,17 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
     /* THE PROMISE THIS PAYMENT DISCHARGED. Reconcile is this field and nothing else. */
     { id: 'settles', label: 'Settles', type: 'ref', to: 'obligations', index: true },
     { id: 'note', type: 'text' },
+    /**
+     * ONE PAYMENT OVER SEVERAL CATEGORIES, SINCE money-core 3.29.0: a shop run that was groceries and a gift, each part
+     * `{ category, amount, note }`. The parts add up to the amount, in its currency, and a write that says otherwise is
+     * refused with what to move (`parts_of`, the kernel's `row-parts.ts`). Every figure that adds up `amount` reads a
+     * split entry as its parts, so spending by category counts each part under its own category and every total stays
+     * the entry's. A LIST OF ENTRIES STILL SHOWS ONE ROW, and a filter on `category` reads the entry's own.
+     *
+     * A JSON FIELD AND NOT A LIST OF ITS OWN: a list would ask the figures to join two lists, which they never do, and
+     * the parts are written in one go, so they can be checked against the amount at once. Not indexed, since this
+     * list's eight are spent and nothing filters on it but `is empty`.
+     */
+    { id: 'parts', label: 'Split', type: 'json', parts_of: 'amount' },
   ],
 };

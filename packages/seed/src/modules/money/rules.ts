@@ -111,7 +111,7 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     rule: 'txn-categorise',
     pack: 'money-core',
     register: 'transactions',
-    when: 'state is cleared, transfer is false, category is empty',
+    when: 'state is cleared, transfer is false, category is empty, parts is empty',
     then: [
       { link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}', where: NAMED } } },
       filedBy('description', '{{what}}'),

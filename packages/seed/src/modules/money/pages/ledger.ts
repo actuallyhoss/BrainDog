@@ -51,7 +51,7 @@ export const SHOW_FILTER = {
   field: 'show',
   control: 'chips',
   options: [
-    { value: 'unfiled', label: 'Not filed yet', where: 'category is empty, transfer is false' },
+    { value: 'unfiled', label: 'Not filed yet', where: 'category is empty, parts is empty, transfer is false' },
     { value: 'moves', label: 'Between your accounts', where: 'transfer is true' },
     { value: 'in', label: 'Money in', where: 'direction is in, transfer is false' },
     { value: 'out', label: 'Money out', where: 'direction is out, transfer is false' },
@@ -118,7 +118,7 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       icon: 'inbox',
       span: 12,
       source: 'register.transactions',
-      where: 'state is not void, transfer is false, category is empty',
+      where: 'state is not void, transfer is false, category is empty, parts is empty',
       columns: LEDGER_LINE_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: 50,

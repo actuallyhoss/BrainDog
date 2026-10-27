@@ -9,7 +9,7 @@ const BUDGETED = 'state is live, direction is out, budget is set';
  * THIS MONTH'S MONEY OUT WITH NO CATEGORY, as the Ledger lists it: the entries `unfiled-spent-month` adds up
  * (`figures/budgets2.ts`), so the link opens the money the line names and nothing else.
  */
-const FILE_THEM = '/r/transactions?f=category:empty&f=direction:is:out&f=transfer:is:false&f=state:is:cleared&f=on:gte:bom';
+const FILE_THEM = '/r/transactions?f=category:empty&f=parts:empty&f=direction:is:out&f=transfer:is:false&f=state:is:cleared&f=on:gte:bom';
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: what each category may spend a month, and how this month is going.

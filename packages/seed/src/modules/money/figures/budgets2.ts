@@ -72,7 +72,7 @@ export const BUDGET_PAGE_FIGURES: Record<string, SeedMetric> = {
     metric: 'unfiled-month',
     name: 'Entries this month with no category',
     source: 'register.transactions',
-    where: `${LEDGER_OUT}, category is empty, on at least bom`,
+    where: `${LEDGER_OUT}, category is empty, parts is empty, on at least bom`,
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },

@@ -4,7 +4,7 @@
  * WHAT NOBODY HAS FILED, SAID ONCE: the sentence the count `txn-uncategorised` counts by (`figures/spending.ts`), so the
  * bar over those entries and the condition it is drawn on read the same entries, less the money that came in.
  */
-const UNFILED = 'state is cleared, transfer is false, category is empty, on after -91d';
+const UNFILED = 'state is cleared, transfer is false, category is empty, parts is empty, on after -91d';
 
 /**
  * ONLY WHAT WENT OUT, as the split above it and the heading over both: the count holds money that came in too, and a

@@ -984,6 +984,11 @@ const FIGURES_29 = new Set([
 const HOME_3_28 = JSON.parse(readFileSync(new URL('./fixtures/money-home-3.28.0.json', import.meta.url), 'utf8')) as Body;
 /* AND A PLAN'S PAGE AS 3.28.0 DECLARED IT, before it was laid out as Property's: four figures, one track and every part in one list. */
 const PLAN_3_28 = JSON.parse(readFileSync(new URL('./fixtures/money-plan-3.28.0.json', import.meta.url), 'utf8')) as Body;
+const unsplit = (d: Body): Body => ({
+  ...d,
+  ...(typeof d.where === 'string' ? { where: d.where.replace(', parts is empty', '') } : {}),
+  ...(typeof d.when === 'string' ? { when: d.when.replace(', parts is empty', '') } : {}),
+});
 const withoutSection29 = (doc: Body): Body => {
   const decls = doc.declarations as Body[];
   const walked = new Set(decls.flatMap((d) => [...((d.legs as Body[] | undefined) ?? []), ...((d.blocks as Body[] | undefined) ?? []).flatMap((b) => (b.from as Body[] | undefined) ?? [])].map((l) => String(l.register))));
@@ -992,8 +997,12 @@ const withoutSection29 = (doc: Body): Body => {
     ...doc,
     declarations: decls
       .filter((d) => !SECTION_29.has(d.page as string) && !FIGURES_29.has(d.metric as string) && d.script !== 'offer_budgets' && d.script !== 'budget_watch' && d.rule !== 'budget-near' && d.rule !== 'budget-over')
+      /* AND NO ENTRY SPLIT INTO PARTS: no `parts` on the Ledger, and nothing filed is told apart from a split entry. */
+      .map((d) => (d.metric === 'txn-uncategorised' || d.rule === 'txn-categorise' ? unsplit(d) : d))
       .map((d) =>
-        d.register === 'categories' && Array.isArray(d.fields)
+        d.register === 'transactions' && Array.isArray(d.fields)
+          ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'parts') }
+          : d.register === 'categories' && Array.isArray(d.fields)
           ? { ...d, fields: (d.fields as Body[]).filter((f) => !CATEGORY_29.has(f.id as string)) }
           : d.page === 'money'
             ? { ...home, nav: d.nav }

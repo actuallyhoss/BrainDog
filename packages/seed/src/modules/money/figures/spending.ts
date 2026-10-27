@@ -66,12 +66,13 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
   },
 
   /* WHAT NOBODY HAS SAID THE PURPOSE OF. The one figure over what moved that is a job rather than a
-     fact, and the reason `txn-categorise` is worth declaring: it is what is left after the rule ran. */
+     fact, and the reason `txn-categorise` is worth declaring: it is what is left after the rule ran. An entry split
+     into parts is filed by its parts (`parts`, `lists/transactions.ts`), so it is not one of them. */
   'txn-uncategorised': {
     metric: 'txn-uncategorised',
     name: 'Without a category',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, category is empty, on after -91d',
+    where: 'state is cleared, transfer is false, category is empty, parts is empty, on after -91d',
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },
@@ -100,6 +101,8 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
  */
 const LEDGER_OUT = 'state is cleared, transfer is false, direction is out';
 
+/* AN ENTRY SPLIT INTO PARTS IS READ AS ITS PARTS by every figure here, since each adds up `amount` and nothing else: each
+   part under its own category, and every total the entry's (`parts`, `lists/transactions.ts`). */
 export const SPEND_VS_LAST_FIGURES: Record<string, SeedMetric> = {
   'spent-last-month': {
     metric: 'spent-last-month',

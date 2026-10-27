@@ -2097,7 +2097,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'd0a54b82ff5bdaa6',
+    declares: 'd2c62503b2757e55',
     history: [
       'Money 3.29.0: Money is a section, with `page.money-accounts`, `page.money-ledger`, `page.money-budgets`, `page.money-coming`, `page.money-forecast`, `page.money-reports` and `page.money-payees` under it, each its line alone, and `register.categories` gains `icon`, `colour`, `budget_alert`, `rollover` and `parent` -> cd223ca9d727a38b',
       'Money 3.29.0, the rest of the section: the home leads with one hero and Coming up, the pages are filled, `script.offer_budgets` offers budgets from last month, and `metric.payees-paid-90d`, `metric.account-now` and the other figures the pages read come with it, and Coming up and Forecast draw each list the whole row -> c39958b1099af6a1',
@@ -2106,6 +2106,8 @@ const DECLARED: Record<string, Version> = {
       'Money 3.29.0, a plan\'s page laid out as Property\'s: where it stands with what is late, one track with the next part under it as Money\'s Instalments tile draws it (five figures of one plan by plan, `metric.plan-parts-paid-by-plan` to `metric.plan-after-next-by-plan`), what was paid in all by each quarter (`metric.plan-paid-by-quarter`, a running line), the next six parts to tick and the parts paid, the rest folded; `metric.plan-late` and `metric.plan-parts-cancelled` added -> cba568698b10ef25',
       'Money 3.29.0, warnings and health: `script.budget_watch` marks a category near or over its budget each month and `rule.budget-near` and `rule.budget-over` say so once, `register.categories` gains `budget_warned` and `warned_month`, and `metric.cash-foreign-share` says how much of Cash now is in other currencies -> c1744441b38109d0',
       'Money 3.29.0, the plan page and the warnings together: `metric.cash-foreign-share` now sits before the plan page figures -> d0a54b82ff5bdaa6',
+      'Money 3.29.0, splits: `register.transactions` gains `parts`, one entry split across categories, and what is not filed yet leaves a split entry out -> 56aa38c98745be9d',
+      'Money 3.29.0, splits beside the plan page and the warnings: `register.transactions` keeps `parts` -> d2c62503b2757e55',
     ],
   },
   'work@1.17.0': {
