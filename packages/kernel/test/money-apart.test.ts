@@ -43,7 +43,7 @@ const FX = {
   },
 } as unknown as Declaration;
 const CASH = { metric: 'cash', name: 'Cash', source: 'register.accounts', value: { sum: 'balance' }, format: 'money', target: { gte: 0 }, window: '30d', compare: 'none' };
-const LINE = 'Cash is {{cash.apart}}, about {{cash.converted}} at {{cash.rate_on}}, and {{cash}} in all.';
+const LINE = 'Cash is {{cash.apart}}, about {{cash.converted}} at {{cash.rate_on}}, {{cash.rate_age}}, and {{cash}} in all.';
 const PAGE = { id: 'page.desk', kind: 'page', body: { page: 'desk', title: 'Desk', blocks: [{ kind: 'note', body: LINE }] } } as unknown as Declaration;
 
 async function record(accounts: { name: string; balance: { amount: number; currency: string } }[]): Promise<{ k: Kernel; sql: NodeSql }> {
@@ -78,6 +78,8 @@ test('POUNDS AND DOLLARS ARE SAID APART, then about what they come to at the rat
   assert.deepEqual(values.cash, { amount: 54_502_525, currency: 'EGP' });
   assert.deepEqual(values['cash.converted'], { amount: 54_502_500, currency: 'EGP' });
   assert.equal(values['cash.rate_on'], '2026-09-28');
+  /* AND HOW OLD IT IS, in words, from the day the clock stands on. */
+  assert.match(String(values['cash.rate_age']), /^\d+ days old$/u);
   /* AND THE RATE ITSELF TRAVELS BESIDE THE FIGURE, so a page can say "$1 = EGP 50.50" under it. */
   const read = k.metric(CASH as never);
   assert.ok(read.ok);
@@ -94,7 +96,7 @@ test('ONE CURRENCY IS SAID AS ONE AMOUNT: apart is that amount, with nothing con
   assert.deepEqual(values.cash, { amount: 4_050_000, currency: 'EGP' });
   /* APART IS THE ONE AMOUNT, so a line that opens on it reads as it did. */
   assert.deepEqual(values['cash.apart'], { amount: 4_050_000, currency: 'EGP' });
-  for (const part of ['cash.converted', 'cash.rate_on']) assert.equal(values[part], undefined, `${part} is said of one currency`);
+  for (const part of ['cash.converted', 'cash.rate_on', 'cash.rate_age']) assert.equal(values[part], undefined, `${part} is said of one currency`);
   sql.close();
 });
 

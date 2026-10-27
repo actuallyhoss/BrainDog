@@ -5776,12 +5776,12 @@ const ROW_PARTS = ['first', 'names', 'more', 'since'] as const;
 type RowPart = (typeof ROW_PARTS)[number];
 
 /** The parts of a money figure a sentence may name: each currency apart, the sum converted, the rates' day, its parts held. */
-const CONVERTED_PARTS = ['apart', 'converted', 'rate_on', 'groups'] as const;
+const CONVERTED_PARTS = ['apart', 'converted', 'rate_on', 'rate_age', 'groups'] as const;
 type ConvertedPart = (typeof CONVERTED_PARTS)[number];
 
 /**
  * `{{cash-now.apart}}`: a money figure in each currency it holds, never converted, then `{{cash-now.converted}}` the one
- * amount those come to in the home currency, to whole units, and `{{cash-now.rate_on}}` the day of the rates it took.
+ * amount those come to in the home currency, to whole units, and `{{cash-now.rate_on}}` the day of the rates it took and `{{cash-now.rate_age}}` how old they are.
  *
  * - `apart` IS ALWAYS SAID, one amount where there is one currency, so a line can open on it on any record.
  * - `converted` AND `rate_on` ARE SAID ONLY WHERE THE FIGURE WAS CONVERTED FROM ANOTHER CURRENCY, so a record that keeps
@@ -5807,6 +5807,12 @@ function convertedValue(deps: PageDeps, decl: MetricDecl, part: ConvertedPart): 
   const read = deps.read(decl);
   if (!read.ok || read.value.value === null || read.value.unit === null || !read.value.fx?.asOf) return undefined;
   if (part === 'rate_on') return read.value.fx.asOf;
+  /* `rate_age` IS HOW OLD THOSE RATES ARE, in words: "under a day old", "1 day old", "29 days old". */
+  if (part === 'rate_age') {
+    const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
+    const days = Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${read.value.fx.asOf}T00:00:00Z`)) / 86_400_000));
+    return days === 0 ? 'under a day old' : days === 1 ? '1 day old' : `${days} days old`;
+  }
   const unit = 10 ** exponentOf(read.value.unit);
   return { amount: Math.round(read.value.value / unit) * unit, currency: read.value.unit };
 }

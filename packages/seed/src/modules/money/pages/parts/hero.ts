@@ -4,10 +4,10 @@ import { LASTS_SAID, ON_WHAT_IS_DUE } from './runway.ts';
 
 /**
  * WHAT CASH NOW IS MADE OF, under the number: how far it moved in thirty days, then each currency in its own amount and
- * the day of the rate that added them up. The second sentence names the rate's day, which a record kept in one currency
- * has none of, so there it goes whole and the number is not said twice. How old the rate is stays the page's foot.
+ * the day of the rate that added them up. The second sentence names the rate's day and how old it is, with the one
+ * place the rates are kept to update; a record kept in one currency has none of it, so there it goes whole.
  */
-const CASH_NOW_SAID = "{{cash-now.moved}} on a month ago. {{cash-now.apart}} at {{cash-now.rate_on}}'s rate.";
+const CASH_NOW_SAID = "{{cash-now.moved}} on a month ago. {{cash-now.apart}} at {{cash-now.rate_on}}'s rate, {{cash-now.rate_age}} · [Update](/r/fx)";
 
 /**
  * ONE NUMBER FIRST, SINCE money-core 3.29.0. Money opened on a sentence and a chart a screen tall, with the answers in a

@@ -913,8 +913,9 @@ export function tileOf(
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
     note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), lowest, across].filter(Boolean).join(' · '),
-    /* A MISSED TARGET IS AMBER, and red only on a tile its page declared `bad`: the day the cash runs out. */
-    tone: met === null ? undefined : met ? 'good' : missed,
+    /* A MISSED TARGET IS AMBER, and red only on a tile its page declared `bad`: the day the cash runs out. AND CASH NOW
+       UNDER NOTHING, the one figure that is red wherever it is drawn: money below nought is the thing that needs the person. */
+    tone: met === null ? undefined : met ? 'good' : cell.metric === 'cash-now' && r.value < 0 ? 'bad' : missed,
     ...(door ? { href: door } : {}),
     /* AND IT SAYS SO, so a page being read leaves the tile out: "Earning £0" over projects none of which says what it
        earns is no figure at all. A page being arranged still draws it, with the sentence. */
