@@ -744,6 +744,12 @@ export function toRows(
       tone: toneOf(register, e, now),
       cells: columns.map((c) => {
         if (c.field === 'seq') return `#${e.seq}`;
+        /* A CHIP COLUMN IS THE ROW'S CATEGORY MARK in words, its icon and colour, read from the row the link points at. */
+        if (c.as === 'chip') {
+          const to = decl(register, c.field)?.to;
+          const at = e.fields[c.field];
+          return to !== undefined && at !== undefined && at !== null ? (names?.chips?.get(`${to}#${at}`) ?? null) : null;
+        }
         return cell(c.field) ?? (c.or === undefined ? null : cell(c.or));
       }),
     };

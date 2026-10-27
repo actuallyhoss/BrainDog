@@ -815,7 +815,7 @@ function projectRows(block: BlockResult, cells: number, markAt?: (i: number) => 
  * leave out.
  */
 function cardRoles(columns: readonly Column[]): CardRole[] {
-  const roles: (CardRole | undefined)[] = columns.map((c) => c.as);
+  const roles: (CardRole | undefined)[] = columns.map((c) => (c.as === 'chip' ? undefined : c.as));
   const free = (test: (c: Column) => boolean) => columns.findIndex((c, i) => roles[i] === undefined && test(c));
   if (!roles.includes('title') && !roles.includes('who')) {
     const i = free((c) => c.align !== 'end');

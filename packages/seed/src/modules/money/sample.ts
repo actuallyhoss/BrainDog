@@ -131,15 +131,15 @@ export const ACCOUNTS: Fields[] = [
  * person fixes in one tap.
  */
 export const CATEGORIES: Fields[] = [
-  { name: 'Client work', direction: 'in', state: 'live', note: 'Invoiced work, whatever it was called on the invoice.' },
-  { name: 'Licensing', direction: 'in', match: 'KILN STOREFRONT PAYOUT', state: 'live', note: '' },
-  { name: 'Contractors', direction: 'out', budget: gbp(700_000), state: 'live', note: '' },
-  { name: 'Software', direction: 'out', budget: gbp(60_000), match: 'FENWICK CLOUD', state: 'live', note: '' },
-  { name: 'Premises', direction: 'out', budget: gbp(165_000), match: 'LOWRY STREET STUDIOS', state: 'live', note: '' },
-  { name: 'Tax', direction: 'out', state: 'live', note: 'Paid from the tax reserve, which is what it is for.' },
-  { name: 'Professional fees', direction: 'out', budget: gbp(40_000), match: 'TALLYARD', state: 'live', note: '' },
-  { name: 'Production', direction: 'out', budget: gbp(90_000), state: 'live', note: '' },
-  { name: 'Travel', direction: 'out', budget: gbp(25_000), match: 'NORTHERN RAIL', state: 'live', note: '' },
+  { name: 'Client work', icon: 'briefcase', colour: 'teal', direction: 'in', state: 'live', note: 'Invoiced work, whatever it was called on the invoice.' },
+  { name: 'Licensing', icon: 'banknote', colour: 'lime', direction: 'in', match: 'KILN STOREFRONT PAYOUT', state: 'live', note: '' },
+  { name: 'Contractors', icon: 'hand-coins', colour: 'violet', direction: 'out', budget: gbp(700_000), state: 'live', note: '' },
+  { name: 'Software', icon: 'zap', colour: 'blue', direction: 'out', budget: gbp(60_000), match: 'FENWICK CLOUD', state: 'live', note: '' },
+  { name: 'Premises', icon: 'house', colour: 'pink', direction: 'out', budget: gbp(165_000), match: 'LOWRY STREET STUDIOS', state: 'live', note: '' },
+  { name: 'Tax', icon: 'landmark', colour: 'slate', direction: 'out', state: 'live', note: 'Paid from the tax reserve, which is what it is for.' },
+  { name: 'Professional fees', icon: 'scale', colour: 'sky', direction: 'out', budget: gbp(40_000), match: 'TALLYARD', state: 'live', note: '' },
+  { name: 'Production', icon: 'ticket', colour: 'yellow', direction: 'out', budget: gbp(90_000), state: 'live', note: '' },
+  { name: 'Travel', icon: 'train-front', colour: 'teal', direction: 'out', budget: gbp(25_000), match: 'NORTHERN RAIL', state: 'live', note: '' },
 ];
 
 /* ── the ledger ──────────────────────────────────────────────────────────── */

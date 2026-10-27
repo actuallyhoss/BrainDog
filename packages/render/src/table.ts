@@ -70,7 +70,7 @@ export type Column = {
    * What this column is on a card, for a `cards` block (`src/cards.ts`). A table ignores it. Absent,
    * the page's evaluator places the column the way a phone card does: text first, a figure after.
    */
-  as?: CardRole | undefined;
+  as?: CardRole | 'chip' | undefined;
 };
 
 export type TableRow = {

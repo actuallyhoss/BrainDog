@@ -39,6 +39,8 @@ export type RefMap = {
   titleOf: ReadonlyMap<number, string>;
   /** The mark and hue each row carries, for a register that declares an identity; empty for every other. */
   markOf: ReadonlyMap<number, Identity>;
+  /** A category-like row's chip, its icon and colour in words (`shopping-cart pink`), for a register that declares both. */
+  chipOf?: ReadonlyMap<number, string>;
 };
 
 /**
@@ -50,7 +52,7 @@ export type RefMap = {
  * `ids` IS THE WALK'S ROW IDS, `<register> <id>` to the number, so the local copy can draw a logged create's ref, an id
  * in the log, as the number a row holds (`local.ts` `Lands.ids`).
  */
-export type Names = ReadonlyMap<string, string> & { readonly marks?: ReadonlyMap<string, Identity>; readonly ids?: ReadonlyMap<string, number> };
+export type Names = ReadonlyMap<string, string> & { readonly chips?: ReadonlyMap<string, string>; readonly marks?: ReadonlyMap<string, Identity>; readonly ids?: ReadonlyMap<string, number> };
 
 /** A `RefMap` for each register a ref field on the asked register points at. */
 export type Refs = ReadonlyMap<string, RefMap>;
@@ -164,6 +166,8 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   const idOf = new Map<number, string>();
   const titleOf = new Map<number, string>();
   const markOf = new Map<number, Identity>();
+  const chipOf = new Map<number, string>();
+  const chips = (REGISTERS[register]?.fields ?? []).some((f) => f.id === 'icon') && (REGISTERS[register]?.fields ?? []).some((f) => f.id === 'colour');
   const title = REGISTERS[register]?.title;
   /* WHICH OF THEM ARE FINISHED, by the list's own `state:` and `done:`, for the picker to leave out (`held.ts`): never
      for the state a new row starts in, so a cleared ledger entry stays and a void one goes (`leftOut`). */
@@ -183,6 +187,10 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
     if (typeof said === 'string' && said !== '') titleOf.set(r.seq, said);
     const mark = identityOfRow(register, r.fields ?? {});
     if (mark) markOf.set(r.seq, mark);
+    if (chips) {
+      const words = [r.fields?.icon, r.fields?.colour].filter((w): w is string => typeof w === 'string' && w !== '').join(' ');
+      if (words !== '') chipOf.set(r.seq, words);
+    }
   }
   /* A ROW FOLDED INTO ANOTHER BY A MERGE IS THAT OTHER ROW wherever something still points at it (`names.ts`
      `survivorsOf`): the pointer reads as its number, so it is named, marked and opened as the row that stayed. Its own
@@ -201,7 +209,7 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   TITLES.set(register, new Map([...idOf.keys()].map((seq) => [seq, titleOf.get(seq) ?? ''])));
   FINISHED.set(register, over);
   MONEY_HELD.set(register, kept);
-  return { seqOf, idOf, titleOf, markOf };
+  return { seqOf, idOf, titleOf, markOf, ...(chipOf.size > 0 ? { chipOf } : {}) };
 }
 
 /**
@@ -216,16 +224,19 @@ export function namesOf(refs: Refs): Names {
   const out = new Map<string, string>();
   const marks = new Map<string, Identity>();
   const ids = new Map<string, number>();
+  const chips = new Map<string, string>();
   for (const [register, map] of refs) {
+    for (const [seq, words] of map.chipOf ?? []) chips.set(`${register}#${seq}`, words);
     for (const [seq, title] of map.titleOf) out.set(`${register}#${seq}`, title);
     for (const [seq, mark] of map.markOf ?? []) marks.set(`${register}#${seq}`, mark);
     for (const [id, seq] of map.seqOf) ids.set(`${register} ${id}`, seq);
   }
-  return withMarks(out, marks, ids);
+  return withMarks(out, marks, ids, chips);
 }
 
 /* NOT ENUMERABLE, so a `Names` still compares and spreads as the map of titles it always was. */
-const withMarks = (names: Map<string, string>, marks: ReadonlyMap<string, Identity>, ids?: ReadonlyMap<string, number>): Names => {
+const withMarks = (names: Map<string, string>, marks: ReadonlyMap<string, Identity>, ids?: ReadonlyMap<string, number>, chips?: ReadonlyMap<string, string>): Names => {
+  if (chips && chips.size > 0) Object.defineProperty(names, 'chips', { value: chips, enumerable: false });
   Object.defineProperty(names, 'marks', { value: marks, enumerable: false });
   if (ids) Object.defineProperty(names, 'ids', { value: ids, enumerable: false });
   return names as Names;
@@ -238,7 +249,7 @@ const withMarks = (names: Map<string, string>, marks: ReadonlyMap<string, Identi
 export function joinNames(first: Names | null | undefined, next: Names): Names {
   const out = new Map([...(first ?? []), ...next]);
   const ids = first?.ids || next.ids ? new Map([...(first?.ids ?? []), ...(next.ids ?? [])]) : undefined;
-  return withMarks(out, new Map([...(first?.marks ?? []), ...(next.marks ?? [])]), ids);
+  return withMarks(out, new Map([...(first?.marks ?? []), ...(next.marks ?? [])]), ids, new Map([...(first?.chips ?? []), ...(next.chips ?? [])]));
 }
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
