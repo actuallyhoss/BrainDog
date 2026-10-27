@@ -15281,6 +15281,37 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return out instanceof Promise ? out.then((v: unknown) => sight.maskMoney(ctx, v)) : sight.maskMoney(ctx, out);
     };
   }
+  /* AND EVERY READ THAT DRAWS ROWS, NOT ONLY get, list AND search, MARKS AN AGENT'S RUN BY WHO WROTE THEM (`readFrom`): a
+     page, a preview, Today and the log carry the same row text, so a run that read a feed's words there asks as it would
+     after a list. The rows are found by their ids anywhere in the answer, and a history line by the row it is about. */
+  const rowIdsIn = (v: unknown): string[] => {
+    const ids = new Set<string>();
+    const walk = (x: unknown, depth: number): void => {
+      if (ids.size >= 500 || depth > 12 || x === null || typeof x !== 'object') return;
+      if (Array.isArray(x)) {
+        for (const y of x) walk(y, depth + 1);
+        return;
+      }
+      for (const [k, y] of Object.entries(x as Record<string, unknown>)) {
+        if (typeof y === 'string') {
+          if (k === 'id' || k === 'entry') ids.add(y);
+          else if (k === 'target' && y.startsWith('entry:')) ids.add(y.slice('entry:'.length));
+        } else walk(y, depth + 1);
+      }
+    };
+    walk(v, 0);
+    return [...ids];
+  };
+  for (const name of ['page', 'previewPage', 'recentHistory', 'today'] as const) {
+    const method = (api as Record<string, unknown>)[name];
+    if (typeof method !== 'function') continue;
+    (api as Record<string, unknown>)[name] = async function (this: unknown, ...argv: unknown[]) {
+      const out = (await (method as (...a: unknown[]) => unknown).apply(this, argv)) as Result<unknown>;
+      const ctx = argv.find(isCtx);
+      if (ctx !== undefined && out.ok && ctx.principal.kind === 'token') readFrom(ctx, ok({ rows: rowIdsIn(out.value).map((id) => ({ id })) }));
+      return out;
+    };
+  }
   /* TODAY ASKS EACH PART AS IT IS ASKED ALONE, wrappers and all (`today.ts`). */
   todayAsks = { previewPage: api.previewPage as never, handled: api.handled as never, sharedOut: api.sharedOut as never, list: api.list as never };
   /* AND A PROJECT'S PAGE ASKS EACH PART OF ITS SHAPE THE SAME WAY (`project-shape.ts`). */
