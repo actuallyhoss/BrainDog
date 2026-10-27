@@ -96,6 +96,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
          and never left out. */
       kind: 'split',
       heading: 'Spending by category',
+      donut: true,
       icon: 'chart-pie',
       span: 12,
       source: 'register.transactions',

@@ -334,6 +334,7 @@ export type PageBlock = {
   area?: 'main' | 'rail';
   /** A `queue`'s: one tile per question, drawn with its recommended option's visual. */
   tiles?: boolean;
+  donut?: boolean;
   /** The project's rows, then the ones that apply everywhere (06 §1.1). */
   inherit?: boolean;
   /** A `feed`'s: `seen` marks the rows after the reader's read mark as new, and `first` caps the rows. */

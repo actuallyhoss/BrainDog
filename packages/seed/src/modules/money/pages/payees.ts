@@ -74,6 +74,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       /* UNDER WHICH CATEGORIES, IN THE SAME DAYS: with one payee picked, the category its money went under. */
       kind: 'split',
       heading: 'Under which category',
+      donut: true,
       icon: 'chart-pie',
       span: 12,
       source: 'register.transactions',

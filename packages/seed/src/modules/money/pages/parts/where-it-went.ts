@@ -40,6 +40,7 @@ export const WHERE_IT_WENT: Record<string, unknown>[] = [
        ONLY WHILE THIS MONTH HAS SPENDING, so a month nobody has spent in yet draws no empty track. */
     kind: 'split',
     heading: 'This month, by category',
+      donut: true,
     icon: 'chart-pie',
     span: 12,
     source: 'metric.spent-by-category-month',

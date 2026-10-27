@@ -157,6 +157,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
     {
       kind: 'split',
       heading: "Where this month's money went",
+      donut: true,
       icon: 'chart-pie',
       span: 12,
       source: 'register.transactions',

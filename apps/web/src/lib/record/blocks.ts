@@ -204,6 +204,12 @@ function barRows(block: BlockResult): string[] {
     const key = said ?? 'Nobody in particular';
     const hue = tint ? e.fields[tint] : undefined;
     if (!tints.has(key) && typeof hue === 'number' && Number.isFinite(hue)) tints.set(key, String(hue));
+    /* A SPLIT BY A LINK TO ROWS THAT WEAR A COLOUR (a category) DRAWS EACH PART IN THAT COLOUR: the last word of the chip. */
+    if (!tint && !tints.has(key) && block.kind === 'split') {
+      const to = REGISTERS[block.register ?? '']?.fields.find((f) => f.id === by)?.to;
+      const colour = to === undefined ? undefined : block.names?.chips?.get(`${to}#${String(e.fields[by])}`)?.split(' ').at(-1);
+      if (colour !== undefined && colour !== '') tints.set(key, colour);
+    }
     const list = grouped.get(key) ?? [];
     list.push(...valuesOf(e.fields[of]));
     grouped.set(key, list);
@@ -1530,6 +1536,7 @@ function formOf(block: BlockResult): string {
   if (block.kind === 'queue' && keyOf(block, 'lead') === true) return ' lead';
   if (block.kind === 'queue' && keyOf(block, 'tiles') === true) return ' tiles';
   if (block.kind === 'heat' && keyOf(block, 'who') === true) return ' who';
+  if (block.kind === 'split' && keyOf(block, 'donut') === true) return ' donut';
   return '';
 }
 
