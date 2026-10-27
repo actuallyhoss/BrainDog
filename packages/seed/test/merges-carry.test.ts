@@ -128,7 +128,7 @@ test('A RECORD HOLDING ROADMAP IS HANDED ITS PAGE BY WORK IN THE NIGHT, asks not
   assert.equal(k.packs().find((p) => p.id === 'roadmap')?.version, '2.0.0');
   assert.ok(pageIds(k).includes('page.roadmap'), 'the page went with Roadmap');
   assert.equal(ownerOf(k, 'page.roadmap'), 'work', 'Work holds the page now');
-  assert.equal((k.get('tasks#1') as { fields: { what: string } }).fields.what, 'Cut the specimen page');
+  assert.equal((k.get('tasks#1') as unknown as { fields: { what: string } }).fields.what, 'Cut the specimen page');
   assert.equal(k.count('tasks'), 2);
   sql.close();
 });

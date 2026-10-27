@@ -297,7 +297,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   assert.equal((headed('Notes') as unknown as { document?: boolean }).document, true);
   /* THE ONE READING IS COUNTED THIS WEEK, where nobody has said where it stands, and the Numbers part draws it beside the
      work (the record answers it with the page's shape, `project-shape.ts`). */
-  const stands = blocks.find((b) => b.heading === 'Where it stands' && (b as { key?: unknown }).key === 'stands-figures') as Drawn & { readings?: { label?: string; reading: { value: unknown } | null }[] };
+  const stands = blocks.find((b) => b.heading === 'Where it stands' && (b as { key?: unknown }).key === 'stands-figures') as unknown as { readings?: { label?: string; reading: { value: unknown } | null }[] };
   assert.equal(stands.readings?.find((r) => r.label === 'Numbers this week')?.reading?.value, 1, 'the one number the project reported this week');
   const rows = blocks.filter((b) => b.kind === 'project').map((b) => (b as unknown as { parts: string[] }).parts);
   assert.deepEqual(rows, [['hero', 'side'], ['numbers', 'what-is-open'], ['dates', 'who-is-on-it', 'runs-on', 'agents-here', 'decisions', 'happened']]);

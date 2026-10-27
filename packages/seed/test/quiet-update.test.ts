@@ -2029,7 +2029,7 @@ test('A RECORD ON PEOPLE 3.x UPDATES TO PEOPLE 4.0.0 AND CORE ON ITS OWN, keeps 
   /* PEOPLE AS 3.9.0 SHIPPED IT: this build's document with the four pages it still declared, under its own name, and no hand-over. */
   const core = firstPartyDocument('core', { seeds: [] })! as { declarations: Body[] };
   const people = firstPartyDocument('people', { holds: [], seeds: [] })! as Body & { declarations: Body[] };
-  const before = { ...people, version: '3.9.0', declarations: [...people.declarations, ...core.declarations.map((d) => ({ ...d, pack: 'people' }))] };
+  const before: Body = { ...people, version: '3.9.0', declarations: [...people.declarations, ...core.declarations.map((d) => ({ ...d, pack: 'people' }))] };
   delete before.hands;
   const planned = value<{ diff: { planHash: string; approve?: string[] } }>(await api.planPack({ doc: before, source: { kind: 'local' } }, owner));
   value(await api.installPack({ doc: before, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
