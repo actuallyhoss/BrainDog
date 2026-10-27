@@ -1975,7 +1975,9 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
        and gets everything handed as before. */
     /* AND TO AN INSTALLED PACK WHEN THE RECORD CAN SAY WHAT WAS HANDED (`Installed.handed`): that pack's plans then leave
        the list where it is until a version of it declares the list, so the handover no longer locks it. */
-    const inUse = installed.used === undefined || rows > 0 || installed.used.includes(decl.id);
+    /* A PAGE IS ALWAYS HANDED: it holds no rows and opens no door, and the receiver's navigation order and hides name it by
+       id, so a page that went to another pack under the same id is kept, where a retire would take it off the sidebar. */
+    const inUse = installed.used === undefined || rows > 0 || decl.kind === 'page' || installed.used.includes(decl.id);
     const takes = (to: string): boolean => installed.handed !== undefined || !installed.packs.some((p) => p.id === to);
     const to = Object.hasOwn(hands, decl.id) && inUse && takes(hands[decl.id]!) ? hands[decl.id] : undefined;
     const body = to === undefined ? null : handedBody(decl.body, to);
