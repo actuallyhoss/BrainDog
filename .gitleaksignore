@@ -1,4 +1,4 @@
-# Every gitleaks finding over the full history, checked by hand on 24 Oct 2026. Each one is a test fixture,
+# Every gitleaks finding over the full history, checked by hand on 27 Oct 2026. Each one is a test fixture,
 # a docs example key or the public VAPID key in wrangler.jsonc. A new finding is not listed, so a scan shows only it.
 014858655b8cdac696704bf655e09aaa99fdb360:apps/cli/test/sealer.test.ts:generic-api-key:38
 014858655b8cdac696704bf655e09aaa99fdb360:apps/cli/test/sealer.test.ts:generic-api-key:41
@@ -87,3 +87,6 @@ ffbba8b5dd9c84ae77bd2a504fe64cfdde18a5ec:tools/ops/stripe-setup.test.mjs:stripe-
 ffbba8b5dd9c84ae77bd2a504fe64cfdde18a5ec:tools/ops/stripe-setup.test.mjs:stripe-access-token:171
 ffbba8b5dd9c84ae77bd2a504fe64cfdde18a5ec:tools/ops/stripe-setup.test.mjs:stripe-access-token:22
 ffbba8b5dd9c84ae77bd2a504fe64cfdde18a5ec:tools/ops/stripe-setup.test.mjs:stripe-access-token:23
+1d1e3e23f46305693bbb0603358b92bee7c6d73f:packages/seed/test/agents-pack.test.ts:stripe-access-token:1184
+41159ba7afa0b19e8a15f7315d4d4d2069038e3c:packages/kernel/test/key-access.test.ts:generic-api-key:19
+e23e983972d30ab4555f4fe49ff6189f41e6edb9:apps/web/src/lib/decide/option-visual.test.ts:generic-api-key:129
