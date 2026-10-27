@@ -431,6 +431,8 @@ importers:
 
   packs/flow-check: {}
 
+  packs/goals: {}
+
   packs/harbour-look: {}
 
   packs/hello: {}
