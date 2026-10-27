@@ -200,7 +200,7 @@ const TABLE = {
   sparkline: { primitive: 'proportional', cells: 3, tone: true, minSpan: 3, purpose: 'figure' },
   /* `label | value | note | colour`: one track cut into parts, with a legend, and a `hole` row after it as
      `bar` has (`src/split.ts`). The colour is optional: a slot's name or a stored hue (`splitSlot`). */
-  split: { primitive: 'proportional', cells: 4, optional: 1, tone: true, hole: true, minSpan: 4, purpose: 'figure' },
+  split: { primitive: 'proportional', cells: 4, optional: 1, forms: ['donut'], tone: true, hole: true, minSpan: 4, purpose: 'figure' },
   /* `label | ±amount | note`: from the first row to the last, the rows between moving it
      (`src/bridge.ts`). */
   bridge: { primitive: 'proportional', cells: 3, tone: false, minSpan: 4, purpose: 'figure' },
@@ -251,7 +251,10 @@ const TABLE = {
   /* The `path` form reads the third cell as a mark, `done`, `next` or nothing, and a last row of two cells,
      `more | N`, as how many open steps the short view left out (`src/path.ts`). */
   steps: { primitive: 'list', cells: 3, forms: ['path'], tone: false, ordered: true, minSpan: 4, purpose: 'plan' },
-  timeline: { primitive: 'list', cells: 3, tone: true, minSpan: 4, purpose: 'plan' },
+  /* `day | title | amount`, and since the money pages up to three more, each optional: two parts of the quiet line under
+     the title ("Outing · Credit card") and the row's chip, a glyph and a category colour (`src/timeline.ts`). A row of
+     three cells draws as it always did. */
+  timeline: { primitive: 'list', cells: 6, optional: 3, tone: true, minSpan: 4, purpose: 'plan' },
   /* A board row is `state | title | fact | fact`, the second fact optional: the two are ONE quiet line under the
      card's title, joined by a dot, as a `todo`'s two are (`src/html.ts`, `svelte/p/Grid.svelte`). Work's board says
      the day a card is due and who holds it, and a row of three cells, or one whose fourth is blank, draws exactly

@@ -167,35 +167,35 @@
     --part: var(--chart-other);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='blue'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='blue'] {
     --part: var(--cat-blue);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='violet'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='violet'] {
     --part: var(--cat-violet);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='pink'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='pink'] {
     --part: var(--cat-pink);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='teal'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='teal'] {
     --part: var(--cat-teal);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='sky'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='sky'] {
     --part: var(--cat-sky);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='yellow'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='yellow'] {
     --part: var(--cat-yellow);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='lime'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='lime'] {
     --part: var(--cat-lime);
   }
 
-  :is(.split-seg, .split-dot)[data-slot='slate'] {
+  :is(.split-seg, .split-dot, .ring-arc)[data-slot='slate'] {
     --part: var(--cat-slate);
   }
 
@@ -237,6 +237,46 @@
   .ring-dot:not([data-step]) {
     background: none;
     box-shadow: inset 0 0 0 1px var(--rule-strong);
+  }
+
+  /* THE DONUT FORM: a thin ring beside its legend, the total in the middle. The legend keeps its rows, one under the
+     other, with the dot, the name, the figure and the share, and the ring is the same dial a `ring` draws. */
+  .split[data-form='donut'] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3) var(--sp-5);
+  }
+
+  .split[data-form='donut'] .ring-dial {
+    inline-size: 112px;
+    block-size: 112px;
+  }
+
+  .split[data-form='donut'] .ring-mark {
+    inline-size: 112px;
+    block-size: 112px;
+  }
+
+  .split[data-form='donut'] .ring-track,
+  .split[data-form='donut'] .ring-arc {
+    stroke-width: 3.2;
+  }
+
+  .split[data-form='donut'] .ring-arc {
+    stroke-opacity: 1;
+  }
+
+  .split[data-form='donut'] .ring-figure {
+    font-size: var(--fs-meta);
+    text-align: center;
+  }
+
+  .split[data-form='donut'] .split-legend {
+    display: grid;
+    flex: 1 1 14rem;
+    gap: var(--sp-2);
+    min-inline-size: 0;
   }
 
   .split-cut {

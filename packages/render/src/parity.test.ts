@@ -202,6 +202,8 @@ const SHAPES: Record<string, string> = {
     '```stat lead | Money\nCash now | GBP 12,400.00 | in 2 accounts · as of 2 Sep | 18 20 - 24 | good\nComing in | GBP 4,800.00 | 5 invoices, 2 late\nGoing out | GBP 1,300.00 | 7 bills | 3 | warn\nEvery month | EGP 900.00 |  | 1 2 3 4\n```',
   'a split with a tone, a part with no number and a hole':
     '```split | Where it goes\nPayroll | GBP 6,000.00 | 4 people\nRent | GBP 3,000.00 |  | warn\nRefunds | −£40.00\nTools | pending\nUncategorised | GBP 900.00 | 12 rows | hole\n```',
+  'a split drawn as a donut, with category colours and a late part':
+    '```split donut | Spent\nOuting | EGP 19,533.00 | 18 lines | pink\nGifts | EGP 18,413.00 | 5 lines | violet\nOwed | EGP 900.00 |  | bad\nUnfiled | EGP 200.00 | 3 lines | hole\n```',
   'a split that is all zero': '```split\nA | 0\nB | 0 | none yet\n```',
   'a split with a late part, striped': '```split | Owed\nPaid | 600\nOverdue | 300 | 3 invoices | bad\nDue soon | 100 |  | warn\n```',
   'a bridge that does not add up': '```bridge | This month\nStart | £9,000\nComing in | +£2,000 | 5 invoices\nGoing out | −£1,600\nEnd of month | £9,000\n```',
@@ -724,12 +726,46 @@ test('A STAT SAYS ITS FIGURE AS A HEADLINE in both renderers: £33,850 and EGP 4
 
 test('A TIMELINE SAYS EACH DAY ONCE where days repeat, and leaves a timeline of distinct days as it was', () => {
   const grouped = toHTML([page(SHAPES['a timeline grouped by day']!)]);
-  assert.deepEqual([...grouped.matchAll(/<li class="item-day num">([^<]*)<\/li>/gu)].map((m) => m[1]), ['1 Oct', '30 Sep']);
+  assert.deepEqual([...grouped.matchAll(/<span class="item-day-name">([^<]*)<\/span>/gu)].map((m) => m[1]), ['1 Oct', '30 Sep']);
+  /* A DAY OF TWO LINES IN ONE CURRENCY SAYS ITS NET at the heading's end, and a day of one line does not say it twice. */
+  assert.deepEqual([...grouped.matchAll(/<span class="item-day-net">([^<]*)<\/span>/gu)].map((m) => m[1]), ['+GBP 3,057.90']);
   assert.match(grouped, /<ul class="list" data-kind="timeline" data-days="">/u);
   assert.equal((grouped.match(/<span class="item-marker num"><\/span>/gu) ?? []).length, 3, 'each row leaves its own date blank');
   const plain = toHTML([page(SHAPES['a timeline whose days do not repeat']!)]);
   assert.doesNotMatch(plain, /item-day|data-days/u);
   assert.match(plain, /<span class="item-marker num">1 Oct<\/span>/u);
+});
+
+test('A LEDGER ROW WEARS ITS CHIP AND THE LINE UNDER ITS TITLE, money in is marked, and both renderers draw one tree', () => {
+  const opts = {
+    now: Date.UTC(2026, 9, 27, 12),
+    icon: (name: string) => (name === 'sun' ? 'M12 3v2' : null),
+    approx: (figure: string) => (figure.includes('USD') ? '≈ EGP 51,744' : null),
+  };
+  const ledger = page(
+    '```timeline\n26 Oct 2026 | Kerbside Deli | −EGP 291.36 | Eating out | Card | sun pink\n26 Oct 2026 | Pay | +USD 1,000.00 | Pay | Bank | moon\n25 Oct 2026 | 0110 InstaPay | −EGP 1,501.50 |  | Bank | ?\n```',
+  );
+  const html = tree(toHTML([ledger], opts));
+  assert.equal(tree(render(Hosted, { props: { block: ledger, opts } }).body), html);
+  const items = [...html.matchAll(/<li class="item"[^>]*>(.*?)<\/li>/gu)].map((m) => m[1]!);
+  assert.equal(items.length, 3);
+  assert.match(items[0]!, /^<span aria-hidden="true" class="item-chip" data-slot="pink"><svg[^>]*><path d="M12 3v2">/u, 'a glyph with art on its colour');
+  assert.match(items[0]!, /<span class="item-under">Eating out · Card<\/span>/u, 'the two parts joined by a dot');
+  assert.match(items[1]!, /^<span aria-hidden="true" class="item-chip">P<\/span>/u, 'a glyph with no art is the title\'s letter');
+  assert.match(items[1]!, /<span class="item-detail" data-sign="in">/u, 'money in is marked');
+  assert.match(items[1]!, /<span class="item-approx num">≈ EGP 51,744<\/span>/u, 'the host restates another currency');
+  assert.doesNotMatch(items[0]!, /item-approx/u, 'and not the home one');
+  assert.match(items[2]!, /^<span aria-hidden="true" class="item-chip" data-unfiled>\?<\/span>/u, 'a line nothing filed');
+  assert.match(items[2]!, /<span class="item-under">Bank<\/span>/u, 'no dot stands alone');
+  assert.match(html, /<span class="item-day-name">Mon 26 Oct<\/span>/u);
+  assert.doesNotMatch(html, /item-day-net/u, 'two currencies on one day are never one sum');
+
+  /* A LIST OF WHAT IS COMING, EACH ON A DAY OF ITS OWN, says the day in the line under the title. */
+  const coming = page('```timeline\n31 Oct 2026 | Pay | +USD 4,012.46 | in 4 days\n15 Nov 2026 | Premium | −USD 287.15 | in 19 days | | | bad\n```');
+  const said = tree(toHTML([coming], opts));
+  assert.equal(tree(render(Hosted, { props: { block: coming, opts } }).body), said);
+  assert.match(said, /<span class="item-under">31 Oct · in 4 days<\/span>/u);
+  assert.match(said, /data-intent="bad"/u, 'a tone past the six cells is still the row\'s tone');
 });
 
 test('A DAY THIS YEAR DROPS ITS YEAR AND AN AMOUNT OF NOTHING IS NOT SAID, on a timeline and on rows, in both renderers', () => {
@@ -738,7 +774,7 @@ test('A DAY THIS YEAR DROPS ITS YEAR AND AN AMOUNT OF NOTHING IS NOT SAID, on a 
   const spec = page('```spec\nAiming for | 20 Sep 2026 | \nMoved | +GBP 0.00 | 1 Jul 2026\nBalance | GBP 0.00 | \n```');
   for (const block of [due, spec]) assert.equal(tree(render(Hosted, { props: { block, opts } }).body), tree(toHTML([block], opts)));
   const timeline = tree(toHTML([due], opts));
-  assert.deepEqual([...timeline.matchAll(/<li class="item-day num">([^<]*)<\/li>/gu)].map((m) => m[1]), ['1 Jul', '28 Dec 2025']);
+  assert.deepEqual([...timeline.matchAll(/<span class="item-day-name">([^<]*)<\/span>/gu)].map((m) => m[1]), ['Wed 1 Jul', 'Sun 28 Dec 2025'], 'with its weekday');
   assert.match(timeline, /Wildcard certificate<\/span><span class="item-detail"><\/span>/u, 'not −£0');
   const rows = tree(toHTML([spec], opts));
   assert.match(rows, /<span class="row-value num">20 Sep<\/span>/u);

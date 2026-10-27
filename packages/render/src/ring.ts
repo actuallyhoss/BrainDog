@@ -71,7 +71,14 @@ const NO_RING = { ring: false, arcs: [], centre: '', left: '' } as const;
 export function ringPlan(rows: readonly RingInput[], home?: string | null): RingPlan {
   if (rows.length === 0) return { form: 'progress', ...NO_RING, arcs: [], name: '', shares: [], empty: true };
   if (rows.length === 1) return progressRing(rows[0]!, home);
+  return partsRing(rows, home);
+}
 
+/**
+ * The arcs of rows read as parts of a whole, for any number of rows: the dial of a ring of two to five, and of a `split`
+ * drawn as a donut, which may have more. The centre is their sum where they share one currency.
+ */
+export function partsRing(rows: readonly RingInput[], home?: string | null): RingPlan {
   const values = rows.map((r) => signedOf(r.value));
   const plan = splitPlan(values);
   const shares: (string | null)[] = rows.map(() => null);

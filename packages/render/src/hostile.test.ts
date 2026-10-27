@@ -276,15 +276,15 @@ test('A CHIP WHOSE WORD IS "constructor" DRAWS', () => {
  * an ordinary English word in an ordinary column, and it vanished from the page.
  */
 test('A TRAILING CELL THAT NAMES A PROTOTYPE MEMBER IS NOT A TONE', () => {
-  /* A `timeline` takes three cells and reads the fourth as a tone, so a fourth cell is the slot
-     itself being read rather than a row too short to have one. A word that is not a tone leaves the
+  /* A `timeline` takes six cells, the last three optional, and reads a cell past the six as a tone, so a seventh cell
+     is the slot itself being read rather than a row too short to have one. A word that is not a tone leaves the
      row one cell too wide, which is a DIALECT_ARITY degradation and says so on the fence. What it
      must not be is what it was: the cell taken off the row and a tone nobody wrote put in its place,
-     with the fence drawn as though the author had written three columns. */
+     with the fence drawn as though the author had written six columns. */
   for (const word of ['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty']) {
-    const [b] = parse('```timeline | Work\n3 Sep | Signed | note | ' + word + '\n```');
+    const [b] = parse('```timeline | Work\n3 Sep | Signed | note | Outing | Card | tag | ' + word + '\n```');
     assert.equal(b?.type, 'degraded', `${word} was read as a tone`);
-    assert.match((b as Degraded).fix, /4 columns where timeline takes 3/);
+    assert.match((b as Degraded).fix, /7 columns where timeline takes 6/);
     assert.ok((b as Degraded).raw.includes(word), `${word} was lost from the fence`);
   }
   /* And the four words that ARE tones are still tones, plus the four aliases the dialect forgives. */

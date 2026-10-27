@@ -9,6 +9,7 @@
   import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
   import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
+  import { partsRing } from '../src/ring.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -18,6 +19,8 @@
   const values = $derived(rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts)))));
   const plan = $derived(splitPlan(values));
   const said = (r: Row | undefined) => text(inline(r?.cells[0] ?? '', opts));
+  /* THE DONUT FORM (`split donut`): the parts as a thin ring with their total in the middle, as `html.ts` draws it. */
+  const donut = $derived(block.form === 'donut' && !plan.empty ? partsRing(rows.map((r) => ({ label: said(r), value: text(inline(r.cells[1] ?? '', opts)), third: '' })), opts.home) : null);
   const name = $derived(splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]), share: p.share }))));
   /* A late part is striped as well as red, by a pattern of its own: `$props.id()` keeps two charts on
      one page from painting from one another's (`lateId` in the mirror). */
@@ -39,9 +42,47 @@
   {/if}
 {/snippet}
 
-<div class="prop split">
+<div class="prop split" data-form={donut ? 'donut' : undefined}>
   {#if plan.empty}
     <p class="split-empty">{SPLIT_ZERO}</p>
+  {:else if donut}
+    <div class="ring-dial">
+      <svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label={donut.name}>
+        {#if late}
+          <defs
+            ><pattern class="late-hatch" id={late} patternUnits="userSpaceOnUse" width="4" height="4"
+              ><rect class="late-ground" width="4" height="4" fill="currentColor" fill-opacity="0.3"></rect><path
+                class="late-stripe"
+                d="M0 0H2L0 2ZM4 0V2L2 4H0Z"
+                fill="currentColor"
+              ></path></pattern
+            ></defs
+          >
+        {/if}
+        <circle class="ring-track" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="4" cx="18" cy="18" r="16" pathLength="100"></circle>
+        {#each donut.arcs as a}
+          {@const tone = rows[a.row]?.tone}
+          <circle
+            class="ring-arc"
+            data-step={a.step}
+            data-slot={splitSlot(rows[a.row]?.cells[3])}
+            data-intent={tone}
+            fill="none"
+            stroke="currentColor"
+            stroke-width="4"
+            style={tone === 'bad' ? `stroke:url(#${late}) var(--chart-late, currentColor)` : undefined}
+            stroke-dasharray={a.dash}
+            stroke-dashoffset={a.offset}
+            transform="rotate(-90 18 18)"
+            cx="18"
+            cy="18"
+            r="16"
+            pathLength="100"
+          ></circle>
+        {/each}
+      </svg>
+      {#if donut.centre}<span class="ring-figure num" aria-hidden="true"><Text nodes={inline(headlineFigure(donut.centre, opts.home), opts)} {opts} /></span>{/if}
+    </div>
   {:else}
     <svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}>
       {#if late}

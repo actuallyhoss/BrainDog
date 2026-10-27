@@ -35,7 +35,21 @@ import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TODO_META_JOIN, todoLines, todoMeta as metaCells, todoTitle } from './todo.ts';
-import { rowsCell, timelineCell, timelineDays, timelineDetails, timelineTitle } from './timeline.ts';
+import {
+  TIMELINE_CHIP,
+  rowsCell,
+  timelineCell,
+  timelineChip,
+  timelineDayHead,
+  timelineDays,
+  timelineDetails,
+  timelineIn,
+  timelineNets,
+  timelineRich,
+  timelineTitle,
+  timelineUnder,
+  type TimelineChip,
+} from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
@@ -74,7 +88,7 @@ import {
 } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
-import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
+import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, partsRing, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_SHARE_HEAD, HEAT_SHARE_LINE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
 import { CALENDAR_FEW, CALENDAR_NONE, CALENDAR_TODAY, CALENDAR_WEEK_NONE, WEEKDAYS, calendarMore, calendarOutside, calendarPlan, calendarSkipped, calendarStripPlan } from './calendar.ts';
 import { LANES_NONE, LANES_NOW, laneHue, laneWho, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
@@ -87,6 +101,7 @@ import { pathRest, pathShort } from './path.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 import { actionLabels } from './actions.ts';
 import { moreSaid, mostOf, type MostKeys } from './most.ts';
+import { statChange } from './hero.ts';
 
 export type RenderOptions = InlineOptions & {
   /**
@@ -94,6 +109,13 @@ export type RenderOptions = InlineOptions & {
    * a record that has none, and left out by a host that does not say, which keeps each figure as its cell wrote it.
    */
   home?: string | null;
+  /**
+   * AN AMOUNT IN ANOTHER CURRENCY, RESTATED IN THE HOME ONE AS A GUIDE: `≈ EGP 51,744` under `$1,000.00`. Handed the
+   * amount as its cell holds it (`readFigure` reads every form a cell does); the host answers the line under it, with its
+   * own `≈`, or null where the amount is already in the home currency or there is no rate to say it at. Only the host holds the rates, so a host that passes nothing
+   * draws each amount alone, as it always did. A ledger's line, a card's figure and the lead figure read it.
+   */
+  approx?: (figure: string) => string | null;
   /** The day a link opened a calendar on (`?day=`, `YYYY-MM-DD`): its cell is marked `aria-current="date"`. */
   day?: string | null;
   /** Turn a spoken id into an address. A link the host cannot resolve renders as plain text. */
@@ -234,6 +256,17 @@ const slotArt = (name: string, o: RenderOptions): string => {
   const d = glyphPath(name, o);
   return d ? glyphSvg(d) : '';
 };
+
+/**
+ * A ledger row's chip (`timelineChip`): its glyph on its category's tint where the host has art for the glyph, else the
+ * title's first letter, and a `?` on a line nothing has filed. A picture beside words that already say the row, so it is
+ * hidden from a screen reader. `List.svelte` draws the same element.
+ */
+function chipHtml(c: TimelineChip, o: RenderOptions): string {
+  const art = c.glyph ? slotArt(c.glyph, o) : '';
+  const attrs = `${c.colour ? ` data-slot="${c.colour}"` : ''}${c.unfiled ? ' data-unfiled=""' : ''}`;
+  return `<span class="item-chip"${attrs} aria-hidden="true">${art || escape(c.unfiled ? '?' : c.letter)}</span>`;
+}
 
 function renderInline(nodes: Inline[], opts: RenderOptions): string {
   return nodes
@@ -549,15 +582,22 @@ function grid(b: Block, o: RenderOptions): string {
      was a tile that said nothing, and a fourth track held its place. */
   const shown = drawnRows(b, o).map(({ row }) => row);
   const body = shown
-    .map(
-      (r) =>
-        `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1], o.home))}>${
-          /* The code quiet or the symbol in its place, as `Grid.svelte` draws it: this printed the
-             code at full size, and the two trees differed on every stat with an amount in it. A stat's
-             figure is a headline, so it is said the way `headlineFigure` says one: `£33,850`, not `£33,850.00`. */
-          r.cells[1] ? amount(r.cells[1], o) : MISSING
-        }</span>${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${cell('cell-note', r.cells[2] && symbolText(r.cells[2], true, o.home), o)}${toneGlyph(r.tone)}</div>`,
-    )
+    .map((r, i) => {
+      /* THE SAME FIGURE IN THE HOME CURRENCY, under a figure in another one, where the host can say it (`approx`). */
+      const approx = r.cells[1] && o.approx ? o.approx(r.cells[1].trim()) : null;
+      /* THE LEAD FIGURE'S CHANGE AS A CHIP in front of the rest of its note (`statChange`), on the lead figure alone. */
+      const note = r.cells[2] ? symbolText(r.cells[2], true, o.home) : '';
+      const change = b.form === 'lead' && i === 0 ? statChange(note) : null;
+      const noted = change
+        ? `<span class="cell-note"><span class="cell-change num" data-dir="${change.dir}">${escape(change.change)}</span>${change.rest ? ` ${renderInline(inline(change.rest, o), o)}` : ''}</span>`
+        : cell('cell-note', note, o);
+      return `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1], o.home))}>${
+        /* The code quiet or the symbol in its place, as `Grid.svelte` draws it: this printed the
+           code at full size, and the two trees differed on every stat with an amount in it. A stat's
+           figure is a headline, so it is said the way `headlineFigure` says one: `£33,850`, not `£33,850.00`. */
+        r.cells[1] ? amount(r.cells[1], o) : MISSING
+      }</span>${approx ? `<span class="cell-approx num">${escape(approx)}</span>` : ''}${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${noted}${toneGlyph(r.tone)}</div>`;
+    })
     .join('');
   return `<div class="grid" style="--cells:${shown.length}">${body}</div>`;
 }
@@ -691,6 +731,8 @@ function list(b: Block, o: RenderOptions): string {
   const days = b.kind === 'timeline' ? timelineDays(b.rows) : [];
   const details = b.kind === 'timeline' ? timelineDetails(b.rows, o.now, o.home) : [];
   const grouped = days.some((d) => d !== null);
+  const nets = b.kind === 'timeline' ? timelineNets(days, details) : [];
+  const rich = b.kind === 'timeline' && timelineRich(b.rows);
   const body = b.rows
     .map((r, i) => {
       /* EVERY ROW CARRIES ITS KEY (`cursor.ts`), so a host walks a page's rows with one query across its blocks. */
@@ -704,13 +746,28 @@ function list(b: Block, o: RenderOptions): string {
            (`timeline.ts`). The heading is an item of the list, so the list stays a list of its children. */
         const day = days[i] ?? null;
         /* EACH CELL AS IT IS SAID (`timelineCell`): a day this year without its year, and an amount of nothing not at all. */
-        const head = day === null ? '' : `<li class="item-day num">${renderInline(inline(timelineCell(day, o.now), o), o)}</li>`;
+        /* WITH ITS WEEKDAY, AND THE DAY'S NET AT ITS END where its lines are in one currency (`timelineNets`). */
+        const net = nets[i] ?? null;
+        const head =
+          day === null
+            ? ''
+            : `<li class="item-day num"><span class="item-day-name">${renderInline(inline(timelineDayHead(day, o.now), o), o)}</span>${net ? `<span class="item-day-net">${escape(net)}</span>` : ''}</li>`;
+        /* MONEY COMING IN IS THE ONE AMOUNT IN COLOUR (`timelineIn`); money going out stays ink. */
+        const said = details[i] ?? '';
+        const sign = timelineIn(said) ? ' data-sign="in"' : '';
+        /* THE MONEY ROW (`timelineRich`): the chip, the title, the amount, and under them the quiet line and the amount
+           restated in the home currency where the host can say it. */
+        if (rich) {
+          const title = timelineTitle(r.cells[1]);
+          const approx = said && o.approx ? o.approx((r.cells[2] ?? '').trim()) : null;
+          return `${head}<li class="item" data-rich=""${toneAttrs(r.tone)}${key}>${chipHtml(timelineChip(r.cells[TIMELINE_CHIP], plain(inline(title, o))), o)}${cell('item-title', title, o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, sign)}${cell('item-under', timelineUnder(r.cells, o.now, grouped), o)}${approx ? `<span class="item-approx num">${escape(approx)}</span>` : ''}</li>`;
+        }
         /* THE GLYPH SITS WITH THE TITLE, as `List.svelte` has drawn it since a tone five hundred pixels
            from the thing it qualifies was found to qualify nothing (13 §2.3). This drew it after the
            detail instead, so the two renderers differed on every timeline row that carried a tone, and
            no shape here was a timeline with one. */
         const marker = grouped ? '<span class="item-marker num"></span>' : cell('item-marker num', timelineCell(r.cells[0], o.now), o);
-        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', timelineTitle(r.cells[1]), o, '', toneGlyph(r.tone))}${cell('item-detail', details[i] ?? '', o)}</li>`;
+        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', timelineTitle(r.cells[1]), o, '', toneGlyph(r.tone))}${cell('item-detail', said, o, sign)}</li>`;
       }
       return `<li class="item"${key}>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })
@@ -959,9 +1016,19 @@ function split(b: Block, o: RenderOptions): string {
   /* The track is 1000 by 100 stretched to its box, so the 10 by 60 tile's stripe follows its width: about 3px apart on
      a phone's full-width track, 5px on a wide tile's. */
   const late = plan.parts.some((p) => rows[p.at]!.tone === LATE) ? lateId(b) : '';
+  /* THE DONUT FORM (`split donut`): the same parts as a thin ring with their total in the middle, each arc in its row's
+     own colour where it names one. The legend under it is the same. */
+  const donut = b.form === 'donut' && !plan.empty ? partsRing(rows.map((r) => ({ label: said(r), value: plain(inline(r.cells[1] ?? '', o)), third: '' })), o.home) : null;
   const track = plan.empty
     ? `<p class="split-empty">${escape(SPLIT_ZERO)}</p>`
-    : `<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
+    : donut
+      ? `<div class="ring-dial"><svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label="${escape(donut.name)}">${late ? latePattern(late, 4, 4) : ''}<circle class="ring-track" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="4" cx="18" cy="18" r="16" pathLength="100"></circle>${donut.arcs
+          .map(
+            (a) =>
+              `<circle class="ring-arc" data-step="${a.step}"${slotAttr(rows[a.row]!)}${toneAttrs(rows[a.row]!.tone)} fill="none" stroke="currentColor" stroke-width="4"${rows[a.row]!.tone === LATE ? ` style="${lateFill('stroke', late)}"` : ''} stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)" cx="18" cy="18" r="16" pathLength="100"></circle>`,
+          )
+          .join('')}</svg>${donut.centre ? `<span class="ring-figure num" aria-hidden="true">${renderInline(inline(headlineFigure(donut.centre, o.home), o), o)}</span>` : ''}</div>`
+      : `<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
         splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]!), share: p.share }))),
       )}">${late ? latePattern(late, 10, 60) : ''}${plan.parts
         .map(
@@ -996,7 +1063,7 @@ function split(b: Block, o: RenderOptions): string {
         all.map((r, i) => [said(r) || SPLIT_PART, plain(inline(r.cells[1] ?? '', o)) || SPLIT_NONE, (!r.hole && i < rows.length ? splitShare(plan, i, values[i]!, plain(inline(r.cells[1] ?? '', o))) : null) ?? SPLIT_NONE]),
       )
     : '';
-  return `<div class="prop split">${track}${legend}${hole}${numbers}</div>`;
+  return `<div class="prop split"${donut ? ' data-form="donut"' : ''}>${track}${legend}${hole}${numbers}</div>`;
 }
 
 /**
