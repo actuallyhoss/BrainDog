@@ -11802,7 +11802,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         out = transaction(() => {
           /* A SHARED LINK CLOSED STAYS CLOSED: its `share.close` is read before the tables go and written again after,
              wherever the file still holds the link open. A closure has no inverse, so the live one is the later truth. */
-          const closed = sql.all<Record<string, Param>>("SELECT * FROM event WHERE kind = 'share.close'");
+          const closed = sql.all<Record<string, Param>>("SELECT id, ts, actor, target, target_kind, field FROM event WHERE kind = 'share.close'");
           const stays = shapes.flatMap((t) =>
             t.where === undefined ? [] : [{ t, rows: sql.all<Record<string, Param>>(`SELECT ${t.columns.join(', ')} FROM ${t.name} WHERE NOT (${t.where})`) }],
           );
@@ -11819,8 +11819,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             const target = row.target ?? null;
             if (!sql.one("SELECT 1 AS n FROM event WHERE target = ? AND kind = 'share.open'", target)) continue;
             if (sql.one("SELECT 1 AS n FROM event WHERE target = ? AND kind = 'share.close'", target)) continue;
-            const cols = Object.keys(row);
-            sql.exec(`INSERT OR IGNORE INTO event (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, ...cols.map((c) => row[c] ?? null));
+            sql.exec(
+              "INSERT OR IGNORE INTO event (id, ts, actor, kind, target, target_kind, field) VALUES (?, ?, ?, 'share.close', ?, ?, ?)",
+              row.id ?? null,
+              row.ts ?? null,
+              row.actor ?? null,
+              target,
+              row.target_kind ?? null,
+              row.field ?? null,
+            );
           }
           return done;
         });
