@@ -12,8 +12,6 @@
 -->
 <script lang="ts">
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
-  import { at } from '$lib/at.ts';
   /* THE STYLESHEETS A DECLARED PAGE'S BLOCKS ARE DRAWN WITH, as `PageView` loads them: the sheets and the book draw the
      product's own blocks and charts, and without these a chart showed as its data table. */
   import '@braindog/skin/blocks-kinds.css';
@@ -56,12 +54,9 @@
   /* DRAWN AT ONCE: every sheet is the product's own parts, with nothing to wait for. */
   $effect(() => drew('ready'));
 
-  /* A DEVELOPER SHOWCASE, NOT THE PRODUCT: its samples ("Your plan lapsed") are made up, so a built app sends anyone who
-     reaches the address to Settings, and the page is never indexed. */
+  /* A DEVELOPER SHOWCASE, NOT THE PRODUCT: a built app is sent to Settings before this is drawn (`+page.ts`), and the
+     page is never indexed. */
   const showcase = import.meta.env.DEV;
-  $effect(() => {
-    if (!showcase) void goto(at('/settings'), { replaceState: true });
-  });
 </script>
 
 <svelte:head>
