@@ -1038,8 +1038,11 @@
 
   /* ONE HEAD FOR EVERY TILE OF ROWS (Money's tiles): the name at the left, the total or the door to the list at the right,
      and a hairline under it, so a run of tiles reads as one grammar. Only over a tile of rows, cards, a split or a bar; a
-     ledger's rows (`data-rich`) already carry theirs. */
-  :global(.block-slot:has(> .block-bar):has(> .block :is(.cards-grid, .split, .list[data-kind='timeline']:not(:has(> .item[data-rich])), .bar, .progress)) > .block-bar) {
+     ledger's rows (`data-rich`) already carry theirs (`timeline.css`). TWO SELECTORS, because a `:has` inside a `:has`
+     is no selector: written as one, the timeline's clause was dropped and Coming up stood with no hairline beside a
+     tile that had one. A bar is `.prop`; there is no `.bar`, so Spent this month and Accounts had none either. */
+  :global(.block-slot:has(> .block-bar):has(> .block :is(.cards-grid, .split, .prop)) > .block-bar),
+  :global(.block-slot:has(> .block > .list[data-kind='timeline']):not(:has(> .block > .list > .item[data-rich])) > .block-bar) {
     padding-block-end: var(--sp-3);
     margin-block-end: var(--sp-2);
     border-block-end: 1px solid var(--rule);

@@ -18,6 +18,13 @@
     gap: var(--sp-1);
   }
 
+  /* A CHART CUT BY CURRENCY HEADS EACH PART ("In EGP", "In USD") WITH A LINE OF ITS OWN, and the line under a part's
+     last row stood as close to that row as the rows to each other, so "In USD" read as one more account. */
+  .block[data-kind='bar'] + .document,
+  .block[data-kind='split'] + .document {
+    margin-block-start: var(--sp-4);
+  }
+
   /* THE TRACK IS CAPPED AT 480px AND THE FIGURE SITS RIGHT AFTER IT (the money review, F5): on a 1100px tile a 4px bar
      ran the whole width and its figure stood 700px from the name it belongs to. */
   .prop-row {
