@@ -77,7 +77,7 @@ async function money(docs: unknown[] = ['portfolio', 'people', 'money-core'].map
           const e = k.get(said);
           return e ? shaped(e) : null;
         },
-        list: async (register: string, where: unknown) => value<{ rows: Entry[] }>(k.list({ register, where: where as never })).rows.map(shaped),
+        list: async (register: string, where: unknown, options?: { order?: string } | null) => value<{ rows: Entry[] }>(k.list({ register, where: where as never, ...(options?.order === 'seq' ? { order: [{ field: 'seq', dir: 'asc' as const }] } : {}) })).rows.map(shaped),
       },
       /* `plans_from_names` makes a plan when a part is made, so the sandbox takes a new thing too. */
       write: (register: string, fields: unknown) => void writes.push({ op: 'create', register, fields }),
@@ -479,5 +479,23 @@ test('two hundred and five entries are asked two hundred at a time, and the five
   const next = r.asked('open');
   assert.equal(next.length, 1);
   assert.equal(next[0]!.body?.options?.[0]?.patches?.length, 5);
+  r.sql.close();
+});
+
+test('the night sweep asks about every entry of an account in a book, even more than fifty with their days out of row order', async () => {
+  const r = await money();
+  const b = books(r);
+  /* 120 entries on an account in no book, made on days that do not follow the order they were made in, so the Ledger's
+     own order (by day) is not row number order. */
+  const made = Array.from({ length: 120 }, (_, i) => {
+    const day = String(((i * 37) % 28) + 1).padStart(2, '0');
+    return r.made('transactions', entry(b.inNone, { on: `2026-09-${day}`, what: `Payment ${i}` }));
+  });
+  await r.turn(12);
+  value(r.k.update('accounts', b.inNone, { book: b.acme }, OWNER));
+  await r.night();
+  const open = r.asked('open');
+  assert.equal(open.length, 1, JSON.stringify(open));
+  assert.equal(open[0]!.body?.options?.[0]?.patches?.length, made.length, 'entries were skipped when the Ledger was read past fifty');
   r.sql.close();
 });

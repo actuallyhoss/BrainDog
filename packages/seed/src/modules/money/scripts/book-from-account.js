@@ -45,8 +45,8 @@ export function bookFromAccount(rows, inBook) {
  * The script. A rule hands the thing that was written as its list and number (`input.register`, `input.seq`), and a
  * person may name one (`input.row`, "transactions#12"). With neither it is the daily count and its one question.
  *
- * A SCRIPT'S LIST IS ONE PAGE OF FIFTY, so each is read a page at a time, each next page asking for numbers below the
- * lowest one read, as `plans-from-names.js` reads. ASKED BY ACCOUNT, since the account is indexed on all four lists
+ * A SCRIPT'S LIST IS ONE PAGE OF FIFTY, so each is read a page at a time, in row number order (`{ order: 'seq' }`), each next page asking for numbers
+ * above the highest one read, as `plans-from-names.js` reads. ASKED BY ACCOUNT, since the account is indexed on all four lists
  * and a Ledger of ten thousand entries in no book, on accounts in no book, is then never read at all.
  *
  * "FILE THEM" CARRIES AT MOST 200 CHANGES, the most one option may carry (the gate's `OPTION_PATCHES`). Past that the
@@ -82,12 +82,13 @@ export default async function run(ctx) {
   const held = (v) => typeof v === 'string' && v !== '';
   const every = async (list, where) => {
     const rows = [];
-    let below = null;
+    let after = null;
     for (;;) {
-      const page = await ctx.record.list(list, below === null ? where : { all: [where, { field: 'seq', lt: below }] });
+      /* IN ROW NUMBER ORDER, because a list answers in its own (the Ledger by day) and `seq` past the lowest of a page skips rows. */
+      const page = await ctx.record.list(list, after === null ? where : { all: [where, { field: 'seq', gt: after }] }, { order: 'seq' });
       for (const r of page) rows.push({ list, id: r.id, seq: r.seq, spoken: `${list}#${r.seq}`, version: r.version, fields: r.fields });
       if (page.length < PAGE) return rows;
-      below = Math.min(...page.map((r) => r.seq));
+      after = Math.max(...page.map((r) => r.seq));
     }
   };
   const nameOf = async (book) => {
