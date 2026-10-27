@@ -97,7 +97,7 @@ test('presence speaks over boot’s rows: the app, where, the last thing it did,
 test('a run is named by where it opened, says what it asked or wrote, and the runs left out are lines', () => {
   const asks = presence({ run: 'S1', project: null, doing: 'Claude Code run', app: 'Claude Code', cwd: '/Users/teo/Developer', wrote: 1, asked: 'Mark Wave 0 done?' });
   const idle = presence({ run: 'S2', project: null, doing: 'Claude run', cwd: '/Users/teo/Developer', wrote: 0 });
-  const pc = presence({ run: 'S3', project: null, doing: 'Claude run', machine: 'Sam', cwd: 'D:\\work', wrote: 0, state: 'waiting', heard_s: 9 * 3600, quiet_s: 9 * 3600 });
+  const pc = presence({ run: 'S3', project: null, doing: 'Claude run', machine: 'Teo', cwd: 'D:\\work', wrote: 0, state: 'waiting', heard_s: 9 * 3600, quiet_s: 9 * 3600 });
   const look = presence({ run: 'S4', project: null, doing: 'Claude run', wrote: 0, looks: true });
   const rows = liveRows(workingRows([], new Map(), NOW), [asks, idle, pc, look], []);
   assert.deepEqual(rows.map((x) => [x.agent, x.project, x.doing]), [['Claude Code', 'the Developer folder', 'Asked you: “Mark Wave 0 done?”']]);

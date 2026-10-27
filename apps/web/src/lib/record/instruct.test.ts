@@ -320,8 +320,8 @@ test('WHO IS OPEN NOW: the runs that did something, the ones that wrote nothing 
   const asks = run({ run: 'S10', doing: 'Claude Code run', repo: null, branch: null, wrote: 1, asked: 'Mark Wave 0 done?' });
   const idle = run({ run: 'S11', doing: 'Claude run', repo: null, branch: null, wrote: 0 });
   const waits = run({ run: 'S12', state: 'waiting', quiet_s: 20 * 60, wrote: 4 });
-  const pc = run({ run: 'S13', machine: 'Sam', cwd: 'D:\\', state: 'waiting', heard_s: 9 * 3600, quiet_s: 9 * 3600, wrote: 0 });
-  const pc2 = run({ run: 'S14', machine: 'Sam', cwd: 'D:\\', state: 'waiting', heard_s: 10 * 3600, quiet_s: 10 * 3600, wrote: 0 });
+  const pc = run({ run: 'S13', machine: 'Teo', cwd: 'D:\\', state: 'waiting', heard_s: 9 * 3600, quiet_s: 9 * 3600, wrote: 0 });
+  const pc2 = run({ run: 'S14', machine: 'Teo', cwd: 'D:\\', state: 'waiting', heard_s: 10 * 3600, quiet_s: 10 * 3600, wrote: 0 });
   const look = run({ run: 'S15', wrote: 0, looks: true });
   const old = run({ run: 'S16', state: 'waiting', quiet_s: 30 * 60 });
   const o = openNow([waits, asks, idle, pc, pc2, look, old, HELPER]);
@@ -330,7 +330,7 @@ test('WHO IS OPEN NOW: the runs that did something, the ones that wrote nothing 
   assert.deepEqual(o.looks.map((r) => r.run), ['S15']);
   assert.deepEqual(o.quiet.map((q) => [q.said, q.runs.map((r) => r.run)]), [['Windows PC', ['S13', 'S14']]]);
   assert.deepEqual(quietSaid(o.quiet[0]!), { what: '2 Claude sessions on D:\\', said: 'Nothing written · silent for 9 h' });
-  assert.equal(machineNamed('Maras-MacBook-Pro.local', [pc]), 'MacBook Pro', 'a Mac keeps its own kind');
+  assert.equal(machineNamed('Teos-MacBook-Pro.local', [pc]), 'MacBook Pro', 'a Mac keeps its own kind');
 });
 
 /* ── an order that names questions (D8) ─────────────────────────────────── */
