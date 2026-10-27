@@ -2097,7 +2097,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'd2c62503b2757e55',
+    declares: '106013d1342fa382',
     history: [
       'Money 3.29.0: Money is a section, with `page.money-accounts`, `page.money-ledger`, `page.money-budgets`, `page.money-coming`, `page.money-forecast`, `page.money-reports` and `page.money-payees` under it, each its line alone, and `register.categories` gains `icon`, `colour`, `budget_alert`, `rollover` and `parent` -> cd223ca9d727a38b',
       'Money 3.29.0, the rest of the section: the home leads with one hero and Coming up, the pages are filled, `script.offer_budgets` offers budgets from last month, and `metric.payees-paid-90d`, `metric.account-now` and the other figures the pages read come with it, and Coming up and Forecast draw each list the whole row -> c39958b1099af6a1',
@@ -2108,6 +2108,7 @@ const DECLARED: Record<string, Version> = {
       'Money 3.29.0, the plan page and the warnings together: `metric.cash-foreign-share` now sits before the plan page figures -> d0a54b82ff5bdaa6',
       'Money 3.29.0, splits: `register.transactions` gains `parts`, one entry split across categories, and what is not filed yet leaves a split entry out -> 56aa38c98745be9d',
       'Money 3.29.0, splits beside the plan page and the warnings: `register.transactions` keeps `parts` -> d2c62503b2757e55',
+      'Money 3.29.0, the look: `page.money` draws Accounts a bar a row and Spent this month as the month itself, and `page.money-accounts`, `page.money-budgets`, `page.money-reports`, `page.money-forecast` and `page.money-payees` say plainer notes -> 106013d1342fa382',
     ],
   },
   'work@1.17.0': {

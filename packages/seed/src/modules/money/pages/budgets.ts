@@ -54,14 +54,15 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       body: 'No category has a budget yet. Each one below is offered from what it spent last month, and nothing is set until you say so.',
     },
     {
-      /* THE MONTH IN TWO FIGURES: spent, and what no budget can count yet. What is budgeted is the line's. */
+      /* THE MONTH IN TWO FIGURES: spent so far, and last month whole beside it. What is budgeted is the line's, and what
+         no budget can count yet is the note under this, with the way to file it: a cell for it said the same twice. */
       kind: 'stat',
       heading: 'This month',
       icon: 'calendar',
       span: 12,
       cells: [
         { metric: 'spent-by-category-month', label: 'Spent so far', note: 'Since the first, on every category' },
-        { metric: 'unfiled-spent-month', label: 'No category yet', note: 'Budgets cannot count it until it is filed' },
+        { metric: 'spent-last-month', label: 'Last month', note: 'The whole month, on every category' },
       ],
       when: { metric: 'spent-by-category-month', gt: 0 },
     },

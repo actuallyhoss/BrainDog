@@ -61,7 +61,7 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
           { metric: 'cash-now', label: 'Cash now', note: 'Every account that counts as cash' },
           { metric: 'card-to-pay', label: 'To pay on the card' },
           { metric: 'cash-as-of', label: 'Oldest balance', note: 'The day the bank or a check last said it' },
-          { metric: 'balances-stale', label: 'Older than a week' },
+          { metric: 'balances-stale', label: 'Older than a week', note: 'Accounts whose balance nobody confirmed in seven days' },
         ],
       },
       {

@@ -79,16 +79,17 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       empty: 'Nothing moved in these months.',
     },
     {
-      /* HOW THE QUARTER WENT: what was kept of what came in, and what went out against the month before; how long the
-         cash lasts with nothing coming in, and how much of it is in other currencies. */
+      /* HOW THE QUARTER WENT: what was kept of what came in, and the last thirty days in and out; how long the cash lasts
+         with nothing coming in, and how much of it is in other currencies. No note says "against the 30 days before": a
+         tile draws no change, so it named a comparison the tile never showed. */
       kind: 'stat',
       heading: 'Health',
       icon: 'heart-pulse',
       span: 12,
       cells: [
         { metric: 'kept-share-90d', label: 'Kept of money in', note: 'The last 90 days, after everything that went out' },
-        { metric: 'spent-30d', label: 'Spent, 30 days', note: 'Against the 30 days before' },
-        { metric: 'received-30d', label: 'Came in, 30 days', note: 'Against the 30 days before' },
+        { metric: 'spent-30d', label: 'Spent, 30 days', note: 'Moves between your own accounts left out' },
+        { metric: 'received-30d', label: 'Came in, 30 days', note: 'Pay and everything else paid in' },
         { metric: 'lasts-no-income', label: 'Lasts with no income', note: 'Cash now, spent at the pace it goes out' },
         { metric: 'cash-foreign-share', label: 'In other currencies', note: 'Of cash now, at the rates you hold' },
       ],
