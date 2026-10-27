@@ -3291,6 +3291,54 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** After an install or a switch-on by `ctx`: each add-on with a part waiting, planned again once (`arrange.ts` `planAgain`). */
   const waitedFor = (ctx: CallContext): Promise<string[]> => planAgain({ kernel, installed: () => installedState(), host: packHost(ctx) });
 
+  /**
+   * AFTER AN ADD-ON IS INSTALLED, SWITCHED ON OR OFF, OR TAKEN OUT: the first-party packs whose legs name an add-on's list
+   * are put in again for the lists the record holds now (`relegFirstParty` in `@braindog/seed/packs/quiet`), so Money's
+   * Cash ahead counts Certificates the moment it is in and stops naming its list once it is gone, with no question and no
+   * new version. Any throw is swallowed: the install that ran this is in already.
+   */
+  const legsFollow = async (ctx: CallContext): Promise<string[]> => {
+    try {
+      const { relegFirstParty } = await import('@braindog/seed/packs/quiet');
+      const { firstPartyManifest } = await import('@braindog/seed/packs');
+      const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
+      const { useCase } = await import('@braindog/seed/usecases');
+      const host = packHost(ctx);
+      const speaking = speakingNow(kernel);
+      const u = speaking === null ? undefined : useCase(speaking.replace(/^usecase-/u, ''));
+      const planned = async (doc: Record<string, unknown>) => {
+        const pack = await normaliseChecked(doc, { kind: 'local' });
+        if (!pack.ok) return pack;
+        const diff = await plan(pack.value, installedState(ctx));
+        const unheld = unresolvedFault(diff);
+        return unheld ? ({ ok: false as const, refusal: unheld }) : ok({ pack: pack.value, diff });
+      };
+      return await relegFirstParty({
+        held: () => kernel.packStates().map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
+        document: (id) => {
+          const own = firstPartyManifest(id as Parameters<typeof firstPartyManifest>[0]).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
+          return moduleDocument(u ?? null, id, { today: dayOf(clock.now()), holds: new Set([...[...kernel.registers()].map(([list]) => list), ...own]) });
+        },
+        plan: async (doc) => {
+          const got = await planned(doc);
+          return got.ok ? ok(got.value.diff) : got;
+        },
+        install: async (doc, planHash) => {
+          const got = await planned(doc);
+          if (!got.ok) return got;
+          return installHeld(kernel, got.value.pack, got.value.diff, host, planHash, []);
+        },
+        tookOff: () => takenOff(),
+        nameOf: (id) => {
+          const body = kernel.declarations().find((d) => d.id === id)?.body as { name?: unknown; title?: unknown } | undefined;
+          return typeof body?.name === 'string' ? body.name : typeof body?.title === 'string' ? body.title : null;
+        },
+      });
+    } catch {
+      return [];
+    }
+  };
+
   /* WHAT AN AGENT OR SLASH MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */
   const arrangement = arranger({
     kernel,
@@ -13141,6 +13189,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND EVERY ADD-ON WITH A PART THAT WAITED IS PLANNED AGAIN, once (`arrange.ts` `planAgain`): a field that waited for
          what this install brought is there with no press, signed by whoever installed it. */
       if (put.ok) await waitedFor(ctx);
+      if (put.ok) await legsFollow(ctx);
       return tail(put);
     },
 
@@ -13149,7 +13198,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
-      return tail(uninstall(args.id, packHost(ctx)));
+      const gone = await uninstall(args.id, packHost(ctx));
+      if (gone.ok) await legsFollow(ctx);
+      return tail(gone);
     },
 
     /**
@@ -13167,9 +13218,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const also: unknown = args.alsoDisable;
       if (also !== undefined && (!Array.isArray(also) || also.some((p) => typeof p !== 'string' || !p)))
         return no('VALUE_MALFORMED', 'alsoDisable is a list of pack ids.', { at: 'alsoDisable' });
-      return tail(
-        kernel.disablePack(args.id, { ...(also === undefined ? {} : { alsoDisable: also as string[] }), actor: actorOf(ctx) }),
-      );
+      const off = await kernel.disablePack(args.id, { ...(also === undefined ? {} : { alsoDisable: also as string[] }), actor: actorOf(ctx) });
+      if (off.ok) await legsFollow(ctx);
+      return tail(off);
     },
 
     /**
@@ -13214,6 +13265,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const out = await kernel.enablePack(args.id, { actor: actorOf(ctx) });
       /* A SWITCH-ON BRINGS WHAT WAITED FOR IT, as an install does, and is what plans an add-on that was off again. */
       if (out.ok) await waitedFor(ctx);
+      if (out.ok) await legsFollow(ctx);
       /* A REGISTER ID IS `[a-z][a-z0-9_]*`, so it goes into the pattern as it is. */
       const fix = !out.ok && 'refusal' in out ? out.refusal.fix : '';
       return tail(offPack(out, (r) => new RegExp(`\\b${r}\\b`).test(fix), args.id));

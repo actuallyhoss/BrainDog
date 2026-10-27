@@ -182,13 +182,19 @@ test('A RECORD THAT HOLDS CERTIFICATES WALKS THEIR PAYOUTS AND THE PRINCIPAL INT
   await put(api, shipped());
   /* A PAYOUT ON THE 20TH EVERY MONTH, AND THE PRINCIPAL BACK ON 10 NOVEMBER: both fall in the next 30 days. */
   await add(api, { start: '2026-09-20', term: 2, ends: '2026-11-10', payout: { amount: 150_000, currency: 'EGP' }, next_payout: '2026-10-20' });
-  /* STILL NOT WALKED: Money was installed before the list was there, and a figure over a list that was not held had the leg left out. */
-  assert.equal(arriving(), 0);
-  /* MONEY IS PUT IN AGAIN FOR A RECORD THAT NOW HOLDS THE LIST, which is what its next update does. */
-  const again = firstPartyDocument('money-core', { holds: held(api), seeds: [] }) as Record<string, unknown>;
-  assert.ok(JSON.stringify(again).includes('"certificates"'), 'Money does not walk Certificates for a record that holds them');
-  await put(api, { ...again, version: '3.99.0' });
+  /* THE ADD-ON ALONE IS ENOUGH: installing it puts Money in again for the lists the record holds, quietly, with no
+     update of Money to wait for. */
+  const version = (): string | null => api.kernel.packStates().find((p) => p.id === 'money-core')?.version ?? null;
+  const before = version();
+  assert.ok(JSON.stringify(api.kernel.metricDecl('arriving-30d')).includes('certificates'), 'Money does not walk Certificates for a record that holds them');
   assert.equal(arriving(), 150_000 + 10_000_000, 'the 20 October payout and the principal on 10 November; the payout after that is past the day it matures');
+  assert.equal(version(), before, 'no version moved');
+  assert.equal(api.kernel.suggestions?.().length ?? 0, 0, 'nothing was asked');
+  /* TAKEN OUT AGAIN, NOTHING REFUSES AND THE WALK STOPS NAMING THE LIST. */
+  said(await api.uninstallPack({ id: 'certificates' }, owner));
+  assert.equal(JSON.stringify(api.kernel.metricDecl('arriving-30d')).includes('certificates'), false, 'Money walks a list the record no longer holds');
+  assert.equal(version(), before);
+  assert.equal(arriving(), 0);
   close();
 });
 

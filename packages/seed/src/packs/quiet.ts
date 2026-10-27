@@ -51,7 +51,8 @@ import type { Result } from '@braindog/ports';
 import { USE_CASES, keptLists, useCaseDocument } from '../usecases/index.ts';
 import { moduleName, namesSaid } from '../usecases/names.ts';
 import { AGENTS_PACK, agentsPackDocument } from './agents.ts';
-import { FIRST_PARTY, FIRST_PARTY_VERSIONS } from './first-party.ts';
+import { ADDON_LEG_LISTS } from '../modules/held-legs.ts';
+import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument } from './first-party.ts';
 
 type Body = Record<string, unknown>;
 
@@ -367,4 +368,47 @@ export function questionFor(id: string, lose: readonly string[]): QuietQuestion 
     body_kind: 'pack',
     body: { install: id },
   };
+}
+
+/**
+ * WHETHER A FIRST-PARTY PACK'S DOCUMENT CHANGES WITH THE ADD-ON LISTS A RECORD HOLDS: some figure or block carries a leg
+ * over a list only an add-on holds (`ADDON_LEG_LISTS`), so the document with those lists held is not the document
+ * without them. Read off the documents, naming no pack and no list.
+ */
+export function leggedByAddons(id: string): boolean {
+  if (!isFirstParty(id) || ADDON_LEG_LISTS.size === 0) return false;
+  const bare = firstPartyDocument(id, { holds: [], seeds: [] });
+  const full = firstPartyDocument(id, { holds: [...ADDON_LEG_LISTS], seeds: [] });
+  return JSON.stringify(bare) !== JSON.stringify(full);
+}
+
+/**
+ * AFTER AN ADD-ON IS INSTALLED, SWITCHED ON, OFF OR REMOVED, every first-party pack the record holds whose legs name an
+ * add-on list is put in again with the lists the record holds now (`port.document`), so Cash ahead counts a certificate's
+ * payout the moment Certificates is in and stops naming the list the moment it is gone. QUIETLY: nothing is asked, and
+ * a plan that would lose anything, add a declaration, or reach outside the record is left alone. A pack whose plan
+ * changes nothing is not installed, so no version moves; the pack stays at the version it holds.
+ * Answers the packs put in.
+ */
+export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' | 'plan' | 'install' | 'nameOf' | 'tookOff'>): Promise<string[]> {
+  const went: string[] = [];
+  const nameOf = (id: string): string => {
+    const said = port.nameOf?.(id);
+    return said && !said.includes('{{') ? said : spelled(id);
+  };
+  const tookOff = new Set((await port.tookOff?.()) ?? []);
+  for (const id of FIRST_PARTY) {
+    if (!leggedByAddons(id)) continue;
+    const held = (await port.held()).find((p) => p.id === id && p.on && p.version !== null);
+    if (!held) continue;
+    const given = await port.document(id);
+    if (!given) continue;
+    const doc = without(given);
+    const planned = await port.plan(doc);
+    if (!planned.ok) continue;
+    const diff = planned.value;
+    if (diff.changes.length === 0 || diff.adds.length > 0 || losses(diff, nameOf, tookOff).length > 0 || unready(diff) !== null) continue;
+    if ((await port.install(doc, diff.planHash)).ok) went.push(id);
+  }
+  return went;
 }
