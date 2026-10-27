@@ -475,3 +475,15 @@ test('A TEXT WITH NO MAX IS STILL HELD TO 16 KB, a document to 512 KB and an add
   assert.equal(said(coerce({ id: 'to', type: 'email' }, `a${address}`)), 'OUT_OF_BOUNDS at to');
   sql.close();
 });
+
+test('ONE LIST PLAYS EACH PART FOR THE AGENTS: a second list claiming skills is refused at install', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(Date.UTC(2026, 9, 1)));
+  const list = (id: string) => ({ id: `register.${id}`, kind: 'register' as const, body: { id, name: id, title: 'name', role: 'skills', fields: [{ id: 'name', type: 'text' }] } as never });
+  const first = await k.install([list('skills')]);
+  assert.ok(first.ok, JSON.stringify(first));
+  const second = await k.install([list('lab_tips')]);
+  assert.equal(second.ok, false, 'a second list took the skills part');
+  assert.match(JSON.stringify(second), /already plays skills/u);
+  sql.close();
+});

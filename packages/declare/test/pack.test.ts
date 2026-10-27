@@ -891,3 +891,20 @@ test('a pack’s title is kept in its manifest, said once, and leaves its checks
   assert.equal(titled.checksum, plain.checksum);
   assert.equal(value<Pack>(await normalise(DOC({ title: '   ' }))).manifest.title, undefined);
 });
+
+test("A LIST THAT PLAYS A PART FOR THE AGENTS SAYS SO IN THE PLAN", async () => {
+  const doc = {
+    pack: 'lab-notes',
+    version: '1.0.0',
+    summary: 'Lab notes.',
+    author: 'Halden',
+    license: 'MIT',
+    requires: { format: 1, primitives: 1, packs: {} },
+    declarations: [{ register: 'lab_tips', name: 'Lab tips', title: 'name', role: 'skills', fields: [{ id: 'name', type: 'text' }] }],
+    seeds: [],
+  };
+  const pack = await normalise(doc);
+  assert.ok(pack.ok, JSON.stringify(pack));
+  const diff = await plan(pack.value as Pack, { format: 1, primitives: 1, record_version: 7, packs: [], declarations: [], rows: {} });
+  assert.match(diff.adds.find((a) => a.id === 'register.lab_tips')?.summary ?? '', /read by your agents as their skills/u);
+});

@@ -6029,6 +6029,12 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   /* A LIST OF PROFILES OR OF WHAT CARRIES BETWEEN MACHINES IS ONE PERSON'S SET-UP, so it is personal or not installed. */
   if (typeof role === 'string' && (PERSONAL_ROLES as readonly string[]).includes(role) && personal !== true)
     return bad('DECLARATION_INVALID', `${id} plays ${role}, which is the owner's alone. Add personal: true to ${id}.`, 'personal', ['true']);
+  /* ONE LIST PLAYS EACH PART, as one holds the projects: the agents read their skills, profiles and rules from the first
+     list that says so, so a second would take the part over the next time either was declared again. */
+  if (typeof role === 'string')
+    for (const [other, body] of installed ?? [])
+      if (other !== decl.id && other.startsWith('register.') && body.role === role)
+        return bad('DECLARATION_INVALID', `${other} already plays ${role}, and one list plays each part. Leave role out of ${id}.`, 'role');
   const fade = decl.body.fade;
   if (fade !== undefined) {
     const f = fade !== null && typeof fade === 'object' && !Array.isArray(fade) ? (fade as Record<string, unknown>) : null;

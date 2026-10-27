@@ -3280,7 +3280,8 @@ function unnamed(kind: DeclKind, body: unknown): string | null {
 
 const summarise = (decl: PackDeclaration): string => {
   const body = decl.body as Record<string, unknown>;
-  if (decl.kind === 'register') return `${(body.fields as unknown[])?.length ?? 0} fields`;
+  /* A LIST THAT PLAYS A PART FOR THE AGENTS SAYS SO: its rows become what every agent of the owner's is told. */
+  if (decl.kind === 'register') return `${(body.fields as unknown[])?.length ?? 0} fields${typeof body.role === 'string' ? `, read by your agents as their ${body.role}` : ''}`;
   if (decl.kind === 'page') return `${(body.blocks as unknown[])?.length ?? 0} blocks`;
   if (decl.kind === 'rule') return `${(body.then as unknown[])?.length ?? 0} actions`;
   return decl.kind;
