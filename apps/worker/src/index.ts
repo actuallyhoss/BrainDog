@@ -3988,9 +3988,11 @@ function arrivals(env: Env): CloudIngestDeps {
        record offered a verified webhook to every webhook pattern in declaration order
        (test/arrive-ingest.test.ts). Mail names none. */
     arrives: async (rec, arrival) => {
-      /* AN HOUR OF ARRIVALS PER RECORD (`ABUSE.inboxHour`), counted here and not at the door because only a verified path
-         reaches this line: a stranger who knows a record id cannot spend its hour with guesses. */
-      const held = await abuseWait(env, 'inboxHour', rec);
+      /* AN HOUR OF ARRIVALS PER RECORD (`ABUSE.inboxHour`), counted here and not at the door because only a known record
+         reaches this line. AN ARRIVAL NOTHING VERIFIED SPENDS ITS OWN, SMALLER HOUR (`inboxStrangerHour`): a stranger who
+         knows the address but not its token stores at most that many, and never spends the hour the record's real
+         senders need. */
+      const held = await abuseWait(env, arrival.verified ? 'inboxHour' : 'inboxStrangerHour', rec);
       if (held !== null) return { ok: false, refusal: { code: 'RATE_LIMITED', fix: tooManyLine(held), retry_after: held } };
       const out = await env.RECORD.get(env.RECORD.idFromName(rec)).arrive({
         channel: arrival.channel,

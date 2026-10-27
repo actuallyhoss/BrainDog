@@ -32,6 +32,7 @@ export const ABUSE = {
 
   /* PER RECORD: what one account can do to the host, whoever holds the token. */
   inboxHour: { most: 1500, seconds: 3600, by: 'record', why: 'Arrivals stored per hour for one record; a busy shop is a few hundred, a loop is thousands.' },
+  inboxStrangerHour: { most: 300, seconds: 3600, by: 'record', why: 'Arrivals nothing verified, kept apart so a stranger who knows the address cannot spend the hour its real senders need.' },
   uploadDay: { most: 200 * 1024 * 1024, seconds: 86_400, by: 'record', why: 'File bytes kept per day for one record, counted in bytes; the bucket is paid for per byte.' },
   slashDay: { most: 200, seconds: 86_400, by: 'record', why: 'Slash asks per day on the included model, on top of the plan month; stops a day spending a month.' },
 } as const satisfies Record<string, AbuseRule>;
