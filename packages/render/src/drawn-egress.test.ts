@@ -78,3 +78,12 @@ test('A FRAME THE COMPONENT MAKES IS TAKEN OUT, AND A SHADOW ROOT OR A WRITTEN D
   assert.throws(() => document.write('<p>'));
   assert.throws(() => (window.Document as { parseHTMLUnsafe: () => unknown }).parseHTMLUnsafe());
 });
+
+test('A SHADOW ROOT WRITTEN IN THE MARKUP IS REFUSED AT INSTALL, where the watch for frames cannot see into it', async () => {
+  const { drawnFault } = await import('./drawn.ts');
+  const { drawnCodeFault } = await import('../../kernel/src/kinds/drawn.ts');
+  const code = '<div><template shadowrootmode="closed"><script>void 0</script></template></div>';
+  assert.match(drawnFault(code) ?? '', /shadow root/u);
+  assert.equal(drawnCodeFault(code), drawnFault(code));
+  assert.equal(drawnFault('<div class="shadow">root</div>'), null);
+});

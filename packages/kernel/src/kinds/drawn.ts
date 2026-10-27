@@ -45,6 +45,7 @@ const RULES: readonly { test: RegExp; fix: string }[] = [
   { test: /url\(\s*["']?\s*(?!data:|#|["')])/iu, fix: 'a url() in it points somewhere other than inline data, and a drawn component loads nothing.' },
   { test: /@import\b/iu, fix: 'it imports a stylesheet, and a drawn component loads nothing. Write the styles in it.' },
   { test: /<\s*(?:link|base|meta|iframe|frame|object|embed|form|portal)\b/iu, fix: 'it holds a link, meta, frame, object or form tag, which a drawn component cannot use. Draw with HTML, SVG, CSS and a script.' },
+  { test: /\bshadowroot(?:mode|clonable|delegatesfocus|serializable)\b/iu, fix: 'it opens a shadow root, and a drawn component draws in its own page. Write the markup as it is.' },
   { test: /<\s*(?:!doctype|html|head|body)\b/iu, fix: 'it is a whole document, and the host writes the head. Write what goes inside the page: the markup, a style tag and a script tag.' },
   { test: /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|importScripts|sendBeacon|RTCPeerConnection|Worker|SharedWorker)\s*\(/u, fix: 'it calls the network, and a drawn component has none. It is handed its rows as braindog.data.' },
   { test: /\bimport\s*\(|\bimport\s+[\w{*]/u, fix: 'it imports a module, and a drawn component loads nothing. Write it as one script.' },
