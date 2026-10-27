@@ -91,6 +91,9 @@
   import QuickHost from '$lib/money/QuickHost.svelte';
   import { pageOfLedger } from '$lib/money/ledger.ts';
   import { quick } from '$lib/money/quick.svelte.ts';
+  import SetupGate from '$lib/money/SetupGate.svelte';
+  import { headsSection, SETUP_KEY, type SetupFacts } from '$lib/money/setup.ts';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { arrivedNow, keepLook, keptHere, lookOrder, lookPage, offerKey, offered, offerUndo, placedOf, undoLook } from './look.ts';
 
   let {
@@ -518,7 +521,7 @@
   /** The page this home arranges and whether the record holds it, or `null` off a home or for one with nothing to arrange. */
   const kept = $derived(mode === 'home' && live ? keptAs(slug, shell.pages ?? []) : null);
 
-  /* ── Money's own: Import a statement ──────────────────────────────────────
+  /* ── Money's own: Import a statement, and the first open ──────────────────
      THE LEDGER IS FOUND FROM THE DECLARATIONS (`quick.ledger`), never named. A page that draws the ledger or its accounts
      offers Import a statement in its ⋯ menu, and an account's own page opens it on that account. */
   const ledgerHere = $derived(mode === 'page' && live && quick.base === apiBase() ? quick.ledger : null);
@@ -529,6 +532,20 @@
     return pageOfLedger(live.page.page.requires, ledgerHere) ? '/add/statement' : null;
   });
   const importItem = $derived(importHref ? [{ label: 'Import a statement', icon: 'upload' as const, href: importHref }] : []);
+  /* MONEY'S HOME OPENS ON ITS SETUP while there is no home currency or no account (`setup.ts`): the first page of its
+     section, drawing the ledger, for the owner of a record that answered. */
+  const setupFacts = $derived.by((): SetupFacts | null => {
+    if (!ledgerHere || !live || showSource) return null;
+    const home = headsSection(shell?.nav ?? [], slug) && pageOfLedger(live.page.page.requires, ledgerHere);
+    return {
+      owner: shell?.me?.owner === true,
+      live: (route.data as { live?: boolean }).live === true,
+      home,
+      currency: shell?.index?.currency ?? null,
+      accounts: (shell?.index?.registers ?? []).find((r) => r.id === ledgerHere.account.list)?.count ?? 0,
+      dismissed: navPrefs.isDismissed(SETUP_KEY),
+    };
+  });
   /**
    * THE BODY A HOME IS BUILT FROM WHILE THE RECORD HOLDS NONE, as its first Done keeps it (`previewedBody`), for Change
    * this page to draft over (C25, C26): the record's week with it, as Edit layout reads it.
@@ -981,6 +998,24 @@
          blocks follow. THE SHAPE'S CODE ARRIVES WITH THE PAGE THAT NEEDS IT, by `import()`: Today draws a page and never a
          project's shape, so its first load does not carry one. While it is on its way the project waits in its own shape
          (`waiting`), and the page's other blocks wait on the shape's reads (`shapeWaits`). -->
+    <SetupGate facts={setupFacts}>
+    {#snippet setup(close)}
+      {#if ledgerHere}
+        {#await import('$lib/money/MoneySetup.svelte') then { default: MoneySetup }}
+          <MoneySetup
+            base={apiBase()}
+            ledger={ledgerHere}
+            currency={shell?.index?.currency ?? null}
+            accounts={(shell?.index?.registers ?? []).find((r) => r.id === ledgerHere.account.list)?.count ?? 0}
+            locale={shell?.index?.locale ?? 'en'}
+            onclose={() => {
+              close();
+              void reread();
+            }}
+          />
+        {/await}
+      {/if}
+    {/snippet}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     <PageBody
       mode="page"
@@ -1004,6 +1039,7 @@
     <!-- THE OFFER COMES AFTER EVERY BLOCK OF THE PAGE, never before the first. -->
     {#if offer && !shapeWaits}<div class="page-offer" data-after="blocks">{@render offer()}</div>{/if}
     {#if hosting}<BatchBar {picked} />{/if}
+    </SetupGate>
   {/if}
   </div>
   {#if hosting}

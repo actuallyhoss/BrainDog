@@ -1,0 +1,354 @@
+<!--
+  Money's first-open setup: the home currency, a first account, and the Money add-ons to switch on, in the board's
+  place on Money's home until it is done or skipped (`SetupGate.svelte`, `setup.ts`).
+
+  A STEP IS LEFT OUT WHEN THE RECORD ALREADY HAS IT: a record with a currency starts on the account, one with an account
+  goes from the currency to the add-ons.
+
+  NOTHING IS WRITTEN UNTIL FINISH. The last press keeps the currency, adds the account and puts each add-on in through
+  the store's own plan (`setup-live.ts`); one whose plan asks for something is named with a link to its own page, and
+  Keep rates current links to where it asks for the address. Finish or Skip, it is kept as done, and never opens again.
+-->
+<script lang="ts">
+  import { onMount, untrack } from 'svelte';
+  import { at } from '$lib/at.ts';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import Button from '$lib/ui/Button.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
+  import Currency from '../../routes/start/Currency.svelte';
+  import { browserCurrencyEnv, currencyChoices } from '../../routes/start/building.ts';
+  import type { Ledger } from './ledger.ts';
+  import { balanceOf, SETUP_KEY, words } from './setup.ts';
+  import type { Finished, SetupRead } from './setup-live.ts';
+
+  let {
+    base,
+    ledger,
+    currency: held,
+    accounts,
+    locale,
+    onclose,
+  }: {
+    base: string;
+    ledger: Ledger;
+    /** The record's home currency, `null` where nobody chose one. */
+    currency: string | null;
+    /** How many accounts the record holds. */
+    accounts: number;
+    locale: string;
+    /** The setup is done with: the page draws its board. */
+    onclose: () => void;
+  } = $props();
+
+  type Step = 'currency' | 'account' | 'addons';
+  /* THE STEPS AS THE RECORD STOOD WHEN THE SETUP OPENED: an account it adds on Finish does not take a step away. */
+  const steps: Step[] = untrack(() => [...(held === null ? (['currency'] as const) : []), ...(accounts === 0 ? (['account'] as const) : []), 'addons']);
+  let place = $state(0);
+  const step = $derived(steps[place] ?? 'addons');
+
+  /* ── the choices ── */
+  let code = $state<string | null>(untrack(() => held));
+  let name = $state('');
+  let kind = $state<string | null>(null);
+  let typed = $state('');
+  let picked = $state<string[]>([]);
+  let rates = $state(false);
+  let said = $state<string | null>(null);
+
+  const ask = $derived.by(() => {
+    if (typeof navigator === 'undefined') return null;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+    return currencyChoices('', browserCurrencyEnv(locale, [...(navigator.languages ?? [])], zone));
+  });
+  const money = $derived(code ?? held ?? '');
+
+  let read = $state.raw<SetupRead | null>(null);
+  onMount(() => {
+    void import('./setup-live.ts').then(async (m) => {
+      const got = await m.readSetup(base, ledger);
+      read = got;
+      if (kind === null) kind = got.kinds[0]?.value ?? null;
+    });
+  });
+
+  function next(): void {
+    said = null;
+    if (step === 'currency' && code === null) return void (said = words.needCurrency);
+    if (step === 'account') {
+      if (name.trim() === '') return void (said = words.needName);
+      if (balanceOf(typed, money) === null) return void (said = words.needBalance);
+    }
+    place = Math.min(place + 1, steps.length - 1);
+  }
+
+  function toggle(id: string, on: boolean): void {
+    picked = on ? [...picked, id] : picked.filter((p) => p !== id);
+  }
+
+  /* ── the press ── */
+  let busy = $state(false);
+  let finished = $state.raw<Finished | null>(null);
+
+  async function finish(): Promise<void> {
+    if (busy || !read) return;
+    busy = true;
+    said = null;
+    try {
+      const { finishSetup } = await import('./setup-live.ts');
+      const minor = balanceOf(typed, money);
+      const out = await finishSetup(base, ledger, read, {
+        currency: held === null ? code : null,
+        account: steps.includes('account') && minor !== null && kind !== null ? { name, kind, minor, currency: money } : null,
+        addons: picked,
+        rates,
+      });
+      await navPrefs.dismiss(SETUP_KEY);
+      if (out.failed.length === 0 && out.left.length === 0) {
+        toasts.push(words.done, { intent: 'good' });
+        onclose();
+      } else finished = out;
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function skip(): Promise<void> {
+    await navPrefs.dismiss(SETUP_KEY);
+    onclose();
+  }
+</script>
+
+<section class="ms" aria-labelledby="ms-title">
+  {#if finished}
+    <h2 class="ms-title" id="ms-title">{finished.left.length > 0 || finished.failed.length > 0 ? words.doneSome : words.done}</h2>
+    {#each finished.failed as f (f)}<p class="ms-warn" role="alert">{f}</p>{/each}
+    {#if finished.left.length > 0}
+      <ul class="ms-left">
+        {#each finished.left as l (l.href)}<li><a href={at(l.href)}>{l.label}</a></li>{/each}
+      </ul>
+    {/if}
+    <div class="ms-actions"><Button weight="primary" onclick={onclose}>{words.toMoney}</Button></div>
+  {:else}
+    <header class="ms-head">
+      <span class="ms-step">{words.step(place + 1, steps.length)}</span>
+      <h2 class="ms-title" id="ms-title">{words.title}</h2>
+      {#if place === 0}<p class="ms-line">{words.lead}</p>{/if}
+    </header>
+
+    {#if step === 'currency'}
+      <div class="ms-body">
+        <p class="ms-line">{words.currencyLine}</p>
+        <Currency bind:value={code} {locale} choices={ask?.choices ?? []} suggested={ask?.suggested ?? null} />
+      </div>
+    {:else if step === 'account'}
+      <div class="ms-body">
+        <h3 class="ms-sub">{words.account}</h3>
+        <p class="ms-line">{words.accountLine}</p>
+        <label class="ms-field">
+          <span class="ms-label">{words.name}</span>
+          <input class="ms-box" autocomplete="off" placeholder={words.namePlaceholder} bind:value={name} />
+        </label>
+        {#if (read?.kinds.length ?? 0) > 0}
+          <span class="ms-label" id="ms-kind">{words.kind}</span>
+          <Segmented role="group" aria-labelledby="ms-kind">
+            {#each read?.kinds ?? [] as k (k.value)}
+              <button type="button" class="segment" data-on={kind === k.value ? '' : undefined} aria-pressed={kind === k.value} onclick={() => (kind = k.value)}>{k.label}</button>
+            {/each}
+          </Segmented>
+        {/if}
+        <label class="ms-field">
+          <span class="ms-label">{words.balance(money)}</span>
+          <input class="ms-box ms-num" inputmode="decimal" autocomplete="off" placeholder="0" bind:value={typed} />
+        </label>
+      </div>
+    {:else}
+      <div class="ms-body">
+        <h3 class="ms-sub">{words.addons}</h3>
+        <p class="ms-line">{words.addonsLine}</p>
+        {#if read && read.addons.length > 0}
+          <ul class="ms-addons">
+            {#each read.addons as a (a.id)}
+              {@const on = read.on.includes(a.id)}
+              <li>
+                <label class="ms-addon">
+                  <input type="checkbox" checked={on || picked.includes(a.id)} disabled={on} onchange={(e) => toggle(a.id, e.currentTarget.checked)} />
+                  <span class="ms-addon-text"><span class="ms-addon-name">{a.title}{#if on}<span class="ms-quiet"> · {words.installed}</span>{/if}</span><span class="ms-quiet">{a.summary}</span></span>
+                </label>
+              </li>
+            {/each}
+            <li>
+              <label class="ms-addon">
+                <input type="checkbox" checked={read.rates || rates} disabled={read.rates} onchange={(e) => (rates = e.currentTarget.checked)} />
+                <span class="ms-addon-text"><span class="ms-addon-name">{words.rates}{#if read.rates}<span class="ms-quiet"> · {words.installed}</span>{/if}</span><span class="ms-quiet">{words.ratesLine}</span></span>
+              </label>
+            </li>
+          </ul>
+        {:else if read}
+          <p class="ms-line">{read.storeFix ?? words.noStore}</p>
+          <div class="ms-actions"><Button href={at('/addons')}>{words.openAddons}</Button></div>
+        {/if}
+      </div>
+    {/if}
+
+    {#if said}<p class="ms-warn" role="alert">{said}</p>{/if}
+    <div class="ms-actions">
+      {#if place > 0}<Button disabled={busy} onclick={() => ((place -= 1), (said = null))}>{words.back}</Button>{/if}
+      {#if step === 'addons'}
+        <Button weight="primary" disabled={busy || read === null} onclick={() => void finish()}>{busy ? words.finishing : words.finish}</Button>
+      {:else}
+        <Button weight="primary" onclick={next}>{words.next}</Button>
+      {/if}
+      <span class="ms-gap"></span>
+      <Button weight="quiet" disabled={busy} onclick={() => void skip()}>{words.skip}</Button>
+    </div>
+  {/if}
+</section>
+
+<style>
+  .ms {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    max-inline-size: 40rem;
+    margin: var(--sp-3) var(--gutter) var(--sp-9);
+    padding: var(--tile-pad-lead);
+    border-radius: var(--r-tile);
+    background: var(--tile);
+  }
+
+  .ms-head,
+  .ms-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .ms-step {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .ms-title,
+  .ms-sub {
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .ms-sub {
+    font-size: var(--fs-body);
+    font-weight: 600;
+  }
+
+  .ms-line {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+  }
+
+  .ms-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+
+  .ms-label {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+  }
+
+  .ms-box {
+    inline-size: 100%;
+    min-block-size: 44px;
+    padding-inline: var(--sp-3);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
+  }
+
+  .ms-box:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  .ms-num {
+    max-inline-size: 16rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ms-addons,
+  .ms-left {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ms-addon {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding-block: var(--sp-3);
+    border-block-end: 1px solid var(--rule);
+    cursor: pointer;
+  }
+
+  .ms-addons li:last-child .ms-addon {
+    border-block-end: 0;
+  }
+
+  .ms-addon input {
+    margin-block-start: 3px;
+  }
+
+  .ms-addon-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .ms-addon-name {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+  }
+
+  .ms-quiet {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+  }
+
+  .ms-left li {
+    padding-block: var(--sp-2);
+  }
+
+  .ms-warn {
+    margin: 0;
+    color: var(--red);
+    font-size: var(--fs-meta);
+  }
+
+  .ms-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .ms-gap {
+    flex: 1;
+  }
+
+  @media (width < 640px) {
+    .ms {
+      padding: var(--tile-pad);
+    }
+  }
+</style>
