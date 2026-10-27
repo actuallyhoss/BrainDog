@@ -968,13 +968,17 @@ export type SummaryCell = { key: 'end' | 'low' | 'everyday'; label: string; figu
 export function forecastSummary(model: ForecastModel, shown: Scenario): SummaryCell[] {
   const last = shown.days.at(-1) ?? { day: model.today, balance: model.opening };
   const change = cents(last.balance - model.opening);
-  const changed = change === 0 ? '' : `${change > 0 ? '+' : ''}${forecastFigure(model, change, 'read')}`;
+  /* THE ANSWER IN WHOLE UNITS, as Cash now is said over it: a walk that averages everyday spending lands on piastres,
+     and "EGP 756,443.02" beside "from EGP 729,312 today" read as two kinds of figure. The list under the chart keeps
+     each movement to the cent. */
+  const read = (v: number): string => forecastFigure(model, Math.round(v), 'read');
+  const changed = change === 0 || Math.round(change) === 0 ? '' : `${change > 0 ? '+' : ''}${read(change)}`;
   const cells: SummaryCell[] = [
     {
       key: 'end',
       label: forecastCashOn(shortDay(last.day, model.today)),
-      figure: forecastFigure(model, last.balance, 'read'),
-      note: [forecastFromToday(forecastFigure(model, model.opening, 'read')), changed].filter(Boolean).join(' · '),
+      figure: read(last.balance),
+      note: [forecastFromToday(read(model.opening)), changed].filter(Boolean).join(' · '),
       ...(change !== 0 ? { dir: change > 0 ? ('in' as const) : ('out' as const) } : {}),
     },
   ];
@@ -984,12 +988,12 @@ export function forecastSummary(model: ForecastModel, shown: Scenario): SummaryC
   cells.push({
     key: 'low',
     label: FORECAST_LOWEST,
-    figure: forecastFigure(model, low.balance, 'read'),
+    figure: read(low.balance),
     note: low.day === model.today ? FORECAST_TODAY : [forecastOnDay(shortDay(low.day, model.today)), cause ? forecastAfter(cause.label) : ''].filter(Boolean).join(', '),
     ...(low.balance < 0 ? { dir: 'out' as const } : {}),
   });
   const everyday = everydayMonthly(model, shown);
-  if (everyday !== null) cells.push({ key: 'everyday', label: FORECAST_EVERYDAY, figure: forecastFigure(model, everyday, 'read'), note: everydayNote(model) });
+  if (everyday !== null) cells.push({ key: 'everyday', label: FORECAST_EVERYDAY, figure: read(everyday), note: everydayNote(model) });
   return cells;
 }
 
@@ -1364,7 +1368,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       : {
           at: at(lowAt),
           y: String(Math.round(Number(y(shown.lowest.balance)) * 100) / 10_000),
-          figure: forecastFigure(model, shown.lowest.balance, 'read'),
+          figure: forecastFigure(model, Math.round(shown.lowest.balance), 'read'),
           ...(lowAt > 1 - LOW_EDGE ? { side: 'end' as const } : lowAt < LOW_EDGE ? { side: 'start' as const } : {}),
           ...(drops.some((s) => s.day === shown.lowest.day) ? { drop: true as const } : {}),
         };
