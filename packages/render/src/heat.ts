@@ -38,7 +38,7 @@ import { calendarDay } from './calendar.ts';
 import { heatGrid, washSteps, WASH_STEPS, type Wash } from './days.ts';
 import { signedOf } from './bridge.ts';
 import { day } from './format.ts';
-import { addDays } from './forecast.ts';
+import { addDays } from './day-math.ts';
 
 /** How many weeks the grid spans. */
 export const HEAT_WEEKS = 12;

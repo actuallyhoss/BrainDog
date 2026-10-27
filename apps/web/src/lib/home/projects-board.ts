@@ -18,6 +18,7 @@
  */
 
 import { nextSplit } from '../page/next-split.ts';
+import { counted, names } from './counted.ts';
 
 const DAY = 86_400_000;
 /** How many days ahead "due" reaches, and how many back a run or a task change still makes a project moving. */
@@ -147,19 +148,10 @@ export type Board = {
 
 /* ── words ─────────────────────────────────────────────────────────────── */
 
-const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-/** A small count in words, as a sentence says it ("three projects"); a large one in figures. */
-export const counted = (n: number): string => (n >= 0 && n < WORDS.length ? WORDS[n]! : n.toLocaleString('en-GB'));
+export { counted, names };
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 /** How many questions wait, as a chip says it: "1 question", "3 questions". */
 const questionsSaid = (n: number): string => (n === 1 ? '1 question' : `${n.toLocaleString('en-GB')} questions`);
-/** "A", "A and B", "A, B and C", or "A, B and 2 more". */
-export function names(list: readonly string[], most = 3): string {
-  const all = [...new Set(list)];
-  if (all.length <= 1) return all[0] ?? '';
-  if (all.length <= most) return `${all.slice(0, -1).join(', ')} and ${all.at(-1)}`;
-  return `${all.slice(0, most - 1).join(', ')} and ${all.length - (most - 1)} more`;
-}
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

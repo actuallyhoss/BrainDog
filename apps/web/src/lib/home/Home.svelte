@@ -71,7 +71,7 @@
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
   import { readMarkOf, stampOf } from '$lib/page/read-mark.ts';
-  import { markAll } from '$lib/record/news-live.ts';
+  import { markAll } from '$lib/record/mark-read.ts';
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import {
     FIRST_TODAY_MOST,

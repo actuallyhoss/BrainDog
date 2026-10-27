@@ -25,7 +25,7 @@
  */
 
 import { DOTS_MOST, isDay, monthGrid, weekStart } from './days.ts';
-import { addDays } from './forecast.ts';
+import { addDays } from './day-math.ts';
 
 /** The words the drawers write that no author did, here because this package cannot import the app's copy. */
 export const CALENDAR_NONE = 'Nothing on the calendar.';

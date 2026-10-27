@@ -2,8 +2,8 @@
  * Home's read mark and History's log against the record; and one figure as a tile, which the palette draws.
  *
  * A ROUTE-ONLY MODULE, loaded by the screens that read it, like `page-live.ts`: the client carries the route table
- * as a value. Home imports `markAll` with the screen, not when the reader leaves, so the mark can be sent from a
- * closing tab.
+ * as a value. Home's read mark (`markAll`) lives in `mark-read.ts`, which Today imports with the screen, and is
+ * re-exported here for History.
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw the sample's
  * figures, feed and log; there is no sample now. A live answer is drawn from the answer and nothing else.
@@ -20,12 +20,14 @@ import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
-import { actorFor, refreshShell, type Fetch } from './boot-live.ts';
+import { actorFor, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noteOf, settlingOf } from './history-live.ts';
 import { beyondOf, format, fxNote, hrefFor, partsText, targetSaid } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { runByIn } from './names.ts';
+
+export { markAll } from './mark-read.ts';
 import type { AuditEvent } from './schema.ts';
 
 /**
@@ -115,24 +117,6 @@ export function tileOf(id: string, r: Reading | null): Metric {
  * HOME READS WHAT IS NEW AS A `feed` BLOCK NOW (`lib/home/default-home.ts`), which the page reader draws with the
  * reader's mark, so the feed's own read went. What stays is the mark: Home stamps it when the reader leaves.
  */
-
-/**
- * Mark everything up to `upTo` read, and ask the shell's `boot` again behind it, whose feed it was. `upTo` is the record's cursor
- * for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists, handed back as it came.
- *
- * THE REQUEST IS MADE BEFORE THIS FIRST WAITS: nothing is awaited between the call and the client's fetch, so a screen
- * that calls it as it is left (`pagehide`) has sent the mark in that turn. Keep it so: an `await` above `markRead`
- * loses the mark of a closing tab.
- */
-export async function markAll(base: string, upTo: Cursor | null, io?: Fetch): Promise<boolean> {
-  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.markRead(upTo ?? undefined);
-  /* ONLY THE SHELL, WHOSE FEED IT WAS, and asked again behind the kept one so the next screen does not wait on it. The
-     mark moves no row and no declaration: dropping the schemas and kept reads with it (`forget`) had the next screen
-     ask every list's schema and walk again on every leave of Today. */
-  refreshShell(base);
-  return out.ok;
-}
 
 /** How many lines of the log History asks for: the record's largest page. */
 export const LOG_PAGE = 200;

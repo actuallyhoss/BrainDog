@@ -1,6 +1,5 @@
 import { CASH_LEGS } from './money/legs.ts';
 import { MODULE_LISTS } from './lists.ts';
-import { MONEY_REGISTERS } from './money/lists/index.ts';
 
 /**
  * A DECLARATION WITH EVERY FORECAST LEG OVER A LIST THE RECORD DOES NOT HOLD TAKEN OFF, as `firstPartyDocument` does for
@@ -23,5 +22,10 @@ export function withoutLegs<T>(body: T, keep: (register: string) => boolean): T 
   return walk(body, null) as T;
 }
 
-/** THE LISTS ONLY AN ADD-ON HOLDS THAT THE CASH WALK NAMES, which the sample and the light figures table leave out. */
-export const ADDON_LEG_LISTS: ReadonlySet<string> = new Set(CASH_LEGS.map((leg) => leg.register).filter((register) => !Object.hasOwn(MONEY_REGISTERS, register) && !Object.values(MODULE_LISTS).some((held) => held.includes(register))));
+/**
+ * THE LISTS ONLY AN ADD-ON HOLDS THAT THE CASH WALK NAMES, which the sample and the light figures table leave out.
+ *
+ * BY THE MODULES' LIST NAMES ALONE, which hold every Money list (`module-lists.test.ts`): the light figures table is on
+ * Today's first load, and asking `MONEY_REGISTERS` put every Money list's whole declaration there with it.
+ */
+export const ADDON_LEG_LISTS: ReadonlySet<string> = new Set(CASH_LEGS.map((leg) => leg.register).filter((register) => !Object.values(MODULE_LISTS).some((held) => held.includes(register))));

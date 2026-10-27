@@ -191,10 +191,8 @@ export {
 export { figureLike } from './figure.ts';
 export {
   FORECAST_KNOBS,
-  addDays,
   against,
   baseKnobs,
-  daysBetween,
   forecastModel,
   forecastPlan,
   horizonChoices,
@@ -203,7 +201,6 @@ export {
   largest,
   readoutAt,
   scenario,
-  shortDay,
   type ForecastKnob,
   type GroupKnobs,
   type ForecastModel,
@@ -213,6 +210,7 @@ export {
   type Scenario,
 } from './forecast.ts';
 export { forecastFigure } from './forecast.ts';
+export { addDays, daysBetween, shortDay } from './day-math.ts';
 export { UNNAMED, cellNamesNothing, inline, magnitudeOfCell, namesNothing, safeHref, text, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,

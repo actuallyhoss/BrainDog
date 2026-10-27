@@ -28,7 +28,6 @@
   import { day } from '../src/format.ts';
   import {
     FORECAST_ADJUST,
-    FORECAST_AXIS_BREAK,
     FORECAST_AXIS_BREAK_STYLE,
     FORECAST_BALANCE,
     FORECAST_CLOSE,
@@ -388,10 +387,11 @@
       ><span class="forecast-now-word">{FORECAST_NOW}</span><span class="forecast-now-figure">{p.now.label}</span></span
     >
     <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk.
-         Where zero is off it, its end nearest zero carries a break beside the real amount, and the name says where it starts. -->
+         Where zero is off it, its end nearest zero carries a break beside the real amount, and the name says where it starts.
+         The break is `FORECAST_AXIS_BREAK` written out and not drawn from a string, whose helper grew the entry script's shared runtime. -->
     <ol class="forecast-axis" aria-hidden="true">
       {#each p.axis as a}<li class="forecast-axis-tick" data-zero={a.zero ? '' : undefined} data-cut={a.cut ? '' : undefined} style="--at:{a.at}"
-          >{#if a.cut}<span class="forecast-axis-break" style={FORECAST_AXIS_BREAK_STYLE}>{@html FORECAST_AXIS_BREAK}</span>{/if}{a.label}</li
+          >{#if a.cut}<span class="forecast-axis-break" style={FORECAST_AXIS_BREAK_STYLE}><svg viewBox="0 0 10 10" width="0.8em" height="0.8em" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1 8L4 2M6 8L9 2" /></svg></span>{/if}{a.label}</li
         >{/each}
     </ol>
     {#if p.cross}<span class="forecast-pin" data-side={p.cross.near ? 'end' : undefined} style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}

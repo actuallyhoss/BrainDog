@@ -65,7 +65,7 @@
   import { arranged, emptyHidden } from './home.ts';
   import { leadIndex } from './lead.ts';
   import { stampOf } from './read-mark.ts';
-  import { markAll } from '$lib/record/news-live.ts';
+  import { markAll } from '$lib/record/mark-read.ts';
   import type { Cursor } from '@braindog/client';
   import { asksActions, judgedWith, readHeld } from './panels.ts';
   import type { ActionRow } from '$lib/record/actions.ts';

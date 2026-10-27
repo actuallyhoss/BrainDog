@@ -24,7 +24,7 @@
  * a cell holding text must not stretch.
  */
 
-import { addDays } from './forecast.ts';
+import { addDays } from './day-math.ts';
 
 /** One day as a cell: where it sits, and the three facts that change how it is drawn. */
 export type DayCell = {

@@ -34,6 +34,9 @@ import { MISSING, axisFigure, exponentOf, headlineFigure } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
 import { readAmount, writeAmount, type AmountSetting } from './money.ts';
+import { addDays, daysBetween, shortDay, shortMonth } from './day-math.ts';
+
+export { addDays, daysBetween, shortDay, shortMonth };
 
 const at = (n: number): string => String(Math.round(n * 100) / 100);
 const DAY_MS = 86_400_000;
@@ -209,27 +212,6 @@ export type Scenario = {
   steps: (ForecastStep & { balance: number })[];
   crossed: { day: string; balance: number } | null;
   lowest: { day: string; balance: number };
-};
-
-const ms = (day: string): number => Date.parse(`${day}T12:00:00Z`);
-export const addDays = (day: string, n: number): string => new Date(ms(day) + n * DAY_MS).toISOString().slice(0, 10);
-export const daysBetween = (from: string, to: string): number => Math.round((ms(to) - ms(from)) / DAY_MS);
-/**
- * `12 Nov`, the way a sentence over a chart says a day, and `12 Nov 2027` when `today` is given and the day is in
- * another year: a walk of a year said "Stays above zero to 14 Oct", which reads as this October, a year early.
- */
-export const shortDay = (day: string, today?: string): string => {
-  if (!ISO.test(day)) return day;
-  const d = new Date(ms(day));
-  const year = today !== undefined && ISO.test(today) && today.slice(0, 4) !== day.slice(0, 4) ? ` ${day.slice(0, 4)}` : '';
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${year}`;
-};
-
-/** `Jul`, a calendar month as a person says it, and `Nov 2025` when `today` is in another year. */
-export const shortMonth = (month: string, today: string): string => {
-  const m = MONTH.exec(month);
-  if (!m) return month;
-  return `${MONTHS[Number(m[2]) - 1]}${m[1] === today.slice(0, 4) ? '' : ` ${m[1]}`}`;
 };
 
 /** A whole number written in a cell, at least `least`, or `null`. */
@@ -1569,7 +1551,7 @@ export const forecastAxisTo = (figure: string): string => `The axis stops at ${f
  * The break both drawers set beside the cut end of the value axis, the mark a chart draws where its axis does not run
  * to zero. Never the colour alone: the end's label is the real amount, and the chart's name says where it starts.
  */
-export const FORECAST_AXIS_BREAK = '<svg viewBox="0 0 10 10" width="0.8em" height="0.8em" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1 8L4 2M6 8L9 2"/></svg>';
+export const FORECAST_AXIS_BREAK = '<svg viewBox="0 0 10 10" width="0.8em" height="0.8em" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1 8L4 2M6 8L9 2"></path></svg>';
 /**
  * The break's own place, beside the label and over the chart's edge, written on the element so the string drawer, which
  * has no sheet of its own, sets it where the component does. No colour: it is the label's.

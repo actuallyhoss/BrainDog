@@ -6,7 +6,7 @@
  * `side.test.ts` holds the order, the folds, the facts and the width without a component.
  */
 
-import { counted, names } from '../home/projects-board.ts';
+import { counted, names } from '../home/counted.ts';
 
 /** One project as the sidebar draws it. */
 export type SideProject = {
