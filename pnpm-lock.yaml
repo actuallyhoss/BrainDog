@@ -439,6 +439,8 @@ importers:
 
   packs/holdings: {}
 
+  packs/insurance: {}
+
   packs/job-starter: {}
 
   packs/landlord: {}
