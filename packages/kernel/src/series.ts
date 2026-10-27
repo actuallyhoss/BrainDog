@@ -28,6 +28,12 @@ export type SeriesLine = {
    */
   each?: string;
   label?: string;
+  /**
+   * EACH BAR IS THE TOTAL SO FAR: the figure's value in its bucket added to every earlier bucket's, the buckets before the
+   * chart's first too, so a plan paid in parts draws what was paid in all by each quarter. A bucket with nothing of its own
+   * stands at the total before it, and one before the first value is a gap, as it is on any line.
+   */
+  running?: boolean;
   /** Money in stands on the zero rule and money out hangs under it. `in` when absent. */
   dir?: 'in' | 'out';
 };
@@ -78,7 +84,7 @@ export function barsOf(
 ): { bars: Bars } | { refusal: Refusal } {
   const bad = (code: string, fix: string, at = 'series'): { refusal: Refusal } => ({ refusal: { code, fix, at } });
   if (!Array.isArray(lines) || lines.length === 0 || lines.length > SERIES_LINES)
-    return bad('DECLARATION_INVALID', `A series draws one to ${SERIES_LINES} lines, each { metric, then?, label?, dir? }.`);
+    return bad('DECLARATION_INVALID', `A series draws one to ${SERIES_LINES} lines, each { metric, then?, label?, dir?, running? }.`);
   const span = (v: number | undefined, b: { least: number; most: number; fallback: number }) =>
     v === undefined ? b.fallback : Number.isInteger(v) && v >= b.least && v <= b.most ? v : null;
   const backs = span(back, SERIES_BACK);
@@ -88,7 +94,7 @@ export function barsOf(
 
   /* HELD ON AN OBJECT, because each line's reading sets them and a narrowed `let` would not see that. */
   const seen: { bucket: Bucket | null; current: string | null; unit: string | null } = { bucket: null, current: null, unit: null };
-  const parts: { past: Group[]; then: Group[] | null; each: number | null; eachParts: Part[] | null; eachUnit: string | null; units: (string | null)[] }[] = [];
+  const parts: { past: Group[]; then: Group[] | null; each: number | null; eachParts: Part[] | null; eachUnit: string | null; units: (string | null)[]; running: boolean }[] = [];
   /* WHETHER ANY LINE CAME BACK IN MORE THAN ONE CURRENCY, OR TWO LINES IN TWO: then the chart is drawn once per currency. */
   const units = new Set<string>();
   let split = false;
@@ -106,8 +112,11 @@ export function barsOf(
   };
 
   for (const line of lines) {
-    if (line === null || typeof line !== 'object') return bad('DECLARATION_INVALID', 'Each line of a series is { metric, then?, label?, dir? }.');
+    if (line === null || typeof line !== 'object') return bad('DECLARATION_INVALID', 'Each line of a series is { metric, then?, label?, dir?, running? }.');
     if (line.dir !== undefined && line.dir !== 'in' && line.dir !== 'out') return bad('DECLARATION_INVALID', `dir is in or out, and this one is ${JSON.stringify(line.dir)}.`);
+    if (line.running !== undefined && typeof line.running !== 'boolean') return bad('DECLARATION_INVALID', `running is true or false, and this one is ${JSON.stringify(line.running)}.`);
+    /* A RUNNING LINE ADDS WHAT IS PAID; money still due later would be added to it twice over, so it takes no then or each. */
+    if (line.running === true && (line.then !== undefined || line.each !== undefined)) return bad('DECLARATION_INVALID', 'A running line adds up what its own figure read, so it takes no then or each.');
     const past = one(line.metric);
     if ('refusal' in past) return past;
     const then = line.then === undefined ? null : one(line.then);
@@ -147,7 +156,7 @@ export function barsOf(
       each = got.value.value ?? null;
       eachUnit = got.value.unit;
     }
-    parts.push({ past: past.groups, then: then ? then.groups : null, each, eachParts, eachUnit, units: [past.unit, then ? then.unit : null] });
+    parts.push({ past: past.groups, then: then ? then.groups : null, each, eachParts, eachUnit, units: [past.unit, then ? then.unit : null], running: line.running === true });
   }
   if (seen.bucket === null || seen.current === null) return bad('DECLARATION_INVALID', 'A series needs figures grouped by a date.');
 
@@ -159,18 +168,26 @@ export function barsOf(
   /* WHETHER ANY LINE ADDED MONEY DUE LATER THIS BUCKET TO WHAT WAS PAID IN IT, which the current bucket then says. */
   let dueNow = false;
   const valuesIn = (unit: string | null) =>
-    parts.map(({ past, then, each, eachParts, eachUnit, units: lineUnits }) =>
+    parts.map(({ past, then, each, eachParts, eachUnit, units: lineUnits, running }) =>
       keys.map((key) => {
         const ahead = key > now && then;
-        const valueOf = (groups: readonly Group[], own: string | null | undefined): number | null => {
-          const group = groups.find((g) => g.key === key);
-          return unit === null
+        const one = (group: Group | undefined, own: string | null | undefined): number | null =>
+          unit === null
             ? (group?.value ?? null)
             : group?.parts
               ? (group.parts.find((p) => p.currency === unit)?.amount ?? null)
               : own === unit
                 ? (group?.value ?? null)
                 : null;
+        const valueOf = (groups: readonly Group[], own: string | null | undefined): number | null => {
+          if (!running) return one(groups.find((g) => g.key === key), own);
+          /* THE TOTAL SO FAR: every bucket up to this one, in this currency, and a gap until the first has a value. */
+          let sum: number | null = null;
+          for (const g of groups) {
+            const v = g.key <= key ? one(g, own) : null;
+            if (v !== null) sum = (sum ?? 0) + v;
+          }
+          return sum;
         };
         const paid = valueOf(ahead ? then : past, ahead ? lineUnits[1] : lineUnits[0]);
         /* THE CURRENT BUCKET IS WHAT WAS PAID SO FAR AND WHAT IS STILL DUE IN IT: an invoice due on the 28th is this month's
