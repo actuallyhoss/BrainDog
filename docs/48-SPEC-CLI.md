@@ -138,7 +138,7 @@ A new machine needs two lines, the install and then `setup`:
 
 ```sh
 curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux; on Windows: irm https://brain.dog/cli/install.ps1 | iex
-braindog setup https://brain.dog/app/<slug>
+braindog setup https://app.brain.dog/app/<slug>
 ```
 
 `login` and `install` stay commands of their own, and `setup` runs both (§5.15).
@@ -370,8 +370,8 @@ or the only one held.
 record's slug, because the app is under `/app` now, and `hostKey` keeps that as `<origin>/<slug>`: `app` is a reserved slug, so a first segment of
 `app` is always the prefix. `login`, `logout` and `--host` key through the same function, so a login written with or
 without `/app` is one entry, and keys written before the move do not change. The CLI has no default host. On the
-Cloud the origin is `https://app.brain.dog` today and becomes `https://brain.dog` at push B; the API calls go to the
-origin's root, `/auth/device` and `/api/*`, which the old name keeps serving after B with no redirect. That matters
+Cloud the origin is `https://app.brain.dog` (it was `https://brain.dog` between pushes B and C of the one-domain move); the API calls go to the
+origin's root, `/auth/device` and `/api/*`, which the other name keeps serving with no redirect. That matters
 because every request here is sent with `redirect: 'error'`, so a redirect on either would fail every command.
 
 Invariants a test checks: the file's mode is `0600` on POSIX; a write is a rename of a complete file; a `value`

@@ -250,7 +250,8 @@ it answers, as zone routes. That goes out in three pushes, and the file carries 
 |---|---|---|---|
 | **A** | `app.brain.dog` as a Custom Domain, and nothing else | `app.brain.dog` · empty · `brain.dog` | live. The app is under `/app` on `app.brain.dog`; a page load outside `/app` and the host's own paths there is a `308` to `/app<path>` on the same name (`legacyRedirect` in `src/route.ts`) |
 | **A2** | the same, plus eight zone routes on `brain.dog`: `/app`, `/app/*`, `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`, `/.well-known/braindog-build` | unchanged | not made. It is a push of its own because it is the one that needs *Zone > Workers Routes > Edit* on `brain.dog` |
-| **B** | unchanged | `brain.dog` · `app.brain.dog` · `brain.dog` | not made. A page load on `app.brain.dog` becomes a `308` to `https://brain.dog/app<path>`, or to the same path when it is already under `/app`; `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*` and the build id stay served there with no redirect, for at least the 90 days a token lives |
+| **B** | unchanged | `brain.dog` · `app.brain.dog` · `brain.dog` | made through the site's binding instead, and since reversed by C. A page load on `app.brain.dog` became a `308` to `https://brain.dog/app<path>`; `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*` and the build id stayed served there with no redirect |
+| **C** | unchanged | `app.brain.dog` · `brain.dog` · `brain.dog` | **the file as it stands.** The app is at `app.brain.dog/app` again. A page load on `brain.dog/app/...` (handed to the Worker by the site's `APP` binding) is a `308` to `https://app.brain.dog/app<path>`, path and query kept; `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*` and the build id stay served on `brain.dog` with no redirect, for at least the 90 days a token lives. Alpha is the same on `app.alpha.brain.dog` and `alpha.brain.dog` |
 
 Alpha is the same on its own names: `app.alpha.brain.dog`, with `RP_ID` `alpha.brain.dog` from push A, and in push B
 `alpha.brain.dog` as the public host with `app.alpha.brain.dog` kept as a legacy host. `RP_ID` must not change between
@@ -447,8 +448,8 @@ lands, no link is made and every link answers the 404.
 the origin from `PUBLIC_HOST` and the lockout's address from `cf-connecting-ip`, which Cloudflare writes and a
 caller cannot. The passkeys' relying party is `RP_ID` when `PUBLIC_HOST` is that name or under it, and the exact host
 when `RP_ID` is empty; a name the host is not under turns passkeys off rather than offering a ceremony the browser
-refuses (`relyingParty` in `packages/host/src/auth.ts`). Since push A it is `brain.dog` while `PUBLIC_HOST` is still
-`app.brain.dog`, so a passkey made now is still offered after push B moves the app to `brain.dog` (§4.4). The routes are 33 §4's table; this host serves all of them but `/auth/token`, the self-host's
+refuses (`relyingParty` in `packages/host/src/auth.ts`). Since push A it is `brain.dog` while `PUBLIC_HOST` is
+`app.brain.dog` (push C), so a passkey is offered on either name whichever the app is on (§4.4). The routes are 33 §4's table; this host serves all of them but `/auth/token`, the self-host's
 server key, and adds the operator's two.
 
 **Shipped switched off.** Without `SESSION_SECRET` (32 characters or more) the Directory holds no MAC key:
@@ -714,7 +715,7 @@ name ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). With no `KEK` bound no key can b
    `paths.base: '/app'` and, once push A2 routes `brain.dog`, `/` and `/_app/version.json` there are the marketing
    site's. `/app/_app/*` is a negative in `run_worker_first`, so step 2 holds for it; `/app/` is in `/app/*`, so the
    Worker answers it by fetching the same bytes from `ASSETS` unchanged. `DEPLOY_HOST` stays `app.brain.dog` through
-   A and A2 and becomes `brain.dog` before push B.
+   A and A2, was `brain.dog` from push B, and is `app.brain.dog` again from push C.
 
 ### 5.18 · Telemetry and logging
 
@@ -1146,7 +1147,7 @@ and 53's runbooks (restore, key rotation, erasure, deletion).
 - [ ] Every route in `index.ts` declares its group; `router-groups` passes; a bearer at `openGrant` is 403 before any RPC.
 - [ ] A browser holds `/ws` for an hour in staging and the object's GB-s stay under 100; a write reaches the tab as `{ version, registers }`.
 - [ ] A redelivered queue message leaves the `EMAIL` mock at one call.
-- [ ] `deploy.yml` passes `deploy-parity` against `https://brain.dog/app/` (against `https://app.brain.dog/app/` until push B, §4.4).
+- [ ] `deploy.yml` passes `deploy-parity` against `https://app.brain.dog/app/` (against `https://app.brain.dog/app/` until push B, §4.4).
 - [ ] A staging record is snapshotted, deleted, and restored to a bookmark; the `export` and `restore.pitr` events exist; no alarm and no R2 object survive the deletion.
 - [ ] Every row of §13's amendment column is applied to its design document in the same revision.
 

@@ -378,8 +378,8 @@ compares the two sets.
 ([22-FRONTEND](22-FRONTEND.md) §2): `[id]/+page.svelte` reads a question (`SG`, `D`) through `governance`
 as Decide does and a row through `get({ spoken })`, and `replaceState`s to the canonical address
 ([50-SPEC-WEB](50-SPEC-WEB.md) §2.2). It reads the sample only when no record answers (`UNREACHABLE` or
-`UNAUTHORIZED`). `brain.dog/app/D41`, or `brain.dog/app/<slug>/D41` naming its record, is a sentence one
-person can say to another (on `app.brain.dog/app/…` until push B of the one-domain move; a slug shaped like a spoken
+`UNAUTHORIZED`). `app.brain.dog/app/D41`, or `app.brain.dog/app/<slug>/D41` naming its record, is a sentence one
+person can say to another (a slug shaped like a spoken
 id is refused, so `/app/d41` is always the question) and a string an agent can emit with no lookup. One resolver, and it is the
 cheapest legibility win available.
 

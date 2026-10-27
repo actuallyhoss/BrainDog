@@ -186,7 +186,7 @@ The artefacts an operator handles, each with invariants a test can check.
 | **PITR bookmark** | the string `getCurrentBookmark()` returns as a copy is dumped | recorded in that copy's metadata; a copy is gone back to by its own bookmark and never by looking one up for its instant; valid for 30 days, and a copy older than that is refused for an in-place restore |
 | **The KEK** | the Worker secret `KEK`: 32 bytes as 64 hex characters or base64url, or two such keys separated by a space during a rotation, the new one first; self-host `/data/kek` and, during a rotation, `/data/kek.prev`, 0600 | `kek_id` = first 18 hex of SHA-256(raw key) (34 §5); `current()` is the first key and `byId` knows both; every `vault_key` row `wrapped_by = 'kek'` carries a `kek_id` the store knows; at most two keys at once; an id is never reused |
 | **The wrapped DEKs** | `vault_key` rows `record` · `connector` · `signing` (30 §1) | exactly one wrapping per row; `connector` is always `kek` (ADR-052); a `passphrase` row has `salt` and `kek_id NULL`; `grant.kek_id` = `vault_key('record').kek_id` while `wrapped_by = 'kek'` |
-| **The signing key** | `vault_key('signing')`, Ed25519; `key_id` = first 16 hex of SHA-256(public key) | made with the record when `KEK` is bound; a record made before that, or with `PROVISION_WITHOUT_KEYS`, has none. The public half is served at `https://brain.dog/app/<slug>/.well-known/braindog-key` (`{ key_id, public_key }`), which is what `--key` names; without `--key`, `verify` checks the file against the key it carries and says that proves nothing about whose key it is. Settings > Export does not draw the key yet |
+| **The signing key** | `vault_key('signing')`, Ed25519; `key_id` = first 16 hex of SHA-256(public key) | made with the record when `KEK` is bound; a record made before that, or with `PROVISION_WITHOUT_KEYS`, has none. The public half is served at `https://app.brain.dog/app/<slug>/.well-known/braindog-key` (`{ key_id, public_key }`), which is what `--key` names; without `--key`, `verify` checks the file against the key it carries and says that proves nothing about whose key it is. Settings > Export does not draw the key yet |
 | **The version tuple** | `app <date>+<sha> · format <user_version> · kernel <migration> · primitives <PRIMITIVES_VERSION>` (31 §6) | `format` moves only with `-- format-bump`; `kernel` = `MAX(migration.version)`; a bug report without it is sent back for it |
 | **A device grant** | a `device_grant` row (30 §1) | `pending approved active expired denied revoked`; `token_hash`, never the token; `expires` rewritten to +90 d on activation; `last_used` older than 14 d → `expired`, the customer told (26 §2.4); a `denied` row is never purged |
 | **The dead-letter suggestion** | a `suggestion` row, `body_kind = 'change'`, `opened_by = 'system'` (30 §8) | names kind, error and a payload summary, never a payload value; one per `dead` outbox row |
@@ -265,7 +265,7 @@ block of `apps/worker/wrangler.jsonc`, or `DIRECTORY_VERSION` in `packages/recor
 applies too; any of the three makes the deploy one that cannot be rolled back.
 
 1. **A restore point** on the live record: Settings > Backups > "Back up now", and
-   `braindog export -o <slug>-<date>.brainl --host https://brain.dog/app/<slug>` on your own machine. `log` in the ops
+   `braindog export -o <slug>-<date>.brainl --host https://app.brain.dog/app/<slug>` on your own machine. `log` in the ops
    record: `deploy <sha> · replaces <live sha>`.
    The deploy also takes its own: the "Take a restore point" step of `deploy.yml` asks the Worker to open every record
    written in the last seven days, and to copy each when a migration changed. A missing `PROVISION_KEY` is red when a migration changed and "not run"
@@ -450,7 +450,7 @@ Precondition: the chosen night fetched with `wrangler r2 object get braindog-blo
 logged. The opened `.brainl` comes from `age -d -i <identity> <copy> > <tmp>/night.brainl`
 where `age` is installed; the drill itself deletes the plaintext it makes.
 
-1. `braindog import <tmp>/night.brainl --host https://brain.dog/app/<slug> --key https://brain.dog/app/<slug>/.well-known/braindog-key`.
+1. `braindog import <tmp>/night.brainl --host https://app.brain.dog/app/<slug> --key https://app.brain.dog/app/<slug>/.well-known/braindog-key`.
    The CLI verifies the file first and sends nothing if it fails. The record answers `NEEDS_BROWSER_SESSION`; the CLI
    asks for an operation grant and the owner approves *import* from their browser (48 §5.2): ten minutes, this command,
    never written.

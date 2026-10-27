@@ -632,9 +632,11 @@ production and `app.alpha.brain.dog` in alpha; the app is under `/app` there; `P
 made now is still offered on `brain.dog` after the move. `assets` has `not_found_handling: 'none'` and §4's
 `run_worker_first`. `brain.dog` itself is still only the marketing site's. **Push A2, not made:** eight zone routes on
 `brain.dog` (`/app`, `/app/*`, `/api/*`, `/mcp`, `/in/*`, `/auth/*`, `/account/*`, `/.well-known/braindog-build`) and
-nothing else. **Push B, after it:** `PUBLIC_HOST` becomes `brain.dog` and `LEGACY_HOSTS` becomes `app.brain.dog`, so a
-page load on the old name is a `308` to `https://brain.dog/app<path>` (a path already under `/app` keeps its own) while `/api/*`, `/mcp` and `/in/*` are served
-there with no redirect. Both are the `STAGE A2` and `STAGE B` fragments at the top of the file.
+nothing else. **Push B, since reversed:** `PUBLIC_HOST` became `brain.dog` and `LEGACY_HOSTS` `app.brain.dog`. **Push C, the
+file as it stands:** `PUBLIC_HOST` is `app.brain.dog` again and `LEGACY_HOSTS` is `brain.dog`, so a page load on
+`brain.dog/app/...` (which reaches this Worker through the site's `APP` binding) is a `308` to
+`https://app.brain.dog/app<path>`, path and query kept, while `/api/*`, `/mcp` and `/in/*` are served there with no
+redirect. No route changed in either.
 
 Sign-up generates three keys — the record DEK, the connector DEK and the signing key — wrapped under the current KEK
 ([12-SECURITY](12-SECURITY.md) §6). The nightly `scheduled()` at `17 3 * * *` takes the snapshot and runs the
@@ -717,7 +719,7 @@ Durable Object class (Cloud) or `directory.sqlite` (self-host), same schema, sam
 | Directory table | Holds |
 |---|---|
 | `person` | `id` (`p_` + ULID), `email` UNIQUE, `name`, `created_at`, `suspended_at` |
-| `passkey` | `id`, `person`, `jwk`, `alg` (ES256 or RS256), `sign_count`, `label`, `backed_up`, `created_at`, `last_used`; both hosts. The relying party is the Cloud's `RP_ID` when the host is under it (`brain.dog` in production since push A, so a passkey made at `app.brain.dog` is still offered once push B puts the app on `brain.dog`) and otherwise the exact host, which is the self-host's case; an `RP_ID` the host is not under switches passkeys off (`relyingParty` in `packages/host/src/auth.ts`) |
+| `passkey` | `id`, `person`, `jwk`, `alg` (ES256 or RS256), `sign_count`, `label`, `backed_up`, `created_at`, `last_used`; both hosts. The relying party is the Cloud's `RP_ID` when the host is under it (`brain.dog` in production since push A, so a passkey made at `app.brain.dog` is offered on either name, whichever the app is on) and otherwise the exact host, which is the self-host's case; an `RP_ID` the host is not under switches passkeys off (`relyingParty` in `packages/host/src/auth.ts`) |
 | `session` | `id_hash` (HMAC-SHA-256 of `s:` and the id, under the host's session key), `person`, `record` (the record the session opened, so a browser holds one cookie), `expires`, `rotated_at`, `authed_at`, `prev_hash`, `prev_until`. The cookie: `__Host-bd_s`, `HttpOnly Secure SameSite=Lax`, 30 days sliding, rotated after 24 h of use; the replaced id answers for sixty seconds, because the app sends its first calls in parallel and the first to arrive rotates; `authed_at` records the last proof, rotation never moves it, and VAULT requires it within 15 minutes |
 | `link` | `hash` (HMAC-SHA-256 of `l:` and the token), `person`, `purpose` (`magic`, 15 min; `claim`, 24 h), `expires`; single use, spent by the statement that deletes it |
 | `challenge` | `hash` (HMAC-SHA-256 of `c:` and the challenge), `purpose`, `person`, `expires` (5 min): WebAuthn challenges in a table rather than in memory, so a ceremony survives the Directory object being evicted; single use, and minting refuses past 10,000 live rows |

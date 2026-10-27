@@ -96,7 +96,7 @@ devDependency is an edge — a build-time import is an import.
 | 21 | `cli` | 1, 2, 3, 7, 8, 13, 14, 17. The manifest holds 2, 13 and 17 today: `braindog mcp` runs the MCP core (`13`) over stdio and reaches the record through the typed client (`17`). The others arrive with the commands that need them, and `14` is for `@braindog/slash/prompts` and nothing else of it. Every edge is a devDependency, because what ships is one bundled file |
 | 22 | `worker` | 2, 7, 8, 10, 11, 13, 16. `8` is the Kennel's rules (`./kennel`, `./catalogue`), which the Cloud answers `/api/kennel/v1/` with (`src/kennel.ts`). `10` is the catalogue, so an update carries progress forward as it does on the self-host. `13` serves `POST /mcp` from the same core the command line runs over stdio; `web`'s `build/` is the asset directory, never an import |
 | 23 | `selfhost` | 2, 7, 8, 10, 11, 12, 13, 16, 17. `12` is `./quickjs`, the sandbox a scheduled script runs in on this host (`src/script.ts`). `13` serves `POST /mcp`, as on the Worker. `17` is a devDependency: the client's integration test runs against this server, because the test needs a runtime and only an app may name one |
-| 24 | `desktop` | — the Mac app, a Tauri window around brain.dog/app. Built with cargo, not pnpm, and imports no package |
+| 24 | `desktop` | — the Mac app, a Tauri window around app.brain.dog/app. Built with cargo, not pnpm, and imports no package |
 | 25 | `watchdog` | — the uptime check, its own small Worker so it is still up when the other Workers are not. It imports no package |
 
 **Eighteen workspaces in the tree today, twenty-two at platform.** The

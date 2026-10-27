@@ -51,8 +51,8 @@ record call from a page under a slug to `/app/<slug>/api/…`, where the host ch
 (33 §4). Data keeps record-relative paths (`/r/<list>`, `/p/<page>`); only rendering adds the prefix. Neither host
 uses the SPA fallback any more: the Worker has `not_found_handling: 'none'` and draws the shell for an app navigation
 itself, and the self-host mounts the build at `/app` (49 §5.19). On the Cloud the app is at `app.brain.dog/app`
-today, and a page load elsewhere on that name is a `308` into `/app`; it moves to `brain.dog/app` at push B, after
-push A2 has routed those paths of `brain.dog` to the Worker (51 §4.4).
+(push C of the one-domain move; between pushes B and C it was at `brain.dog/app`), and a page load on `brain.dog/app/...`
+is a `308` to the same path on `app.brain.dog`, which the site hands to the Worker through its binding (51 §4.4).
 
 ---
 

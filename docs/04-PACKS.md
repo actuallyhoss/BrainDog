@@ -183,7 +183,7 @@ touching anything** — naming both packs and the exact id. No half-installed st
 ## 3 · Install
 
 ```
-$ braindog pack install freelancer-uk --from https://brain.dog/api/kennel/v1/
+$ braindog pack install freelancer-uk --from https://app.brain.dog/api/kennel/v1/
 ```
 
 ```
@@ -245,7 +245,7 @@ Four properties of that screen, each deliberate:
 
 | Source | In the app | From a terminal |
 |---|---|---|
-| The Kennel ([14-KENNEL](14-KENNEL-AND-COMMUNITY.md) §1) | Add-ons, browsed and searched (`apps/web/src/lib/market/listing.ts`) | `braindog pack install freelancer-uk --from https://brain.dog/api/kennel/v1/`; `braindog pack search` reads the Kennel when no `--from` is named |
+| The Kennel ([14-KENNEL](14-KENNEL-AND-COMMUNITY.md) §1) | Add-ons, browsed and searched (`apps/web/src/lib/market/listing.ts`) | `braindog pack install freelancer-uk --from https://app.brain.dog/api/kennel/v1/`; `braindog pack search` reads the Kennel when no `--from` is named |
 | BrainDog's own catalogue, bundled with the build | Add-ons, beside the Kennel's | `braindog pack install freelancer-uk`, which reads the host's `/app/catalogue/` |
 | Any https address | "Install from anywhere" at `/packs`; the host fetches it (`fetchShared`), and refuses a private or local address | not yet: the terminal takes an id or a file |
 | A git ref | the same box, as `git:<owner>/<repo>@<ref>:<path>`, read as that file raw on GitHub | not yet |

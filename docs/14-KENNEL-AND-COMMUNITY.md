@@ -27,7 +27,7 @@ operator's review between that door and the listing.
 
 | | |
 |---|---|
-| Where | `/api/kennel/v1/` on every host: `brain.dog/api/kennel/v1/` on the Cloud, and the same paths on a self-host. It sits under `/api/*`, which the site already forwards to the app, so it needed no DNS and no new route |
+| Where | `/api/kennel/v1/` on every host: `app.brain.dog/api/kennel/v1/` on the Cloud, and the same paths on a self-host. It sits under `/api/*`, which the site already forwards to the app, so it needed no DNS and no new route |
 | What it answers | `index.json` (the catalogue format, unchanged), each published file at `packs/<id>/<version>.pack.json` or `usecases/<id>/<version>.usecase.json`, the `.preview.json` beside it, and `counts.json`. Every read is public, to every origin, and a published file is served as immutable |
 | The index | BrainDog's own catalogue, bundled with the deployed build, then everything listed from outside. An id the bundled catalogue holds, or that BrainDog's built-in modules and use cases install under, is BrainDog's: no submission may take it |
 | Storage | the Cloud's existing R2 bucket, under `kennel/`: the Kennel's index, the review file, the trusted publishers, the counts, and the files. No table, no migration, no new binding |
@@ -118,7 +118,7 @@ Community is not a forum. It is the set of places a person can get unstuck and b
 |---|---|---|---|
 | **GitHub Issues** | the repo | bugs, and the only place that promises a response | free |
 | **GitHub Discussions** | the repo | "how do I model X", pack ideas, show-and-tell. Searchable by Google, unlike Discord | free |
-| **The Kennel** | `brain.dog/api/kennel/v1/` (§1) | pack submissions and the operator's review; the conversation about one belongs in Discussions | free |
+| **The Kennel** | `app.brain.dog/api/kennel/v1/` (§1) | pack submissions and the operator's review; the conversation about one belongs in Discussions | free |
 | **A changelog** | `brain.dog/changelog` | the single highest-leverage community artefact for a solo product: proof of life | a file |
 | Discord | later, if asked | real-time support is a commitment to be present. **Do not open one until there is somebody to talk to** | a real cost |
 

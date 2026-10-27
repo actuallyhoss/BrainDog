@@ -587,7 +587,7 @@ the gate this becomes when the corpus record exists.
    SHA-256 the body; compare with `apps/web/build/app/index.html` and `apps/web/build/app/_app/version.json`.
    *(Amended September 23rd 2026 for push A of the one-domain move: the app is built under `paths.base: '/app'`,
    and once push A2 routes `brain.dog` to the Worker, `/` and `/_app/version.json` there are the marketing site's.
-   `DEPLOY_HOST` is `app.brain.dog` through pushes A and A2 and is set to `brain.dog` before push B.)*
+   `DEPLOY_HOST` is `app.brain.dog` through pushes A and A2 and was set to `brain.dog` before push B and is `app.brain.dog` again from push C.)*
 2. Fetch `/.well-known/braindog-build`; assert `app === BRAINDOG_BUILD`. That path is public and
    `/api/version` is not: the build id belongs to the Worker version rather than to a record, and this
    gate holds no bearer. An unset build answers `null`, which reads as an absent tuple rather than as

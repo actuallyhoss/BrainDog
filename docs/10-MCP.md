@@ -35,7 +35,7 @@ an earlier revision still connects through `initialize`, and a 2026-07-28 client
 ## 2 · Authentication
 
 BrainDog is an OAuth 2.1 **resource server and its own authorization server**, so any MCP client
-connects by the URL `https://brain.dog/mcp` and a person's yes. Every token is an ordinary agent
+connects by the URL `https://app.brain.dog/mcp` and a person's yes. Every token is an ordinary agent
 token, whichever way it was made.
 
 **Two ways to hold a token.** An agent token is a bearer, scoped, revocable, and shown once. It is
@@ -48,7 +48,7 @@ adds the hooks and, with them, the Agent Skill, and registers `braindog mcp` ([4
 
 ```sh
 curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux; on Windows: irm https://brain.dog/cli/install.ps1 | iex
-braindog setup https://brain.dog/app/<slug>
+braindog setup https://app.brain.dog/app/<slug>
 ```
 
 **OAuth, as built** (`packages/host/src/oauth.ts`, the protocol; `packages/record/src/oauth.ts`, its
