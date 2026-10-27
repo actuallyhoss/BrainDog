@@ -73,7 +73,7 @@ type Row = { id: string; register: string; seq: number; fields: Record<string, J
 const row = (id: string, register: string, seq: number, fields: Record<string, Json>, version = 1): Row => ({ id, register, seq, fields, version, updated_at: NOW });
 const egp = (pounds: number) => ({ amount: Math.round(pounds * 100), currency: 'EGP' });
 
-type Leaf = { field?: string; is?: Json; lt?: number; all?: Leaf[] };
+type Leaf = { field?: string; is?: Json; gt?: number; lte?: number; all?: Leaf[] };
 const flat = (w: Leaf | null | undefined): Leaf[] => (w ? (w.all ? w.all.flatMap(flat) : [w]) : []);
 const hostOf = (input: Row, rows: Row[]): CtxHost => ({
   fetch: async () => {
@@ -81,10 +81,10 @@ const hostOf = (input: Row, rows: Row[]): CtxHost => ({
   },
   get: async (spoken) => ([input, ...rows].find((r) => r.id === spoken) ?? null) as unknown as Json,
   list: async (register, where) => {
-    /* A script's list is one page of fifty, newest first, and takes no cursor; `seq lt n` is how a script asks for the next. */
+    /* A script's list is one page of fifty in no order of seq and takes no cursor; a script asks for rows by seq range. */
     const leaves = flat(where as Leaf | null);
-    const has = (r: Row, l: Leaf) => (l.lt !== undefined ? r.seq < l.lt : r.fields[l.field!] === l.is);
-    return rows.filter((r) => r.register === register && leaves.every((l) => has(r, l))).sort((a, b) => b.seq - a.seq).slice(0, 50) as unknown as Json[];
+    const has = (r: Row, l: Leaf) => (l.field === 'seq' ? (l.gt === undefined || r.seq > l.gt) && (l.lte === undefined || r.seq <= l.lte) : r.fields[l.field!] === l.is);
+    return rows.filter((r) => r.register === register && leaves.every((l) => has(r, l))).sort((a, b) => ((a.seq * 7919) % 1009) - ((b.seq * 7919) % 1009)).slice(0, 50) as unknown as Json[];
   },
   now: () => NOW,
   tz: 'UTC',
