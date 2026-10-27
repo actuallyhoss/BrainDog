@@ -10,7 +10,7 @@ braindog addon test reading-list
 braindog addon publish reading-list/reading-list.pack.json --kennel
 ```
 
-`publish --kennel` sends the file to the Kennel at `https://brain.dog/api/kennel/v1/`, or to the one named after `--kennel`, and says whether the version is listed now or waits for review. A later version is published the same way, with its `changes` line saying what moved.
+`publish --kennel` sends the file to the Kennel at `https://app.brain.dog/api/kennel/v1/`, or to the one named after `--kennel`, and says whether the version is listed now or waits for review. A later version is published the same way, with its `changes` line saying what moved.
 
 The Kennel reads a submission the way a record installs one, and holds it to a little more: it must have a title, and a manifest key outside the known set is refused rather than passed over. A version already there, or one earlier than the latest, is refused, and so is a version whose number is smaller than what it changed.
 

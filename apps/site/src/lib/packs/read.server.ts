@@ -57,7 +57,7 @@ export function readPreview(e: Entry): ReturnType<typeof previewOf> {
  * at most. A build with no network, or a Kennel with nothing counted yet, draws no count at all, never a
  * zero: `countsOf` keeps only what rounds to ten or more.
  */
-const COUNTS_AT = 'https://brain.dog/api/kennel/v1/counts.json';
+const COUNTS_AT = 'https://app.brain.dog/api/kennel/v1/counts.json';
 
 let counts: Promise<ReadonlyMap<string, number>> | null = null;
 

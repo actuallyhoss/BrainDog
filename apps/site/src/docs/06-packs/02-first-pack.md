@@ -102,7 +102,7 @@ Reading list 1.0.0 is with the Kennel at https://brain.dog, waiting for review. 
 A submission says who sent it: sign in first with `braindog login`, or sign the file with `--sign <key file>`. Without either, nothing is sent:
 
 ```code | What it prints when nobody is named
-The Kennel needs to know who publishes this: sign it with --sign <key file>, or sign in with braindog login https://brain.dog. Nothing was sent.
+The Kennel needs to know who publishes this: sign it with --sign <key file>, or sign in with braindog login https://app.brain.dog. Nothing was sent.
 ```
 
 Once the Kennel's operator trusts you as a publisher, what you submit is listed straight away instead:

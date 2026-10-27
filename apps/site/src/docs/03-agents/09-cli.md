@@ -6,7 +6,7 @@
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://brain.dog/app/<slug>
+braindog setup https://app.brain.dog/app/<slug>
 ```
 
 On Windows, in PowerShell, install it with `irm https://brain.dog/cli/install.ps1 | iex`. It needs Node.js 24.13 or later. Both scripts put one file in the `.braindog` folder in your home folder, check it against the checksum published beside it, and put a `braindog` command on your PATH. Run the same line again to update. `braindog --version` says the build, the file format it writes, the kernel it expects and the block set it draws.

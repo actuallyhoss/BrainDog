@@ -1,11 +1,12 @@
 /**
  * Every address the site links to, in one place.
  *
- * `APP` is the app, served on this site's own name (`wrangler.jsonc`). Every link under it carries
- * `rel="external"`, because the prerender crawler would otherwise follow it into a path this build
- * does not own and stop the build.
+ * `APP` is the app, on its own name, `app.brain.dog`, under `/app` (`apps/worker/wrangler.jsonc`, `PUBLIC_HOST`).
+ * Absolute, because a sign-in or a device start on any other name is refused at `origin`, and `brain.dog/app` is only
+ * the 308 that sends an old link there. Every link under it carries `rel="external"`, because the prerender crawler
+ * would otherwise try to follow it. `test/one-origin.test.mjs` reads production's `PUBLIC_HOST` and holds the two equal.
  */
-export const APP = '/app';
+export const APP = 'https://app.brain.dog/app';
 export const SIGNIN = `${APP}/signin`;
 export const SIGNUP = `${APP}/signup`;
 export const SOURCE: string | null = 'https://github.com/actuallyhoss/BrainDog';
@@ -22,7 +23,7 @@ export const STATUS: string | null = null;
 /** The skill an agent installs, served from `static/agents/`. */
 export const SKILL = '/agents/braindog/SKILL.md';
 /** Where an MCP client connects: `servesMcp` in `apps/worker/src/route.ts`, with OAuth. */
-export const MCP = 'https://brain.dog/mcp';
+export const MCP = 'https://app.brain.dog/mcp';
 /** The changelog's Atom feed, prerendered beside the page. */
 export const FEED = '/changelog.xml';
 

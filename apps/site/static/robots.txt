@@ -8,8 +8,8 @@
 # answer that question.
 #
 # THE PAGES ARE OPEN, THE APP IS NOT. The site is prose with no account and no data, so every
-# crawler may read it. The record app lives on this origin: the site hands `brain.dog/app/`,
-# `/api/`, `/auth/` and `/account/` to the app's Worker, and they are an app shell, JSON and sign-in
+# crawler may read it. The record app lives at `app.brain.dog`; the site still hands `/app/`,
+# `/api/`, `/auth/` and `/account/` to the app's Worker, where old links are sent on, and they are an app shell, JSON and sign-in
 # behind authentication, nothing a search result should point at. The rule was in place before they
 # started answering here. The app is absent from the sitemap for the same reason.
 

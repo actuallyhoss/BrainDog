@@ -8,7 +8,7 @@ On macOS or Linux, install the command line and point it at your record:
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://brain.dog/app/<slug>
+braindog setup https://app.brain.dog/app/<slug>
 ```
 
 On Windows, in PowerShell, the first line is `irm https://brain.dog/cli/install.ps1 | iex` and the second is the same. The command line needs Node.js 24.13 or later, and nothing needs an administrator.
@@ -30,7 +30,7 @@ The sign-in is a token that can write, lasts ninety days and is kept in `hosts.j
 A client that takes an MCP address can use this one:
 
 ```code | text
-https://brain.dog/mcp
+https://app.brain.dog/mcp
 ```
 
 The first time, the client opens BrainDog in your browser. You pick the record and what the agent may do, then press Allow:
@@ -45,7 +45,7 @@ Write | Read your record, propose changes, and change rows directly.
 The client is given a token that lasts ninety days, and after that it asks you again. For Claude Code the same address is one line:
 
 ```code | sh
-claude mcp add --transport http braindog https://brain.dog/mcp
+claude mcp add --transport http braindog https://app.brain.dog/mcp
 ```
 
 ## As a process

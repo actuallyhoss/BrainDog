@@ -57,5 +57,5 @@ None of the check, test, diff, new or key commands sends anything. [The last pag
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://brain.dog/app/<slug>
+braindog setup https://app.brain.dog/app/<slug>
 ```

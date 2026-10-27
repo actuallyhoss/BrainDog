@@ -76,5 +76,5 @@ Running it again finds each thing by its key and updates it, so nothing arrives 
 
 ```code | sh
 curl -fsSL https://brain.dog/cli/install.sh | sh
-braindog setup https://brain.dog/app/<slug>
+braindog setup https://app.brain.dog/app/<slug>
 ```

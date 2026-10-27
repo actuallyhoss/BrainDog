@@ -108,30 +108,24 @@ test('no _headers rule carries a script policy, which would block the inline sta
 /**
  * WHERE "OPEN THE APP" GOES FOLLOWS WHERE THE APP LIVES, READ FROM THE TWO `wrangler.jsonc` FILES.
  *
- * `APP` in `src/lib/copy.ts` is every "Open the app" on the site and the footer's sign-in. It was the absolute
- * `https://app.brain.dog`, which stays right only while production's `PUBLIC_HOST` is that name: with the one-domain vars a
- * sign-in on `app.brain.dog` is refused at `origin` and a device start there answers 403,
- * so a link to it lands a reader where signing in fails. Once the
- * app's `PUBLIC_HOST` is the site's own name, the link is the relative `/app`, which the site's script hands to its own
- * environment's app, so the alpha site's readers reach alpha's app and not production's. Before the flip `/app` on
- * `brain.dog` refuses sign-in too, so the link waits for the flip, and this test says which of the two it must be.
+ * `APP` in `src/lib/copy.ts` is every "Open the app" on the site and the footer's sign-in. It is the app's own name,
+ * `https://<PUBLIC_HOST>/app`, because a sign-in on any other name is refused at `origin` and a device start there answers
+ * 403. When `PUBLIC_HOST` is the site's own name (the shared-name shape of the one-domain move) the link is the relative
+ * `/app`, which the site's script hands to its own environment's app. This test says which of the two it must be, and
+ * holds the site's script to handing `/app` over either way, because `brain.dog/app` is the 308 that old links rely on.
  */
 const checker = await import(new URL('../../worker/scripts/provision-check.mjs', import.meta.url).href);
 
-test('"Open the app" is /app once the app lives on the site name, and the site hands /app to the app in every environment', async () => {
+test('"Open the app" goes to the name the app lives on, and the site still hands /app to the app so an old link is sent on', async () => {
   const { APP } = await import('../src/lib/copy.ts');
   const worker = checker.wranglerConfig();
   const site = checker.siteConfig();
   const host = worker.env.production.vars.PUBLIC_HOST;
   const shared = (site.env.production.routes ?? []).filter((r) => r.custom_domain).map(checker.hostOf).includes(host);
-  if (!shared) {
-    assert.equal(APP, `https://${host}`, `production's app is on ${host}, its own name, so "Open the app" has to go there`);
-    return;
-  }
-  assert.equal(APP, '/app', `production's app is on ${host}, the site's own name, so "Open the app" is the site's /app`);
+  assert.equal(APP, shared ? '/app' : `https://${host}/app`, `production's app is on ${host}, so "Open the app" has to go there`);
   for (const env of ['production', 'alpha']) {
     const first = (site.env[env]?.assets ?? site.assets ?? {}).run_worker_first ?? [];
-    for (const path of ['/app', '/app/signin']) assert.ok(checker.workerFirst(first, path), `${env}: the site answers ${path} with its 404 page, so the link goes nowhere`);
+    for (const path of ['/app', '/app/signin']) assert.ok(checker.workerFirst(first, path), `${env}: the site answers ${path} with its 404 page, so an old link goes nowhere`);
   }
 });
 
