@@ -18,6 +18,7 @@ import { parseSentence, type Replay, type SentenceParts, type SentenceWorld } fr
 
 import { pathOf, said as saidOf } from '../automations.ts';
 import type { CallContext } from '../index.ts';
+import { hiddenOf } from '../sight.ts';
 import { previewerOf } from '../slash.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -98,7 +99,8 @@ export function methods(deps: RecordDeps) {
           one: typeof declared?.one === 'string' ? declared.one : undefined,
           title: r.title,
           state: typeof declared?.state === 'string' ? declared.state : undefined,
-          fields: r.fields.filter((f) => f.retired !== true && f.derived !== true).map((f) => ({ id: f.id, type: f.type, label: f.label, values: f.values, labels: f.labels, to: f.to })),
+          /* A FIELD A SHARE HIDES FROM THEM IS NOT ONE THEY MAY NAME: a sentence on it would read its values back. */
+          fields: r.fields.filter((f) => f.retired !== true && f.derived !== true && !hiddenOf(ctx, r.id).has(f.id)).map((f) => ({ id: f.id, type: f.type, label: f.label, values: f.values, labels: f.labels, to: f.to })),
         };
       });
     const doors = sql
@@ -169,7 +171,7 @@ export function methods(deps: RecordDeps) {
       ...(replay.kind === 'written' && replay.op === 'update' ? { order: [{ field: 'updated_at', dir: 'desc' as const }] } : {}),
       ...(replay.kind === 'written' && replay.op === 'delete' ? { includeDeleted: true } : {}),
       reads: (register: string) => readable(ctx, register) === null,
-    }, kernel.scope(ctx, replay.register));
+    }, kernel.scope(ctx, replay.register), [...hiddenOf(ctx, replay.register)]);
     if (!got.ok) return { looked: null, note: fixOf(got) };
     const inWindow = got.value.rows.filter((r) => {
       if (replay.kind === 'time') return true;
