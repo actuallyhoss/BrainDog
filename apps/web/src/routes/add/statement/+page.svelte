@@ -186,14 +186,14 @@
         <label class="st-label" for="st-paste">{words.paste}</label>
         <textarea id="st-paste" class="st-box st-paste" rows="5" placeholder={words.pasteHint} bind:value={pasted}></textarea>
         <div class="st-actions">
-          <Button disabled={pasted.trim() === ''} onclick={() => take('pasted.csv', pasted)}>{words.read}</Button>
+          <Button disabled={pasted.trim() === ''} onclick={() => take(words.pastedName, pasted)}>{words.read}</Button>
         </div>
         {#if why}<p class="st-warn" role="alert">{why}</p>{/if}
       </section>
     {:else}
       <section class="st-step" aria-labelledby="st-columns">
         <div class="st-row">
-          <h2 class="st-label" id="st-columns">{words.columns} <span class="st-quiet">{exp.file}</span></h2>
+          <h2 class="st-label" id="st-columns">{words.columns}{#if exp.file !== words.pastedName} <span class="st-quiet">{exp.file}</span>{/if}</h2>
           <Button weight="quiet" size="sm" onclick={again}>{words.other}</Button>
         </div>
         <label class="st-check"><input type="checkbox" checked={two} onchange={(e) => setTwo(e.currentTarget.checked)} /> {words.twoColumns}</label>
@@ -225,7 +225,7 @@
           <h2 class="st-label" id="st-preview">{words.preview}</h2>
           <p class="st-sum" aria-live="polite">
             {#if split}
-              <strong>{words.fresh(split.fresh.length)}</strong>{#if split.already.length > 0}<span class="st-quiet"> · {words.skipped(split.already.length)}</span>{/if}
+              <strong>{words.fresh(split.fresh.length)}</strong>{#if split.already.length > 0}<span class="st-quiet">{` · ${words.skipped(split.already.length)}`}</span>{/if}
             {:else}
               <span class="st-quiet">{words.checking}</span>
             {/if}
