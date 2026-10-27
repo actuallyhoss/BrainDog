@@ -368,7 +368,8 @@ test('THE WHOLE BOOK YOU OWE IS A FIGURE NOW, and it is the receivable one with 
 const cashWalk = (): { from: Leg[]; horizon: number } => {
   const block = CASH_AHEAD;
   assert.ok(Array.isArray(block.from) && typeof block.horizon === 'number', 'the walk names its legs and its horizon');
-  return { from: block.from as Leg[], horizon: block.horizon };
+  /* AS A RECORD WITHOUT AN ADD-ON IS GIVEN IT: a leg over a list only an add-on holds is left out of the page it installs. */
+  return { from: (block.from as Leg[]).filter((leg) => !ADDON_LEG_LISTS.has(leg.register)), horizon: block.horizon };
 };
 
 /** What one leg of a walk moves over the horizon, in minor units, and how many steps it moves it in. */

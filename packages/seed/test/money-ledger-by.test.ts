@@ -27,6 +27,7 @@ import { KINDS } from '../../render/src/kinds.ts';
 import { NOW, day, firstPartyDocument } from '../src/index.ts';
 import { FILING_FIGURES } from '../src/modules/money/figures/filing.ts';
 import { LEDGER, LEDGER_COLUMNS, LEDGER_LINES } from '../src/modules/money/pages/parts/ledger.ts';
+import { LEDGER_LINE_COLUMNS } from '../src/modules/money/pages/ledger.ts';
 import { MOVED_COLUMNS } from '../src/modules/money/pages/shared.ts';
 
 const OWNER = { actor: 'p_1' };
@@ -198,10 +199,11 @@ test('THE RECORD HOLDS WHO FILED EACH LINE, and the tile hands it over beside it
 test('WHAT STANDS IN THE WAY of saying it on the line, each of which is not this file\'s', async () => {
   const { k, tile } = await sample();
 
-  /* 1. A TIMELINE DRAWS THREE CELLS AND THE LEDGER'S ARE TAKEN: the day, the name and the amount. A fourth column for
-        who filed a line would never be drawn. */
-  assert.equal(KINDS.timeline.cells, 3);
-  assert.equal(MOVED_COLUMNS.length, KINDS.timeline.cells);
+  /* 1. A TIMELINE DRAWS SIX CELLS AND THE LEDGER'S ARE TAKEN: the day, the name and the amount, then the two halves of
+        the quiet line and the chip, which are optional. A seventh column for who filed a line would never be drawn. */
+  assert.equal(KINDS.timeline.cells, 6);
+  assert.equal(MOVED_COLUMNS.length, KINDS.timeline.cells - (KINDS.timeline.optional ?? 0));
+  assert.equal(LEDGER_LINE_COLUMNS.length, KINDS.timeline.cells);
 
   /* 2. THE NAMES ARE NOT BESIDE THE LINES. A line's rule is the rule's id, and who changed it is the door's or the
         rule's own handle, so a host has no name to write: not "Talabat" and not "Harbour Bank". */
