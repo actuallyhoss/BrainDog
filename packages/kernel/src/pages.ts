@@ -127,6 +127,8 @@ export type PageBlock = {
    * A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. With `ahead:`
    * naming a figure over the walk (`runway-days`), the trend is that walk's balance over the window AHEAD from today
    * instead, from the figure the walk opens from and over its legs, so a tile draws the very walk Cash ahead draws.
+   * `ahead:` may name the figure a walk opens from (`cash-now`) instead, and the fullest walk declared from it is drawn
+   * (`walkFrom`), so a page that knows only what is held draws its future without naming whose figure walks it.
    */
   cells?: { metric: string; label?: string; trend?: string; note?: string; ahead?: string }[];
   /**
@@ -3827,6 +3829,26 @@ function trendOf(deps: PageDeps, metric: string, window: string): { trend?: (num
 }
 
 /**
+ * THE FULLEST WALK THAT OPENS FROM FIGURE `id`: of the figures over `forecast.runway` whose `opening` names it, the one
+ * over the most legs, by id when two tie. Two figures over the same legs walk one walk, so which is answered changes
+ * nothing drawn, and a walk over fewer legs (what lasts if nothing comes in) is a part of the whole one, not the future.
+ */
+function walkFrom(deps: PageDeps, id: string): MetricDecl | null {
+  const best = fullestWalk(deps.metrics?.() ?? [], id);
+  return best === null ? null : deps.metric(best.metric);
+}
+
+/** `walkFrom`'s choice among `figures`, as declared: the reader of the lists a page reads asks it with no live target. */
+function fullestWalk(figures: readonly MetricDecl[], id: string): MetricDecl | null {
+  let best: MetricDecl | null = null;
+  for (const d of figures) {
+    if (d.source !== 'forecast.runway' || !Array.isArray(d.legs) || d.opening?.metric !== id) continue;
+    if (best === null || d.legs.length > (best.legs as unknown[]).length) best = d;
+  }
+  return best;
+}
+
+/**
  * A TREND AHEAD: the walk a figure over `forecast.runway` walks (its legs, from the figure its `opening` names), over the
  * window from today, as the balance at the end of each day, today first. The same walk Cash ahead draws over the same
  * legs, so a tile on Today and the chart on Money cannot draw two pictures of one future.
@@ -3842,9 +3864,12 @@ function aheadOf(
 ): { trend?: (number | null)[]; ahead?: { from: string; currency: string; low: { day: string; value: number } } } | { refusal: Refusal } {
   const span = windowMs(window);
   if (span === null) return { refusal: { code: 'DECLARATION_INVALID', fix: `trend: ${window} is not a window. Write 12w, 90d or 3m.`, at: 'trend' } };
-  const decl = deps.metric(walkId);
-  if (!decl || decl.source !== 'forecast.runway' || !Array.isArray(decl.legs) || typeof decl.opening?.metric !== 'string')
-    return { refusal: { code: 'DECLARATION_INVALID', fix: `ahead: names a figure over the walk that opens from a figure of what is held, such as runway-days; ${walkId} is not one.`, at: 'ahead' } };
+  const isWalk = (d: MetricDecl | null): d is MetricDecl & { legs: Leg[]; opening: { metric: string } } =>
+    d !== null && d.source === 'forecast.runway' && Array.isArray(d.legs) && typeof d.opening?.metric === 'string';
+  const named = deps.metric(walkId);
+  const decl = isWalk(named) ? named : walkFrom(deps, walkId);
+  if (!isWalk(decl))
+    return { refusal: { code: 'DECLARATION_INVALID', fix: `ahead: names a figure over the walk, or a figure of what is held that a walk opens from, such as runway-days or cash-now; ${walkId} is neither.`, at: 'ahead' } };
   const opening = deps.metric(decl.opening.metric);
   const held = opening ? deps.read(opening) : null;
   if (!held?.ok || typeof held.value.value !== 'number') return {};
@@ -5081,7 +5106,13 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const at = cell.metric.indexOf(':');
       addFigure(at < 0 ? cell.metric : cell.metric.slice(0, at));
       /* AND A TREND AHEAD READS THE WALK IT DRAWS: every list its legs walk and the figure it opens from. */
-      if (typeof (cell as { ahead?: unknown }).ahead === 'string') addFigure((cell as { ahead: string }).ahead);
+      if (typeof (cell as { ahead?: unknown }).ahead === 'string') {
+        const ahead = (cell as { ahead: string }).ahead;
+        addFigure(ahead);
+        /* A FIGURE OF WHAT IS HELD DRAWS THE FULLEST WALK FROM IT (`walkFrom`), whose legs are read too. */
+        const walk = fullestWalk(beside?.metrics?.() ?? [], ahead);
+        if (walk) addFigure(walk.metric);
+      }
     }
     /* A SERIES READS EVERY FIGURE IT LINES UP. */
     for (const line of block.series ?? [])

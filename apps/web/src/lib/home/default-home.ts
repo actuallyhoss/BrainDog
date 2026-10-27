@@ -566,7 +566,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       ...(holds.runs ? [workingTile(voice)] : []),
       /* CASH AHEAD (today F5): the cash now, how long it lasts, and what comes in and goes out in the next thirty days,
          read from the Money page's own figures, where that page is. ITS LINE IS THE TWELVE WEEKS AHEAD, the walk the
-         runway counts (`ahead: runway-days`) and Money's Cash ahead draws over the same twelve weeks, with today, the
+         runway counts (`ahead: cash-now`, the fullest walk from the cash now) and Money's Cash ahead draws over the same twelve weeks, with today, the
          lowest point and both ends marked; it was the twelve weeks behind, under a tile called Cash ahead, and ended in
          a drop Money's chart did not have. */
       ...(holds.money
@@ -578,7 +578,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
               heading: words.money,
               icon: 'wallet',
               cells: [
-                { metric: 'cash-now', label: words.cashNow, trend: '12w', ahead: 'runway-days', note: words.lastsTo },
+                { metric: 'cash-now', label: words.cashNow, trend: '12w', ahead: 'cash-now', note: words.lastsTo },
                 { metric: 'arriving-30d', label: words.comingIn },
                 { metric: 'leaving-30d', label: words.goingOut },
               ],

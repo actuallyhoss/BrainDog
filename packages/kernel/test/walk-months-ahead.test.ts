@@ -129,6 +129,24 @@ test('A STAT CELL WITH ahead: DRAWS THE WALK FROM TODAY, a balance a day, and sa
   sql.close();
 });
 
+test('A STAT CELL WITH ahead: NAMING WHAT IS HELD DRAWS THE FULLEST WALK FROM IT, never one over fewer legs', async () => {
+  const { k, sql } = await record();
+  /* A SECOND WALK FROM THE SAME CASH, OVER THE MONEY GOING OUT ALONE: a part of the future, not the future. */
+  const lean = { ...RUNWAY, metric: 'lasts-lean', name: 'Lasts lean', legs: [LEGS[1]] };
+  const page = { id: 'page.desk', kind: 'page', body: { page: 'desk', title: 'Desk', blocks: [{ kind: 'stat', heading: 'Cash ahead', cells: [{ metric: 'cash', trend: '4w', ahead: 'cash' }] }] } };
+  const made = await k.install([metric(lean), page as never]);
+  assert.ok(made.ok, JSON.stringify(made));
+  type Cell = { trend?: (number | null)[]; ahead?: { from: string; currency: string; low: { day: string; value: number } } };
+  const out = k.page('desk') as { ok: boolean; value: { blocks: { readings?: Cell[]; refusals?: unknown[] }[] } };
+  assert.ok(out.ok, JSON.stringify(out));
+  const [cell] = out.value.blocks[0]!.readings!;
+  assert.deepEqual(out.value.blocks[0]!.refusals ?? [], []);
+  /* THE PAY ON THE 31ST IS IN IT, so the walk is the runway's over both legs. */
+  assert.equal(cell!.trend![11], 150_000);
+  assert.deepEqual(cell!.ahead, { from: '2026-10-20', currency: 'EGP', low: { day: '2026-11-13', value: 30_000 } });
+  sql.close();
+});
+
 test('A WALK TO ZERO SAYS WHERE IT GOES UNDER: the day, what falls due then and its money, and nothing when it never does', async () => {
   const { k, sql } = await record();
   /* WITH NOTHING COMING IN, the opening 1,000.00 meets the house's 1,200.00 on 13 November and goes under there. */
