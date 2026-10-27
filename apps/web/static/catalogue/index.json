@@ -3544,8 +3544,32 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.2.1",
+      "latest": "2.2.2",
       "versions": [
+        {
+          "version": "2.2.2",
+          "checksum": "e55c0cc6e1b71e3b4faf0b3b1569b8843a1539b6156a01905a40391cff362220",
+          "bytes": 15864,
+          "published_at": "2026-10-27T18:54:28.260Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Revenue bands"
+            ],
+            "pages": [
+              "Revenue bands"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own. The month now finds the cards on the new Projects board.",
+          "preview": true
+        },
         {
           "version": "2.2.1",
           "checksum": "4d509a97d6b7766bf512eaeb50f7257ffca29d0586d11cccf9511d625491e960",

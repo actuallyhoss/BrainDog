@@ -611,7 +611,8 @@ const NOT_DRAWN = 'until a card reads its figure off a figure (PGS-C29 job 2: pa
 test('2.2.0 IS 2.1.0 WITH TWO ADDITIONS TO PROJECTS, and nothing else moved', () => {
   const was = JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/portfolio-bands/2.1.0.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;
   const now = template();
-  assert.equal(now.version, '2.2.1');
+  /* 2.2.2 SINCE 27 October: the column goes into Projects' board, the key In play answers since Portfolio 1.30.0. */
+  assert.equal(now.version, '2.2.2');
   assert.equal(was.adds, undefined);
   const { version: _v, changes: _c, adds: _a, icon: _i, ...rest } = now;
   const { version: _w, changes: _d, ...before } = was;
