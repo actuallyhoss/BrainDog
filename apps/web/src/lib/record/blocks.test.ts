@@ -54,11 +54,11 @@ const figure = (row: Row | undefined): number => signedOf(row?.cells[1] ?? '');
 /**
  * THE BRIDGE MONEY DREW UNTIL money-core 3.17.0, MADE FOR THE TEST: Coming and going opens on the calendar since
  * REC-B23, and a book's page, which still draws one, has no book in the sample. Its legs are the ones Cash ahead walks
- * on the Money page, read off that page's own declaration, over the thirty days `leaving-30d` and `arriving-30d` walk.
+ * on the Forecast page, read off that page's own declaration, over the thirty days `leaving-30d` and `arriving-30d` walk.
  */
 const moneyBridge = () => {
-  const ahead = pages()['money']?.blocks.find((b) => b.kind === 'forecast' && b.source === 'forecast.runway') as { from?: unknown } | undefined;
-  assert.ok(ahead?.from, '/p/money draws no Cash ahead, so this test has no legs to walk');
+  const ahead = pages()['money-forecast']?.blocks.find((b) => b.kind === 'forecast' && b.source === 'forecast.runway') as { from?: unknown } | undefined;
+  assert.ok(ahead?.from, '/p/money-forecast draws no Cash ahead, so this test has no legs to walk');
   return readBlock({ kind: 'bridge', span: 12, source: 'forecast.runway', opening: { metric: 'cash-now' }, from: ahead.from, horizon: 30 } as never);
 };
 

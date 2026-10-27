@@ -827,9 +827,10 @@ test('THE CASH WALK SAYS WHAT IT STARTED FROM', () => {
      already know the walk began at 5,000 — and the red "RUNWAY 0 days" headline above it is derived
      from the same invisible figure. A forecast whose arithmetic cannot be checked from the screen is
      a number somebody has to trust. */
-  const drawn = page('money');
+  /* CASH AHEAD IS THE FORECAST PAGE'S SINCE money-core 3.29.0, where Money's home draws the walk small in its hero. */
+  const drawn = page('money-forecast');
   const walk = drawn?.blocks.find((b) => b.opening !== undefined);
-  assert.ok(walk, 'the money page draws no cash walk, so this test proves nothing');
+  assert.ok(walk, 'the forecast page draws no cash walk, so this test proves nothing');
   const first = walk.rows[0]!;
   assert.equal(first.cells[1], 'What is liquid today');
   assert.match(String(first.cells[3]), /GBP/, 'the opening row carries no figure');
@@ -966,9 +967,9 @@ const rowsOfBlock = (block: BlockResult) =>
 
 test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out, and where it lands', () => {
   /* A BRIDGE MADE FOR THE TEST, SINCE money-core 3.17.0: Coming and going opens on the calendar (REC-B23), and the
-     sample holds no book whose page still draws one. It walks the legs Cash ahead walks on the Money page, over thirty days. */
-  const ahead = pages()['money']?.blocks.find((b) => b.kind === 'forecast' && b.source === 'forecast.runway') as { from?: unknown } | undefined;
-  assert.ok(ahead?.from, '/p/money draws no Cash ahead, so this test has no legs to walk');
+     sample holds no book whose page still draws one. It walks the legs Cash ahead walks on the Forecast page, over thirty days. */
+  const ahead = pages()['money-forecast']?.blocks.find((b) => b.kind === 'forecast' && b.source === 'forecast.runway') as { from?: unknown } | undefined;
+  assert.ok(ahead?.from, '/p/money-forecast draws no Cash ahead, so this test has no legs to walk');
   const block = readBlock({ kind: 'bridge', span: 12, source: 'forecast.runway', opening: { metric: 'cash-now' }, from: ahead.from, horizon: 30 } as never);
   assert.ok(block.walk, 'the bridge has no walk');
   const rows = rowsOfBlock(block);
@@ -988,9 +989,9 @@ test('A SPLIT GROUPS BY WHAT THE MONEY IS FOR, in the words the screen shows', (
   assert.ok(!labels.some((l) => l?.includes('_')), 'a category printed as its id');
 });
 
-test('THE MONEY PAGE DRAWS ITS BARS BY MONTH as a series, a header naming each line and a row a month', async () => {
+test('THE FORECAST PAGE DRAWS ITS BARS BY MONTH as a series, a header naming each line and a row a month', async () => {
   const { draw } = await import('./blocks.ts');
-  const series = page('money')!.blocks.find((b) => b.kind === 'series')!;
+  const series = page('money-forecast')!.blocks.find((b) => b.kind === 'series')!;
   const drawn = draw(series);
   assert.equal(drawn.refusal, null);
   const [segment] = drawn.segments;
@@ -1001,13 +1002,14 @@ test('THE MONEY PAGE DRAWS ITS BARS BY MONTH as a series, a header naming each l
   const months = segment.rows.slice(1);
   assert.equal(months.length, series.bars!.keys.length);
   assert.match(months[0]!.cells[0]!, /^[A-Z][a-z]{2} \d{4}$/u, 'a month as a person says it');
-  assert.ok(months.some((r) => /^£[\d,]+\.\d\d$/u.test(r.cells[1] ?? '')), 'money in the home currency');
+  /* THE FORECAST PAGE'S SINCE money-core 3.29.0: last month, this one and three ahead, where a whole amount ahead is said in whole pounds. */
+  assert.ok(months.some((r) => /^£[\d,]+(\.\d\d)?$/u.test(r.cells[1] ?? '')), 'money in the home currency');
   assert.deepEqual(months.slice(-4).map((r) => r.cells[3]), ['due', 'ahead', 'ahead', 'ahead'], 'this month holds money still due in it, and says so');
 });
 
-test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety days remembered, every movement, and its knobs', async () => {
+test('THE FORECAST PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety days remembered, every movement, and its knobs', async () => {
   const { draw } = await import('./blocks.ts');
-  const forecast = page('money')!.blocks.find((b) => b.kind === 'forecast')!;
+  const forecast = page('money-forecast')!.blocks.find((b) => b.kind === 'forecast')!;
   assert.deepEqual(forecast.refusals, []);
   const drawn = draw(forecast);
   assert.equal(drawn.refusal, null);
@@ -1019,11 +1021,11 @@ test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety day
   assert.equal(marks[0], 'opening');
   assert.ok(marks.filter((m) => m === 'past').length >= 80, 'the sample remembers ninety days of cash');
   assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
-  /* TWELVE WEEKS FIRST SINCE money-core 3.27.0 (ten from 3.17.0, three months before), the span Today's line of the same
-     walk draws, AND TWO YEARS WALKED SINCE 3.9.0 and the kernel's WALK_UNASKED: the longest length Cash ahead offers is
-     730 days, so every length is still on the control without walking further than it shows. */
-  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '84']);
-  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'reach')?.cells.slice(0, 2), ['reach', '730']);
+  /* THIRTEEN WEEKS FIRST ON THE FORECAST PAGE SINCE money-core 3.29.0 (twelve on the home from 3.27.0, ten from 3.17.0),
+     AND A YEAR WALKED, the longest length the page offers (`horizons`, and the kernel's WALK_UNASKED), so every length is
+     still on the control without walking further than it shows. */
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '91']);
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'reach')?.cells.slice(0, 2), ['reach', '365']);
   /* `leave` IS FOLDED INTO `count` AND `sell` IS OFFERED, since money-core 3.0.0: one control over the streams, not two
      with opposite meanings, and what a pack declares sellable. */
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend count grow drift sell']);
