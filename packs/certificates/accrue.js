@@ -46,7 +46,7 @@ export function levelled(fields, today) {
   const money = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';
   const same = (a, b) => money(a) && a.amount === b.amount && a.currency === b.currency;
   const out = {};
-  const principal = fields.principal;
+  const principal = fields.amount;
   if (!money(principal) || typeof fields.rate !== 'number') return out;
   const start = dayOf(fields.start);
   if (start === null) return out;
@@ -55,9 +55,9 @@ export function levelled(fields, today) {
     ends = monthsOn(fields.start, Math.round(fields.term));
     out.ends = ends;
   }
-  const compound = fields.compound === true;
+  const compound = fields.roll === true;
   const step = CYCLE[fields.every];
-  if (!money(fields.payout) && !compound && step) out.payout = { amount: interestOver(principal.amount, fields.rate, (step * 365) / 12, false), currency: principal.currency };
+  if (!money(fields.pays) && !compound && step) out.pays = { amount: interestOver(principal.amount, fields.rate, (step * 365) / 12, false), currency: principal.currency };
   if (!dayOf(fields.next_payout) && step) {
     const first = monthsOn(fields.start, step);
     out.next_payout = dayOf(ends) !== null && dayOf(first) > dayOf(ends) ? ends : first;

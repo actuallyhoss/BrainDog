@@ -1,0 +1,229 @@
+{
+  "format": 1,
+  "made_at": "2026-10-27T14:56:10.077Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Two ways to clear what you are paying off, and what each saves in interest.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "how",
+              "label": "Way"
+            },
+            {
+              "as": "figure",
+              "field": "takes",
+              "label": "Debt-free in"
+            },
+            {
+              "as": "when",
+              "field": "debt_free",
+              "label": "Debt-free on"
+            },
+            {
+              "as": "fact",
+              "field": "saved",
+              "label": "Interest saved"
+            },
+            {
+              "as": "fact",
+              "field": "order",
+              "label": "Paid off in this order"
+            },
+            {
+              "as": "fact",
+              "field": "said",
+              "label": "What happened"
+            }
+          ],
+          "empty": "No plan yet. Add a debt below with its balance, yearly rate and minimum, and both plans appear here.",
+          "heading": "Two ways to be debt-free",
+          "kind": "cards",
+          "limit": 2,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "how"
+            }
+          ],
+          "source": "register.payoff_plans",
+          "span": 12,
+          "key": "k1sweo6h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "how",
+              "label": "Way",
+              "width": "14ch"
+            },
+            {
+              "align": "end",
+              "field": "extra",
+              "label": "Extra each month",
+              "width": "18ch"
+            },
+            {
+              "field": "takes",
+              "label": "Debt-free in",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "interest",
+              "label": "Interest paid",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "minimum_interest",
+              "label": "Interest at the minimums",
+              "width": "20ch"
+            },
+            {
+              "align": "end",
+              "field": "saved",
+              "label": "Interest saved",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "sooner",
+              "label": "Months sooner",
+              "width": "14ch"
+            }
+          ],
+          "empty": "Nothing to compare yet. The extra you pay each month is typed here once a plan exists, and both plans are worked again.",
+          "heading": "The two compared",
+          "kind": "table",
+          "limit": 2,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "how"
+            }
+          ],
+          "source": "register.payoff_plans",
+          "span": 12,
+          "key": "k0uq5y7w",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "The avalanche pays the highest rate first and costs the least interest. The snowball pays the smallest balance first and clears a debt soonest. Type a new extra on either plan and both are worked again.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Debt",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "align": "end",
+              "field": "left",
+              "label": "Balance left",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "apr",
+              "label": "Yearly rate %",
+              "width": "14ch"
+            },
+            {
+              "align": "end",
+              "field": "minimum",
+              "label": "Minimum each month",
+              "width": "18ch"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            }
+          ],
+          "empty": "No debts yet. Add a card, a loan or an instalment plan with what is left on it and its minimum.",
+          "heading": "What you are paying off",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "left"
+            }
+          ],
+          "source": "register.debts",
+          "span": 12,
+          "key": "k0r6kygi",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a debt",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "debts",
+          "span": 12,
+          "key": "k1y88pcq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        }
+      ],
+      "icon": "credit-card",
+      "nav": {
+        "order": 55,
+        "section": "Money"
+      },
+      "page": "debts",
+      "requires": [
+        "register.debts",
+        "register.payoff_plans"
+      ],
+      "title": "Debts",
+      "read_at": "2026-10-27T14:56:10.077Z",
+      "zone": "UTC",
+      "look": {
+        "look": "debts",
+        "basis": "r1alcvje",
+        "by": "rule",
+        "hide": [
+          "k1sweo6h",
+          "k0uq5y7w",
+          "k0r6kygi"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

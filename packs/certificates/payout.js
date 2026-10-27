@@ -31,7 +31,7 @@ export function payoutOf(line, certificates) {
   if (f.direction !== 'in' || f.state !== 'cleared' || !f.amount || !isDay(f.on)) return { nothing: 'The line is not money in that has cleared, so no certificate was looked for.' };
   const found = certificates.filter((c) => {
     const g = c.fields;
-    if (g.state !== 'live' || !g.payout || g.payout.amount !== f.amount.amount || g.payout.currency !== f.amount.currency) return false;
+    if (g.state !== 'live' || !g.pays || g.pays.amount !== f.amount.amount || g.pays.currency !== f.amount.currency) return false;
     if (g.account && g.account !== f.account) return false;
     return isDay(g.next_payout) && apart(g.next_payout, f.on) <= 5;
   });
@@ -41,7 +41,7 @@ export function payoutOf(line, certificates) {
 
 export function moveOn(certificate, next) {
   const g = certificate.fields;
-  const name = String(g.issuer ?? '').trim() || 'The certificate';
+  const name = String(g.bank ?? '').trim() || 'The certificate';
   if (!(isDay(next) && isDay(g.next_payout) && next > g.next_payout)) return { nothing: name + ' has no later payout day to move to, so nothing was asked.' };
   const matured = isDay(g.ends) && next > g.ends;
   return {

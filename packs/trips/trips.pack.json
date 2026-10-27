@@ -1,10 +1,10 @@
 {
   "pack": "trips",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "icon": "plane",
   "title": "Trips",
   "summary": "Name a trip with its dates and file the Ledger's lines into it, and each trip says what it cost in total, by category and in each currency.",
-  "changes": "When a trip's dates change, the lines it filed that now fall outside them are taken out again.",
+  "changes": "Renames the colour field to hue. When a trip's dates change, the lines it filed that now fall outside them are taken out again.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -66,7 +66,7 @@
           "required": true
         },
         {
-          "id": "colour",
+          "id": "hue",
           "label": "Colour",
           "type": "enum",
           "values": [
@@ -273,7 +273,7 @@
               "width": "13ch"
             },
             {
-              "field": "colour",
+              "field": "hue",
               "label": "Colour",
               "width": "10ch"
             }

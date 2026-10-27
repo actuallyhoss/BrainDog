@@ -106,13 +106,13 @@ async function layOut(ctx, row, cover) {
   const f = row.fields;
   const startYear = isDay(f.starts_on) ? Number(f.starts_on.slice(0, 4)) : null;
   const want = f.illustration ? illustrationRows(f.illustration, cover, startYear, f.age_at_start) : [];
-  const have = await ctx.record.list('illustration_years', { field: 'policy', is: row.id });
+  const have = await ctx.record.list('illustration_years', { field: 'of', is: row.id });
   const byYear = new Map(have.filter((h) => !h.fields.deleted_at && !h.deleted_at).map((h) => [h.fields.year, h]));
   for (const w of want) {
     const h = byYear.get(w.year);
     byYear.delete(w.year);
     if (!h) {
-      ctx.write('illustration_years', Object.fromEntries(Object.entries({ policy: row.id, ...w }).filter(([, v]) => v !== null)));
+      ctx.write('illustration_years', Object.fromEntries(Object.entries({ of: row.id, ...w }).filter(([, v]) => v !== null)));
       continue;
     }
     const patch = {};
@@ -124,7 +124,7 @@ async function layOut(ctx, row, cover) {
 
 async function work(ctx, row, today) {
   const f = row.fields;
-  const line = typeof f.premium === 'string' ? await ctx.record.get(f.premium) : null;
+  const line = typeof f.cost === 'string' ? await ctx.record.get(f.cost) : null;
   const next = {};
   const set = (key, value) => {
     if (value === null ? f[key] !== null && f[key] !== undefined : !same(f[key], value)) next[key] = value;
@@ -139,7 +139,7 @@ async function work(ctx, row, today) {
       if (isDay(line.fields.ends) && line.fields.ends < end) end = line.fields.ends;
       const n = payments(start, end, line.fields.every);
       set('paid', { amount: n * amount.amount, currency: amount.currency });
-      set('payments', n);
+      set('times', n);
     }
   }
   if (isDay(f.starts_on) && isDay(f.matures_on) && f.matures_on > f.starts_on) {

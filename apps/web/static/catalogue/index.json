@@ -380,8 +380,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.1",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "ab47464a35c84d7a3d69ebec869f6f403e4f887320479c3f680013ed78e088e6",
+          "bytes": 24094,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Renames four fields: principal is amount, payout is pays, direction is flow, compound is roll, issuer is bank. Shows what each certificate will be worth when it matures, and Cash ahead walks that value as the money coming back.",
+          "preview": true
+        },
         {
           "version": "1.1.1",
           "checksum": "2840f63d7e60aa930216650cb68b2c5631745399804ffbd9ff326b037ac1d36a",
@@ -485,8 +512,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "3.0.0",
       "versions": [
+        {
+          "version": "3.0.0",
+          "checksum": "db2cde9edfd1a1b9b793a5d83193c891a0c93c7c128986a01883f2cb06139e65",
+          "bytes": 28290,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Reconcile is now filed. A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. A count that says neither is filed as one entry, as before, and every older count reads as it did.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "c952963eaa8fe44e4c1dd3cd87d15d122b7a56564e8e9e74648d38c8d35a81ac",
@@ -843,8 +896,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "34099c571e01ba65e720afe825d38178549c771fe20741f494a8b8107a97a773",
+          "bytes": 20479,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Debts",
+              "Payoff plans"
+            ],
+            "pages": [
+              "Debts"
+            ],
+            "rules": [
+              "Work out the plans when a debt changes",
+              "Work out the plans when the extra changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Renames fields: balance is left, method is how, months is mos. The first version: a list of debts, two plans worked out from it, and a page that shows them side by side.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "a78b3b930b34b556c4410adaad3f394355332ed22c6481b182b1d9c8760e5c13",
@@ -1126,8 +1207,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "0ce25debd64518545084bb17520ef44841f5e7f05826dbaa9f5854b1d2436947",
+          "bytes": 17818,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Goals"
+            ],
+            "pages": [
+              "Goals"
+            ],
+            "rules": [
+              "goals_pace",
+              "goals_pace_on_balance"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Renames the parent field to under. The monthly pace reads every goal and every account, however many there are.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "d9e6f23bc22050e754244907d97ef78d4a21af22700bfcca94b9d4045d5b1fe9",
@@ -1332,8 +1440,39 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "3.0.0",
       "versions": [
+        {
+          "version": "3.0.0",
+          "checksum": "f8cb4cf0a349d5de591c63f90bf2e1062a5e34fc98cd6df1abafd9793d70bf3a",
+          "bytes": 44304,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Renames fields: a gold rate's current is live, symbol is code, and a buy's holding is item. Every buy, gold rate and holding is read, however many there are, where the page and the figures stopped at fifty.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "08f659f8723eea62155b7a3988322ab9f66305cbe72957d26f71b2a01dcb867b",
@@ -1572,8 +1711,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "3853e181af34fa2505617c130adf44b89ccc9b978c49236c46ff2a34b1d95ab6",
+          "bytes": 35388,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Renames fields: premium is cost, payments is times, and an illustration year's policy is of. Draws the insurer's year-by-year illustration as a table and a three-line chart on each policy, with the age for each year.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "cdedfe0400fc78b240a6cb003018b46b94d02a29fc6351f17be78def91b6b403",
@@ -5162,8 +5329,35 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "8cbe236fd2755c42eb72eacebc09fbc8bf935fb34775036c100ec78da6f70336",
+          "bytes": 15584,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Trips"
+            ],
+            "pages": [
+              "Trips",
+              "{{name}}"
+            ],
+            "rules": [
+              "File the Ledger's lines of a trip's days into it"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Renames the colour field to hue. When a trip's dates change, the lines it filed that now fall outside them are taken out again.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "31719a216e80d8e645397735824bff5ba1146070879243016e02c7f948d7660e",
@@ -5371,8 +5565,39 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "d4436c86d64a7385ef68c384631dfb3852811540be9c23ae6480bcfb496a4715",
+          "bytes": 36865,
+          "published_at": "2026-10-27T14:56:10.077Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "money-core",
+              "holdings"
+            ],
+            "lists": [
+              "Zakat working",
+              "Cash at its lowest",
+              "Zakat given"
+            ],
+            "pages": [
+              "Zakat"
+            ],
+            "rules": [
+              "zakat_inputs",
+              "zakat_rate",
+              "zakat_metals"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Renames fields: measure is mode, owed_to_you is lent, left_out is left, lowest is low, counts is taken, paid_on is paid. First version. Needs Investments and gold. Shows the nisab, the year, the lowest each cash account stood at, the metals, the bills due and what 2.5% comes to, and keeps what you give.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "adf23ef139ebb255d89df1d131897c7e7f5e9b59e53d55cbffb4d2ea1f022223",

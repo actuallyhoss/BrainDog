@@ -141,8 +141,8 @@ async function every(ctx, register, where) {
 }
 
 export default async function run(ctx) {
-  const rows = await every(ctx, DEBTS, { field: 'balance', present: true });
-  const plans = await every(ctx, PLANS, { field: 'method', present: true });
+  const rows = await every(ctx, DEBTS, { field: 'left', present: true });
+  const plans = await every(ctx, PLANS, { field: 'how', present: true });
   const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);
 
   /* THE EXTRA: the plan whose extra differs from what it was last worked with, the newest edit when both do. */
@@ -152,7 +152,7 @@ export default async function run(ctx) {
   const known = plans.find((p) => isMoney(p.fields.extra));
   const set = edited ? edited.fields.extra : known ? known.fields.extra : null;
 
-  const open = rows.filter((r) => isMoney(r.fields.balance) && r.fields.balance.amount > 0);
+  const open = rows.filter((r) => isMoney(r.fields.left) && r.fields.left.amount > 0);
   if (open.length === 0 && plans.length === 0) {
     ctx.log('There are no debts with a balance, so no plan was made.');
     return;
@@ -160,10 +160,10 @@ export default async function run(ctx) {
 
   /* THE CURRENCY: the extra's, or the one holding the most debts. */
   const counts = new Map();
-  for (const r of open) counts.set(r.fields.balance.currency, (counts.get(r.fields.balance.currency) ?? 0) + 1);
+  for (const r of open) counts.set(r.fields.left.currency, (counts.get(r.fields.left.currency) ?? 0) + 1);
   const currency = set ? set.currency : [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   const extra = set ? set.amount : 0;
-  const worked = open.filter((r) => r.fields.balance.currency === currency);
+  const worked = open.filter((r) => r.fields.left.currency === currency);
   const left = open.length - worked.length;
 
   const debts = worked.map((r) => {
@@ -171,7 +171,7 @@ export default async function run(ctx) {
     return {
       id: r.id,
       name: String(r.fields.name),
-      balance: r.fields.balance.amount,
+      balance: r.fields.left.amount,
       minimum: Math.max(0, min),
       apr: Number(r.fields.apr ?? 0) || 0,
     };
@@ -198,9 +198,9 @@ export default async function run(ctx) {
 
     const comparable = ok && base !== null && base.months !== null;
     const patch = {
-      method,
+      how: method,
       used: currency === null ? null : { amount: extra, currency },
-      months: ok ? plan.months : null,
+      mos: ok ? plan.months : null,
       takes: ok ? span(plan.months) : null,
       debt_free: ok ? after(today, plan.months) : null,
       interest: ok ? money(plan.interest) : null,
@@ -212,7 +212,7 @@ export default async function run(ctx) {
       worked_at: ctx.now(),
     };
 
-    const mine = plans.find((p) => p.fields.method === method);
+    const mine = plans.find((p) => p.fields.how === method);
     if (currency !== null && !(mine && same(mine.fields.extra, patch.used))) patch.extra = patch.used;
     if (mine) ctx.update(`${PLANS}#${mine.seq}`, patch, mine.version);
     else ctx.write(PLANS, patch);

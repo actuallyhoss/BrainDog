@@ -79,7 +79,7 @@ function markRates(ctx, rates, today) {
   for (const r of rates) {
     const next = undated(r) ? { on: today } : {};
     const now = ids.has(r.id);
-    if ((r.fields.current === true) !== now) next.current = now;
+    if ((r.fields.live === true) !== now) next.live = now;
     if (Object.keys(next).length > 0) ctx.update('gold_rates#' + r.seq, next, r.version);
   }
   return current;
@@ -89,7 +89,7 @@ function markRates(ctx, rates, today) {
 async function work(ctx, row, current, today, repriced) {
   if (!row) return;
   const f = row.fields;
-  const buys = await every(ctx, 'holding_buys', { field: 'holding', is: row.id });
+  const buys = await every(ctx, 'holding_buys', { field: 'item', is: row.id });
   const next = {};
 
   let qty = f.qty;
@@ -196,11 +196,11 @@ export default async function run(ctx) {
     const paid = buy === null ? null : paidOf(buy);
     if (buy !== null && paid !== null && !same(buy.fields.paid, paid)) ctx.update('holding_buys#' + buy.seq, { paid }, buy.version);
     /* GONE, OR MOVED FROM ONE HOLDING TO ANOTHER: which holding it left is not said, so every holding is worked out. */
-    if (buy === null || (input.op === 'update' && moved.includes('holding'))) {
+    if (buy === null || (input.op === 'update' && moved.includes('item'))) {
       for (const row of await every(ctx, 'holdings')) await work(ctx, row, current, today, false);
       return;
     }
-    const holding = typeof buy.fields.holding === 'string' ? await ctx.record.get(buy.fields.holding) : null;
+    const holding = typeof buy.fields.item === 'string' ? await ctx.record.get(buy.fields.item) : null;
     await work(ctx, holding, current, today, false);
     return;
   }

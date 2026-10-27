@@ -113,7 +113,7 @@ function pureRate(rates) {
   const best = {};
   for (const r of rates) {
     const k = r.fields.karat;
-    if (r.fields.current !== true || !amount(r.fields.per_gram) || PURITY[k] === undefined) continue;
+    if (r.fields.live !== true || !amount(r.fields.per_gram) || PURITY[k] === undefined) continue;
     best[k] = r.fields.per_gram;
   }
   if (best['24k']) return best['24k'];
@@ -129,7 +129,7 @@ export default async function run(ctx) {
 
   const rate = pureRate(await ctx.record.list('gold_rates'));
   const silver = amount(f.silver_rate) ? f.silver_rate : null;
-  const useSilver = f.measure === 'silver' && silver !== null;
+  const useSilver = f.mode === 'silver' && silver !== null;
   const grams = useSilver ? 595 : 85;
   const per = useSilver ? silver : rate;
   const nisab = per ? { amount: Math.round(grams * per.amount), currency: per.currency } : null;
@@ -147,18 +147,18 @@ export default async function run(ctx) {
     const got = await lowest(ctx, a, today);
     if (got === null) continue;
     live.add(a.id);
-    const next = { account: a.id, lowest: got.balance, lowest_on: got.on, since: got.from, moves: got.moves, whole: got.whole, counts: got.balance.currency === cur, worked_on: today };
+    const next = { account: a.id, low: got.balance, lowest_on: got.on, since: got.from, moves: got.moves, whole: got.whole, taken: got.balance.currency === cur, worked_on: today };
     const row = rowOf.get(a.id);
     if (!row) ctx.write('zakat_cash', next);
     else {
       const patch = {};
-      for (const k of Object.keys(next)) if (k === 'lowest' ? !same(row.fields.lowest, next.lowest) : row.fields[k] !== next[k]) patch[k] = next[k];
+      for (const k of Object.keys(next)) if (k === 'low' ? !same(row.fields.low, next.low) : row.fields[k] !== next[k]) patch[k] = next[k];
       if (Object.keys(patch).length > 0) ctx.update('zakat_cash#' + row.seq, patch, row.version);
     }
     if (got.balance.currency === cur) cash += Math.max(0, got.balance.amount);
     else left += 1;
   }
-  for (const r of kept) if (!live.has(r.fields.account) && r.fields.counts !== false) ctx.update('zakat_cash#' + r.seq, { counts: false }, r.version);
+  for (const r of kept) if (!live.has(r.fields.account) && r.fields.taken !== false) ctx.update('zakat_cash#' + r.seq, { taken: false }, r.version);
 
   /* METALS, from Investments and gold: gold and metal holdings at what each is worth now. */
   let metals = 0;
@@ -197,8 +197,8 @@ export default async function run(ctx) {
   }
   const otherDebts = amount(f.debts_other) && f.debts_other.currency === cur ? f.debts_other.amount : 0;
   if (amount(f.debts_other) && f.debts_other.currency !== cur) left += 1;
-  const owedIn = amount(f.owed_to_you) && f.owed_to_you.currency === cur ? f.owed_to_you.amount : 0;
-  if (amount(f.owed_to_you) && f.owed_to_you.currency !== cur) left += 1;
+  const owedIn = amount(f.lent) && f.lent.currency === cur ? f.lent.amount : 0;
+  if (amount(f.lent) && f.lent.currency !== cur) left += 1;
 
   const money = (n) => (cur === null ? null : { amount: n, currency: cur });
   const total = cash + metals + owedIn - bills - otherDebts;
@@ -221,11 +221,11 @@ export default async function run(ctx) {
     total: money(zakatable),
     due: money(met ? Math.round((zakatable * RATE) / 1000) : 0),
     met,
-    left_out: left,
+    left: left,
     worked_on: today,
   };
   if (!basis) {
-    ctx.write('zakat_basis', { ...out, measure: 'gold' });
+    ctx.write('zakat_basis', { ...out, mode: 'gold' });
     return;
   }
   const patch = {};

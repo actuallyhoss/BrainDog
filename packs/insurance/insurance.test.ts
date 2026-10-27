@@ -99,7 +99,7 @@ test('BEFORE THE ADD-ON: a record has no policies list and no Insurance page', a
 
 test('THE FILE: one list, a rule and its script, two pages, and no kernel change, on money-core 3', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version, doc.author], ['insurance', '1.1.0', 'BrainDog']);
+  assert.deepEqual([doc.pack, doc.version, doc.author], ['insurance', '2.0.0', 'BrainDog']);
   assert.deepEqual((doc.requires as Body).packs, { 'money-core': '>=3.0.0 <4.0.0' });
   const kinds = (key: string) => doc.declarations.filter((d) => key in d).map((d) => d[key]);
   assert.deepEqual(kinds('register'), ['policies', 'illustration_years']);
@@ -107,7 +107,7 @@ test('THE FILE: one list, a rule and its script, two pages, and no kernel change
   assert.deepEqual([kinds('rule'), kinds('script')], [['insurance_figures'], ['insurance_figures']]);
   const list = doc.declarations.find((d) => d.register === 'policies')!;
   const byId = new Map((list.fields as { id: string; type: string; to?: string }[]).map((f) => [f.id, f]));
-  assert.deepEqual([byId.get('premium')?.type, byId.get('premium')?.to, byId.get('illustration')?.type], ['ref', 'recurring', 'json']);
+  assert.deepEqual([byId.get('cost')?.type, byId.get('cost')?.to, byId.get('illustration')?.type], ['ref', 'recurring', 'json']);
   assert.doesNotMatch(readFileSync(PACK_FILE, 'utf8'), /—|\bowe/u, 'a dash or a word a money page may not say');
 });
 
@@ -123,7 +123,7 @@ test('INSTALLED FROM THE FILE with nothing refused, and it needs money-core', as
   assert.ok(diff.adds.some((a) => a.id === 'page.insurance'));
   assert.ok(diff.adds.some((a) => a.id === 'register.policies'));
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'insurance')?.version, '1.1.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'insurance')?.version, '2.0.0');
   sql.close();
 });
 
@@ -134,16 +134,16 @@ test('PREMIUMS PAID: counted from the first day by how often the line comes roun
   const monthly = line(api, 'Life premium', 250, 'monthly', '2025-11-25');
   const yearly = line(api, 'Savings premium', 1800, 'yearly', '2024-03-31');
   const clamped = line(api, 'Cover premium', 40, 'monthly', '2026-01-31');
-  const a = write(api, 'policies', { name: 'Harbour Life', insurer: 'Northgate Assurance', number: 'HL-0042', premium: monthly, cover: usd(250_000), starts_on: '2025-11-25', matures_on: '2045-11-25' });
-  const b = write(api, 'policies', { name: 'Fenmoor Saver', insurer: 'Pellbridge Mutual', premium: yearly, starts_on: '2024-03-31', matures_on: '2034-03-31' });
-  const c = write(api, 'policies', { name: 'Quay Cover', insurer: 'Northgate Assurance', premium: clamped, starts_on: '2026-01-31' });
+  const a = write(api, 'policies', { name: 'Harbour Life', insurer: 'Northgate Assurance', number: 'HL-0042', cost: monthly, cover: usd(250_000), starts_on: '2025-11-25', matures_on: '2045-11-25' });
+  const b = write(api, 'policies', { name: 'Fenmoor Saver', insurer: 'Pellbridge Mutual', cost: yearly, starts_on: '2024-03-31', matures_on: '2034-03-31' });
+  const c = write(api, 'policies', { name: 'Quay Cover', insurer: 'Northgate Assurance', cost: clamped, starts_on: '2026-01-31' });
   await settle(api);
   /* 25 Nov 2025 to 25 Oct 2026 is twelve payments. */
-  assert.deepEqual([fields(api, a).paid, fields(api, a).payments, fields(api, a).per_year], [usd(250 * 12), 12, usd(250 * 12)]);
+  assert.deepEqual([fields(api, a).paid, fields(api, a).times, fields(api, a).per_year], [usd(250 * 12), 12, usd(250 * 12)]);
   /* 31 Mar in 2024, 2025 and 2026. */
-  assert.deepEqual([fields(api, b).paid, fields(api, b).payments], [usd(1800 * 3), 3]);
+  assert.deepEqual([fields(api, b).paid, fields(api, b).times], [usd(1800 * 3), 3]);
   /* 31 Jan, 28 Feb, 31 Mar, 30 Apr, 31 May, 30 Jun, 31 Jul, 31 Aug, 30 Sep: nine, and the 31 Oct is still ahead. */
-  assert.deepEqual([fields(api, c).paid, fields(api, c).payments], [usd(40 * 9), 9]);
+  assert.deepEqual([fields(api, c).paid, fields(api, c).times], [usd(40 * 9), 9]);
   sql.close();
 });
 
@@ -154,7 +154,7 @@ test('MORE THAN FIFTY LIVE POLICIES ARE ALL WORKED OUT by the daily run', async 
   for (const id of FIRST_PARTY) said(await put(api, firstPartyDocument(id)));
   said(await put(api, file()));
   const monthly = line(api, 'Shared premium', 100, 'monthly', '2025-11-25');
-  const ids = Array.from({ length: 60 }, (_, i) => write(api, 'policies', { name: `Policy ${i + 1}`, insurer: 'Northgate Assurance', premium: monthly, starts_on: '2025-11-25' }));
+  const ids = Array.from({ length: 60 }, (_, i) => write(api, 'policies', { name: `Policy ${i + 1}`, insurer: 'Northgate Assurance', cost: monthly, starts_on: '2025-11-25' }));
   await settle(api, 12);
   /* THE PREMIUM CHANGED IN REPEATING, which no rule watches: only the daily run, over every live policy, picks it up. */
   said(api.kernel.update('recurring', monthly, { amount: usd(200) } as never, { actor: 'p_1' }));
@@ -202,16 +202,16 @@ test('A POLICY WITH NO PREMIUM LINE OR NO DAYS IS LEFT AS IT IS, and nothing is 
   const id = write(api, 'policies', { name: 'Old Cover', insurer: 'Northgate Assurance', cover: usd(100_000) });
   await settle(api);
   const f = fields(api, id);
-  for (const key of ['paid', 'per_year', 'payments', 'term_pct', 'illustrated']) assert.equal(f[key] ?? null, null, `${key} was made up`);
+  for (const key of ['paid', 'per_year', 'times', 'term_pct', 'illustrated']) assert.equal(f[key] ?? null, null, `${key} was made up`);
   sql.close();
 });
 
 test('A PREMIUM CHANGED IN REPEATING IS PICKED UP THE NEXT TIME, and a line that ended stops counting', async () => {
   const { api, sql } = await record();
   const premium = line(api, 'Life premium', 100, 'monthly', '2026-01-10', { ends: '2026-06-10' });
-  const id = write(api, 'policies', { name: 'Short Cover', insurer: 'Northgate Assurance', premium, starts_on: '2026-01-10' });
+  const id = write(api, 'policies', { name: 'Short Cover', insurer: 'Northgate Assurance', cost: premium, starts_on: '2026-01-10' });
   await settle(api);
-  assert.equal(fields(api, id).payments, 6, '10 Jan to 10 Jun');
+  assert.equal(fields(api, id).times, 6, '10 Jan to 10 Jun');
   sql.close();
 });
 
@@ -220,7 +220,7 @@ test('A PREMIUM CHANGED IN REPEATING IS PICKED UP THE NEXT TIME, and a line that
 test('THE PAGE: fund value, cover and premiums a year in one currency, and the policies as cards', async () => {
   const { api, sql } = await record();
   const premium = line(api, 'Life premium', 250, 'monthly', '2025-11-25');
-  write(api, 'policies', { name: 'Harbour Life', insurer: 'Northgate Assurance', premium, cover: usd(250_000), fund_value: usd(4_100), fund_as_of: '2026-10-01', starts_on: '2025-11-25', matures_on: '2045-11-25' });
+  write(api, 'policies', { name: 'Harbour Life', insurer: 'Northgate Assurance', cost: premium, cover: usd(250_000), fund_value: usd(4_100), fund_as_of: '2026-10-01', starts_on: '2025-11-25', matures_on: '2045-11-25' });
   write(api, 'policies', { name: 'Fenmoor Saver', insurer: 'Pellbridge Mutual', cover: usd(50_000), fund_value: usd(12_000), fund_as_of: '2026-09-01', matures_on: '2034-03-31' });
   await settle(api);
   const page = await pageOf(api, 'insurance');
@@ -251,7 +251,7 @@ test('A FUND VALUE OVER NINETY DAYS OLD IS SAID, with the day it is from', async
 test('EACH POLICY HAS A PAGE with its fund, its age, the premiums paid so far and its maturity', async () => {
   const { api, sql } = await record();
   const premium = line(api, 'Life premium', 250, 'monthly', '2025-11-25');
-  write(api, 'policies', { name: 'Harbour Life', insurer: 'Northgate Assurance', number: 'HL-0042', premium, cover: usd(250_000), fund_value: usd(4_100), fund_as_of: '2026-10-01', starts_on: '2025-11-25', matures_on: '2045-11-25', maturity_benefit: usd(90_000) });
+  write(api, 'policies', { name: 'Harbour Life', insurer: 'Northgate Assurance', number: 'HL-0042', cost: premium, cover: usd(250_000), fund_value: usd(4_100), fund_as_of: '2026-10-01', starts_on: '2025-11-25', matures_on: '2045-11-25', maturity_benefit: usd(90_000) });
   await settle(api);
   const listed = said<{ slug: string; title: string; about?: { register?: string } }[]>(await api.pages(owner));
   const own = listed.filter((p) => p.about?.register === 'policies');

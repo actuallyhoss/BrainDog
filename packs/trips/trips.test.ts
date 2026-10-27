@@ -84,9 +84,9 @@ function ledger(api: Api): { account: string; food: string; hotel: string; lines
   return { account, food, hotel, lines };
 }
 
-test('THE FILE: trips 1.1.0 on money-core, one list, a rule and its script, two pages, and a trip field on the Ledger with no index', () => {
+test('THE FILE: trips 2.0.0 on money-core, one list, a rule and its script, two pages, and a trip field on the Ledger with no index', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['trips', '1.1.0', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['trips', '2.0.0', 'Apache-2.0']);
   assert.equal(doc.seeds, undefined, 'no example rows');
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), ['trips']);
@@ -109,10 +109,10 @@ test('SAVING A TRIP FILES THE LEDGER LINES OF ITS DAYS, and leaves void lines, o
   const { api, close } = await fresh();
   const { lines, account } = ledger(api);
   /* A LINE IN ANOTHER TRIP ALREADY: the earlier trip keeps it. */
-  const earlier = make(api, 'trips', { name: 'Weekend away', from: '2026-10-09', to: '2026-10-09', colour: 'green' });
+  const earlier = make(api, 'trips', { name: 'Weekend away', from: '2026-10-09', to: '2026-10-09', hue: 'green' });
   const ferry = make(api, 'transactions', { what: 'Ferry', on: '2026-10-09', direction: 'out', amount: gbp(900), account, state: 'cleared', trip: earlier });
   await settle(api);
-  const trip = make(api, 'trips', { name: 'Harbour week', from: '2026-10-06', to: '2026-10-10', colour: 'blue' });
+  const trip = make(api, 'trips', { name: 'Harbour week', from: '2026-10-06', to: '2026-10-10', hue: 'blue' });
   await settle(api);
   const inTrip = (k: string) => fieldsOf(api, lines[k]!).trip ?? null;
   assert.deepEqual(['hotel', 'dinner', 'lunch', 'refund'].map(inTrip), [trip, trip, earlier, trip]); /* the weekend trip, written first, filed the lunch of its one day */
@@ -124,7 +124,7 @@ test('SAVING A TRIP FILES THE LEDGER LINES OF ITS DAYS, and leaves void lines, o
 test('WHEN A TRIP\'S DATES SHRINK, THE LINES IT FILED OUTSIDE THEM COME OUT; a line put in by hand from outside its days stays', async () => {
   const { api, close } = await fresh();
   const { lines, account } = ledger(api);
-  const trip = make(api, 'trips', { name: 'Harbour week', from: '2026-10-06', to: '2026-10-10', colour: 'blue' });
+  const trip = make(api, 'trips', { name: 'Harbour week', from: '2026-10-06', to: '2026-10-10', hue: 'blue' });
   await settle(api);
   const inTrip = (k: string) => fieldsOf(api, lines[k]!).trip ?? null;
   assert.deepEqual(['hotel', 'dinner', 'lunch', 'refund'].map(inTrip), [trip, trip, trip, trip]);
@@ -140,7 +140,7 @@ test('A TRIP WITH MORE THAN FIFTY LINES, EVEN ON ONE DAY, FILES THEM ALL', async
   const { api, close } = await fresh();
   const { account } = ledger(api);
   const ids = Array.from({ length: 130 }, (_, i) => make(api, 'transactions', { what: `Round ${i}`, on: i < 120 ? '2026-10-07' : '2026-10-08', direction: 'out', amount: gbp(100), account, state: 'cleared' }));
-  const trip = make(api, 'trips', { name: 'Busy week', from: '2026-10-06', to: '2026-10-10', colour: 'blue' });
+  const trip = make(api, 'trips', { name: 'Busy week', from: '2026-10-06', to: '2026-10-10', hue: 'blue' });
   /* 130 new lines start 390 other runs ahead of the trip's, fifty at a time. */
   for (let i = 0; i < 12; i++) await settle(api);
   assert.equal(ids.filter((id) => fieldsOf(api, id).trip === trip).length, 130);
@@ -150,7 +150,7 @@ test('A TRIP WITH MORE THAN FIFTY LINES, EVEN ON ONE DAY, FILES THEM ALL', async
 test('THE TRIP PAGE: total, money back and lines filed, by category and by account, with nothing refused', async () => {
   const { api, close } = await fresh();
   ledger(api);
-  make(api, 'trips', { name: 'Harbour week', from: '2026-10-06', to: '2026-10-10', colour: 'blue' });
+  make(api, 'trips', { name: 'Harbour week', from: '2026-10-06', to: '2026-10-10', hue: 'blue' });
   await settle(api);
   const spent = await metric(api, 'trip-spent:Harbour week');
   assert.deepEqual([spent.value, spent.unit], [30_000 + 4_500 + 1_500, 'GBP']);

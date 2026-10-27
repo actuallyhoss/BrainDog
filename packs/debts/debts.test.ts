@@ -49,7 +49,7 @@ const row = (register: string, fields: Record<string, Json>, updated = NOW): Row
 };
 const usd = (amount: number): Json => ({ amount, currency: 'USD' });
 const debt = (name: string, balance: number, apr: number, minimum: number, currency = 'USD'): Row =>
-  row('debts', { name, balance: { amount: balance, currency }, apr, minimum: { amount: minimum, currency } });
+  row('debts', { name, left: { amount: balance, currency }, apr, minimum: { amount: minimum, currency } });
 
 type Leaf = { field?: string; gt?: number; lte?: number; all?: Leaf[] };
 const flat = (w: Leaf | null | undefined): Leaf[] => (w ? (w.all ? w.all.flatMap(flat) : [w]) : []);
@@ -75,7 +75,7 @@ const writesOf = (a: ScriptAnswer): ScriptWrite[] => {
 type Patch = Record<string, Json>;
 /** The plan the run wrote for one way, whether it created it or updated it. */
 const planOf = (w: ScriptWrite[], method: string): Patch => {
-  const hit = w.find((x) => ((x as { fields?: Patch; patch?: Patch }).fields ?? (x as { patch?: Patch }).patch)?.method === method) as { fields?: Patch; patch?: Patch } | undefined;
+  const hit = w.find((x) => ((x as { fields?: Patch; patch?: Patch }).fields ?? (x as { patch?: Patch }).patch)?.how === method) as { fields?: Patch; patch?: Patch } | undefined;
   assert.ok(hit, `no plan for ${method}`);
   return (hit.fields ?? hit.patch) as Patch;
 };
@@ -93,17 +93,17 @@ test('THE PACK CARRIES payoff.js AS ITS SOURCE, byte for byte, fetches nothing, 
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'debts');
-  assert.equal(PACK.version, '1.0.0');
+  assert.equal(PACK.version, '2.0.0');
 });
 
 test('TWO DEBTS AT NO INTEREST: 300 and 600, 50 minimum each and 100 extra, clear in 5 months, against 12 at the minimums', async () => {
   const a = debt('Phone', 30_000, 0, 5_000);
   const b = debt('Sofa', 60_000, 0, 5_000);
-  const set = row('payoff_plans', { method: 'avalanche', extra: usd(10_000), used: usd(0) });
+  const set = row('payoff_plans', { how: 'avalanche', extra: usd(10_000), used: usd(0) });
   const w = writesOf(await runInQuickJs(decl(), hostOf([a, b, set])));
   for (const method of ['avalanche', 'snowball']) {
     const p = planOf(w, method);
-    assert.equal(p.months, 5);
+    assert.equal(p.mos, 5);
     assert.equal(p.takes, '5 months');
     assert.equal(p.debt_free, '2027-03-15');
     assert.deepEqual(p.interest, usd(0));
@@ -125,22 +125,22 @@ test('MORE THAN FIFTY DEBTS ARE ALL IN THE PLAN, not the first page', async () =
 test('THE EXTRA IS PAID EVERY MONTH AND A PAID-OFF MINIMUM IS PASSED ON, so the same two debts with 100 extra finish sooner than with none', async () => {
   const rows = [debt('Phone', 30_000, 0, 5_000), debt('Sofa', 60_000, 0, 5_000)];
   const nothing = planOf(writesOf(await runInQuickJs(decl(), hostOf(rows))), 'avalanche');
-  const plans = [row('payoff_plans', { method: 'avalanche', extra: usd(10_000), used: usd(0) })];
+  const plans = [row('payoff_plans', { how: 'avalanche', extra: usd(10_000), used: usd(0) })];
   const more = planOf(writesOf(await runInQuickJs(decl(), hostOf([...rows, ...plans]))), 'avalanche');
-  assert.equal(nothing.months, 9, 'with no extra the Phone minimum passes on once it is paid, after month 6, and the Sofa ends in month 9');
-  assert.equal(more.months, 5);
+  assert.equal(nothing.mos, 9, 'with no extra the Phone minimum passes on once it is paid, after month 6, and the Sofa ends in month 9');
+  assert.equal(more.mos, 5);
 });
 
 test('THE AVALANCHE COSTS THE LEAST INTEREST AND THE SNOWBALL CLEARS THE SMALLEST FIRST', async () => {
   const card = debt('Store card', 400_000, 27, 12_000);
   const small = debt('Laptop plan', 80_000, 5, 6_000);
   const car = debt('Car loan', 900_000, 9, 20_000);
-  const extra = row('payoff_plans', { method: 'avalanche', extra: usd(30_000), used: usd(0) });
+  const extra = row('payoff_plans', { how: 'avalanche', extra: usd(30_000), used: usd(0) });
   const w = writesOf(await runInQuickJs(decl(), hostOf([card, small, car, extra])));
   const av = planOf(w, 'avalanche');
   const sn = planOf(w, 'snowball');
   assert.ok((av.interest as { amount: number }).amount < (sn.interest as { amount: number }).amount, 'the avalanche pays less interest');
-  assert.ok(Number(av.months) <= Number(sn.months));
+  assert.ok(Number(av.mos) <= Number(sn.mos));
   assert.match(String(av.order), /^Store card \(\d+ months?\), then /);
   assert.match(String(sn.order), /^Laptop plan \(\d+ months?\), then /);
   assert.ok((av.saved as { amount: number }).amount > (sn.saved as { amount: number }).amount - 1, 'saved is the minimums\' interest less the plan\'s');
@@ -151,26 +151,26 @@ test('THE AVALANCHE COSTS THE LEAST INTEREST AND THE SNOWBALL CLEARS THE SMALLES
 
 test('THE EXTRA A PERSON EDITED IS TAKEN FOR BOTH PLANS, the newest edit when both differ', async () => {
   const rows = [debt('Phone', 30_000, 0, 5_000), debt('Sofa', 60_000, 0, 5_000)];
-  const av = row('payoff_plans', { method: 'avalanche', extra: usd(0), used: usd(0) }, '2026-10-01T00:00:00.000Z');
-  const sn = row('payoff_plans', { method: 'snowball', extra: usd(10_000), used: usd(0) }, '2026-10-14T00:00:00.000Z');
+  const av = row('payoff_plans', { how: 'avalanche', extra: usd(0), used: usd(0) }, '2026-10-01T00:00:00.000Z');
+  const sn = row('payoff_plans', { how: 'snowball', extra: usd(10_000), used: usd(0) }, '2026-10-14T00:00:00.000Z');
   const w = writesOf(await runInQuickJs(decl(), hostOf([...rows, av, sn])));
   for (const method of ['avalanche', 'snowball']) assert.deepEqual(planOf(w, method).used, usd(10_000), method);
   assert.deepEqual(planOf(w, 'avalanche').extra, usd(10_000), 'the plan that was not edited is given it');
   /* AND A PLAN THAT ALREADY HOLDS WHAT IT WAS WORKED WITH IS NOT WRITTEN OVER with the same extra. */
-  const settled = row('payoff_plans', { method: 'snowball', extra: usd(10_000), used: usd(10_000) });
+  const settled = row('payoff_plans', { how: 'snowball', extra: usd(10_000), used: usd(10_000) });
   assert.equal('extra' in planOf(writesOf(await runInQuickJs(decl(), hostOf([...rows, settled]))), 'snowball'), false);
 });
 
 test('A MINIMUM THAT DOES NOT COVER THE INTEREST NEVER ENDS, and the plan names the debt instead of giving a date', async () => {
   const w = writesOf(await runInQuickJs(decl(), hostOf([debt('Old card', 500_000, 36, 10_000)])));
   const p = planOf(w, 'avalanche');
-  assert.equal(p.months, null);
+  assert.equal(p.mos, null);
   assert.equal(p.debt_free, null);
   assert.match(String(p.said), /The minimum on Old card does not cover its interest/);
   /* WITH AN EXTRA IT DOES END, and there is nothing to compare with, which it says. */
-  const extra = row('payoff_plans', { method: 'avalanche', extra: usd(30_000), used: usd(0) });
+  const extra = row('payoff_plans', { how: 'avalanche', extra: usd(30_000), used: usd(0) });
   const q = planOf(writesOf(await runInQuickJs(decl(), hostOf([debt('Old card', 500_000, 36, 10_000), extra]))), 'avalanche');
-  assert.ok(typeof q.months === 'number');
+  assert.ok(typeof q.mos === 'number');
   assert.equal(q.saved, null);
   assert.match(String(q.said), /never ends, so there is nothing to compare with/);
 });
@@ -178,7 +178,7 @@ test('A MINIMUM THAT DOES NOT COVER THE INTEREST NEVER ENDS, and the plan names 
 test('A DEBT IN ANOTHER CURRENCY IS LEFT OUT AND SAID, because two currencies are never added', async () => {
   const w = writesOf(await runInQuickJs(decl(), hostOf([debt('Phone', 30_000, 0, 5_000), debt('Sofa', 60_000, 0, 5_000), debt('Bike', 90_000, 0, 5_000, 'EUR')])));
   const p = planOf(w, 'avalanche');
-  assert.equal(p.months, 9, 'the two dollar debts alone, with no extra');
+  assert.equal(p.mos, 9, 'the two dollar debts alone, with no extra');
   assert.match(String(p.said), /1 debt in another currency than USD was left out/);
 });
 
@@ -234,20 +234,20 @@ test('INSTALLED BESIDE MONEY-CORE: a debt written by a person makes both plans, 
   assert.equal(page0.blocks[1]!.rows.length, 0, 'no plan until there is a debt');
 
   for (const [name, balance, apr, minimum] of [['Phone', 30_000, 0, 5_000], ['Sofa', 60_000, 0, 5_000]] as const)
-    said(await api.create({ register: 'debts', fields: { name, balance: usd(balance), apr, minimum: usd(minimum) } }, owner));
+    said(await api.create({ register: 'debts', fields: { name, left: usd(balance), apr, minimum: usd(minimum) } }, owner));
   await settle(api);
   const page = said<Page>(await api.page({ slug: 'debts' }, owner));
   const plans = page.blocks.find((b) => b.heading === 'Two ways to be debt-free')!;
-  assert.deepEqual(plans.rows.map((r) => [r.fields.method, r.fields.takes]).sort(), [['avalanche', '9 months'], ['snowball', '9 months']]);
+  assert.deepEqual(plans.rows.map((r) => [r.fields.how, r.fields.takes]).sort(), [['avalanche', '9 months'], ['snowball', '9 months']]);
   assert.equal(page.blocks.find((b) => b.heading === 'What you are paying off')!.rows.length, 2);
 
   /* A CHANGED EXTRA IS WORKED AGAIN, on both plans. */
   const seqs = sql.all<{ seq: number; fields: string }>("SELECT seq, fields FROM entry WHERE register = 'payoff_plans' AND deleted_at IS NULL");
-  const av = seqs.find((r) => (JSON.parse(r.fields) as { method: string }).method === 'avalanche')!;
+  const av = seqs.find((r) => (JSON.parse(r.fields) as { how: string }).how === 'avalanche')!;
   said(await api.update({ register: 'payoff_plans', seq: av.seq, patch: { extra: usd(25_000) } } as never, owner));
   await settle(api);
   const again = said<Page>(await api.page({ slug: 'debts' }, owner)).blocks.find((b) => b.heading === 'Two ways to be debt-free')!;
-  assert.deepEqual(again.rows.map((r) => [r.fields.method, r.fields.takes, r.fields.extra]).sort(), [
+  assert.deepEqual(again.rows.map((r) => [r.fields.how, r.fields.takes, r.fields.extra]).sort(), [
     ['avalanche', '3 months', usd(25_000)],
     ['snowball', '3 months', usd(25_000)],
   ]);

@@ -97,9 +97,9 @@ const DATED: Leg[] = [
        record does not hold). Money in on each payout day, every month, quarter or year, until the day it matures. */
     register: 'certificates',
     on: 'next_payout',
-    amount: 'payout',
+    amount: 'pays',
     where: 'state is live',
-    incoming: { field: 'direction', is: 'in' },
+    incoming: { field: 'flow', is: 'in' },
     every: { field: 'every', months: { monthly: 1, quarterly: 3, yearly: 12 } },
     ends: 'ends',
   },
@@ -109,7 +109,7 @@ const DATED: Leg[] = [
     on: 'ends',
     amount: 'at_maturity',
     where: 'state is live, ends is set',
-    incoming: { field: 'direction', is: 'in' },
+    incoming: { field: 'flow', is: 'in' },
   },
 ];
 

@@ -70,7 +70,7 @@ test('THE PACK CARRIES ITS TWO SCRIPTS AS THEIR SOURCE, byte for byte; neither f
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'certificates');
-  assert.equal(file.value.pack.manifest.version, '1.1.1');
+  assert.equal(file.value.pack.manifest.version, '2.0.0');
 });
 
 test('THE SCRIPT STEPS A PAYOUT BY THE WALK’S OWN LEG, written into its source as data', () => {
@@ -87,11 +87,11 @@ test('MONEY WALKS A CERTIFICATE TWICE: EACH PAYOUT TO ITS END, AND THE PRINCIPAL
   assert.deepEqual(
     mine.map((l) => [l.on, l.amount, l.every === undefined ? 'once' : 'repeats']),
     [
-      ['next_payout', 'payout', 'repeats'],
+      ['next_payout', 'pays', 'repeats'],
       ['ends', 'at_maturity', 'once'],
     ],
   );
-  for (const l of mine) assert.deepEqual(l.incoming, { field: 'direction', is: 'in' });
+  for (const l of mine) assert.deepEqual(l.incoming, { field: 'flow', is: 'in' });
 });
 
 test('IT INSTALLS BESIDE MONEY, AND THE REGISTER, THE PAGE AND THE FIGURES ARE THERE', async () => {
@@ -108,7 +108,7 @@ test('IT INSTALLS BESIDE MONEY, AND THE REGISTER, THE PAGE AND THE FIGURES ARE T
 /* ── The page, the figures and the walk ────────────────────────────────────────────────────────── */
 
 const add = async (api: Api, fields: Record<string, unknown>) =>
-  said<{ id: string }>(await api.create({ register: 'certificates', fields: { issuer: 'Harbour Bank', principal: { amount: 10_000_000, currency: 'EGP' }, rate: 18, start: '2026-07-01', every: 'monthly', ...fields } }, owner));
+  said<{ id: string }>(await api.create({ register: 'certificates', fields: { bank: 'Harbour Bank', amount: { amount: 10_000_000, currency: 'EGP' }, rate: 18, start: '2026-07-01', every: 'monthly', ...fields } }, owner));
 
 async function settle(api: Api): Promise<void> {
   const refuse = async (): Promise<never> => {
@@ -134,7 +134,7 @@ test('A CERTIFICATE ADDED WITH ONLY ITS TERMS IS WORKED OUT: when it matures, wh
   await settle(api);
   const f = fieldsOf(sql, 1);
   assert.equal(f.ends, '2027-07-01');
-  assert.deepEqual(f.payout, { amount: 150_000, currency: 'EGP' });
+  assert.deepEqual(f.pays, { amount: 150_000, currency: 'EGP' });
   assert.equal(f.next_payout, '2026-08-01');
   /* 106 days of 18% on EGP 100,000.00 by 15 October: 5,227.40 */
   assert.deepEqual(f.accrued, { amount: Math.round((10_000_000 * 18 * 106) / 36_500), currency: 'EGP' });
@@ -146,7 +146,7 @@ test('A CERTIFICATE ADDED WITH ONLY ITS TERMS IS WORKED OUT: when it matures, wh
 test('A CERTIFICATE THAT COMPOUNDS IS WORTH ITS PRINCIPAL GROWN OVER THE TERM ON THE DAY IT MATURES', async () => {
   const { api, sql, close } = await fresh();
   await put(api, shipped());
-  await add(api, { term: 12, compound: true });
+  await add(api, { term: 12, roll: true });
   await settle(api);
   const f = fieldsOf(sql, 1);
   assert.equal(f.at_maturity.amount, 10_000_000 + f.interest.amount);
@@ -157,10 +157,10 @@ test('A CERTIFICATE THAT COMPOUNDS IS WORTH ITS PRINCIPAL GROWN OVER THE TERM ON
 test('A PAYOUT OR A DAY SOMEBODY WROTE IS NEVER WRITTEN OVER', async () => {
   const { api, sql, close } = await fresh();
   await put(api, shipped());
-  await add(api, { term: 12, payout: { amount: 140_000, currency: 'EGP' }, next_payout: '2026-11-01', ends: '2027-06-30' });
+  await add(api, { term: 12, pays: { amount: 140_000, currency: 'EGP' }, next_payout: '2026-11-01', ends: '2027-06-30' });
   await settle(api);
   const f = fieldsOf(sql, 1);
-  assert.deepEqual([f.payout.amount, f.next_payout, f.ends], [140_000, '2026-11-01', '2027-06-30']);
+  assert.deepEqual([f.pays.amount, f.next_payout, f.ends], [140_000, '2026-11-01', '2027-06-30']);
   close();
 });
 
@@ -168,12 +168,12 @@ test('THE PAGE READS ITS TOTALS AND ONE CARD A CERTIFICATE, with no refusal, and
   const { api, close } = await fresh();
   await put(api, shipped());
   await add(api, { term: 12 });
-  await add(api, { issuer: 'Lakeside Savings', principal: { amount: 5_000_000, currency: 'EGP' }, rate: 12, term: 6, start: '2026-01-01', every: 'quarterly', state: 'matured' });
+  await add(api, { bank: 'Lakeside Savings', amount: { amount: 5_000_000, currency: 'EGP' }, rate: 12, term: 6, start: '2026-01-01', every: 'quarterly', state: 'matured' });
   await settle(api);
   const page = said<{ blocks: { heading?: string; kind: string; refusals: unknown[]; rows?: { fields: Record<string, unknown> }[]; body?: string }[] }>(await api.page({ slug: 'certificates' }, owner));
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
   const live = page.blocks.find((b) => b.heading === 'Your certificates')!;
-  assert.deepEqual(live.rows!.map((r) => r.fields.issuer), ['Harbour Bank']);
+  assert.deepEqual(live.rows!.map((r) => r.fields.bank), ['Harbour Bank']);
   const lead = page.blocks[0]!;
   assert.notEqual((lead as { drawn?: boolean }).drawn, false, 'the line over the page is not drawn');
   close();
@@ -193,7 +193,7 @@ test('A RECORD THAT HOLDS CERTIFICATES WALKS THEIR PAYOUTS AND THE PRINCIPAL INT
   assert.equal(JSON.stringify(api.kernel.metricDecl('arriving-30d')).includes('certificates'), false, 'a record without the add-on walks a list it does not hold');
   await put(api, shipped());
   /* A PAYOUT ON THE 20TH EVERY MONTH, AND THE VALUE BACK ON 10 NOVEMBER: both fall in the next 30 days. */
-  await add(api, { start: '2026-09-20', term: 2, ends: '2026-11-10', at_maturity: { amount: 10_000_000, currency: 'EGP' }, payout: { amount: 150_000, currency: 'EGP' }, next_payout: '2026-10-20' });
+  await add(api, { start: '2026-09-20', term: 2, ends: '2026-11-10', at_maturity: { amount: 10_000_000, currency: 'EGP' }, pays: { amount: 150_000, currency: 'EGP' }, next_payout: '2026-10-20' });
   /* THE ADD-ON ALONE IS ENOUGH: installing it puts Money in again for the lists the record holds, quietly, with no
      update of Money to wait for. */
   const version = (): string | null => api.kernel.packStates().find((p) => p.id === 'money-core')?.version ?? null;
@@ -217,16 +217,16 @@ type Row = { id: string; register: string; seq: number; fields: Record<string, J
 const row = (id: string, register: string, seq: number, fields: Record<string, Json>, version = 1): Row => ({ id, register, seq, fields, version, updated_at: NOW as unknown as string });
 
 const CERT = row('01K5CRT0000000000000000001', 'certificates', 1, {
-  issuer: 'Harbour Bank',
-  principal: { amount: 10_000_000, currency: 'EGP' },
+  bank: 'Harbour Bank',
+  amount: { amount: 10_000_000, currency: 'EGP' },
   rate: 18,
   start: '2026-07-01',
   every: 'monthly',
-  payout: { amount: 150_000, currency: 'EGP' },
+  pays: { amount: 150_000, currency: 'EGP' },
   next_payout: '2026-10-01',
   ends: '2027-07-01',
   state: 'live',
-  direction: 'in',
+  flow: 'in',
   account: 'accounts#2',
 });
 
@@ -274,5 +274,5 @@ test('NOTHING IS ASKED when the amount differs, the account differs, the day is 
   assert.equal(await none(row(LINE.id, 'transactions', 7, { ...LINE.fields, account: 'accounts#9' }), [CERT]), null);
   assert.equal(await none(row(LINE.id, 'transactions', 7, { ...LINE.fields, on: '2026-10-20' }), [CERT]), null);
   assert.equal(await none(row(LINE.id, 'transactions', 7, { ...LINE.fields, direction: 'out' }), [CERT]), null);
-  assert.equal(await none(LINE, [CERT, row('01K5CRT0000000000000000002', 'certificates', 2, { ...CERT.fields, issuer: 'Lakeside Savings' })]), null);
+  assert.equal(await none(LINE, [CERT, row('01K5CRT0000000000000000002', 'certificates', 2, { ...CERT.fields, bank: 'Lakeside Savings' })]), null);
 });

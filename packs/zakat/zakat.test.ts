@@ -102,9 +102,9 @@ const cashOf = (api: Api, id: string): Body => rows(api, 'zakat_cash').find((r) 
 
 /* ── the file ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-test('THE FILE IS 1.0.0, NEEDS Investments and gold, and its script is work.js byte for byte, reaching only what it says', () => {
+test('THE FILE IS 2.0.0, NEEDS Investments and gold, and its script is work.js byte for byte, reaching only what it says', () => {
   const doc = file();
-  assert.equal(doc.version, '1.0.0');
+  assert.equal(doc.version, '2.0.0');
   assert.deepEqual((doc.requires as { packs: Body }).packs, { 'money-core': '>=2.0.0', holdings: '>=2.0.0' });
   const s = decl(doc, 'script', 'zakat_work');
   assert.equal(s.source, readFileSync(WORK_FILE, 'utf8'), 'zakat.pack.json and work.js disagree; copy work.js into the source');
@@ -115,7 +115,7 @@ test('THE FILE IS 1.0.0, NEEDS Investments and gold, and its script is work.js b
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['zakat', '1.0.0']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['zakat', '2.0.0']);
 });
 
 test('WITHOUT INVESTMENTS AND GOLD IT IS NOT INSTALLED: the add-on asks for it', async () => {
@@ -136,7 +136,7 @@ test('INSTALLED WITH INVESTMENTS AND GOLD: three lists, three rules, a script, f
   for (const id of ['register.zakat_basis', 'register.zakat_cash', 'register.zakat_paid', 'script.zakat_work', 'page.zakat', 'rule.zakat_inputs', 'rule.zakat_rate', 'rule.zakat_metals', 'metric.zakat-due'])
     assert.ok(ids.includes(id), `${id} is not added`);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'zakat')?.version, '1.0.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'zakat')?.version, '2.0.0');
   close();
 });
 
@@ -157,7 +157,7 @@ test('A CASH ACCOUNT COUNTS AT THE LOWEST IT STOOD AT OVER 354 DAYS, worked back
   pay(api, main, '2026-09-10', 'out', 99_000_000, { state: 'pending' });
   await work(made);
   const row = cashOf(api, main);
-  assert.deepEqual([row.lowest, row.lowest_on, row.since, row.counts, row.whole], [egp(27_000_000), '2025-10-06', '2025-10-06', true, true]);
+  assert.deepEqual([row.low, row.lowest_on, row.since, row.taken, row.whole], [egp(27_000_000), '2025-10-06', '2025-10-06', true, true]);
   made.close();
 });
 
@@ -174,11 +174,11 @@ test('THE LOWEST CAN BE IN THE MIDDLE OF THE YEAR, and a balance below nothing c
   await work(made);
   /* WALLET: END OF 31 AUG IS 100,000 - 300,000 + ... = -200,000 + 400,000 OUT ALREADY IN IT. THE STATEMENT IS TODAY. */
   const w = cashOf(api, wallet);
-  assert.equal((w.lowest as Money).amount, 100_000 - 300_000);
+  assert.equal((w.low as Money).amount, 100_000 - 300_000);
   assert.equal(w.lowest_on, '2026-03-05');
   const s = cashOf(api, savings);
   /* 5,000,000 TODAY; BEFORE 10 MAY 4,500,000; BEFORE 10 JAN (OUT 2,000,000) 6,500,000; LOWEST IS 4,500,000 FROM 10 JAN TO 9 MAY. */
-  assert.deepEqual([(s.lowest as Money).amount, s.lowest_on], [4_500_000, '2026-01-10']);
+  assert.deepEqual([(s.low as Money).amount, s.lowest_on], [4_500_000, '2026-01-10']);
   /* THE WALLET COUNTS FOR NOTHING IN THE TOTAL, NOT FOR LESS THAN NOTHING. */
   assert.equal((basisOf(api).cash as Money).amount, 4_500_000);
   made.close();
@@ -192,7 +192,7 @@ test('A LEDGER OF MORE THAN ONE PAGE IS READ WHOLE, in slices of days', async ()
   for (let i = 0; i < 120; i++) pay(api, big, new Date(Date.UTC(2026, 4, 28 + i)).toISOString().slice(0, 10), 'in', 100_000);
   await work(made);
   const row = cashOf(api, big);
-  assert.deepEqual([(row.lowest as Money).amount, row.whole, row.moves], [5_000_000, true, 120]);
+  assert.deepEqual([(row.low as Money).amount, row.whole, row.moves], [5_000_000, true, 120]);
   made.close();
 });
 
@@ -207,7 +207,7 @@ test('A BALANCE CHECK AND A PAYMENT THAT PRINTED ITS BALANCE RESTART THE WORKING
   await work(made);
   /* TODAY IS 3,500.00 LESS 1,000.00 = 2,500.00; THE LOWEST IS 2,000.00 FROM 1 MAR UNTIL THE JUNE PAYMENT. */
   const row = cashOf(api, acct);
-  assert.equal((row.lowest as Money).amount, 200_000 - 0);
+  assert.equal((row.low as Money).amount, 200_000 - 0);
   made.close();
 });
 
@@ -225,7 +225,7 @@ test('THE WORKING: nisab from the gold rate, the year from the first gold buy, c
   account(api, 'Card', egp(-2_000_000), { kind: 'card' });
   account(api, 'Dollars', usd(900_000));
   const gold = write(api, 'holdings', { label: 'Gold bar 24k', kind: 'gold', karat: '24k', unit: 'gram' });
-  write(api, 'holding_buys', { holding: gold, bought_on: '2025-09-01', qty: 10, price: egp(480_000) });
+  write(api, 'holding_buys', { item: gold, bought_on: '2025-09-01', qty: 10, price: egp(480_000) });
   write(api, 'gold_rates', { karat: '24k', per_gram: egp(520_000), from: 'hand' });
   /* TWO BILLS DUE: ONE PART PAID, AND ONE NOT YET DUE. */
   write(api, 'obligations', { what: 'Workshop', direction: 'owed_by_me', amount: egp(2_000_000), paid_so_far: egp(500_000), state: 'part', due: '2026-09-01' });
@@ -237,12 +237,12 @@ test('THE WORKING: nisab from the gold rate, the year from the first gold buy, c
   assert.deepEqual([first.cash, first.metals, first.bills_due], [egp(27_000_000), egp(5_200_000), egp(1_500_000)]);
   assert.deepEqual([first.total, first.met, first.due], [egp(30_700_000), false, egp(0)]);
   /* TWO LEFT OUT: THE DOLLARS ACCOUNT, AND THE SAMPLE POUNDS ACCOUNT THE RECORD COMES WITH. */
-  assert.equal(first.left_out, 2);
+  assert.equal(first.left, 2);
   /* THE YEAR: 354 DAYS FROM THE FIRST GOLD BUY, 1 SEPT 2025 -> 21 AUG 2026, COMPLETE BY 25 SEPT. */
   assert.deepEqual([first.hawl_from, first.hawl_by, first.hawl_ends, first.hawl_done], ['2025-09-01', 'gold', '2026-08-21', true]);
 
   /* CASH DUE TO YOU TAKES IT OVER THE NISAB: 307,000.00 + 150,000.00 = 457,000.00, AND 2.5% IS 11,425.00. */
-  edit(api, 'zakat_basis', rows(api, 'zakat_basis')[0]!.id, { owed_to_you: egp(15_000_000) });
+  edit(api, 'zakat_basis', rows(api, 'zakat_basis')[0]!.id, { lent: egp(15_000_000) });
   await settle(api);
   const next = basisOf(api);
   assert.deepEqual([next.total, next.met, next.due], [egp(45_700_000), true, egp(1_142_500)]);
@@ -253,7 +253,7 @@ test('A DAY SOMEBODY GIVES FOR THE YEAR BEATS THE FIRST GOLD BUY, and a year not
   const made = await inPounds();
   const { api } = made;
   const gold = write(api, 'holdings', { label: 'Gold 21k', kind: 'gold', karat: '21k', unit: 'gram' });
-  write(api, 'holding_buys', { holding: gold, bought_on: '2025-01-01', qty: 5, price: egp(400_000) });
+  write(api, 'holding_buys', { item: gold, bought_on: '2025-01-01', qty: 5, price: egp(400_000) });
   write(api, 'gold_rates', { karat: '24k', per_gram: egp(520_000) });
   await work(made);
   const id = rows(api, 'zakat_basis')[0]!.id;
@@ -270,7 +270,7 @@ test('SILVER IS 595 g AT THE SILVER PRICE GIVEN, and silver chosen with no price
   write(api, 'gold_rates', { karat: '24k', per_gram: egp(520_000) });
   await work(made);
   const id = rows(api, 'zakat_basis')[0]!.id;
-  edit(api, 'zakat_basis', id, { measure: 'silver' });
+  edit(api, 'zakat_basis', id, { mode: 'silver' });
   await settle(api);
   assert.deepEqual([basisOf(api).measure_used, basisOf(api).nisab_grams], ['gold', 85]);
   edit(api, 'zakat_basis', id, { silver_rate: egp(6_000) });
@@ -308,9 +308,9 @@ test('A NEW GOLD RATE WORKS IT OUT AGAIN WITH NOBODY WAITING FOR THE NIGHT, and 
 
 test('WHAT YOU GAVE IS KEPT, newest first, whole', async () => {
   const { api, close } = await inPounds();
-  write(api, 'zakat_paid', { paid_on: '2025-09-20', amount: egp(1_000_000), note: 'Local charity' });
-  write(api, 'zakat_paid', { paid_on: '2026-09-20', amount: egp(1_200_000), for_year: '2026-08-20' });
-  assert.deepEqual(rows(api, 'zakat_paid').map((r) => r.fields.paid_on).sort(), ['2025-09-20', '2026-09-20']);
+  write(api, 'zakat_paid', { paid: '2025-09-20', amount: egp(1_000_000), note: 'Local charity' });
+  write(api, 'zakat_paid', { paid: '2026-09-20', amount: egp(1_200_000), for_year: '2026-08-20' });
+  assert.deepEqual(rows(api, 'zakat_paid').map((r) => r.fields.paid).sort(), ['2025-09-20', '2026-09-20']);
   close();
 });
 
@@ -324,7 +324,7 @@ test('THE PAGE SHOWS THE STEPS: a line, what it comes to, the cash accounts, and
   const main = account(api, 'Main', egp(50_000_000));
   pay(api, main, '2026-02-01', 'in', 1_000_000);
   write(api, 'gold_rates', { karat: '24k', per_gram: egp(520_000) });
-  write(api, 'zakat_paid', { paid_on: '2025-09-20', amount: egp(1_000_000) });
+  write(api, 'zakat_paid', { paid: '2025-09-20', amount: egp(1_000_000) });
   await work(made);
   const page = await pageOf(api);
   assert.equal(page.title, 'Zakat');
@@ -337,7 +337,7 @@ test('THE PAGE SHOWS THE STEPS: a line, what it comes to, the cash accounts, and
   const cell = (m: string): number | null => tiles.readings!.find((r) => r.metric === m)!.reading.value;
   assert.deepEqual([cell('zakat-total'), cell('zakat-nisab'), cell('zakat-due'), cell('zakat-given')], [49_000_000, 44_200_000, 1_225_000, 1_000_000]);
   const cash = on.find((b) => b.heading === 'Step 3. Cash at its lowest over 354 days')!;
-  assert.deepEqual((cash.rows ?? []).map((r) => r.fields.lowest), [egp(49_000_000)]);
+  assert.deepEqual((cash.rows ?? []).map((r) => r.fields.low), [egp(49_000_000)]);
   const given = on.find((b) => b.heading === 'What you have given')!;
   assert.equal((given.rows ?? []).length, 1);
   made.close();

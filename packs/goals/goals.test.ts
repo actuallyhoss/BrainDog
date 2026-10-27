@@ -79,7 +79,7 @@ const read = (api: Api, id: string): Body => api.kernel.get(id)!.fields as Body;
 test('THE FILE DECLARES THE LIST, THE TWO RULES, THE SCRIPT, THE FIGURES AND THE PAGE', () => {
   const doc = file();
   assert.equal(doc.pack, 'goals');
-  assert.equal(doc.version, '1.0.1');
+  assert.equal(doc.version, '2.0.0');
   const list = doc.declarations.find((d) => d.register === 'money_goals')!;
   const ids = (list.fields as Body[]).map((f) => f.id);
   /* THE WORDS PERSONAL'S SAVINGS GOALS USES, kept so the two read alike. */
@@ -106,7 +106,7 @@ test('BEFORE THE PACK THE RECORD HAS NO GOALS, AND THE FILE INSTALLS WITH NOTHIN
     ['metric.goals-behind', 'metric.goals-have-by-name', 'metric.goals-held', 'metric.goals-need', 'metric.goals-reached', 'metric.goals-saving', 'page.goals', 'register.money_goals', 'rule.goals_pace', 'rule.goals_pace_on_balance', 'script.goals_pace'],
   );
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'goals')?.version, '1.0.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'goals')?.version, '2.0.0');
   sql.close();
 });
 
@@ -183,8 +183,8 @@ test('SUB-GOALS ADD UP INTO THE GOAL THEY ARE PART OF, WHICH ASKS NOTHING ITSELF
   const a = account(api, 'Holiday pot', gbp(30_000));
   const b = account(api, 'Gift pot', gbp(10_000));
   const whole = goal(api, { name: 'Next year', kind: 'value', target: gbp(200_000), by: '2027-03-25' });
-  goal(api, { name: 'Holiday', kind: 'account', account: a, target: gbp(120_000), by: '2027-03-25', parent: whole });
-  goal(api, { name: 'Gifts', kind: 'account', account: b, target: gbp(80_000), by: '2027-03-25', parent: whole });
+  goal(api, { name: 'Holiday', kind: 'account', account: a, target: gbp(120_000), by: '2027-03-25', under: whole });
+  goal(api, { name: 'Gifts', kind: 'account', account: b, target: gbp(80_000), by: '2027-03-25', under: whole });
   await settle(api);
   assert.deepEqual(read(api, whole).have, gbp(40_000));
   assert.equal(read(api, whole).need ?? null, null);

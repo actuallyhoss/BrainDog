@@ -80,7 +80,7 @@ export default async function run(ctx) {
   const now = day(today);
   const key = (g) => `money_goals#${g.seq}`;
   const is = (ref, row, register) => ref === row.id || ref === `${register}#${row.seq}`;
-  const childOf = (s, g) => typeof s.fields.parent === 'string' && s.fields.parent !== '' && is(s.fields.parent, g, 'money_goals');
+  const childOf = (s, g) => typeof s.fields.under === 'string' && s.fields.under !== '' && is(s.fields.under, g, 'money_goals');
   const held = new Map();
 
   const own = (g) => {
