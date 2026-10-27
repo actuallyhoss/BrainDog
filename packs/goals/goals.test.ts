@@ -139,6 +139,18 @@ test('A GOAL SLIPS BEHIND WHEN IT HOLDS LESS THAN THE LINE FROM WHERE IT BEGAN, 
   close();
 });
 
+test('MORE THAN FIFTY ACCOUNTS ARE ALL COUNTED toward a goal in their currency', async () => {
+  const { api, close } = await money();
+  const before = goal(api, { name: 'Before', kind: 'currency', target: gbp(600_000), by: '2027-03-25' });
+  await settle(api, 12);
+  const base = (read(api, before).have as Money).amount;
+  for (let i = 0; i < 60; i++) account(api, `Pot ${i + 1}`, gbp(1_000));
+  const g = goal(api, { name: 'Everything', kind: 'currency', target: gbp(6_000_000), by: '2027-03-25' });
+  await settle(api, 12);
+  assert.deepEqual(read(api, g).have, gbp(base + 60_000));
+  close();
+});
+
 test('A GOAL IN A CURRENCY ADDS THE OPEN ACCOUNTS IN THAT CURRENCY AND NEVER ADDS ANOTHER', async () => {
   const { api, close } = await money();
   account(api, 'Current', gbp(100_000));

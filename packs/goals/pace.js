@@ -26,10 +26,55 @@ const money = (m) => m && typeof m.amount === 'number' && typeof m.currency === 
 const same = (a, b) => (a === undefined || a === null ? b === undefined || b === null : money(a) ? money(b) && a.amount === b.amount && a.currency === b.currency : a === b);
 const day = (s) => Math.round(Date.parse(`${String(s).slice(0, 10)}T00:00:00Z`) / DAY);
 
+/**
+ * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with
+ * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,
+ * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.
+ */
+async function every(ctx, register, where) {
+  const PAGE = 50;
+  const READS = 60;
+  let reads = 0;
+  const ask = (above, upto) => {
+    reads += 1;
+    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];
+    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });
+  };
+  const first = await ask(0, null);
+  if (first.length < PAGE) return first;
+  const seen = new Map(first.map((r) => [r.id, r]));
+  let top = Math.max(...first.map((r) => r.seq));
+  for (;;) {
+    if (reads >= READS) break;
+    const above = await ask(top, null);
+    for (const r of above) seen.set(r.id, r);
+    if (above.length < PAGE) break;
+    top = Math.max(...above.map((r) => r.seq));
+  }
+  const spans = [[0, top]];
+  let short = false;
+  while (spans.length > 0) {
+    if (reads >= READS) {
+      short = true;
+      break;
+    }
+    const [a, b] = spans.pop();
+    const page = await ask(a, b);
+    for (const r of page) seen.set(r.id, r);
+    if (page.length >= PAGE && b - a > 1) {
+      const mid = Math.floor((a + b) / 2);
+      spans.push([a, mid], [mid, b]);
+    }
+  }
+  const rows = [...seen.values()];
+  rows.short = short;
+  return rows;
+}
+
 export default async function run(ctx) {
-  const goals = await ctx.record.list('money_goals');
+  const goals = await every(ctx, 'money_goals');
   if (goals.length === 0) return null;
-  const accounts = await ctx.record.list('accounts');
+  const accounts = await every(ctx, 'accounts');
   const open = accounts.filter((a) => a.fields.state !== 'closed' && money(a.fields.balance));
   const today = ctx.today();
   const now = day(today);
