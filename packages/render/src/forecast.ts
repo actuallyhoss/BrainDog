@@ -169,6 +169,8 @@ export type GroupKnobs = {
   drift?: Record<string, number>;
   /** The day holdings are counted as sold, or `null` for not sold. */
   sell?: string | null;
+  /** Whether the walk is read as if no money came in from today (`noIncome` on `Knobs`). */
+  noIncome?: boolean;
 };
 
 /** One walk's knobs, read from what its group holds. */
@@ -180,6 +182,7 @@ export const knobsIn = (model: ForecastModel, held: GroupKnobs, key: string): Kn
   ...(held.grow !== undefined ? { grow: held.grow } : {}),
   ...(held.drift !== undefined ? { drift: held.drift } : {}),
   ...(held.sell !== undefined ? { sell: held.sell } : {}),
+  ...(held.noIncome ? { noIncome: true } : {}),
 });
 
 export type Knobs = {
@@ -190,6 +193,12 @@ export type Knobs = {
   grow?: Growth;
   drift?: Readonly<Record<string, number>>;
   sell?: string | null;
+  /**
+   * IF INCOME STOPPED: every movement of money in left out of the walk, from today. It is the walk `lasts-no-income`
+   * counts, the same steps with the incoming ones gone, so the line it draws crosses where that figure says. Holdings a
+   * reader counts as sold still arrive: selling is a question of its own, asked by the sell knob.
+   */
+  noIncome?: boolean;
 };
 
 export type Scenario = {
@@ -511,7 +520,8 @@ export const knobsMoved = (model: ForecastModel, k: Knobs): boolean =>
   (k.grow?.in ?? 0) !== 0 ||
   (k.grow?.out ?? 0) !== 0 ||
   Object.values(k.drift ?? {}).some((n) => n !== 0) ||
-  Boolean(k.sell);
+  Boolean(k.sell) ||
+  Boolean(k.noIncome);
 
 const cents = (n: number): number => Math.round(n * 100) / 100;
 
@@ -548,6 +558,7 @@ export function scenario(model: ForecastModel, knobs: Knobs): Scenario {
   const steps = model.steps
     /* A PLAN LEFT OUT IS EVERY PART OF IT, whose labels all differ, so the knob holds the plan's name as `of` says it. */
     .filter((s) => !leave.has(s.label) && !(s.of !== undefined && leave.has(s.of)))
+    .filter((s) => !knobs.noIncome || s.delta <= 0)
     .map((s) => {
       /* GROWTH BY THE DAY THE MONEY WAS DUE, AND DRIFT BY THE DAY IT ARRIVES. An invoice paid ten days late is not ten
          days bigger, but the dollars in it are changed into pounds on the day they come. */
@@ -900,6 +911,19 @@ export type ForecastPlan = {
    * the soonest, so a plan of many parts over years does not cover the line in numbers.
    */
   drops: { n: number; at: string; y: string; label: string; day: string; amount: string }[];
+  /**
+   * EVERY OTHER MOVEMENT THE LIST UNDER THE CHART NAMES, AS A DOT ON THE LINE (money-core 3.29.0): a salary, a premium, a
+   * bill, each where it moves the balance, money in apart from money out, so a step in the line is never left unsaid.
+   * Each is one path of zero-length strokes, `''` where there is none. Everyday spending is not marked: it is a week's
+   * share every seventh day, and the summary says it once.
+   */
+  marks: { in: string; out: string };
+  /**
+   * THE LOWEST POINT, SAID BESIDE ITS DOT (money-core 3.29.0): where it sits (shares across and down), the figure, and
+   * which way its words lean at the chart's ends, or `null` where the lowest is today, which today's label already says.
+   * `drop` is set where a numbered part of a plan sits on the same day, so the words hang below its disc.
+   */
+  lowLabel: { at: string; y: string; figure: string; side?: 'start' | 'end'; drop?: true } | null;
   /** The month names under the chart; `edge` is the start's own month, set at the left edge rather than centred. */
   ticks: { at: string; label: string; edge?: true }[];
   /** The start and the end of the time axis, for the scrub. */
@@ -926,6 +950,93 @@ export type ForecastPlan = {
 
 /** The most parts of plans a chart numbers as drops: the soonest, so the line is never covered in numbers. */
 export const FORECAST_DROPS_MOST = 6;
+
+/** How near either end of the chart the lowest point is, as a share, for its words to lean inward from it. */
+const LOW_EDGE = 0.15;
+
+/** How many movements the list under the chart names before the rest wait in Every movement, every numbered part kept. */
+export const FORECAST_NEXT_MOST = 8;
+
+/** One cell of the summary over the chart: what it is called, its figure said short, the line under it, and its way. */
+export type SummaryCell = { key: 'end' | 'low' | 'everyday'; label: string; figure: string; note: string; dir?: 'in' | 'out' };
+
+/**
+ * THE ANSWER BEFORE THE CHART (money-core 3.29.0): the cash at the horizon and how far that is from today, the lowest
+ * point and what took it there, and what everyday spending takes a month where the record measured it. Read off the
+ * walk on screen, so a knob that moves the line moves these with it, and a drawer with no knobs says the host's walk.
+ */
+export function forecastSummary(model: ForecastModel, shown: Scenario): SummaryCell[] {
+  const last = shown.days.at(-1) ?? { day: model.today, balance: model.opening };
+  const change = cents(last.balance - model.opening);
+  const changed = change === 0 ? '' : `${change > 0 ? '+' : ''}${forecastFigure(model, change, 'read')}`;
+  const cells: SummaryCell[] = [
+    {
+      key: 'end',
+      label: forecastCashOn(shortDay(last.day, model.today)),
+      figure: forecastFigure(model, last.balance, 'read'),
+      note: [forecastFromToday(forecastFigure(model, model.opening, 'read')), changed].filter(Boolean).join(' · '),
+      ...(change !== 0 ? { dir: change > 0 ? ('in' as const) : ('out' as const) } : {}),
+    },
+  ];
+  const low = shown.lowest;
+  /* WHAT TOOK IT THERE: the last movement out on the lowest day, which is the one a reader looks for. */
+  const cause = listedSteps(shown.steps.filter((s) => s.day === low.day && s.delta < 0)).at(-1);
+  cells.push({
+    key: 'low',
+    label: FORECAST_LOWEST,
+    figure: forecastFigure(model, low.balance, 'read'),
+    note: low.day === model.today ? FORECAST_TODAY : [forecastOnDay(shortDay(low.day, model.today)), cause ? forecastAfter(cause.label) : ''].filter(Boolean).join(', '),
+    ...(low.balance < 0 ? { dir: 'out' as const } : {}),
+  });
+  const everyday = everydayMonthly(model, shown);
+  if (everyday !== null) cells.push({ key: 'everyday', label: FORECAST_EVERYDAY, figure: forecastFigure(model, everyday, 'read'), note: everydayNote(model) });
+  return cells;
+}
+
+/** What everyday spending takes a month on the walk on screen, or `null` where it moves none. */
+function everydayMonthly(model: ForecastModel, shown: Scenario): number | null {
+  if (!shown.steps.some(isEveryday)) return null;
+  const weeks = model.steps.filter(isEveryday);
+  return Math.abs(model.spent ?? Math.round((-weeks.reduce((n, s) => n + s.delta, 0) / weeks.length) * (52 / 12)));
+}
+
+/** The line under everyday spending's figure: `a month, the average of Jul to Sep`, or `a month` where no months came. */
+function everydayNote(model: ForecastModel): string {
+  const m = model.measured;
+  if (!m) return FORECAST_A_MONTH;
+  return forecastAverageOf(m.from === m.to ? shortMonth(m.from, model.today) : `${shortMonth(m.from, model.today)} to ${shortMonth(m.to, model.today)}`);
+}
+
+/** One line of the list under the chart: a movement, or the one line everyday spending is said in. */
+export type NextRow = { everyday: true; said: string } | { everyday?: undefined; n: number | null; dir: 'in' | 'out'; day: string; label: string; amount: string };
+
+/**
+ * THE LIST UNDER THE CHART (money-core 3.29.0): everyday spending in one line, then the movements in order, each
+ * instalment and each repeating line on its own row with its day and its amount to the cent, the soonest
+ * `FORECAST_NEXT_MOST` and every part of a plan the line numbers, so a number on the line is always in the list. `more`
+ * is how many movements inside the horizon wait in Every movement.
+ */
+export function forecastNext(model: ForecastModel, shown: Scenario, plan: Pick<ForecastPlan, 'drops'>, most = FORECAST_NEXT_MOST): { rows: NextRow[]; more: number } {
+  const end = addDays(model.today, shown.horizon);
+  const listed = listedSteps(shown.steps).filter((s) => s.day <= end);
+  const numbered = new Map<(typeof listed)[number], number>();
+  /* A DROP IS NUMBERED IN THE ORDER THE PLAN NUMBERS THEM: the soonest parts of plans going out, after today. */
+  let n = 0;
+  for (const s of listed) if (n < plan.drops.length && s.of !== undefined && s.of !== '' && s.delta < 0 && s.day > model.today) numbered.set(s, ++n);
+  const kept = listed.filter((s, i) => i < most || numbered.has(s));
+  const said = forecastEveryday(model, shown);
+  return {
+    rows: [
+      ...(said ? [{ everyday: true as const, said }] : []),
+      ...kept.map((s) => ({ n: numbered.get(s) ?? null, dir: s.delta > 0 ? ('in' as const) : ('out' as const), day: shortDay(s.day, model.today), label: s.label, amount: forecastFigure(model, s.delta) })),
+    ],
+    more: listed.length - kept.length,
+  };
+}
+
+/** Whether any money comes in inside the horizon, which is what "If income stopped" would take away. */
+export const hasIncome = (model: ForecastModel, horizon: number = model.horizon): boolean =>
+  model.steps.some((s) => s.delta > 0 && s.day <= addDays(model.today, Math.max(1, Math.min(reachOf(model), Math.round(horizon)))));
 
 /** How many round steps the value axis is cut into at most, so at most one more name than this down its side. */
 const AXIS_MOST = 5;
@@ -1237,6 +1348,27 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     .filter(Boolean)
     .join('. ');
 
+  /* THE DROPS FIRST, so a dot is never drawn under a numbered disc. */
+  const drops = shown.steps
+    .filter((s) => s.of !== undefined && s.of !== '' && s.delta < 0 && s.day > model.today && s.day <= end)
+    .slice(0, FORECAST_DROPS_MOST);
+  const marked = (incoming: boolean) =>
+    listedSteps(shown.steps)
+      .filter((s) => s.day <= end && (incoming ? s.delta > 0 : s.delta < 0) && !drops.includes(s))
+      .map((s) => `M${x(s.day)} ${y(s.balance)}h0`)
+      .join(' ');
+  const lowAt = daysBetween(start, shown.lowest.day) / span;
+  const lowLabel: ForecastPlan['lowLabel'] =
+    shown.lowest.day === model.today
+      ? null
+      : {
+          at: at(lowAt),
+          y: String(Math.round(Number(y(shown.lowest.balance)) * 100) / 10_000),
+          figure: forecastFigure(model, shown.lowest.balance, 'read'),
+          ...(lowAt > 1 - LOW_EDGE ? { side: 'end' as const } : lowAt < LOW_EDGE ? { side: 'start' as const } : {}),
+          ...(drops.some((s) => s.day === shown.lowest.day) ? { drop: true as const } : {}),
+        };
+
   return {
     said,
     warn: c !== null,
@@ -1273,10 +1405,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
         }
       : null,
     low: `M${x(shown.lowest.day)} ${y(shown.lowest.balance)}h0`,
-    drops: shown.steps
-      .filter((s) => s.of !== undefined && s.of !== '' && s.delta < 0 && s.day > model.today && s.day <= end)
-      .slice(0, FORECAST_DROPS_MOST)
-      .map((s, i) => ({
+    drops: drops.map((s, i) => ({
         n: i + 1,
         at: at(daysBetween(start, s.day) / span),
         y: String(Math.round(Number(y(s.balance)) * 100) / 10_000),
@@ -1284,6 +1413,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
         day: shortDay(s.day, model.today),
         amount: forecastFigure(model, s.delta, 'read'),
       })),
+    marks: { in: marked(true), out: marked(false) },
+    lowLabel,
     ticks,
     start,
     span,
@@ -1330,6 +1461,7 @@ export const FORECAST_PAINT = {
   walk: { fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linejoin': 'round', 'stroke-linecap': 'round' },
   now: { fill: 'none', stroke: 'currentColor', 'stroke-width': '7', 'stroke-linecap': 'round' },
   rule: { fill: 'none', stroke: 'currentColor', 'stroke-opacity': '0.35', 'stroke-width': '1' },
+  mark: { fill: 'none', stroke: 'currentColor', 'stroke-width': '5', 'stroke-linecap': 'round' },
 } as const satisfies Record<string, Readonly<Record<string, string>>>;
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */
@@ -1412,6 +1544,19 @@ export const forecastRecorded = (day: string, figure: string): string => `record
 export const forecastUnderIn = (n: number): string => (n <= 0 ? 'Cash goes under today' : `Cash goes under in ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastAverage = (n: number): string => (n <= 0 ? 'on average so far: on time' : `on average so far: ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastLowest = (figure: string, day: string): string => `Lowest ${figure} on ${day}`;
+/** The word over the lowest point's figure, on the chart and in the summary. */
+export const FORECAST_LOWEST = 'Lowest';
+export const forecastCashOn = (day: string): string => `Cash on ${day}`;
+export const forecastFromToday = (figure: string): string => `from ${figure} today`;
+export const forecastOnDay = (day: string): string => `on ${day}`;
+export const forecastAfter = (label: string): string => `after ${label}`;
+export const FORECAST_A_MONTH = 'a month';
+export const forecastAverageOf = (months: string): string => `a month, the average of ${months}`;
+/** What the list under the chart is called, and what is said of the movements it leaves to Every movement. */
+export const FORECAST_NEXT = 'Next movements';
+export const forecastNextMore = (n: number): string => `${n} more in Every movement`;
+/** The one-press question beside the horizon: the walk with every movement of money in left out. */
+export const FORECAST_NO_INCOME = 'If income stopped';
 /** Where a value axis that leaves zero out starts, said in the chart's name: `The axis starts at E£980,000.` */
 export const forecastAxisFrom = (figure: string): string => `The axis starts at ${figure}.`;
 /** And where one under zero throughout stops, at its top. */

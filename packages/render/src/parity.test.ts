@@ -1194,3 +1194,19 @@ test('A CALENDAR ROW\'S AMOUNT, ITS THIRD CELL, draws one tree in both renderers
     assert.deepEqual([...new Set(said)], ['£1,875.00', '£42.50']);
   }
 });
+
+test('THE HORIZON AND IF INCOME STOPPED ARE UP FRONT, outside Adjust, and only where the host asks and they can move the line', () => {
+  const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
+  const block = page(SHAPES['a forecast that walks past the length it opens on']!);
+  const knobs = tree(render(Knobbed, { props: { block, opts: { scenario: true } } }).body);
+  const ask = knobs.slice(knobs.indexOf('<div class="forecast-ask">'), knobs.indexOf('<dl class="forecast-summary">'));
+  assert.match(ask, /<div aria-label="Horizon" class="segmented forecast-segs" role="group">/u, 'the horizon is a segmented control up front');
+  assert.match(ask, /<button aria-checked="false" class="forecast-chip forecast-income" role="switch" type="button">/u, 'and the income question a switch beside it');
+  const fold = knobs.slice(knobs.indexOf('<div class="forecast-knobs"'));
+  assert.doesNotMatch(fold, /aria-label="Horizon"/u, 'Adjust no longer holds the horizon');
+  assert.ok(knobs.indexOf('forecast-ask') < knobs.indexOf('forecast-summary'), 'the questions come before the answer');
+  /* A WALK WITH NOTHING COMING IN OFFERS NO INCOME TO STOP; and with no host asking, neither is drawn. */
+  const rent = page('```forecast\nopening | 2026-09-17 | Cash now | £1,000.00\nstep | 2026-10-01 | Rent | −£100.00\nstep | 2026-11-01 | Rent | −£100.00\nhorizon | 90 |  | \nknobs | horizon count |  | \n```');
+  assert.doesNotMatch(tree(render(Knobbed, { props: { block: rent, opts: { scenario: true } } }).body), /forecast-income/u);
+  assert.doesNotMatch(tree(render(Block, { props: { block } }).body), /forecast-ask/u);
+});

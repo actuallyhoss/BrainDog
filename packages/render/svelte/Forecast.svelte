@@ -41,7 +41,10 @@
     FORECAST_GROW_OUT,
     FORECAST_HORIZON,
     FORECAST_LATE,
+    FORECAST_LOWEST,
     FORECAST_MOVE,
+    FORECAST_NEXT,
+    FORECAST_NO_INCOME,
     FORECAST_NONE,
     FORECAST_NOW,
     FORECAST_NUMBERS,
@@ -62,6 +65,10 @@
     forecastDriftNote,
     forecastMore,
     forecastModel,
+    forecastNext,
+    forecastNextMore,
+    forecastSummary,
+    hasIncome,
     forecastPerYear,
     forecastPlan,
     forecastRateOf,
@@ -104,7 +111,7 @@
 
   /* A WALK ON ITS OWN HOLDS ITS KNOBS HERE; A WALK OF A GROUP (one a currency) READS THE GROUP'S, so one set of controls,
      under the walk that names `knobs`, moves every walk of the declaration at once. Spending is held by currency. */
-  const own: GroupKnobs = $state({ horizon: null, late: 0, spend: {}, leave: [], grow: { in: 0, out: 0 }, drift: {}, sell: null });
+  const own: GroupKnobs = $state({ horizon: null, late: 0, spend: {}, leave: [], grow: { in: 0, out: 0 }, drift: {}, sell: null, noIncome: false });
   let group = $state.raw<Group | null>(null);
   /* THE GROUP'S NAME AND THIS WALK'S KEY AS WORDS, so a walk redrawn with new rows stays in the group it was in. */
   const groupId = $derived(opts.scenario ? model?.group?.id : undefined);
@@ -133,7 +140,8 @@
   const plan = $derived(drawn && shown && base ? forecastPlan(drawn, shown, moved ? base : null) : null);
   const knobbed = $derived(Boolean(opts.scenario) && (model?.knobs.length ?? 0) > 0);
   /* WHETHER ANYTHING IS DRAWN UNDER THE CHART TO MOVE: a knob, or another currency to show it in. */
-  const controls = $derived(knobbed || shows.length > 0);
+  /* THE HORIZON IS UP FRONT NOW, so a block whose only knob is the horizon has nothing for Adjust to open. */
+  const controls = $derived((knobbed && Boolean(model?.knobs.some((k) => k !== 'horizon'))) || shows.length > 0);
   /* EVERY MOVEMENT SITS INSIDE ADJUST WHERE ADJUST IS DRAWN, and stood alone under the chart as an orphan line of grey
      (the money review). Without Adjust it stays under the chart, as `toHTML` draws it, so a reader can still open it. */
   const inside = $derived(Boolean(opts.scenario) && controls);
@@ -185,6 +193,18 @@
   const sellEnd = $derived(drawn && shown ? addDays(drawn.today, shown.horizon) : '');
   const soon = $derived(drawn && shown ? underNote(drawn, shown) : '');
   const readout = $derived(drawn && shown && plan && scrub !== null ? readoutAt(drawn, shown, plan, scrub) : null);
+  /* THE ANSWER OVER THE CHART AND THE LIST UNDER IT, from the walk on screen, as `toHTML` draws them from the host's. */
+  const summary = $derived(drawn && shown ? forecastSummary(drawn, shown) : []);
+  const next = $derived(drawn && shown && plan ? forecastNext(drawn, shown, plan) : { rows: [], more: 0 });
+  /* THE TWO QUESTIONS ASKED MOST, UP FRONT AND NOT INSIDE ADJUST (money-core 3.29.0): how far to look, and what if no
+     money came in. Each is drawn only where it can move the line: a horizon of more than one length, and a walk that
+     has money coming in to take away. */
+  const horizonUp = $derived(knobbed && Boolean(model?.knobs.includes('horizon')) && choices.length > 1);
+  const incomeUp = $derived(knobbed && drawn !== null && model?.group === null && hasIncome(drawn, held.horizon ?? drawn.horizon));
+  /* THE INCOME QUESTION IS SET BY REPLACING THE VALUE, as the later knobs are, for a group made without it. */
+  const toggleIncome = () => {
+    held.noIncome = !held.noIncome;
+  };
   const title = $derived(text(inline(block.heading ?? '', opts)) || FORECAST_BALANCE);
 
   /* A WALK JOINS ITS GROUP FOR AS LONG AS IT IS DRAWN, and tells the controls how it writes money and what it could count. */
@@ -214,6 +234,7 @@
     held.grow = { in: 0, out: 0 };
     held.drift = {};
     held.sell = null;
+    held.noIncome = false;
     if (group) group.sold = {};
   };
   /* THE LATER KNOBS ARE SET BY REPLACING THE WHOLE VALUE, because a group made before them holds none of them and a
@@ -354,6 +375,8 @@
       {#if p.walk}<path class="forecast-walk" style={p.below ? `stroke:url(#${uid}-under)` : undefined} {...FORECAST_PAINT.walk} d={p.walk} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.future}<path class="forecast-future" style={p.below ? `stroke:url(#${uid}-under)` : undefined} d={p.future} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-low" d={p.low} vector-effect="non-scaling-stroke"></path>
+      {#if p.marks.in}<path class="forecast-mark" data-dir="in" {...FORECAST_PAINT.mark} d={p.marks.in} vector-effect="non-scaling-stroke"></path>{/if}
+      {#if p.marks.out}<path class="forecast-mark" data-dir="out" {...FORECAST_PAINT.mark} d={p.marks.out} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-now" {...FORECAST_PAINT.now} d={p.now.d} vector-effect="non-scaling-stroke"></path>
       {#if p.cross}<path class="forecast-cross" d={p.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
       <!-- THE DAY BEING READ, a hairline down the chart, so a thumb sees which point the readout names. -->
@@ -374,6 +397,14 @@
     {#if p.cross}<span class="forecast-pin" data-side={p.cross.near ? 'end' : undefined} style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}
     <!-- EACH PART OF A PLAN THE LINE DROPS BY, numbered on the line and in the list under the chart (`drops`). -->
     {#each p.drops as d (d.n)}<span class="forecast-drop num" style="--at:{d.at};--y:{d.y}" aria-hidden="true">{d.n}</span>{/each}
+    <!-- THE LOWEST POINT SAID BESIDE ITS DOT, where it is not today (`lowLabel`). -->
+    {#if p.lowLabel}<span
+        class="forecast-low-label num"
+        data-side={p.lowLabel.side}
+        data-drop={p.lowLabel.drop ? '' : undefined}
+        style="--at:{p.lowLabel.at};--y:{p.lowLabel.y}"
+        aria-hidden="true"><span class="forecast-low-word">{FORECAST_LOWEST}</span><span class="forecast-low-figure">{p.lowLabel.figure}</span></span
+      >{/if}
     {#if readout}
       <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
         <span class="forecast-readout-day">{readout.day}</span>
@@ -387,14 +418,28 @@
   <ol class="forecast-ticks" aria-hidden="true">
     {#each p.ticks as t}<li class="forecast-tick" data-edge={t.edge ? '' : undefined} style="--at:{t.at}">{t.label}</li>{/each}
   </ol>
-  {#if p.drops.length}
-    <ol class="forecast-drops">
-      {#each p.drops as d (d.n)}<li class="forecast-drop-item"
-          ><span class="forecast-drop-n num" aria-hidden="true">{d.n}</span><span class="forecast-drop-label">{d.label}</span><span class="forecast-drop-day">{d.day}</span><span
-            class="forecast-drop-amount num">{d.amount}</span
-          ></li
-        >{/each}
-    </ol>
+{/snippet}
+
+<!-- EVERY MOVEMENT IN ORDER UNDER THE CHART, each part of a plan numbered as its mark on the line is (`forecastNext`). -->
+{#snippet listed()}
+  {#if next.rows.length}
+    <div class="forecast-next">
+      <p class="forecast-next-head">{FORECAST_NEXT}</p>
+      <ol class="forecast-next-list">
+        {#each next.rows as r, i (i)}
+          {#if r.everyday}
+            <li class="forecast-next-item" data-everyday="">{r.said}</li>
+          {:else}
+            <li class="forecast-next-item" data-dir={r.dir}
+              >{#if r.n === null}<span class="forecast-next-dot" aria-hidden="true"></span>{:else}<span class="forecast-next-n num" aria-hidden="true">{r.n}</span>{/if}<span
+                class="forecast-next-day">{r.day}</span
+              ><span class="forecast-next-label">{r.label}</span><span class="forecast-next-amount num">{r.amount}</span></li
+            >
+          {/if}
+        {/each}
+      </ol>
+      {#if next.more > 0}<p class="forecast-next-more">{forecastNextMore(next.more)}</p>{/if}
+    </div>
   {/if}
 {/snippet}
 
@@ -459,17 +504,6 @@
     </div>
   {/if}
   {#if knobbed}
-    <!-- ONE SEGMENTED CONTROL, the house's, from a quarter to the block's longest choice and "To the end". -->
-    {#if m.knobs.includes('horizon') && choices.length > 1}
-      <div class="forecast-knob" role="group" aria-label={FORECAST_HORIZON}>
-        <span class="forecast-knob-name" aria-hidden="true">{FORECAST_HORIZON}</span>
-        <div class="segmented forecast-segs">
-          {#each choices as c (c.days)}
-            <button type="button" class="segment" data-on={pressed(s) === c.days ? '' : undefined} aria-pressed={pressed(s) === c.days} onclick={() => pick(c)}>{c.label}</button>
-          {/each}
-        </div>
-      </div>
-    {/if}
     {#if m.knobs.includes('late')}
       <label class="forecast-knob">
         <span class="forecast-knob-name">{m.lateName ?? FORECAST_LATE}</span>
@@ -548,11 +582,42 @@
   {#if !drawn || !shown || !plan}
     <p class="forecast-empty">{FORECAST_NONE}</p>
   {:else}
+    <!-- HOW FAR TO LOOK AND WHAT IF NOTHING CAME IN, the two questions up front: one segmented control, the house's, from a
+         quarter to the block's longest choice and "To the end", and one switch. -->
+    {#if horizonUp || incomeUp}
+      <div class="forecast-ask">
+        {#if horizonUp}
+          <div class="segmented forecast-segs" role="group" aria-label={FORECAST_HORIZON}>
+            {#each choices as c (c.days)}
+              <button type="button" class="segment" data-on={pressed(shown) === c.days ? '' : undefined} aria-pressed={pressed(shown) === c.days} onclick={() => pick(c)}>{c.label}</button>
+            {/each}
+          </div>
+        {/if}
+        {#if incomeUp}
+          <button type="button" class="forecast-chip forecast-income" role="switch" aria-checked={Boolean(held.noIncome)} onclick={toggleIncome}
+            ><span class="switch-track" aria-hidden="true"></span><span class="forecast-chip-label">{FORECAST_NO_INCOME}</span></button
+          >
+        {/if}
+      </div>
+    {/if}
+    <dl class="forecast-summary">
+      {#each summary as c (c.key)}
+        <div class="forecast-sum" data-key={c.key}>
+          <dt class="forecast-sum-label">{c.label}</dt>
+          <dd class="forecast-sum-figure num">{c.figure}</dd>
+          <dd class="forecast-sum-note" data-dir={c.dir}>{c.note}</dd>
+        </div>
+      {/each}
+    </dl>
     <!-- NO SENTENCE WHERE THE PAGE'S HEADLINE SAYS IT (`legend`), until a knob moves the walk off the one it read. -->
     {#if plan.legend}{@render said(plan)}{/if}
     {@render chart(plan)}
     {#if soon}
       <p class="forecast-soon">{soon}</p>
+    {/if}
+    <!-- WHAT THE KNOBS CHANGED, right under the line they moved: the walk with the controls, and each other walk of its group. -->
+    {#if (knobbed || group) && moved && base}
+      <p class="forecast-against" role="status">{against(base, shown, moved)}</p>
     {/if}
     {#if opts.scenario}
       <!-- ADJUST IS A DISCLOSURE, the same quiet pill as full screen, pressed while the knobs under it are open. -->
@@ -580,10 +645,7 @@
         {#if inside}{@render numbers(drawn, shown)}{/if}
       </div>
     {/if}
-    <!-- WHAT THE KNOBS CHANGED, under every walk they move: the one with the controls, and each other walk of its group. -->
-    {#if (knobbed || group) && moved && base}
-      <p class="forecast-against" role="status">{against(base, shown, moved)}</p>
-    {/if}
+    {@render listed()}
     <!-- EVERY MOVEMENT IS A QUESTION ASKED OF THE ANSWER, so where there is an Adjust it is the last thing inside it. -->
     {#if !inside}{@render numbers(drawn, shown)}{/if}
     {#if opts.scenario}

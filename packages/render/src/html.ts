@@ -46,7 +46,32 @@ import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPla
 import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
-import { FORECAST_AXIS_BREAK, FORECAST_AXIS_BREAK_STYLE, FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NOW, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, nowPlaced, scenario, underNote } from './forecast.ts';
+import {
+  FORECAST_AXIS_BREAK,
+  FORECAST_AXIS_BREAK_STYLE,
+  FORECAST_BALANCE,
+  FORECAST_LOWEST,
+  FORECAST_MOVE,
+  FORECAST_NEXT,
+  FORECAST_NONE,
+  FORECAST_NOW,
+  FORECAST_NUMBERS,
+  FORECAST_PAINT,
+  FORECAST_WHAT,
+  FORECAST_WHEN,
+  baseKnobs,
+  forecastEveryday,
+  forecastFigure,
+  forecastModel,
+  forecastNext,
+  forecastNextMore,
+  forecastPlan,
+  forecastSummary,
+  listedSteps,
+  nowPlaced,
+  scenario,
+  underNote,
+} from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
@@ -1708,20 +1733,33 @@ function forecast(b: Block, o: RenderOptions): string {
     ? `<defs><linearGradient class="forecast-split" id="${under}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100"><stop class="forecast-above" offset="${plan.zero}%"></stop><stop class="forecast-under" offset="${plan.zero}%"></stop></linearGradient></defs>`
     : '';
   const cutLine = under ? ` style="stroke:url(#${under})"` : '';
-  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${split}${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-today', plan.now.rule)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past, cutLine)}${path('forecast-walk', plan.walk, `${painted(FORECAST_PAINT.walk)}${cutLine}`)}${path('forecast-future', plan.future, cutLine)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true"><span class="forecast-now-word">${escape(FORECAST_NOW)}</span><span class="forecast-now-figure">${escape(plan.now.label)}</span></span>${axis}${
+  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${split}${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-today', plan.now.rule)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past, cutLine)}${path('forecast-walk', plan.walk, `${painted(FORECAST_PAINT.walk)}${cutLine}`)}${path('forecast-future', plan.future, cutLine)}${path('forecast-low', plan.low)}${path('forecast-mark', plan.marks.in, ` data-dir="in"${painted(FORECAST_PAINT.mark)}`)}${path('forecast-mark', plan.marks.out, ` data-dir="out"${painted(FORECAST_PAINT.mark)}`)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true"><span class="forecast-now-word">${escape(FORECAST_NOW)}</span><span class="forecast-now-figure">${escape(plan.now.label)}</span></span>${axis}${
     plan.cross ? `<span class="forecast-pin"${plan.cross.near ? ' data-side="end"' : ''} style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
-  }${plan.drops.map((d) => `<span class="forecast-drop num" style="--at:${d.at};--y:${d.y}" aria-hidden="true">${d.n}</span>`).join('')}</div>`;
+  }${plan.drops.map((d) => `<span class="forecast-drop num" style="--at:${d.at};--y:${d.y}" aria-hidden="true">${d.n}</span>`).join('')}${
+    plan.lowLabel
+      ? `<span class="forecast-low-label num"${plan.lowLabel.side ? ` data-side="${plan.lowLabel.side}"` : ''}${plan.lowLabel.drop ? ' data-drop=""' : ''} style="--at:${plan.lowLabel.at};--y:${plan.lowLabel.y}" aria-hidden="true"><span class="forecast-low-word">${escape(FORECAST_LOWEST)}</span><span class="forecast-low-figure">${escape(plan.lowLabel.figure)}</span></span>`
+      : ''
+  }</div>`;
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks
     .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
     .join('')}</ol>`;
-  /* EACH PART OF A PLAN THE LINE DROPS BY, numbered as its mark on the line is, with its day and amount (`drops`). */
-  const drops = plan.drops.length
-    ? `<ol class="forecast-drops">${plan.drops
-        .map(
-          (d) =>
-            `<li class="forecast-drop-item"><span class="forecast-drop-n num" aria-hidden="true">${d.n}</span><span class="forecast-drop-label">${escape(d.label)}</span><span class="forecast-drop-day">${escape(d.day)}</span><span class="forecast-drop-amount num">${escape(d.amount)}</span></li>`,
+  /* THE ANSWER OVER THE CHART: the cash at the horizon, the lowest point and everyday spending (`forecastSummary`). */
+  const summary = `<dl class="forecast-summary">${forecastSummary(model, shown)
+    .map(
+      (c) =>
+        `<div class="forecast-sum" data-key="${c.key}"><dt class="forecast-sum-label">${escape(c.label)}</dt><dd class="forecast-sum-figure num">${escape(c.figure)}</dd><dd class="forecast-sum-note"${c.dir ? ` data-dir="${c.dir}"` : ''}>${escape(c.note)}</dd></div>`,
+    )
+    .join('')}</dl>`;
+  /* EVERY MOVEMENT IN ORDER UNDER THE CHART, each part of a plan numbered as its mark on the line is (`forecastNext`). */
+  const next = forecastNext(model, shown, plan);
+  const listed = next.rows.length
+    ? `<div class="forecast-next"><p class="forecast-next-head">${escape(FORECAST_NEXT)}</p><ol class="forecast-next-list">${next.rows
+        .map((r) =>
+          r.everyday
+            ? `<li class="forecast-next-item" data-everyday="">${escape(r.said)}</li>`
+            : `<li class="forecast-next-item" data-dir="${r.dir}">${r.n === null ? '<span class="forecast-next-dot" aria-hidden="true"></span>' : `<span class="forecast-next-n num" aria-hidden="true">${r.n}</span>`}<span class="forecast-next-day">${escape(r.day)}</span><span class="forecast-next-label">${escape(r.label)}</span><span class="forecast-next-amount num">${escape(r.amount)}</span></li>`,
         )
-        .join('')}</ol>`
+        .join('')}</ol>${next.more > 0 ? `<p class="forecast-next-more">${escape(forecastNextMore(next.more))}</p>` : ''}</div>`
     : '';
   /* EVERYDAY SPENDING IS ONE LINE, not a row a week (`forecastEveryday`), and the bills are listed around it. */
   const everyday = forecastEveryday(model, shown);
@@ -1734,7 +1772,7 @@ function forecast(b: Block, o: RenderOptions): string {
     .join('')}</tbody></table></details>`;
   const note = underNote(model, shown);
   const soon = note ? `<p class="forecast-soon">${escape(note)}</p>` : '';
-  return `<div class="prop forecast">${said}${chart}${ticks}${drops}${soon}${numbers}</div>`;
+  return `<div class="prop forecast">${summary}${said}${chart}${ticks}${soon}${listed}${numbers}</div>`;
 }
 
 /**
