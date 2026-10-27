@@ -157,9 +157,10 @@ async function fresh(): Promise<Kernel> {
 test('CASH IN OTHER CURRENCIES IS THE SHARE OF CASH NOW OUTSIDE THE HOME ONE, at the rate held, and nothing without one', async () => {
   const k = await fresh();
   value(k.create('accounts', { name: 'Harbour Bank', kind: 'bank', liquid: true, balance: egp(60_000), as_of: '2026-10-01', state: 'open' }, OWNER));
-  value(k.create('accounts', { name: 'Dollar Savings', kind: 'bank', liquid: true, balance: usd(1_000), as_of: '2026-10-01', state: 'open' }, OWNER));
   const read = () => value<{ value: number | null }>(k.metric(MONEY_METRICS['cash-foreign-share'] as never)).value;
-  assert.equal(read(), null, 'a share with no home currency');
+  assert.equal(read(), 0, 'one currency and no home one is all at home');
+  value(k.create('accounts', { name: 'Dollar Savings', kind: 'bank', liquid: true, balance: usd(1_000), as_of: '2026-10-01', state: 'open' }, OWNER));
+  assert.equal(read(), null, 'a share of two currencies with no home one');
   value(k.setPackConfig('money-core', { home_currency: 'EGP' }, OWNER));
   assert.equal(read(), null, 'a share with no rate for dollars');
   value(k.create('fx', { currency: 'USD', base: 'EGP', rate: 40, as_of: '2026-09-30' }, OWNER));

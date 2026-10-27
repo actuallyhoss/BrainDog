@@ -507,11 +507,14 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
  * THE SHARE OF THE MONEY HELD OUTSIDE THE HOME CURRENCY, as a fraction: the amounts in any other currency over every
  * amount, each half converted into the home currency at the rates the record holds on the day asked about.
  *
- * NO VALUE RATHER THAN A WRONG ONE. With no home currency there is no "other"; with a rate missing for any amount a half
- * is only at least, and a share of a part is no share; with nothing held above nought a share of it means nothing. A
- * record whose money is all in the home currency reads nought.
+ * WITH NO HOME CURRENCY SET, MONEY ALL IN ONE CURRENCY IS AT HOME, and reads nought.
+ *
+ * NO VALUE RATHER THAN A WRONG ONE. With no home currency and two currencies held there is no "other"; with a rate
+ * missing for any amount a half is only at least, and a share of a part is no share; with nothing held above nought a
+ * share of it means nothing. A record whose money is all in the home currency reads nought.
  */
-function foreignShare(amounts: readonly Amount[], home: string | null, rates: EvalRates, today: string): Summed {
+function foreignShare(amounts: readonly Amount[], said: string | null, rates: EvalRates, today: string): Summed {
+  const home = said ?? ownCurrency(amounts);
   if (home === null) return { value: null, unit: null };
   const whole = summed(amounts, home, home, rates, today);
   const away = summed(

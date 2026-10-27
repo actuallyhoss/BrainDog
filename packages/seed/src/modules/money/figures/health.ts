@@ -24,8 +24,8 @@ const MOVED = 'state is cleared, transfer is false';
  *
  * WHAT IS HELD IN OTHER CURRENCIES, SINCE money-core 3.29.0: of Cash now, the share in a currency other than the home
  * one, both halves converted at the rates held (`read: 'foreign'`, `foreignShare` in
- * `packages/kernel/src/money-figures.ts`). The same accounts and the same roll as Cash now. No home currency, or a rate
- * missing, reads nothing rather than a share of a part. No target a share could miss: holding dollars is a choice.
+ * `packages/kernel/src/money-figures.ts`). The same accounts and the same roll as Cash now. Two currencies and no home
+ * one, or a rate missing, reads nothing rather than a share of a part; one currency and no home one reads nought. No target a share could miss: holding dollars is a choice.
  *
  * THE MONTH SO FAR, EACH WAY: money in since the first, and money out, which is `spent-by-category-month`'s whole.
  */
