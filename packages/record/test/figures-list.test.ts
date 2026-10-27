@@ -85,9 +85,9 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      month ahead, made it 130, and money-core 3.29.0's five figures of one account (its balance, its Ledger lines, the gap
      between them and its money in and out by month), lines-by-account, and the ten of a month against its budgets (what
      is left, what came in, what is unfiled and unfiled spent, the budgets' total and the categories with none, the share
-     kept, and who was paid, how often and when last), made it 146. The number is
+     kept, and who was paid, how often and when last), made it 146, and every-month-net, what is left each month, 147. The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 146);
+  assert.equal(declared.length, 147);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
@@ -182,7 +182,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 146);
+  assert.equal(listed.length, 147);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });
