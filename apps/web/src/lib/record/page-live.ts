@@ -68,7 +68,7 @@ import { sourceRows } from './source-rows.ts';
 import { scriptOf } from './scripts.ts';
 import { noteWithoutLeftovers } from './brief.ts';
 import { learnZone, recordToday } from './zone.ts';
-import { daySaid } from '../work/board.ts';
+import { daySaid } from '../page/page-writes.ts';
 import { pathOf } from '../ui/icons.ts';
 import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
