@@ -1546,8 +1546,41 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.0.1",
+      "latest": "3.1.0",
       "versions": [
+        {
+          "version": "3.1.0",
+          "checksum": "1729f8a18e0735412b71262744ba43bfb74d3b666919400eb1b6da477c957639",
+          "bytes": 45132,
+          "published_at": "2026-10-27T16:29:43.641Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Says once when a holding's price is over 30 days old, and when a gold rate in use is over 7 days old.",
+          "preview": true
+        },
         {
           "version": "3.0.1",
           "checksum": "cf5307180a50b886e0dae94b09769a6bbcbcd4c63002ab71e8071b2ee55e2034",

@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Words the gain figure as a percent of cost.",
+  "changes": "Says once when a holding's price is over 30 days old, and when a gold rate in use is over 7 days old.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -432,6 +432,42 @@
             "as": "costing"
           }
         }
+      ]
+    },
+    {
+      "rule": "holdings_price_old",
+      "name": "Say when a price is over 30 days old",
+      "pack": "holdings",
+      "register": "holdings",
+      "when": "price is set, priced_on before -30d",
+      "then": [
+        {
+          "notify": {
+            "say": "{{label}} was last priced {{ago:priced_on}}, so what it is worth may be out of date."
+          }
+        }
+      ],
+      "once_per": [
+        "entry",
+        "priced_on"
+      ]
+    },
+    {
+      "rule": "gold_rate_old",
+      "name": "Say when a gold rate is over 7 days old",
+      "pack": "holdings",
+      "register": "gold_rates",
+      "when": "live is true, on before -7d",
+      "then": [
+        {
+          "notify": {
+            "say": "The {{karat}} gold rate was set {{ago:on}}, so what your gold is worth may be out of date."
+          }
+        }
+      ],
+      "once_per": [
+        "entry",
+        "on"
       ]
     },
     {

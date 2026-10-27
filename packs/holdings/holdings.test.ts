@@ -140,7 +140,7 @@ const SPREAD_MS = 15 * 60_000;
 test('THE FILE IS 2.0.0, Investments and gold, and every field and kind 1.4.2 held is still there as it was', () => {
   const doc = file();
   const old = v142();
-  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.0.1', 'Investments and gold']);
+  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.1.0', 'Investments and gold']);
   assert.equal(old.version, '1.4.2', 'the frozen 1.4.2 moved');
   assert.equal(v100().version, '1.0.0', 'the frozen 1.0.0 moved');
   assert.deepEqual(doc.requires, old.requires);
@@ -192,11 +192,20 @@ test('THE SCRIPTS IN THE FILE ARE cost.js AND twin.js, byte for byte, each reach
   /* NOTHING CALLS OUT: the gold rate is typed or written by another add-on, never fetched by this one. */
   assert.doesNotMatch(readFileSync(COST_FILE, 'utf8'), /ctx\.fetch/u);
   /* THREE RULES START THE COST SCRIPT, one a list, and none starts the question: a question a write opened would come mid-edit. */
-  assert.deepEqual(doc.declarations.filter((d) => d.rule !== undefined).map((d) => [d.rule, (d.on as { written: { register: string } }).written.register]), [
+  assert.deepEqual(doc.declarations.filter((d) => d.rule !== undefined && d.on !== undefined).map((d) => [d.rule, (d.on as { written: { register: string } }).written.register]), [
     ['holdings_cost', 'holdings'],
     ['holdings_buy', 'holding_buys'],
     ['holdings_rate', 'gold_rates'],
   ]);
+  /* AND TWO THAT TELL OF A PRICE GROWN OLD (3.1.0), each once a row a day it was priced on, past the age the figures
+     `holdings-stale` and `gold-rates-old` count from. */
+  assert.deepEqual(
+    doc.declarations.filter((d) => d.rule !== undefined && d.on === undefined).map((d) => [d.rule, d.register, d.when, d.once_per]),
+    [
+      ['holdings_price_old', 'holdings', 'price is set, priced_on before -30d', ['entry', 'priced_on']],
+      ['gold_rate_old', 'gold_rates', 'live is true, on before -7d', ['entry', 'on']],
+    ],
+  );
 });
 
 const ADDS = [
@@ -204,22 +213,22 @@ const ADDS = [
   'metric.holdings-at-cost', 'metric.holdings-by-kind', 'metric.holdings-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-gain',
   'metric.holdings-gain-pct', 'metric.holdings-gained', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value',
   'page.holding', 'page.holdings', 'register.gold_rates', 'register.holding_buys', 'register.holdings',
-  'rule.holdings_buy', 'rule.holdings_cost', 'rule.holdings_rate', 'script.holdings_cost', 'script.holdings_twin',
+  'rule.gold_rate_old', 'rule.holdings_buy', 'rule.holdings_cost', 'rule.holdings_price_old', 'rule.holdings_rate', 'script.holdings_cost', 'script.holdings_twin',
 ];
 
-test('INSTALLED FROM THE FILE: three lists, three rules, two scripts, eighteen figures and two pages, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: three lists, five rules, two scripts, eighteen figures and two pages, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ADDS);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.0.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.0');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.0.1']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.1.0']);
 });
 
 test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so every amount reads in the money somebody chose', () => {
@@ -586,7 +595,7 @@ async function upgraded(doc: Doc, rows: readonly Body[] = HELD): Promise<Awaited
   const diff = await planOf(made.api, file());
   assert.deepEqual(diff.conflicts, [], 'the update met a conflict');
   said(await put(made.api, file()));
-  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.0.1');
+  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.0');
   return { ...made, ids, before };
 }
 
@@ -682,6 +691,24 @@ test('THE PAGE SAYS THE OLDEST PRICE, AND OVER THIRTY DAYS OLD IT WARNS IN WORDS
   bs = await blocks();
   assert.deepEqual([drawn(tile(bs)!), drawn(warn(bs)!)], [false, true]);
   assert.match(String(warn(bs)!.body), /\{\{bad:over 30 days ago\}\}/u);
+  close();
+});
+
+test('A PRICE OVER THIRTY DAYS OLD, AND A GOLD RATE OVER SEVEN, ARE SAID ONCE, and a fresh one says nothing', async () => {
+  const { api, sql, close } = await inPounds();
+  const told = (): string[] => sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor IN ('rule:holdings_price_old', 'rule:gold_rate_old') ORDER BY rowid").map((n) => n.note);
+  const old = hold(api, { label: 'Silver, two grams', kind: 'commodity', qty: 2, unit_cost: egp(300_000), price: egp(410_000), priced_on: SIXTY_AGO });
+  hold(api, { label: 'Silver, five grams', kind: 'commodity', qty: 5, unit_cost: egp(300_000), price: egp(410_000), priced_on: '2026-09-20' });
+  rate(api, { karat: '21k', per_gram: egp(450_000), on: '2026-09-10', live: true });
+  rate(api, { karat: '24k', per_gram: egp(520_000), on: '2026-09-24', live: true });
+  await settle(api);
+  assert.equal(told().length, 2, told().join(' | '));
+  assert.match(told().find((t) => t.startsWith('Silver'))!, /^Silver, two grams was last priced .+, so what it is worth may be out of date\.$/u);
+  assert.match(told().find((t) => t.startsWith('The'))!, /^The 21k gold rate was set .+, so what your gold is worth may be out of date\.$/u);
+  /* WRITTEN AGAIN WITH THE SAME OLD DAY, NOTHING MORE IS SAID. */
+  edit(api, 'holdings', old, { note: 'kept in the safe' });
+  await settle(api);
+  assert.equal(told().length, 2, 'an old price was said twice');
   close();
 });
 

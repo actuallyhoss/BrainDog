@@ -1,0 +1,1231 @@
+{
+  "pack": "holdings",
+  "version": "3.1.0",
+  "icon": "chart-pie",
+  "title": "Investments and gold",
+  "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
+  "changes": "Says once when a holding's price is over 30 days old, and when a gold rate in use is over 7 days old.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=2.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "holdings",
+      "name": "Holdings",
+      "icon": "money",
+      "one": "holding",
+      "holds": "what you own beyond cash: funds, shares, certificates, policies and gold, with what each cost and what it is worth now",
+      "title": "label",
+      "mobile": [
+        "label",
+        "qty",
+        "value"
+      ],
+      "pack": "holdings",
+      "delete": "refuse_while_referenced",
+      "fields": [
+        {
+          "id": "label",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Type",
+          "type": "enum",
+          "values": [
+            "certificate",
+            "policy",
+            "commodity",
+            "other",
+            "gold",
+            "fund",
+            "stock"
+          ],
+          "labels": {
+            "certificate": "Certificate",
+            "policy": "Policy",
+            "commodity": "Commodity",
+            "other": "Other",
+            "gold": "Gold",
+            "fund": "Fund",
+            "stock": "Shares"
+          },
+          "index": true,
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "karat",
+          "label": "Karat",
+          "type": "enum",
+          "values": [
+            "24k",
+            "22k",
+            "21k",
+            "18k"
+          ],
+          "labels": {
+            "24k": "24k",
+            "22k": "22k",
+            "21k": "21k",
+            "18k": "18k"
+          },
+          "index": true
+        },
+        {
+          "id": "unit",
+          "label": "Counted in",
+          "type": "enum",
+          "values": [
+            "gram",
+            "share",
+            "unit"
+          ],
+          "labels": {
+            "gram": "Grams",
+            "share": "Shares",
+            "unit": "Units"
+          }
+        },
+        {
+          "id": "code",
+          "label": "Ticker",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "qty",
+          "label": "How many",
+          "type": "decimal",
+          "min": 0,
+          "qualifies": "unit_cost"
+        },
+        {
+          "id": "unit_cost",
+          "label": "Cost each",
+          "type": "money"
+        },
+        {
+          "id": "cost",
+          "label": "What it cost",
+          "type": "money"
+        },
+        {
+          "id": "price",
+          "label": "Worth each now",
+          "type": "money"
+        },
+        {
+          "id": "priced_on",
+          "label": "Priced on",
+          "type": "day"
+        },
+        {
+          "id": "value",
+          "label": "Worth now",
+          "type": "money"
+        },
+        {
+          "id": "valued_by",
+          "label": "Valued by",
+          "type": "enum",
+          "values": [
+            "price",
+            "gold_rate",
+            "cost"
+          ],
+          "labels": {
+            "price": "Your price",
+            "gold_rate": "Gold rate",
+            "cost": "What it cost"
+          },
+          "index": true
+        },
+        {
+          "id": "gain",
+          "label": "Gain",
+          "type": "money"
+        },
+        {
+          "id": "gain_pct",
+          "label": "Gain %",
+          "type": "decimal"
+        },
+        {
+          "id": "acquired_on",
+          "label": "Held since",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "matures_on",
+          "label": "Matures on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "holding_buys",
+      "name": "Buys",
+      "icon": "hand-coins",
+      "one": "buy",
+      "holds": "each buy of a holding: the day, how many grams or shares, the price each and the fees",
+      "title": "item",
+      "mobile": [
+        "item",
+        "bought_on",
+        "qty",
+        "paid"
+      ],
+      "pack": "holdings",
+      "fields": [
+        {
+          "id": "item",
+          "label": "Holding",
+          "type": "ref",
+          "to": "holdings",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "bought_on",
+          "label": "Bought on",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "qty",
+          "label": "Grams or shares",
+          "type": "decimal",
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "price",
+          "label": "Price each",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "fees",
+          "label": "Fees",
+          "type": "money"
+        },
+        {
+          "id": "paid",
+          "label": "Paid",
+          "type": "money"
+        },
+        {
+          "id": "karat",
+          "label": "Karat",
+          "type": "enum",
+          "values": [
+            "24k",
+            "22k",
+            "21k",
+            "18k"
+          ],
+          "labels": {
+            "24k": "24k",
+            "22k": "22k",
+            "21k": "21k",
+            "18k": "18k"
+          },
+          "derive": {
+            "via": {
+              "ref": "item",
+              "field": "karat"
+            }
+          }
+        },
+        {
+          "id": "kept_at",
+          "label": "Kept at",
+          "type": "text"
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "register": "gold_rates",
+      "name": "Gold rates",
+      "icon": "vault",
+      "one": "gold rate",
+      "holds": "what a gram of gold sells for, a karat a row, in the money you count in, set by hand or by a feed",
+      "title": "karat",
+      "mobile": [
+        "karat",
+        "per_gram",
+        "on"
+      ],
+      "pack": "holdings",
+      "fields": [
+        {
+          "id": "karat",
+          "label": "Karat",
+          "type": "enum",
+          "values": [
+            "24k",
+            "22k",
+            "21k",
+            "18k"
+          ],
+          "labels": {
+            "24k": "24k",
+            "22k": "22k",
+            "21k": "21k",
+            "18k": "18k"
+          },
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "per_gram",
+          "label": "A gram",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "on",
+          "label": "Rate of",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "from",
+          "label": "Set by",
+          "type": "enum",
+          "values": [
+            "hand",
+            "feed"
+          ],
+          "labels": {
+            "hand": "Hand",
+            "feed": "Feed"
+          }
+        },
+        {
+          "id": "live",
+          "label": "In use",
+          "type": "bool",
+          "index": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "rule": "holdings_cost",
+      "pack": "holdings",
+      "on": {
+        "written": {
+          "register": "holdings",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "qty",
+            "unit_cost",
+            "price",
+            "kind",
+            "karat"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "holdings_cost",
+            "input": {
+              "changed": "{{trigger.changed}}"
+            },
+            "as": "costing"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "holdings_buy",
+      "pack": "holdings",
+      "on": {
+        "written": {
+          "register": "holding_buys",
+          "op": [
+            "create",
+            "update",
+            "delete"
+          ],
+          "fields": [
+            "item",
+            "qty",
+            "price",
+            "fees",
+            "bought_on"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "holdings_cost",
+            "input": {
+              "changed": "{{trigger.changed}}",
+              "op": "{{trigger.op}}"
+            },
+            "as": "costing"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "holdings_rate",
+      "pack": "holdings",
+      "on": {
+        "written": {
+          "register": "gold_rates",
+          "op": [
+            "create",
+            "update",
+            "delete"
+          ],
+          "fields": [
+            "karat",
+            "per_gram",
+            "on"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "holdings_cost",
+            "input": {
+              "changed": "{{trigger.changed}}"
+            },
+            "as": "costing"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "holdings_price_old",
+      "name": "Say when a price is over 30 days old",
+      "pack": "holdings",
+      "register": "holdings",
+      "when": "price is set, priced_on before -30d",
+      "then": [
+        {
+          "notify": {
+            "say": "{{label}} was last priced {{ago:priced_on}}, so what it is worth may be out of date."
+          }
+        }
+      ],
+      "once_per": [
+        "entry",
+        "priced_on"
+      ]
+    },
+    {
+      "rule": "gold_rate_old",
+      "name": "Say when a gold rate is over 7 days old",
+      "pack": "holdings",
+      "register": "gold_rates",
+      "when": "live is true, on before -7d",
+      "then": [
+        {
+          "notify": {
+            "say": "The {{karat}} gold rate was set {{ago:on}}, so what your gold is worth may be out of date."
+          }
+        }
+      ],
+      "once_per": [
+        "entry",
+        "on"
+      ]
+    },
+    {
+      "script": "holdings_cost",
+      "title": "Count what each holding cost, is worth and gained",
+      "pack": "holdings",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "holdings",
+        "holding_buys",
+        "gold_rates"
+      ],
+      "writes": [
+        "holdings",
+        "holding_buys",
+        "gold_rates"
+      ],
+      "source": "/**\n * What each holding cost, what it is worth now and what it has gained, worked out from its buys, its own price and,\n * for gold, the gold rate a person or a feed says.\n *\n * WHAT IT COST. A holding with buys counts their grams or shares into `qty` and what they cost, fees in, into `cost`,\n * and `unit_cost` is that cost spread over the count. Each buy's own `paid` is its count times its price, plus its fees.\n * A holding with no buys is costed as before, its count times what one cost, so a holding written before buys existed\n * keeps every number it had. Buys in two currencies are never added: the holding keeps its own count and cost.\n *\n * WHAT IT IS WORTH, in this order: the holding's own price (\"Worth each now\"), when somebody gave one; for gold, the\n * newest gold rate for its karat, or the 24k rate times the karat over 24 when there is none for that karat; and else\n * what it cost. `valued_by` says which of the three it was, so a page can say a value is only what was paid.\n *\n * WHAT IT GAINED is its worth less its cost, and the gain over the cost as a percent, said only when something other\n * than the cost priced it and both are in one currency. A holding that stands at what it cost has no gain, not a gain\n * of nought.\n *\n * THE GOLD RATE. One row a karat is current: the newest by its day, and by when it was written on a tie. A rate written\n * with no day is dated today. A new rate marks itself current, the one before it not, and every gold holding is worked\n * out again against it.\n *\n * STARTED BY A RULE with the row that moved: a holding is worked out; a buy is priced and its holding worked out (a buy\n * deleted, or moved to another holding, works out every holding, since which holding it left is not said); a gold rate is marked and\n * every gold holding worked out. STARTED BY THE CLOCK once a day, with no row, it marks the rates and works out every\n * holding nothing has worked out yet, which is how a record that held holdings before this version gains its gains with\n * nobody writing a row again, then the gold holdings and the first page of the rest. The unvalued and the gold are read past\n * the first fifty, by number; only that last page is one page of fifty.\n *\n * A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY in `priced_on`, and a price said again is dated again when the rule\n * says the price moved and the day did not (`changed`, the fields the write moved, comma separated). A day somebody\n * wrote is never written over, and a price taken away takes its day with it. Nothing is written to a row that already\n * says what this would write.\n */\n\n/** A karat's share of pure gold. */\nconst PURITY = { '24k': 24, '22k': 22, '21k': 21, '18k': 18 };\n\nconst amount = (m) => m !== null && typeof m === 'object' && typeof m.amount === 'number' && typeof m.currency === 'string';\nconst same = (a, b) => (amount(a) && amount(b) ? a.amount === b.amount && a.currency === b.currency : !amount(a) && !amount(b));\nconst number = (n) => typeof n === 'number' && Number.isFinite(n);\n/** Counts are kept to six places, so a sum of grams reads 46.5 and not 46.50000000000001. */\nconst tidy = (n) => Math.round(n * 1e6) / 1e6;\n\n/** What one buy paid: its count times its price, plus its fees in the same currency. `null` when it cannot be said. */\nfunction paidOf(buy) {\n  const { qty, price, fees } = buy.fields;\n  if (!number(qty) || !amount(price)) return null;\n  if (amount(fees) && fees.currency !== price.currency) return null;\n  return { amount: Math.round(qty * price.amount) + (amount(fees) ? fees.amount : 0), currency: price.currency };\n}\n\n/** The current rate a karat: the newest row by its day, then by when it was written. */\nfunction currentOf(rates) {\n  const best = {};\n  for (const r of rates) {\n    const k = r.fields.karat;\n    if (typeof k !== 'string' || !amount(r.fields.per_gram)) continue;\n    const day = typeof r.fields.on === 'string' ? r.fields.on : '';\n    const was = best[k];\n    if (!was || day > was.day || (day === was.day && r.seq > was.seq)) best[k] = { day, seq: r.seq, id: r.id, per_gram: r.fields.per_gram };\n  }\n  return best;\n}\n\n/** What a gram of this karat is worth by the rates, or `null`. Not rounded, so the holding's worth is rounded once. */\nfunction rateFor(current, karat) {\n  if (typeof karat !== 'string' || PURITY[karat] === undefined) return null;\n  if (current[karat]) return current[karat].per_gram;\n  const pure = current['24k'];\n  if (!pure) return null;\n  return { amount: (pure.per_gram.amount * PURITY[karat]) / 24, currency: pure.per_gram.currency };\n}\n\n/** Dates a rate nobody dated, and marks the newest a karat current and the rest not. */\nfunction markRates(ctx, rates, today) {\n  const undated = (r) => amount(r.fields.per_gram) && !(typeof r.fields.on === 'string' && r.fields.on !== '');\n  const current = currentOf(rates.map((r) => (undated(r) ? { ...r, fields: { ...r.fields, on: today } } : r)));\n  const ids = new Set(Object.values(current).map((c) => c.id));\n  for (const r of rates) {\n    const next = undated(r) ? { on: today } : {};\n    const now = ids.has(r.id);\n    if ((r.fields.live === true) !== now) next.live = now;\n    if (Object.keys(next).length > 0) ctx.update('gold_rates#' + r.seq, next, r.version);\n  }\n  return current;\n}\n\n/** Works out one holding against its buys and the rates, and writes what moved. */\nasync function work(ctx, row, current, today, repriced) {\n  if (!row) return;\n  const f = row.fields;\n  const buys = await every(ctx, 'holding_buys', { field: 'item', is: row.id });\n  const next = {};\n\n  let qty = f.qty;\n  let cost = null;\n  const paid = buys.map(paidOf);\n  const currencies = new Set(paid.filter(Boolean).map((p) => p.currency));\n  if (buys.length > 0 && paid.every(Boolean) && currencies.size === 1) {\n    qty = tidy(buys.reduce((s, b) => s + b.fields.qty, 0));\n    const [currency] = currencies;\n    cost = { amount: paid.reduce((s, p) => s + p.amount, 0), currency };\n    if (f.qty !== qty) next.qty = qty;\n    const each = qty > 0 ? { amount: Math.round(cost.amount / qty), currency } : null;\n    if (each && !same(f.unit_cost, each)) next.unit_cost = each;\n    const first = buys.map((b) => b.fields.bought_on).filter((d) => typeof d === 'string').sort()[0];\n    if (first && f.acquired_on !== first) next.acquired_on = first;\n  } else if (number(qty) && amount(f.unit_cost)) {\n    cost = { amount: Math.round(qty * f.unit_cost.amount), currency: f.unit_cost.currency };\n  }\n  if (cost === null || !number(qty)) {\n    if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);\n    return;\n  }\n\n  let value = cost;\n  let by = 'cost';\n  const gram = f.kind === 'gold' ? rateFor(current, f.karat) : null;\n  if (amount(f.price)) {\n    value = { amount: Math.round(qty * f.price.amount), currency: f.price.currency };\n    by = 'price';\n  } else if (gram) {\n    value = { amount: Math.round(qty * gram.amount), currency: gram.currency };\n    by = 'gold_rate';\n  }\n  const gained = by !== 'cost' && value.currency === cost.currency;\n  const gain = gained ? { amount: value.amount - cost.amount, currency: cost.currency } : null;\n  const pct = gained && cost.amount > 0 ? Math.round(((value.amount - cost.amount) / cost.amount) * 1000) / 10 : null;\n\n  if (!same(f.cost, cost)) next.cost = cost;\n  if (!same(f.value, value)) next.value = value;\n  if (f.valued_by !== by) next.valued_by = by;\n  if (!same(f.gain, gain)) next.gain = gain;\n  if ((number(f.gain_pct) ? f.gain_pct : null) !== pct) next.gain_pct = pct;\n  if (amount(f.price) && (!f.priced_on || repriced) && f.priced_on !== today) next.priced_on = today;\n  if (!amount(f.price) && f.priced_on) next.priced_on = null;\n  if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);\n}\n\n/**\n * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with\n * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,\n * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.\n */\nasync function every(ctx, register, where) {\n  const PAGE = 50;\n  const READS = 60;\n  let reads = 0;\n  const ask = (above, upto) => {\n    reads += 1;\n    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];\n    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });\n  };\n  const first = await ask(0, null);\n  if (first.length < PAGE) return first;\n  const seen = new Map(first.map((r) => [r.id, r]));\n  let top = Math.max(...first.map((r) => r.seq));\n  for (;;) {\n    if (reads >= READS) break;\n    const above = await ask(top, null);\n    for (const r of above) seen.set(r.id, r);\n    if (above.length < PAGE) break;\n    top = Math.max(...above.map((r) => r.seq));\n  }\n  const spans = [[0, top]];\n  let short = false;\n  while (spans.length > 0) {\n    if (reads >= READS) {\n      short = true;\n      break;\n    }\n    const [a, b] = spans.pop();\n    const page = await ask(a, b);\n    for (const r of page) seen.set(r.id, r);\n    if (page.length >= PAGE && b - a > 1) {\n      const mid = Math.floor((a + b) / 2);\n      spans.push([a, mid], [mid, b]);\n    }\n  }\n  const rows = [...seen.values()];\n  rows.short = short;\n  return rows;\n}\n\nexport default async function run(ctx) {\n  const input = ctx.input !== null && typeof ctx.input === 'object' ? ctx.input : {};\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  const moved = typeof input.changed === 'string' ? input.changed.split(',') : [];\n  const repriced = moved.includes('price') && !moved.includes('priced_on');\n  const rates = await every(ctx, 'gold_rates');\n  const id = typeof input.id === 'string' ? input.id : null;\n\n  if (id !== null && input.register === 'holding_buys') {\n    const buy = await ctx.record.get(id);\n    const current = currentOf(rates);\n    const paid = buy === null ? null : paidOf(buy);\n    if (buy !== null && paid !== null && !same(buy.fields.paid, paid)) ctx.update('holding_buys#' + buy.seq, { paid }, buy.version);\n    /* GONE, OR MOVED FROM ONE HOLDING TO ANOTHER: which holding it left is not said, so every holding is worked out. */\n    if (buy === null || (input.op === 'update' && moved.includes('item'))) {\n      for (const row of await every(ctx, 'holdings')) await work(ctx, row, current, today, false);\n      return;\n    }\n    const holding = typeof buy.fields.item === 'string' ? await ctx.record.get(buy.fields.item) : null;\n    await work(ctx, holding, current, today, false);\n    return;\n  }\n  if (id !== null && input.register === 'gold_rates') {\n    const current = markRates(ctx, rates, today);\n    for (const row of await every(ctx, 'holdings', { field: 'kind', is: 'gold' })) await work(ctx, row, current, today, false);\n    return;\n  }\n  if (id !== null) {\n    await work(ctx, await ctx.record.get(id), currentOf(rates), today, repriced);\n    return;\n  }\n  /* THE CLOCK: the rates, every holding nothing has worked out yet, the gold, and the first page of the rest, which\n     catches a holding whose buy a rule could not start a run for on a busy day. */\n  const current = markRates(ctx, rates, today);\n  const done = new Set();\n  const lists = [{ field: 'valued_by', empty: true }, { field: 'kind', is: 'gold' }, null];\n  const rows = [];\n  for (const where of lists) rows.push(...(await (where === null ? ctx.record.list('holdings') : every(ctx, 'holdings', where))));\n  for (const row of rows) {\n    if (done.has(row.id)) continue;\n    done.add(row.id);\n    await work(ctx, row, current, today, false);\n  }\n}\n"
+    },
+    {
+      "script": "holdings_twin",
+      "title": "Ask once about an account counted twice",
+      "pack": "holdings",
+      "runs": {
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "holdings",
+        "accounts"
+      ],
+      "writes": [
+        "accounts"
+      ],
+      "source": "/**\n * One thing written down twice: an account that counts as cash and a holding with the same name. The account's balance\n * is in the cash and the holding's worth is in Holdings value, so the same thing may be counted twice. Asked once:\n * stop counting the account as cash, or keep counting it.\n *\n * WHAT IT READS. Once a day, the accounts that count as cash and are not closed, and the holdings. Two names are the\n * same when their letters are, whatever the capitals and wherever the spaces. A blank name matches nothing.\n *\n * WHAT IT WRITES. Nothing. The one change rides on the answer \"Stop counting it\" and is made by whoever picks it: the\n * account stops counting as cash and keeps its balance. \"Keep counting it\" changes nothing.\n *\n * ONE QUESTION TO A PAIR, EVER. The cause is the pair, by the two lines' own numbers, and the record holds one question\n * to a cause: a run that finds it waiting adds none, and a run that finds it answered asks nothing. So this keeps no\n * memory of its own. An account taken out of cash is no longer read, so it is not asked about either.\n *\n * ONE RUN ASKS ONE QUESTION, so with several pairs the one asked about turns with the day. Always asking about the\n * first would hand an answered pair back every night and never reach the second. Holdings and accounts are read past\n * the first page of fifty, by number.\n */\nconst same = (name) => (typeof name === 'string' ? name.normalize('NFKC').toLowerCase().replace(/\\s+/gu, '') : '');\n\n/**\n * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with\n * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,\n * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.\n */\nasync function every(ctx, register, where) {\n  const PAGE = 50;\n  const READS = 60;\n  let reads = 0;\n  const ask = (above, upto) => {\n    reads += 1;\n    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];\n    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });\n  };\n  const first = await ask(0, null);\n  if (first.length < PAGE) return first;\n  const seen = new Map(first.map((r) => [r.id, r]));\n  let top = Math.max(...first.map((r) => r.seq));\n  for (;;) {\n    if (reads >= READS) break;\n    const above = await ask(top, null);\n    for (const r of above) seen.set(r.id, r);\n    if (above.length < PAGE) break;\n    top = Math.max(...above.map((r) => r.seq));\n  }\n  const spans = [[0, top]];\n  let short = false;\n  while (spans.length > 0) {\n    if (reads >= READS) {\n      short = true;\n      break;\n    }\n    const [a, b] = spans.pop();\n    const page = await ask(a, b);\n    for (const r of page) seen.set(r.id, r);\n    if (page.length >= PAGE && b - a > 1) {\n      const mid = Math.floor((a + b) / 2);\n      spans.push([a, mid], [mid, b]);\n    }\n  }\n  const rows = [...seen.values()];\n  rows.short = short;\n  return rows;\n}\n\nexport default async function run(ctx) {\n  const holdings = await every(ctx, 'holdings');\n  if (holdings.length === 0) return null;\n  const accounts = (await every(ctx, 'accounts', { field: 'liquid', is: true })).filter((a) => a.fields.liquid === true && a.fields.state !== 'closed');\n  const pairs = [];\n  for (const account of accounts) {\n    const name = same(account.fields.name);\n    if (name === '') continue;\n    for (const holding of holdings) if (same(holding.fields.label) === name) pairs.push({ account, holding });\n  }\n  if (pairs.length === 0) return null;\n  const day = Math.round(Date.parse(`${ctx.today()}T00:00:00Z`) / 86_400_000);\n  const { account, holding } = pairs[day % pairs.length];\n  const name = String(account.fields.name).trim().replace(/\\s+/gu, ' ');\n  return {\n    ask: {\n      cause: `holdings.twin:${account.seq}:${holding.seq}`,\n      question: `${name} is an account and a holding. It may be counted twice. Stop counting the account as cash?`,\n      about: name,\n      options: [\n        {\n          id: 'stop',\n          label: 'Stop counting it',\n          because: 'The account keeps its balance and is left out of your cash. The holding is counted as it is.',\n          patches: [{ id: `accounts#${account.seq}`, version: account.version, fields: { liquid: false } }],\n        },\n        { id: 'keep', label: 'Keep counting it', because: 'Both are counted as they are, and this is not asked again.' },\n      ],\n    },\n  };\n}\n"
+    },
+    {
+      "metric": "holdings-value",
+      "name": "Holdings value",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is set",
+      "value": {
+        "sum": "value"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "sellable": true
+    },
+    {
+      "metric": "holdings-count",
+      "name": "Holdings",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-costed",
+      "name": "Holdings costed",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "cost is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-at-cost",
+      "name": "Holdings at what they cost",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "valued_by is cost",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-unpriced",
+      "name": "Holdings with no price",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "price is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-priced-on",
+      "name": "Oldest price",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "price is set, priced_on is set",
+      "value": {
+        "min": "priced_on"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-stale",
+      "name": "Prices over 30 days old",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "price is set, priced_on before -30d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-cost",
+      "name": "Paid in",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "cost is set",
+      "value": {
+        "sum": "cost"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-gain",
+      "name": "Gain",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "gain is set",
+      "value": {
+        "sum": "gain"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-gain-pct",
+      "name": "Gain on what was paid",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "gain is set",
+      "value": {
+        "ratio": {
+          "of": {
+            "sum": "gain"
+          },
+          "per": {
+            "sum": "cost"
+          }
+        }
+      },
+      "format": "pct",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-gained",
+      "name": "Holdings with a gain said",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "gain is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-by-kind",
+      "name": "Worth now, by type",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is set",
+      "value": {
+        "sum": "value"
+      },
+      "group_by": "kind",
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "gold-held",
+      "name": "Gold holdings",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "kind is gold",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "gold-grams",
+      "name": "Gold, in grams",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "kind is gold, qty is set",
+      "value": {
+        "sum": "qty"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holding-buys",
+      "name": "Buys",
+      "pack": "holdings",
+      "source": "register.holding_buys",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "gold-rates-current",
+      "name": "Gold rates in use",
+      "pack": "holdings",
+      "source": "register.gold_rates",
+      "where": "live is true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "gold-rate-on",
+      "name": "Oldest gold rate in use",
+      "pack": "holdings",
+      "source": "register.gold_rates",
+      "where": "live is true, on is set",
+      "value": {
+        "min": "on"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "gold-rates-old",
+      "name": "Gold rates over 7 days old",
+      "pack": "holdings",
+      "source": "register.gold_rates",
+      "where": "live is true, on before -7d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "holdings",
+      "title": "Investments and gold",
+      "pack": "holdings",
+      "nav": {
+        "section": "Money",
+        "order": 30
+      },
+      "icon": "chart-pie",
+      "requires": [
+        "register.holdings",
+        "register.holding_buys",
+        "register.gold_rates"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Funds, shares, certificates and gold you own, with what you paid and what each is worth now. Add a holding to start, then its buys.",
+          "when": {
+            "metric": "holdings-count",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "What you own beyond cash, at what you paid until each one has a price.",
+          "when": {
+            "metric": "holdings-count",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a holding",
+          "icon": "plus",
+          "span": 12,
+          "register": "holdings",
+          "when": {
+            "metric": "holdings-count",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "stat",
+          "lead": true,
+          "heading": "What you hold",
+          "icon": "chart-pie",
+          "span": 8,
+          "cells": [
+            {
+              "metric": "holdings-value",
+              "label": "Worth now",
+              "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
+            },
+            {
+              "metric": "holdings-cost",
+              "label": "Paid in"
+            },
+            {
+              "metric": "holdings-gain",
+              "label": "Gain"
+            },
+            {
+              "metric": "holdings-gain-pct",
+              "label": "Gain on what was paid"
+            }
+          ],
+          "when": {
+            "metric": "holdings-at-cost",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "stat",
+          "lead": true,
+          "heading": "What you hold",
+          "icon": "chart-pie",
+          "span": 8,
+          "cells": [
+            {
+              "metric": "holdings-value",
+              "label": "Worth now"
+            },
+            {
+              "metric": "holdings-cost",
+              "label": "Paid in"
+            },
+            {
+              "metric": "holdings-gain",
+              "label": "Gain"
+            },
+            {
+              "metric": "holdings-gain-pct",
+              "label": "Gain on what was paid"
+            }
+          ],
+          "when": {
+            "metric": "holdings-at-cost",
+            "is": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Gold rate",
+          "icon": "vault",
+          "span": 4,
+          "body": "21k is priced at 21/24 of the 24k rate and 18k at 18/24, unless you give a rate for that karat.",
+          "source": "register.gold_rates",
+          "where": "live is true",
+          "columns": [
+            {
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "field": "per_gram",
+              "label": "A gram",
+              "align": "end"
+            },
+            {
+              "field": "on",
+              "label": "Rate of",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "karat",
+              "dir": "asc"
+            }
+          ],
+          "limit": 4
+        },
+        {
+          "kind": "capture",
+          "heading": "Set today's gold rate",
+          "icon": "vault",
+          "span": 4,
+          "register": "gold_rates",
+          "when": {
+            "metric": "gold-rates-current",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "body": "The gold rate is from {{gold-rate-on}}, {{bad:over a week ago}}. Set today's rate and your gold is worth today's money.",
+          "when": {
+            "metric": "gold-rates-old",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "split",
+          "heading": "Where it sits",
+          "icon": "chart-pie",
+          "span": 12,
+          "source": "metric.holdings-by-kind",
+          "when": {
+            "metric": "holdings-count",
+            "gt": 0
+          },
+          "empty": "Nothing is valued yet."
+        },
+        {
+          "kind": "table",
+          "heading": "Buys",
+          "icon": "hand-coins",
+          "span": 12,
+          "body": "Each buy is kept with its own day, so how long each piece has been held can always be said.",
+          "source": "register.holding_buys",
+          "columns": [
+            {
+              "field": "bought_on",
+              "label": "Bought on"
+            },
+            {
+              "field": "item",
+              "label": "Holding"
+            },
+            {
+              "field": "qty",
+              "label": "Grams or shares",
+              "align": "end"
+            },
+            {
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "field": "paid",
+              "label": "Paid",
+              "align": "end"
+            },
+            {
+              "field": "kept_at",
+              "label": "Kept at"
+            }
+          ],
+          "order": [
+            {
+              "field": "bought_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No buys yet. Add each one with its day, grams or shares, the price and the fees."
+        },
+        {
+          "kind": "cards",
+          "heading": "Everything you hold",
+          "icon": "chart-line",
+          "span": 12,
+          "source": "register.holdings",
+          "group": "kind",
+          "columns": [
+            {
+              "field": "label",
+              "as": "title"
+            },
+            {
+              "field": "value",
+              "as": "figure"
+            },
+            {
+              "field": "qty",
+              "label": "How many",
+              "as": "fact"
+            },
+            {
+              "field": "karat",
+              "label": "Karat",
+              "as": "fact"
+            },
+            {
+              "field": "gain_pct",
+              "label": "Gain on cost, %",
+              "as": "fact"
+            }
+          ],
+          "order": [
+            {
+              "field": "label",
+              "dir": "asc"
+            }
+          ],
+          "limit": 100,
+          "empty": "Nothing held yet. A fund, some shares, a certificate or a buy of gold goes here."
+        },
+        {
+          "kind": "stat",
+          "heading": "Priced on",
+          "icon": "calendar-clock",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "holdings-priced-on",
+              "label": "Oldest price"
+            }
+          ],
+          "when": {
+            "metric": "holdings-stale",
+            "is": 0
+          }
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}. That is the oldest price here. Say what each holding is worth now and the value above is today's.",
+          "when": {
+            "metric": "holdings-stale",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Every gold rate",
+          "icon": "vault",
+          "span": 12,
+          "fold": true,
+          "when": {
+            "metric": "gold-rates-current",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Gold rates said",
+          "icon": "vault",
+          "span": 12,
+          "source": "register.gold_rates",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Rate of"
+            },
+            {
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "field": "per_gram",
+              "label": "A gram",
+              "align": "end"
+            },
+            {
+              "field": "from",
+              "label": "Set by"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 30
+        }
+      ]
+    },
+    {
+      "page": "holding",
+      "title": "{{label}}",
+      "for": {
+        "register": "holdings",
+        "fleeting": true
+      },
+      "icon": "chart-line",
+      "pack": "holdings",
+      "requires": [
+        "register.holdings",
+        "register.holding_buys"
+      ],
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "source": "register.holdings",
+          "where": "seq is {{seq}}",
+          "columns": [
+            {
+              "field": "label",
+              "as": "title"
+            },
+            {
+              "field": "value",
+              "as": "figure"
+            },
+            {
+              "field": "cost",
+              "label": "Paid",
+              "as": "fact"
+            },
+            {
+              "field": "gain",
+              "label": "Gain",
+              "as": "fact"
+            },
+            {
+              "field": "gain_pct",
+              "label": "Gain on cost, %",
+              "as": "fact"
+            }
+          ],
+          "limit": 1
+        },
+        {
+          "kind": "table",
+          "heading": "Buys",
+          "icon": "hand-coins",
+          "span": 12,
+          "source": "register.holding_buys",
+          "where": "item is {{spoken}}",
+          "columns": [
+            {
+              "field": "bought_on",
+              "label": "Bought on"
+            },
+            {
+              "field": "qty",
+              "label": "Grams or shares",
+              "align": "end"
+            },
+            {
+              "field": "price",
+              "label": "Price each",
+              "align": "end"
+            },
+            {
+              "field": "fees",
+              "label": "Fees",
+              "align": "end"
+            },
+            {
+              "field": "paid",
+              "label": "Paid",
+              "align": "end"
+            },
+            {
+              "field": "kept_at",
+              "label": "Kept at"
+            }
+          ],
+          "order": [
+            {
+              "field": "bought_on",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No buys yet. Its count and cost are the ones typed on it."
+        }
+      ]
+    }
+  ]
+}
