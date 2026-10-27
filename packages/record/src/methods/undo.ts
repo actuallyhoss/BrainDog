@@ -495,6 +495,10 @@ export function methods(deps: RecordDeps) {
       )) {
         const row = kernel.get(target.slice('entry:'.length), { includeDeleted: true });
         if (row !== null && !sight.mayWrite(ctx, row.register, row.id)) return nothing();
+        /* AND THE LIST AT THE LEVEL A WRITE THERE NEEDS: a caller since held to read on it may not write it back either,
+           any more than she may write it now. */
+        const held = row === null ? null : guard(ctx, 'write', row.register);
+        if (held) return { ok: false, refusal: held };
       }
       const own = actors.some((x) => x !== null && mine.has(x));
       const foreign = actors.some((x) => x === null || (!mine.has(x) && !x.startsWith('rule:')));
