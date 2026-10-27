@@ -566,6 +566,8 @@
     page: parsed.prefix === null || parsed.prefix === '>' ? paging(parsed.text, pageWho) : null,
     /* THE MONEY ROWS, while the record keeps a ledger and a page that can open the sheet is drawn (`create.ts`). */
     ledger: quick.ready,
+    /* THE CASH COUNTER, while the record holds the list a count is written to. */
+    cashCount: listNamed.has('cash_counts'),
   });
 
   /**

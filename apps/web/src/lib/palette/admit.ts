@@ -100,6 +100,11 @@ export type Live = {
    * `ready`). Absent is no, so a caller that knows nothing of it is offered no money row.
    */
   ledger?: boolean;
+  /**
+   * Whether the record holds the lists the cash counter writes (`cash_counts`). Absent is no, so a record without the
+   * add-on is offered no Count cash row.
+   */
+  cashCount?: boolean;
 };
 
 export type Command = {
@@ -367,6 +372,16 @@ export const COMMANDS: readonly Command[] = [
     group: copy.commands,
     icon: 'plus',
     when: (live) => (live.page ?? null) !== null,
+  },
+  /* AND THE COUNTER, while the record holds the lists a count is written to (`Live.cashCount`). */
+  {
+    id: 'c-count-cash',
+    title: 'Count cash',
+    href: '/count-cash',
+    group: copy.destinations,
+    icon: 'money',
+    aliases: ['till', 'notes', 'coins'],
+    when: (live) => live.cashCount === true,
   },
   /* AND THE THREE THAT ADD MONEY (`create.ts` `MONEY_ADDS`), offered while the record keeps a ledger. */
   ...MONEY_ADDS,
