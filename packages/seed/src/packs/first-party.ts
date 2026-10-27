@@ -760,7 +760,13 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.29.0: Money is a section with a page per job, `page.money-accounts`, `page.money-ledger`,
  *   `page.money-budgets`, `page.money-coming`, `page.money-forecast`, `page.money-reports` and `page.money-payees`, each
  *   its line alone until its blocks are written, and Categories gains `icon`, `colour`, `budget_alert`, `rollover` and
- *   `parent`, all optional. 3.27.0 is master's. Pages and fields added and nothing taken away, so a minor step.
+ *   `parent`, all optional. 3.27.0 is master's. Pages and fields added and nothing taken away, so a minor step. THE
+ *   WAVE THAT FILLED THE PAGES CLOSED IN THE SAME UNRELEASED STEP: the home leads with one hero, Coming up and what was
+ *   spent, with no side column; the pages are written; `script.offer_budgets` offers each category a budget from last
+ *   month's pace and sets none; and sixteen figures the pages read come with them (`metric.account-now`,
+ *   `metric.payees-paid-90d` and the rest). The cash walk names Certificates' list, and a record without that add-on
+ *   installs Money with the leg left out (`ADDON_LEG_LISTS`). Figures and a script added and nothing taken away, so the
+ *   step stays minor and stays 3.29.0, since no record was given it.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and

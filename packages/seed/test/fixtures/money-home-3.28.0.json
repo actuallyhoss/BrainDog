@@ -1,0 +1,597 @@
+{
+  "page": "money",
+  "title": "Money",
+  "nav": {
+    "section": "Money",
+    "order": 10,
+    "place": 40
+  },
+  "icon": "money",
+  "requires": [
+    "register.accounts",
+    "register.obligations",
+    "register.transactions",
+    "register.recurring",
+    "register.installments",
+    "register.categories",
+    "register.books",
+    "register.balances"
+  ],
+  "pack": "money-core",
+  "layout": {
+    "rail": 4
+  },
+  "blocks": [
+    {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+        "all": [
+          {
+            "metric": "books-held",
+            "lt": 2
+          },
+          {
+            "metric": "runway-days",
+            "beyond": false
+          }
+        ]
+      },
+      "body": "Cash is {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s), {{cash-now.moved}} on a month ago. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}."
+    },
+    {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+        "all": [
+          {
+            "metric": "books-held",
+            "lt": 2
+          },
+          {
+            "metric": "runway-days",
+            "beyond": true
+          }
+        ]
+      },
+      "body": "Cash is {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}."
+    },
+    {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+        "metric": "books-held",
+        "gte": 2
+      },
+      "body": "You have {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s) in {{books-held}} books. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}."
+    },
+    {
+      "kind": "bar",
+      "heading": "What you have, by book",
+      "icon": "book",
+      "span": 12,
+      "source": "metric.cash-by-book",
+      "unset": "In no book",
+      "when": {
+        "metric": "books-held",
+        "gte": 2
+      },
+      "empty": "No account counts as cash yet."
+    },
+    {
+      "kind": "capture",
+      "heading": "Add an account",
+      "icon": "plus",
+      "span": 12,
+      "register": "accounts",
+      "when": {
+        "metric": "cash-accounts",
+        "lt": 1
+      }
+    },
+    {
+      "kind": "forecast",
+      "heading": "Cash ahead",
+      "icon": "chart-line",
+      "span": 12,
+      "source": "forecast.runway",
+      "opening": {
+        "metric": "cash-now"
+      },
+      "recorded": "cash-now",
+      "from": [
+        {
+          "register": "obligations",
+          "on": "due",
+          "amount": "amount",
+          "where": "state is open or part, repeats is not monthly or quarterly or yearly",
+          "incoming": {
+            "field": "direction",
+            "is": "owed_to_me"
+          }
+        },
+        {
+          "register": "recurring",
+          "on": "next_due",
+          "amount": "amount",
+          "where": "state is live",
+          "incoming": {
+            "field": "direction",
+            "is": "in"
+          },
+          "every": {
+            "field": "every",
+            "months": {
+              "monthly": 1,
+              "quarterly": 3,
+              "yearly": 12
+            },
+            "weeks": {
+              "weekly": 1,
+              "fortnightly": 2
+            },
+            "twice": {
+              "twice_monthly": [
+                1,
+                15
+              ]
+            }
+          },
+          "ends": "ends",
+          "days": "day_of_month",
+          "weekend": "weekend"
+        },
+        {
+          "register": "installments",
+          "on": "due",
+          "amount": "amount",
+          "where": "state is open",
+          "incoming": {
+            "field": "direction",
+            "is": "in"
+          },
+          "group": "plan"
+        },
+        {
+          "register": "accounts",
+          "on": "arrives",
+          "amount": "balance",
+          "where": "liquid is false, arrives is set, kind is bank",
+          "incoming": {
+            "field": "kind",
+            "is": "bank"
+          }
+        },
+        {
+          "register": "services",
+          "on": "renews",
+          "amount": "cost",
+          "where": "state is not cancelled",
+          "every": {
+            "field": "cycle",
+            "months": {
+              "monthly": 1,
+              "yearly": 12,
+              "two_yearly": 24
+            }
+          }
+        },
+        {
+          "register": "transactions",
+          "on": "on",
+          "amount": "amount",
+          "where": "state is cleared, transfer is false",
+          "incoming": {
+            "field": "direction",
+            "is": "in"
+          },
+          "everyday": {
+            "months": 3
+          }
+        }
+      ],
+      "horizon": 84,
+      "horizons": [
+        84,
+        180,
+        365,
+        730,
+        1825,
+        "last"
+      ],
+      "axis": "fit",
+      "knobs": [
+        "horizon",
+        "late",
+        "spend",
+        "count",
+        "grow",
+        "drift",
+        "sell"
+      ],
+      "late": "days-late-in",
+      "under": 30,
+      "headline": "under",
+      "when": {
+        "metric": "cash-accounts",
+        "gt": 0
+      },
+      "empty": "Nothing is dated ahead yet."
+    },
+    {
+      "kind": "stat",
+      "heading": "Lasts",
+      "icon": "calendar",
+      "span": 12,
+      "area": "rail",
+      "cells": [
+        {
+          "metric": "lasts-no-income",
+          "label": "With no money coming in",
+          "note": "If all money in stopped, {{every-month-in.names}} too, it lasts to {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due. With what comes in it still runs out on {{runs-out-on}}."
+        }
+      ],
+      "when": {
+        "all": [
+          {
+            "metric": "cash-accounts",
+            "gt": 0
+          },
+          {
+            "metric": "cash-now",
+            "gte": 0
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stat",
+      "heading": "Runs out",
+      "icon": "alert",
+      "span": 12,
+      "area": "rail",
+      "tone": "bad",
+      "cells": [
+        {
+          "metric": "runs-out-on",
+          "label": "With what is due and expected",
+          "note": "In {{runway-days}}"
+        }
+      ],
+      "when": {
+        "metric": "cash-now",
+        "lt": 0
+      }
+    },
+    {
+      "kind": "split",
+      "heading": "Accounts",
+      "icon": "landmark",
+      "span": 12,
+      "area": "rail",
+      "source": "metric.cash-by-account",
+      "limit": 12,
+      "when": {
+        "metric": "cash-now",
+        "gt": 0
+      }
+    },
+    {
+      "kind": "stat",
+      "heading": "Cash now does not add up",
+      "icon": "alert",
+      "span": 12,
+      "tone": "bad",
+      "cells": [
+        {
+          "metric": "cash-cross-check",
+          "label": "Cash now, less its entries added up",
+          "note": "These two should be the same. Until they are, read the money on this page as unchecked."
+        }
+      ],
+      "when": {
+        "metric": "cash-cross-check",
+        "not": 0
+      }
+    },
+    {
+      "kind": "timeline",
+      "heading": "Ledger",
+      "body": "{{filed-today}} filed today.",
+      "icon": "receipt",
+      "span": 12,
+      "source": "register.transactions",
+      "where": "state is not void",
+      "columns": [
+        {
+          "field": "on"
+        },
+        {
+          "field": "payee",
+          "or": "what"
+        },
+        {
+          "field": "amount",
+          "sign": {
+            "field": "direction",
+            "minus": "out"
+          }
+        }
+      ],
+      "order": [
+        {
+          "field": "on",
+          "dir": "desc"
+        }
+      ],
+      "limit": 6,
+      "empty": "Nothing has moved yet."
+    },
+    {
+      "kind": "section",
+      "heading": "Heads up",
+      "icon": "bell",
+      "span": 12,
+      "area": "rail",
+      "box": true,
+      "when": {
+        "metric": "cash-accounts",
+        "gt": 0
+      }
+    },
+    {
+      "kind": "note",
+      "tone": "warn",
+      "span": 12,
+      "area": "rail",
+      "body": "The oldest balance in Cash now was last confirmed on {{cash-as-of}}. [Update balances](/r/balances?new=1)",
+      "when": {
+        "metric": "balances-stale",
+        "gt": 0
+      }
+    },
+    {
+      "kind": "note",
+      "tone": "warn",
+      "span": 12,
+      "area": "rail",
+      "body": "Invoices {{bad:late}}: {{late-in}} to come in. [See them](/r/obligations?f=direction:is:owed_to_me&f=state:in:open,part&f=due:before:today)",
+      "when": {
+        "metric": "late-in",
+        "gt": 0
+      }
+    },
+    {
+      "kind": "note",
+      "tone": "bad",
+      "span": 12,
+      "area": "rail",
+      "says": [
+        {
+          "when": {
+            "all": [
+              {
+                "metric": "installments-late",
+                "gt": 0
+              },
+              {
+                "metric": "overdue",
+                "gt": 0
+              }
+            ]
+          },
+          "body": "{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. Bills late too: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)"
+        },
+        {
+          "when": {
+            "metric": "installments-late",
+            "gt": 0
+          },
+          "body": "{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. [See it](/r/installments?f=state:is:open&f=direction:is:out&f=due:before:today)"
+        },
+        {
+          "body": "Bills {{bad:late}}: {{overdue}} to pay. [See them](/r/obligations?f=direction:is:owed_by_me&f=state:in:open,part&f=due:before:today)"
+        }
+      ],
+      "when": {
+        "any": [
+          {
+            "metric": "overdue",
+            "gt": 0
+          },
+          {
+            "metric": "installments-late",
+            "gt": 0
+          }
+        ]
+      }
+    },
+    {
+      "kind": "section",
+      "heading": "Coming and going",
+      "icon": "calendar",
+      "span": 12,
+      "box": true,
+      "when": {
+        "metric": "cash-accounts",
+        "gt": 0
+      }
+    },
+    {
+      "kind": "calendar",
+      "span": 12,
+      "source": "deadlines",
+      "where": "amount is set, day after yesterday, day before +31d",
+      "columns": [
+        {
+          "field": "title"
+        },
+        {
+          "field": "day"
+        },
+        {
+          "field": "amount",
+          "sign": {
+            "field": "direction",
+            "minus": "out"
+          }
+        }
+      ],
+      "back": 0,
+      "ahead": 1,
+      "when": {
+        "metric": "cash-accounts",
+        "gt": 0
+      },
+      "empty": "Nothing falls due in the next 30 days."
+    },
+    {
+      "kind": "progress",
+      "heading": "Instalments",
+      "icon": "credit-card",
+      "span": 12,
+      "cells": [
+        {
+          "metric": "installments-paid-by-plan",
+          "label": "Paid"
+        },
+        {
+          "metric": "installments-total-by-plan",
+          "label": "Parts"
+        },
+        {
+          "metric": "installments-next-due-by-plan",
+          "label": "Next due"
+        },
+        {
+          "metric": "installments-left-by-plan",
+          "label": "Left"
+        },
+        {
+          "metric": "installments-after-next-by-plan",
+          "label": "Left after"
+        }
+      ],
+      "when": {
+        "metric": "installments-left",
+        "gt": 0
+      },
+      "empty": "Nothing is being paid in parts."
+    },
+    {
+      "kind": "series",
+      "heading": "In and out, by month",
+      "icon": "chart-column",
+      "span": 12,
+      "series": [
+        {
+          "metric": "in-by-month",
+          "then": "in-ahead-by-month",
+          "label": "Money in"
+        },
+        {
+          "metric": "out-by-month",
+          "then": "out-ahead-by-month",
+          "label": "Money out",
+          "dir": "out"
+        }
+      ],
+      "back": 6,
+      "ahead": 3,
+      "net": true,
+      "when": {
+        "metric": "out-by-month",
+        "gt": 0
+      },
+      "empty": "Nothing moved or due in these months."
+    },
+    {
+      "kind": "stat",
+      "heading": "Every month",
+      "icon": "refresh",
+      "span": 12,
+      "cells": [
+        {
+          "metric": "every-month-in",
+          "label": "Repeats, coming in"
+        },
+        {
+          "metric": "every-month-out",
+          "label": "Repeats, going out"
+        },
+        {
+          "metric": "leaving-30d",
+          "label": "Going out, 30 days",
+          "note": "Bills, what repeats and parts of plans"
+        }
+      ],
+      "when": {
+        "metric": "every-month-out",
+        "gt": 0
+      }
+    },
+    {
+      "kind": "bar",
+      "heading": "Every month, by category",
+      "icon": "chart-bar",
+      "span": 12,
+      "source": "metric.every-month-by-category",
+      "unset": "No category",
+      "when": {
+        "metric": "every-month-out",
+        "gt": 0
+      },
+      "empty": "Nothing that repeats has a category yet."
+    },
+    {
+      "kind": "section",
+      "heading": "Where it went",
+      "icon": "receipt",
+      "span": 12,
+      "fold": true,
+      "when": {
+        "metric": "cash-accounts",
+        "gt": 0
+      }
+    },
+    {
+      "kind": "split",
+      "heading": "This month, by category",
+      "icon": "chart-pie",
+      "span": 12,
+      "source": "metric.spent-by-category-month",
+      "unset": "No category yet",
+      "when": {
+        "metric": "spent-by-category-month",
+        "gt": 0
+      },
+      "empty": "Nothing spent this month yet."
+    },
+    {
+      "kind": "bar",
+      "heading": "No category yet, by who was paid",
+      "icon": "chart-bar",
+      "span": 12,
+      "source": "register.transactions",
+      "where": "state is cleared, transfer is false, category is empty, on after -91d, direction is out",
+      "columns": [
+        {
+          "field": "payee"
+        },
+        {
+          "field": "amount"
+        }
+      ],
+      "unset": "No name yet",
+      "limit": 8,
+      "when": {
+        "metric": "txn-uncategorised",
+        "gt": 0
+      },
+      "empty": "Everything paid out in the last 91 days has a category."
+    }
+  ]
+}

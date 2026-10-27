@@ -193,7 +193,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.29.0',
-      notes: 'Money is a section: Accounts, Ledger, Budgets, Coming up, Forecast, Reports and Payees each have a page under it. A category can carry an icon, a colour, a share of its budget to warn at, whether what is left carries over, and a category it sits under.',
+      notes: "Money is a section with a page for each job: Accounts, Ledger, Budgets, Coming up, Forecast, Reports and Payees. The home leads with your cash and what comes up next. Budgets are offered from last month's spending, never set for you. The ledger reads by day, each line with its category's chip, and a quick add puts in a line in a few taps. The forecast is redrawn. Property, Insurance, Trips, Certificates, Debts, Goals and Zakat come as add-ons.",
     },
     {
       version: '3.28.0',

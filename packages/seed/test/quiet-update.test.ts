@@ -26,11 +26,11 @@ import { peopleBefore3 } from './people-before-3.ts';
 import { thingsUndone, useCaseThingsUndone } from './things-before.ts';
 import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
 import { NEXT_30 } from '../src/modules/money/pages/parts/next30.ts';
+import { ADDON_LEG_LISTS, withoutLegs } from '../src/modules/held-legs.ts';
 import { DUE_30D } from '../src/modules/money/pages/shared.ts';
 import { QUEUE } from '../src/modules/money/pages/parts/queue.ts';
 import { AGES } from '../src/modules/money/pages/parts/ages.ts';
 import { BUDGET } from '../src/modules/money/pages/parts/budget.ts';
-import { SPENDING } from '../src/modules/money/pages/parts/spending.ts';
 
 type Body = Record<string, unknown>;
 const TODAY = dayOf(NOW);
@@ -263,17 +263,20 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
       JSON.stringify(steps),
     );
   assert.deepEqual(port.asked, [], 'nothing was lost, so nothing was asked');
-  /* AND THE PAGES ARE THIS BUILD'S: Money's side column, and This week drawn on the new figure. */
+  /* AND THE PAGES ARE THIS BUILD'S: Money's one column, and This week drawn on the new figure. */
   const page = value<{ layout?: unknown; blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('money'));
-  assert.deepEqual(page.layout, { rail: 4 });
+  /* NO SIDE COLUMN SINCE money-core 3.29.0: the home is one column of tiles, and its pages carry what the rail held. */
+  assert.equal(page.layout, undefined);
   const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
   /* THIS WEEK IS ITS OWN BAND AGAIN, SINCE the screens scope of 24 October (E24). */
   assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
   /* AND LASTS SAYS THE DAY, over the figure the update brought with it (money-core 3.12.0): in the sentence under how long
-     the money lasts with nothing coming in since 3.27.0, where it was a figure of its own. */
-  const runs = (page.blocks as { heading?: string; cells?: { metric: string; note?: string }[] }[]).find((b) => b.heading === 'Lasts');
-  assert.deepEqual(runs?.cells?.map((c) => c.metric), ['lasts-no-income']);
-  assert.match(runs?.cells?.[0]?.note ?? '', /\{\{runs-out-on\}\}/u);
+     the money lasts with nothing coming in since 3.27.0, where it was a figure of its own, and since 3.29.0 a cell of the
+     hero, beside the day it runs out on. */
+  const hero = (page.blocks as { lead?: boolean; cells?: { metric: string; note?: string }[] }[]).find((b) => b.lead === true && Array.isArray(b.cells));
+  const lasts = hero?.cells?.find((c) => c.metric === 'lasts-no-income');
+  assert.ok(hero?.cells?.some((c) => c.metric === 'runs-out-on'), 'the hero says no day the money runs out on');
+  assert.match(lasts?.note ?? '', /\{\{runs-out-on\}\}/u);
   assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
 });
@@ -765,9 +768,10 @@ const withoutBatch78 = (doc: Body): Body => {
   const book = withPage(money, 'money-book', (now) => now.filter((b) => !(b.kind === 'note' && (b.when as Body | undefined)?.metric === 'book-lasts-until:{{name}}')));
   return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles' && d.script !== 'file_back' && d.script !== 'learn_category' && d.rule !== 'rule-files-back' && d.rule !== 'category-teaches' && d.rule !== 'category-taught' && d.script !== 'settle_matched_line' && d.rule !== 'recurring-went-through') };
 };
-/** AND BATCH 92'S, folded into the same unreleased step and undone first (money-every-month-92, REC-B23 jobs 5 to 7): the walk of the next thirty days stands under Coming and going again, Every month goes, and the chart reads twelve months back. And a deleted payment no longer reopens its bill (unsettle-92): `payment-unsettles` and its script go. */
+/** AND BATCH 92'S, folded into the same unreleased step and undone first (money-every-month-92, REC-B23 jobs 5 to 7): the walk of the next thirty days stands under Coming and going again, Every month goes, and the chart reads twelve months back. And a deleted payment no longer reopens its bill (unsettle-92): `payment-unsettles` and its script go. The walk put back walks no add-on's list, which it did not then (Certificates came in money-core 3.29.0). */
+const NEXT_30_BRIDGE = withoutLegs(NEXT_30.find((x) => x.kind === 'bridge') as Body, (register) => !ADDON_LEG_LISTS.has(register));
 const withoutBatch92 = (doc: Body): Body => {
-  const money = withPage(doc, 'money', (now) => now.filter((b) => b.heading !== 'Every month').flatMap((b) => (b.heading === 'Coming and going' ? [b, NEXT_30.find((x) => x.kind === 'bridge') as Body] : [b])).map((b) => (b.heading === 'In and out, by month' ? { ...b, back: 12 } : b)));
+  const money = withPage(doc, 'money', (now) => now.filter((b) => b.heading !== 'Every month').flatMap((b) => (b.heading === 'Coming and going' ? [b, NEXT_30_BRIDGE] : [b])).map((b) => (b.heading === 'In and out, by month' ? { ...b, back: 12 } : b)));
   return { ...money, declarations: (money.declarations as Body[]).filter((d) => d.script !== 'unsettle' && d.rule !== 'payment-unsettles') };
 };
 /**
@@ -964,16 +968,38 @@ const withoutAhead27 = (doc: Body): Body => ({
 });
 /**
  * MONEY 3.29.0 COMES OFF BEFORE ALL: no page per job under Money, and Categories without an icon, a colour, a share to
- * warn at, a carry over or a category it sits under.
+ * warn at, a carry over or a category it sits under. AND THE REBUILD IN THE SAME UNRELEASED STEP: none of the figures
+ * the new pages read and no offer of budgets from last month, a book's spending as bars and not a donut, and Money's
+ * home as 3.28.0 declared it, with its side column (`fixtures/money-home-3.28.0.json`), its walk keeping the legs over
+ * the lists this record's own walks keep.
  */
 const SECTION_29 = new Set(['money-accounts', 'money-ledger', 'money-budgets', 'money-coming', 'money-forecast', 'money-reports', 'money-payees']);
 const CATEGORY_29 = new Set(['icon', 'colour', 'budget_alert', 'rollover', 'parent']);
-const withoutSection29 = (doc: Body): Body => ({
-  ...doc,
-  declarations: (doc.declarations as Body[])
-    .filter((d) => !SECTION_29.has(d.page as string))
-    .map((d) => (d.register === 'categories' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !CATEGORY_29.has(f.id as string)) } : d)),
-});
+const FIGURES_29 = new Set([
+  'budgets-total', 'budgets-unset', 'unfiled-spent-month', 'unfiled-month', 'payees-paid-90d', 'paid-times-by-payee-90d', 'paid-last-by-payee',
+  'kept-share-90d', 'received-month', 'left-month', 'account-now', 'account-lines', 'account-gap', 'lines-by-account', 'account-in-by-month',
+  'account-out-by-month',
+]);
+const HOME_3_28 = JSON.parse(readFileSync(new URL('./fixtures/money-home-3.28.0.json', import.meta.url), 'utf8')) as Body;
+const withoutSection29 = (doc: Body): Body => {
+  const decls = doc.declarations as Body[];
+  const walked = new Set(decls.flatMap((d) => [...((d.legs as Body[] | undefined) ?? []), ...((d.blocks as Body[] | undefined) ?? []).flatMap((b) => (b.from as Body[] | undefined) ?? [])].map((l) => String(l.register))));
+  const home = { ...HOME_3_28, blocks: (HOME_3_28.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: (b.from as Body[]).filter((l) => walked.has(String(l.register))) } : b)) };
+  return {
+    ...doc,
+    declarations: decls
+      .filter((d) => !SECTION_29.has(d.page as string) && !FIGURES_29.has(d.metric as string) && d.script !== 'offer_budgets')
+      .map((d) =>
+        d.register === 'categories' && Array.isArray(d.fields)
+          ? { ...d, fields: (d.fields as Body[]).filter((f) => !CATEGORY_29.has(f.id as string)) }
+          : d.page === 'money'
+            ? { ...home, nav: d.nav }
+            : d.page === 'money-book'
+              ? { ...d, blocks: (d.blocks as Body[]).map(({ donut: _donut, ...b }) => b) }
+              : d,
+      ),
+  };
+};
 /** MONEY 3.24.0 COMES OFF FIRST (the look of 26 October, R4): the Accounts split read six accounts at most. */
 const withoutLimit24 = (doc: Body): Body =>
   withPage(doc, 'money', (now) => now.map((x) => (x.heading === 'Accounts' && x.limit === 12 ? { ...x, limit: 6 } : x)));
@@ -1063,6 +1089,21 @@ const withoutUiPassR3 = (doc: Body): Body =>
         return [{ ...off, body: off.body.replace(ACTS, '') }];
       }),
   );
+/**
+ * THIS MONTH'S SPENDING AS 3.28.0 DREW IT, the whole width and its part with no category named "No category". Written out
+ * because money-core 3.29.0 renamed and narrowed the part (`parts/spending.ts`), and a step older than it puts back what
+ * was, not what is.
+ */
+const SPENDING_3_28: Body = {
+  kind: 'bar',
+  heading: "This month's spending",
+  icon: 'chart-bar',
+  span: 12,
+  source: 'metric.spent-vs-last-month',
+  unset: 'No category',
+  when: { metric: 'spent-by-category-month', gt: 0 },
+  empty: 'Nothing spent this month or last has a category yet.',
+};
 const WHERE_IT_WENT_100: ReadonlySet<string> = new Set(['Where it went', 'This month, by category', 'No category yet, by who was paid']);
 const noAxis = ({ axis: _axis, ...rest }: Body): Body => rest;
 const withoutBatch100 = (doc: Body): Body => {
@@ -1073,7 +1114,7 @@ const withoutBatch100 = (doc: Body): Body => {
         if (b.heading === 'Lasts' && b.area === 'rail') return [RUNS_OUT_99];
         if (b.heading === 'Cash ahead') return [noAxis({ ...b, horizon: 90, horizons: [90, 180, 365, 730, 1825, 'last'] })];
         if (b.heading === 'What it holds today') return [AGES[0] as Body, b];
-        if (b.heading === 'Instalments') return [b, SPENDING[0] as Body, BUDGET.find((x) => x.kind === 'progress') as Body];
+        if (b.heading === 'Instalments') return [b, SPENDING_3_28, BUDGET.find((x) => x.kind === 'progress') as Body];
         return [b];
       }),
   );
@@ -1465,8 +1506,9 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   /* THE BOARD AND THE WALK OF THIRTY DAYS WEAR NO HEADING. */
   assert.deepEqual(blocks('work-board').filter((b) => b.kind === 'board').map((b) => [b.heading, b.icon]), [[undefined, undefined]]);
   const money = blocks('money');
-  /* AND SINCE REC-B23 NO WALK OF THIRTY DAYS AT ALL: the calendar opens Coming and going. */
-  assert.deepEqual([money[money.findIndex((b) => b.heading === 'Coming and going') + 1]!.kind, money.some((b) => b.kind === 'bridge')], ['calendar', false]);
+  /* AND SINCE REC-B23 NO WALK OF THIRTY DAYS AT ALL, and since money-core 3.29.0 no calendar either: Coming up names the
+     next few things, and the Coming up page holds the rest. */
+  assert.deepEqual([money.some((b) => b.kind === 'timeline' && b.heading === 'Coming up'), money.some((b) => b.kind === 'bridge' || b.kind === 'calendar')], [true, false]);
   /* PEOPLE DRAWS NO DOTS, AND SINCE 3.2.0 NO LIST OVER ITS CARDS EITHER, and keeps the figures the chart and the list drew on. */
   const people = blocks('people');
   assert.ok(!people.some((b) => b.kind === 'heat'), 'the twelve weeks of dots are still on People');
