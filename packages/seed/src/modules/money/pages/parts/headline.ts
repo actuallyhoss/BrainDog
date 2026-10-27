@@ -1,20 +1,18 @@
-/** Money's first line: what the money is doing, in one sentence. */
+/** Money's first line: where the money is kept, and what is late, in one sentence. */
 
 const ONE_BOOK = { metric: 'books-held', lt: 2 };
 /**
- * EACH CURRENCY APART, THEN ABOUT WHAT THEY COME TO, SINCE money-core 3.27.0: the line said one amount in the home
- * currency, a dollar balance blended in at a rate a month old with nothing saying so. Now it is the money in each currency
- * it is kept in (`cash-now.apart`), and only where some was converted, about what that comes to and the day of the rate
- * (`cash-now.converted`, `cash-now.rate_on`), a clause that goes on a record kept in one currency.
- */
-const CASH_SAID = "{{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate";
-/**
- * AND THE ACCOUNTS THE MONEY IS IN, SINCE money-core 3.27.0: the accounts Cash now cuts into that hold money
+ * THE ACCOUNTS THE MONEY IS IN, SINCE money-core 3.27.0: the accounts Cash now cuts into that hold money
  * (`cash-by-account.groups`), the ones the Accounts tile lists. The count of every cash account said seven beside a
  * tile of six, which leaves one at nought out of its legend.
  */
 const ACCOUNTS_SAID = '{{cash-by-account.groups}} account(s)';
-const WHAT_THERE_IS = `Cash is ${CASH_SAID}, across ${ACCOUNTS_SAID}, {{cash-now.moved}} on a month ago.`;
+/**
+ * WHERE THE MONEY IS KEPT, AND NOT HOW MUCH, SINCE money-core 3.29.0. How much is the hero's (`hero.ts`): Cash now in the
+ * figure's own size, each currency in its own amount under it and its change on a month ago, which this line said
+ * until the hero stood under it. A line saying the same money over a tile saying it bigger was one fact twice.
+ */
+const WHAT_THERE_IS = `Kept in ${ACCOUNTS_SAID}.`;
 
 /**
  * AND A PART THAT IS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4: "Money's first line says how much he
@@ -32,22 +30,10 @@ const CARD_OWES = ' On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}
 
 export const HEADLINE: Record<string, unknown>[] = [
   {
-    /* THE HEADLINE LINE, SAID FROM THE FIGURES: what the money is doing, in one sentence inside the page's headline
-       tile with its name and tools. Since money-core 3.3.0 it is said on every record that keeps one set of money,
-       and not only while the walk goes under: what there is and where, then, only while it is true, the day count
-       the walk below goes under in. A clause whose figure has no value is left out by the writer (`leadOf`), so a
-       record whose money lasts the year reads "Cash is £33,850 across 2 accounts" and stops there, and a record with
-       no account yet reads no sentence at all. The figures are the tiles' own, so the line and the tiles cannot
-       disagree. With two books or more one Cash now adds a company's money to a person's own, so this line goes
-       with the tile it would sum, and the line after it is said in its place.
-
-       HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, SINCE money-core 3.3.0 (`{{cash-now.change}}`, "+8% on a month
-       ago"), said against the point the night remembered thirty days back. In words since the UI pass of 20 October
-       (`{{cash-now.moved}}`, "6% down on a month ago"), where a minus sign led a clause of a sentence. A record with no point that old, or a
-       point in another currency, has no change, and the clause drops with nothing left of it.
-
-       WHEN IT RUNS OUT IS THE TILE'S, SINCE money-core 3.11.0: the side column says it in the figure's own size beside
-       the walk, and a line saying it as well would be the same fact twice on one screen. */
+    /* THE PAGE'S LINE: where the money is kept, then, only while it is true, the part that is late and what is to pay
+       on the card. A clause whose figure has no value is left out by the writer (`leadOf`), so a record with no account
+       yet reads no sentence at all. How much there is, how it moved in a month and when it runs out are the hero's
+       (`hero.ts`), drawn under the line, so no figure is said twice on one screen. */
     kind: 'note',
     lead: true,
     span: 12,
@@ -55,50 +41,24 @@ export const HEADLINE: Record<string, unknown>[] = [
     body: `${WHAT_THERE_IS}${LATE_PART}${CARD_OWES}`,
   },
   {
-    /* WITH TWO BOOKS OR MORE THE LINE SAYS WHERE THE MONEY IS KEPT, AND NO SUM, SINCE money-core 3.17.0. No block here
-       was the page's lead on such a record, so the app said its own filler under the page's name: "One screen that
-       gathers what you keep an eye on: figures, tables and notes." Two counts, the books and the accounts that count as
-       cash, and never an amount: one figure over two books adds a company's money to a person's own, which is why the
-       line above goes. What each book holds is the tile under it (`by-book.ts`).
-
-       AND HOW MUCH, SINCE money-core 3.18.0 (the audit of 22 October, U4, his call taken as suggested): a line of two
-       counts and no amount opened the page of a finance app, and the one total stood inside the chart. Cash now leads,
-       as Cash ahead's own today already says it, with the books it is kept in after it; what each book holds is still
-       the tile under it. Then the part that is late, as on one book. */
+    /* WITH TWO BOOKS OR MORE THE LINE SAYS HOW MANY, SINCE money-core 3.17.0, so a person reads that the hero's Cash
+       now holds both before reading it. What each book holds is on the Accounts page. Then the part that is late, as
+       on one book. */
     kind: 'note',
     lead: true,
     span: 12,
     when: { metric: 'books-held', gte: 2 },
-    body: `You have ${CASH_SAID}, across ${ACCOUNTS_SAID} in {{books-held}} books.${LATE_PART}${CARD_OWES}`,
+    body: `Kept in ${ACCOUNTS_SAID} in {{books-held}} books.${LATE_PART}${CARD_OWES}`,
   },
-  /* NO "WHAT YOU HAVE" TILE BESIDE THE LINE, SINCE money-core 3.4.0. It said Cash now, the accounts and how long it
-     lasts, which are the three figures the line above says, so a person read them twice before reading anything
-     else. Cash ahead draws how the same cash moves, the whole width. */
 ];
 
 /**
- * HOW LONG THE CASH LASTS WITH NOTHING COMING IN IS THE LASTS TILE'S, SINCE THE UI PASS OF 20 OCTOBER (money F3): every
- * line below ended on it, and the tile beside the chart said the day on what is due, two answers to one question a
- * screen apart. The tile now says both, each named by what it assumes, and no line repeats either (`money.test.ts`
- * holds that no tile beside the line says a figure the line says).
- *
- * THE LINE THAT SAYS THE MONEY LASTS THE YEAR, DECLARED AND NOT PLACED (money-lasts-line-76, REC-B07). Money is at
- * twenty-four blocks, the most a page declares (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`), and this is a
- * third lead note where `HEADLINE` holds two: placed today, Money is refused at install. It comes in when a block is
- * given up for it: `MONEY_PAGE` then spreads this where it spreads `HEADLINE`.
- *
- * WHAT IT CHANGES. The line of what there is steps aside while the money lasts (`beyond: false`), or the cash would be
- * said twice; it still stands where nobody can count the days, with no account or over two currencies and no rate.
- *
- * EACH LINE ENDS ON HOW LONG THE CASH LASTS WITH NO INCOME, SINCE money-core 3.17.0 (`lasts-no-income`), as a clause of
- * its own after a comma, because the writer leaves out a whole clause when one of its holes reads nothing (`leadOf`):
- * past five years, or over two currencies with no rate, the clause goes and the rest of the line stands.
+ * THE LINE MONEY OPENS ON, SPLIT BY WHETHER THE MONEY LASTS THE YEAR (REC-B07). While the walk goes under inside the year,
+ * the hero says the day and how long it lasts with nothing coming in, so the line says where the money is kept and no
+ * more. While it does not, the hero draws no day, and the line says that on what is due the money lasts the year.
  */
 export const HEADLINE_LASTS: Record<string, unknown>[] = [
   {
-    /* WHAT THERE IS, AND NOTHING OF HOW LONG (the UI pass of 20 October, money F3): while the walk goes under, the Lasts
-       tile beside the chart says both how long it lasts on what is due and with nothing coming in, so the line says
-       the cash alone and no answer stands a screen away from a second one. */
     ...HEADLINE[0],
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
     body: `${WHAT_THERE_IS}${LATE_PART}${CARD_OWES}`,

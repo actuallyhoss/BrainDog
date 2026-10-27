@@ -4,8 +4,9 @@ export const CROSS_CHECK: Record<string, unknown>[] = [
   {
     /* CASH NOW IS NOT WHAT ITS ENTRIES ADD UP TO (REC-A17 job 4): the one tile on this page about the page itself.
        "Wrong money on a screen is the worst class of defect in this repo", and the record works Cash now out a second
-       way each time it is read (`cash-cross-check` in `figures/cash.ts`), so a figure that is out says so here, straight
-       under the walk that starts from it, and is not read as if it were right.
+       way each time it is read (`cash-cross-check` in `figures/cash.ts`), so a figure that is out says so here, and is not
+       read as if it were right. THE FIRST LINE OF HEADS UP SINCE money-core 3.29.0, where it stood under the walk: the
+       home is one board under the hero, and what needs a look about its money is read in one place.
 
        DRAWN ONLY WHILE THE TWO DISAGREE, in any currency (`not: 0`): at nought, which is every day on a record that
        is right, there is no tile and no word about a check. The figure is the difference, Cash now less the same

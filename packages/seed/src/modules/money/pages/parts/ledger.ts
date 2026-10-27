@@ -61,7 +61,7 @@ export const LEDGER: Record<string, unknown>[] = [
     heading: 'Ledger',
     body: '{{filed-today}} filed today.',
     icon: 'receipt',
-    span: 12,
+    /* NO WIDTH OF ITS OWN, SINCE money-core 3.29.0, so the app pairs it beside the accounts on Money's home. */
     source: 'register.transactions',
     where: 'state is not void',
     columns: LEDGER_COLUMNS,

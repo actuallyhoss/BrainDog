@@ -1,7 +1,7 @@
 /** Lasts, and Runs out: how long the money lasts, beside the walk, calm while there is cash and red once there is none. */
 
 /* THE CELL BOTH TILES DRAW: the day the money runs out on what is due, with the days left under it. */
-const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' };
+export const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due and expected', note: 'In {{runway-days}}' };
 
 /**
  * HOW LONG IT LASTS IF NOTHING COMES IN, the one tile's since the UI pass of 20 October (money F3): the line over the
@@ -15,7 +15,7 @@ const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due and exp
  * (`every-month-in.names`). Only while the walk with what is due and expected also goes under inside the year is that
  * day said, as a sentence of its own; while it does not, the sentence goes whole (`noteOf`).
  */
-const LASTS_SAID = {
+export const LASTS_SAID = {
   metric: 'lasts-no-income',
   label: 'With no money coming in',
   note:

@@ -20,7 +20,7 @@ export const INSTALMENTS: Record<string, unknown>[] = [
     kind: 'progress',
     heading: 'Instalments',
     icon: 'credit-card',
-    span: 12,
+    /* NO WIDTH OF ITS OWN, SINCE money-core 3.29.0: half a row beside a neighbour, or the whole row alone. */
     cells: [
       { metric: 'installments-paid-by-plan', label: 'Paid' },
       { metric: 'installments-total-by-plan', label: 'Parts' },

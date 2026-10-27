@@ -72,3 +72,37 @@ export const NEXT_30: Record<string, unknown>[] = [
     empty: 'Nothing falls due in the next 30 days.',
   },
 ];
+
+/** How far ahead Money's home looks for what falls due: the month ahead and the next, so a plan's next part is in reach. */
+export const COMING_UP_DAYS = 60;
+
+/** How many things the home's Coming up draws. The Coming up page holds the rest. */
+export const COMING_UP_LINES = 6;
+
+/**
+ * COMING UP, ON MONEY'S HOME SINCE money-core 3.29.0: the next few things that move money, a bill, a repeating line, a
+ * part of a plan or money owed in, late first and then by day, each with its amount signed by the way it goes. It takes
+ * the place of the month's calendar, which with every month after it is the Coming up page's, so the home reads the
+ * next six things and not a grid of thirty days. A phone reads it first under the hero, so a late bill is the first thing
+ * under the cash.
+ *
+ * EVERY LIST'S MONEY, as the calendar read it (`source: deadlines`, overdue first): only what carries an amount, so a
+ * task with a day is not money coming up. Late by a month at most: what is later than that is Heads up's to say, as a
+ * total with its way to act, and six bills months old would fill the tile with nothing coming. Two months ahead, so a
+ * plan whose next part is six weeks off is still named.
+ * Once there is an account, as everything under the hero is; a record with nothing dated draws no tile.
+ */
+export const COMING_UP: Record<string, unknown>[] = [
+  {
+    kind: 'timeline',
+    heading: 'Coming up',
+    icon: 'calendar',
+    source: 'deadlines',
+    where: 'amount is set, day after -31d',
+    horizon: COMING_UP_DAYS,
+    columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+    limit: COMING_UP_LINES,
+    when: { metric: 'cash-accounts', gt: 0 },
+    empty: 'Nothing falls due in the next two months.',
+  },
+];

@@ -9,10 +9,8 @@ export const ACCOUNTS_TILE: Record<string, unknown>[] = [
     kind: 'split',
     heading: 'Accounts',
     icon: 'landmark',
-    /* IN THE SIDE COLUMN, UNDER WHEN THE MONEY RUNS OUT, SINCE money-core 3.11.0: the whole width from 3.4.0, and
-       above Heads up from 3.5.0, which reads its balances and is now under the walk beside it. */
-    span: 12,
-    area: 'rail',
+    /* NO WIDTH OF ITS OWN, SINCE money-core 3.29.0, where it stood in a side column from 3.11.0: Money's home is one
+       board of even pairs under the hero, and the app sets this beside the Ledger, or across the row alone. */
     source: 'metric.cash-by-account',
     /* EVERY ACCOUNT CASH NOW ADDS UP, SINCE money-core 3.24.0: the line says "7 accounts" and the tile stopped at six. */
     limit: 12,

@@ -16,10 +16,9 @@ export const HEADS_UP: Record<string, unknown>[] = [
     heading: 'Heads up',
     icon: 'bell',
     span: 12,
-    /* IN THE SIDE COLUMN, UNDER THE ACCOUNTS (the UI pass of 20 October, H18 and H19): what needs a look sits on the
-       first screen beside the walk and the Ledger, where it stood under both and the column beside the Ledger was
-       empty. Each line ends on its one way to act. A box never crosses columns, so every line is in the rail too. */
-    area: 'rail',
+    /* THE LAST TILE OF MONEY'S HOME, ACROSS THE ROW, SINCE money-core 3.29.0, where it stood in a side column from the UI
+       pass of 20 October: the home is one board with no side column, and a boxed section takes every block after it,
+       so it closes the page. Each line ends on its one way to act. */
     box: true,
     /* ONLY ONCE THERE IS AN ACCOUNT, as every line under it reads money there is, so a fresh record reads its line
        and the box to add an account and nothing else. */
@@ -37,7 +36,6 @@ export const HEADS_UP: Record<string, unknown>[] = [
     kind: 'note',
     tone: 'warn',
     span: 12,
-    area: 'rail',
     body: 'The oldest balance in Cash now was last confirmed on {{cash-as-of}}. [Update balances](/r/balances?new=1)',
     when: { metric: 'balances-stale', gt: 0 },
   },
@@ -54,7 +52,6 @@ export const HEADS_UP: Record<string, unknown>[] = [
     kind: 'note',
     tone: 'warn',
     span: 12,
-    area: 'rail',
     body: 'Invoices {{bad:late}}: {{late-in}} to come in. [See them](/r/obligations?f=direction:is:owed_to_me&f=state:in:open,part&f=due:before:today)',
     when: { metric: 'late-in', gt: 0 },
   },
@@ -65,7 +62,6 @@ export const HEADS_UP: Record<string, unknown>[] = [
     kind: 'note',
     tone: 'bad',
     span: 12,
-    area: 'rail',
     says: [
       {
         when: { all: [{ metric: 'installments-late', gt: 0 }, { metric: 'overdue', gt: 0 }] },
@@ -87,7 +83,6 @@ export const HEADS_UP: Record<string, unknown>[] = [
     kind: 'note',
     tone: 'warn',
     span: 12,
-    area: 'rail',
     body: 'Categories holding money going the other way from how they are marked: {{categories-against-direction}}. Make it either way: in Categories, set Which way to Either way.',
     when: { metric: 'categories-against-direction', gt: 0 },
   },

@@ -15,15 +15,17 @@ export const SPENDING: Record<string, unknown>[] = [
        in it (`spent-by-category-month`). Without that, a month nobody has spent in yet drew last month as a fall in
        every category, which looks like good news and is the calendar.
 
-       WHAT NOBODY GAVE A CATEGORY IS THE WHOLE LESS THE PARTS, named "No category" and never left out.
+       WHAT NOBODY GAVE A CATEGORY IS THE WHOLE LESS THE PARTS, named and never left out.
 
-       NOT ON THE PAGE YET: `money.ts` places it. THE WHOLE WIDTH, as every chart on Money is. */
+       SPENT THIS MONTH, ON MONEY'S HOME SINCE money-core 3.29.0: the first tile under the hero, beside Coming up, and
+       how this month's spending stands against last month's is the health figure it carries. NO WIDTH OF ITS OWN, so
+       the app pairs it with its neighbour into two even columns, and gives it the whole row when it stands alone.
+       WHAT NOBODY FILED IS "Not filed yet", the part a person can still do something about. */
     kind: 'bar',
-    heading: "This month's spending",
+    heading: 'Spent this month',
     icon: 'chart-bar',
-    span: 12,
     source: 'metric.spent-vs-last-month',
-    unset: 'No category',
+    unset: 'Not filed yet',
     when: { metric: 'spent-by-category-month', gt: 0 },
     empty: 'Nothing spent this month or last has a category yet.',
   },
