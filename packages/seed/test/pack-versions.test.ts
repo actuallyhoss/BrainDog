@@ -1981,7 +1981,7 @@ const DECLARED: Record<string, Version> = {
       metric.budget-passed-on metric.budgets-set metric.budgets-total metric.budgets-unset metric.card-to-pay metric.card-to-pay-on
       metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-cross-check metric.cash-now
       metric.categories-against-direction metric.chasing metric.currencies-held metric.days-late-in metric.due-30d
-      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.filed-by-rule-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-net metric.every-month-out metric.filed-by-rule-30d
       metric.filed-for-you-30d metric.filed-today metric.in-30d metric.in-ahead-by-month metric.in-by-month metric.in-due-by-month
       metric.installments-after-next-by-plan metric.installments-due-30d metric.installments-late metric.installments-left
       metric.installments-left-by-plan metric.installments-next-due-by-plan metric.installments-paid-by-plan
@@ -2012,10 +2012,11 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'c39958b1099af6a1',
+    declares: '9f6db23eb5f872a2',
     history: [
       'Money 3.29.0: Money is a section, with `page.money-accounts`, `page.money-ledger`, `page.money-budgets`, `page.money-coming`, `page.money-forecast`, `page.money-reports` and `page.money-payees` under it, each its line alone, and `register.categories` gains `icon`, `colour`, `budget_alert`, `rollover` and `parent` -> cd223ca9d727a38b',
       'Money 3.29.0, the rest of the section: the home leads with one hero and Coming up, the pages are filled, `script.offer_budgets` offers budgets from last month, and `metric.payees-paid-90d`, `metric.account-now` and the other figures the pages read come with it, and Coming up and Forecast draw each list the whole row -> c39958b1099af6a1',
+      'Money 3.29.0, polish: Coming up adds what is left every month (`metric.every-month-net`), the home goes red under nothing and says how old its rate is -> 9f6db23eb5f872a2',
     ],
   },
   'work@1.17.0': {

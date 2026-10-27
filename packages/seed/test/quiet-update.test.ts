@@ -978,7 +978,7 @@ const CATEGORY_29 = new Set(['icon', 'colour', 'budget_alert', 'rollover', 'pare
 const FIGURES_29 = new Set([
   'budgets-total', 'budgets-unset', 'unfiled-spent-month', 'unfiled-month', 'payees-paid-90d', 'paid-times-by-payee-90d', 'paid-last-by-payee',
   'kept-share-90d', 'received-month', 'left-month', 'account-now', 'account-lines', 'account-gap', 'lines-by-account', 'account-in-by-month',
-  'account-out-by-month',
+  'account-out-by-month', 'every-month-net',
 ]);
 const HOME_3_28 = JSON.parse(readFileSync(new URL('./fixtures/money-home-3.28.0.json', import.meta.url), 'utf8')) as Body;
 const withoutSection29 = (doc: Body): Body => {
