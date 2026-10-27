@@ -73,7 +73,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       kind: 'table',
       heading: 'Instalments, the year ahead',
       icon: 'credit-card',
-      span: 6,
+      span: 12,
       source: 'register.installments',
       where: 'state is open, due before +366d',
       columns: [
@@ -88,11 +88,12 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
     },
     {
       /* WHAT REPEATS, EACH LINE ONCE WITH HOW OFTEN AND WHEN IT NEXT LANDS: the dots on the chart that come round. A
-         paused line is not walked, so it is not here either. */
+         paused line is not walked, so it is not here either. THE WHOLE ROW, as the instalments are: four columns need
+         two thirds of it, and a list with something late in it is read first, so two halves would not stay paired. */
       kind: 'table',
       heading: 'What repeats',
       icon: 'refresh',
-      span: 6,
+      span: 12,
       source: 'register.recurring',
       where: 'state is live',
       columns: [

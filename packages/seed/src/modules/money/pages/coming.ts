@@ -15,14 +15,14 @@ const DUE_COLUMNS = [
 ];
 
 /**
- * One week of what falls due, from the first day to the day before the last, both said from this week's Monday
+ * One week of what falls due, the whole row, from the first day to the day before the last, both said from this week's Monday
  * (`bow`). Sixty-one days ahead at most, so the weeks reach as far as the page says.
  */
 const week = (heading: string, where: string, empty: string): Record<string, unknown> => ({
   kind: 'table',
   heading,
   icon: 'calendar-days',
-  span: 6,
+  span: 12,
   source: 'deadlines',
   horizon: 61,
   where: `${DUE_WITH_MONEY}, ${where}`,
@@ -81,14 +81,12 @@ export const MONEY_COMING_PAGE: SeedPage = {
       limit: 12,
       empty: 'No bill or invoice falls due in the next 60 days.',
     },
-    /* THE WEEKS, MONDAY TO SUNDAY, TWO TO A ROW. This week holds what is already late, first and in the late red, since
-       the record reads what is overdue before the rest. */
+    /* THE WEEKS, MONDAY TO SUNDAY, EACH THE WHOLE ROW. This week holds what is already late, first and in the late red,
+       since the record reads what is overdue before the rest, and a list with something late in it is drawn above the
+       figures: two weeks side by side would be parted by it and leave half a row empty. */
     week('This week', 'day before bow+7d', 'Nothing falls due this week.'),
     week('Next week', 'day after bow+6d, day before bow+14d', 'Nothing falls due next week.'),
-    {
-      ...week('Later, to 60 days', 'day after bow+13d', 'Nothing else falls due in the next 60 days.'),
-      span: 12,
-    },
+    week('Later, to 60 days', 'day after bow+13d', 'Nothing else falls due in the next 60 days.'),
     {
       /* WHAT IS PAUSED, FOLDED: a paused line is walked by nothing, so it is nowhere above, and still a line to start again. */
       kind: 'section',
