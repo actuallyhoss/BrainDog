@@ -18,7 +18,7 @@ import { BUDGET_PAGE_FIGURES } from './budgets2.ts';
 import { HEALTH_FIGURES } from './health.ts';
 import { INSTALMENTS_FIGURES, LATE_PART_FIGURES } from './instalments.ts';
 import { PAYEE_FIGURES } from './payees.ts';
-import { NEXT_PART_FIGURES, PLAN_FIGURES, PLANS_FIGURES } from './plans.ts';
+import { NEXT_PART_FIGURES, PLAN_FIGURES, PLAN_PAGE_FIGURES, PLANS_FIGURES } from './plans.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
 import { SPEND_VS_LAST_FIGURES, SPENDING_FIGURES } from './spending.ts';
@@ -88,6 +88,10 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   ...PAYEE_FIGURES,
   ...HEALTH_FIGURES,
   ...ACCOUNT_FIGURES,
+
+  /* WHAT A PLAN'S PAGE SUMS UP, SINCE money-core 3.29.0: what is late, the parts cancelled, the plan's track with
+     its next part, and what was paid each quarter. LAST, so every figure above keeps its place in the document. */
+  ...PLAN_PAGE_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

@@ -119,6 +119,117 @@ export const PLAN_FIGURES: Record<string, SeedMetric> = {
 };
 
 /**
+ * WHAT A PLAN'S PAGE SUMS UP, SINCE money-core 3.29.0: what is late, the parts cancelled, the plan's track with its next
+ * part, and what was paid each quarter, each read once a plan as the figures above are. Their own export, declared last in Money
+ * (`figures/index.ts`), so every figure a record already holds keeps its place in the document.
+ */
+export const PLAN_PAGE_FIGURES: Record<string, SeedMetric> = {
+  /* WHAT IS LATE ON ONE PLAN: the open parts whose day has gone, added up. Held to nought, so a late amount is drawn in
+     the late red, and with no part late it has no value and its cell is not drawn. */
+  'plan-late': {
+    metric: 'plan-late',
+    name: 'Late on one plan',
+    source: 'register.installments',
+    where: `due before today, ${STILL_OPEN}`,
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { lte: 0 },
+    ...ONCE,
+  },
+
+  /* HOW MANY PARTS ARE CANCELLED, which the list of them under the fold waits for. */
+  'plan-parts-cancelled': {
+    metric: 'plan-parts-cancelled',
+    name: 'Parts cancelled on one plan',
+    source: 'register.installments',
+    where: `state is cancelled, ${OF_PLAN}`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  /* THE TRACK OF ONE PLAN, AS MONEY'S INSTALMENTS TILE DRAWS EACH PLAN'S (`installments-*-by-plan` below): the parts
+     paid against the parts that stand, then the day of the next part, what is left and what is left once it is paid,
+     which the app says under the bar as "Next EGP 120,000 on 28 Nov", or the part late in red. Grouped by the plan
+     and read once a plan, so the one plan's page draws one track. Either way the money goes, as the rest of the page. */
+  'plan-parts-paid-by-plan': {
+    metric: 'plan-parts-paid-by-plan',
+    name: 'Parts paid of one plan, as a track',
+    source: 'register.installments',
+    where: PAID,
+    value: { count: 'id' },
+    group_by: 'plan',
+    format: 'int',
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  'plan-parts-by-plan': {
+    metric: 'plan-parts-by-plan',
+    name: 'Parts of one plan, as a track',
+    source: 'register.installments',
+    where: COUNTED,
+    value: { count: 'id' },
+    group_by: 'plan',
+    format: 'int',
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  'plan-next-due-by-plan': {
+    metric: 'plan-next-due-by-plan',
+    name: 'Next part of one plan, as a track',
+    source: 'register.installments',
+    where: STILL_OPEN,
+    value: { min: 'due' },
+    group_by: 'plan',
+    format: 'day',
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  'plan-left-by-plan': {
+    metric: 'plan-left-by-plan',
+    name: 'Left to pay on one plan, as a track',
+    source: 'register.installments',
+    where: STILL_OPEN,
+    value: { sum: 'amount' },
+    group_by: 'plan',
+    format: MONEY,
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  'plan-after-next-by-plan': {
+    metric: 'plan-after-next-by-plan',
+    name: 'Left on one plan once the next part is paid, as a track',
+    source: 'register.installments',
+    where: STILL_OPEN,
+    value: { max: 'left_after' },
+    group_by: 'plan',
+    format: MONEY,
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  /* WHAT WAS PAID EACH QUARTER, by the day each part fell due, which the page's chart adds up as it goes ("Paid in all,
+     over time", a running line). By the due day as the Property add-on's chart is, so the two say the same quarters. */
+  'plan-paid-by-quarter': {
+    metric: 'plan-paid-by-quarter',
+    name: 'Paid on one plan, by quarter',
+    source: 'register.installments',
+    where: PAID,
+    value: { sum: 'amount' },
+    group_by: 'due',
+    bucket: 'quarter',
+    format: MONEY,
+    target: { gte: 0 },
+    ...ONCE,
+  },
+};
+
+/**
  * EVERY PLAN AT ONCE, FOR MONEY'S INSTALMENTS TILE: the parts paid and the parts in all, one count a plan, by the names
  * the owner gave them ("installments-paid-by-plan / installments-total per plan"). Only what goes out, as the tile
  * draws only what goes out (`pages/parts/instalments.ts`), and a cancelled part in neither.

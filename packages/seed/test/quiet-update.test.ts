@@ -969,8 +969,8 @@ const withoutAhead27 = (doc: Body): Body => ({
 /**
  * MONEY 3.29.0 COMES OFF BEFORE ALL: no page per job under Money, and Categories without an icon, a colour, a share to
  * warn at, a carry over or a category it sits under. AND THE REBUILD IN THE SAME UNRELEASED STEP: none of the figures
- * the new pages read and no offer of budgets from last month, a book's spending as bars and not a donut, and Money's
- * home as 3.28.0 declared it, with its side column (`fixtures/money-home-3.28.0.json`), its walk keeping the legs over
+ * the new pages read and no offer of budgets from last month, a book's spending as bars and not a donut, a plan's page
+ * as 3.28.0 declared it (`fixtures/money-plan-3.28.0.json`), and Money's home as 3.28.0 declared it, with its side column (`fixtures/money-home-3.28.0.json`), its walk keeping the legs over
  * the lists this record's own walks keep.
  */
 const SECTION_29 = new Set(['money-accounts', 'money-ledger', 'money-budgets', 'money-coming', 'money-forecast', 'money-reports', 'money-payees']);
@@ -978,9 +978,12 @@ const CATEGORY_29 = new Set(['icon', 'colour', 'budget_alert', 'rollover', 'pare
 const FIGURES_29 = new Set([
   'budgets-total', 'budgets-unset', 'unfiled-spent-month', 'unfiled-month', 'payees-paid-90d', 'paid-times-by-payee-90d', 'paid-last-by-payee',
   'kept-share-90d', 'received-month', 'left-month', 'account-now', 'account-lines', 'account-gap', 'lines-by-account', 'account-in-by-month',
-  'account-out-by-month', 'every-month-net',
+  'account-out-by-month', 'every-month-net', 'plan-late', 'plan-parts-cancelled', 'plan-paid-by-quarter',
+  'plan-parts-paid-by-plan', 'plan-parts-by-plan', 'plan-next-due-by-plan', 'plan-left-by-plan', 'plan-after-next-by-plan',
 ]);
 const HOME_3_28 = JSON.parse(readFileSync(new URL('./fixtures/money-home-3.28.0.json', import.meta.url), 'utf8')) as Body;
+/* AND A PLAN'S PAGE AS 3.28.0 DECLARED IT, before it was laid out as Property's: four figures, one track and every part in one list. */
+const PLAN_3_28 = JSON.parse(readFileSync(new URL('./fixtures/money-plan-3.28.0.json', import.meta.url), 'utf8')) as Body;
 const withoutSection29 = (doc: Body): Body => {
   const decls = doc.declarations as Body[];
   const walked = new Set(decls.flatMap((d) => [...((d.legs as Body[] | undefined) ?? []), ...((d.blocks as Body[] | undefined) ?? []).flatMap((b) => (b.from as Body[] | undefined) ?? [])].map((l) => String(l.register))));
@@ -994,7 +997,9 @@ const withoutSection29 = (doc: Body): Body => {
           ? { ...d, fields: (d.fields as Body[]).filter((f) => !CATEGORY_29.has(f.id as string)) }
           : d.page === 'money'
             ? { ...home, nav: d.nav }
-            : d.page === 'money-book'
+            : d.page === 'money-plan'
+              ? PLAN_3_28
+              : d.page === 'money-book'
               ? { ...d, blocks: (d.blocks as Body[]).map(({ donut: _donut, ...b }) => b) }
               : d,
       ),

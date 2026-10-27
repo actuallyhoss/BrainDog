@@ -22,7 +22,7 @@ import { sayOf } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyDocument } from '../src/index.ts';
-import { PLAN_FIGURES, PLANS_FIGURES } from '../src/modules/money/figures/plans.ts';
+import { PLAN_FIGURES, PLAN_PAGE_FIGURES, PLANS_FIGURES } from '../src/modules/money/figures/plans.ts';
 import { MONEY_PLAN_PAGE } from '../src/modules/money/pages/plan.ts';
 
 type Fields = Record<string, unknown>;
@@ -44,7 +44,6 @@ type Block = {
   /** What the record answers for each `{{figure:plan}}` in the block's words, by the words in the braces. */
   values?: Record<string, unknown>;
   unnamed?: string[];
-  wholeRead?: { total: number; of: number; rows: { label: string; value: number; of: number }[] };
 };
 
 const OWNER = { actor: 'p_1' };
@@ -71,7 +70,7 @@ const hostFor = (k: Kernel): Host => ({
 /** Money's document with the plan's figures and page in it, each added only while the document does not name it. */
 const withPlanPage = (doc: unknown): unknown => {
   const d = doc as { declarations: Fields[] };
-  const figures = [...Object.values(PLAN_FIGURES), ...Object.values(PLANS_FIGURES)].filter((f) => !d.declarations.some((x) => x.metric === f.metric));
+  const figures = [...Object.values(PLAN_FIGURES), ...Object.values(PLANS_FIGURES), ...Object.values(PLAN_PAGE_FIGURES)].filter((f) => !d.declarations.some((x) => x.metric === f.metric));
   const pages = d.declarations.some((x) => x.page === MONEY_PLAN_PAGE.page) ? [] : [MONEY_PLAN_PAGE];
   return { ...d, declarations: [...d.declarations, ...figures, ...pages] };
 };
@@ -120,9 +119,9 @@ function cellOf(blocks: Block[], id: string): Cell {
 }
 const read = (blocks: Block[], id: string): Reading => cellOf(blocks, id).reading!;
 /** The sentence a plan with parts is led by, with the plan's name filled in and every figure of it still to be written. */
-const sentenceOf = (name: string): string => `{{plan-parts-paid:${name}}} of {{plan-parts:${name}}} paid. {{plan-left:${name}}} left, the last part on {{plan-last-due:${name}}}.`;
+const sentenceOf = (name: string): string => `{{plan-parts-paid:${name}}} of {{plan-parts:${name}}} parts paid, the last due on {{plan-last-due:${name}}}.`;
 /** The sentence a plan with every part paid is led by: the same count, nothing left in words, and the day it ended. */
-const paidUpOf = (name: string): string => `{{plan-parts-paid:${name}}} of {{plan-parts:${name}}} paid, and nothing is left. The last part was on {{plan-last-due:${name}}}.`;
+const paidUpOf = (name: string): string => `{{plan-parts-paid:${name}}} of {{plan-parts:${name}}} parts paid, and nothing is left. The last was due on {{plan-last-due:${name}}}.`;
 /** The lead as a person reads it: every figure in braces written as the record answered it, a day as its count of days. */
 const wordsOf = (lead: Block): string =>
   lead.body!.replace(/\{\{([^{}]+)\}\}/g, (whole, key: string) => {
@@ -146,6 +145,30 @@ function said(blocks: Block[], id: string): unknown {
 /** A day in the sentence as whole days since 1970, whether the record answers it as that count or as the day written out. */
 const dayOf = (v: unknown): number => (typeof v === 'string' ? daysOf(v) : (v as number));
 const tableOf = (blocks: Block[]): Block => blocks.find((b) => b.kind === 'table')!;
+/** A block of the page by its heading. */
+const headed = (blocks: Block[], heading: string): Block => {
+  const found = blocks.find((b) => b.heading === heading);
+  assert.ok(found, `${heading} is on the page`);
+  return found;
+};
+/**
+ * The plan's track as the app reads it: each of its five figures by the plan's name, one group each, so a value is the
+ * plan's own (`page-live.ts` draws the bar and the next part under it from these).
+ */
+function trackOf(blocks: Block[], name: string): { paid: unknown; parts: unknown; next: unknown; left: unknown; after: unknown } {
+  const track = drawn(blocks).find((b) => b.kind === 'progress');
+  assert.ok(track, 'the track is drawn');
+  assert.equal(track.heading, 'Parts paid');
+  const [paid, parts, next, left, after] = track.readings!.map((c) => {
+    assert.equal(c.refusal, undefined, JSON.stringify(c.refusal));
+    const groups = c.reading?.groups ?? [];
+    assert.ok(groups.length <= 1, `${c.metric} reads one plan`);
+    return groups.find((g) => g.key === name)?.value ?? null;
+  });
+  return { paid, parts, next, left, after };
+}
+/** The folded list of every part still to come: the one table with no heading, after the fold. */
+const toComeOf = (blocks: Block[]): Block => blocks.find((b) => b.kind === 'table' && b.heading === undefined)!;
 
 test('the page is one page a plan, under Money, and needs the list of plans', () => {
   assert.equal(MONEY_PLAN_PAGE.page, 'money-plan');
@@ -159,8 +182,26 @@ test('the page is one page a plan, under Money, and needs the list of plans', ()
 });
 
 test('every figure of one plan is read once a plan, by the name its parts share', () => {
-  assert.deepEqual(Object.keys(PLAN_FIGURES), ['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-parts-open', 'plan-next-due', 'plan-last-due']);
-  for (const [id, f] of Object.entries(PLAN_FIGURES)) {
+  assert.deepEqual(Object.keys(PLAN_FIGURES), [
+    'plan-parts-paid',
+    'plan-parts',
+    'plan-paid',
+    'plan-left',
+    'plan-parts-open',
+    'plan-next-due',
+    'plan-last-due',
+  ]);
+  assert.deepEqual(Object.keys(PLAN_PAGE_FIGURES), [
+    'plan-late',
+    'plan-parts-cancelled',
+    'plan-parts-paid-by-plan',
+    'plan-parts-by-plan',
+    'plan-next-due-by-plan',
+    'plan-left-by-plan',
+    'plan-after-next-by-plan',
+    'plan-paid-by-quarter',
+  ]);
+  for (const [id, f] of Object.entries({ ...PLAN_FIGURES, ...PLAN_PAGE_FIGURES })) {
     assert.equal(f.metric, id);
     assert.equal(f.source, 'register.installments');
     assert.match(String(f.where), /plan is \{\{it\}\}$/, id);
@@ -173,18 +214,17 @@ test('a plan of six parts with two paid reads 2 of 6 paid, and left is its open 
   write(k, 'Flat', SIX);
   const blocks = pageOf(k, 'Flat');
 
-  /* THE SENTENCE'S FOUR FIGURES, each answered for this plan: 2 of 6 paid, E£176,500 left, the last part on 1 Jun 2027. */
+  /* THE SENTENCE'S COUNTS, answered for this plan: 2 of 6 parts paid, and what is left is the summary's. */
   assert.deepEqual([said(blocks, 'plan-parts-paid'), said(blocks, 'plan-parts')], [2, 6]);
-  assert.deepEqual(said(blocks, 'plan-left'), egp(4 * PART));
+  assert.deepEqual([read(blocks, 'plan-left').value, read(blocks, 'plan-left').unit], [4 * PART, 'EGP']);
   const paid = read(blocks, 'plan-paid');
   assert.deepEqual([paid.value, paid.unit], [2 * PART, 'EGP']);
   /* THE NEXT IS THE FIRST PART STILL OPEN, the third, and the last is the sixth. */
-  assert.deepEqual([read(blocks, 'plan-next-due').value, dayOf(said(blocks, 'plan-last-due'))], [daysOf(due(3)), daysOf(due(6))]);
+  const track = trackOf(blocks, 'Flat');
+  assert.deepEqual([track.next, dayOf(said(blocks, 'plan-last-due'))], [daysOf(due(3)), daysOf(due(6))]);
 
-  /* AND THE TRACK DRAWS THE SAME TWO OF SIX, one track, counted from the parts' own status. */
-  const track = drawn(blocks).find((b) => b.kind === 'progress')!;
-  assert.deepEqual(track.wholeRead, { rows: [{ label: 'Flat', rows: 6, value: 2, of: 6 }], total: 2, of: 6 });
-  assert.equal(track.heading, 'Parts paid');
+  /* AND THE TRACK DRAWS THE SAME TWO OF SIX, one track, counted from the parts' own status, with what is left. */
+  assert.deepEqual([track.paid, track.parts, track.left], [2, 6, 4 * PART]);
 });
 
 test('a cancelled part counts in neither side', async () => {
@@ -193,13 +233,13 @@ test('a cancelled part counts in neither side', async () => {
   const blocks = pageOf(k, 'Flat');
 
   assert.deepEqual([said(blocks, 'plan-parts-paid'), said(blocks, 'plan-parts')], [2, 4]);
-  assert.deepEqual(said(blocks, 'plan-left'), egp(2 * PART));
+  assert.equal(read(blocks, 'plan-left').value, 2 * PART);
   assert.equal(read(blocks, 'plan-paid').value, 2 * PART);
   /* THE LAST PART IS THE LAST ONE THAT STANDS: the sixth is cancelled, so the plan ends on the fifth. */
   assert.equal(dayOf(said(blocks, 'plan-last-due')), daysOf(due(5)));
-  assert.deepEqual([drawn(blocks).find((b) => b.kind === 'progress')!.wholeRead!.total, drawn(blocks).find((b) => b.kind === 'progress')!.wholeRead!.of], [2, 4]);
-  /* IT IS STILL LISTED, under its own word, so nobody wonders where a part went. */
-  assert.equal(tableOf(blocks).matched, 6);
+  assert.deepEqual([trackOf(blocks, 'Flat').paid, trackOf(blocks, 'Flat').parts], [2, 4]);
+  /* IT IS STILL LISTED, under its own heading, so nobody wonders where a part went: two paid, two to come, two cancelled. */
+  assert.deepEqual([headed(blocks, 'Paid').matched, toComeOf(blocks).matched, headed(drawn(blocks), 'Cancelled').matched], [2, 2, 2]);
 });
 
 test('one plan reads only its own parts', async () => {
@@ -209,8 +249,8 @@ test('one plan reads only its own parts', async () => {
   const car = pageOf(k, 'Car, the red one');
   /* A NAME WITH A COMMA IN IT IS ONE PLAN, in the sentence as in the list. */
   assert.equal(leadOf(car).body, sentenceOf('Car, the red one'));
-  assert.deepEqual([said(car, 'plan-parts-paid'), said(car, 'plan-parts'), said(car, 'plan-left')], [1, 3, egp(2 * PART)]);
-  assert.equal(tableOf(car).matched, 3);
+  assert.deepEqual([said(car, 'plan-parts-paid'), said(car, 'plan-parts'), read(car, 'plan-left').value], [1, 3, 2 * PART]);
+  assert.deepEqual([headed(car, 'Paid').matched, headed(car, 'Upcoming').matched], [1, 2]);
   assert.equal(said(pageOf(k, 'Flat'), 'plan-parts'), 6);
 
   /* AND MONEY'S TWO COUNTS SAY EVERY PLAN AT ONCE, one count a plan. */
@@ -257,26 +297,84 @@ async function counted(k: Kernel): Promise<void> {
   assert.fail('the script comes to rest');
 }
 
-test('the parts are listed with day, amount, status and what is left after each, and the last open part reads nought', async () => {
+test('the parts to come and the parts paid are listed apart, with what is left after each part to come', async () => {
   const k = await moneyCore();
   write(k, 'Flat', SIX);
   await counted(k);
-  const table = tableOf(pageOf(k, 'Flat'));
+  const blocks = pageOf(k, 'Flat');
 
-  assert.equal(table.heading, 'Parts');
-  const fields = table.columns!.map((c) => c.field);
-  for (const f of ['due', 'amount', 'state', 'left_after']) assert.ok(fields.includes(f), `${f} is a column`);
-  assert.equal(table.columns!.find((c) => c.field === 'left_after')!.label, 'Left after');
-  /* EVERY PART, THE EARLIEST FIRST, and no part of another plan. */
-  const rows = table.rows!;
-  assert.deepEqual(rows.map((r) => r.fields.due), [1, 2, 3, 4, 5, 6].map(due));
-  assert.deepEqual(rows.map((r) => r.fields.state), SIX);
-  assert.equal(rows.every((r) => (r.fields.amount as Money).amount === PART), true);
-  /* AFTER THE THIRD, THE FIRST STILL OPEN, three are left; after the sixth, none. */
-  assert.deepEqual(rows[2]!.fields.left_after, egp(3 * PART));
-  assert.deepEqual(rows[5]!.fields.left_after, egp(0));
+  /* THE NEXT SIX TO TICK, THE EARLIEST FIRST: a todo, so a part is marked paid where it is read. */
+  const upcoming = headed(blocks, 'Upcoming');
+  assert.equal(upcoming.kind, 'todo');
+  assert.deepEqual(upcoming.rows!.map((r) => r.fields.due), [3, 4, 5, 6].map(due));
+
+  /* THE PARTS PAID, THE LATEST FIRST, with the day each was paid. */
+  const paid = headed(blocks, 'Paid');
+  assert.deepEqual(paid.rows!.map((r) => r.fields.due), [2, 1].map(due));
+  for (const f of ['due', 'what', 'amount', 'settled']) assert.ok(paid.columns!.some((c) => c.field === f), `${f} is a column of Paid`);
+
+  /* EVERY PART STILL TO COME, UNDER THE FOLD, with what is left after it; after the sixth, none. */
+  const fold = blocks[blocks.indexOf(toComeOf(blocks)) - 1]!;
+  assert.deepEqual([fold.kind, fold.heading], ['section', 'Every part still to come']);
+  const rows = toComeOf(blocks).rows!;
+  assert.equal(toComeOf(blocks).columns!.find((c) => c.field === 'left_after')!.label, 'Left after');
+  assert.deepEqual(rows.map((r) => r.fields.due), [3, 4, 5, 6].map(due));
+  assert.deepEqual(rows[0]!.fields.left_after, egp(3 * PART));
+  assert.deepEqual(rows[3]!.fields.left_after, egp(0));
   /* WHAT IS LEFT AFTER THE FIRST OPEN PART AND THAT PART ARE WHAT THE PAGE SAYS IS LEFT. */
-  assert.equal((rows[2]!.fields.left_after as Money).amount + PART, (said(pageOf(k, 'Flat'), 'plan-left') as Money).amount);
+  assert.equal((rows[0]!.fields.left_after as Money).amount + PART, read(blocks, 'plan-left').value);
+});
+
+test('the summary says paid in, left and what is late, and the track the next part', async () => {
+  const k = await moneyCore();
+  /* THREE PARTS BEFORE THE CLOCK'S DAY, ONE PAID AND TWO NOT, AND THREE AFTER IT. */
+  value(k.create('plans', { name: 'Flat' }, OWNER));
+  const days = ['2026-05-01', '2026-07-01', '2026-08-01', '2026-10-01', '2026-11-01', '2026-12-01'];
+  days.forEach((day, i) =>
+    value(k.create('installments', { what: `Flat, part ${i + 1}`, plan: 'Flat', number: i + 1, direction: 'out', amount: egp(PART * (i + 1)), due: day, state: i === 0 ? 'paid' : 'open' }, OWNER)),
+  );
+  await counted(k);
+  const blocks = pageOf(k, 'Flat');
+  const stat = headed(blocks, 'Where it stands');
+  assert.deepEqual(stat.readings!.map((c) => c.label), ['Paid in', 'Left', 'Late']);
+  assert.equal(read(blocks, 'plan-paid').value, PART);
+  assert.equal(read(blocks, 'plan-left').value, PART * (2 + 3 + 4 + 5 + 6));
+  /* THE NEXT IS THE EARLIEST STILL OPEN, the second, late already: its day, and its amount as what is left less what is
+     left once it is paid, which the app says under the track. */
+  const track = trackOf(blocks, 'Flat');
+  assert.equal(track.next, daysOf('2026-07-01'));
+  assert.equal((track.left as number) - (track.after as number), 2 * PART);
+  /* LATE IS THE OPEN PARTS WHOSE DAY HAS GONE, held to nought, so it is drawn red. */
+  assert.equal(read(blocks, 'plan-late').value, PART * (2 + 3));
+  assert.deepEqual((cellOf(blocks, 'plan-late') as Cell & { target?: unknown }).target, { lte: 0 });
+});
+
+test('the chart adds up what was paid each quarter as it goes', async () => {
+  const k = await moneyCore();
+  value(k.create('plans', { name: 'Flat' }, OWNER));
+  const days = ['2025-11-01', '2026-02-01', '2026-03-01', '2026-08-01', '2026-11-01'];
+  days.forEach((day, i) =>
+    value(k.create('installments', { what: `Flat, part ${i + 1}`, plan: 'Flat', number: i + 1, direction: 'out', amount: egp(PART), due: day, state: i < 4 ? 'paid' : 'open' }, OWNER)),
+  );
+  const chart = headed(drawn(pageOf(k, 'Flat')), 'Paid in all, over time') as Block & { bars?: { keys: string[]; values: (number | null)[][]; unit: string } };
+  assert.equal(chart.kind, 'series');
+  assert.deepEqual(chart.bars!.keys, ['2025-Q4', '2026-Q1', '2026-Q2', '2026-Q3']);
+  /* ONE, THEN TWO MORE, NOTHING IN THE SECOND QUARTER, AND ONE MORE: the total so far, never what one quarter paid. */
+  assert.deepEqual(chart.bars!.values, [[PART, 3 * PART, 3 * PART, 4 * PART]]);
+  assert.equal(chart.bars!.unit, 'EGP');
+});
+
+test('where the Property add-on holds the plan, the lead sends to it, and nothing here says its worth', () => {
+  const leads = (MONEY_PLAN_PAGE.blocks as { lead?: boolean; says?: { when?: unknown; body: string }[] }[]).filter((b) => b.lead === true && b.says);
+  assert.equal(leads.length, 2);
+  for (const l of leads) {
+    assert.deepEqual(l.says![0]!.when, { metric: 'property-value-of:{{name}}', empty: false });
+    assert.match(l.says![0]!.body, /\[Property\]\(\/p\/properties\)/);
+    assert.equal(l.says![0]!.body.startsWith(l.says![1]!.body), true, 'the same sentence, with the line to Property after it');
+  }
+  /* AND NO FIGURE OF PROPERTY'S IS DRAWN HERE: what a property is worth and the equity are its page's. */
+  const named = JSON.stringify((MONEY_PLAN_PAGE.blocks as { cells?: unknown; series?: unknown }[]).map((b) => [b.cells, b.series]));
+  assert.doesNotMatch(named, /property-/);
 });
 
 test('a plan with no parts says so in a sentence, and draws no figure about nothing', async () => {
@@ -306,15 +404,16 @@ test('a plan with parts is led by one sentence, and a plan all paid says no next
   assert.equal(lead.kind, 'note');
   assert.equal(lead.body, sentenceOf('Flat'));
   /* EVERY FIGURE OF IT IS ANSWERED, by the words in its braces, so no brace is left for a person to read. */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['plan-last-due:Flat', 'plan-left:Flat', 'plan-parts-paid:Flat', 'plan-parts:Flat']);
-  assert.deepEqual([said(flat, 'plan-parts-paid'), said(flat, 'plan-parts'), said(flat, 'plan-left')], [2, 6, egp(4 * PART)]);
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['plan-last-due:Flat', 'plan-parts-paid:Flat', 'plan-parts:Flat']);
+  assert.deepEqual([said(flat, 'plan-parts-paid'), said(flat, 'plan-parts')], [2, 6]);
   assert.equal(dayOf(said(flat, 'plan-last-due')), daysOf('2027-06-01'));
-  /* AND THE FOUR ARE SAID ONCE: no tile repeats the sentence under it. */
+  /* AND THE SENTENCE'S FIGURES ARE SAID ONCE: the summary under it holds the amounts and the next day. */
   const cells = drawn(flat).flatMap((b) => b.readings ?? []).map((c) => c.metric.split(':')[0]);
-  assert.deepEqual(cells, ['plan-paid', 'plan-next-due']);
+  assert.deepEqual(cells, ['plan-paid', 'plan-left', 'plan-late', ...['parts-paid', 'parts', 'next-due', 'left', 'after-next'].map((f) => `plan-${f}-by-plan`)]);
+  assert.equal(trackOf(flat, 'Flat').next, daysOf(due(3)));
 
   const desk = pageOf(k, 'Desk');
-  assert.equal(drawn(desk).some((b) => b.heading === 'Next part'), false, 'nothing is next once every part is paid');
+  assert.equal(trackOf(desk, 'Desk').next, null, 'nothing is next once every part is paid');
   /* ALL PAID IS LED BY ITS OWN SENTENCE, which asks for no amount left: no part is open, so nothing would be added up
      and the nought would have no currency to be written in. It still ends on the day the plan ended. */
   assert.equal(leadOf(desk).body, paidUpOf('Desk'));
@@ -335,19 +434,19 @@ test('the lead is one of three sentences, by whether the plan has a part and whe
 
   /* A PART STILL OPEN: what is left is an amount in the parts' own currency, and the day is the day it will end. */
   const flat = pageOf(k, 'Flat');
-  assert.equal(wordsOf(leadOf(flat)), `2 of 6 paid. EGP ${4 * PART} left, the last part on ${day(flat)}.`);
+  assert.equal(wordsOf(leadOf(flat)), `2 of 6 parts paid, the last due on ${day(flat)}.`);
   /* NONE PAID YET IS STILL A PLAN WITH A PART OPEN, and reads the same sentence from nought. */
   const car = pageOf(k, 'Car');
   assert.equal(leadOf(car).body, sentenceOf('Car'));
-  assert.equal(wordsOf(leadOf(car)), `0 of 3 paid. EGP ${3 * PART} left, the last part on ${day(car)}.`);
+  assert.equal(wordsOf(leadOf(car)), `0 of 3 parts paid, the last due on ${day(car)}.`);
 
   /* EVERY PART PAID: nothing is left, in words, and no nought stands where an amount would. */
   const desk = pageOf(k, 'Desk');
-  assert.equal(wordsOf(leadOf(desk)), `2 of 2 paid, and nothing is left. The last part was on ${day(desk)}.`);
+  assert.equal(wordsOf(leadOf(desk)), `2 of 2 parts paid, and nothing is left. The last was due on ${day(desk)}.`);
   assert.doesNotMatch(wordsOf(leadOf(desk)), /\b0 left\b|\{\{/);
   /* A CANCELLED PART IS IN NEITHER SIDE HERE TOO: one paid and one cancelled is a plan all paid, of one part. */
   const boat = pageOf(k, 'Boat');
-  assert.equal(wordsOf(leadOf(boat)), `1 of 1 paid, and nothing is left. The last part was on ${day(boat)}.`);
+  assert.equal(wordsOf(leadOf(boat)), `1 of 1 parts paid, and nothing is left. The last was due on ${day(boat)}.`);
   assert.equal(dayOf(said(boat, 'plan-last-due')), daysOf(due(1)));
 
   /* AND NO PART AT ALL IS NEITHER: one sentence that says so, never "nothing is left" about a plan nobody has filled. */
@@ -402,7 +501,8 @@ test('a plan in two currencies with one all paid and one open is led by the open
   const trip = pageOf(k, 'Trip');
   /* ONE BLOCK LEADS (`leadOf` holds that), and it is the one about what is left, in the currency that is left. */
   assert.equal(leadOf(trip).body, sentenceOf('Trip'));
-  assert.deepEqual([said(trip, 'plan-parts-paid'), said(trip, 'plan-parts'), said(trip, 'plan-left')], [1, 2, egp(PART)]);
+  assert.deepEqual([said(trip, 'plan-parts-paid'), said(trip, 'plan-parts')], [1, 2]);
+  assert.deepEqual([read(trip, 'plan-left').value, read(trip, 'plan-left').unit], [PART, 'EGP']);
 
   /* AND BOTH CURRENCIES PAID IS ALL PAID, once and not once a currency. */
   value(k.create('plans', { name: 'Tour' }, OWNER));
@@ -414,8 +514,10 @@ test('a plan in two currencies with one all paid and one open is led by the open
 });
 
 test('nothing a person reads on the page is an id, a dash or a word about the list', () => {
-  const blocks = MONEY_PLAN_PAGE.blocks as { heading?: string; body?: string; empty?: string; cells?: { label?: string }[]; columns?: { label?: string }[] }[];
-  const copy = blocks.flatMap((b) => [b.heading, b.body, b.empty, ...(b.cells ?? []).map((c) => c.label), ...(b.columns ?? []).map((c) => c.label)]).filter((s): s is string => typeof s === 'string');
+  const blocks = MONEY_PLAN_PAGE.blocks as { heading?: string; body?: string; says?: { body: string }[]; empty?: string; cells?: { label?: string }[]; columns?: { label?: string }[] }[];
+  const copy = blocks
+    .flatMap((b) => [b.heading, b.body, ...(b.says ?? []).map((l) => l.body), b.empty, ...(b.cells ?? []).map((c) => c.label), ...(b.columns ?? []).map((c) => c.label)])
+    .filter((s): s is string => typeof s === 'string');
   assert.ok(copy.length > 6);
   for (const said of copy) {
     assert.doesNotMatch(said, /[—–]/, said);
@@ -423,6 +525,6 @@ test('nothing a person reads on the page is an id, a dash or a word about the li
     /* ONLY THE PLAN'S NAME IS FILLED, alone or as the plan a figure of the plan is asked about. */
     assert.equal(said.replace(/\{\{plan-[a-z-]+:\{\{name\}\}\}\}/g, '').replace(/\{\{name\}\}/g, '').includes('{{'), false, said);
   }
-  /* AND IT IS A SHORT PAGE: Money's own holds twenty-four blocks, and this adds none to it. */
-  assert.ok(blocks.length <= 8);
+  /* AND IT IS A SHORT PAGE, well inside the twenty-four blocks a page holds, and Money's own gains none from it. */
+  assert.ok(blocks.length <= 12);
 });

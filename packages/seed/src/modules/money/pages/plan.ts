@@ -26,24 +26,49 @@ const HAS_OPEN = { all: [HAS_PARTS, { metric: OPEN_PARTS, gte: 1 }] };
 const ALL_PAID = { all: [HAS_PARTS, { metric: OPEN_PARTS, lt: 1 }] };
 
 /**
+ * WHILE THE PROPERTY ADD-ON HOLDS THIS PLAN AS A FLAT OR A HOUSE: its figure of what the plan is worth now has a value.
+ * A record without the add-on has no such figure, and a `when:` naming a figure nobody declared never holds, so the
+ * sentence that sends to Property is said only where Property is.
+ */
+const A_PROPERTY = { metric: 'property-value-of:{{name}}', empty: false };
+
+/** Where Property's own page is, which lists each property with what it is worth and what is owned beyond what is left. */
+const TO_PROPERTY = '[Property](/p/properties) has what it is worth and your equity.';
+
+/** The columns every list of parts shares, in the order Property's lists draw them: the day, what it is, the amount. */
+const DUE = { field: 'due', label: 'Due', width: '13ch' };
+const WHAT = { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' };
+const AMOUNT = { field: 'amount', label: 'Amount', width: '15ch', align: 'end' };
+const LEFT_AFTER = { field: 'left_after', label: 'Left after', width: '15ch', align: 'end' };
+
+/** The lead of a plan with parts, said with the line to Property where the add-on holds the plan. */
+const lead = (when: unknown, body: string): Record<string, unknown> => ({
+  kind: 'note',
+  lead: true,
+  span: 12,
+  when,
+  says: [{ when: A_PROPERTY, body: `${body} ${TO_PROPERTY}` }, { body }],
+});
+
+/**
  * ONE PAGE A PLAN, UNDER MONEY, SINCE REC-B12 (jobs 3 and 4): an instalment plan has its own page. A TEMPLATE, as
  * a book's page is (`book.ts`): one declaration, one page for each plan, every `{{name}}` filled from it. A record
  * that keeps no plan has none of these pages and loses nothing, and Money's own page gains no block for it.
  *
- * WHAT IT SAYS IS "10 of 23 paid. E£176,500 left, the last part on 5 Oct 2036.", AS ONE LINE. It was four figures
- * under four words while a note's `{{figure}}` could not name which plan it was asked about; a note's hole now takes
- * the plan after a colon, as a tile's figure does (`figureAsked` in `packages/kernel/src/pages.ts`), and `{{name}}` is
- * filled before the figure is asked, so the sentence is the lead and the four are said once.
+ * LAID OUT AS THE PROPERTY ADD-ON'S PAGE OF A PLAN IS, SINCE money-core 3.29.0: where it stands, the parts paid as one
+ * track, what was paid in all by each quarter, then the parts to come and the parts paid. The next six parts are a
+ * list to tick, so a part due is marked paid where it is read, and every part still to come is folded under them, as
+ * Property folds them. Where Property holds the plan, the lead sends to it for what the plan is worth and the equity,
+ * which this page never says.
+ *
+ * THE LEAD IS ONE OF THREE SENTENCES: no part yet, a part still open (`HAS_OPEN`), and every part paid (`ALL_PAID`),
+ * which says nothing is left in words and never "0 left". Each waits on counts of parts, one number whatever currencies
+ * the parts are in. The amounts are the summary's: paid in, left and what is late in the late red, and the track says
+ * the next part, its amount and its day, under the parts paid. A cell whose figure has nothing to say is not drawn, so
+ * a plan all paid shows what was paid in alone.
  *
  * EVERY FIGURE IS COUNTED FROM THE PARTS (`figures/plans.ts`), so the page cannot disagree with Instalments, and a
- * cancelled part is in neither side. A tile is drawn only while its figures have something to say: a plan with no
- * part reads one sentence, and a plan all paid has no next part to show. THE LEAD SENTENCE WAITS FOR A PART TOO: a
- * figure of a plan that holds no value is not answered at all, so its braces would be left showing.
- *
- * THREE LEAD SENTENCES AND ONE DRAWN, SINCE BATCH 72: no part yet, a part still open (`HAS_OPEN`), and every part paid
- * (`ALL_PAID`), which reads "2 of 2 paid, and nothing is left. The last part was on 1 Feb 2027." and never "0 left".
- * In two currencies it is still one: a plan with any part open reads what is left, and only a plan with none reads
- * that nothing is.
+ * cancelled part is in neither side; it is listed under the fold, under its own word.
  */
 export const MONEY_PLAN_PAGE: SeedPage = {
   page: 'money-plan',
@@ -56,82 +81,123 @@ export const MONEY_PLAN_PAGE: SeedPage = {
   pack: 'money-core',
   blocks: [
     {
-      /* A PLAN NOBODY HAS GIVEN A PART: one sentence and what to do, in place of four figures of nought. */
+      /* A PLAN NOBODY HAS GIVEN A PART: one sentence and what to do, in place of figures of nought. */
       kind: 'note',
       lead: true,
       span: 12,
       when: { metric: 'plan-parts:{{name}}', lt: 1 },
       body: 'No part of {{name}} is on Instalments yet. Add its parts there with {{name}} as the plan, and this page counts them.',
     },
+    /* HOW MANY ARE PAID AND WHEN IT ENDS. The amounts are the summary's, under it, and said once. */
+    lead(HAS_OPEN, '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, the last due on {{plan-last-due:{{name}}}}.'),
+    lead(ALL_PAID, '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, and nothing is left. The last was due on {{plan-last-due:{{name}}}}.'),
     {
-      /* WHERE IT STANDS, IN THE OWNER'S OWN ORDER: how many are paid, what is left, and when it ends. */
-      kind: 'note',
-      lead: true,
+      /* THE SUMMARY: paid in, left, and what is late, which is red while it is not nought: the block's tone is bad, so a
+         figure off its line is drawn red and not amber. A cell with nothing to say is left out, so a plan all paid reads
+         paid in alone. */
+      kind: 'stat',
+      heading: 'Where it stands',
+      icon: 'wallet',
+      tone: 'bad',
       span: 12,
-      when: HAS_OPEN,
-      body: '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} paid. {{plan-left:{{name}}}} left, the last part on {{plan-last-due:{{name}}}}.',
+      when: HAS_PARTS,
+      cells: [
+        { metric: 'plan-paid:{{name}}', label: 'Paid in' },
+        { metric: 'plan-left:{{name}}', label: 'Left' },
+        { metric: 'plan-late:{{name}}', label: 'Late', note: 'Past its day' },
+      ],
     },
     {
-      /* A PLAN ALL PAID, SINCE BATCH 72: it read "2 of 2 paid. 0 left", a nought with no currency to be written in,
-         because no open part is added up. It says nothing is left in words, and the day it ended as a day gone. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: ALL_PAID,
-      body: '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} paid, and nothing is left. The last part was on {{plan-last-due:{{name}}}}.',
-    },
-    {
-      /* ONE TRACK, THE PARTS PAID AGAINST EVERY PART THAT STANDS, read off the list's own status; Money's
-         Instalments tile reads the same two counts from its two figures by plan, so "2 of 6" here is "2 of 6" there. */
+      /* ONE TRACK, THE PARTS PAID AGAINST EVERY PART THAT STANDS, AND THE NEXT PART UNDER IT, as Money's Instalments tile
+         draws each plan from the same five figures cut to one plan: "10 of 40", then "Next EGP 120,000 on 28 Nov", or the
+         part late in the late red. The amount is what is left less what is left once that part is paid, worked out by
+         the app, so no figure subtracts two currencies. */
       kind: 'progress',
       heading: 'Parts paid',
       icon: 'credit-card',
       span: 12,
-      source: 'register.installments',
-      where: `${PARTS}, state is not cancelled`,
-      columns: [{ field: 'plan' }, { field: 'state' }],
+      cells: [
+        { metric: 'plan-parts-paid-by-plan:{{name}}', label: 'Paid' },
+        { metric: 'plan-parts-by-plan:{{name}}', label: 'Parts' },
+        { metric: 'plan-next-due-by-plan:{{name}}', label: 'Next due' },
+        { metric: 'plan-left-by-plan:{{name}}', label: 'Left' },
+        { metric: 'plan-after-next-by-plan:{{name}}', label: 'Left after' },
+      ],
       when: HAS_PARTS,
       empty: 'No part of {{name}} is on Instalments yet.',
     },
     {
-      /* ONLY ONCE A PART IS PAID: an amount of nought has no currency to be written in. */
-      kind: 'stat',
-      heading: 'Paid so far',
-      icon: 'wallet',
-      span: 6,
+      /* WHAT WAS PAID IN ALL BY EACH QUARTER, the quarters before the chart's first in it too: a running line over what
+         was paid each quarter, under the heading Property's chart has. Only once a part is paid. */
+      kind: 'series',
+      heading: 'Paid in all, over time',
+      icon: 'chart-column',
+      span: 12,
+      series: [{ metric: 'plan-paid-by-quarter:{{name}}', label: 'Paid in all', running: true }],
+      back: 24,
       when: { metric: 'plan-parts-paid:{{name}}', gt: 0 },
-      cells: [{ metric: 'plan-paid:{{name}}', label: 'Paid so far' }],
+      empty: 'Nothing is paid on {{name}} yet.',
     },
     {
-      /* ONLY WHILE A PART IS STILL OPEN: a plan all paid has no next day, and the tile goes with it. */
-      kind: 'stat',
-      heading: 'Next part',
+      /* THE NEXT SIX PARTS, A LIST TO TICK: a tick marks a part paid where it is read, with its Undo, as a bill is on
+         Coming up. Its day and amount are one quiet line under it; a note on the part, where it has one, is the line
+         between. */
+      kind: 'todo',
+      heading: 'Upcoming',
       icon: 'calendar-clock',
-      span: 6,
-      when: { metric: 'plan-next-due:{{name}}', empty: false },
-      cells: [{ metric: 'plan-next-due:{{name}}', label: 'Due' }],
+      span: 12,
+      source: 'register.installments',
+      where: `${PARTS}, state is open`,
+      columns: [{ field: 'what' }, { field: 'note' }, { field: 'due' }, { field: 'amount' }],
+      order: [{ field: 'due', dir: 'asc' }],
+      limit: 6,
+      empty: 'Nothing is left to pay on {{name}}.',
     },
     {
-      /* EVERY PART, THE EARLIEST FIRST, cancelled ones too under their own word. Paid by is the one payment that paid
-         a part (REC-B11) and Left after is what the plan still owes once this part is paid, both written by Money's
-         scripts and never typed. 120 is ten years of months; a longer plan says how many more there are. */
+      /* THE PARTS PAID, THE LATEST FIRST, with the day each was paid and the payment that paid it (REC-B11). */
       kind: 'table',
-      heading: 'Parts',
+      heading: 'Paid',
       icon: 'receipt',
       span: 12,
       source: 'register.installments',
-      where: PARTS,
-      columns: [
-        { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-        { field: 'due', label: 'Due', width: '13ch', align: 'end' },
-        { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
-        { field: 'state', label: 'Status', width: '11ch' },
-        { field: 'paid_by', label: 'Paid by', width: 'minmax(10ch,18ch)' },
-        { field: 'left_after', label: 'Left after', width: '15ch', align: 'end' },
-      ],
+      where: `${PARTS}, state is paid`,
+      columns: [DUE, WHAT, AMOUNT, { field: 'settled', label: 'Paid on', width: '13ch' }, { field: 'paid_by', label: 'Paid by', width: 'minmax(10ch,18ch)' }],
+      order: [{ field: 'due', dir: 'desc' }],
+      limit: 120,
+      empty: 'No part of {{name}} is paid yet.',
+    },
+    {
+      /* EVERY PART STILL TO COME, FOLDED, as Property folds them: the six above are the ones a person acts on. */
+      kind: 'section',
+      heading: 'Every part still to come',
+      icon: 'calendar-clock',
+      span: 12,
+      fold: true,
+    },
+    {
+      /* LEFT AFTER is what the plan still has to pay once this part is paid, written by Money's script and never typed.
+         120 is ten years of months. */
+      kind: 'table',
+      span: 12,
+      source: 'register.installments',
+      where: `${PARTS}, state is open`,
+      columns: [DUE, WHAT, AMOUNT, LEFT_AFTER],
       order: [{ field: 'due', dir: 'asc' }],
       limit: 120,
-      empty: 'No part of {{name}} is on Instalments yet.',
+      empty: 'Nothing is left to pay on {{name}}.',
+    },
+    {
+      /* A CANCELLED PART IS COUNTED NOWHERE and still listed, under its own heading, so nobody wonders where it went. */
+      kind: 'table',
+      heading: 'Cancelled',
+      icon: 'calendar-x',
+      span: 12,
+      source: 'register.installments',
+      where: `${PARTS}, state is cancelled`,
+      columns: [DUE, WHAT, AMOUNT],
+      order: [{ field: 'due', dir: 'asc' }],
+      limit: 120,
+      when: { metric: 'plan-parts-cancelled:{{name}}', gte: 1 },
     },
   ],
 };

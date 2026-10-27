@@ -2072,8 +2072,10 @@ const DECLARED: Record<string, Version> = {
       metric.leaving-30d metric.ledger-in-no-book metric.ledger-newest-days metric.ledger-rows-7d metric.left-month
       metric.lines-by-account metric.net-by-month metric.nights-missed-30d metric.out-30d metric.out-ahead-by-month
       metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-to-you metric.paid-last-by-payee
-      metric.paid-times-by-payee-90d metric.payees-paid-90d metric.plan-last-due metric.plan-left metric.plan-next-due
-      metric.plan-paid metric.plan-parts metric.plan-parts-open metric.plan-parts-paid metric.project-in-by-month
+      metric.paid-times-by-payee-90d metric.payees-paid-90d metric.plan-after-next-by-plan metric.plan-last-due metric.plan-late
+      metric.plan-left metric.plan-left-by-plan metric.plan-next-due metric.plan-next-due-by-plan metric.plan-paid metric.plan-paid-by-quarter
+      metric.plan-parts metric.plan-parts-by-plan metric.plan-parts-cancelled metric.plan-parts-open metric.plan-parts-paid
+      metric.plan-parts-paid-by-plan metric.project-in-by-month
       metric.project-in-month metric.project-kept-month metric.project-out-by-month metric.project-out-month metric.project-owed
       metric.received-30d metric.received-7d metric.received-month metric.repeating-in-no-book metric.repeating-overdue
       metric.rule-filed metric.rules-filing metric.rules-filing-30d metric.runs-out-on metric.runway-days metric.settled-in-7d
@@ -2095,12 +2097,13 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'fc0797c342345df5',
+    declares: 'cba568698b10ef25',
     history: [
       'Money 3.29.0: Money is a section, with `page.money-accounts`, `page.money-ledger`, `page.money-budgets`, `page.money-coming`, `page.money-forecast`, `page.money-reports` and `page.money-payees` under it, each its line alone, and `register.categories` gains `icon`, `colour`, `budget_alert`, `rollover` and `parent` -> cd223ca9d727a38b',
       'Money 3.29.0, the rest of the section: the home leads with one hero and Coming up, the pages are filled, `script.offer_budgets` offers budgets from last month, and `metric.payees-paid-90d`, `metric.account-now` and the other figures the pages read come with it, and Coming up and Forecast draw each list the whole row -> c39958b1099af6a1',
       'Money 3.29.0, polish: Coming up adds what is left every month (`metric.every-month-net`), the home goes red under nothing and says how old its rate is -> 9f6db23eb5f872a2',
       'Money 3.29.0 takes 3.27.1 in: `script.book_from_account` and `script.plans_from_names` read each list in row number order -> fc0797c342345df5',
+      'Money 3.29.0, a plan\'s page laid out as Property\'s: where it stands with what is late, one track with the next part under it as Money\'s Instalments tile draws it (five figures of one plan by plan, `metric.plan-parts-paid-by-plan` to `metric.plan-after-next-by-plan`), what was paid in all by each quarter (`metric.plan-paid-by-quarter`, a running line), the next six parts to tick and the parts paid, the rest folded; `metric.plan-late` and `metric.plan-parts-cancelled` added -> cba568698b10ef25',
     ],
   },
   'work@1.17.0': {
