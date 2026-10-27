@@ -423,6 +423,8 @@ importers:
 
   packs/card-alerts: {}
 
+  packs/certificates: {}
+
   packs/count-cash: {}
 
   packs/dates: {}
