@@ -417,9 +417,12 @@ test('the catalogue this app ships lists every pack in packs/, at its version, b
 });
 
 /** The tool run over a folder of packs into a catalogue folder: its exit code and everything it said. */
+/* A RUN WITHOUT `--check` WRITES, whatever the runner sets: the tool checks rather than writes where `CI` is set. */
+const { CI: _ci, ...plainEnv } = process.env;
+
 function run(packs: string, to: string, ...flags: string[]): { code: number; said: string } {
   try {
-    return { code: 0, said: execFileSync(process.execPath, [TOOL, '--packs', packs, '--to', to, ...flags], { encoding: 'utf8', stdio: 'pipe' }) };
+    return { code: 0, said: execFileSync(process.execPath, [TOOL, '--packs', packs, '--to', to, ...flags], { encoding: 'utf8', stdio: 'pipe', env: plainEnv }) };
   } catch (e) {
     const x = e as { status?: number; stdout?: string; stderr?: string };
     return { code: x.status ?? 1, said: `${x.stdout ?? ''}${x.stderr ?? ''}` };

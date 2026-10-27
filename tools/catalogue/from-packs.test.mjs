@@ -24,7 +24,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = join(ROOT, 'tools', 'catalogue', 'from-packs.mjs');
 
 const scratch = () => mkdtempSync(join(tmpdir(), 'from-packs-'));
-const run = (packs, to) => spawnSync(process.execPath, [SCRIPT, '--packs', packs, '--to', to], { encoding: 'utf8' });
+/* A RUN THAT WRITES, whatever the runner sets: the tool checks rather than writes where `CI` is set, and a runner sets it. */
+const { CI: _ci, ...env } = process.env;
+const run = (packs, to) => spawnSync(process.execPath, [SCRIPT, '--packs', packs, '--to', to], { encoding: 'utf8', env });
 const indexOf = (to) => {
   const read = readCatalogue(JSON.parse(readFileSync(join(to, 'index.json'), 'utf8')));
   assert.ok(read.ok, 'the index written reads back');
