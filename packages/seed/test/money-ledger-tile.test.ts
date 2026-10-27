@@ -162,7 +162,8 @@ test('ADD A MOVEMENT IS DECLARED AND WAITS: one line cannot say an amount, an ac
   const typed = k.create('transactions', { what: 'Coffee beans', on: day(0), direction: 'out', amount: { amount: 0, currency: 'GBP' }, state: 'cleared' } as never, { actor: 'p_test' });
   assert.equal(typed.ok, false, 'the Ledger takes an entry with no account now: place ADD_MOVEMENT');
   assert.match(sayOf(typed), /account/iu);
-  assert.equal(declared.length, 24, 'Money has room now: place ADD_MOVEMENT under the Ledger once a capture can ask for an account');
+  /* THE PAGE HAS ROOM SINCE money-core 3.29.0, a page per job, so the one reason left is the account a line cannot give: a
+     movement is added from the sheet the app opens, which asks for one. */
   assert.ok(!declared.some((b) => b.kind === 'capture' && b.register === 'transactions'), 'Add a movement is on the page: say so here and in parts/ledger.ts');
 });
 

@@ -114,7 +114,7 @@ test('THREE FULL MONTHS OF CLEARED SPENDING SHORTEN IT: the everyday leg is in t
 
 /* THE LASTS TILE SAYS IT, SINCE THE UI PASS OF 20 OCTOBER (money F3), beside the day on what is due, and the lead says
    what there is: the two answers to how long it lasts stood a screen apart, one in the line and one in the tile. */
-test('MONEY\'S LASTS TILE SAYS IT, and the one line drawn says what there is and that it lasts the year', async () => {
+test('MONEY\'S HERO SAYS IT, and the one line drawn says where the money is kept and that it lasts the year', async () => {
   const { k } = await lived();
   type Drawn = { kind: string; heading?: string; lead?: boolean; drawn?: boolean; body?: string; values?: Record<string, unknown>; cells?: { metric: string }[] };
   const blocks = value<{ blocks: Drawn[] }>(k.page('money')).blocks;
@@ -123,11 +123,12 @@ test('MONEY\'S LASTS TILE SAYS IT, and the one line drawn says what there is and
   /* AND THE PART THAT IS LATE AFTER IT, since money-core 3.18.0, a sentence the app leaves out while none is. */
   assert.equal(
     leads[0]!.body,
-    "Cash is {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.",
+    'Kept in {{cash-by-account.groups}} account(s), and on what is due it lasts the year. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.',
   );
   assert.equal(leads[0]!.values?.['lasts-no-income'], undefined, 'the line says it again');
-  /* ONE FIGURE SINCE money-core 3.27.0, with the day it ends on in the sentence under it: the line says it lasts the year
-     on what is due, so the tile no longer says "Lasts past" beside it. */
-  assert.deepEqual(blocks.find((b) => b.heading === 'Lasts')?.cells?.map((c) => c.metric), ['lasts-no-income']);
+  /* THE HERO SAYS IT SINCE money-core 3.29.0, as the cell after the day it runs out on what is due, with the day it ends
+     on in the sentence under it; the line says it lasts the year on what is due, so no cell says "Lasts past" beside it. */
+  const hero = blocks.find((b) => b.kind === 'stat' && b.lead === true);
+  assert.ok(hero?.cells?.some((c) => c.metric === 'lasts-no-income'), 'the hero does not say how long it lasts with nothing coming in');
   assert.equal(reading(k, 'lasts-no-income').value, 68);
 });

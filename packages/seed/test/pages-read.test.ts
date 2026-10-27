@@ -20,6 +20,7 @@ import type { Param, Row, Sql } from '@braindog/ports';
 import { refused, sayOf } from '@braindog/ports';
 
 import { NOW, PAGES, REGISTERS, RUNS, THINGS, installSeed } from '../src/index.ts';
+import { readCashAhead } from './money-walk-page.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -210,10 +211,11 @@ test('EVERY BLOCK ON THE MONEY PAGE DRAWS, including the one about the future', 
   const refused = money.blocks.filter((b) => b.refusals.length > 0);
   assert.deepEqual(refused.map((b) => `${b.heading}: ${b.refusals[0]?.fix}`), []);
 
-  const walk = money.blocks.find((b) => b.source === 'forecast.runway')!;
-  assert.ok(walk.walk, 'the cash walk did not run');
-  assert.ok(walk.walk.steps.length > 0, 'the walk found no movements');
-  assert.equal(walk.walk.currency, 'GBP');
+  /* THE FUTURE IS THE HERO'S SINCE money-core 3.29.0: Cash now's cell carries the walk ahead, a balance a day. */
+  const cash = money.blocks.find((b) => b.kind === 'stat' && b.lead === true)?.readings?.find((c) => c.metric === 'cash-now');
+  assert.ok(cash?.ahead, 'the cash walk did not run');
+  assert.ok((cash.trend ?? []).length > 1, 'the walk found no days');
+  assert.equal(cash.ahead.currency, 'GBP');
   sql.close();
 });
 
@@ -309,14 +311,17 @@ test('THE MONEY PAGE READS WHOLE ON A RECORD, and every walk on it starts from C
 
   const cash = k.metric(k.metricDecl('cash-now')!);
   assert.ok(cash.ok && cash.value.value !== null);
-  const walks = money.blocks.filter((b) => b.source === 'forecast.runway');
-  assert.deepEqual(walks.map((b) => b.kind), ['forecast']);
-  for (const walk of walks) assert.equal(walk.walk?.from, cash.value.value, `${walk.kind} does not start from Cash now`);
+  /* NO CHART WALKS ON THE HOME SINCE money-core 3.29.0: the hero draws the walk small, today first, from Cash now. */
+  assert.deepEqual(money.blocks.filter((b) => b.source === 'forecast.runway').map((b) => b.kind), []);
+  const hero = money.blocks.find((b) => b.kind === 'stat' && b.lead === true)?.readings?.find((c) => c.metric === 'cash-now');
+  assert.equal(hero?.reading?.value, cash.value.value, 'the hero does not say Cash now');
+  assert.ok(hero?.ahead && hero.ahead.low.value <= cash.value.value, 'the walk ahead does not start from Cash now');
 
-  /* A REPEATING ROW IS SPENT EVERY TIME IT COMES ROUND: the rent appears in each month of the forecast's walk. */
-  const forecast = walks.find((b) => b.kind === 'forecast')!;
+  /* A REPEATING ROW IS SPENT EVERY TIME IT COMES ROUND: the rent appears in each month of Cash ahead's walk. */
+  const forecast = readCashAhead(k);
   const rent = forecast.walk!.steps.filter((s) => s.label === 'Studio rent');
   assert.ok(rent.length >= 11, `the rent came round ${rent.length} times in a year`);
+  assert.equal(forecast.walk!.from, cash.value.value, 'Cash ahead does not start from Cash now');
 
   const accounts = money.blocks.find((b) => b.source === 'metric.cash-by-account')!;
   assert.equal(accounts.readings?.[0]?.reading?.groups?.length, 2);

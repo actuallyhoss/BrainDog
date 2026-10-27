@@ -24,6 +24,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, day, firstPartyDocument } from '../src/index.ts';
 import { MONEY_PAGES } from '../src/modules/money.ts';
 import { MONEY_BOOK_PAGE } from '../src/modules/money/pages/book.ts';
+import { CASH_AHEAD, readCashAhead } from './money-walk-page.ts';
 
 const OWNER = { actor: 'p_1' };
 /** Twelve weeks (ten until money-core 3.27.0), then every longer length the knob offers. */
@@ -83,19 +84,19 @@ function drawn(k: Kernel, slug: string): Ahead {
   return ahead;
 }
 
-test('BOTH PAGES DECLARE TEN WEEKS FIRST, every longer length after it, and a fitted axis', () => {
-  for (const page of ['money', MONEY_BOOK_PAGE.page]) {
-    const ahead = declared(page);
-    assert.equal(ahead.horizon, 84, `${page} opens on twelve weeks`);
-    assert.deepEqual(ahead.horizons, WINDOWS, `${page}'s knob offers twelve weeks and every longer length`);
-    assert.equal(ahead.axis, 'fit', `${page}'s axis fits the walk`);
+test('MONEY AND A BOOK DECLARE TWELVE WEEKS FIRST, every longer length after it, and a fitted axis', () => {
+  /* MONEY'S WALK IS ONE DECLARATION WHEREVER A PAGE PLACES IT (`parts/forecast.ts`), since its home leads with the hero. */
+  for (const [name, ahead] of [['Money', CASH_AHEAD as Ahead], [MONEY_BOOK_PAGE.page, declared(MONEY_BOOK_PAGE.page)]] as const) {
+    assert.equal(ahead.horizon, 84, `${name} opens on twelve weeks`);
+    assert.deepEqual(ahead.horizons, WINDOWS, `${name}'s knob offers twelve weeks and every longer length`);
+    assert.equal(ahead.axis, 'fit', `${name}'s axis fits the walk`);
   }
 });
 
 test('A FRESH RECORD INSTALLS THEM, and Money and a book both answer a walk that opens on 84 days', async () => {
   const k = await fresh();
   /* WHAT THE RECORD HOLDS, not only what the seed says: the page as installed opens on twelve weeks. */
-  for (const id of ['money', MONEY_BOOK_PAGE.page]) {
+  for (const id of [MONEY_BOOK_PAGE.page]) {
     const decl = k.declarations().find((d) => d.id === `page.${id}`);
     assert.ok(decl, `the record holds no ${id} page`);
     const ahead = (JSON.parse(decl.body) as { blocks: Ahead[] }).blocks.find((b) => b.kind === 'forecast' && b.heading === 'Cash ahead')!;
@@ -104,8 +105,7 @@ test('A FRESH RECORD INSTALLS THEM, and Money and a book both answer a walk that
 
   const found = (k.pages() as unknown as { slug: string; title: string; template: string | null }[]).find((p) => p.template === MONEY_BOOK_PAGE.page && p.title === 'Studio');
   assert.ok(found, 'Studio has a page of its own');
-  for (const slug of ['money', found.slug]) {
-    const ahead = drawn(k, slug);
+  for (const [slug, ahead] of [['Money', readCashAhead(k) as unknown as Ahead], [found.slug, drawn(k, found.slug)]] as const) {
     assert.equal(ahead.walk?.horizon, 84, `${slug} opens on twelve weeks`);
     /* THE LONGER LENGTHS STAY IN REACH: a load walks past the opening, and never past two years and a day unasked. */
     const reach = ahead.walk?.reach ?? 0;
@@ -115,7 +115,7 @@ test('A FRESH RECORD INSTALLS THEM, and Money and a book both answer a walk that
 
 test('FIVE YEARS IS STILL ONE PRESS AWAY, and the walk still opens on twelve weeks', async () => {
   const k = await fresh();
-  const asked = drawn({ page: (slug: string) => k.page(slug, undefined, { walk: 1825 }) } as unknown as Kernel, 'money');
+  const asked = readCashAhead(k, { walk: 1825 }) as unknown as Ahead;
   assert.equal(asked.walk?.horizon, 84, 'it still opens on twelve weeks');
   assert.ok((asked.walk?.reach ?? 0) >= 1825, `five years asked for walks ${String(asked.walk?.reach)} days`);
 });

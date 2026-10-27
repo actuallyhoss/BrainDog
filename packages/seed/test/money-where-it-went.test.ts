@@ -1,6 +1,7 @@
 /**
- * MONEY'S WHERE IT WENT (PGS-C20 job 3): a folded heading at the end of Money over this month as shares of what it was
- * for, and who was paid in what nobody has filed, read off the declaration and then off the page a fresh record draws.
+ * WHERE IT WENT (PGS-C20 job 3): this month as shares of what it was for, and who was paid in what nobody has filed, read
+ * off the declaration and then off each block a fresh record draws. Money's home no longer places them (money-core
+ * 3.29.0: its Spent this month carries the part nobody filed); the file stays for the pages that do.
  *
  * Unfiled entries grouped by merchant, with bars and each one's share. RED FIRST, against money.ts before this change: no
  * block on Money was headed Where it went, and nothing on any page drew the entries with no category by who was paid.
@@ -10,13 +11,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
-import { openRecord, type Entry, type Kernel } from '@braindog/kernel';
+import { openRecord, type Entry, type Kernel, type PageBlock } from '@braindog/kernel';
 import { sayOf } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { BANKS, COMPANIES } from '../../../fixtures/names.ts';
 import { METRICS, firstPartyDocument } from '../src/index.ts';
-import { MONEY_PAGE } from '../src/modules/money/pages/money.ts';
 import { WHERE_IT_WENT } from '../src/modules/money/pages/parts/where-it-went.ts';
 
 type When = { metric?: string; gt?: number; gte?: number; lt?: number };
@@ -31,8 +31,7 @@ type Drawn = {
   wholeRead?: { rows: WholeRow[]; total: number | null };
 };
 
-const BLOCKS = MONEY_PAGE.blocks as readonly Declared[];
-const at = (heading: string): number => BLOCKS.findIndex((b) => b.heading === heading);
+const BLOCKS = WHERE_IT_WENT as unknown as readonly Declared[];
 
 /** 20 October, so every entry below is this month and the last 91 days. */
 const TODAY = Date.UTC(2026, 9, 20, 12);
@@ -112,34 +111,24 @@ const FILED = 4_200 + 1_800 + 2_600 + 12_000 + 3_400 + 900 + 5_100;
 const UNFILED = 4_000 + 3_000 + 2_000 + 1_500 + 1_000;
 
 function drawn(k: Kernel): Drawn[] {
-  const blocks = value<{ blocks: Drawn[] }>(k.page('money')).blocks;
-  for (const heading of WHERE_IT_WENT.map((b) => b.heading as string)) {
-    const b = blocks.find((x) => x.heading === heading);
-    assert.ok(b, `Money draws no block headed ${heading}`);
-    assert.deepEqual(b.refusals, [], `${heading} is refused`);
-  }
+  const blocks = WHERE_IT_WENT.map((b) => k.block(b as unknown as PageBlock) as unknown as Drawn);
+  for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} is refused`);
   return blocks;
 }
 const of = (blocks: Drawn[], heading: string): Drawn => blocks.find((b) => b.heading === heading)!;
 
-test('WHERE IT WENT IS THE LAST OF MONEY, a folded heading over the split and the bar, and the page is 24 blocks at the most', () => {
-  assert.ok(BLOCKS.length <= 24, `Money declares ${BLOCKS.length} blocks, and a page declares 24 at the most`);
-  const section = at('Where it went');
-  assert.equal(section, BLOCKS.length - 3, 'Where it went is not the last three blocks of Money');
-  assert.equal(section, at('Every month, by category') + 1, 'Where it went does not follow Every month, by category');
+test('WHERE IT WENT IS A FOLDED HEADING OVER THE SPLIT AND THE BAR, as a page places it', () => {
   assert.deepEqual(
-    BLOCKS.slice(section).map((b) => [b.kind, b.heading]),
+    BLOCKS.map((b) => [b.kind, b.heading]),
     [
       ['section', 'Where it went'],
       ['split', 'This month, by category'],
       ['bar', 'No category yet, by who was paid'],
     ],
   );
-  const [heading, split, bar] = BLOCKS.slice(section) as [Declared, Declared, Declared];
-  /* FOLDED, AND THE FIRST FOLD ON THE PAGE, so what stands before it is what stood there. */
+  const [heading, split, bar] = BLOCKS as [Declared, Declared, Declared];
   assert.equal(heading.fold, true, 'Where it went is open');
   assert.notEqual(heading.box, true, 'Where it went is a box');
-  assert.equal(BLOCKS.findIndex((b) => b.kind === 'section' && b.fold === true), section, 'another heading folds before Where it went');
   assert.deepEqual(heading.when, { metric: 'cash-accounts', gt: 0 });
   /* THE SPLIT, over the figure already declared, its hole named. */
   assert.deepEqual([split.source, split.unset, split.when], ['metric.spent-by-category-month', 'No category yet', { metric: 'spent-by-category-month', gt: 0 }]);
@@ -152,30 +141,10 @@ test('WHERE IT WENT IS THE LAST OF MONEY, a folded heading over the split and th
   assert.equal(bar.limit, 8);
 });
 
-test('THE TILES BEFORE THE FOLD ARE SIX AT THE MOST, counted as `money-page.test.ts` counts them', () => {
-  const leads = BLOCKS.filter((b) => b.lead && b.when !== undefined).map((b) => b.when!);
-  const standsIn = (b: Declared): boolean =>
-    b.when !== undefined && (b.when.lt !== undefined || leads.some((w) => w.metric === b.when!.metric && w.lt !== undefined && b.when!.gte === w.lt));
-  const main = BLOCKS.filter((b) => b.area !== 'rail');
-  const fold = main.findIndex((b) => b.kind === 'section' && b.fold === true);
-  assert.ok(fold > 0, 'Money has no fold');
-  let boxed = false;
-  const above = main.slice(0, fold).filter((b) => {
-    if (b.kind === 'section') {
-      boxed = b.box === true;
-      return boxed;
-    }
-    return !boxed && !b.lead && !standsIn(b);
-  });
-  assert.ok(above.length <= 6, `Money stands ${above.length} tiles before its fold: ${above.map((b) => b.heading).join(', ')}`);
-  assert.ok(!above.some((b) => WHERE_IT_WENT.some((w) => w.heading === b.heading)), 'a block of Where it went stands before the fold');
-});
-
 test('A FRESH RECORD WITH AN ACCOUNT AND NOTHING SPENT draws neither block, and no heading over nothing', async () => {
   const r = await fresh();
   const blocks = drawn(r.k);
   /* A HEADING WHOSE BLOCKS ARE ALL SHUT IS SHUT WITH THEM (`emptyBoxesShut`), so the fold says nothing it cannot open. */
-  assert.equal(of(blocks, 'Where it went').drawn, false, 'Where it went is drawn over nothing');
   assert.equal(of(blocks, 'This month, by category').drawn, false, 'the split is drawn over a month with nothing spent');
   assert.equal(of(blocks, 'No category yet, by who was paid').drawn, false, 'the bar is drawn with nothing unfiled');
 });
@@ -185,7 +154,6 @@ test('TWELVE ENTRIES THIS MONTH, FIVE UNFILED: the split holds the month with No
   twelve(r);
   assert.equal(reading(r.k, 'txn-uncategorised'), 5);
   const blocks = drawn(r.k);
-  assert.notEqual(of(blocks, 'Where it went').drawn, false, 'Where it went is shut over a month with spending');
 
   const split = of(blocks, 'This month, by category');
   assert.notEqual(split.drawn, false, 'the split is not drawn over a month with spending');

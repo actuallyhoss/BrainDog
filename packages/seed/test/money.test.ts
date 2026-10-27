@@ -26,6 +26,7 @@ import { MONEY_METRICS, MONEY_PAGES, MONEY_TARGET_SETTINGS, nightOf } from '../s
 import { BUDGET } from '../src/modules/money/pages/parts/budget.ts';
 import { SPENDING } from '../src/modules/money/pages/parts/spending.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
+import { CASH_AHEAD, readCashAhead } from './money-walk-page.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -357,18 +358,16 @@ test('THE WHOLE BOOK YOU OWE IS A FIGURE NOW, and it is the receivable one with 
 /* ── every list that holds a dated amount is in the cash walk ────────────── */
 
 /**
- * The money page's walk, read off the declaration rather than retyped here.
+ * Cash ahead's walk, which Money declares for the pages that place it, read off the declaration rather than retyped here.
  *
  * THE DEFECT BELOW WAS A MISSING ENTRY IN `from:`, so a test carrying its own copy of the legs could
  * not have seen it: it would have walked the four legs it wrote down and reported a healthy runway
  * while the page on screen walked two.
  */
 const cashWalk = (): { from: Leg[]; horizon: number } => {
-  const blocks = PAGES.money!.blocks as readonly { kind?: string; from?: unknown; horizon?: unknown }[];
-  const block = blocks.find((b) => b.kind === 'forecast');
-  assert.ok(block, 'the money page draws a cash walk');
-  assert.ok(Array.isArray(block.from) && typeof block.horizon === 'number', 'and the walk names its legs and its horizon');
-  return { from: block.from as Leg[], horizon: block.horizon as number };
+  const block = CASH_AHEAD;
+  assert.ok(Array.isArray(block.from) && typeof block.horizon === 'number', 'the walk names its legs and its horizon');
+  return { from: block.from as Leg[], horizon: block.horizon };
 };
 
 /** What one leg of a walk moves over the horizon, in minor units, and how many steps it moves it in. */
@@ -496,12 +495,13 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
   /* THE COUNTS ARE ASSERTED BECAUSE A SWEEP THAT FINDS NOTHING PASSES EVERY LOOP BELOW IT: the walk's two tiles on
      `/p/money`, and the same two on each of the founder's Overview and Dashboard, which since founder 1.7.0 lead with
      the money there is and no longer with who owes whom. */
-  /* ONE ON `/p/money` SINCE money-core 3.27.0, what goes out in the next thirty days under Every month, in the walk's
+  /* THE HERO'S TWO SINCE money-core 3.29.0, the walk's own words, where there was one (leaving) under Every month on
+     `/p/money` from 3.27.0: what goes out in the next thirty days under Every month, in the walk's
      own words, as Today's money tile says it: none from 3.3.0, when the bridge said the thirty days there, and the
      bridge has been off Money since. */
   assert.deepEqual(
     cells.filter((c) => c.where === 'money-core /money').map((c) => [c.metric, c.label]),
-    [['leaving-30d', 'Going out, 30 days']],
+    [['arriving-30d', 'Coming in, 30 days'], ['leaving-30d', 'Going out, 30 days']],
     'the Money page says the thirty days twice again',
   );
   /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0, which drew the walk's two under the cash
@@ -703,66 +703,33 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.ok(!(page.requires as string[]).includes('register.people'), 'Money needs People again');
   const headings = (page.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.deepEqual(headings, [
-    /* THE HEADLINE LINE, which carries no heading: it is the sentence in the page's headline tile. */
+    /* THE LINE, WHICH CARRIES NO HEADING: it is the sentence in the page's headline tile, in three forms, one of which a
+       record draws: where the money is kept, the same ending on the year, and the line for two books. */
     undefined,
-    /* THE SAME LINE ENDING ON THE YEAR, SINCE money-core 3.17.0 (money-lasts-line-78): drawn in its place while the
-       money lasts, so one of the two is read. */
     undefined,
-    /* AND THE LINE A RECORD WITH TWO BOOKS OPENS ON, SINCE money-core 3.17.0: how many books and accounts, and no sum. */
     undefined,
-    'What you have, by book',
     'Add an account',
-    'Cash ahead',
-    /* THE SIDE COLUMN, SINCE money-core 3.11.0: how long the money lasts and where it sits, beside the walk. The
-       questions went to Decide (REC-B23 step 7). */
-    'Lasts',
-    /* AND RUNS OUT, IN ITS PLACE WHILE THE CASH IS BELOW NOUGHT, SINCE THE UI PASS OF 20 OCTOBER: the box below made room. */
-    'Runs out',
+    /* THE HERO, SINCE money-core 3.29.0: Cash now with the walk ahead drawn small, and the four answers under it. */
+    undefined,
+    /* THE BOARD, in pairs: what comes up, what was spent this month, the accounts and the Ledger, then the plans paid in parts. */
+    'Coming up',
+    'Spent this month',
     'Accounts',
-    /* THE CHECK, DRAWN SINCE cash-page-54 (REC-A17): one tile while the two ways of adding cash up disagree. The line
-       it drew while no balance is typed went for the lead above: Money is at the most blocks a page declares. */
-    'Cash now does not add up',
-    /* THE LEDGER, OPEN, SINCE ledger-tile-59 (REC-B15): the six newest entries in a tile of their own, before the boxed
-       Heads up, where twelve were folded under History as What moved. */
     'Ledger',
-    /* ONE TILE OF THREE LINES, SINCE money-core 3.5.0: an old balance, money late coming in and money late going out,
-       each a note with no heading of its own under one boxed section. */
-    /* IN THE SIDE COLUMN SINCE THE UI PASS OF 20 OCTOBER, each line ending on its one way to act. The box to say what
-       one account holds today (money-core 3.16.0) went: the old balance's line says Update balances, the same form. */
-    'Heads up',
-    undefined,
-    undefined,
-    undefined,
-    /* WHAT COMES IN AND GOES OUT IS OPEN, ONE TILE, SINCE money-core 3.11.0, and what already happened is folded under
-       History. One view of the month is kept of three (3.4.0). */
-    'Coming and going',
-    /* NO WALK OF THE NEXT THIRTY DAYS, SINCE REC-B23: it was Cash ahead's arithmetic again, so the calendar of them
-       opens the tile. WITH NO HEADING OF ITS OWN SINCE money-core 3.21.0 (the audit of 25 October, Z18): two headings
-       stood one over the other. */
-    undefined,
     'Instalments',
-    /* THE MONTHS BEHIND, OPEN UNDER COMING AND GOING: the folded History heading stood over this one chart and went
-       to make room, and Being chased went with it. */
-    'In and out, by month',
-    /* WHAT REPEATS, SINCE REC-B23: in and out every month, after the chart whose months ahead it is. */
-    'Every month',
-    /* AND WHAT THE REPEATING COSTS ARE FOR, ONE BAR A CATEGORY, SINCE REC-B23 step 7, in the block the questions gave up. */
-    'Every month, by category',
-    /* WHERE IT WENT, FOLDED AT THE END, SINCE money-where-it-went-100 (PGS-C20). */
-    'Where it went',
-    'This month, by category',
-    'No category yet, by who was paid',
+    /* HEADS UP CLOSES THE PAGE: whether Cash now adds up, then its lines, each ending on its one way to act. */
+    'Heads up',
+    'Cash now does not add up',
+    undefined,
+    undefined,
+    undefined,
   ]);
-  /* WHAT STANDS BESIDE THE WALK, AND WHAT IS FOLDED. */
+  /* NO SIDE COLUMN AND NO FOLD: the hero takes the row and the tiles under it pair as one board. */
   const blocks = page.blocks as { heading?: string; area?: string; fold?: boolean; box?: boolean }[];
-  assert.deepEqual((page as { layout?: unknown }).layout, { rail: 4 });
-  assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Lasts', 'Runs out', 'Accounts', 'Heads up', undefined, undefined, undefined]);
-  assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), ['Where it went'], 'Where it went is not the one fold');
-  assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up', 'Coming and going']);
-  /* UNDER COMING AND GOING, SINCE REC-B23, THE CALENDAR AND NO WALK: the walk of thirty days is off the page
-     (`money-page.test.ts` holds it there). */
-  const under = (page.blocks as { kind: string; heading?: string }[])[blocks.findIndex((b) => b.heading === 'Coming and going') + 1]!;
-  assert.deepEqual([under.kind, under.heading], ['calendar', undefined]);
+  assert.equal((page as { layout?: unknown }).layout, undefined);
+  assert.deepEqual(blocks.filter((b) => b.area !== undefined).map((b) => b.heading), []);
+  assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), []);
+  assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up']);
   /* NO LAW ON A PAGE EVERYBODY DRAWS: the late notes say what is late in words any record's owner reads. */
   assert.ok(!JSON.stringify(page).includes('Statutory'), 'a note speaks for one country');
 
@@ -783,19 +750,18 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     readings?: readonly { metric: string; reading: { value: number | null; verdict?: string } | null; target?: unknown }[];
   })[];
   assert.ok(drawn.some((b) => b.kind === 'note' && b.lead === true && b.drawn !== false), 'the sample draws no line over Money, so this asks nothing');
-  assert.equal(drawn.find((b) => b.heading === 'Cash ahead')?.headline, 'under');
 
-  /* LASTS SAYS HOW LONG THE MONEY LASTS WITH NOTHING COMING IN, AND WHY, SINCE money-core 3.27.0 (the day the walk goes
+  /* THE HERO SAYS HOW LONG THE MONEY LASTS WITH NOTHING COMING IN, AND WHY, SINCE money-core 3.27.0 (Lasts until 3.29.0) (the day the walk goes
      under since 3.12.0, the count of days from 3.11.0; Runs out until 3.17.0). The sample's cash is above nought, so the
      calm tile is drawn with no tone. Its sentence says the day the money with nothing in lasts to and what falls due
      then, and, since the sample's walk with what comes in also goes under inside the year, that day too, which is the
      count's own: today and the days the money lasts. */
-  const runs = drawn.find((b) => b.heading === 'Lasts')! as (typeof drawn)[number] & { tone?: string; cells?: { metric: string; note?: string }[]; values?: Record<string, unknown> };
-  assert.notEqual(runs.drawn, false, 'the sample runs out inside the year and draws no Lasts');
+  const runs = drawn.find((b) => b.kind === 'stat' && b.lead === true)! as (typeof drawn)[number] & { tone?: string; cells?: { metric: string; note?: string }[]; values?: Record<string, unknown> };
+  assert.notEqual(runs.drawn, false, 'the sample runs out inside the year and draws no hero');
   assert.equal(runs.tone, undefined, 'cash above nought is drawn in the danger colour');
-  assert.deepEqual(runs.cells?.map((c) => c.metric), ['lasts-no-income']);
+  assert.ok(runs.cells?.some((c) => c.metric === 'lasts-no-income'));
   const days = reading(k, 'runway-days');
-  const dry = runs.readings?.[0]?.reading?.value;
+  const dry = runs.readings?.find((c) => c.metric === 'lasts-no-income')?.reading?.value;
   assert.ok(typeof days === 'number' && typeof dry === 'number', `no days to hold the tile to: ${String(days)}, ${String(dry)}`);
   assert.ok(dry <= days, 'money with nothing coming in lasts longer than money with what comes in');
   const on = reading(k, 'runs-out-on');
@@ -812,44 +778,38 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
  * that went: the folded History heading, which stood over one chart, and Being chased. Nothing above Heads up moved,
  * because that is the page a person reads each morning.
  */
-test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and where the money went is folded at the end', async () => {
+test('MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and its home is the hero and one board', async () => {
   const blocks = MONEY_PAGES.money!.blocks as readonly { kind: string; heading?: string; span?: number; lead?: boolean; area?: string }[];
   assert.ok(blocks.length <= 24, `Money declares ${blocks.length} blocks, and a page declares 24 at the most`);
 
-  /* THE SPENDING AND THE BUDGETS ARE OFF MONEY SINCE money-where-it-went-100 (PGS-C20): Where it went, folded at the
-     end, answers where this month's money went, so the chart stands straight after Instalments. */
-  const parts = blocks.findIndex((b) => b.heading === 'Instalments');
-  assert.ok(parts >= 0, 'Money draws no Instalments to stand them after');
-  assert.equal(blocks[parts + 1]!.heading, 'In and out, by month');
-  assert.ok(!blocks.includes(SPENDING[0] as never) && !blocks.includes(BUDGET[0] as never), "This month's spending or Budgets is back on Money");
-  /* INSIDE COMING AND GOING. */
-  assert.ok(blocks.findIndex((b) => b.heading === 'Coming and going') < parts);
+  /* THE SPENDING IS ON MONEY AGAIN, AS SPENT THIS MONTH, and the budgets are a page of their own. */
+  assert.ok(blocks.includes(SPENDING[0] as never), 'Spent this month is not on Money');
+  assert.ok(!blocks.includes(BUDGET[0] as never), 'Budgets is back on Money');
   /* THE LINE A PASSED BUDGET WRITES IS NOT PLACED YET: no page writes it (budget-tile-70), and a block that draws
      nothing would cost a tile that does. When this fails the page reader has learnt it or somebody placed it early. */
   assert.ok(!blocks.includes(BUDGET[1] as never), "the passed-budget line is on Money before a page can write it");
 
-  /* NOTHING THAT LEADS THE PAGE MOVED: the line, the walk, the side column, the check and the Ledger. */
+  /* WHAT LEADS THE PAGE: the line, the box to add an account, the hero, and then the board. */
   assert.deepEqual(
-    blocks.slice(0, 11).map((b) => [b.kind, b.heading, b.area]),
+    blocks.slice(0, 10).map((b) => [b.kind, b.heading, b.area]),
     [
       ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['note', undefined, undefined],
-      ['bar', 'What you have, by book', undefined],
       ['capture', 'Add an account', undefined],
-      ['forecast', 'Cash ahead', undefined],
-      ['stat', 'Lasts', 'rail'],
-      ['stat', 'Runs out', 'rail'],
-      ['split', 'Accounts', 'rail'],
-      ['stat', 'Cash now does not add up', undefined],
+      ['stat', undefined, undefined],
+      ['timeline', 'Coming up', undefined],
+      ['bar', 'Spent this month', undefined],
+      ['split', 'Accounts', undefined],
       ['timeline', 'Ledger', undefined],
+      ['progress', 'Instalments', undefined],
     ],
   );
-  assert.deepEqual([blocks[0]!.lead, blocks[1]!.lead, blocks[2]!.lead], [true, true, true]);
+  assert.deepEqual([blocks[0]!.lead, blocks[1]!.lead, blocks[2]!.lead, blocks[4]!.lead], [true, true, true, true]);
 
-  /* AND THE RECORD TAKES THE PAGE AND DRAWS BOTH ON THE SAMPLE WITHOUT A REFUSAL. */
+  /* AND THE RECORD TAKES THE PAGE AND DRAWS IT ON THE SAMPLE WITHOUT A REFUSAL. */
   const k = await seeded();
-  for (const heading of ['This month, by category', 'No category yet, by who was paid']) blockOf(k, 'money', heading);
+  for (const heading of ['Spent this month', 'Coming up', 'Ledger']) blockOf(k, 'money', heading);
 });
 
 /**
@@ -904,12 +864,13 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
     /* A PLAN'S PAGE WALKS NO CASH (`money-plan`, money-core 3.17.0): it has no headline row to hold to. */
     if (walk < 0) {
       /* NOR AN ACCOUNT'S OR A BILL'S (money-core 3.19.0): each is one thing, said first, and not a walk of the money. */
-      /* NOR, SINCE money-core 3.29.0, THE SECTION'S PAGES THAT ARE STILL THEIR LINE ALONE. */
+      /* NOR MONEY'S HOME, SINCE money-core 3.29.0: its hero draws the walk small beside Cash now, and the chart is Forecast's.
+         NOR THE SECTION'S PAGES THAT ARE STILL THEIR LINE ALONE. */
       /* NOR BUDGETS, REPORTS OR PAYEES (money-core 3.29.0): each is a job of the section, and Cash ahead is Money's and
          Forecast's. */
       /* NOR THE ACCOUNTS AND THE LEDGER: each is a list of what there is and what moved. */
       /* NOR COMING UP (money-core 3.29.0): what falls due, by week, beside the Forecast page that walks it. */
-      assert.ok(['money-plan', 'money-rules', 'money-account', 'money-bill', 'money-budgets', 'money-reports', 'money-payees', 'money-accounts', 'money-ledger', 'money-coming'].includes(slug) || lineAlone, `${slug}: the page draws no Cash ahead`);
+      assert.ok(['money', 'money-plan', 'money-rules', 'money-account', 'money-bill', 'money-budgets', 'money-reports', 'money-payees', 'money-accounts', 'money-ledger', 'money-coming'].includes(slug) || lineAlone, `${slug}: the page draws no Cash ahead`);
     } else if ((page as { layout?: unknown }).layout !== undefined) {
       assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole main column`);
       assert.equal((blocks[stat] as { area?: string }).area, 'rail', `${slug}: the figure is not in the side column`);
@@ -966,20 +927,19 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
      of 20 October (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
   /* EACH CURRENCY APART, AND THE ACCOUNTS THE ACCOUNTS TILE LISTS, SINCE money-core 3.27.0: the sample keeps one
      currency, so nothing is said converted, and every account it counts as cash holds money. */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on', 'cash-by-account.groups', 'cash-now.apart', 'cash-now.moved']);
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on', 'cash-by-account.groups']);
   assert.equal(lead.values?.['cash-by-account.groups'], reading(k, 'cash-accounts'));
+  /* HOW MUCH, AND HOW FAR IT MOVED, ARE THE HERO'S SINCE money-core 3.29.0, drawn under the line in the figure's own size. */
+  const hero = blocks.find((b) => b.kind === 'stat' && b.lead === true)!;
+  assert.deepEqual(Object.keys(hero.values ?? {}).filter((v) => v.startsWith('cash-now.')).sort(), ['cash-now.apart', 'cash-now.moved']);
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
   /* IN WORDS SINCE THE UI PASS OF 20 OCTOBER: "6% down on a month ago", where it said "−6%". */
-  assert.equal(lead.values?.['cash-now.moved'], `${-moved}% down`);
-  /* HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, so a record that has no night a month back to measure from loses
-     that clause and keeps the rest. */
+  assert.equal(hero.values?.['cash-now.moved'], `${-moved}% down`);
+  /* THE LINE IS WHERE THE MONEY IS KEPT, a sentence, and then the part that is late, a sentence of its own. */
   const [money, late] = lead.body?.split(/(?<=\.)\s+/u) ?? [];
-  assert.deepEqual(
-    money?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9._-]+)\}\}/gu)].map((m) => m[1])),
-    [['cash-now.apart'], ['cash-now.converted', 'cash-now.rate_on'], ['cash-by-account.groups'], ['cash-now.moved']],
-  );
+  assert.equal(money, 'Kept in {{cash-by-account.groups}} account(s).');
   /* AND THE PART THAT IS LATE, A SENTENCE OF ITS OWN SINCE money-core 3.18.0, which the sample has none of: its figures
      hold no value here, so the app leaves the sentence out whole (`leadOf`). */
   assert.match(late ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u);
@@ -1002,7 +962,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
  * WHERE THE MONEY SITS, WHAT FALLS DUE AND WHAT MOVED, read off the drawn page: the accounts add up to the headline, the
  * calendar holds the next thirty days and nothing else, and the ledger is newest first with every minor unit.
  */
-test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and what moved is newest first', async () => {
+test('THE ACCOUNTS ADD UP TO CASH NOW, Coming up is the next few things, and what moved is newest first', async () => {
   const k = await seeded();
 
   /* ONE PART AN ACCOUNT, NAMED AS THE RECORD NAMES IT, and the parts are the headline to the penny. */
@@ -1024,20 +984,18 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
   assert.ok(stale && stale.drawn !== false, 'an old balance is not said on the page that reads it');
   assert.notEqual(drawn('Heads up'), false, 'the line about an old balance is drawn with no tile round it');
 
-  /* THE NEXT THIRTY DAYS AND NOTHING ELSE, each with its money, from today to the thirtieth day. */
-  const due = blockOf(k, 'money', 'calendar');
+  /* THE NEXT FEW THINGS THAT MOVE MONEY, each with its money: Coming up reads what is late by a month at most and the next
+     two months, six lines, over the one source Today's Due soon reads across every list. */
+  const due = blockOf(k, 'money', 'Coming up');
   assert.ok(due.rows.length > 0, 'nothing falls due on the sample, so this proves nothing');
+  assert.ok(due.rows.length <= 6, 'Coming up holds more than six lines');
   for (const r of due.rows) {
     assert.ok(r.fields.amount !== null && typeof r.fields.amount === 'object', `${String(r.fields.title)} holds no money`);
-    assert.ok(String(r.fields.day) >= day(0) && String(r.fields.day) <= day(30), `${String(r.fields.title)} falls due on ${String(r.fields.day)}`);
+    assert.ok(String(r.fields.day) >= day(-31) && String(r.fields.day) <= day(60), `${String(r.fields.title)} falls due on ${String(r.fields.day)}`);
   }
-  /* ONE SOURCE FOR THE THIRTY DAYS, SINCE money-core 3.21.0 (the audit of 25 October, Z14): what Today's Due soon reads
-     across every list, with money on it, over the same days. Money's calendar read Bills and invoices alone. */
-  const across = k.block({ kind: 'table', source: 'deadlines', where: 'amount is set, day after yesterday, day before +31d', horizon: 31, limit: 200 } as never);
+  const across = k.block({ kind: 'table', source: 'deadlines', where: 'amount is set, day after -31d', horizon: 60, limit: 6 } as never);
   const named = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => `${String(r.fields.day)} ${String(r.fields.row)}`).sort();
   assert.deepEqual(named(due.rows), named(across.rows ?? []));
-  assert.ok(due.rows.some((r) => r.fields.list === 'recurring'), 'a repeating line is not on the calendar');
-  assert.ok(due.rows.some((r) => r.fields.list === 'obligations'), 'a bill is not on the calendar');
 
   /* NEWEST FIRST, AND THE AMOUNT AS THE ROW HOLDS IT: a ledger keeps every minor unit. */
   const moved = blockOf(k, 'money', 'Ledger');
@@ -1080,10 +1038,6 @@ test('HEADS UP IS NOT DRAWN WHEN NOTHING UNDER IT IS TRUE, on a record with an a
   assert.ok(out.ok, sayOf(out));
   const blocks = (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks;
   assert.equal(blocks.find((b) => b.heading === 'Heads up')?.drawn, false, 'an empty Heads up box is drawn');
-  /* AND COMING AND GOING IS SHUT TOO, SINCE REC-B23: the walk of thirty days was the one block in it drawn on every record
-     with an account, and with it off the page nothing here falls due, repeats or moved. `money-page.test.ts` draws the
-     box once something repeats. */
-  assert.equal(blocks.find((b) => b.heading === 'Coming and going')?.drawn, false, 'an empty Coming and going box is drawn');
 });
 
 /**
@@ -1350,9 +1304,9 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
     /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines of Heads up carry no heading either. */
     return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean; body?: string }[] }).blocks
       .filter((b) => b.drawn !== false)
-      .map((b) => (b.lead === true ? (b.body?.startsWith('Cash is {{cash-now.apart}}') ? undefined : 'kept in') : (b.heading ?? '')));
+      .map((b) => (b.lead === true && b.body !== undefined ? (b.body.includes('{{books-held}}') ? 'kept in' : undefined) : (b.heading ?? '')));
   };
-  assert.ok(drawn().includes(undefined) && !drawn().includes('What you have, by book'));
+  assert.ok(drawn().includes(undefined));
   made('Home');
   const two = drawn();
   assert.ok(!two.includes(undefined), 'the line of one book is still said over two');
@@ -1362,17 +1316,15 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
   /* WHAT IS WAITING ON THE PERSON MAY LEAD, wherever a page declares it, and Money declares it nowhere since REC-B23
      step 7. The filter stays for a look that puts the questions first while there are any (`look.<page>`'s `lead`,
      `loop/contract-17.md`): the books' figure is held beside the walk among the rest either way. */
-  assert.deepEqual(two.filter((h) => h !== 'Waiting on you').slice(0, 3), ['kept in', 'What you have, by book', 'Cash ahead']);
+  assert.deepEqual(two.filter((h) => h !== 'Waiting on you').slice(0, 2), ['kept in', ''], 'the hero follows the line');
 });
 
 test('CASH AHEAD OPENS ON TEN WEEKS AND WALKS TO THE LONGEST LENGTH IT OFFERS, so a year and two are a press away', async () => {
   /* SINCE money-core 3.7.0: the walk is `horizons:` long and says so (`reach`), and opens on `horizon:`. Opening on 90 days
      before the record walked further took every longer length off the control. */
   const k = await seeded();
-  const out = k.page('money');
-  assert.ok(out.ok, sayOf(out));
-  const ahead = out.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number; steps?: { day: string }[] } } | undefined;
-  assert.ok(ahead?.walk, 'Cash ahead drew no walk');
+  const ahead = readCashAhead(k) as { walk?: { horizon?: number; reach?: number; steps?: { day: string }[] } };
+  assert.ok(ahead.walk, 'Cash ahead drew no walk');
   assert.equal(ahead.walk.horizon, 84);
   /* AND A LOAD WALKS NO FURTHER THAN TWO YEARS AND A DAY, though the block offers five years and "to the end" again since
      money-core 3.10.0: those made every opening of Money walk twenty times the chart it opens on (3.9.0), and the kernel
@@ -1385,9 +1337,7 @@ test('CASH AHEAD OPENS ON TEN WEEKS AND WALKS TO THE LONGEST LENGTH IT OFFERS, s
   assert.ok(steps.every((s) => s.day <= day(731)), 'a load walks five years');
 
   /* FIVE YEARS IS WALKED WHEN A READER PICKS IT. */
-  const asked = k.page('money', undefined, { walk: 1825 });
-  assert.ok(asked.ok, sayOf(asked));
-  const longer = asked.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number } } | undefined;
+  const longer = readCashAhead(k, { walk: 1825 }) as { walk?: { horizon?: number; reach?: number } };
   assert.equal(longer?.walk?.horizon, 84, 'it still opens on twelve weeks');
   assert.ok((longer?.walk?.reach ?? 0) >= 1825, `five years asked for walks ${String(longer?.walk?.reach)} days`);
 });

@@ -176,11 +176,11 @@ test('HOME IS CALLED TODAY, in the voice and as the page title', () => {
   assert.equal(home().title, 'Today');
 });
 
-/* AND HOW MUCH THERE IS, SINCE money-core 3.18.0 (the audit of 22 October, U4): with two books the line leads with Cash
-   now, and every line ends on the part that is late, a sentence the app leaves out while none is. */
+/* WHERE IT IS KEPT, SINCE money-core 3.29.0: how much there is is the hero's under the line, and every line ends on the
+   part that is late, a sentence the app leaves out while none is. */
 /* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0 (B8), left out whole with no card that says it. */
 const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
-test('MONEY WITH TWO BOOKS OPENS ON HOW MUCH THERE IS AND WHERE IT IS KEPT, and with one book on its cash', async () => {
+test('MONEY WITH TWO BOOKS OPENS ON WHERE ITS MONEY IS KEPT, and with one book on how long it lasts', async () => {
   const k = await founder();
   type Lead = Drawn & { lead?: boolean; body?: string; values?: Record<string, unknown> };
   const leads = (): Lead[] => (drawnOn(k, 'money') as Lead[]).filter((b) => b.kind === 'note' && b.lead === true);
@@ -192,21 +192,16 @@ test('MONEY WITH TWO BOOKS OPENS ON HOW MUCH THERE IS AND WHERE IT IS KEPT, and 
   account('Everyday', own, 'GBP');
   /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE LASTS THE YEAR, and since money-core 3.17.0 the line says so
      (`HEADLINE_LASTS`): one lead still, the line of what there is stepping aside for it. */
-  assert.deepEqual(leads().map((b) => b.body), [`Cash is {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s), {{cash-now.moved}} on a month ago, and on what is due it lasts the year.${LATE}`]);
+  assert.deepEqual(leads().map((b) => b.body), [`Kept in {{cash-by-account.groups}} account(s), and on what is due it lasts the year.${LATE}`]);
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
-  assert.deepEqual(two.map((b) => b.body), [`You have {{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate, across {{cash-by-account.groups}} account(s) in {{books-held}} books.${LATE}`], 'one lead');
+  assert.deepEqual(two.map((b) => b.body), [`Kept in {{cash-by-account.groups}} account(s) in {{books-held}} books.${LATE}`], 'one lead');
   /* NO CARD SAYS WHAT IS TO PAY ON IT: the sum reads nought and its day reads nothing, so the card's sentence goes whole. */
   assert.deepEqual(two[0]!.values, {
     'books-held': 2,
     'card-to-pay': 0,
-    /* EACH CURRENCY APART, SINCE money-core 3.27.0, and with no home currency nothing converted to say beside them. */
     'cash-by-account.groups': 2,
-    'cash-now.apart': [
-      { amount: 250_000, currency: 'GBP' },
-      { amount: 250_000, currency: 'USD' },
-    ],
   });
   /* AND THE PAGE IS STILL WITHIN WHAT A PAGE DECLARES. */
   assert.ok(value<{ blocks: unknown[] }>(k.page('money')).blocks.length <= 24);

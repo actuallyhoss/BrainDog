@@ -31,6 +31,7 @@ import { openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { FIRST_PARTY, NOW, day, firstPartyDocument, gbp, installSeed } from '../src/index.ts';
 import { put, record, value, type Doc } from './money-core-earlier.ts';
+import { CASH_AHEAD, readCashAhead } from './money-walk-page.ts';
 
 /**
  * money-core 2.3.0 AS IT SHIPPED, examples and all. Kept as a file and not rebuilt out of today's document, because
@@ -42,14 +43,11 @@ const MONEY_CORE_2_3_0 = JSON.parse(readFileSync(new URL('./fixtures/money-core-
 
 const OWNER = { actor: 'p_1' };
 
-/** The steps of the row called `what` in the walk a block on `/p/money` draws, as `day delta`. */
+/** The steps of the row called `what` in the walk Cash ahead draws, as `day delta`. */
 function walked(k: Kernel, heading: string, what: string): string[] {
-  const out = k.page('money');
-  assert.ok(out.ok, sayOf(out));
-  const block = (
-    out.value as { blocks: readonly { kind: string; heading?: string; refusals: readonly unknown[]; walk?: { steps: readonly { day: string; label: string; delta: number }[] } }[] }
-  ).blocks.find((b) => (b.heading ?? b.kind) === heading);
-  assert.ok(block?.walk, `/p/money draws no walk headed ${heading}`);
+  const block = readCashAhead(k) as unknown as { heading?: string; refusals: readonly unknown[]; walk?: { steps: readonly { day: string; label: string; delta: number }[] } };
+  assert.equal(block.heading, heading);
+  assert.ok(block.walk, `${heading} draws no walk`);
   assert.deepEqual(block.refusals, [], `${heading} refused`);
   return block.walk.steps.filter((s) => s.label === what).map((s) => `${s.day} ${String(s.delta)}`);
 }
@@ -74,7 +72,7 @@ const HOSTING_BILL = {
   repeats: 'monthly',
 };
 
-test('money-core declares `ends` on Money as a day, and names it on the repeating leg of both walks `/p/money` draws', () => {
+test('money-core declares `ends` on Money as a day, and names it on the repeating leg of the walk Money draws', () => {
   const doc = firstPartyDocument('money-core', { seeds: [] }) as unknown as Doc;
   for (const register of ['obligations', 'recurring']) {
     const list = doc.declarations.find((d) => d.register === register);
@@ -85,8 +83,8 @@ test('money-core declares `ends` on Money as a day, and names it on the repeatin
       register,
     );
   }
-  const money = doc.declarations.find((d) => d.page === 'money');
-  const legs = (money?.blocks as { kind: string; heading?: string; from?: { register: string; ends?: string; where?: string }[] }[])
+  /* THE WALK MONEY DECLARES, wherever a page places it (`parts/forecast.ts`). */
+  const legs = [CASH_AHEAD as unknown as { kind: string; heading?: string; from?: { register: string; ends?: string; where?: string }[] }]
     .filter((b) => b.from !== undefined)
     .map((b) => ({ ...b, heading: b.heading ?? b.kind }));
   assert.deepEqual(
@@ -103,7 +101,7 @@ test('money-core declares `ends` on Money as a day, and names it on the repeatin
   }
 });
 
-test('a monthly line ending on 10 November walks 10 September, October and November on `/p/money`, and walks on again once its end is cleared', async () => {
+test('a monthly line ending on 10 November walks 10 September, October and November on Cash ahead, and walks on again once its end is cleared', async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   const seeded = await installSeed(k);
   assert.ok(seeded.ok, sayOf(seeded));

@@ -131,12 +131,13 @@ test('a record with no plan draws no tile, and one all paid draws none either', 
   assert.notEqual(tile(k).drawn, false);
 });
 
-test('it is the one tile it was: its heading, its icon, the full width, and only while something is left', () => {
+test('it is the one tile it was: its heading, its icon, no width of its own, and only while something is left', () => {
   assert.equal(INSTALMENTS.length, 1);
   const [block] = INSTALMENTS as Fields[];
   assert.deepEqual(
     [block!.kind, block!.heading, block!.icon, block!.span, block!.when],
-    ['progress', 'Instalments', 'credit-card', 12, { metric: 'installments-left', gt: 0 }],
+    /* NO WIDTH OF ITS OWN SINCE money-core 3.29.0, so the app pairs it on Money's board. */
+    ['progress', 'Instalments', 'credit-card', undefined, { metric: 'installments-left', gt: 0 }],
   );
   assert.deepEqual((block!.cells as { metric: string }[]).map((c) => c.metric), [PAID, TOTAL, ...NEXT]);
 });
@@ -193,5 +194,5 @@ test('Money holds no more blocks than it did', () => {
   assert.equal(blocks.filter((b) => b.heading === 'Instalments').length, 1);
 });
 
-/** How many blocks Money held before this job (money-core 3.17.0 as batch 69 left it). */
-const BLOCKS = 24;
+/** How many blocks Money's home holds since money-core 3.29.0, a page per job: the line, the hero, six tiles and Heads up. */
+const BLOCKS = 15;

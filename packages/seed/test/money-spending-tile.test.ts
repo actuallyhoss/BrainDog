@@ -1,5 +1,5 @@
 /**
- * Money's tile "This month's spending" (REC-B19 job 3), read through the kernel on a record that installed Money the
+ * Money's tile "Spent this month" (REC-B19 job 3), read through the kernel on a record that installed Money the
  * way a person does and then kept two months of spending in four categories.
  *
  * WHAT IS HELD HERE: `parts/spending.ts` gives one block under that heading over `spent-vs-last-month`, it is drawn
@@ -96,17 +96,17 @@ const tile = (k: Kernel): Tile => k.block(SPENDING[0] as never) as unknown as Ti
 /** The tile's part for one category. */
 const part = (t: Tile, category: Entry): Part | undefined => t.readings?.[0]?.reading.groups?.find((g) => g.key === category.id);
 
-test("ONE BLOCK, HEADED 'This month's spending', over this month against last by category", () => {
+test("ONE BLOCK, HEADED 'Spent this month', over this month against last by category", () => {
   assert.equal(SPENDING.length, 1);
   const block = SPENDING[0]!;
-  assert.equal(block.heading, "This month's spending");
+  assert.equal(block.heading, 'Spent this month');
   assert.equal(block.source, 'metric.spent-vs-last-month');
   assert.ok(METRICS['spent-vs-last-month'], 'Money no longer declares the figure the tile reads');
-  /* A TILE WEARS A GLYPH AND TAKES THE WHOLE WIDTH, as every chart on Money does. */
+  /* A TILE WEARS A GLYPH AND NAMES NO WIDTH, so the app pairs it on Money's board (money-core 3.29.0). */
   assert.equal(typeof block.icon, 'string');
-  assert.equal(block.span, 12);
-  /* WHAT NOBODY GAVE A CATEGORY IS NAMED, in the words REC-B19 gives it. */
-  assert.equal(block.unset, 'No category');
+  assert.equal(block.span, undefined);
+  /* WHAT NOBODY GAVE A CATEGORY IS NAMED, as the part a person can still file. */
+  assert.equal(block.unset, 'Not filed yet');
 });
 
 test('DRAWN ONLY WHILE THIS MONTH HAS SPENDING: last month alone draws nothing, and the first payment draws it', async () => {

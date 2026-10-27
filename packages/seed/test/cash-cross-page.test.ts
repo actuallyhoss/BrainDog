@@ -30,6 +30,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, day, firstPartyDocument } from '../src/index.ts';
 import { CASH_FIGURES } from '../src/modules/money/figures/cash.ts';
+import { BY_BOOK } from '../src/modules/money/pages/parts/by-book.ts';
 import { CROSSCHECK_NOTHING } from '@braindog/kernel';
 
 const OWNER = { actor: 'p_1' };
@@ -189,10 +190,13 @@ test('apart in two currencies the tile is drawn and reads each amount in its own
   assert.deepEqual(about(k).drawn.map((d) => [d.kind, d.tone]), [['stat', 'bad']], 'the tile was left out with two currencies out');
 });
 
-/** Money's blocks as the pack document declares them, before any record reads them. */
+/**
+ * Money's blocks as the pack document declares them, before any record reads them, and the bar of what each book holds,
+ * which the Accounts page places and not the home (money-core 3.29.0).
+ */
 function declared(): { heading?: string; empty?: string; body?: string; source?: string }[] {
   const doc = firstPartyDocument('money-core', { seeds: [] }) as { declarations: { page?: string; blocks?: Record<string, unknown>[] }[] };
-  return (doc.declarations.find((d) => d.page === 'money')?.blocks ?? []) as never;
+  return [...(doc.declarations.find((d) => d.page === 'money')?.blocks ?? []), ...BY_BOOK] as never;
 }
 
 test('WITH NO ACCOUNT the reading says the one sentence, and the page draws nothing about the check: the box to add an account stands', async () => {

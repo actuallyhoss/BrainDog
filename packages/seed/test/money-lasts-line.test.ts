@@ -97,12 +97,11 @@ const bill = (k: Kernel, amount: number, due: number): void =>
    which the app leaves out whole while no part is late (`leadOf`). With two books the line says the money there is. */
 /* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0 (B8), left out whole with no card that says it. */
 const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
-/* EACH CURRENCY APART AND ABOUT WHAT THEY COME TO, over the accounts the Accounts tile lists, since money-core 3.27.0. */
-const CASH = "{{cash-now.apart}}, about {{cash-now.converted}} at {{cash-now.rate_on}}'s rate";
+/* THE LINE SAYS WHERE THE MONEY IS KEPT, since money-core 3.29.0: how much there is, and in which currencies, is the hero's. */
 const ACCOUNTS = '{{cash-by-account.groups}} account(s)';
-const WHAT_THERE_IS = `Cash is ${CASH}, across ${ACCOUNTS}, {{cash-now.moved}} on a month ago.${LATE}`;
-const LASTS = `Cash is ${CASH}, across ${ACCOUNTS}, {{cash-now.moved}} on a month ago, and on what is due it lasts the year.${LATE}`;
-const BOOKS = `You have ${CASH}, across ${ACCOUNTS} in {{books-held}} books.${LATE}`;
+const WHAT_THERE_IS = `Kept in ${ACCOUNTS}.${LATE}`;
+const LASTS = `Kept in ${ACCOUNTS}, and on what is due it lasts the year.${LATE}`;
+const BOOKS = `Kept in ${ACCOUNTS} in {{books-held}} books.${LATE}`;
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
@@ -112,11 +111,11 @@ test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that 
   assert.deepEqual(bodies(k, 'money'), [LASTS]);
 });
 
-test('MONEY GAVE UP ONE BLOCK FOR THE LINE: twenty-four still, no word on categories marked the other way, and its figure still declared', async () => {
+test('MONEY IS ONE HERO AND A BOARD: well under the most a page declares, no word on categories marked the other way, and its figure still declared', async () => {
   const blocks = MONEY_PAGE.blocks as Record<string, unknown>[];
-  assert.equal(blocks.length, 24, 'the most a page declares');
+  assert.ok(blocks.length <= 16, 'a front door, not the most a page declares');
   assert.deepEqual(blocks.filter((b) => JSON.stringify(b).includes('categories-against-direction')), []);
-  assert.equal(blocks.filter((b) => b.lead === true).length, 3, 'what there is, that it lasts, and the line for two books');
+  assert.equal(blocks.filter((b) => b.kind === 'note' && b.lead === true).length, 3, 'what there is, that it lasts, and the line for two books');
   const k = await record();
   assert.ok(k.metricDecl('categories-against-direction'), 'the figure is still there to be read');
   /* A BILL PAST THE CASH TAKES THE YEAR BACK OUT OF MONEY'S LINE, and the cash is still said once. */
@@ -134,8 +133,7 @@ test('WITH ONE BOOK AND A WALK THAT NEVER GOES UNDER, the line says the cash and
   const line = leads(k)[0]!;
   /* ONE ACCOUNT HOLDING MONEY, AND ONE CURRENCY, SO THE CASH IS SAID AS IT IS: no sum at a rate beside it. */
   assert.equal(line.values?.['cash-by-account.groups'], 1);
-  assert.deepEqual(line.values?.['cash-now.apart'], gbp(500_000));
-  assert.equal(line.values?.['cash-now.converted'], undefined);
+  assert.equal(line.values?.['cash-now.apart'], undefined, 'how much there is is the hero\'s');
   assert.equal(line.values?.['runway-days'], undefined, 'the line carries no day count: that is the tile\'s');
 
   /* A BILL PAST THE CASH TAKES THE YEAR BACK OUT OF THE LINE, and the day it runs out is the tile's to say. */

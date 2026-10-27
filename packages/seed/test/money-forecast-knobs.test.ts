@@ -1,5 +1,5 @@
 /**
- * Cash ahead on `/p/money` turns on the forecast's later controls, and its instalments say which plan each part is in.
+ * Cash ahead on Money turns on the forecast's later controls, and its instalments say which plan each part is in.
  *
  * WHAT WAS MISSING. The controls for growth, rate drift and counting a plan in or out were built in the renderer, the
  * kernel and the browser's walk, and no page declared them: Cash ahead
@@ -20,6 +20,7 @@ import { sayOf } from '@braindog/ports';
 import { openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { INSTALLMENTS, NOW, installSeed } from '../src/index.ts';
+import { readCashAhead } from './money-walk-page.ts';
 
 type Walked = { heading?: string; refusals: readonly unknown[]; knobs?: string[]; sells?: unknown; walk?: { steps: { day: string; label: string; delta: number; source: string; of?: string }[] } };
 
@@ -27,10 +28,8 @@ async function cashAhead(): Promise<Walked> {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   const seeded = await installSeed(k);
   assert.ok(seeded.ok, sayOf(seeded));
-  const out = k.page('money');
-  assert.ok(out.ok, sayOf(out));
-  const block = (out.value as { blocks: Walked[] }).blocks.find((b) => b.heading === 'Cash ahead');
-  assert.ok(block?.walk, '/p/money draws no Cash ahead');
+  const block = readCashAhead(k) as unknown as Walked;
+  assert.ok(block.walk, 'Cash ahead draws no walk');
   assert.deepEqual(block.refusals, []);
   return block;
 }

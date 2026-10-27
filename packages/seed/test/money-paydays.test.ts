@@ -12,12 +12,12 @@ import assert from 'node:assert/strict';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
-import { sayOf } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyDocument, gbp } from '../src/index.ts';
 import { CASH_LEGS } from '../src/modules/money/legs.ts';
 import { RECURRING_REGISTER } from '../src/modules/money/lists/recurring.ts';
+import { readCashAhead } from './money-walk-page.ts';
 
 /* THE SCRIPT IS PLAIN JAVASCRIPT, run in a sandbox as written, so it is imported by its URL and typed here by hand. */
 type Row = { id: string; seq: number; version: number; fields: Record<string, unknown> };
@@ -64,11 +64,8 @@ async function moneyCore(): Promise<Kernel> {
 
 /** The days a line called `what` walks on Cash ahead, the first `n` of them. */
 function walked(k: Kernel, what: string, n: number): string[] {
-  const out = k.page('money');
-  assert.ok(out.ok, sayOf(out));
-  const blocks = (out.value as { blocks: readonly { heading?: string; walk?: { steps: readonly { day: string; label: string }[] } }[] }).blocks;
-  const walk = blocks.find((b) => b.heading === 'Cash ahead')?.walk;
-  assert.ok(walk, '/p/money draws no Cash ahead');
+  const walk = (readCashAhead(k) as unknown as { walk?: { steps: readonly { day: string; label: string }[] } }).walk;
+  assert.ok(walk, 'Cash ahead draws no walk');
   return walk.steps.filter((s) => s.label === what).slice(0, n).map((s) => s.day);
 }
 
@@ -203,7 +200,7 @@ test('three days, "15, last, 3", fit the box and are said by the walk in one lin
   const k = await moneyCore();
   value(k.create('recurring', line('Three days', '2026-09-15', { day_of_month: '15, last, 3' }), OWNER));
   assert.deepEqual(walked(k, 'Three days', 3), ['2026-09-15', '2026-10-15', '2026-11-15']);
-  const said = JSON.stringify(k.page('money')).match(/\d+ lines? of [^"]*could not read[^"]*/u)?.[0];
+  const said = JSON.stringify(readCashAhead(k)).match(/\d+ lines? of [^"]*could not read[^"]*/u)?.[0];
   assert.ok(said, 'three days walked in silence');
   assert.match(said, /^1 line of /u);
 });
