@@ -158,12 +158,18 @@ function unsealed(api: Pick<RecordApi, 'kernel'>, row: Entry): Json {
  * `none`, so a group shape added later is covered without anyone remembering this function; a leaf names its field by
  * id only (`IDENT` there), so the id is the one spelling to catch.
  */
-function namesSealed(where: unknown, sealed: Set<string>): string | null {
+function namesSealed(where: unknown, register: string, sealedIn: (register: string) => Set<string>): string | null {
   if (where === null || typeof where !== 'object') return null;
   const node = where as Record<string, unknown>;
-  if (typeof node.field === 'string' && sealed.has(node.field)) return node.field;
-  for (const value of Object.values(node)) {
-    const found = namesSealed(value, sealed);
+  if (typeof node.field === 'string' && sealedIn(register).has(node.field)) return node.field;
+  for (const [key, value] of Object.entries(node)) {
+    /* A `pointed` HOP ASKS ITS QUESTION OF ANOTHER LIST, so its leaves name that list's fields and are checked against
+       that list's secrets: read against this one's, a hop from projects to clients asked what a client's key holds. */
+    const hop = key === 'pointed' && value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+    const found =
+      hop !== null && typeof hop.register === 'string'
+        ? namesSealed(hop.where ?? null, hop.register, sealedIn) ?? (typeof hop.by === 'string' && sealedIn(hop.register).has(hop.by) ? hop.by : null)
+        : namesSealed(value, register, sealedIn);
     if (found !== null) return found;
   }
   return null;
@@ -227,7 +233,7 @@ export function scriptReads(api: Pick<RecordApi, 'kernel' | 'list' | 'get'>): (s
           throw new Error(
             `${s.scripted.script} filtered ${register} with ${JSON.stringify(where)}, and a script filters with a predicate tree, such as {"field":"name","is":"Acme"}, so nothing was read.`,
           );
-        const sealed = namesSealed(where, sealedOf(api, register));
+        const sealed = namesSealed(where, register, (r) => sealedOf(api, r));
         if (sealed !== null)
           throw new Error(`${s.scripted.script} filtered ${register} on ${sealed}, which is a secret, and a script may not ask what a secret field holds.`);
         const asked = listOptions(s.scripted.script, register, options);

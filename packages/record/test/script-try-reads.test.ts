@@ -156,3 +156,48 @@ test("AND ITS ONE LIST OPTION AS THE RUN TAKES IT: the deleted rows when asked, 
   assert.match(tried.value![1]!, /a script's list takes \{"includeDeleted":true\}, \{"order":"seq"\} or nothing, so nothing was read\.$/u);
   sql.close();
 });
+
+test('A HOP TO ANOTHER LIST IS HELD TO THAT LIST\'S SECRETS, in a trial as in the scheduled run', async () => {
+  const PROJECTS = { id: 'register.projects', kind: 'register' as const, body: { id: 'projects', name: 'Projects', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } as never };
+  const VENDORS = {
+    id: 'register.vendors',
+    kind: 'register' as const,
+    body: {
+      id: 'vendors',
+      name: 'Vendors',
+      title: 'name',
+      fields: [
+        { id: 'name', type: 'text', required: true },
+        { id: 'key', type: 'secret' },
+        { id: 'project', type: 'ref', to: 'projects' },
+      ],
+    } as never,
+  };
+  const hopBody = { ...BODY, script: 'hop', reads: ['projects', 'vendors'] };
+  const hop = async (reads: Reads): Promise<string[]> => {
+    try {
+      const rows = await reads.list('projects', { pointed: { register: 'vendors', by: 'project', where: { field: 'key', present: true } } });
+      return [`answered ${String(rows.length)}`];
+    } catch (e) {
+      return [`refused: ${(e as Error).message}`];
+    }
+  };
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), tryScript: async (d) => hop(d.reads) });
+  assert.ok((await api.kernel.install([PROJECTS, VENDORS, SEEN])).ok);
+  const made = await api.create({ register: 'projects', fields: { name: 'Alpha' } }, owner);
+  assert.ok(made.ok, JSON.stringify(made));
+  assert.ok((await api.create({ register: 'vendors', fields: { name: 'Acme', project: (made.value as { id: string }).id } }, owner)).ok);
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.key', ?) WHERE register = 'vendors'", GRANT);
+
+  const tried = (await api.scriptTry({ body: hopBody }, owner)) as { ok: boolean; value?: string[] };
+  assert.ok(tried.ok, JSON.stringify(tried));
+  assert.match(tried.value![0]!, /^refused: hop filtered projects on key, which is a secret/u);
+  const scheduled = scriptReads(api)({
+    job: null as never,
+    host: null,
+    scripted: { script: 'hop', version: 1, actor: 'script:hop@v1', input: null, decl: hopBody, record: { id: 'self', tz: 'UTC' } },
+  });
+  assert.deepEqual(await hop(scheduled as unknown as Reads), tried.value);
+  sql.close();
+});

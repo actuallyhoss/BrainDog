@@ -6405,12 +6405,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** The first sealed field a filter names anywhere in its tree, or `null`. The host's `namesSealed`. */
-  const namesSealed = (where: unknown, sealed: Set<string>): string | null => {
+  const namesSealed = (where: unknown, register: string): string | null => {
     if (where === null || typeof where !== 'object') return null;
     const node = where as Record<string, unknown>;
-    if (typeof node.field === 'string' && sealed.has(node.field)) return node.field;
-    for (const value of Object.values(node)) {
-      const found = namesSealed(value, sealed);
+    if (typeof node.field === 'string' && sealedOf(register).has(node.field)) return node.field;
+    for (const [key, value] of Object.entries(node)) {
+      /* A `pointed` hop's leaves name the other list's fields, so they are read against that list's secrets. */
+      const hop = key === 'pointed' && value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+      const found =
+        hop !== null && typeof hop.register === 'string'
+          ? namesSealed(hop.where ?? null, hop.register) ?? (typeof hop.by === 'string' && sealedOf(hop.register).has(hop.by) ? hop.by : null)
+          : namesSealed(value, register);
       if (found !== null) return found;
     }
     return null;
@@ -11968,7 +11973,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             throw new Error(
               `${script} filtered ${register} with ${JSON.stringify(where)}, and a script filters with a predicate tree, such as {"field":"name","is":"Acme"}, so nothing was read.`,
             );
-          const field = namesSealed(where, sealedOf(register));
+          const field = namesSealed(where, register);
           if (field !== null) throw new Error(`${script} filtered ${register} on ${field}, which is a secret, and a script may not ask what a secret field holds.`);
           /* THE ONE OPTION A SCRIPT'S LIST TAKES, refused otherwise in the words of `listOptions` in `@braindog/host/script`,
              since the record cannot import the host. Without it a trial dropped `includeDeleted` and answered live rows

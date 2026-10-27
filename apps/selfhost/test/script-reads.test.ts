@@ -103,6 +103,7 @@ async function selfhost(scripts: ReturnType<typeof reader>[] | ((grantId: string
   return {
     running,
     grantId,
+    owner,
     sent,
     seen: () => running.sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'seen'").map((r) => (JSON.parse(r.fields) as { said: string }).said),
     run: (name: string) => {
@@ -192,6 +193,48 @@ test('A FILTER ON A SECRET FIELD IS REFUSED, so the grant id cannot be read back
     for (const said of s.seen()) assert.notEqual(said.toLowerCase(), s.grantId.toLowerCase(), 'the script read the grant id back through a filter');
     assert.equal(run.outcome, 'refused', run.note);
     assert.match(run.why, /filtered clients on token, which is a secret/);
+    assert.deepEqual(s.seen(), []);
+  } finally {
+    await s.close();
+  }
+});
+
+/**
+ * A HOP TO ANOTHER LIST ASKS THAT LIST'S QUESTION, and its secrets are that list's. The check read every leaf against the
+ * list being listed, so a `pointed` hop from Projects into Vendors asked which vendor holds a key unchecked.
+ */
+test('A FILTER THAT HOPS TO ANOTHER LIST IS REFUSED WHEN IT ASKS ABOUT THAT LIST\'S SECRET', async () => {
+  const PROJECTS = { id: 'register.projects', kind: 'register', body: { id: 'projects', name: 'Projects', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } };
+  const VENDORS = {
+    id: 'register.vendors',
+    kind: 'register',
+    body: {
+      id: 'vendors',
+      name: 'Vendors',
+      title: 'name',
+      fields: [
+        { id: 'name', type: 'text', required: true },
+        { id: 'key', type: 'secret' },
+        { id: 'project', type: 'ref', to: 'projects' },
+      ],
+    },
+  };
+  const hop = `export default async function run(ctx) {
+  const held = await ctx.record.list('projects', { pointed: { register: 'vendors', by: 'project', where: { field: 'key', present: true } } });
+  ctx.write('seen', { said: JSON.stringify(held.map((r) => r.fields.name)) });
+}`;
+  const s = await selfhost(() => [PROJECTS, VENDORS, reader('hops-to-key', ['projects', 'vendors'], hop)] as never);
+  try {
+    const owner = s.owner;
+    const made = await s.running.api.create({ register: 'projects', fields: { name: 'Alpha' } }, owner);
+    assert.ok(made.ok, JSON.stringify(made));
+    const project = (made.value as { id: string }).id;
+    assert.ok((await s.running.api.create({ register: 'vendors', fields: { name: 'Acme', project } }, owner)).ok);
+    s.running.sql.exec("UPDATE entry SET fields = json_set(fields, '$.key', ?) WHERE register = 'vendors'", s.grantId);
+    await s.running.poll();
+    const run = s.run('hops-to-key');
+    assert.equal(run.outcome, 'refused', run.note);
+    assert.match(run.why, /filtered projects on key, which is a secret/);
     assert.deepEqual(s.seen(), []);
   } finally {
     await s.close();
