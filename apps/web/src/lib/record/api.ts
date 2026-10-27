@@ -748,7 +748,9 @@ export function toRows(
         if (c.as === 'chip') {
           const to = decl(register, c.field)?.to;
           const at = e.fields[c.field];
-          return to !== undefined && at !== undefined && at !== null ? (names?.chips?.get(`${to}#${at}`) ?? null) : null;
+          /* A LINE NOTHING HAS FILED YET WEARS A QUESTION MARK. */
+          if (at === undefined || at === null || at === '') return '?';
+          return to !== undefined ? (names?.chips?.get(`${to}#${at}`) ?? null) : null;
         }
         return cell(c.field) ?? (c.or === undefined ? null : cell(c.or));
       }),

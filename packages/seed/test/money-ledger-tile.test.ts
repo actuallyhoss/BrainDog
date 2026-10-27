@@ -213,8 +213,8 @@ test('THE DAY, THE SIGNED AMOUNT AND THE ORDER ARE THE LEDGER\'S, whatever its n
   const tile = drawn(k).find((b) => b.heading === 'Ledger');
   assert.ok(tile, 'the page draws no Ledger');
   const columns = tile.columns ?? [];
-  /* THREE CELLS, which is all a timeline draws: a fourth column for the payee would never be on the page. */
-  assert.equal(columns.length, 3);
+  /* THE THREE A LIST OF LINES ALWAYS DRAWS, then the category, the account and the category's chip for the row's quiet line. */
+  assert.equal(columns.length, 6);
   assert.deepEqual(columns[0], { field: 'on' });
   assert.deepEqual(columns[1], { field: 'payee', or: 'what' });
   assert.deepEqual(columns[2], { field: 'amount', sign: { field: 'direction', minus: 'out' } });

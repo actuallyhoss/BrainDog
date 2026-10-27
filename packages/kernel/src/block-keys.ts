@@ -87,6 +87,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   panel: ['section'],
   tiles: ['queue'],
   who: ['heat'],
+  donut: ['split'],
   short: ['steps'],
   register: ['capture', 'inputs'],
   series: ['series'],

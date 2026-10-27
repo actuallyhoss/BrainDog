@@ -1,6 +1,6 @@
 /** The Ledger on Money's page: the six newest entries, and the box that adds one. */
 
-import { MOVED_COLUMNS } from '../shared.ts';
+import { LEDGER_LINE_COLUMNS } from '../ledger.ts';
 
 /** How many entries the tile draws. Six, so the page stays a page: the Ledger itself holds the rest. */
 export const LEDGER_LINES = 6;
@@ -10,7 +10,7 @@ export const LEDGER_LINES = 6;
  * amount are `MOVED_COLUMNS`' own, so the sign is said once. The name reads `payee` and falls back to `what`, the
  * bank's line or the words a person typed, on an entry no payee was read for.
  */
-export const LEDGER_COLUMNS = [MOVED_COLUMNS[0]!, { field: 'payee', or: 'what' }, MOVED_COLUMNS[2]!];
+export const LEDGER_COLUMNS = LEDGER_LINE_COLUMNS;
 
 export const LEDGER: Record<string, unknown>[] = [
   {

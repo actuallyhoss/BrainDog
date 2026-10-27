@@ -14,8 +14,7 @@ import { MOVED_COLUMNS } from './shared.ts';
  * - the CATEGORY is the line's chip, its icon and colour, and the first half of the line under the name, "Groceries ·
  *   Card"; an empty one is a line not filed yet;
  * - the ACCOUNT is the second half of that line;
- * - the BANK'S OWN WORDS (`counterparty_text`, else the description) are the line under the name where no payee is
- *   known, so a row is never the bank's raw text alone.
+ * - the CHIP is the category again, read as its icon and colour (`as: chip`), so a line wears its category's mark.
  *
  * A LIST DRAWS THE FIRST THREE TODAY and leaves the rest for its row, as a timeline's three cells always have; the three
  * after them are declared so the row's under-line can be drawn from the record's own fields and not guessed at.
@@ -26,7 +25,7 @@ export const LEDGER_LINE_COLUMNS = [
   MOVED_COLUMNS[2]!,
   { field: 'category' },
   { field: 'account' },
-  { field: 'counterparty_text', or: 'what' },
+  { field: 'category', as: 'chip' },
 ];
 
 /**

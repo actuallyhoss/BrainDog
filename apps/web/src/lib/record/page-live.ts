@@ -838,6 +838,8 @@ export function tileOf(
   const held = (cell as { target?: unknown }).target;
   const decl = built && isTarget(held) ? { ...built, target: held } : built;
   const label = str(cell.label) ?? decl?.name ?? cell.metric;
+  /* THE FORMAT THE RECORD SENT WITH THE FIGURE, for a pack's metric this build holds no declaration of. */
+  const declared = typeof (cell as { format?: unknown }).format === 'string' ? ((cell as { format?: unknown }).format as string) : undefined;
   const r = cell.reading;
   /* A FIGURE IN SEVERAL CURRENCIES IS EACH AMOUNT IN ITS OWN, never a blank, and says why it is not one number. */
   /* ON A PAGE, RATES OUT OF DATE ARE THE FOOT'S TO SAY, WITH THE RATE AND ITS AGE (`footed`), so a tile converted at them
@@ -904,7 +906,7 @@ export function tileOf(
     /* A CURRENCY CODE IS MONEY AND ANY OTHER UNIT IS A QUANTITY. Every unit went to `money`, so a
        sum of 150 kg drew `KG 1.50` and 12.5 hours drew `H 0.13`. */
     value: !r.unit
-      ? format(decl?.format ?? (typeof (cell as { format?: unknown }).format === 'string' ? (cell as { format: string }).format : undefined), r.value)
+      ? format(decl?.format ?? declared, r.value)
       : /^[A-Z]{3}$/u.test(r.unit)
         ? money(Math.round(r.value), r.unit)
         : quantity(r.value, r.unit),

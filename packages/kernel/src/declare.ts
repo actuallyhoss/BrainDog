@@ -1829,7 +1829,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
 
     /* THE FLAGS THE NEW FORMS ARE TOLD BY, each a yes or a no, because a string here is a form drawn by accident:
        `lead: 'no'` is truthy wherever it is read. */
-    for (const flag of ['lead', 'range', 'tiles', 'who', 'box'] as const) {
+    for (const flag of ['lead', 'range', 'tiles', 'who', 'box', 'donut'] as const) {
       const value = (raw as Record<string, unknown>)[flag];
       if (value !== undefined && typeof value !== 'boolean')
         return bad('DECLARATION_INVALID', `${id}.${at}'s ${flag} is ${JSON.stringify(value)}; it is true or false.`, at);
@@ -2233,6 +2233,11 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         if (column.as === undefined) continue;
         /* EXCEPT `scope`, which the page layer fills with where the row applies, on any kind but a card. */
         if (column.as === 'scope' && block.kind !== 'cards') continue;
+        /* AND `chip`, a timeline's sixth cell: the icon and colour of the row a link points at (a ledger line's category). */
+        if (column.as === 'chip') {
+          if (block.kind === 'timeline') continue;
+          return bad('DECLARATION_INVALID', `${id}.${at} gives a column as chip, which draws a timeline row's mark, and ${String(block.kind)} draws none.`, at);
+        }
         if (block.kind !== 'cards')
           return bad('DECLARATION_INVALID', `${id}.${at} gives a column as, which is its role on a card, and only a cards block reads it.`, at);
         /* ON A CARD, `scope` IS A FACT that says where the row applies, "Everywhere" for a row of no project. */

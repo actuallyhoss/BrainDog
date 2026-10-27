@@ -142,6 +142,8 @@ export type PageBlock = {
   range?: boolean;
   /** A `queue`'s: one tile per question, drawn with its recommended option's visual. */
   tiles?: boolean;
+  /** A `split`'s: the parts drawn as a thin ring with their total in the middle. */
+  donut?: boolean;
   /** A `heat`'s: a line a person, a dot in each week they were in touch, columns `day | who`. `people:` until People 2.6.0. */
   who?: boolean;
   /** A `section`'s: the blocks after it, up to the next section, drawn on one surface. */
