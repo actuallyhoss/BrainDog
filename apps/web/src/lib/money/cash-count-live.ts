@@ -18,6 +18,7 @@ import { REGISTERS } from '../record/held.ts';
 import { rowWriter, type Wrote } from '../record/rows-write.ts';
 import { recordToday } from '../record/zone.ts';
 import { recordNow } from '../record/boot-live.ts';
+import { findLedger } from './read.ts';
 
 /** One account to count: the row, its currency and what the record expects it to hold, in hundredths. */
 export type Counted = {
@@ -53,12 +54,19 @@ async function rows(client: Client, register: string, filter: string | null): Pr
   return out;
 }
 
-/** The cash accounts to count, with what each is expected to hold, the category names, and the record's day. */
-export async function loadCounter(base: string): Promise<{ ok: true; value: Loaded } | { ok: false; fix: string }> {
+/**
+ * The cash accounts to count, with what each is expected to hold, the category names, and the record's day.
+ *
+ * WHICH LISTS HOLD THE ACCOUNTS AND THE CATEGORIES IS THE LEDGER'S TO SAY (`ledger.ts`), read off the declarations of the
+ * lists the tab holds, as the quick-add sheet reads them, and never off a list's name.
+ */
+export async function loadCounter(base: string, lists: readonly { id: string; kernel?: true }[]): Promise<{ ok: true; value: Loaded } | { ok: false; fix: string }> {
   const client = createClient({ base });
+  const ledger = await findLedger(base, lists);
+  if (ledger === null) return { ok: false, fix: 'This record keeps no ledger, so there is no account to count.' };
   const [accounts, categories, byAccount] = await Promise.all([
-    rows(client, 'accounts', 'kind is cash, state is not closed'),
-    rows(client, 'categories', null),
+    rows(client, ledger.account.list, 'kind is cash, state is not closed'),
+    ledger.category === null ? Promise.resolve([]) : rows(client, ledger.category.list, null),
     client.metric('cash-by-account').catch(() => null),
     learn(client.schema, 'cash_counts', new Map()).catch(() => undefined),
   ]);

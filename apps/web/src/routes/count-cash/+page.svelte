@@ -77,8 +77,9 @@
   } as const;
 
   const base = $derived(apiBase(page.url));
-  const counter = read(() => base, async (): Promise<Result<Loaded>> => {
-    const got = await loadCounter(base);
+  const lists = $derived((page.data as { lists?: { id: string; kernel?: true }[] } | undefined)?.lists ?? []);
+  const counter = read(() => (lists.length === 0 ? null : `${base} ${lists.length}`), async (): Promise<Result<Loaded>> => {
+    const got = await loadCounter(base, lists);
     return got.ok ? { ok: true, value: got.value } : { ok: false, refusal: { code: 'UNREACHABLE', fix: got.fix } };
   });
 
