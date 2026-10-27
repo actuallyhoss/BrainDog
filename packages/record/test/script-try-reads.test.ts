@@ -153,6 +153,6 @@ test("AND ITS ONE LIST OPTION AS THE RUN TAKES IT: the deleted rows when asked, 
   assert.ok(tried.ok, JSON.stringify(tried));
   assert.deepEqual(tried.value, await probeDeleted(scheduled as unknown as Reads));
   assert.ok(tried.value![0]!.includes('["Bolt",true,false]'), `the trial did not hand over the deleted row: ${tried.value![0]}`);
-  assert.match(tried.value![1]!, /a script's list takes \{"includeDeleted":true\} or nothing, so nothing was read\.$/u);
+  assert.match(tried.value![1]!, /a script's list takes \{"includeDeleted":true\}, \{"order":"seq"\} or nothing, so nothing was read\.$/u);
   sql.close();
 });

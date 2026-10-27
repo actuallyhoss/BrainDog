@@ -51,7 +51,7 @@ const scripted = (call: string): Scripted => ({
     decl: {
       egress: [],
       keys: [],
-      reads: ['clients'],
+      reads: ['clients', 'ranked'],
       writes: ['seen'],
       source: `export default async function run(ctx) {
   const rows = await ${call};
@@ -104,8 +104,8 @@ test('ASKED FOR, THE DELETED ROWS COME BACK WITH `deleted_at` SET AND THEIR SECR
 test('AN OPTION THAT IS NOT `{ includeDeleted: true or false }` IS REFUSED, NOT READ AS NO OPTIONS', async () => {
   const { sql, api } = await record();
   const reads = scriptReads(api)(scripted('null'));
-  for (const bad of [{ includeDeleted: 'true' }, { includeDeleted: 1 }, { deleted: true }, 'includeDeleted', [true]] as const)
-    await assert.rejects(reads.list('clients', null, bad as never), /takes \{"includeDeleted":true\} or nothing, so nothing was read\./u, JSON.stringify(bad));
+  for (const bad of [{ order: 'seqs' }, { order: 'name' }, { includeDeleted: 'true' }, { includeDeleted: 1 }, { deleted: true }, 'includeDeleted', [true]] as const)
+    await assert.rejects(reads.list('clients', null, bad as never), /takes \{"includeDeleted":true\}, \{"order":"seq"\} or nothing, so nothing was read\./u, JSON.stringify(bad));
   sql.close();
 });
 
@@ -135,5 +135,40 @@ test("THE WHOLE PATH ON THE SELF-HOST: `ctx.record.list(register, where, { inclu
     ['Bolt', true, false],
   ]);
   assert.deepEqual(await said("ctx.record.list('clients')"), [['Acme', false, false]]);
+  sql.close();
+});
+
+test('`{ order: "seq" }` PAGES A LIST BY ROW NUMBER, SO `seq gt` WALKS EVERY ROW EVEN WHEN THE LIST IS NOT IN THAT ORDER', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  /* A list with its own order, as the Ledger has its day: rows come back by `rank`, not by row number. */
+  const RANKED = {
+    id: 'register.ranked',
+    kind: 'register' as const,
+    body: { id: 'ranked', name: 'Ranked', title: 'rank', order: { field: 'rank', dir: 'asc' }, fields: [{ id: 'rank', type: 'int', required: true }] } as never,
+  };
+  const put = await api.kernel.install([RANKED]);
+  assert.ok(put.ok, JSON.stringify(put));
+  const made: number[] = [];
+  for (let i = 0; i < 120; i++) {
+    const r = await api.create({ register: 'ranked', fields: { rank: (i * 37) % 120 } }, owner);
+    assert.ok(r.ok && !('asked' in r.value), JSON.stringify(r));
+    made.push(r.value.seq!);
+  }
+  const reads = scriptReads(api)(scripted('null'));
+  const walk = async (order: boolean, down: boolean): Promise<number[]> => {
+    const seen: number[] = [];
+    let at: number | null = null;
+    for (;;) {
+      const where = at === null ? null : { field: 'seq', [down ? 'lt' : 'gt']: at };
+      const page = (await reads.list('ranked', where as never, order ? { order: 'seq' } : null)) as unknown as { seq: number }[];
+      seen.push(...page.map((r) => r.seq));
+      if (page.length < 50) return seen;
+      at = down ? Math.min(...page.map((r) => r.seq)) : Math.max(...page.map((r) => r.seq));
+    }
+  };
+  assert.deepEqual(await walk(true, false), [...made].sort((a, b) => a - b));
+  /* The old walk, in the list's own order, loses rows. */
+  assert.ok((await walk(false, true)).length < made.length);
   sql.close();
 });

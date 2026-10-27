@@ -11896,10 +11896,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           /* THE ONE OPTION A SCRIPT'S LIST TAKES, refused otherwise in the words of `listOptions` in `@braindog/host/script`,
              since the record cannot import the host. Without it a trial dropped `includeDeleted` and answered live rows
              alone while the scheduled run answered both. */
-          if (options !== null && (typeof options !== 'object' || Array.isArray(options) || Object.entries(options).some(([k, v]) => k !== 'includeDeleted' || typeof v !== 'boolean')))
-            throw new Error(`${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true} or nothing, so nothing was read.`);
+          if (
+            options !== null &&
+            (typeof options !== 'object' || Array.isArray(options) || Object.entries(options).some(([k, v]) => !((k === 'includeDeleted' && typeof v === 'boolean') || (k === 'order' && v === 'seq'))))
+          )
+            throw new Error(`${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true}, {"order":"seq"} or nothing, so nothing was read.`);
           const deleted = (options as { includeDeleted?: unknown } | null)?.includeDeleted;
-          const asked = typeof deleted === 'boolean' ? { includeDeleted: deleted } : {};
+          const bySeq = (options as { order?: unknown } | null)?.order === 'seq';
+          const asked = { ...(typeof deleted === 'boolean' ? { includeDeleted: deleted } : {}), ...(bySeq ? { order: [{ field: 'seq', dir: 'asc' }] } : {}) };
           const page = await this.list({ register, ...(where === null ? {} : { where }), ...asked } as never, as);
           if (!page.ok) throw new Error(fixOf(page));
           return page.value.rows.map(unsealed);

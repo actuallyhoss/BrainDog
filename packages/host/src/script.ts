@@ -177,20 +177,28 @@ function namesSealed(where: unknown, sealed: Set<string>): string | null {
  * away, or it writes each of them again on its next run: mercury's ledger read live rows only and put back every
  * transaction he deleted.
  *
+ * `{ order: "seq" }` asks for the page oldest-made first, by row number. A list answers one page of 50 in ITS OWN
+ * order (the Ledger by day, the others by last change), so a script that pages with `seq lt <lowest on the page>`
+ * skips rows whenever that is not row-number order. In `seq` order, `seq gt <highest on the page>` walks every row.
+ *
  * ANYTHING ELSE IS REFUSED, NOT READ AS NO OPTIONS. A script that meant to ask for its deleted rows and misspelled the
  * question would be answered the live rows alone, and would write the deleted ones back without a word. The record's
  * `list` refuses an `includeDeleted` that is not true or false for the same reason; this refuses first, in the
  * script's own terms, and refuses a key the record would have passed over.
  */
-function listOptions(script: string, register: string, options: Json): { includeDeleted?: boolean } {
+function listOptions(script: string, register: string, options: Json): { includeDeleted?: boolean; order?: { field: string; dir: 'asc' }[] } {
   if (options === null) return {};
   const refused = new Error(
-    `${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true} or nothing, so nothing was read.`,
+    `${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true}, {"order":"seq"} or nothing, so nothing was read.`,
   );
   if (typeof options !== 'object' || Array.isArray(options)) throw refused;
-  for (const [key, value] of Object.entries(options)) if (key !== 'includeDeleted' || typeof value !== 'boolean') throw refused;
+  for (const [key, value] of Object.entries(options)) {
+    if (key === 'includeDeleted' && typeof value === 'boolean') continue;
+    if (key === 'order' && value === 'seq') continue;
+    throw refused;
+  }
   const asked = options['includeDeleted'];
-  return typeof asked === 'boolean' ? { includeDeleted: asked } : {};
+  return { ...(typeof asked === 'boolean' ? { includeDeleted: asked } : {}), ...(options['order'] === 'seq' ? { order: [{ field: 'seq', dir: 'asc' as const }] } : {}) };
 }
 
 /**
