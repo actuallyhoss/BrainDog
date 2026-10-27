@@ -1,5 +1,5 @@
 <!--
-  `/count-cash`: the full-screen cash counter.
+  `/count`: the full-screen counter, cash by default.
 
   PICK THE CASH ACCOUNT, THEN COUNT IT NOTE BY NOTE. One row for each note and coin of the account's currency, each with
   a minus, the count and a plus (44 square, under a thumb), and the total sticks to the bottom of a phone or the side of

@@ -1,6 +1,6 @@
 {
   "pack": "count-cash",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "icon": "hand-coins",
   "title": "Count the cash",
   "summary": "Count the cash note by note and coin by coin, or by its total, and the record keeps it as a balance check and files the difference from what it thought was there, as lines you describe or as Discrepancy.",
@@ -259,7 +259,7 @@
           {
             "cells": [
               "Count the cash by note and coin",
-              "/count-cash?list=cash_counts",
+              "/count?list=cash_counts",
               "Pick the account, count each note, and say how any difference is recorded"
             ]
           }
@@ -279,7 +279,7 @@
           {
             "cells": [
               "Count this account's cash",
-              "/count-cash?list=cash_counts&account={{seq}}",
+              "/count?list=cash_counts&account={{seq}}",
               "Note by note, then the difference"
             ]
           }

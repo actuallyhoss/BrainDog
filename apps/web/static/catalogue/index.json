@@ -512,8 +512,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "3.0.0",
+      "latest": "3.0.1",
       "versions": [
+        {
+          "version": "3.0.1",
+          "checksum": "ac0a8180d7711f9f60a98a91c9342272ce0340664befa96c76ce8dafdc2991de",
+          "bytes": 28280,
+          "published_at": "2026-10-27T15:13:58.187Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Reconcile is now filed. A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. A count that says neither is filed as one entry, as before, and every older count reads as it did.",
+          "preview": true
+        },
         {
           "version": "3.0.0",
           "checksum": "db2cde9edfd1a1b9b793a5d83193c891a0c93c7c128986a01883f2cb06139e65",
