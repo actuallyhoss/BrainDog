@@ -58,7 +58,7 @@ export function levelled(fields, today) {
   const compound = fields.roll === true;
   const step = CYCLE[fields.every];
   if (!money(fields.pays) && !compound && step) out.pays = { amount: interestOver(principal.amount, fields.rate, (step * 365) / 12, false), currency: principal.currency };
-  if (!dayOf(fields.next_payout) && step) {
+  if (!dayOf(fields.next_payout) && step && !compound) {
     const first = monthsOn(fields.start, step);
     out.next_payout = dayOf(ends) !== null && dayOf(first) > dayOf(ends) ? ends : first;
   }
