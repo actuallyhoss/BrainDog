@@ -147,6 +147,23 @@ test('PREMIUMS PAID: counted from the first day by how often the line comes roun
   sql.close();
 });
 
+test('MORE THAN FIFTY LIVE POLICIES ARE ALL WORKED OUT by the daily run', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  for (const id of FIRST_PARTY) said(await put(api, firstPartyDocument(id)));
+  said(await put(api, file()));
+  const monthly = line(api, 'Shared premium', 100, 'monthly', '2025-11-25');
+  const ids = Array.from({ length: 60 }, (_, i) => write(api, 'policies', { name: `Policy ${i + 1}`, insurer: 'Northgate Assurance', premium: monthly, starts_on: '2025-11-25' }));
+  await settle(api, 12);
+  /* THE PREMIUM CHANGED IN REPEATING, which no rule watches: only the daily run, over every live policy, picks it up. */
+  said(api.kernel.update('recurring', monthly, { amount: usd(200) } as never, { actor: 'p_1' }));
+  clock.advance(24 * 60 * 60_000 + 15 * 60_000 + 1);
+  await settle(api, 12);
+  assert.equal(ids.filter((id) => (fields(api, id).paid as Money | undefined)?.amount === usd(200).amount * 12).length, 60);
+  sql.close();
+});
+
 test('THE TERM, AND THE ILLUSTRATION: percent of the term gone, and this year\'s mid figure', async () => {
   const { api, sql } = await record();
   const id = write(api, 'policies', {
