@@ -167,7 +167,7 @@ test('THE LANE RUNS THE DRILL ONLY WHEN ITS NAMES ARE SET, and says skipped othe
   const run = async (d, opts) => ((seen = { d, opts }), opts.say('  green  shut: fine'), [{ name: 'shut', pass: true, said: 'fine' }]);
   const out = await stranger(env, { run });
   assert.deepEqual(out, { code: 0, lines: ['green  shut: fine'] });
-  assert.equal(seen.d.host, 'https://brain.dog');
+  assert.equal(seen.d.host, 'https://app.brain.dog');
   assert.equal(seen.d.mail.kind, 'inbox');
   assert.equal(seen.opts.sweepWith.operatorKey, 'o');
   const redOut = await stranger(env, { run: async () => [{ name: 'mail', pass: false, said: 'no letter' }] });

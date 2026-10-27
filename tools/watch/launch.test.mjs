@@ -234,10 +234,10 @@ test("QUESTION 7'S COUNT IS HELD TO launch.ts: a calm host passes it, and every 
   }
 });
 
-test('THE NAMES COME FROM apps/worker/wrangler.jsonc: production is brain.dog, its old name app.brain.dog, sign-up by invitation', () => {
+test('THE NAMES COME FROM apps/worker/wrangler.jsonc: production is app.brain.dog, its old name brain.dog, sign-up by invitation', () => {
   const names = namesOf(wranglerConfig());
-  assert.equal(names.host, 'brain.dog');
-  assert.ok(names.legacy.includes('app.brain.dog'), names.legacy.join(', '));
+  assert.equal(names.host, 'app.brain.dog');
+  assert.ok(names.legacy.includes('brain.dog'), names.legacy.join(', '));
   assert.equal(names.signup, 'invite');
   assert.equal(namesOf(wranglerConfig(), 'production', 'down.example.test').host, 'down.example.test');
   assert.throws(() => namesOf({ env: {} }), /no PUBLIC_HOST/);
