@@ -73,3 +73,20 @@ test('THE INSTALLED SCRIPT IS READ WITH THE SAME KEYCHAIN, so an update that cha
   const diff = await plan(await packOf({ ...DOC({ ...GOLD, title: 'Gold, 24k' }), version: '1.0.1' }), held);
   assert.deepEqual(diff.calls_out.map((c) => [c.ingest, c.change]), [['gold-rate', 'same']]);
 });
+
+test("A PACK'S DIGEST THAT POSTS OUT IS IN THE PLAN, with its key, and is approved like any call out", async () => {
+  const NOTES = { register: 'notes', name: 'Notes', title: 'title', fields: [{ id: 'title', type: 'text' }] };
+  const DIGEST = {
+    digest: 'weekly-notes',
+    title: 'Notes, weekly',
+    schedule: { at: '08:00' },
+    channels: ['webhook'],
+    webhook: { url: 'https://collector.example.org/in', grant: 'signing' },
+    sections: [{ source: 'register.notes' }],
+  };
+  const doc = { ...DOC(GOLD), declarations: [NOTES, DIGEST] };
+  const diff = await plan(await packOf(doc), EMPTY);
+  const line = 'CALLS OUT collector.example.org · daily at 08:00 · a table of register.notes · grant "signing"';
+  assert.deepEqual(diff.calls_out.map((c) => c.line), [line]);
+  assert.ok(diff.approve.includes(line), JSON.stringify(diff.approve));
+});

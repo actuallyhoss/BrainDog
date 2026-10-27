@@ -45,7 +45,7 @@ export const egressOf = (
   decl: { kind: string; body: unknown },
   nameOf?: (project: string) => string | null,
   opensOf?: (label: string) => string | null,
-): Egress | null => (decl.kind === 'ingest' || decl.kind === 'script' ? egressOfBody(decl.body, nameOf, opensOf) : null);
+): Egress | null => (decl.kind === 'ingest' || decl.kind === 'script' || decl.kind === 'digest' ? egressOfBody(decl.body, nameOf, opensOf) : null);
 export type { Egress };
 
 /* A use case: a pack with a front, its modules, signals and voice. */
