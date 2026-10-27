@@ -45,7 +45,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       lead: true,
       span: 12,
       body:
-        'Cash ahead, with every salary, premium and part of a plan on its day and everyday spending at its three-month average. ' +
+        'Cash ahead, with every pay, premium and part of a plan on its day and everyday spending at its three-month average. ' +
         'If all money in stopped, it lasts to {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due.',
     },
     CASH_AHEAD,

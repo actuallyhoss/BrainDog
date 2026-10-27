@@ -246,7 +246,7 @@ export const MONEY_ADDS: readonly Command[] = [
     act: 'money',
     group: copy.commands,
     icon: 'arrow-down-left',
-    aliases: ['received', 'earned', 'salary', 'refund'],
+    aliases: ['received', 'earned', 'paid me', 'refund'],
     when: (live) => live.ledger === true,
   },
   {
