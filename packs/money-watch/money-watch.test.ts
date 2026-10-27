@@ -432,7 +432,9 @@ test('LOOKS LIKE IT REPEATS: three payments a month apart open one offer, and ye
     /* ASKED ONCE A PAYEE: a fourth payment offers nothing, and no second line is ever written. */
     await r.charge('NETFLIX.COM', '2026-10-13', 21_900, { counterparty_text: 'NETFLIX.COM' });
     await r.nextDay();
-    assert.deepEqual(r.open().map((q) => q.question), ['Netflix E£219 on 12 Oct and again on 13 Oct. Both real?']);
+    /* AND MONEY'S OWN MONTHLY BUDGET OFFER, which the next day's run asks of September's Subscriptions
+       (`packages/seed/src/modules/money/scripts/offer-budgets.js`): Money's question, not this add-on's. */
+    assert.deepEqual(r.open().map((q) => q.question), ['Netflix E£219 on 12 Oct and again on 13 Oct. Both real?', 'Give Subscriptions a budget of EGP 250 a month?']);
     assert.equal(r.rows('recurring').length, 1);
   } finally {
     await r.close();

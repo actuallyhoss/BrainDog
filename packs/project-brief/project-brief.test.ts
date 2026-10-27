@@ -488,7 +488,9 @@ test('AN ACTION THAT STOPPED FOR KILN IS NAMED ON KILN\'S PAGE with why and sinc
   assert.deepEqual([quiet.rows, quiet.refusals, quiet.drawn], [[], [], false]);
   /* THE PROVIDER REFUSES THE KEY, so the action pauses, and Kiln's page names it. */
   clock.advance(2 * 3_600_000);
-  await api.kernel.runActions(answer(401, 'no') as never);
+  /* MONEY'S OWN SCRIPTS FALL DUE IN THE SAME PASS (book from account, last day and the rest), and a pass leases five
+     jobs by default, so the pass is given room for this poll as well. */
+  await api.kernel.runActions(answer(401, 'no') as never, { limit: 20 });
   const stopped = blockOf(await pageOf(api, 'kiln'), STOPPED) as Block & { drawn?: boolean };
   assert.deepEqual(stopped.refusals, []);
   assert.deepEqual(stopped.rows.map((r) => [r.fields.name, r.fields.why]), [['Kiln sales', 'paused']]);
