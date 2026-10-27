@@ -505,6 +505,8 @@ importers:
 
   packs/worked-numbers: {}
 
+  packs/zakat: {}
+
   tools/client-checks:
     devDependencies:
       '@modelcontextprotocol/client':
