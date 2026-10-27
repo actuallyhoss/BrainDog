@@ -24,8 +24,10 @@ export const STUDENT = {
      a table of it stood above. Only counts are added, so a minor step.
      1.5.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
      the Courses list"), not by its id ("Label: courses"), and every list's name is declared before any
-     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
-  version: '1.5.1',
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
+     1.6.0: Studies is part of Student now. A piece of work can carry a mark as a number, and a reading list of books and
+     papers sits beside the courses. A field and a list added and nothing taken away, so a minor step. */
+  version: '1.6.0',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',
@@ -119,6 +121,7 @@ export const STUDENT = {
           { id: 'course', label: 'Course', type: 'ref', to: 'courses', index: true, qualifies: 'what' },
           { id: 'due', label: 'Due', type: 'day', index: true, deadline: true, remind: ['-2d', '0d'] },
           { id: 'grade', label: 'Grade', type: 'text' },
+          { id: 'mark', label: 'Mark', type: 'decimal', min: 0, max: 100 },
           { id: 'note', label: 'Notes', type: 'document' },
           { id: 'tags', type: 'list', of: 'text' },
         ],
@@ -143,6 +146,31 @@ export const STUDENT = {
         ],
       },
       /* WHAT HOME AND STUDIES ARE DRAWN ON, SINCE 1.5.0, each over its tile's own clauses. */
+      {
+        register: 'course_reads',
+        name: 'Reading list',
+        one: 'reading',
+        icon: 'doc',
+        holds: 'books, articles and papers to read, for a course or for yourself',
+        title: 'name',
+        mobile: ['name', 'state'],
+        fields: [
+          { id: 'name', label: 'Title', type: 'text', required: true, search: true },
+          { id: 'by', label: 'By', type: 'text' },
+          { id: 'course', label: 'Course', type: 'ref', to: 'courses', index: true },
+          {
+            id: 'state',
+            label: 'Status',
+            type: 'enum',
+            values: ['queued', 'reading', 'finished'],
+            labels: { queued: 'Queued', reading: 'Reading', finished: 'Finished' },
+            default: 'queued',
+            index: true,
+          },
+          { id: 'thoughts', label: 'A line on it', type: 'text' },
+          { id: 'tags', type: 'list', of: 'text' },
+        ],
+      },
       counted('homework-open', 'Work to hand in', 'register.assignments', TO_HAND_IN),
       counted('homework-due-7d', 'Due this week', 'register.assignments', `${TO_HAND_IN}, due before +8d`),
       counted('homework-later', 'Due after this week', 'register.assignments', `${TO_HAND_IN}, due after +7d`),

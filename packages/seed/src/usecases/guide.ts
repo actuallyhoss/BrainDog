@@ -56,7 +56,7 @@ export const GUIDE = {
      1.6.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
      the Steps list"), not by its id ("Label: steps"), and every list's name is declared before any
      singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
-  version: '1.6.1',
+  version: '1.7.0',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',
@@ -232,6 +232,7 @@ export const GUIDE = {
           },
           { id: 'milestone', label: 'Milestone', type: 'ref', to: 'milestones', index: true },
           { id: 'order', label: 'Order', type: 'int', index: true },
+          { id: 'why', label: 'Why', type: 'text' },
           { id: 'by', label: 'By', type: 'day', index: true, deadline: true, remind: ['0d'] },
           { id: 'waiting_on', label: 'Waiting on', type: 'text' },
           /* AN AGENT THAT TAKES A STEP SAYS SO HERE, as a team's ticket does, so Taken by agents lists it. */

@@ -1513,7 +1513,7 @@ const handedBefore = (doc: Body, id: string): Body =>
   id !== 'founder' ? doc : (({ extends: _laid, ...rest }) => ({ ...rest, declarations: FOUNDER_2_7.declarations, config: FOUNDER_2_7.config, hands: FOUNDER_2_7.hands }))(doc);
 
 /* AND ONE OF BILLS AND INVOICES WAS AN `item` (P25, the UI pass of 20 October), which a use case's label setting starts from. */
-const oneBefore = (doc: Body): Body => JSON.parse(JSON.stringify(doc).replaceAll('"default":"bill or invoice"', '"default":"item"')) as Body;
+const oneBefore = (doc: Body): Body => JSON.parse(JSON.stringify(doc).replaceAll('"default":"bill or invoice"', '"default":"item"').replaceAll('{"id":"retro","label":"How it went","type":"document"},', '')) as Body;
 
 /**
  * THE PROJECT PAGE AS IT WAS BEFORE portfolio 1.23.0 (founder 3.2.0, team 2.24.0): no road of stages, the roadmap drawn

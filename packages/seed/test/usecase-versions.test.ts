@@ -2128,6 +2128,27 @@ const DECLARED: Record<string, Version> = {
       '`page.orders` opens on a capture box for `register.orders` under its line, "Add an order", where a new shop drew nothing to press (audit C of 25 October, X7) -> db1dc8be3e901825',
     ],
   },
+  'guide@1.7.0': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway metric.guide-resources metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices metric.milestone-resources metric.milestone-steps page.guide page.home-guide page.milestone register.choices register.milestones register.resources register.steps rule.guide_milestone_open rule.guide_milestone_passed setting.label_choices setting.label_milestones setting.label_resources setting.label_steps setting.one_choices setting.one_milestones setting.one_resources setting.one_steps setting.shared_version setting.speaks setting.start_next_milestone setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '8719fe1699ace09b',
+    history: ["Starting a project is part of the New project guide now: `register.steps` gains a why, the reason for a step; nothing taken away -> 8719fe1699ace09b"],
+  },
+  'student@1.6.0': {
+    holds: `
+      metric.courses-held metric.homework-due-7d metric.homework-later metric.homework-open metric.study-done-12w metric.study-held page.home-student page.studies register.assignments register.course_reads register.courses register.study_sessions setting.label_assignments setting.label_course_reads setting.label_courses setting.label_study_sessions setting.one_assignments setting.one_course_reads setting.one_courses setting.one_study_sessions setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '7ad0fb8e9bdb5e06',
+    history: ["Studies is part of Student now: `register.assignments` gains a mark, and `register.course_reads` is a reading list beside the courses; nothing taken away -> 7ad0fb8e9bdb5e06"],
+  },
+  'team@2.29.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project register.cycle_days register.cycle_plan register.cycles rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day script.plan_follows_ticket setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '8d09acce2d6bc162',
+    history: ["Team task list is part of Team board now: `register.cycles` gains a retro, a document for how the cycle went; nothing taken away -> 8d09acce2d6bc162"],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

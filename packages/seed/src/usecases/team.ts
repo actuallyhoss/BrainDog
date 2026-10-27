@@ -250,8 +250,11 @@ export const TEAM = {
      2.28.0, THE PROJECT PAGE OF 27 OCTOBER: the project page it embeds draws the project's own parts in three blocks,
      the hero beside its lane's tile, its numbers beside its work, then its dates, who is on it, what it runs on, the
      agents, what was decided and what happened; the plan and Key numbers move under More about, and What changed goes
-     for those parts. Projects 1.30.0 leads with its board. No id added or taken away, so a minor step. */
-  version: '2.28.0',
+     for those parts. Projects 1.30.0 leads with its board. No id added or taken away, so a minor step.
+
+     2.29.0: Team task list is part of Team board now. A cycle carries a retro, a document for how it went. One field
+     added and nothing taken away, so a minor step. */
+  version: '2.29.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -339,6 +342,7 @@ export const TEAM = {
           { id: 'starts', label: 'Starts', type: 'day', index: true },
           { id: 'ends', label: 'Ends', type: 'day', index: true },
           { id: 'goal', label: 'Goal', type: 'text' },
+          { id: 'retro', label: 'How it went', type: 'document' },
           { id: 'tags', type: 'list', of: 'text' },
         ],
       },

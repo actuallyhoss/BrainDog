@@ -25,7 +25,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '2.4.0', notes: 'The count of the budgets you have set is kept by Money now, so Home and Money read the same one. Nothing you see on Home changes.' },
     { version: '2.3.1', notes: NAMED('Ledger') },
   ],
-  student: [{ version: '1.5.1', notes: NAMED('Courses') }],
+  student: [
+    { version: '1.6.0', notes: 'Studies is part of Student now: a piece of work can carry a mark as a number, and a reading list of books and papers sits beside your courses.' },
+    { version: '1.5.1', notes: NAMED('Courses') },
+  ],
   founder: [
     { version: '3.7.0', notes: "A project page leads with what is true of the project, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane: what it brings in, its dated path, or what it costs to keep. Its numbers have lines and say their age, and its dates, what it runs on and renews, its agents and what happened sit under them. Projects opens on what needs you and one sorted list." },
     { version: '3.6.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
@@ -70,6 +73,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.29.0', notes: 'Team task list is part of Team board now: a cycle can carry a write-up of how it went.' },
     { version: '2.28.0', notes: "A product's page leads with what is true of it, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane, and its numbers, dates, what it runs on, its agents and what happened sit under it. Projects opens on what needs you and one sorted list." },
     { version: '2.27.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
     {
@@ -103,7 +107,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
         'Working now on Agent work lists only the runs heard from in the last fifteen minutes, with a helper folded under the run it helps, where it listed any run from today, even one quiet for hours.',
     },
   ],
-  guide: [{ version: '1.6.1', notes: NAMED('Steps') }],
+  guide: [
+    { version: '1.7.0', notes: 'Starting a project is part of the New project guide now: a step can say why it is worth doing.' },
+    { version: '1.6.1', notes: NAMED('Steps') },
+  ],
   shop: [
     { version: '1.4.0', notes: 'The Orders page opens on a box to add an order, so a new shop has something to press on its first tab.' },
     { version: '1.3.0', notes: 'Orders sits second in the menu, after Work and before Projects, Money and People.' },
