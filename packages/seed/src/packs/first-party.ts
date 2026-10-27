@@ -749,7 +749,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   nothing. 3.25.0 is master's. One number changed, no id added or taken away, so a minor step.
  * - money-core 3.27.0: "It went through" on a repeating line marks the one open bill for the same money paid as well
  *   (`script.settle_matched_line` may write Bills and invoices), where the bill stayed open and read late on Today the
- *   morning after he answered. 3.26.0 is master's. One script changed, no id added or taken away, so a minor step.
+ *   morning after he answered. 3.27.0 is master's. One script changed, no id added or taken away, so a minor step.
+ * - money-core 3.29.0: Money is a section with a page per job, `page.money-accounts`, `page.money-ledger`,
+ *   `page.money-budgets`, `page.money-coming`, `page.money-forecast`, `page.money-reports` and `page.money-payees`, each
+ *   its line alone until its blocks are written, and Categories gains `icon`, `colour`, `budget_alert`, `rollover` and
+ *   `parent`, all optional. 3.27.0 is master's. Pages and fields added and nothing taken away, so a minor step.
  * - people 3.8.0 (the audit of 25 October, Y2): Organisations gains `retired_on`, which its `org:` names as the
  *   kernel's `retired` part, so a shop met by a name a card text cut short is retired on his yes, kept and never
  *   deleted, and People's list and count leave it out. 3.7.0 is master's (Scripts as a page). A field added and
@@ -774,7 +778,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.30.0',
   people: '3.9.0',
-  'money-core': '3.27.0',
+  'money-core': '3.29.0',
   estate: '2.5.0',
   work: '1.19.0',
 };

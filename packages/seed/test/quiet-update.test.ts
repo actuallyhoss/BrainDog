@@ -961,6 +961,18 @@ const withoutAhead27 = (doc: Body): Body => ({
         : d,
     ),
 });
+/**
+ * MONEY 3.29.0 COMES OFF BEFORE ALL: no page per job under Money, and Categories without an icon, a colour, a share to
+ * warn at, a carry over or a category it sits under.
+ */
+const SECTION_29 = new Set(['money-accounts', 'money-ledger', 'money-budgets', 'money-coming', 'money-forecast', 'money-reports', 'money-payees']);
+const CATEGORY_29 = new Set(['icon', 'colour', 'budget_alert', 'rollover', 'parent']);
+const withoutSection29 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => !SECTION_29.has(d.page as string))
+    .map((d) => (d.register === 'categories' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !CATEGORY_29.has(f.id as string)) } : d)),
+});
 /** MONEY 3.24.0 COMES OFF FIRST (the look of 26 October, R4): the Accounts split read six accounts at most. */
 const withoutLimit24 = (doc: Body): Body =>
   withPage(doc, 'money', (now) => now.map((x) => (x.heading === 'Accounts' && x.limit === 12 ? { ...x, limit: 6 } : x)));
@@ -1140,7 +1152,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(withoutAhead27(raw))))))))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(withoutAhead27(withoutSection29(raw)))))))))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

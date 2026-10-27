@@ -182,6 +182,14 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.29.0',
+      notes: 'Money is a section: Accounts, Ledger, Budgets, Coming up, Forecast, Reports and Payees each have a page under it. A category can carry an icon, a colour, a share of its budget to warn at, whether what is left carries over, and a category it sits under.',
+    },
+    {
+      version: '3.28.0',
+      notes: 'Answering "It went through" about a repeating line marks its open bill for the same money paid as well, where the bill stayed open and read late on Today.',
+    },
+    {
       version: '3.27.0',
       notes: 'Answering "It went through" about a repeating line marks its open bill for the same money paid as well, where the bill stayed open and read late on Today.',
     },

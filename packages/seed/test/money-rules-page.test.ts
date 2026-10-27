@@ -111,8 +111,11 @@ test('the page is under Money, after a plan, needs the two lists, and is last of
   const requires = MONEY_RULES_PAGE.requires as string[];
   assert.ok(requires.includes('register.filing_rules'));
   assert.ok(requires.includes('register.transactions'));
-  /* AFTER IT, SINCE money-core 3.19.0, ONLY THE PAGES OF ONE ACCOUNT AND ONE BILL, which are on no rail. */
-  const railed = Object.entries(MONEY_PAGES).filter(([, page]) => (page as { nav?: unknown }).nav !== undefined);
+  /* LAST UNDER MONEY BY ITS ORDER, SINCE money-core 3.29.0: the section's own pages are declared after it and listed
+     before it, since a section lists its pages by `nav.order` and not by where they stand in the document. */
+  const railed = Object.entries(MONEY_PAGES)
+    .flatMap(([slug, page]) => ((n) => (n === undefined ? [] : [[slug, n.order] as const]))((page as { nav?: { order: number } }).nav))
+    .sort((a, b) => a[1] - b[1]);
   assert.equal(railed.at(-1)?.[0], 'money-rules');
 });
 

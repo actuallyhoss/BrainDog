@@ -13,7 +13,10 @@ import { FILING_FIGURES } from './filing.ts';
 import { FLOW_FIGURES } from './flow.ts';
 import { BOOK_FIGURES } from './books.ts';
 import { BUDGET_FIGURES } from './budgets.ts';
+import { BUDGET_PAGE_FIGURES } from './budgets2.ts';
+import { HEALTH_FIGURES } from './health.ts';
 import { INSTALMENTS_FIGURES, LATE_PART_FIGURES } from './instalments.ts';
+import { PAYEE_FIGURES } from './payees.ts';
 import { NEXT_PART_FIGURES, PLAN_FIGURES, PLANS_FIGURES } from './plans.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
@@ -77,6 +80,12 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   /* THE PARTS LATE, SINCE money-core 3.18.0 (the audit of 22 October, U4): what Money's first line and Heads up name when
      a part's day has gone. LAST, so every figure above keeps its place in the document. */
   ...LATE_PART_FIGURES,
+
+  /* THE FIGURES OF MONEY'S OWN PAGES, SINCE money-core 3.29.0: Budgets, Payees, and how healthy the money is. LAST, so
+     every figure above keeps its place in the document. */
+  ...BUDGET_PAGE_FIGURES,
+  ...PAYEE_FIGURES,
+  ...HEALTH_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

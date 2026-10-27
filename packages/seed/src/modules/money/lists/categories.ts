@@ -59,6 +59,56 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
        comma in it could not be typed or pasted back: `no more than: categories has no field called
        no`. The test that says every field is reachable by the name the screen shows caught it. */
     { id: 'budget', label: 'Most a month', type: 'money' },
+    /* HOW A CATEGORY IS DRAWN AND HOW ITS BUDGET IS KEPT, SINCE money-core 3.29.0. A glyph from a fixed set and a colour
+       from the category hues (`--cat-*`), so a ledger line, a budget bar and a share of the month wear the same chip
+       for the same category; nothing is fetched from the web for it. `budget_alert` is the share of the most a month
+       at which a warning is due, `rollover` carries what is left of this month into the next, and `parent` puts a
+       category under another. All five are optional, so a category as it was before reads as it did. */
+    {
+      id: 'icon',
+      label: 'Icon',
+      type: 'enum',
+      values: [
+        'shopping-cart',
+        'shopping-bag',
+        'utensils',
+        'coffee',
+        'car',
+        'plane',
+        'train-front',
+        'house',
+        'zap',
+        'phone',
+        'heart-pulse',
+        'gift',
+        'ticket',
+        'music',
+        'graduation-cap',
+        'dumbbell',
+        'briefcase',
+        'banknote',
+        'piggy-bank',
+        'landmark',
+        'credit-card',
+        'hand-coins',
+        'repeat',
+        'scale',
+        'heart',
+        'package',
+        'tag',
+      ],
+    },
+    {
+      id: 'colour',
+      label: 'Colour',
+      type: 'enum',
+      values: ['pink', 'violet', 'blue', 'teal', 'yellow', 'lime', 'sky', 'slate'],
+      labels: { pink: 'Pink', violet: 'Violet', blue: 'Blue', teal: 'Teal', yellow: 'Yellow', lime: 'Lime', sky: 'Sky', slate: 'Slate' },
+    },
+    /* A WHOLE PERCENT AND NO COMMA IN THE LABEL, for the reason `budget`'s says. */
+    { id: 'budget_alert', label: 'Warn at percent', type: 'int', min: 1, max: 100 },
+    { id: 'rollover', label: 'Carries over', type: 'bool', default: false },
+    { id: 'parent', label: 'Under', type: 'ref', to: 'categories' },
     { id: 'state', label: 'Status', type: 'enum', values: ['live', 'retired'], default: 'live', index: true, required: true },
     { id: 'note', type: 'text' },
   ],
