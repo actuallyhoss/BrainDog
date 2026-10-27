@@ -887,6 +887,13 @@ export function methods(deps: RecordDeps) {
       const catalog = kernel.catalog();
       const what = inside(parent.what, isObj(args?.what) ? (args.what as ShareTarget) : undefined, catalog);
       if (what === null) return refuse('OUT_OF_BOUNDS', 'That reaches past what you manage. Pick something inside it.', 'what');
+      /* `$me` IS READ FOR WHOEVER HOLDS A SHARE, so a condition on your own rows handed on would reach theirs instead. */
+      if (JSON.stringify(what).includes('"$me"'))
+        return refuse('OUT_OF_BOUNDS', 'Yours reaches the rows that are yours, which cannot be shared on as they are. Name the rows to share instead.', 'what');
+      /* AND NEVER WHAT YOU ARE KEPT FROM: a share on a list somebody keeps from you would reach past your own reach. */
+      const kept = (sharesFor(sql, me) ?? []).filter((d) => d.effect === 'deny');
+      if (catalog.lists.some((l) => shareTargetReaches(what, l) && kept.some((d) => shareTargetReaches(d.what, l))))
+        return refuse('OUT_OF_BOUNDS', 'Part of that is kept from you, so you cannot share it on. Pick a list nothing is kept from you on.', 'what');
 
       /* NEVER MORE THAN THE PARENT: its switches off stay off, its hidden fields stay hidden, its time bounds the child. */
       const asked = isObj(args?.caps) ? (args.caps as ShareCaps) : {};
