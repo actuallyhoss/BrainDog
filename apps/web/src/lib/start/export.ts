@@ -504,13 +504,13 @@ function cellAs(field: Field, raw: string, day: (v: string) => string | null, cu
 /* ── which list, and which field ───────────────────────────────────────── */
 
 /** A name squeezed for matching: "Due date" and `due_date` are one. */
-const squeeze = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+export const squeeze = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 
 /**
  * THE WORDS OTHER APPS HEAD A COLUMN WITH, by the field id this build's lists use for it. Vocabulary, not a person's
  * data: a bank calls a description "Narrative", Todoist calls a task "Content", Trello a card's "Name".
  */
-const SAID_AS: Readonly<Record<string, readonly string[]>> = {
+export const SAID_AS: Readonly<Record<string, readonly string[]>> = {
   what: ['description', 'details', 'memo', 'narrative', 'title', 'task', 'content', 'summary', 'item', 'payee', 'merchant', 'reference', 'name'],
   name: ['name', 'title', 'fullname', 'company', 'contact', 'project'],
   due: ['due', 'duedate', 'deadline', 'date', 'dueon'],

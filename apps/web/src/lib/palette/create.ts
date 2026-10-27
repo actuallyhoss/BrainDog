@@ -260,3 +260,17 @@ export const MONEY_ADDS: readonly Command[] = [
     when: (live) => live.ledger === true,
   },
 ];
+
+/**
+ * IMPORT A STATEMENT: a bank's CSV into one account's lines, on its own screen (`routes/add/statement`). Offered on the
+ * money rows' rule, while the record keeps a ledger, and named here so the palette's chunk carries no part of the mapper.
+ */
+export const MONEY_IMPORT: Command = {
+  id: 'c-money-import',
+  title: 'Import a statement',
+  href: '/add/statement',
+  group: copy.commands,
+  icon: 'upload',
+  aliases: ['csv', 'bank statement', 'import transactions'],
+  when: (live) => live.ledger === true,
+};

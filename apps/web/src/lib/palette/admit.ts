@@ -39,7 +39,7 @@ import { BINDINGS } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
 import { terms, tokensOf } from '../record/find.ts';
 import type { IconName } from '../ui/icons.ts';
-import { MONEY_ADDS, words } from './create.ts';
+import { MONEY_ADDS, MONEY_IMPORT, words } from './create.ts';
 import type { Offer } from './customise.ts';
 import { words as pageWords, type Paging } from './new-page.ts';
 
@@ -368,6 +368,7 @@ export const COMMANDS: readonly Command[] = [
     icon: 'plus',
     when: (live) => (live.page ?? null) !== null,
   },
-  /* AND THE THREE THAT ADD MONEY (`create.ts` `MONEY_ADDS`), offered while the record keeps a ledger. */
+  /* AND THE THREE THAT ADD MONEY (`create.ts` `MONEY_ADDS`), offered while the record keeps a ledger, and the import. */
   ...MONEY_ADDS,
+  MONEY_IMPORT,
 ];

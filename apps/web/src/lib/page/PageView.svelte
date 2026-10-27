@@ -517,6 +517,18 @@
   });
   /** The page this home arranges and whether the record holds it, or `null` off a home or for one with nothing to arrange. */
   const kept = $derived(mode === 'home' && live ? keptAs(slug, shell.pages ?? []) : null);
+
+  /* ── Money's own: Import a statement ──────────────────────────────────────
+     THE LEDGER IS FOUND FROM THE DECLARATIONS (`quick.ledger`), never named. A page that draws the ledger or its accounts
+     offers Import a statement in its ⋯ menu, and an account's own page opens it on that account. */
+  const ledgerHere = $derived(mode === 'page' && live && quick.base === apiBase() ? quick.ledger : null);
+  const importHref = $derived.by(() => {
+    if (!ledgerHere || !live || !shell?.me || !may(shell, 'append', ledgerHere.list)) return null;
+    const about = live.page.page.identity;
+    if (about && about.register === ledgerHere.account.list && typeof about.seq === 'number') return `/add/statement?account=${about.seq}`;
+    return pageOfLedger(live.page.page.requires, ledgerHere) ? '/add/statement' : null;
+  });
+  const importItem = $derived(importHref ? [{ label: 'Import a statement', icon: 'upload' as const, href: importHref }] : []);
   /**
    * THE BODY A HOME IS BUILT FROM WHILE THE RECORD HOLDS NONE, as its first Done keeps it (`previewedBody`), for Change
    * this page to draft over (C25, C26): the record's week with it, as Edit layout reads it.
@@ -883,11 +895,14 @@
           {look}
           keys={drawnKeys}
           heads={blockHeads}
-          extra={projectPage && dataHref
-            ? [{ label: 'Edit details', icon: 'edit', href: dataHref }]
-            : dataHref && !showSource && !roomy.current
-              ? [{ label: words.showData, icon: 'rows', href: dataHref }]
-              : []}
+          extra={[
+            ...(projectPage && dataHref
+              ? [{ label: 'Edit details', icon: 'edit' as const, href: dataHref }]
+              : dataHref && !showSource && !roomy.current
+                ? [{ label: words.showData, icon: 'rows' as const, href: dataHref }]
+                : []),
+            ...importItem,
+          ]}
         />
       {/if}
   {/snippet}
