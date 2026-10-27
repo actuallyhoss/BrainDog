@@ -56,7 +56,7 @@ export const MONEY_COMING_PAGE: SeedPage = {
       body: 'What comes in and goes out next, this week, next week and later, each in its own currency. In the next 30 days {{arriving-30d}} comes in and {{leaving-30d}} goes out.',
     },
     {
-      /* WHAT REPEATS AT ITS MONTHLY SHARE, in and out, beside the line's next thirty days. */
+      /* WHAT REPEATS AT ITS MONTHLY SHARE, in, out and what is left, beside the line's next thirty days. */
       kind: 'stat',
       heading: 'What repeats, a month',
       icon: 'calendar',
@@ -64,6 +64,7 @@ export const MONEY_COMING_PAGE: SeedPage = {
       cells: [
         { metric: 'every-month-in', label: 'Repeats in, a month' },
         { metric: 'every-month-out', label: 'Repeats out, a month' },
+        { metric: 'every-month-net', label: 'Left over, a month' },
       ],
       when: { metric: 'cash-accounts', gt: 0 },
     },

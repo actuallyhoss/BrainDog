@@ -87,6 +87,19 @@ export const FLOW_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* WHAT IS LEFT EVERY MONTH OF WHAT REPEATS: what comes in less what goes out, the two figures above added, so the
+     three on Coming up cannot disagree. */
+  'every-month-net': {
+    metric: 'every-month-net',
+    name: 'Every month, left over',
+    source: 'register.recurring',
+    value: { sum_of: [{ metric: 'every-month-in' }, { metric: 'every-month-out', minus: true }] },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* MONEY YOU ARE OWED THAT IS PAST ITS DATE, the other side of `overdue`. */
   'late-in': {
     metric: 'late-in',
