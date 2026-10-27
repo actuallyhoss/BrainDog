@@ -451,9 +451,11 @@ export function hrefFor(decl: MetricDecl): string | null {
 /* A WALK'S HOLE IS IN ITS LEGS AND IN THE FIGURE IT OPENS FROM (book-walk-opening-76): `book-lasts-until` has no `where`
    and opens from `book-cash:{{it}}`. Read by `where` alone it was a figure with nothing to fill, offered in the palette
    and read bare, where the record refuses it and asks for it by name. */
+/* AND A SUM'S HOLE IS IN THE FIGURES IT ADDS (money-core 3.29.0): `account-gap` has no `where` and adds `account-now:{{it}}`
+   less `account-lines:{{it}}`, so it is a figure about one account and is read once it is named. */
 export const isTemplate = (decl: MetricDecl): boolean => {
-  const walk = decl as { legs?: unknown; opening?: unknown };
-  return JSON.stringify([decl.where ?? null, walk.legs ?? null, walk.opening ?? null]).includes('{{');
+  const walk = decl as { legs?: unknown; opening?: unknown; value?: unknown };
+  return JSON.stringify([decl.where ?? null, walk.legs ?? null, walk.opening ?? null, walk.value ?? null]).includes('{{');
 };
 
 /** The ten aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */

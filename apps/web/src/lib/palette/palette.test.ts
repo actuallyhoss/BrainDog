@@ -245,10 +245,10 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
   /* AND THE ONES IT DROPS REALLY ARE UNREADABLE, so the filter is not throwing away rows that work. */
   for (const [id, decl] of Object.entries(METRICS))
     if (isTemplate(decl)) {
-      /* A walk's parameter is in its legs and its opening and not in a `where` (`book-lasts-until`), and a tree's is in
-         the tree (`kpi-stale`). */
-      const walk = decl as { legs?: unknown; opening?: unknown };
-      assert.match(JSON.stringify([decl.where ?? null, walk.legs ?? null, walk.opening ?? null]), /\{\{/u, `${id} is dropped as a template and carries no parameter`);
+      /* A walk's parameter is in its legs and its opening and not in a `where` (`book-lasts-until`), a tree's is in
+         the tree (`kpi-stale`), and a sum's is in the figures it adds (`account-gap`). */
+      const walk = decl as { legs?: unknown; opening?: unknown; value?: unknown };
+      assert.match(JSON.stringify([decl.where ?? null, walk.legs ?? null, walk.opening ?? null, walk.value ?? null]), /\{\{/u, `${id} is dropped as a template and carries no parameter`);
     }
 });
 
