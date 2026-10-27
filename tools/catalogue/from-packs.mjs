@@ -289,8 +289,9 @@ const canonical = readCatalogue(JSON.parse(JSON.stringify(index)));
 if (!canonical.ok) fail(`the index this run made does not read back: ${canonical.refusal.fix}`);
 const indexText = `${JSON.stringify(canonical.value, null, 2)}\n`;
 
-/* CI checks rather than writes; read here so the build script needs no POSIX shell. */
-if (values.check || process.env.CI) {
+/* CI checks rather than writes the catalogue the build publishes, read here so the build script needs no POSIX shell.
+   A run told where to write (`--to`) writes there under CI too, as the tests that publish into a scratch folder do. */
+if (values.check || (process.env.CI && values.to === undefined)) {
   const onDisk = (path) => {
     const target = join(to, ...path.split('/'));
     return existsSync(target) ? readFileSync(target, 'utf8') : null;
