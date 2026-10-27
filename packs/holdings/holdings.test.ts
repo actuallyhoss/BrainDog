@@ -861,13 +861,12 @@ test('THE SCRIPT IN THE FILE IS twin.js, byte for byte: it reads holdings and ac
 /* ── What the script is not told (audit 71, finding 6) ─────────────────────────────────────────── */
 
 /**
- * WHY THESE TWO ARE `todo`. A script is handed lists and nothing about questions: `ctx.record` reads the lists it
+ * WHY THIS ONE IS `todo`. A script is handed lists and nothing about questions: `ctx.record` reads the lists it
  * declared, and whether a cause waits or was answered is said to the host after the run, never to the script. So
- * `twin.js` cannot skip a pair somebody answered, and it cannot ask again about one whose account moved. And an answer's
- * change must say the version it read, so it cannot leave that out either. Both are the record's to fix, not this
- * file's. The tests beside them hold what is true today, so the two faults have a size.
+ * `twin.js` cannot skip a pair somebody answered. That is the record's to fix, not this file's. The test beside it
+ * holds what is true today, so the fault has a size.
  */
-const WAITS = 'the record tells a script nothing about a question it asked, and an answer\'s change must carry a version';
+const WAITS = 'the record tells a script nothing about a question it asked';
 
 /**
  * One pair asked about and answered "Keep counting it", then a second pair written down: how many nights until the
@@ -916,35 +915,30 @@ async function movedSinceAsked(): Promise<Awaited<ReturnType<typeof asking>> & {
 }
 const stop = (api: Api, id: string): Out => api.kernel.decide(id, { decide: { option: 'stop', reason: 'Looked at both.' } } as never, 'p_1') as Out;
 
-test('ON A RECORD: an account that moved since the question REFUSES "Stop counting it" and writes nothing, and the question waits', async () => {
-  const { api, night, asked, account, question, close } = await movedSinceAsked();
+test('ON A RECORD: an account whose balance moved since the question is still taken out of cash by "Stop counting it"', async () => {
+  const { api, asked, account, question, close } = await movedSinceAsked();
   try {
+    /* THE PICK WRITES ONTO THE ACCOUNT AS IT IS NOW: the balance moved, and nothing the answer changes was written since. */
     const out = stop(api, question);
-    assert.equal(out.ok, false);
-    assert.equal(out.refusal?.code, 'VERSION_STALE');
-    /* THE REFUSAL NAMES THE ACCOUNT, never its number. */
-    assert.match(out.refusal!.fix, /"Silver Bar" changed after this was asked/u);
-    assert.equal(api.kernel.get(account)!.fields.liquid, true, 'a refused answer changed the account');
-    /* ONE QUESTION STILL, AND STILL OPEN: nights add none, since the pair's cause is waiting. */
-    for (let i = 0; i < 2; i += 1) await night();
-    assert.deepEqual(asked().map((q) => q.status), ['open']);
-    /* "Keep counting it" changes nothing, so it is never stale and still ends it. */
-    said(api.kernel.decide(question, { decide: { option: 'keep', reason: 'Looked at both.' } } as never, 'p_1'));
+    assert.ok(out.ok, `${out.refusal?.code}: ${out.refusal?.fix}`);
+    assert.equal(api.kernel.get(account)!.fields.liquid, false);
+    assert.deepEqual(api.kernel.get(account)!.fields.balance, egp(3_100_000), 'the answer wrote over the newer balance');
     assert.deepEqual(asked().map((q) => q.status === 'open'), [false]);
   } finally {
     close();
   }
 });
 
-test('ON A RECORD: an account that moved since the question can still be taken out of cash, the night after at the latest', { todo: WAITS }, async () => {
-  const { api, night, asked, account, close } = await movedSinceAsked();
+test('ON A RECORD: an account taken out of cash by hand since the question leaves "Stop counting it" nothing to write, and the question closes', async () => {
+  const { api, asked, account, question, close } = await movedSinceAsked();
   try {
-    await night();
-    const open = asked().filter((q) => q.status === 'open');
-    assert.equal(open.length, 1);
-    const out = stop(api, open[0]!.id);
+    said(api.kernel.update('accounts', account, { liquid: false, balance: egp(3_000_000) } as never, { actor: 'p_1', version: api.kernel.get(account)!.version } as never));
+    said(api.kernel.update('accounts', account, { liquid: true } as never, { actor: 'p_1', version: api.kernel.get(account)!.version } as never));
+    const out = stop(api, question);
     assert.ok(out.ok, `${out.refusal?.code}: ${out.refusal?.fix}`);
-    assert.equal(api.kernel.get(account)!.fields.liquid, false);
+    /* THE ACCOUNT IS AS THE PERSON LEFT IT, and the question that can no longer be true is closed. */
+    assert.equal(api.kernel.get(account)!.fields.liquid, true, 'a stale answer wrote over a change made by hand');
+    assert.deepEqual(asked().map((q) => q.status === 'open'), [false]);
   } finally {
     close();
   }
