@@ -21,7 +21,7 @@ import { evaluate, parseWhere, type Schema } from '@braindog/where';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { fixOf, sayOf } from '@braindog/ports';
 
-import { LOOKUPS, METRICS, NOW, REGISTERS, ROWS, THINGS, installSeed, type SeedMetric } from '../src/index.ts';
+import { ACCOUNTS, LOOKUPS, METRICS, NOW, REGISTERS, ROWS, THINGS, installSeed, type SeedMetric } from '../src/index.ts';
 
 function openSqlite(): Sql & { close(): void } {
   const db = new DatabaseSync(':memory:');
@@ -261,6 +261,14 @@ const filled = (decl: SeedMetric, it: string): MetricDecl =>
 
 /* ── the two readings agree ──────────────────────────────────────────────── */
 
+/**
+ * WHAT A FIGURE READ ONCE FOR EACH OF SOMETHING IS ASKED ABOUT: a project's name, or, for a figure of one account (money-core
+ * 3.29.0's account page, `name is {{it}}` over the accounts and `account is {{it}}` over the Ledger), each sample account's.
+ */
+const ONE_ACCOUNT = /(?:name|account) is \{\{it\}\}|account-(?:now|lines):\{\{it\}\}/u;
+const paramsOf = (decl: unknown): string[] =>
+  ONE_ACCOUNT.test(JSON.stringify(decl)) ? ACCOUNTS.map((a) => String(a.name)) : THINGS.map((t) => String(t.name));
+
 test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () => {
   const { k, sql } = await seeded();
   let checked = 0;
@@ -291,7 +299,10 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     /* NOR OF A FIGURE READ ONCE PER CATEGORY (`budget-passed-on`, money-core 3.17.0): a project's name is no category, and
        a running total with a stop is not a sum this walk works out by hand. `money-budget-passed.test.ts` holds it. */
     if (JSON.stringify(decl).includes('category is {{it}}')) continue;
-    const params = JSON.stringify(decl).includes('{{it}}') ? THINGS.map((t) => String(t.name)) : [null];
+    /* NOR OF A SUM OF FIGURES (`sum_of`, money-core 3.29.0's `account-gap`): it adds two figures this walk checks on
+       their own, and holds no entries of its own to add by hand. `money-account-page.test.ts` holds it. */
+    if ((decl.value as { sum_of?: unknown }).sum_of !== undefined) continue;
+    const params = JSON.stringify(decl).includes('{{it}}') ? paramsOf(decl) : [null];
     for (const it of params) {
       const one = it === null ? (decl as MetricDecl) : filled(decl, it);
       const read = k.metric(one);
@@ -376,7 +387,7 @@ test('THE NINE ARE ALL READABLE, so the record ships with no tile it cannot answ
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
     /* NOR ONE READ ONCE PER CATEGORY, which a project's name does not fill (`money-budget-passed.test.ts` reads it). */
     if (JSON.stringify(decl).includes('category is {{it}}')) continue;
-    const one = JSON.stringify(decl).includes('{{it}}') ? filled(decl, String(THINGS[0]!.name)) : (decl as MetricDecl);
+    const one = JSON.stringify(decl).includes('{{it}}') ? filled(decl, paramsOf(decl)[0]!) : (decl as MetricDecl);
     const read = k.metric(one);
     if (!read.ok) unreadable.push(`${one.metric}: ${sayOf(read)}`);
   }

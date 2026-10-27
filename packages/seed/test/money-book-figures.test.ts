@@ -20,6 +20,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { METRICS, firstPartyDocument } from '../src/index.ts';
 import { BOOK_FIGURES } from '../src/modules/money/figures/books.ts';
+import { ACCOUNT_FIGURES } from '../src/modules/money/figures/accounts.ts';
 import { MONEY_METRICS } from '../src/modules/money/figures/index.ts';
 import { MONEY_BOOK_PAGE } from '../src/modules/money/pages/book.ts';
 
@@ -116,7 +117,7 @@ test('MONEY DECLARES THEM, after every figure it already held, and a fresh recor
   /* LAST IN THE DOCUMENT, in this order, so no figure a record already holds moves; but for the three of the next unpaid part of
      each plan (the UI pass of 20 October) and the parts late (money-core 3.18.0), which came after them for the same reason,
      and the ten of the Budgets, Payees and Reports pages (money-core 3.29.0). */
-  assert.deepEqual(Object.keys(MONEY_METRICS).slice(-ALL.length - 14, -14), ALL);
+  assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES)).slice(-ALL.length - 14, -14), ALL);
   const { k } = await fresh();
   for (const id of ALL) assert.ok(k.declarations().some((d) => d.id === `metric.${id}`), `money-core installed without ${id}`);
 });

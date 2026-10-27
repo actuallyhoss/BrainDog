@@ -907,7 +907,8 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
       /* NOR, SINCE money-core 3.29.0, THE SECTION'S PAGES THAT ARE STILL THEIR LINE ALONE. */
       /* NOR BUDGETS, REPORTS OR PAYEES (money-core 3.29.0): each is a job of the section, and Cash ahead is Money's and
          Forecast's. */
-      assert.ok(['money-plan', 'money-rules', 'money-account', 'money-bill', 'money-budgets', 'money-reports', 'money-payees'].includes(slug) || lineAlone, `${slug}: the page draws no Cash ahead`);
+      /* NOR THE ACCOUNTS AND THE LEDGER: each is a list of what there is and what moved. */
+      assert.ok(['money-plan', 'money-rules', 'money-account', 'money-bill', 'money-budgets', 'money-reports', 'money-payees', 'money-accounts', 'money-ledger'].includes(slug) || lineAlone, `${slug}: the page draws no Cash ahead`);
     } else if ((page as { layout?: unknown }).layout !== undefined) {
       assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole main column`);
       assert.equal((blocks[stat] as { area?: string }).area, 'rail', `${slug}: the figure is not in the side column`);

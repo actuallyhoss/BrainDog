@@ -152,6 +152,9 @@ type Figure = { metric: string; format?: string; source?: string; value?: unknow
 const figuresOf = (k: Kernel): Figure[] =>
   (k.declarations() as { kind: string; pack_id: string; body: string }[])
     .filter((d) => d.kind === 'metric' && d.pack_id === 'money-core')
+    /* NOT A FIGURE OF ONE ACCOUNT (money-core 3.29.0's account page): an account holds one currency, so such a figure has
+       no second currency to keep apart, and no book or project is an account. `money-account-page.test.ts` holds them. */
+    .filter((d) => !/(?:name|account) is \{\{it\}\}|account-(?:now|lines):\{\{it\}\}/u.test(d.body))
     .map((d) => {
       const body = JSON.parse(d.body) as Figure;
       return (JSON.stringify(body).includes('{{it}}') ? fill(body, null, JSON.stringify(body).includes('category is {{it}}') ? 'Software' : KILN) : body) as Figure;

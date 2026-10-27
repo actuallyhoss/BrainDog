@@ -17,6 +17,7 @@ import { sayOf } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { METRICS, firstPartyDocument } from '../src/index.ts';
+import { ACCOUNT_FIGURES } from '../src/modules/money/figures/accounts.ts';
 import { MONEY_METRICS } from '../src/modules/money/figures/index.ts';
 
 const OWNER = { actor: 'p_1' };
@@ -113,7 +114,7 @@ test('MONEY DECLARES THE FOUR, after every figure it already held, and a fresh r
      `book-lasts-until` (book-lasts-until-76), and twenty-seven by the UI pass of 20 October, which put the three of the
      next unpaid part of each plan last, and twenty-eight by money-core 3.18.0, with the parts late after them, and
      thirty-eight by money-core 3.29.0, with the ten of the Budgets, Payees and Reports pages. */
-  assert.deepEqual(Object.keys(MONEY_METRICS).slice(-FOUR.length - 38, -38), [...FOUR]);
+  assert.deepEqual(Object.keys(MONEY_METRICS).filter((id) => !(id in ACCOUNT_FIGURES)).slice(-FOUR.length - 38, -38), [...FOUR]);
   const { k } = await fresh();
   for (const id of FOUR) assert.ok(k.declarations().some((d) => d.id === `metric.${id}`), `money-core installed without ${id}`);
 });
