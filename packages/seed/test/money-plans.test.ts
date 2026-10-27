@@ -259,16 +259,17 @@ test('the script is Money\'s own, fetches nothing, runs each night and when a ru
  * read at. The filter reads the few tests the script uses and refuses any other, so a filter the record would not
  * read is not passed over here.
  */
-function recordOf(start: Row[]) {
+function recordOf(start: Row[], ownOrder: (r: Row) => number = (r) => -Number(r.spoken.split('#')[1])) {
   let rows = start;
   const seqOf = (r: Row) => Number(r.spoken.split('#')[1]);
   const matches = (r: Row, where: unknown): boolean => {
     if (where === undefined || where === null) return true;
-    const w = where as { all?: unknown[]; field?: string; is?: unknown; lt?: number };
+    const w = where as { all?: unknown[]; field?: string; is?: unknown; lt?: number; gt?: number };
     if (w.all) return w.all.every((x) => matches(r, x));
     const held = w.field === 'seq' ? seqOf(r) : r.fields[w.field!];
     if ('is' in w) return held === w.is;
     if ('lt' in w) return typeof held === 'number' && held < w.lt!;
+    if ('gt' in w) return typeof held === 'number' && held > w.gt!;
     /* AS THE RECORD READS IT: a word anywhere in the text, its capitals folded and nothing else. */
     const ascii = (s: string) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
     if ('contains' in w) return typeof held === 'string' && ascii(held).includes(ascii(String((w as { contains: unknown }).contains)));
@@ -289,9 +290,11 @@ function recordOf(start: Row[]) {
           const found = rows.find((r) => r.spoken === spoken);
           return found ? shaped(found) : null;
         },
-        list: async (list: string, where?: unknown) => {
+        list: async (list: string, where?: unknown, options: { order?: string } | null = null) => {
           lists += 1;
-          return rows.filter((r) => r.list === list && matches(r, where)).sort((a, b) => seqOf(b) - seqOf(a)).slice(0, 50).map(shaped);
+          /* A LIST ANSWERS IN ITS OWN ORDER (`ownOrder`, newest made first unless a test says otherwise), or by row number when asked. */
+          const by = options?.order === 'seq' ? seqOf : ownOrder;
+          return rows.filter((r) => r.list === list && matches(r, where)).sort((a, b) => by(a) - by(b)).slice(0, 50).map(shaped);
         },
       },
       write: (list: string, fields: Fields) => void added.push({ list, fields }),
@@ -339,6 +342,14 @@ test('run on a record whose plans are only names, the script makes each plan, th
 
   const third = await record.run();
   assert.deepEqual([third.out, third.added, third.updates, third.log], [null, [], [], []]);
+});
+
+test('a list that answers in its own order, not row order, still has every part read', async () => {
+  /* The newest DUE first, as a list with its own order answers, which is not the order the parts were made in. */
+  const scrambled = (r: Row) => -Date.parse(String(r.fields.due ?? '2000-01-01')) + (Number(r.spoken.split('#')[1]) % 7);
+  const record = recordOf(TEN_YEARS().reverse(), scrambled);
+  const first = await record.run();
+  assert.equal(first.updates.length, 123, 'parts were skipped when the list was not read in row order');
 });
 
 test('what the script says names the plans and holds no id', async () => {
@@ -489,7 +500,7 @@ test('on a record, a plan of sixty parts is made, linked and counted across two 
           const found = rowsOf(spoken.split('#')[0]!).find((e) => `${e.register}#${e.seq}` === spoken);
           return found ? shaped(found) : null;
         },
-        list: async (register: string, where?: unknown) => value<{ rows: Entry[] }>(k.list({ register, ...(where === undefined ? {} : { where: where as never }) })).rows.map(shaped),
+        list: async (register: string, where?: unknown, options?: { order?: string } | null) => value<{ rows: Entry[] }>(k.list({ register, ...(where === undefined || where === null ? {} : { where: where as never }), ...(options?.order === 'seq' ? { order: [{ field: 'seq', dir: 'asc' as const }] } : {}) })).rows.map(shaped),
       },
       write: (register: string, fields: Fields) => void todo.push(() => void value(k.create(register, fields, OWNER))),
       update: (spoken: string, patch: Fields, version: number) =>

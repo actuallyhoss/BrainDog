@@ -134,8 +134,8 @@ export function plansFromNames(parts, plans) {
  * HANDED ONE PLAN, IT DOES THAT PLAN ALONE, the same way (`{ id, register: 'plans', seq }`, or "plans#3" under `plan`):
  * what a rule starts when a plan is made, by this script a moment ago or by a person, so its parts are linked then.
  *
- * A SCRIPT'S LIST IS ONE PAGE OF FIFTY, THE NEWEST MADE FIRST, and a plan that runs ten years is 120 parts. So each
- * list is read a page at a time, each next page asking for numbers below the lowest one read, until a page comes back
+ * A SCRIPT'S LIST IS ONE PAGE OF FIFTY, IN THE LIST'S OWN ORDER, and a plan that runs ten years is 120 parts. So each
+ * list is read a page at a time, in row number order (`{ order: 'seq' }`), each next page asking for numbers above the highest one read, until a page comes back
  * short. A figure counted from the first page alone would be wrong and look right.
  *
  * IT STOPS AT 900 WRITES, under the 1,000 its declaration asks for, makes the plans first, and says the rest waits. A
@@ -147,13 +147,14 @@ export default async function run(ctx) {
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
   const every = async (list, where) => {
     const rows = [];
-    let below = null;
+    let after = null;
     for (;;) {
-      const tests = [...(where ? [where] : []), ...(below === null ? [] : [{ field: 'seq', lt: below }])];
-      const page = await ctx.record.list(list, tests.length === 0 ? undefined : tests.length === 1 ? tests[0] : { all: tests });
+      /* IN ROW NUMBER ORDER: a list answers in its own order, and `seq` below the lowest of a page skips rows. */
+      const tests = [...(where ? [where] : []), ...(after === null ? [] : [{ field: 'seq', gt: after }])];
+      const page = await ctx.record.list(list, tests.length === 0 ? null : tests.length === 1 ? tests[0] : { all: tests }, { order: 'seq' });
       for (const r of page) rows.push({ list, id: r.id, spoken: `${list}#${r.seq}`, version: r.version, fields: r.fields });
       if (page.length < PAGE) return rows;
-      below = Math.min(...page.map((r) => r.seq));
+      after = Math.max(...page.map((r) => r.seq));
     }
   };
 

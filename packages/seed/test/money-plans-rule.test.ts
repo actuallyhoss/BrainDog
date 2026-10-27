@@ -64,7 +64,7 @@ async function money() {
           const e = k.get(said);
           return e ? shaped(e) : null;
         },
-        list: async (register: string, where: unknown) => value<{ rows: Entry[] }>(k.list({ register, ...(where === undefined ? {} : { where: where as never }) })).rows.map(shaped),
+        list: async (register: string, where: unknown, options?: { order?: string } | null) => value<{ rows: Entry[] }>(k.list({ register, ...(where === undefined || where === null ? {} : { where: where as never }), ...(options?.order === 'seq' ? { order: [{ field: 'seq', dir: 'asc' as const }] } : {}) })).rows.map(shaped),
       },
       write: (register: string, fields: unknown) => void writes.push({ op: 'create', register, fields }),
       update: (spoken: string, patch: unknown, version: number) => void writes.push({ op: 'update', spoken, patch, version }),
