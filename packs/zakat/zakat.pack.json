@@ -1,10 +1,10 @@
 {
   "pack": "zakat",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "scale",
   "title": "Zakat",
   "summary": "Works out zakat step by step in plain words: the nisab from your gold rate, the year from your first gold buy or a day you set, each cash account at its lowest over 354 days, your gold and metals, less bills due, and 2.5% of the total. Keeps a list of what you have given.",
-  "changes": "Renames fields: measure is mode, owed_to_you is lent, left_out is left, lowest is low, counts is taken, paid_on is paid. First version. Needs Investments and gold. Shows the nisab, the year, the lowest each cash account stood at, the metals, the bills due and what 2.5% comes to, and keeps what you give.",
+  "changes": "Says the year's dates as words and words the note about other currencies.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -777,7 +777,7 @@
           "heading": "Step 2. The year",
           "icon": "calendar-clock",
           "span": 12,
-          "body": "Your year began on {{zakat-hawl-from}}, taken from your first gold buy unless you gave a day. It is 354 days long, and it is complete: {{good:the year has run}}. Zakat is due now.",
+          "body": "Your year began on {{day:zakat-hawl-from}}, taken from your first gold buy unless you gave a day. It is 354 days long, and it is complete: {{good:the year has run}}. Zakat is due now.",
           "when": {
             "metric": "zakat-hawl-done",
             "gt": 0
@@ -788,7 +788,7 @@
           "heading": "Step 2. The year",
           "icon": "calendar-clock",
           "span": 12,
-          "body": "Your year began on {{zakat-hawl-from}} and ends on {{zakat-hawl-ends}}, 354 days on. The figure below is what 2.5% comes to today.",
+          "body": "Your year began on {{day:zakat-hawl-from}} and ends on {{day:zakat-hawl-ends}}, 354 days on. The figure below is what 2.5% comes to today.",
           "when": {
             "all": [
               {
@@ -901,7 +901,7 @@
           "kind": "note",
           "tone": "warn",
           "span": 12,
-          "body": "{{zakat-left-out}} amounts are in another currency from the gold rate and are left out, not added in.",
+          "body": "Amounts in another currency from the gold rate are left out, not added in: {{zakat-left-out}}.",
           "when": {
             "metric": "zakat-left-out",
             "gt": 0
