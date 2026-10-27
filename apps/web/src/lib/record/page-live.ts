@@ -860,7 +860,7 @@ export function tileOf(
      because nothing was measured against a target. The cell's own note is left out: it names the same walk's other
      figure, which has no value either. */
   const lasts = r && r.value === null && !cell.refusal && r.refusals.length === 0 ? beyondOf(r) : null;
-  if (lasts !== null) return { id: cell.metric, label, value: copy.lastsPast(lasts), note: '' };
+  if (lasts !== null) return { id: cell.metric, label, value: /^lasts\b/iu.test(label) ? copy.pastDay(lasts) : copy.lastsPast(lasts), note: '' };
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const empty = (r.held ?? r.rows) === 0;

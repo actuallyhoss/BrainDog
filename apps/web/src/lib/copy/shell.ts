@@ -244,6 +244,8 @@ export const shell = {
   figureUnavailable: 'This figure cannot be worked out yet. The add-on that owns it says why.',
   /* A WALK AHEAD THAT NEVER WENT UNDER: the last day it looked at, said where the day the money runs out would be. */
   lastsPast: (day: string) => `Lasts past ${day}`,
+  /* THE SAME, UNDER A LABEL THAT ALREADY SAYS LASTS: "Lasts" over "Lasts past 3 Sep 2027" said the word twice. */
+  pastDay: (day: string) => `Past ${day}`,
   figureConverted: (day: string) => `Converted at rates as of ${day}.`,
   /** Under a cash figure whose line is the walk ahead: where it is lowest, said roughly, and on which day. */
   cashLowest: (amount: string, day: string) => `Lowest ${amount} on ${day}`,

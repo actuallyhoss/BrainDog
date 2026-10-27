@@ -293,7 +293,10 @@ function progressRows(block: BlockResult): string[] {
         const from = currencyOf(own);
         const rate = from !== null && currency !== null && from !== currency && block.fx ? rateFor(block.fx.rates as Rate[], from, currency, recordToday(clockOf(block))) : null;
         const limit = rate ? intoHome((own as { amount: number }).amount, from!, currency!, rate.rate) : own;
-        const part = spent.groups.find((g) => g.key === String(e.fields[label] ?? ''))?.value ?? 0;
+        /* A PART IS KEYED BY WHAT THE FIGURE GROUPS BY: the row itself where that is a link to it (a category's id, which
+           Money's spending figures group by), else the words in the label. Matched by the words alone, every budget drew
+           nothing spent against a figure grouped by its category. */
+        const part = spent.groups.find((g) => (e.id !== undefined && g.key === e.id) || g.key === String(e.fields[label] ?? ''))?.value ?? 0;
         const figure = currency ? money(Math.round(part), currency) : String(part);
         return `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(figure)} | ${escapeCell(said(value, limit))} | `;
       }),
@@ -1233,7 +1236,9 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
       ...split.charts.flatMap(({ currency, block: part }) => [
         ...(one || currency === null ? [] : parse(`**${copy.inCurrency(currency)}**`, { page: true })),
         ...drawSegments(part, kinds),
-        ...(split.converted ? parse(copy.figureConverted(longDay(split.converted)), { page: true }) : []),
+        /* THE RATES' DAY ONLY WHEN THEY ARE OUT OF DATE: at current rates each converted bar already says what it was
+           converted from, and the same "Converted at rates as of" line stood under every chart of Reports. */
+        ...(split.converted && split.stale === true ? parse(copy.figureConverted(longDay(split.converted)), { page: true }) : []),
       ]),
       ...(split.note ? parse(split.note, { page: true }) : []),
     ];
@@ -1337,7 +1342,9 @@ function groupedSegments(block: BlockResult, kinds?: Readonly<Record<string, Kin
     return { key: ref !== null ? `#${ref}` : name.toLowerCase(), name, ref };
   });
   const gone = new Set(block.entries.flatMap((e, i) => (mergedAway(e.fields, decl) ? [i] : [])));
-  const runs = groupCards(keys, block.fold ?? false, gone);
+  /* A GROUP BY A KIND OF ROW HEADS A KIND OF ONE TOO: an organisation with one person in it needs no heading, but a
+     lone cash account under no heading read as one more bank account. */
+  const runs = groupCards(keys, block.fold ?? false, gone, field?.type === 'enum');
   /* EVERY CARD MERGED AWAY draws nothing, so the block says its `empty:` (`drawn`) rather than an empty grid. */
   if (runs.length === 0) return [];
   if (!runs.some((r) => r.kind === 'group')) return gone.size > 0 ? drawSegments(only(block, runs.flatMap((r) => r.rows)), kinds) : null;

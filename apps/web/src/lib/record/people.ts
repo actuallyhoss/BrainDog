@@ -250,12 +250,13 @@ export function foldedTo(n: number, fold: boolean | number): number {
  * THE RECORD'S ORDER IS KEPT, so a block ordered by the last day in touch reads the most recent first, and a group stands
  * where its first card stood, its most recent, with the rest of its cards under it. A group is a group only once it has
  * two cards here; with one, that card stays where it was, among the cards around it, which are one run and not one each.
+ * `single` makes a group of one card a group too, for a block grouped by a kind of row (an account's Bank, Cash, Card).
  * `keys[i]` is what card `i` is grouped under, or `null` for none; a card in `gone` is not drawn at all.
  *
  * A GROUP IS FOLDED ONLY WHERE ITS REST HAS SOMEWHERE TO OPEN: one that points at a row, whose page lists them all. A
  * group named by words alone shows every card, since folding them would hide people nobody could then reach.
  */
-export function groupCards(keys: readonly (GroupKey | null)[], fold: boolean | number, gone: ReadonlySet<number> = new Set()): CardRun[] {
+export function groupCards(keys: readonly (GroupKey | null)[], fold: boolean | number, gone: ReadonlySet<number> = new Set(), single = false): CardRun[] {
   const byKey = new Map<string, number[]>();
   keys.forEach((k, i) => {
     if (k && !gone.has(i)) byKey.set(k.key, [...(byKey.get(k.key) ?? []), i]);
@@ -265,7 +266,7 @@ export function groupCards(keys: readonly (GroupKey | null)[], fold: boolean | n
   keys.forEach((k, i) => {
     if (gone.has(i)) return;
     const group = k ? byKey.get(k.key) : undefined;
-    if (k && group && group.length > 1) {
+    if (k && group && (group.length > 1 || single)) {
       if (placed.has(k.key)) return;
       placed.add(k.key);
       const shown = k.ref === null ? group.length : foldedTo(group.length, fold);

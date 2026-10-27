@@ -33,6 +33,12 @@ test('the count of days, which is the same walk, says the same day', () => {
   assert.equal(t.value, 'Lasts past 7 Oct 2027');
 });
 
+test('under a label that already says lasts, the day is said without the word again', () => {
+  const t = tileOf({ metric: 'runs-out-on', label: 'Lasts', reading: walked({ beyond: { day: '2027-10-07', days: 365 } }) } as never);
+  assert.equal(t.value, 'Past 7 Oct 2027');
+  assert.equal(t.value, copy.pastDay('7 Oct 2027'));
+});
+
 test('a note that names a figure with no value is not said under it', () => {
   const t = tile(walked({ beyond: { day: '2027-10-07', days: 365 } }), { note: 'In {{runway-days}}' });
   assert.equal(t.value, 'Lasts past 7 Oct 2027');
