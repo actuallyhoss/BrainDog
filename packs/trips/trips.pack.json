@@ -1,10 +1,10 @@
 {
   "pack": "trips",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "plane",
   "title": "Trips",
   "summary": "Name a trip with its dates and file the Ledger's lines into it, and each trip says what it cost in total, by category and in each currency.",
-  "changes": "Renames the colour field to hue. When a trip's dates change, the lines it filed that now fall outside them are taken out again.",
+  "changes": "Says a trip's days as words.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -313,7 +313,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{from}} to {{to}}."
+          "body": "From {{day:from}}, until {{day:to}}."
         },
         {
           "kind": "stat",

@@ -1,0 +1,135 @@
+{
+  "format": 1,
+  "made_at": "2026-10-27T15:55:15.219Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "{{trips-count}} trips, each with the Ledger's lines from its days filed into it.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "trips-count": 0
+          },
+          "read_as": {
+            "trips-count": "figure"
+          }
+        },
+        {
+          "empty": "Nothing is filed in a trip yet.",
+          "heading": "Spent on each trip",
+          "icon": "chart-bar",
+          "kind": "bar",
+          "source": "metric.trip-spent-by-trip",
+          "span": 12,
+          "key": "k0vztay9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "metric": "trip-spent-by-trip",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [],
+                "more": 0
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Trip",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "from",
+              "label": "From",
+              "width": "13ch"
+            },
+            {
+              "field": "to",
+              "label": "To",
+              "width": "13ch"
+            },
+            {
+              "field": "hue",
+              "label": "Colour",
+              "width": "10ch"
+            }
+          ],
+          "empty": "No trip yet. Add one with its name and the days it ran.",
+          "heading": "Every trip",
+          "icon": "plane",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "from"
+            }
+          ],
+          "source": "register.trips",
+          "span": 12,
+          "key": "k1ndxgri",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a trip",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "trips",
+          "span": 12,
+          "key": "k1sv815o",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        }
+      ],
+      "icon": "plane",
+      "nav": {
+        "order": 60,
+        "section": "Money"
+      },
+      "pack": "trips",
+      "page": "trips",
+      "requires": [
+        "register.trips",
+        "register.transactions"
+      ],
+      "title": "Trips",
+      "read_at": "2026-10-27T15:55:15.219Z",
+      "zone": "UTC",
+      "look": {
+        "look": "trips",
+        "basis": "r1j8hnq4",
+        "by": "rule",
+        "hide": [
+          "k1ndxgri"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}
