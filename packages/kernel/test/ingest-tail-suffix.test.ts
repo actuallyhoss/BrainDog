@@ -3,7 +3,7 @@
  *
  * MEASURED ON THE LIVE RECORD, 20 Oct: HSBC (EGP) held 826 in its last four, and the bank's texts print 5826. "Which
  * account is the account ending 5826?" said every account had nothing in its last four yet, and pressing HSBC was then
- * refused because it "already holds 014". The two sentences disagreed, and neither let the texts be filed.
+ * refused because it "already holds 826". The two sentences disagreed, and neither let the texts be filed.
  *
  * EVERY VALUE IS INVENTED.
  */
@@ -22,9 +22,9 @@ test('DIGITS KEPT SHORT ARE OFFERED AS THE END OF WHAT WAS PRINTED, and the answ
   assert.ok(q, 'no question was asked about 5826');
 
   /* HE PUTS THREE OF THE FOUR ON THE CARD BY HAND, after the question was asked. */
-  assert.ok(r.k.update('accounts', r.card, { last4: '014' } as never, OWNER).ok);
+  assert.ok(r.k.update('accounts', r.card, { last4: '826' } as never, OWNER).ok);
   const offered = (bodyOf(r.sql, q.id).options as Option[]).find((o) => o.id === r.card);
-  assert.equal(offered?.because, 'Digits the bank prints: 014, the end of 5826.', 'the option still says the card holds nothing');
+  assert.equal(offered?.because, 'Digits the bank prints: 826, the end of 5826.', 'the option still says the card holds nothing');
 
   const said = answer(r, q.id, r.card).said;
   assert.equal(said, 'Filed 1 to Credit Card. Credit Card held 826 in Digits the bank prints, the end of 5826; it holds 5826 now.');

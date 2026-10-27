@@ -325,7 +325,7 @@ function matchMaskedTail(folded: string, entries: readonly (readonly [string, Js
     for (const [literal, value] of entries) {
       const whole = fold(literal);
       /* THE STORED VALUE ENDS IN WHAT WAS PRINTED, behind stars; or THE REVERSE TAIL, what was printed ends in a stored
-         value of three digits or more, `***7731` against `395` and an account's whole number against its last four. */
+         value of three digits or more, `***7731` against `731` and an account's whole number against its last four. */
       const tail = starred && whole.length > digits.length && whole.endsWith(digits);
       const reverse = whole.length >= 3 && whole.length < digits.length && isDigits(whole) && digits.endsWith(whole);
       if (!tail && !reverse) continue;

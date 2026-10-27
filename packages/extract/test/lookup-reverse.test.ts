@@ -24,7 +24,7 @@ function read(form: Form, text: string, rows: { id: string; value: string }[]) {
 }
 
 test('A STORED VALUE THE PRINTED DIGITS END IN IS THE ONE ROW, behind stars or as a whole account number', () => {
-  const card = { id: 'a_card', value: '395' };
+  const card = { id: 'a_card', value: '731' };
   assert.deepEqual(matchLiterals('***7731', table(card), 'lookup'), ['a_card']);
   assert.deepEqual(matchLiterals('*** 7731', table(card), 'lookup'), ['a_card']);
   /* AN ACCOUNT'S WHOLE NUMBER, eight digits or more and no stars, against its last four. */
@@ -32,15 +32,15 @@ test('A STORED VALUE THE PRINTED DIGITS END IN IS THE ONE ROW, behind stars or a
 });
 
 test('TWO STORED VALUES THE DIGITS END IN ARE AMBIGUOUS, and not whichever row came first', () => {
-  assert.equal(matchLiterals('***17731', table({ id: 'a', value: '395' }, { id: 'b', value: '7731' }), 'lookup'), 'ambiguous');
-  assert.equal(matchLiterals('***17731', table({ id: 'b', value: '7731' }, { id: 'a', value: '395' }), 'lookup'), 'ambiguous');
+  assert.equal(matchLiterals('***17731', table({ id: 'a', value: '731' }, { id: 'b', value: '7731' }), 'lookup'), 'ambiguous');
+  assert.equal(matchLiterals('***17731', table({ id: 'b', value: '7731' }, { id: 'a', value: '731' }), 'lookup'), 'ambiguous');
 });
 
 test('A SHORT BARE RUN IS A FIGURE, never an account, and a value shorter than three is never a tail', () => {
-  assert.deepEqual(matchLiterals('7731 at Corner Shop', table({ id: 'a', value: '395' }), 'lookup'), []);
-  assert.deepEqual(matchLiterals('***7731', table({ id: 'a', value: '95' }), 'lookup'), []);
+  assert.deepEqual(matchLiterals('7731 at Corner Shop', table({ id: 'a', value: '731' }), 'lookup'), []);
+  assert.deepEqual(matchLiterals('***7731', table({ id: 'a', value: '31' }), 'lookup'), []);
   /* AND `enum` NEVER READS IT. */
-  assert.deepEqual(matchLiterals('***7731', table({ id: 'a', value: '395' }), 'enum'), []);
+  assert.deepEqual(matchLiterals('***7731', table({ id: 'a', value: '731' }), 'enum'), []);
 });
 
 test('A FIELD THAT SPLITS READS EACH OF ITS VALUES, and one that does not reads the whole of it', () => {
