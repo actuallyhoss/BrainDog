@@ -24,7 +24,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import '../record/fixtures/fill.ts';
-import { ACTS, COMMANDS, UNDO_LAST, admits, commands, type Command, type Live } from './admit.ts';
+import { ACTS, COMMANDS, UNDO_LAST, admits, commands, type Command } from './admit.ts';
 import { QUIET_HREF, customise, lookSaid, type Here, type Offer, type Place } from './customise.ts';
 import { BINDINGS, type Binding } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
@@ -41,12 +41,6 @@ const src = (...parts: string[]) => readFileSync(join(fileURLToPath(new URL('../
 const good: Command = { id: 'fixture', title: 'Open the Keychain', href: '/keychain', group: 'Go to', icon: 'vault' };
 
 /* ── the rule, applied to the list ────────────────────────────────────────── */
-
-test('COUNT CASH IS A ROW ONLY WHILE THE RECORD HOLDS THE COUNTS', () => {
-  const among = (live: Parameters<typeof commands>[0]) => commands(live).map((c) => c.title);
-  assert.ok(!among({ undoable: false, creation: null }).includes('Count cash'));
-  assert.ok(among({ undoable: false, creation: null, cashCount: true }).includes('Count cash'));
-});
 
 test('EVERY DECLARED COMMAND PASSES ALL THREE TESTS', () => {
   /* The rule is enforced by a filter, and a filter with nothing watching it turns a mistake into an
@@ -112,10 +106,10 @@ test('A ROW THAT CANNOT RUN RIGHT NOW IS ABSENT, NOT GREYED OUT', () => {
 });
 
 test('THE ROW THAT MAKES SOMETHING is declared, admitted, and there only while the query is a whole sentence', () => {
-  /* TWENTY, with Count cash after the money rows; it was nineteen, and sixteen before the three money rows; it was fifteen: `New page` joined the add row and `Customise` (PGS-C30, `new-page.test.ts`). The
+  /* NINETEEN, and it was sixteen before the three money rows; it was fifteen: `New page` joined the add row and `Customise` (PGS-C30, `new-page.test.ts`). The
      count is exact on purpose, because a row added or lost here is a change to what every screen can reach, and it
      should arrive with the line that says so. */
-  assert.equal(COMMANDS.length, 20, `the palette declares ${COMMANDS.length} rows`);
+  assert.equal(COMMANDS.length, 19, `the palette declares ${COMMANDS.length} rows`);
   const add = COMMANDS.find((c) => c.id === 'c-add');
   assert.ok(add, 'no row adds anything');
   assert.equal(admits(add), null, `the add row is refused: ${admits(add)}`);
