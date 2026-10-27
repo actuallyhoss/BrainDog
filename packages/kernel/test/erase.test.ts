@@ -133,3 +133,36 @@ test('AN ERASURE THAT WOULD GO WRONG WRITES NOTHING: a short subject, a basis na
   assert.ok(remaining(sql, 'quill').length > 0, 'a refused erasure removed something');
   sql.close();
 });
+
+test('AN ERASED GUEST LOSES WHAT WAS SHARED WITH THEM, and no share, event, put-off question or held arrival still names them', async () => {
+  const { k, sql } = await record();
+  const at = new Date(NOW).toISOString();
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_guest', 'guest@quill.test', 'Gil Quill')");
+  sql.exec(
+    `INSERT INTO share (id, who_kind, who, what, can, made_by, made_at) VALUES
+       ('sh_1', 'person', 'p_guest', '{"lists":["contacts"]}', 'view', 'p_owner', ?),
+       ('sh_2', 'email', 'gil@quill.test', '{"lists":["contacts"]}', 'view', 'p_owner', ?),
+       ('sh_3', 'person', 'p_owner', '{"lists":["contacts"]}', 'view', 'p_owner', ?)`,
+    at,
+    at,
+    at,
+  );
+  sql.exec("INSERT INTO share_group (id, name, made_by, made_at) VALUES ('g_1', 'Friends', 'p_owner', ?)", at);
+  sql.exec("INSERT INTO share_group_member (group_id, person_id, added_by, added_at) VALUES ('g_1', 'p_guest', 'p_owner', ?)", at);
+  sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind, field) VALUES ('ev_g', ?, 'p_owner', 'access.grant', 'share:sh_2', 'share', 'email:gil@quill.test')", at);
+  sql.exec(
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, defer_until, defer_why) VALUES ('sg_g', 'options', '{}', 'open', 'p_owner', ?, '2099-01-01', 'Waiting on Gil Quill to send his numbers')",
+    at,
+  );
+  sql.exec(
+    "INSERT INTO inbox_raw (id, ts, channel, headers, body, sha256, state, reason) VALUES ('raw_g', ?, 'webhook', '{}', '{\"amount\":3}', 'def', 'review', 'This looks like Gil Quill, with the same payee.')",
+    at,
+  );
+  assert.ok(k.access('p_guest', null), 'the fixture never gave the guest a way in');
+
+  value<EraseReport>(await k.erase({ subjects: ['Gil Quill', 'gil@quill.test'], personId: 'p_guest', basis: 'Asked to be forgotten' }, 'p_owner'));
+  assert.equal(k.access('p_guest', null), null, 'the erased guest still reads the record');
+  assert.deepEqual(remaining(sql, 'gil'), [], 'something of the guest is still readable');
+  assert.equal(sql.one<{ revoked_at: string | null }>("SELECT revoked_at FROM share WHERE id = 'sh_3'")?.revoked_at, null, 'a share to somebody else ended');
+  sql.close();
+});

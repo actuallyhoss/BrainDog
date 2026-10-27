@@ -23,6 +23,7 @@
 import type { Sql } from '@braindog/ports';
 
 import { jcs } from './declare.ts';
+import { bumpEpoch, revokeShare } from './shares.ts';
 import { project, projectedText } from './fts.ts';
 
 /** The one spelling of *removed later* (`02 §10`). */
@@ -159,16 +160,36 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   /* A DELETE LEAVES THE TERM IN THE INDEX'S SEGMENTS until they merge, so they are merged now. */
   if (erasedEntries.length > 0) sql.exec("INSERT INTO entry_fts (entry_fts) VALUES ('optimize')");
 
+  /* ── share, share_group_member: what they were given, ended ──
+     A guest holds the record through shares alone, so deleting their member rows below revoked nothing: every share to
+     an erased person or to an erased address ends here, with whatever was shared onward from it, and an address waiting
+     to be claimed goes to the tombstone. Before the event scrub, so the revocations' own events are scrubbed too. */
+  const erasedPeople = new Set(personIds);
+  let shares = 0;
+  for (const sh of sql.all<{ id: string; who_kind: string; who: string }>("SELECT id, who_kind, who FROM share WHERE who_kind IN ('person', 'email')"))
+    if (sh.who_kind === 'person' ? erasedPeople.has(sh.who) : names(sh.who, subjects)) shares += revokeShare({ sql, at, mint: deps.mint }, deps.actor, sh.id, 'erased').length;
+  for (const sh of sql.all<{ id: string; who: string }>("SELECT id, who FROM share WHERE who_kind = 'email'"))
+    if (names(sh.who, subjects)) sql.exec('UPDATE share SET who = ? WHERE id = ?', ERASED, sh.id);
+  for (const person of personIds) {
+    const n = sql.one<{ n: number }>('SELECT count(*) AS n FROM share_group_member WHERE person_id = ?', person)?.n ?? 0;
+    sql.exec('DELETE FROM share_group_member WHERE person_id = ?', person);
+    shares += Number(n);
+  }
+  if (shares > 0) bumpEpoch(sql);
+  bump('share', shares);
+
   /* ── event: the payload of every event that names the subject or is about a row that was erased ── */
   const about = new Set(erasedEntries.map((e) => `entry:${e}`));
   let events = 0;
-  for (const ev of sql.all<{ id: string; target: string | null; from_v: string | null; to_v: string | null; note: string | null }>(
-    'SELECT id, target, from_v, to_v, note FROM event',
+  for (const ev of sql.all<{ id: string; target: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null }>(
+    'SELECT id, target, field, from_v, to_v, note FROM event',
   )) {
-    const hit = (ev.target !== null && about.has(ev.target)) || names(ev.from_v, subjects) || names(ev.to_v, subjects) || names(ev.note, subjects);
+    const hit = (ev.target !== null && about.has(ev.target)) || names(ev.field, subjects) || names(ev.from_v, subjects) || names(ev.to_v, subjects) || names(ev.note, subjects);
     if (!hit) continue;
     sql.exec(
-      'UPDATE event SET from_v = CASE WHEN from_v IS NULL THEN NULL ELSE ? END, to_v = CASE WHEN to_v IS NULL THEN NULL ELSE ? END, note = CASE WHEN note IS NULL THEN NULL ELSE ? END WHERE id = ?',
+      'UPDATE event SET field = CASE WHEN field IS NULL OR NOT ? THEN field ELSE ? END, from_v = CASE WHEN from_v IS NULL THEN NULL ELSE ? END, to_v = CASE WHEN to_v IS NULL THEN NULL ELSE ? END, note = CASE WHEN note IS NULL THEN NULL ELSE ? END WHERE id = ?',
+      names(ev.field, subjects) ? 1 : 0,
+      ERASED,
       ERASED,
       ERASED,
       ERASED,
@@ -180,11 +201,12 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
 
   /* ── inbox_raw and what its receipts extracted ── */
   const raws = sql
-    .all<{ id: string; headers: string | null; body: string | null }>('SELECT id, headers, body FROM inbox_raw')
-    .filter((r) => names(r.headers, subjects) || names(r.body, subjects))
+    .all<{ id: string; headers: string | null; body: string | null; reason: string | null }>('SELECT id, headers, body, reason FROM inbox_raw')
+    .filter((r) => names(r.headers, subjects) || names(r.body, subjects) || names(r.reason, subjects))
     .map((r) => r.id);
   for (const raw of raws) {
-    sql.exec("UPDATE inbox_raw SET headers = ?, body = ?, state = 'erased' WHERE id = ?", ERASED, ERASED, raw);
+    /* THE REASON TOO: a held arrival's says which row it resembled, by that row's title. */
+    sql.exec("UPDATE inbox_raw SET headers = ?, body = ?, reason = CASE WHEN reason IS NULL THEN NULL ELSE ? END, state = 'erased' WHERE id = ?", ERASED, ERASED, ERASED, raw);
     sql.exec("UPDATE ingest_receipt SET wrote = '[]' WHERE raw_id = ?", raw);
   }
   bump('inbox_raw', raws.length);
@@ -210,7 +232,8 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
     return n;
   };
   tomb('decision', 'id', ['question', 'answer', 'reason']);
-  tomb('suggestion', 'id', ['body']);
+  /* A QUESTION PUT OFF KEEPS THE WORDS SAID WHY, which name whoever it waits on. */
+  tomb('suggestion', 'id', ['body', 'defer_why']);
   /* A CAUSE A FILER TYPED CAN CARRY A NAME (`call-mara-quill`), read with its separators as spaces. A decision's goes
      to the tombstone like its words (migration 31's trigger lets it); a question's is let go, since two open questions
      both tombstoned to one cause would break the index that holds one open question to a cause. */
