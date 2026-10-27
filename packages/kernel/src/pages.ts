@@ -394,6 +394,8 @@ export type BlockResult = PageBlock & {
   readings?: {
     metric: string;
     label?: string;
+    /** The figure's declared format (`pct`, `day`, `int`...), for a host that holds no copy of the declaration. */
+    format?: string;
     reading: Reading | null;
     refusal?: Refusal;
     trend?: (number | null)[];
@@ -2828,7 +2830,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
         const param = at < 0 ? undefined : cell.metric.slice(at + 1);
         const read = deps.read(param === undefined ? decl : (fill(decl, null, param) as MetricDecl));
         const moved = window === undefined ? {} : walkOf !== undefined ? aheadOf(deps, walkOf, window) : trendOf(deps, cell.metric, window);
-        const target = decl.target === undefined ? {} : { target: decl.target };
+        /* THE FIGURE'S DECLARED FORMAT RIDES WITH IT, so a pack's percent or day is said as one by a host that holds no
+           copy of the declaration (`tileOf`). */
+        const target = { ...(decl.target === undefined ? {} : { target: decl.target }), ...(typeof decl.format === 'string' ? { format: decl.format } : {}) };
         if ('refusal' in moved) return { ...cell, ...target, reading: read.ok ? read.value : null, refusal: moved.refusal };
         if (read.ok) return { ...cell, ...target, reading: read.value, ...moved };
         return refused(read) ? { ...cell, ...target, reading: null, refusal: read.refusal } : { ...cell, ...target, reading: null };

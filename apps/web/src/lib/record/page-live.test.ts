@@ -1609,3 +1609,9 @@ test('an empty table on a list this record does not hold draws its heading and e
   assert.equal(block.empty, 'No glaze is waiting.');
   assert.equal(block.rows.length, 0);
 });
+
+test('a figure a pack declares as a percent or a day is said as one', () => {
+  const read = (value: number) => ({ value, unit: null, rows: 3, held: 3, refusals: [], delta: null, why: '', met: true });
+  assert.equal(tileOf({ metric: 'pack-gain-pct', format: 'pct', reading: read(0.15) } as never).value, '15%');
+  assert.match(tileOf({ metric: 'pack-priced-on', format: 'day', reading: read(20_500) } as never).value, /[A-Z][a-z]{2}/u, 'a day, not its number');
+});
