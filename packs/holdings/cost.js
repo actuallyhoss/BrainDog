@@ -1,44 +1,183 @@
 /**
- * What each holding cost and what it is worth: its quantity times what one unit cost, written into `cost`, and its
- * quantity times what one is worth now, written into `value`. A holding nobody has priced is worth what it cost.
+ * What each holding cost, what it is worth now and what it has gained, worked out from its buys, its own price and,
+ * for gold, the gold rate a person or a feed says.
  *
- * STARTED WITH A ROW'S ID when its quantity, unit cost or price changes, it works that row out. Started with no id,
- * once a day, it works out every holding whose `value` is still empty, so rows written before the add-on was installed,
- * and rows an earlier version costed and never valued, are done too. A row missing its quantity or its unit cost, or
- * already holding what this would write, is left as it is. Each amount is in the currency of the number it came from.
+ * WHAT IT COST. A holding with buys counts their grams or shares into `qty` and what they cost, fees in, into `cost`,
+ * and `unit_cost` is that cost spread over the count. Each buy's own `paid` is its count times its price, plus its fees.
+ * A holding with no buys is costed as before, its count times what one cost, so a holding written before buys existed
+ * keeps every number it had. Buys in two currencies are never added: the holding keeps its own count and cost.
  *
- * A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY, the record's own day, in `priced_on`: a price nobody dated was taken
- * as it is, and then nothing could say it had gone old. A day somebody wrote is never written over.
+ * WHAT IT IS WORTH, in this order: the holding's own price ("Worth each now"), when somebody gave one; for gold, the
+ * newest gold rate for its karat, or the 24k rate times the karat over 24 when there is none for that karat; and else
+ * what it cost. `valued_by` says which of the three it was, so a page can say a value is only what was paid.
  *
- * A PRICE SAID AGAIN IS DATED AGAIN, WHEN THE RULE SAYS THE PRICE MOVED. The row alone cannot say it: a price typed this
- * morning beside a day sixty days old reads the same as one nobody touched. So the rule hands `changed`, the fields the
- * write moved, comma separated. `price` in it and `priced_on` not in it is a new price nobody dated, stamped today;
- * both in it is a day somebody wrote with the price, kept. With no `changed`, or one that names no field (a run the
- * clock started, or a record that does not fill it), the day is kept, since keeping an old day warns and writing a new
- * one would hide it. A PRICE TAKEN AWAY TAKES ITS DAY WITH IT: a day beside no price says nothing.
+ * WHAT IT GAINED is its worth less its cost, and the gain over the cost as a percent, said only when something other
+ * than the cost priced it and both are in one currency. A holding that stands at what it cost has no gain, not a gain
+ * of nought.
+ *
+ * THE GOLD RATE. One row a karat is current: the newest by its day, and by when it was written on a tie. A rate written
+ * with no day is dated today. A new rate marks itself current, the one before it not, and every gold holding is worked
+ * out again against it.
+ *
+ * STARTED BY A RULE with the row that moved: a holding is worked out; a buy is priced and its holding worked out (a buy
+ * deleted, or moved to another holding, works out every holding, since which holding it left is not said); a gold rate is marked and
+ * every gold holding worked out. STARTED BY THE CLOCK once a day, with no row, it marks the rates and works out every
+ * holding nothing has worked out yet, which is how a record that held holdings before this version gains its gains with
+ * nobody writing a row again, then the gold holdings and the first page of the rest. A script reads one page of fifty of
+ * a list, so a record with more holdings to catch up is done fifty a day.
+ *
+ * A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY in `priced_on`, and a price said again is dated again when the rule
+ * says the price moved and the day did not (`changed`, the fields the write moved, comma separated). A day somebody
+ * wrote is never written over, and a price taken away takes its day with it. Nothing is written to a row that already
+ * says what this would write.
  */
+
+/** A karat's share of pure gold. */
+const PURITY = { '24k': 24, '22k': 22, '21k': 21, '18k': 18 };
+
+const amount = (m) => m !== null && typeof m === 'object' && typeof m.amount === 'number' && typeof m.currency === 'string';
+const same = (a, b) => (amount(a) && amount(b) ? a.amount === b.amount && a.currency === b.currency : !amount(a) && !amount(b));
+const number = (n) => typeof n === 'number' && Number.isFinite(n);
+/** Counts are kept to six places, so a sum of grams reads 46.5 and not 46.50000000000001. */
+const tidy = (n) => Math.round(n * 1e6) / 1e6;
+
+/** What one buy paid: its count times its price, plus its fees in the same currency. `null` when it cannot be said. */
+function paidOf(buy) {
+  const { qty, price, fees } = buy.fields;
+  if (!number(qty) || !amount(price)) return null;
+  if (amount(fees) && fees.currency !== price.currency) return null;
+  return { amount: Math.round(qty * price.amount) + (amount(fees) ? fees.amount : 0), currency: price.currency };
+}
+
+/** The current rate a karat: the newest row by its day, then by when it was written. */
+function currentOf(rates) {
+  const best = {};
+  for (const r of rates) {
+    const k = r.fields.karat;
+    if (typeof k !== 'string' || !amount(r.fields.per_gram)) continue;
+    const day = typeof r.fields.on === 'string' ? r.fields.on : '';
+    const was = best[k];
+    if (!was || day > was.day || (day === was.day && r.seq > was.seq)) best[k] = { day, seq: r.seq, id: r.id, per_gram: r.fields.per_gram };
+  }
+  return best;
+}
+
+/** What a gram of this karat is worth by the rates, or `null`. Not rounded, so the holding's worth is rounded once. */
+function rateFor(current, karat) {
+  if (typeof karat !== 'string' || PURITY[karat] === undefined) return null;
+  if (current[karat]) return current[karat].per_gram;
+  const pure = current['24k'];
+  if (!pure) return null;
+  return { amount: (pure.per_gram.amount * PURITY[karat]) / 24, currency: pure.per_gram.currency };
+}
+
+/** Dates a rate nobody dated, and marks the newest a karat current and the rest not. */
+function markRates(ctx, rates, today) {
+  const undated = (r) => amount(r.fields.per_gram) && !(typeof r.fields.on === 'string' && r.fields.on !== '');
+  const current = currentOf(rates.map((r) => (undated(r) ? { ...r, fields: { ...r.fields, on: today } } : r)));
+  const ids = new Set(Object.values(current).map((c) => c.id));
+  for (const r of rates) {
+    const next = undated(r) ? { on: today } : {};
+    const now = ids.has(r.id);
+    if ((r.fields.current === true) !== now) next.current = now;
+    if (Object.keys(next).length > 0) ctx.update('gold_rates#' + r.seq, next, r.version);
+  }
+  return current;
+}
+
+/** Works out one holding against its buys and the rates, and writes what moved. */
+async function work(ctx, row, current, today, repriced) {
+  if (!row) return;
+  const f = row.fields;
+  const buys = await ctx.record.list('holding_buys', { field: 'holding', is: row.id });
+  const next = {};
+
+  let qty = f.qty;
+  let cost = null;
+  const paid = buys.map(paidOf);
+  const currencies = new Set(paid.filter(Boolean).map((p) => p.currency));
+  if (buys.length > 0 && paid.every(Boolean) && currencies.size === 1) {
+    qty = tidy(buys.reduce((s, b) => s + b.fields.qty, 0));
+    const [currency] = currencies;
+    cost = { amount: paid.reduce((s, p) => s + p.amount, 0), currency };
+    if (f.qty !== qty) next.qty = qty;
+    const each = qty > 0 ? { amount: Math.round(cost.amount / qty), currency } : null;
+    if (each && !same(f.unit_cost, each)) next.unit_cost = each;
+    const first = buys.map((b) => b.fields.bought_on).filter((d) => typeof d === 'string').sort()[0];
+    if (first && f.acquired_on !== first) next.acquired_on = first;
+  } else if (number(qty) && amount(f.unit_cost)) {
+    cost = { amount: Math.round(qty * f.unit_cost.amount), currency: f.unit_cost.currency };
+  }
+  if (cost === null || !number(qty)) {
+    if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);
+    return;
+  }
+
+  let value = cost;
+  let by = 'cost';
+  const gram = f.kind === 'gold' ? rateFor(current, f.karat) : null;
+  if (amount(f.price)) {
+    value = { amount: Math.round(qty * f.price.amount), currency: f.price.currency };
+    by = 'price';
+  } else if (gram) {
+    value = { amount: Math.round(qty * gram.amount), currency: gram.currency };
+    by = 'gold_rate';
+  }
+  const gained = by !== 'cost' && value.currency === cost.currency;
+  const gain = gained ? { amount: value.amount - cost.amount, currency: cost.currency } : null;
+  const pct = gained && cost.amount > 0 ? Math.round(((value.amount - cost.amount) / cost.amount) * 1000) / 10 : null;
+
+  if (!same(f.cost, cost)) next.cost = cost;
+  if (!same(f.value, value)) next.value = value;
+  if (f.valued_by !== by) next.valued_by = by;
+  if (!same(f.gain, gain)) next.gain = gain;
+  if ((number(f.gain_pct) ? f.gain_pct : null) !== pct) next.gain_pct = pct;
+  if (amount(f.price) && (!f.priced_on || repriced) && f.priced_on !== today) next.priced_on = today;
+  if (!amount(f.price) && f.priced_on) next.priced_on = null;
+  if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);
+}
+
 export default async function run(ctx) {
-  const id = ctx.input && ctx.input.id;
-  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('holdings', { field: 'value', empty: true });
+  const input = ctx.input !== null && typeof ctx.input === 'object' ? ctx.input : {};
   const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);
-  const amount = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';
-  const same = (a, b) => amount(a) && a.amount === b.amount && a.currency === b.currency;
-  const moved = ctx.input && typeof ctx.input.changed === 'string' ? ctx.input.changed.split(',') : [];
+  const moved = typeof input.changed === 'string' ? input.changed.split(',') : [];
   const repriced = moved.includes('price') && !moved.includes('priced_on');
+  const rates = await ctx.record.list('gold_rates');
+  const id = typeof input.id === 'string' ? input.id : null;
+
+  if (id !== null && input.register === 'holding_buys') {
+    const buy = await ctx.record.get(id);
+    const current = currentOf(rates);
+    const paid = buy === null ? null : paidOf(buy);
+    if (buy !== null && paid !== null && !same(buy.fields.paid, paid)) ctx.update('holding_buys#' + buy.seq, { paid }, buy.version);
+    /* GONE, OR MOVED FROM ONE HOLDING TO ANOTHER: which holding it left is not said, so every holding is worked out. */
+    if (buy === null || (input.op === 'update' && moved.includes('holding'))) {
+      for (const row of await ctx.record.list('holdings')) await work(ctx, row, current, today, false);
+      return;
+    }
+    const holding = typeof buy.fields.holding === 'string' ? await ctx.record.get(buy.fields.holding) : null;
+    await work(ctx, holding, current, today, false);
+    return;
+  }
+  if (id !== null && input.register === 'gold_rates') {
+    const current = markRates(ctx, rates, today);
+    for (const row of await ctx.record.list('holdings', { field: 'kind', is: 'gold' })) await work(ctx, row, current, today, false);
+    return;
+  }
+  if (id !== null) {
+    await work(ctx, await ctx.record.get(id), currentOf(rates), today, repriced);
+    return;
+  }
+  /* THE CLOCK: the rates, every holding nothing has worked out yet, the gold, and the first page of the rest, which
+     catches a holding whose buy a rule could not start a run for on a busy day. */
+  const current = markRates(ctx, rates, today);
+  const done = new Set();
+  const lists = [{ field: 'valued_by', empty: true }, { field: 'kind', is: 'gold' }, null];
+  const rows = [];
+  for (const where of lists) rows.push(...(await (where === null ? ctx.record.list('holdings') : ctx.record.list('holdings', where))));
   for (const row of rows) {
-    if (!row) continue;
-    const qty = row.fields.qty;
-    const each = row.fields.unit_cost;
-    const now = row.fields.price;
-    if (typeof qty !== 'number' || !amount(each)) continue;
-    const cost = { amount: Math.round(qty * each.amount), currency: each.currency };
-    const value = amount(now) ? { amount: Math.round(qty * now.amount), currency: now.currency } : cost;
-    const next = {};
-    if (!same(row.fields.cost, cost)) next.cost = cost;
-    if (!same(row.fields.value, value)) next.value = value;
-    if (amount(now) && (!row.fields.priced_on || repriced) && row.fields.priced_on !== today) next.priced_on = today;
-    if (!amount(now) && row.fields.priced_on) next.priced_on = null;
-    if (Object.keys(next).length === 0) continue;
-    ctx.update('holdings#' + row.seq, next, row.version);
+    if (done.has(row.id)) continue;
+    done.add(row.id);
+    await work(ctx, row, current, today, false);
   }
 }

@@ -1,0 +1,400 @@
+{
+  "pack": "holdings",
+  "version": "1.4.2",
+  "icon": "chart-pie",
+  "title": "Holdings",
+  "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, what each is worth now when you have a price for it, and what they come to together.",
+  "changes": "Its two scripts have short names: Count what each holding cost and is worth, and Ask once about an account counted twice. What each does is unchanged. Now draws its own icon.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=2.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "holdings",
+      "name": "Holdings",
+      "icon": "money",
+      "one": "holding",
+      "holds": "what you hold rather than spend: certificates, policies and commodities, with what each one cost and when it matures",
+      "title": "label",
+      "mobile": [
+        "label",
+        "qty",
+        "unit_cost"
+      ],
+      "pack": "holdings",
+      "fields": [
+        {
+          "id": "label",
+          "label": "Description",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Type",
+          "type": "enum",
+          "values": [
+            "certificate",
+            "policy",
+            "commodity",
+            "other"
+          ],
+          "index": true,
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "qty",
+          "label": "How many",
+          "type": "decimal",
+          "min": 0,
+          "required": true,
+          "qualifies": "unit_cost"
+        },
+        {
+          "id": "unit_cost",
+          "label": "Cost each",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "cost",
+          "label": "What it cost",
+          "type": "money"
+        },
+        {
+          "id": "price",
+          "label": "Worth each now",
+          "type": "money"
+        },
+        {
+          "id": "priced_on",
+          "label": "Priced on",
+          "type": "day"
+        },
+        {
+          "id": "value",
+          "label": "Worth now",
+          "type": "money"
+        },
+        {
+          "id": "acquired_on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "matures_on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "rule": "holdings_cost",
+      "pack": "holdings",
+      "on": {
+        "written": {
+          "register": "holdings",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "qty",
+            "unit_cost",
+            "price"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "holdings_cost",
+            "input": {
+              "changed": "{{trigger.changed}}"
+            },
+            "as": "costing"
+          }
+        }
+      ]
+    },
+    {
+      "script": "holdings_cost",
+      "title": "Count what each holding cost and is worth",
+      "pack": "holdings",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "holdings"
+      ],
+      "writes": [
+        "holdings"
+      ],
+      "source": "/**\n * What each holding cost and what it is worth: its quantity times what one unit cost, written into `cost`, and its\n * quantity times what one is worth now, written into `value`. A holding nobody has priced is worth what it cost.\n *\n * STARTED WITH A ROW'S ID when its quantity, unit cost or price changes, it works that row out. Started with no id,\n * once a day, it works out every holding whose `value` is still empty, so rows written before the add-on was installed,\n * and rows an earlier version costed and never valued, are done too. A row missing its quantity or its unit cost, or\n * already holding what this would write, is left as it is. Each amount is in the currency of the number it came from.\n *\n * A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY, the record's own day, in `priced_on`: a price nobody dated was taken\n * as it is, and then nothing could say it had gone old. A day somebody wrote is never written over.\n *\n * A PRICE SAID AGAIN IS DATED AGAIN, WHEN THE RULE SAYS THE PRICE MOVED. The row alone cannot say it: a price typed this\n * morning beside a day sixty days old reads the same as one nobody touched. So the rule hands `changed`, the fields the\n * write moved, comma separated. `price` in it and `priced_on` not in it is a new price nobody dated, stamped today;\n * both in it is a day somebody wrote with the price, kept. With no `changed`, or one that names no field (a run the\n * clock started, or a record that does not fill it), the day is kept, since keeping an old day warns and writing a new\n * one would hide it. A PRICE TAKEN AWAY TAKES ITS DAY WITH IT: a day beside no price says nothing.\n */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('holdings', { field: 'value', empty: true });\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  const amount = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';\n  const same = (a, b) => amount(a) && a.amount === b.amount && a.currency === b.currency;\n  const moved = ctx.input && typeof ctx.input.changed === 'string' ? ctx.input.changed.split(',') : [];\n  const repriced = moved.includes('price') && !moved.includes('priced_on');\n  for (const row of rows) {\n    if (!row) continue;\n    const qty = row.fields.qty;\n    const each = row.fields.unit_cost;\n    const now = row.fields.price;\n    if (typeof qty !== 'number' || !amount(each)) continue;\n    const cost = { amount: Math.round(qty * each.amount), currency: each.currency };\n    const value = amount(now) ? { amount: Math.round(qty * now.amount), currency: now.currency } : cost;\n    const next = {};\n    if (!same(row.fields.cost, cost)) next.cost = cost;\n    if (!same(row.fields.value, value)) next.value = value;\n    if (amount(now) && (!row.fields.priced_on || repriced) && row.fields.priced_on !== today) next.priced_on = today;\n    if (!amount(now) && row.fields.priced_on) next.priced_on = null;\n    if (Object.keys(next).length === 0) continue;\n    ctx.update('holdings#' + row.seq, next, row.version);\n  }\n}\n"
+    },
+    {
+      "script": "holdings_twin",
+      "title": "Ask once about an account counted twice",
+      "pack": "holdings",
+      "runs": {
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "holdings",
+        "accounts"
+      ],
+      "writes": [
+        "accounts"
+      ],
+      "source": "/**\n * One thing written down twice: an account that counts as cash and a holding with the same name. The account's balance\n * is in the cash and the holding's worth is in Holdings value, so the same thing may be counted twice. Asked once:\n * stop counting the account as cash, or keep counting it.\n *\n * WHAT IT READS. Once a day, the accounts that count as cash and are not closed, and the holdings. Two names are the\n * same when their letters are, whatever the capitals and wherever the spaces. A blank name matches nothing.\n *\n * WHAT IT WRITES. Nothing. The one change rides on the answer \"Stop counting it\" and is made by whoever picks it: the\n * account stops counting as cash and keeps its balance. \"Keep counting it\" changes nothing.\n *\n * ONE QUESTION TO A PAIR, EVER. The cause is the pair, by the two lines' own numbers, and the record holds one question\n * to a cause: a run that finds it waiting adds none, and a run that finds it answered asks nothing. So this keeps no\n * memory of its own. An account taken out of cash is no longer read, so it is not asked about either.\n *\n * ONE RUN ASKS ONE QUESTION, so with several pairs the one asked about turns with the day. Always asking about the\n * first would hand an answered pair back every night and never reach the second. A script reads one page of fifty of\n * each list, so a record with more of either is matched on its first fifty.\n */\nconst same = (name) => (typeof name === 'string' ? name.normalize('NFKC').toLowerCase().replace(/\\s+/gu, '') : '');\n\nexport default async function run(ctx) {\n  const holdings = await ctx.record.list('holdings');\n  if (holdings.length === 0) return null;\n  const accounts = (await ctx.record.list('accounts', { field: 'liquid', is: true })).filter((a) => a.fields.liquid === true && a.fields.state !== 'closed');\n  const pairs = [];\n  for (const account of accounts) {\n    const name = same(account.fields.name);\n    if (name === '') continue;\n    for (const holding of holdings) if (same(holding.fields.label) === name) pairs.push({ account, holding });\n  }\n  if (pairs.length === 0) return null;\n  const day = Math.round(Date.parse(`${ctx.today()}T00:00:00Z`) / 86_400_000);\n  const { account, holding } = pairs[day % pairs.length];\n  const name = String(account.fields.name).trim().replace(/\\s+/gu, ' ');\n  return {\n    ask: {\n      cause: `holdings.twin:${account.seq}:${holding.seq}`,\n      question: `${name} is an account and a holding. It may be counted twice. Stop counting the account as cash?`,\n      about: name,\n      options: [\n        {\n          id: 'stop',\n          label: 'Stop counting it',\n          because: 'The account keeps its balance and is left out of your cash. The holding is counted as it is.',\n          patches: [{ id: `accounts#${account.seq}`, version: account.version, fields: { liquid: false } }],\n        },\n        { id: 'keep', label: 'Keep counting it', because: 'Both are counted as they are, and this is not asked again.' },\n      ],\n    },\n  };\n}\n"
+    },
+    {
+      "metric": "holdings-value",
+      "name": "Holdings value",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is set",
+      "value": {
+        "sum": "value"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "sellable": true
+    },
+    {
+      "metric": "holdings-count",
+      "name": "Holdings",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-costed",
+      "name": "Holdings costed",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "cost is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-at-cost",
+      "name": "Holdings at what they cost",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is set, price is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-unpriced",
+      "name": "Holdings with no price",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "price is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-priced-on",
+      "name": "Oldest price",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "price is set, priced_on is set",
+      "value": {
+        "min": "priced_on"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-stale",
+      "name": "Prices over 30 days old",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "price is set, priced_on before -30d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "holdings",
+      "title": "Holdings",
+      "pack": "holdings",
+      "nav": {
+        "section": "Money",
+        "order": 30
+      },
+      "icon": "money",
+      "requires": [
+        "register.holdings"
+      ],
+      "blocks": [
+        {
+          "kind": "stat",
+          "lead": true,
+          "heading": "What you hold",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "holdings-value",
+              "label": "Holdings value",
+              "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
+            }
+          ],
+          "when": {
+            "metric": "holdings-unpriced",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "stat",
+          "lead": true,
+          "heading": "What you hold",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "holdings-value",
+              "label": "Holdings value"
+            }
+          ],
+          "when": {
+            "metric": "holdings-unpriced",
+            "is": 0
+          }
+        },
+        {
+          "kind": "stat",
+          "heading": "Priced on",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "holdings-priced-on",
+              "label": "Oldest price"
+            }
+          ],
+          "when": {
+            "metric": "holdings-stale",
+            "is": 0
+          }
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}. That is the oldest price here. Say what each holding is worth now and the value above is today's.",
+          "when": {
+            "metric": "holdings-stale",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Everything you hold",
+          "span": 12,
+          "source": "register.holdings",
+          "columns": [
+            {
+              "field": "label",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "kind"
+            },
+            {
+              "field": "qty"
+            },
+            {
+              "field": "unit_cost"
+            },
+            {
+              "field": "price"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "acquired_on"
+            },
+            {
+              "field": "matures_on"
+            }
+          ],
+          "order": [
+            {
+              "field": "acquired_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 100,
+          "empty": "Nothing held yet. A certificate, a policy or a lot of a commodity goes here with what it cost, and what it is worth now when you know."
+        }
+      ]
+    }
+  ]
+}
