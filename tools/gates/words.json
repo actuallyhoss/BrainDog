@@ -1,5 +1,5 @@
 {
-  "about": "The words a person must never read in BrainDog, each with the word to say instead (EXP-B07). tools/gates/words.mjs reads every copy object the app ships against it. An entry whose page names a rule is read by that rule of the page lint too (packages/render/src/lint.ts, PAGE_WORDS): plain-words for the machinery's nouns for a thing, system-word for the words of how the app is built. buttons are the one-word buttons a person may read (BUTTON_WORDS there); any other button says a verb and its object. Both are held equal by the gate and by lint.test.ts. A shape is a regular expression read case-blind unless case is true; unless is a shape that, when the whole string matches it, forgives it. held is today's debt by file and count, read only on the repository itself, and it only shrinks.",
+  "about": "The words a person must never read in BrainDog, each with the word to say instead. tools/gates/words.mjs reads every copy object the app ships against it. An entry whose page names a rule is read by that rule of the page lint too (packages/render/src/lint.ts, PAGE_WORDS): plain-words for the machinery's nouns for a thing, system-word for the words of how the app is built. buttons are the one-word buttons a person may read (BUTTON_WORDS there); any other button says a verb and its object. Both are held equal by the gate and by lint.test.ts. A shape is a regular expression read case-blind unless case is true; unless is a shape that, when the whole string matches it, forgives it. held is today's debt by file and count, read only on the repository itself, and it only shrinks.",
   "words": [
     {
       "name": "row",
@@ -92,14 +92,14 @@
       "shape": "\\brecommended\\b",
       "say": "suggested",
       "page": "system-word",
-      "why": "Suggested is the one word (RQ-EXP-412)."
+      "why": "Suggested is the one word."
     },
     {
       "name": "Submit",
       "shape": "\\bsubmit\\b",
       "say": "a verb and its object, such as Save the bill",
       "page": false,
-      "why": "A button says what it does to what (RQ-EXP-408)."
+      "why": "A button says what it does to what."
     },
     {
       "name": "OK",
@@ -107,14 +107,14 @@
       "case": true,
       "say": "Done, or a verb and its object",
       "page": false,
-      "why": "A button says what it does to what (RQ-EXP-408)."
+      "why": "A button says what it does to what."
     },
     {
       "name": "isn't code",
       "shape": "\\bisn['\u2019]t code\\b",
       "say": "not just code",
       "page": "system-word",
-      "why": "The product's words are \"not just code\" (RQ-EXP-417)."
+      "why": "The product's words are \"not just code\"."
     },
     {
       "name": "an id in a sentence",
@@ -192,10 +192,10 @@
   "titles": {
     "keys": "(?:title|heading|label|button)s?$",
     "say": "the same words with no full stop",
-    "why": "A title, a heading, a label or a button is a name, not a sentence (RQ-EXP-409). A key ending in one of those words holds one."
+    "why": "A title, a heading, a label or a button is a name, not a sentence. A key ending in one of those words holds one."
   },
   "buttons": ["Undo", "Cancel", "Done", "Close", "Back"],
   "held": {
-    "apps/web/src/lib/copy/shell.ts": { "count": 1, "why": "mcp is \"MCP\", the door's name in the shell. EXP-B08 names it for what it does." }
+    "apps/web/src/lib/copy/shell.ts": { "count": 1, "why": "mcp is \"MCP\", the door's name in the shell. A later change names it for what it does." }
   }
 }

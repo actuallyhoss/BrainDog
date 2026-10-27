@@ -22,7 +22,7 @@ const task = (key: string, title: string, when: string): HomeLine => ({ key, tit
 
 const SALARY = money('obligations#2', 'Lanternfish salary', '13 days late');
 const FEE = money('obligations#5', 'Copperleaf contractor fee', '14 days late');
-const HARBOUR = money('obligations#9', 'Harbourview instalment, 2 of 40', '9 days late');
+const HARBOUR = money('obligations#9', 'Harbourview instalment, 2 of 36', '9 days late');
 const REFUND = task('tasks#41', 'Send Jennifer the Crumb Pass refund email', '7 days late');
 const TODAY: HomeLine = { key: 'obligations#12', title: 'Northwind premium', when: 'Due today', amount: { text: '−$287', dir: 'out' }, late: false };
 
@@ -47,7 +47,7 @@ test('THREE PAYMENTS, A TASK AND QUESTIONS ARE THREE SENTENCES, each thing by na
   const brief = briefOf({ lines: [SALARY, FEE, HARBOUR, REFUND], needYou: 2, agents: ['Claude'], calm: 'Nothing needs you now.' });
   assert.equal(
     brief.text,
-    '3 payments are late: Lanternfish salary by 13 days, Copperleaf contractor fee by 14 days and Harbourview instalment, 2 of 40 by 9 days. ' +
+    '3 payments are late: Lanternfish salary by 13 days, Copperleaf contractor fee by 14 days and Harbourview instalment, 2 of 36 by 9 days. ' +
       'Send Jennifer the Crumb Pass refund email is 7 days late. Claude is working, and 2 questions wait for you.',
   );
   /* THE ONE RED PHRASE IS THE FIRST THING THAT NEEDS HIM, and the figures are figures. */
@@ -58,7 +58,7 @@ test('THREE PAYMENTS, A TASK AND QUESTIONS ARE THREE SENTENCES, each thing by na
   assert.deepEqual(brief.parts.filter((p) => p.href).map((p) => [p.text, p.href]), [
     ['Lanternfish salary', '/r/obligations/2'],
     ['Copperleaf contractor fee', '/r/obligations/5'],
-    ['Harbourview instalment, 2 of 40', '/r/obligations/9'],
+    ['Harbourview instalment, 2 of 36', '/r/obligations/9'],
     ['Send Jennifer the Crumb Pass refund email', '/r/tasks/41'],
     ['2 questions', '/decide'],
   ]);
@@ -71,7 +71,7 @@ test('ONE PAYMENT IS ITS OWN SENTENCE, MORE THAN THREE ARE NAMED THREE AND COUNT
   assert.equal(NAMED_MOST, 3);
   assert.equal(
     said,
-    '9 payments are late: Lanternfish salary by 13 days, Copperleaf contractor fee by 14 days, Harbourview instalment, 2 of 40 by 9 days and 6 more. ' +
+    '9 payments are late: Lanternfish salary by 13 days, Copperleaf contractor fee by 14 days, Harbourview instalment, 2 of 36 by 9 days and 6 more. ' +
       'Claude and Codex are working, and 1 question waits for you.',
   );
 });

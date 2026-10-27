@@ -26,12 +26,12 @@ test('LASTS SAYS ITS DAYS, THE DAY THEY END ON AND WHAT FALLS DUE THEN, and the 
   const tile = tileOf(cell(79), {
     'every-month-in.names': 'Pay',
     'lasts-no-income.on': '2027-01-13',
-    'lasts-no-income.because': 'House, part 3 of 40',
+    'lasts-no-income.because': 'House, part 3 of 36',
   });
   assert.equal(tile.value, '79 days');
   assert.equal(tile.label, 'With no money coming in');
   /* THE WALK WITH WHAT COMES IN NEVER GOES UNDER, so its sentence goes whole and the first keeps its full stop. */
-  assert.match(tile.note, /^If all money in stopped, Pay too, it lasts to (?:Wed )?13 Jan(?: 2027)?, when House, part 3 of 40 is due\.$/u);
+  assert.match(tile.note, /^If all money in stopped, Pay too, it lasts to (?:Wed )?13 Jan(?: 2027)?, when House, part 3 of 36 is due\.$/u);
 });
 
 test('WHERE THE MONEY RUNS OUT EVEN WITH WHAT COMES IN, the second sentence says the day; with no money in to name, its clause goes', () => {

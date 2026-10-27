@@ -3,7 +3,7 @@
  * `Kiln` filled in, as a figure cell always has (`fill(decl, null, param)`), and the first colon separates.
  *
  * WHAT WAS MEASURED BEFORE IT: a path had no colon, so the hole was never asked and a plan's lead sentence,
- * "10 of 23 paid. E£176,500 left", was drawn with its braces showing. The plan's page stood on four tiles instead.
+ * "10 of 21 paid. E£176,500 left", was drawn with its braces showing. The plan's page stood on four tiles instead.
  */
 
 import { test } from 'node:test';

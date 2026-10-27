@@ -101,12 +101,12 @@ test('MONEY OPENS ON ITS CASH: a late instalment leads no page past the walk of 
     block({ kind: 'forecast', source: 'forecast.runway', heading: 'Cash ahead' }),
     block({ kind: 'split', source: 'metric.cash-by-account', heading: 'Accounts', area: 'rail' }),
     block({ kind: 'section', heading: 'Coming and going' }),
-    block({ kind: 'progress', source: 'register.installments', heading: 'Instalments', rows: [row('installments', 11, { what: 'Instalment, harbourview, 2 of 40', due: '2026-09-29' })], matched: 1 }),
+    block({ kind: 'progress', source: 'register.installments', heading: 'Instalments', rows: [row('installments', 11, { what: 'Instalment, harbourview, 2 of 36', due: '2026-09-29' })], matched: 1 }),
   );
   const [, walk, , , instalments] = keysOf(blocks);
   const look = composeLook(input(blocks, { page: 'money', lists: [INSTALMENTS], titleOf: (r) => (r === 'installments' ? 'what' : null) }));
   assert.equal(look.lead, undefined, 'the instalments did not lead past Cash ahead');
-  assert.deepEqual(look.next, { row: 'installments#11', text: 'Instalment, harbourview, 2 of 40 is 7 days late' }, 'what is late is still said, in the next line');
+  assert.deepEqual(look.next, { row: 'installments#11', text: 'Instalment, harbourview, 2 of 36 is 7 days late' }, 'what is late is still said, in the next line');
   const drawn = applyLook(blocks, look);
   assert.ok(keysOf(drawn.blocks).indexOf(walk!) < keysOf(drawn.blocks).indexOf(instalments!), 'the walk stays above');
 

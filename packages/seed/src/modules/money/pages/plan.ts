@@ -109,7 +109,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
     },
     {
       /* ONE TRACK, THE PARTS PAID AGAINST EVERY PART THAT STANDS, AND THE NEXT PART UNDER IT, as Money's Instalments tile
-         draws each plan from the same five figures cut to one plan: "10 of 40", then "Next EGP 120,000 on 28 Nov", or the
+         draws each plan from the same five figures cut to one plan: "10 of 36", then "Next EGP 120,000 on 28 Nov", or the
          part late in the late red. The amount is what is left less what is left once that part is paid, worked out by
          the app, so no figure subtracts two currencies. */
       kind: 'progress',

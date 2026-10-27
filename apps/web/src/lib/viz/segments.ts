@@ -35,7 +35,7 @@ export function segments(total: number, done: number, width: number, current = f
   }));
 }
 
-/** "Lina, parts paid: 10 of 23, the 11th current". */
+/** "Lina, parts paid: 10 of 21, the 11th current". */
 export function describeSegments(total: number, done: number, subject: string | undefined, current = false): string {
   const n = Math.max(0, Math.floor(total));
   const d = Math.min(Math.max(0, Math.floor(done)), n);

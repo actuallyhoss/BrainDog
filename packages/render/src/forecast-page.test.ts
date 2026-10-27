@@ -25,7 +25,7 @@ step | 2026-10-31 | Salary | EGP 200,000.00
 step | 2026-11-03 | Everyday spending | EGP −9,230.77
 step | 2026-11-25 | Premium | EGP −15,000.00
 step | 2026-11-30 | Salary | EGP 200,000.00
-step | 2027-01-13 | House, part 3 of 40 | EGP −531,765.00
+step | 2027-01-13 | House, part 3 of 36 | EGP −531,765.00
 of | House |  |
 horizon | 91 |  |
 `;
@@ -40,7 +40,7 @@ test('THE SUMMARY SAYS THE CASH AT THE HORIZON AND ITS CHANGE, THE LOWEST POINT 
   assert.match(end!.note.replaceAll(' ', ' '), /^from .*500,000 today · −/u, 'the change from today, signed');
   assert.equal(end!.dir, 'out');
   assert.equal(low!.label, 'Lowest');
-  assert.equal(low!.note, 'on 13 Jan 2027, after House, part 3 of 40', 'the lowest day and the part of the plan that took it there');
+  assert.equal(low!.note, 'on 13 Jan 2027, after House, part 3 of 36', 'the lowest day and the part of the plan that took it there');
   assert.equal(everyday!.key, 'everyday');
   assert.match(everyday!.figure.replaceAll(' ', ' '), /40,000/u);
   assert.equal(everyday!.note, 'a month, the average of Jul to Sep');
@@ -68,7 +68,7 @@ test('EVERY MOVEMENT IS A DOT ON THE LINE AND A ROW OF THE LIST, money in apart 
   const next = forecastNext(model, shown, plan);
   assert.deepEqual(
     next.rows.map((r) => (r.everyday ? 'everyday' : `${r.n ?? '·'} ${r.label}`)),
-    ['everyday', '· Salary', '· Premium', '· Salary', '1 House, part 3 of 40'],
+    ['everyday', '· Salary', '· Premium', '· Salary', '1 House, part 3 of 36'],
   );
   assert.equal(next.more, 0);
 });

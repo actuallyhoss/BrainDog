@@ -28,7 +28,7 @@
     tone?: Tone | undefined;
     /** What is being counted, which leads the sentence: "Lina, parts paid". */
     subject?: string | undefined;
-    /** The whole sentence, when "10 of 23 done" will not do. */
+    /** The whole sentence, when "10 of 21 done" will not do. */
     summary?: string | undefined;
   } = $props();
 

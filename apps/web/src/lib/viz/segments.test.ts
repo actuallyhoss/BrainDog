@@ -43,7 +43,7 @@ test('no steps, or no room, draws nothing', () => {
 });
 
 test('it reads as a sentence', () => {
-  assert.equal(describeSegments(23, 10, 'Lina, parts paid', true), 'Lina, parts paid: 10 of 23 done, the 11th current');
+  assert.equal(describeSegments(21, 10, 'Lina, parts paid', true), 'Lina, parts paid: 10 of 21 done, the 11th current');
   assert.equal(describeSegments(4, 2, undefined), '2 of 4 done');
   assert.equal(describeSegments(4, 4, undefined, true), '4 of 4 done');
 });

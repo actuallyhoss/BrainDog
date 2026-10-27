@@ -80,7 +80,7 @@ test('A CALENDAR OVER WHAT FALLS DUE SAYS EACH LINE\'S MONEY, signed by the way 
     ['[Studio salary](/r/recurring/2)', '2026-09-30'],
   ]);
   assert.match(cells[0]![2] ?? '', /^−.*287\.15/u);
-  assert.match(cells[1]![2] ?? '', /^\+.*4,038\.46/u);
+  assert.match(cells[1]![2] ?? '', /^\+.*4,012\.46/u);
 });
 
 test('an authored calendar keeps its rows and their tone, and one with nothing in it says the empty state', () => {
