@@ -243,7 +243,7 @@ test('nothing a reader was invited to read is hidden from them', () => {
  *
  * MEASURED on the walk of 2 October: a press made a round trip and then asked "Why?", and two of the owner's decisions
  * carried the reasons "f" and "y". So the press sends the answer alone, the one line opens only on the record's own
- * `wants: 'reason'`, and the suggestion is an outline with a dot rather than the filled primary.
+ * `wants: 'reason'`, and the suggested answer is the one filled primary and says so on its own button (UX21).
  */
 test('one press is the answer, and a reason is asked for only when the record asks', () => {
   const chooseAt = page.indexOf('function choose(key: string) {');
@@ -253,12 +253,13 @@ test('one press is the answer, and a reason is asked for only when the record as
   assert.match(page, /out\.from === 'refused' && out\.wants === 'reason' && said === undefined/u, 'the one line opens on something other than the record asking');
   assert.match(page, /\{#if asked\}\n\s+<form class="line-form" onsubmit=\{sendReason\}>/u, 'the reason line is drawn without the record asking');
 
-  /* THE SUGGESTION IS SAID, NEVER FILLED: of the record's two answers only Accept is the primary, whichever is suggested,
-     and the press is the reader's. A question of options is a card each, and its own button gives it (today F9). */
+  /* THE SUGGESTED ANSWER IS THE ONE FILLED PRIMARY (UX21), "Accept, suggested" on its own button, as on the queue's cards
+     (`primaryOf`): of the record's two answers the suggested one is filled, and Accept only where nothing is suggested.
+     The press is still the reader's. A question of options is a card each, and its own button gives it (today F9). */
   const snippetAt = page.indexOf('{#snippet answer(');
   const snippet = page.slice(snippetAt, page.indexOf('{/snippet}', snippetAt));
   assert.ok(snippetAt >= 0, 'the one answer button is no longer one snippet');
-  assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={option.key === 'accept' ? 'primary' : undefined}"], 'an answer is drawn heavier for being suggested');
+  assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={marked || (suggestedKey === undefined && option.key === 'accept') ? 'primary' : undefined}"], 'the filled answer is not the suggested one, or Accept where nothing is suggested');
   const pickAt = page.indexOf('function pick(key: string) {');
   assert.doesNotMatch(page.slice(pickAt, page.indexOf('\n  }\n', pickAt)), /send\(/u, 'a choice sends its answer before Needs you');
   const pressAt = page.indexOf('async function press(key: string) {');
@@ -266,6 +267,7 @@ test('one press is the answer, and a reason is asked for only when the record as
   assert.ok(pressAt >= 0, 'an option card’s button no longer has its own press');
   assert.match(press, /if \(confirming !== key && hardly\(key\)\) \{\n\s+confirming = key;[^]*?return;\n\s+\}\n\s+confirming = null;\n\s+chosenKey = key;\n\s+choose\(key\);$/u, 'a card’s press does not give its answer, or gives one that cannot be undone without asking');
   assert.match(snippet, /data-suggested=\{marked \? '' : undefined\}/u, 'the suggestion is no longer marked on its button');
+  assert.match(snippet, /\{#if marked\}<span class="gate-sug">, \{gate\.suggested\.toLowerCase\(\)\}<\/span>\{\/if\}/u, 'the filled answer no longer says on its button that it is the suggested one');
   assert.match(snippet, /labelOf\(option, q, moves\)/u, 'an answer no longer says what it does');
 });
 
