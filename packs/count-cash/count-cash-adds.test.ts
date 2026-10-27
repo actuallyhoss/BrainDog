@@ -141,14 +141,11 @@ test('A COUNT ON MONEY: EGP 120,400.00 against a till rolled to EGP 119,900.00 r
   const at = headings(old).indexOf('Heads up');
   assert.ok(at >= 0, `Money has no Heads up: ${headings(old).join(', ')}`);
   assert.deepEqual(headings(old).slice(at + 1, at + 3), [COUNT, LAST]);
-  /* AND IN THE MAIN COLUMN, under the Ledger the difference is filed into: Heads up and its lines stand in the side
-     column, and a box never crosses columns, so the two are the first main blocks after the Ledger and not the foot
-     of the page, nor a form squeezed into the side column. */
-  const main = old.blocks.filter((b) => b.area !== 'rail').map((b) => b.heading);
-  const ledgerAt = main.indexOf('Ledger');
-  assert.ok(ledgerAt >= 0, `Money's main column has no Ledger: ${main.join(', ')}`);
-  assert.deepEqual(main.slice(ledgerAt + 1, ledgerAt + 3), [COUNT, LAST]);
-  assert.deepEqual([blockOf(old, 'Heads up').area, blockOf(old, COUNT).area, blockOf(old, LAST).area], ['rail', 'main', 'main']);
+  /* AND IN THE ONE COLUMN, SINCE money-core 3.29.0 gave Money's home no side column: Heads up stands among the tiles,
+     so the two follow it there and are never a form squeezed into a narrow column. The box keeps `area: main`, which
+     a page with no rail reads as the page itself. */
+  assert.ok(!old.blocks.some((b) => b.area === 'rail'), "Money's home has a side column again");
+  assert.deepEqual([blockOf(old, 'Heads up').area, blockOf(old, COUNT).area, blockOf(old, LAST).area], [undefined, 'main', 'main']);
   const box = blockOf(old, COUNT);
   assert.deepEqual([box.added, box.drawn ?? true, box.refusals], ['count-cash', true, []]);
   /* AND THE LAST COUNT IS LEFT OUT WHILE THERE IS NONE, rather than a tile with nothing in it. */
