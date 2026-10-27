@@ -976,6 +976,15 @@
     text-underline-offset: 3px;
   }
 
+  /* A LINE THAT OPENS ITS ROW IS 44 TALL UNDER A THUMB, and the row's own padding takes the growth back; it was 20. */
+  @media (pointer: coarse) {
+    a.li-text {
+      min-block-size: var(--tap);
+      align-content: center;
+      margin-block: -8px;
+    }
+  }
+
   .li-sub {
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -1206,6 +1215,15 @@
   a.r-name:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
+  }
+
+  /* THE NAME IS 44 TALL UNDER A THUMB, one line centred in it, and the margin takes the growth back so the row keeps
+     its height; it was 20. */
+  @media (pointer: coarse) {
+    a.r-name {
+      line-height: var(--tap);
+      margin-block: calc((20px - var(--tap)) / 2);
+    }
   }
 
   .r-kind {
