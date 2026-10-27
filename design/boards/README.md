@@ -1,8 +1,8 @@
 # Boards
 
-A board is the picture of one screen that he says yes to before the screen is built or restyled (EXP-A01). Boards
+A board is the picture of one screen that a maintainer approves before the screen is built or restyled. Boards
 are drawn by the product's own renderer, from a record, by `tools/look/board.mjs`, so there is no second frame to
-drift from the real one and every count on a board is computed. The hand-drawn boards in `loop/design/` are retired.
+drift from the real one and every count on a board is computed.
 
 ## One folder a board
 
@@ -12,9 +12,9 @@ drift from the real one and every count on a board is computed. The hand-drawn b
 |---|---|---|
 | `page.dog` | the board's author, optional | A page, in the page source format (`docs/06-PAGES.md` section 1), installed on the copy of the record through the public write path (`setDeclaration`) and drawn at `/p/<page>`. A board with no page draws the screens `checks.json` names. |
 | `skin.css` | the board's author, optional | What changes in the look: a sheet put after the product's own sheets on every picture. A board with no `skin.css` draws the screen as it stands. |
-| `checks.json` | the board's author | The screen's checks, read by EXP-E04's gate and printed on the sheet. Shape below. |
+| `checks.json` | the board's author | The screen's checks, read by the `board-yes` gate and printed on the sheet. Shape below. |
 | `paths.json` | the board's author | The source files this board governs, as a list of globs (`packages/skin/**`). A board folder is never governed: its own files are held as drawn. |
-| `yes.json` | `board.mjs --yes` only | His yes: his words and the hashes of what he saw. Never written by hand. |
+| `yes.json` | `board.mjs --yes` only | The approval: its words and the hashes of what was seen. Never written by hand. |
 | `variants/<id>.css`, `variants/<id>.dog` | the board's author, optional | An open choice: a patch drawn beside the base, so a choice is two pictures of one board. A `.css` variant is put after `skin.css`; a `.dog` variant is a whole page that stands in for `page.dog`. |
 | `stand-ins/<id>.json` | the board's author, optional | A block the renderer cannot draw yet: `{ "name", "needs", "span" }`. It is drawn on the page as a plain note in its place, outlined dashed on the sheet, and listed. The list is the order book for the pages area. |
 
@@ -53,7 +53,7 @@ drift from the real one and every count on a board is computed. The hand-drawn b
 }
 ```
 
-`board` and `units` are what the planner counts (`loop/tools/plan.mjs`). `seen` is true once the pictures have been
+`board` and `units` are what the planner counts. `seen` is true once the pictures have been
 looked at and false while the yes is one taken without them. `paths` holds each governed file's hash, and `drawn` each of
 the board's own files' hash, as they were when the pictures were drawn. This is the area's one sign-off file: parts
 C, D and E write here, never to a file of their own.
