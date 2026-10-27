@@ -1,0 +1,601 @@
+{
+  "format": 1,
+  "made_at": "2026-10-27T12:52:26.858Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Zakat is worked out from your cash, your gold and metals, and the bills due. Set today's gold rate on Investments and gold, and the steps below fill in.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "zakat-nisab-set"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "Your zakatable wealth is {{zakat-total}}, at or above the nisab of {{zakat-nisab}}. Two and a half percent of it is {{zakat-due}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "zakat-met"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Your zakatable wealth is {{zakat-total}}, below the nisab of {{zakat-nisab}}, so no zakat is due this year.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "zakat-nisab-set"
+              },
+              {
+                "lt": 1,
+                "metric": "zakat-met"
+              }
+            ]
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Zakat at 2.5%",
+              "metric": "zakat-due"
+            },
+            {
+              "label": "Zakatable wealth",
+              "metric": "zakat-total"
+            },
+            {
+              "label": "Nisab",
+              "metric": "zakat-nisab"
+            },
+            {
+              "label": "Given so far",
+              "metric": "zakat-given"
+            }
+          ],
+          "heading": "What it comes to",
+          "icon": "scale",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "key": "k1e2s9kc",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Zakat at 2.5%",
+              "metric": "zakat-due",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Zakatable wealth",
+              "metric": "zakat-total",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Nisab",
+              "metric": "zakat-nisab",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Given so far",
+              "metric": "zakat-given",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "heading": "How it is worked out",
+          "icon": "list-checks",
+          "kind": "section",
+          "span": 12,
+          "key": "k19yh5m5",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "The nisab is the least wealth zakat applies to: {{zakat-grams}} g, which is 85 g of 24k gold at your gold rate, or 595 g of silver if you chose silver and gave a silver price. Today that is {{zakat-nisab}}.",
+          "heading": "Step 1. The nisab",
+          "icon": "scale",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "zakat-nisab-set"
+          },
+          "key": "k1utypp6",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Your year began on {{zakat-hawl-from}}, taken from your first gold buy unless you gave a day. It is 354 days long, and it is complete: {{good:the year has run}}. Zakat is due now.",
+          "heading": "Step 2. The year",
+          "icon": "calendar-clock",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "zakat-hawl-done"
+          },
+          "key": "k0cf7flz",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Your year began on {{zakat-hawl-from}} and ends on {{zakat-hawl-ends}}, 354 days on. The figure below is what 2.5% comes to today.",
+          "heading": "Step 2. The year",
+          "icon": "calendar-clock",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "zakat-hawl-known"
+              },
+              {
+                "lt": 1,
+                "metric": "zakat-hawl-done"
+              }
+            ]
+          },
+          "key": "k0cf7flz-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "No day is known for your year yet. Buy gold on Investments and gold, or give the day it began in your own figures below.",
+          "heading": "Step 2. The year",
+          "icon": "calendar-clock",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "zakat-hawl-known"
+          },
+          "key": "k0cf7flz-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "Each cash account counts at the least it stood at on any day of the last 354 days, which is the part that stayed the whole year. A card is not counted.",
+          "columns": [
+            {
+              "field": "account",
+              "label": "Account"
+            },
+            {
+              "align": "end",
+              "field": "lowest",
+              "label": "Lowest"
+            },
+            {
+              "align": "end",
+              "field": "lowest_on",
+              "label": "On"
+            }
+          ],
+          "empty": "No cash account yet. Add an account that counts as cash on Money.",
+          "heading": "Step 3. Cash at its lowest over 354 days",
+          "icon": "wallet",
+          "kind": "table",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "lowest_on"
+            }
+          ],
+          "source": "register.zakat_cash",
+          "span": 12,
+          "where": "counts is true",
+          "key": "k142zm13",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Cash at its lowest",
+              "metric": "zakat-cash"
+            }
+          ],
+          "heading": "Cash in all",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 4,
+          "key": "k1lgzbam",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Cash at its lowest",
+              "metric": "zakat-cash",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "cells": [
+            {
+              "label": "Worth now",
+              "metric": "zakat-metals"
+            }
+          ],
+          "heading": "Step 4. Gold and metals",
+          "icon": "vault",
+          "kind": "stat",
+          "span": 4,
+          "key": "k0p8hgym",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Worth now",
+              "metric": "zakat-metals",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "cells": [
+            {
+              "label": "Bills and debts due, taken off",
+              "metric": "zakat-bills"
+            },
+            {
+              "label": "Due to you, added",
+              "metric": "zakat-owed-in"
+            }
+          ],
+          "heading": "Step 5. Bills due, and cash due to you",
+          "icon": "receipt",
+          "kind": "stat",
+          "span": 4,
+          "key": "k1bu2z0k",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Bills and debts due, taken off",
+              "metric": "zakat-bills",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Due to you, added",
+              "metric": "zakat-owed-in",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "body": "Cash, plus gold and metals, plus cash due to you, less bills due, is {{zakat-total}}. At or above {{zakat-nisab}}, zakat is two and a half percent of it, {{zakat-due}}.",
+          "heading": "Step 6. The total and the 2.5%",
+          "icon": "calculator",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "zakat-nisab-set"
+          },
+          "key": "k0bfit1s",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{zakat-left-out}} amounts are in another currency from the gold rate and are left out, not added in.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "zakat-left-out"
+          },
+          "key": "k08lez9h-4",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "fold": true,
+          "heading": "Your own figures",
+          "icon": "sliders-horizontal",
+          "kind": "section",
+          "span": 12,
+          "key": "k19ovycg",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "Open the row to choose silver, give a silver price, give the day your year began, add cash due to you or add debts that are due.",
+          "columns": [
+            {
+              "field": "label",
+              "label": "Name"
+            },
+            {
+              "field": "measure",
+              "label": "Nisab by"
+            },
+            {
+              "field": "hawl_on",
+              "label": "Year began on"
+            },
+            {
+              "align": "end",
+              "field": "owed_to_you",
+              "label": "Cash due to you"
+            },
+            {
+              "align": "end",
+              "field": "debts_other",
+              "label": "Other debts due"
+            }
+          ],
+          "empty": "The first daily run makes this row.",
+          "heading": "What you set",
+          "icon": "sliders-horizontal",
+          "kind": "table",
+          "limit": 1,
+          "source": "register.zakat_basis",
+          "span": 12,
+          "key": "k19fu5kb",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Mark zakat as given",
+          "icon": "hand-coins",
+          "kind": "capture",
+          "register": "zakat_paid",
+          "span": 12,
+          "key": "k041ghgs",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "columns": [
+            {
+              "field": "paid_on",
+              "label": "Given on"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount"
+            },
+            {
+              "field": "for_year",
+              "label": "For the year ending"
+            },
+            {
+              "field": "note",
+              "label": "To whom or how"
+            }
+          ],
+          "empty": "Nothing given yet. When you give, mark it here and it stays as your history.",
+          "heading": "What you have given",
+          "icon": "history",
+          "kind": "table",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "paid_on"
+            }
+          ],
+          "source": "register.zakat_paid",
+          "span": 12,
+          "key": "k0ehwwva",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "This is a working, not a ruling. Ask a scholar you trust about your own case, such as what counts as cash or how to treat a debt.",
+          "kind": "note",
+          "span": 12,
+          "key": "k08lez9h-5",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "scale",
+      "nav": {
+        "order": 40,
+        "section": "Money"
+      },
+      "pack": "zakat",
+      "page": "zakat",
+      "requires": [
+        "register.zakat_basis",
+        "register.zakat_cash",
+        "register.zakat_paid",
+        "register.gold_rates",
+        "register.holdings"
+      ],
+      "title": "Zakat",
+      "read_at": "2026-10-27T12:52:26.858Z",
+      "zone": "UTC",
+      "look": {
+        "look": "zakat",
+        "basis": "r1g8ju3w",
+        "by": "rule",
+        "hide": [
+          "k142zm13",
+          "k19fu5kb",
+          "k0ehwwva"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

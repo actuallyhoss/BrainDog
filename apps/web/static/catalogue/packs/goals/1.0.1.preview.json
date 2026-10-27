@@ -1,0 +1,266 @@
+{
+  "format": 1,
+  "made_at": "2026-10-27T12:52:26.858Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Saving for {{goals-saving}} goals, each counted from what you hold.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "goals-saving": 0
+          },
+          "read_as": {
+            "goals-saving": "figure"
+          }
+        },
+        {
+          "cells": [
+            {
+              "label": "To put by each month",
+              "metric": "goals-need"
+            },
+            {
+              "label": "Saving for",
+              "metric": "goals-saving"
+            },
+            {
+              "label": "Behind",
+              "metric": "goals-behind"
+            },
+            {
+              "label": "Reached",
+              "metric": "goals-reached"
+            }
+          ],
+          "heading": "Where the goals stand",
+          "kind": "stat",
+          "span": 12,
+          "key": "k1jbzajr",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "To put by each month",
+              "metric": "goals-need",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Saving for",
+              "metric": "goals-saving",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Behind",
+              "metric": "goals-behind",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Reached",
+              "metric": "goals-reached",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "body": "{{goals-behind}} {{bad:behind}}. Each is holding less than a straight line from where it began to its target has reached today. Put by what its row asks each month and it catches up.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "goals-behind"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "target"
+            },
+            {
+              "field": "by"
+            }
+          ],
+          "empty": "No goal yet. Add one with a target and a day, and how close you are shows here.",
+          "heading": "How far each has come",
+          "icon": "star",
+          "kind": "progress",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.money_goals",
+          "span": 12,
+          "spent": "goals-have-by-name",
+          "where": "state is not paused",
+          "key": "k0acg4to",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "metric": "goals-have-by-name",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [],
+                "more": 0
+              }
+            }
+          ],
+          "wholeRead": {
+            "rows": [],
+            "total": 0
+          },
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "have"
+            },
+            {
+              "field": "target"
+            },
+            {
+              "field": "by"
+            },
+            {
+              "field": "need"
+            },
+            {
+              "field": "pace"
+            },
+            {
+              "field": "parent"
+            }
+          ],
+          "empty": "No goals yet. A goal says what you are saving for, the target, and the day you want it by. Give it an account, a currency or a value to count.",
+          "heading": "Every goal",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "by"
+            }
+          ],
+          "source": "register.money_goals",
+          "span": 12,
+          "key": "k1gr1sgj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "star",
+      "nav": {
+        "order": 50,
+        "section": "Money"
+      },
+      "pack": "goals",
+      "page": "goals",
+      "requires": [
+        "register.money_goals"
+      ],
+      "title": "Goals",
+      "read_at": "2026-10-27T12:52:26.858Z",
+      "zone": "UTC",
+      "look": {
+        "look": "goals",
+        "basis": "r1rhv246",
+        "by": "rule",
+        "hide": [
+          "k1gr1sgj"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

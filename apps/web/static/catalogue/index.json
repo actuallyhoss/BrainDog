@@ -374,14 +374,91 @@
     },
     {
       "kind": "pack",
+      "id": "certificates",
+      "title": "Certificates",
+      "summary": "Bank certificates and fixed deposits: the rate, what each has earned so far, when it pays next and when it matures. Its payouts and the principal coming back are walked into Cash ahead.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "736cfc1e3929403a554cc1a0147b097c73715e728cffb5b4f337027a14c24c91",
+          "bytes": 22415,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "landmark"
+    },
+    {
+      "kind": "pack",
       "id": "count-cash",
       "title": "Count the cash",
-      "summary": "Write down what is actually in a cash box or an account, and the record keeps it as a balance check and writes the difference from what it thought was there into the ledger.",
+      "summary": "Count the cash note by note and coin by coin, or by its total, and the record keeps it as a balance check and files the difference from what it thought was there, as lines you describe or as Discrepancy.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.4.2",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "4df001ba7e73ff6648a5781e704f12f7947464b266b29773e28bf0b4f64a8c98",
+          "bytes": 28252,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. A count that says neither is filed as one entry, as before, and every older count reads as it did.",
+          "preview": true
+        },
         {
           "version": "1.4.2",
           "checksum": "ffb9aea1730764388d653787b4f3f796aac38a28dcb7be2958d5efc3246baafa",
@@ -680,6 +757,58 @@
     },
     {
       "kind": "pack",
+      "id": "debts",
+      "title": "Debts",
+      "summary": "List what you are paying off, with its balance, yearly rate and minimum, and see how long the avalanche and the snowball each take to clear it, with an extra amount a month, and how much interest each saves.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "a78b3b930b34b556c4410adaad3f394355332ed22c6481b182b1d9c8760e5c13",
+          "bytes": 20477,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Debts",
+              "Payoff plans"
+            ],
+            "pages": [
+              "Debts"
+            ],
+            "rules": [
+              "Work out the plans when a debt changes",
+              "Work out the plans when the extra changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: a list of debts, two plans worked out from it, and a page that shows them side by side.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "credit-card"
+    },
+    {
+      "kind": "pack",
       "id": "feed-example",
       "title": "feed-example",
       "summary": "Polls stats.example.com every 1h for Monthly recurring revenue, Active users.",
@@ -917,8 +1046,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "e1815a2f36b6c25116e569abc224bcfb386258fd8a841d520dbeaff4160209ff",
+          "bytes": 17787,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Goals"
+            ],
+            "pages": [
+              "Goals"
+            ],
+            "rules": [
+              "goals_pace",
+              "goals_pace_on_balance"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The monthly pace reads every goal and every account, however many there are.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "8094b806dfdcd659c8314675a8b35b3c2370f4cc4f4ec38c6e15af81c883c9f1",
@@ -957,7 +1113,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true,
+      "shelf": "money",
       "icon": "star"
     },
     {
@@ -1096,8 +1252,39 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "version": "2.0.1",
+          "checksum": "e82a832de518bc9e1dbbd2b1437a6d47268b5ad8bfb1adcc53ffbb5cd6f74b92",
+          "bytes": 44272,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Every buy, gold rate and holding is read, however many there are, where the page and the figures stopped at fifty.",
+          "preview": true
+        },
         {
           "version": "2.0.0",
           "checksum": "6b14c8552b189fe2c7423922a9a8b8540c9b654b4cadb11c7dbe6fa9f00c2ab1",
@@ -1299,14 +1486,82 @@
     },
     {
       "kind": "pack",
+      "id": "insurance",
+      "title": "Insurance",
+      "summary": "Your life and savings policies: who the insurer is, what the premium is and where it is paid, the cover, what the fund is worth and from when, and when it matures.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "3fc640504dabdac3e5473ca8166bf1cb21e6e0c98aa4c0478fae15a3c9bf69dc",
+          "bytes": 26704,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version: a list of policies, a page with the fund value and its age, and one page for each policy with the premiums paid so far.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "shield"
+    },
+    {
+      "kind": "pack",
       "id": "job-starter",
-      "title": "Starter jobs",
-      "summary": "Three kinds of job to run on your own machine: a review of your week, a sort of what arrived, and where a repository stands. Each one only reads and proposes, and you approve each kind once before it can run.",
+      "title": "Jobs on your machine",
+      "summary": "Four kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, and composing a page of this record. Each one only reads and proposes, and you approve each kind once before it can run.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "840e852d352f741037cec60ccdf6980f251bb35a23c919f88136d9822c987f49",
+          "bytes": 4363,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Composing a page on your machine is one of its kinds now; it was the Slash on your machine add-on. Starter jobs is called Jobs on your machine. A record that held Slash on your machine keeps that job, still approved."
+        },
         {
           "version": "1.0.1",
           "checksum": "7e1feea075bbf5d1a17caad67a8666a4bd5e1f2f7eb649d1bd076b9326bdd62c",
@@ -2337,12 +2592,40 @@
       "kind": "pack",
       "id": "new-project",
       "title": "Starting a project",
-      "summary": "A guide for something new: three stages (idea, first users, first money), the next steps at each as a checklist an agent can tick, the decisions you made with reasons, and a weekly page on where it stands.",
+      "summary": "Now part of New project guide. A guide for something new: three stages (idea, first users, first money), the next steps at each as a checklist an agent can tick, the decisions you made with reasons, and a weekly page on where it stands.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "fd3aeec0109146814067607bd46c57f9a5ee25e8c18b03a6721ec597725d910c",
+          "bytes": 17539,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Projects",
+              "Next steps",
+              "Decisions",
+              "Weekly notes"
+            ],
+            "pages": [
+              "Your project",
+              "This week"
+            ],
+            "rules": [
+              "Ask what comes next when a step is ticked"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Now part of New project guide, which holds what this brought. A record that holds this keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "22a4ad13b51f41a9d58a2f84fc67d0e173efe792a5b1f83572f803e52a49012e",
@@ -3246,6 +3529,57 @@
     },
     {
       "kind": "pack",
+      "id": "property",
+      "title": "Property",
+      "summary": "A flat or a house paid in parts: what it is worth, what you have paid, what is left and what you own beyond that, with the parts to come and the parts paid. Makes the parts for you, or reads a plan you paste.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "f29ffd147ff4a88621b21368532f52dc5dd0fe6b4a7263862a4464cd273d70c8",
+          "bytes": 38302,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Property",
+              "{{name}}, property"
+            ],
+            "rules": [
+              "Make the parts of a plan",
+              "Read a pasted plan",
+              "Add up a plan when a part changes",
+              "Add up a plan when its price changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "building"
+    },
+    {
+      "kind": "pack",
       "id": "rates-open-er-api-com",
       "title": "rates-open-er-api-com",
       "summary": "Polls open.er-api.com every 1d for what one USD is worth in each other currency the record holds, named when it is installed.",
@@ -3572,12 +3906,31 @@
       "kind": "pack",
       "id": "roadmap",
       "title": "Roadmap",
-      "summary": "Your dated tasks on one time axis: work with an effort as a window, a due day as a line, and either dragged to a new date.",
+      "summary": "Now part of Work: the dated tasks on one time axis are Work's Timeline page. Nothing here to install; Work has it.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.1",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "423584f84770a552f503e23254a3b61a153d1f6ccf1714f00a0e943984f086db",
+          "bytes": 625,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Now part of Work, as its Timeline page. A record that held Roadmap keeps the same page, its changes and its place in the menu, now from Work."
+        },
         {
           "version": "1.1.1",
           "checksum": "f2355a9b74ed95bdd39b0c320f29e6617b8ad358e71b0df52388e4d8e7568c54",
@@ -3645,7 +3998,6 @@
         }
       ],
       "categories": [
-        "templates",
         "made-by-braindog"
       ],
       "publisher": {
@@ -3653,7 +4005,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "shelf": "planning",
+      "unlisted": true,
       "icon": "square-kanban"
     },
     {
@@ -4015,12 +4367,31 @@
       "kind": "pack",
       "id": "slash-desk",
       "title": "Slash on your machine",
-      "summary": "Hands the heavy thinking of composing a page to your own machine. You press it on Slash, one job runs on a machine you enrolled, and what it would change waits for you in Decide. It writes nothing itself.",
+      "summary": "Now part of Jobs on your machine (Starter jobs): the job that composes a page on your machine is one of its kinds. Install that add-on for it.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "2.0.0",
       "versions": [
+        {
+          "version": "2.0.0",
+          "checksum": "68e622d2db4321a813bf084dd0a55aac118bfdf6c7f5e760ed30b00b73551868",
+          "bytes": 641,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "agents"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Now part of Jobs on your machine. A record that held this keeps the same job, still approved, now from there."
+        },
         {
           "version": "1.0.1",
           "checksum": "1417b315a41b7e0aa0e8ce029d5a8ddf2e9cfed2079c5fa3e3d10362383dd628",
@@ -4068,7 +4439,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "shelf": "helpers",
+      "unlisted": true,
       "icon": "slash"
     },
     {
@@ -4329,12 +4700,39 @@
       "kind": "pack",
       "id": "studies",
       "title": "Studies",
-      "summary": "Your courses, assignments with due dates, marks as numbers with a trend for each course, a reading list and study sessions. Says what is due this week first.",
+      "summary": "Now part of Student. Your courses, assignments with due dates, marks as numbers with a trend for each course, a reading list and study sessions. Says what is due this week first.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "2905ac1f13dbdd94cfda1e602db035e25322e82cc0bd821565ac300867b040b9",
+          "bytes": 16453,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Reading list",
+              "Study sessions"
+            ],
+            "pages": [
+              "Studies"
+            ],
+            "rules": [
+              "Ask whether to plan study for a new assignment"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Now part of Student, which holds what this brought. A record that holds this keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "2d2cc44af4254f7788634cf1c5c3e5a25e7ebf3020cf8276eef981b573ae3029",
@@ -4498,12 +4896,38 @@
       "kind": "pack",
       "id": "team-board",
       "title": "Team task list",
-      "summary": "Tasks with an owner, a person or an agent, a status and a priority, a board to move them across, and a page that says who is doing what right now, fed by agent sessions.",
+      "summary": "Now part of Team board. Tasks with an owner, a person or an agent, a status and a priority, a board to move them across, and a page that says who is doing what right now, fed by agent sessions.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "61aae770b1544c6522170ccab25060703469d5d1c4aedcd02f1b782c071d9f5e",
+          "bytes": 11850,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Team",
+              "Team tasks"
+            ],
+            "pages": [
+              "Board",
+              "Who is doing what"
+            ],
+            "rules": [
+              "Ask what unblocks a blocked task"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Now part of Team board, which holds what this brought. A record that holds this keeps it, and it still installs by its name. Nothing in it changed.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "0bd8cf58063f3bd9d41f70463cb8ec8771d0dc0c9654aeed5f6b91f010b72b01",
@@ -4594,6 +5018,57 @@
       },
       "unlisted": true,
       "icon": "board"
+    },
+    {
+      "kind": "pack",
+      "id": "trips",
+      "title": "Trips",
+      "summary": "Name a trip with its dates and file the Ledger's lines into it, and each trip says what it cost in total, by category and in each currency.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "10b3db11fa2f8b8125ffeb5a6492045325e50bf3a3f2dca44bd4ddc312418f42",
+          "bytes": 13840,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Trips"
+            ],
+            "pages": [
+              "Trips",
+              "{{name}}"
+            ],
+            "rules": [
+              "File the Ledger's lines of a trip's days into it"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "plane"
     },
     {
       "kind": "pack",
@@ -4725,6 +5200,61 @@
       },
       "shelf": "planning",
       "icon": "chart-line"
+    },
+    {
+      "kind": "pack",
+      "id": "zakat",
+      "title": "Zakat",
+      "summary": "Works out zakat step by step in plain words: the nisab from your gold rate, the year from your first gold buy or a day you set, each cash account at its lowest over 354 days, your gold and metals, less bills due, and 2.5% of the total. Keeps a list of what you have given.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "6c12bb2c75803d652f00ff171c66b16a1a3c40f7c2474f54ab3a1b7393a3df52",
+          "bytes": 36866,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core",
+              "holdings"
+            ],
+            "lists": [
+              "Zakat working",
+              "Cash at its lowest",
+              "Zakat given"
+            ],
+            "pages": [
+              "Zakat"
+            ],
+            "rules": [
+              "zakat_inputs",
+              "zakat_rate",
+              "zakat_metals"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "First version. Needs Investments and gold. Shows the nisab, the year, the lowest each cash account stood at, the metals, the bills due and what 2.5% comes to, and keeps what you give.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "money",
+      "icon": "scale"
     },
     {
       "kind": "usecase",
@@ -5129,8 +5659,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "starter",
-      "latest": "1.6.1",
+      "latest": "1.7.0",
       "versions": [
+        {
+          "version": "1.7.0",
+          "checksum": "d41d8cb36578d03c275ed1c27c532ed52cfc4ab2f1fa2aa500ccb92901bf6bdd",
+          "bytes": 37902,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Milestones",
+              "Choices",
+              "Resources",
+              "Steps"
+            ],
+            "pages": [
+              "Your project",
+              "Guide",
+              "{{what}}"
+            ],
+            "rules": [
+              "Mark a milestone passed on the path once it is reached",
+              "Take a milestone off the path as passed when it is moved back"
+            ],
+            "examples": 0,
+            "skills": [
+              "project-coach",
+              "step-taker",
+              "choice-recorder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.6.1",
           "checksum": "3fddd83a8d940877f5e716edd0d323218b8fd46c2e0456dd5b68b8890549e9f1",
@@ -5722,8 +6284,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.5.1",
+      "latest": "1.6.0",
       "versions": [
+        {
+          "version": "1.6.0",
+          "checksum": "add8001f34a8fe4b5061c2ff0b3089590f6fd61d7b022b4285198988b39f3048",
+          "bytes": 16603,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Study sessions",
+              "Reading list"
+            ],
+            "pages": [
+              "Today",
+              "Studies"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "study-planner"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.5.1",
           "checksum": "da3ad080a69933d7879ea02ed8bcb6b93579ef5ed10e18b7e8e9f600427d49be",
@@ -5871,8 +6459,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.28.0",
+      "latest": "2.29.0",
       "versions": [
+        {
+          "version": "2.29.0",
+          "checksum": "c5b29c93b5cdea6e52b239c84f8a4f8de17b4675b76ff3263d02299a59512ac2",
+          "bytes": 37535,
+          "published_at": "2026-10-27T12:52:26.858Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Cycles",
+              "Cycle plan",
+              "Cycle days"
+            ],
+            "pages": [
+              "Team",
+              "Cycles",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.28.0",
           "checksum": "702b5359d674b9f837e8d63f7e85efa970123ac713b3b60081e555f580650b49",

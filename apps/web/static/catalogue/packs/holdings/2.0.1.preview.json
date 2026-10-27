@@ -1,0 +1,528 @@
+{
+  "format": 1,
+  "made_at": "2026-10-27T12:52:26.858Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Funds, shares, certificates and gold you own, with what you paid and what each is worth now. Add a holding to start, then its buys.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "holdings-count"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "What you own beyond cash, at what you paid until each one has a price.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "holdings-count"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a holding",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "holdings",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "holdings-count"
+          },
+          "key": "k0gr37qo",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "cells": [
+            {
+              "label": "Worth now",
+              "metric": "holdings-value",
+              "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
+            },
+            {
+              "label": "Paid in",
+              "metric": "holdings-cost"
+            },
+            {
+              "label": "Gain",
+              "metric": "holdings-gain"
+            },
+            {
+              "label": "Gain on what was paid",
+              "metric": "holdings-gain-pct"
+            }
+          ],
+          "heading": "What you hold",
+          "icon": "chart-pie",
+          "kind": "stat",
+          "lead": true,
+          "span": 8,
+          "when": {
+            "gt": 0,
+            "metric": "holdings-at-cost"
+          },
+          "key": "k1x4zwfp",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Worth now",
+              "metric": "holdings-value"
+            },
+            {
+              "label": "Paid in",
+              "metric": "holdings-cost"
+            },
+            {
+              "label": "Gain",
+              "metric": "holdings-gain"
+            },
+            {
+              "label": "Gain on what was paid",
+              "metric": "holdings-gain-pct"
+            }
+          ],
+          "heading": "What you hold",
+          "icon": "chart-pie",
+          "kind": "stat",
+          "lead": true,
+          "span": 8,
+          "when": {
+            "is": 0,
+            "metric": "holdings-at-cost"
+          },
+          "key": "k1x4zwfp-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Worth now",
+              "metric": "holdings-value",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Paid in",
+              "metric": "holdings-cost",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Gain",
+              "metric": "holdings-gain",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Gain on what was paid",
+              "metric": "holdings-gain-pct",
+              "target": {
+                "gte": 0
+              },
+              "format": "pct",
+              "reading": {
+                "value": null,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": null
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "body": "21k is priced at 21/24 of the 24k rate and 18k at 18/24, unless you give a rate for that karat.",
+          "columns": [
+            {
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "align": "end",
+              "field": "per_gram",
+              "label": "A gram"
+            },
+            {
+              "align": "end",
+              "field": "on",
+              "label": "Rate of"
+            }
+          ],
+          "heading": "Gold rate",
+          "icon": "vault",
+          "kind": "table",
+          "limit": 4,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "karat"
+            }
+          ],
+          "source": "register.gold_rates",
+          "span": 4,
+          "where": "current is true",
+          "key": "k1qrph0m",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Set today's gold rate",
+          "icon": "vault",
+          "kind": "capture",
+          "register": "gold_rates",
+          "span": 4,
+          "when": {
+            "lt": 1,
+            "metric": "gold-rates-current"
+          },
+          "key": "k1ww1ej8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "body": "The gold rate is from {{gold-rate-on}}, {{bad:over a week ago}}. Set today's rate and your gold is worth today's money.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "gold-rates-old"
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "empty": "Nothing is valued yet.",
+          "heading": "Where it sits",
+          "icon": "chart-pie",
+          "kind": "split",
+          "source": "metric.holdings-by-kind",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "holdings-count"
+          },
+          "key": "k1m81vst",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Each buy stays a row with its own day, so how long each piece has been held can always be said.",
+          "columns": [
+            {
+              "field": "bought_on",
+              "label": "Bought on"
+            },
+            {
+              "field": "holding",
+              "label": "Holding"
+            },
+            {
+              "align": "end",
+              "field": "qty",
+              "label": "Grams or shares"
+            },
+            {
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Paid"
+            },
+            {
+              "field": "kept_at",
+              "label": "Kept at"
+            }
+          ],
+          "empty": "No buys yet. Add each one with its day, grams or shares, the price and the fees.",
+          "heading": "Buys",
+          "icon": "hand-coins",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "bought_on"
+            }
+          ],
+          "source": "register.holding_buys",
+          "span": 12,
+          "key": "k04w9z4o",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "label"
+            },
+            {
+              "as": "figure",
+              "field": "value"
+            },
+            {
+              "as": "fact",
+              "field": "qty",
+              "label": "How many"
+            },
+            {
+              "as": "fact",
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "as": "fact",
+              "field": "gain_pct",
+              "label": "Gain %"
+            }
+          ],
+          "empty": "Nothing held yet. A fund, some shares, a certificate or a buy of gold goes here.",
+          "group": "kind",
+          "heading": "Everything you hold",
+          "icon": "chart-line",
+          "kind": "cards",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "label"
+            }
+          ],
+          "source": "register.holdings",
+          "span": 12,
+          "key": "k0qjo8h0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fold": 3,
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Oldest price",
+              "metric": "holdings-priced-on"
+            }
+          ],
+          "heading": "Priced on",
+          "icon": "calendar-clock",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "holdings-stale"
+          },
+          "key": "k0fyxxqv",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Oldest price",
+              "metric": "holdings-priced-on",
+              "target": {
+                "gte": 0
+              },
+              "format": "day",
+              "reading": {
+                "value": null,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": null
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}. That is the oldest price here. Say what each holding is worth now and the value above is today's.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "holdings-stale"
+          },
+          "key": "k08lez9h-4",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "fold": true,
+          "heading": "Every gold rate",
+          "icon": "vault",
+          "kind": "section",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "gold-rates-current"
+          },
+          "key": "k1fi0ou3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Rate of"
+            },
+            {
+              "field": "karat",
+              "label": "Karat"
+            },
+            {
+              "align": "end",
+              "field": "per_gram",
+              "label": "A gram"
+            },
+            {
+              "field": "from",
+              "label": "Set by"
+            }
+          ],
+          "heading": "Gold rates said",
+          "icon": "vault",
+          "kind": "table",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.gold_rates",
+          "span": 12,
+          "key": "k1jvc5zg",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "chart-pie",
+      "nav": {
+        "order": 30,
+        "section": "Money"
+      },
+      "pack": "holdings",
+      "page": "holdings",
+      "requires": [
+        "register.holdings",
+        "register.holding_buys",
+        "register.gold_rates"
+      ],
+      "title": "Investments and gold",
+      "read_at": "2026-10-27T12:52:26.858Z",
+      "zone": "UTC",
+      "look": {
+        "look": "holdings",
+        "basis": "r04tmcsi",
+        "by": "rule",
+        "hide": [
+          "k1qrph0m",
+          "k04w9z4o",
+          "k0qjo8h0",
+          "k0fyxxqv"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

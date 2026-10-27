@@ -1,0 +1,22 @@
+{
+  "pack": "roadmap",
+  "version": "2.0.0",
+  "icon": "square-kanban",
+  "title": "Roadmap",
+  "summary": "Now part of Work: the dated tasks on one time axis are Work's Timeline page. Nothing here to install; Work has it.",
+  "changes": "Now part of Work, as its Timeline page. A record that held Roadmap keeps the same page, its changes and its place in the menu, now from Work.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "work": "^1.0.0"
+    }
+  },
+  "hands": {
+    "page.roadmap": "work"
+  },
+  "declarations": []
+}
