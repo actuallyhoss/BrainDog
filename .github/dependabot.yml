@@ -1,0 +1,60 @@
+# Dependency updates. Dependabot is the one updater for this repository.
+#
+# The cooldown matches pnpm-workspace.yaml's minimumReleaseAge (24 hours) with room, so an update
+# never asks for a version the frozen install would refuse. Pull requests are grouped so the
+# packages that move together arrive together.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    groups:
+      svelte-and-vite:
+        patterns:
+          - svelte
+          - svelte-check
+          - '@sveltejs/*'
+          - vite
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/setup
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: cargo
+    directory: /apps/desktop/src-tauri
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      tauri:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /apps/selfhost
+    schedule:
+      interval: monthly

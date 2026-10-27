@@ -109,10 +109,9 @@ Target: `master`. Enforcement: active.
 
 - [ ] **Allow select actions only.** *Settings → Actions → General → Actions permissions.* Allow
       actions created by GitHub, and add the exact list this repository uses:
-      `pnpm/action-setup@*`, and `github/codeql-action/*@*` if CodeQL stays. `52 §8` names four
-      actions and CodeQL adds two; whichever way that is settled, the allow-list here should equal
-      the specification's row, and disagreeing with it should be visible.
-- [ ] **Pin third-party actions to a commit sha**, not a tag. A tag is mutable, and pinning to a
+      `pnpm/action-setup@*`, `github/codeql-action/*@*` and `docker/*@*` (the image workflow). The
+      allow-list should equal the Actions row of `52 §8`.
+- [x] **Pin third-party actions to a commit sha**, not a tag. Done in every workflow. A tag is mutable, and pinning to a
       major means a compromised release inside that major arrives silently. Dependabot's
       `github-actions` entry keeps the pins current; without pinning, it is keeping a moving target
       current, which is a different and weaker thing.
