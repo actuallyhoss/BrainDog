@@ -366,7 +366,7 @@
           "kind": "note",
           "tone": "warn",
           "span": 12,
-          "body": "{{goals-behind}} {{bad:behind}}. Each is holding less than a straight line from where it began to its target has reached today. Put by what its row asks each month and it catches up.",
+          "body": "{{goals-behind}} {{bad:behind}}. Each is holding less than a straight line from where it began to its target has reached today. Put by what each goal asks each month and it catches up.",
           "when": {
             "metric": "goals-behind",
             "gt": 0

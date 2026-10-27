@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-27T12:52:26.858Z",
+  "made_at": "2026-10-27T13:29:50.891Z",
   "pages": [
     {
       "blocks": [
@@ -467,7 +467,7 @@
           "refusals": []
         },
         {
-          "body": "Open the row to choose silver, give a silver price, give the day your year began, add cash due to you or add debts that are due.",
+          "body": "Open your figures to choose silver, give a silver price, give the day your year began, add cash due to you or add debts that are due.",
           "columns": [
             {
               "field": "label",
@@ -492,7 +492,7 @@
               "label": "Other debts due"
             }
           ],
-          "empty": "The first daily run makes this row.",
+          "empty": "Your figures are made on the first daily run.",
           "heading": "What you set",
           "icon": "sliders-horizontal",
           "kind": "table",
@@ -583,7 +583,7 @@
         "register.holdings"
       ],
       "title": "Zakat",
-      "read_at": "2026-10-27T12:52:26.858Z",
+      "read_at": "2026-10-27T13:29:50.891Z",
       "zone": "UTC",
       "look": {
         "look": "zakat",

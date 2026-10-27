@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-27T12:52:26.858Z",
+  "made_at": "2026-10-27T13:29:50.891Z",
   "pages": [
     {
       "blocks": [
@@ -58,7 +58,7 @@
           "key": "k05h55za",
           "rows": [
             {
-              "id": "01M5YPPKKA32CEDNWVR9W3KJVQ",
+              "id": "01M5YRV31BDQM12CRJB0RXG4P0",
               "register": "assignments",
               "seq": 1,
               "fields": {
@@ -71,12 +71,12 @@
               },
               "state": "doing",
               "version": 1,
-              "created_at": "2026-10-27T12:52:26.858Z",
-              "updated_at": "2026-10-27T12:52:26.858Z",
+              "created_at": "2026-10-27T13:29:50.891Z",
+              "updated_at": "2026-10-27T13:29:50.891Z",
               "deleted_at": null
             },
             {
-              "id": "01M5YPPKKA32CEDNWVRE16B87K",
+              "id": "01M5YRV31BDQM12CRJB3GYQX4K",
               "register": "assignments",
               "seq": 2,
               "fields": {
@@ -89,8 +89,8 @@
               },
               "state": "todo",
               "version": 1,
-              "created_at": "2026-10-27T12:52:26.858Z",
-              "updated_at": "2026-10-27T12:52:26.858Z",
+              "created_at": "2026-10-27T13:29:50.891Z",
+              "updated_at": "2026-10-27T13:29:50.891Z",
               "deleted_at": null
             }
           ],
@@ -280,7 +280,7 @@
           "key": "k024tqnn",
           "rows": [
             {
-              "id": "01M5YPPKKA32CEDNWVR2E5A01H",
+              "id": "01M5YRV31BDQM12CRJASWFZS42",
               "register": "courses",
               "seq": 1,
               "fields": {
@@ -295,12 +295,12 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-27T12:52:26.858Z",
-              "updated_at": "2026-10-27T12:52:26.858Z",
+              "created_at": "2026-10-27T13:29:50.891Z",
+              "updated_at": "2026-10-27T13:29:50.891Z",
               "deleted_at": null
             },
             {
-              "id": "01M5YPPKKA32CEDNWVR6T39Q5A",
+              "id": "01M5YRV31BDQM12CRJAWX2H3WM",
               "register": "courses",
               "seq": 2,
               "fields": {
@@ -315,8 +315,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-27T12:52:26.858Z",
-              "updated_at": "2026-10-27T12:52:26.858Z",
+              "created_at": "2026-10-27T13:29:50.891Z",
+              "updated_at": "2026-10-27T13:29:50.891Z",
               "deleted_at": null
             }
           ],
@@ -369,7 +369,7 @@
           "key": "k0uqyifm",
           "rows": [
             {
-              "id": "01M5YPPKKA32CEDNWVRKD6MSNM",
+              "id": "01M5YRV31BDQM12CRJB84PBXJV",
               "register": "assignments",
               "seq": 3,
               "fields": {
@@ -383,8 +383,8 @@
               },
               "state": "marked",
               "version": 1,
-              "created_at": "2026-10-27T12:52:26.858Z",
-              "updated_at": "2026-10-27T12:52:26.858Z",
+              "created_at": "2026-10-27T13:29:50.891Z",
+              "updated_at": "2026-10-27T13:29:50.891Z",
               "deleted_at": null
             }
           ],
@@ -413,7 +413,7 @@
           "key": "k0etlpnb",
           "rows": [
             {
-              "id": "01M5YPPKKA32CEDNWVRQXQHFX4",
+              "id": "01M5YRV31BDQM12CRJBDHSTY70",
               "register": "course_reads",
               "seq": 1,
               "fields": {
@@ -426,8 +426,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-27T12:52:26.858Z",
-              "updated_at": "2026-10-27T12:52:26.858Z",
+              "created_at": "2026-10-27T13:29:50.891Z",
+              "updated_at": "2026-10-27T13:29:50.891Z",
               "deleted_at": null
             }
           ],
@@ -497,7 +497,7 @@
           "key": "k09ia8hh",
           "rows": [
             {
-              "id": "01M5YPPKKA32CEDNWVRVWM26RW",
+              "id": "01M5YRV31BDQM12CRJBK96VXCV",
               "register": "study_sessions",
               "seq": 1,
               "fields": {
@@ -510,8 +510,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-27T12:52:26.858Z",
-              "updated_at": "2026-10-27T12:52:26.858Z",
+              "created_at": "2026-10-27T13:29:50.891Z",
+              "updated_at": "2026-10-27T13:29:50.891Z",
               "deleted_at": null
             }
           ],
@@ -533,7 +533,7 @@
         "register.study_sessions"
       ],
       "title": "Studies",
-      "read_at": "2026-10-27T12:52:26.858Z",
+      "read_at": "2026-10-27T13:29:50.891Z",
       "zone": "UTC",
       "look": {
         "look": "studies",

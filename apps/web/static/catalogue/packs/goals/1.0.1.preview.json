@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-27T12:52:26.858Z",
+  "made_at": "2026-10-27T13:29:50.891Z",
   "pages": [
     {
       "blocks": [
@@ -124,7 +124,7 @@
           "why": "empty"
         },
         {
-          "body": "{{goals-behind}} {{bad:behind}}. Each is holding less than a straight line from where it began to its target has reached today. Put by what its row asks each month and it catches up.",
+          "body": "{{goals-behind}} {{bad:behind}}. Each is holding less than a straight line from where it began to its target has reached today. Put by what each goal asks each month and it catches up.",
           "kind": "note",
           "span": 12,
           "tone": "warn",
@@ -250,7 +250,7 @@
         "register.money_goals"
       ],
       "title": "Goals",
-      "read_at": "2026-10-27T12:52:26.858Z",
+      "read_at": "2026-10-27T13:29:50.891Z",
       "zone": "UTC",
       "look": {
         "look": "goals",

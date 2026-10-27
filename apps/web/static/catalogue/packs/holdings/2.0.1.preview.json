@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-27T12:52:26.858Z",
+  "made_at": "2026-10-27T13:29:50.891Z",
   "pages": [
     {
       "blocks": [
@@ -284,7 +284,7 @@
           "why": "when"
         },
         {
-          "body": "Each buy stays a row with its own day, so how long each piece has been held can always be said.",
+          "body": "Each buy is kept with its own day, so how long each piece has been held can always be said.",
           "columns": [
             {
               "field": "bought_on",
@@ -509,7 +509,7 @@
         "register.gold_rates"
       ],
       "title": "Investments and gold",
-      "read_at": "2026-10-27T12:52:26.858Z",
+      "read_at": "2026-10-27T13:29:50.891Z",
       "zone": "UTC",
       "look": {
         "look": "holdings",
