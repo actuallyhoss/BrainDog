@@ -33,6 +33,8 @@ export type SeedCatalogueEntry = {
   title: string;
   summary: string;
   modules: readonly string[];
+  /** `false` for what is installed and never offered: core, which every record holds (`@braindog/record` `CatalogueEntry`). */
+  offered?: false;
   /**
    * The words a person uses for what it keeps, which the first run listens for: a pack's from its
    * manifest, a use case's its own `signals`.
@@ -102,12 +104,15 @@ export function before(requires: readonly string[]): string[] {
 
 /** The first-party packs, each with no example rows, and the use cases that carry a pack of their own. */
 export function seedCatalogue(): SeedCatalogueEntry[] {
-  /* CORE IS ON OFFER BY ITS ID, because every record installs it, and is listed nowhere as an add-on. */
+  /* CORE IS NEVER OFFERED: it is on every record, and is not an add-on. IT IS CARRIED ALL THE SAME, marked `offered: false`,
+     because every use case installs it first (`modulesFor`) and the first run's `setup` names it: left out, every use case
+     and every first run on a host was refused "There is no add-on called core on offer here". */
   const modules: SeedCatalogueEntry[] = FIRST_PARTY.map((id) => {
     const bare = firstPartyDocument(id, { seeds: [] });
     return {
       id,
       kind: 'pack',
+      ...(id === 'core' ? { offered: false as const } : {}),
       title: id,
       summary: typeof bare?.summary === 'string' ? bare.summary : '',
       modules: before(firstPartyManifest(id).requires).filter((m) => m !== id),

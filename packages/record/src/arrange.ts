@@ -61,6 +61,11 @@ export type CatalogueEntry = {
   /** The packs installed before it, in order. */
   modules: readonly string[];
   /**
+   * `false` FOR WHAT IS INSTALLED AND NEVER OFFERED: core, the pages every record holds, which a use case and the first run
+   * install by its id. It is found as any entry is, and left out of every list of what is on offer.
+   */
+  offered?: false | undefined;
+  /**
    * The version `doc` builds, when the host knows it without building one, so a pack on at an older version is offered as
    * an update. Absent, the document is built to read it, and only for a pack a proposal names.
    */
@@ -577,7 +582,7 @@ export function arranger(d: ArrangeDeps) {
 
   /* ONE SENTENCE THAT NAMES WHAT IS OFFERED, the short list and the whole catalogue together. */
   const notOffered = (id: string, at: string, shelf: readonly ShelfEntry[] = []): Result<never> => {
-    const all = [...catalogue.map((e) => ({ id: e.id, title: e.title })), ...shelf.filter((x) => !catalogue.some((e) => e.id === x.id))];
+    const all = [...catalogue.filter((e) => e.offered !== false).map((e) => ({ id: e.id, title: e.title })), ...shelf.filter((x) => !catalogue.some((e) => e.id === x.id))];
     return refuse(
       'DECLARATION_UNKNOWN',
       all.length === 0
@@ -687,7 +692,7 @@ export function arranger(d: ArrangeDeps) {
     return {
       packs: [...packs.map((p) => ({ id: p.id, ...(p.version === null ? {} : { version: p.version }), ...(p.disabled_at === null ? {} : { off: true }) })), ...handed],
       offer: catalogue
-        .filter((e) => !held.has(e.id))
+        .filter((e) => !held.has(e.id) && e.offered !== false)
         /* A PACK IS ITS ID AND ONE LINE; a use case says so, and its title, because that is what a person is offered. */
         .map((e) => ({
           id: e.id,
