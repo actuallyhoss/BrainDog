@@ -123,7 +123,7 @@ export const footWords = {
 export type RatesWay = 'none' | 'held' | 'unread';
 
 /** The rates action, filled in and waiting for a yes. Record-relative: the renderer's `href` puts the record in front. */
-const RATES_PRESET = '/automations?new=action&preset=rates';
+const RATES_PRESET = '/addons/money-core#keep-rates';
 
 /** Where a scheduled action is listed with its state and its way back on. An action has no address of its own. */
 const RATES_HELD = '/automations?tab=scheduled';

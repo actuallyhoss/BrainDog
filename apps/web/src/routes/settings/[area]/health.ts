@@ -81,6 +81,10 @@ export type More = {
 };
 
 /** The word of the link at the line's end when what needs a look is messages waiting: they open where they wait. */
+/** The word of the link when the newest exchange rate is old. */
+export const KEEP_RATES = 'Keep rates current';
+/** Money's switch for it (`routes/addons/[id]/rates-switch.ts`). */
+const KEEP_RATES_AT = '/addons/money-core#keep-rates';
 export const OPEN_THEM = 'Open the inbox';
 
 /** The sign that counts messages waiting to be filed. */
@@ -188,7 +192,10 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     const raw = lead?.said;
     const named = raw === undefined ? 'One check needs a look' : plainSign(raw).replace(/[.!?]$/u, '');
     const link =
-      lead?.sign === ARRIVALS && more.inboxAt
+      /* THE NEWEST EXCHANGE RATE BEING OLD LINKS TO THE SWITCH THAT KEEPS RATES CURRENT, in Money's settings. */
+      /\bexchange rates?\b/iu.test(named) && /\bold\b/iu.test(named)
+        ? { text: KEEP_RATES, href: KEEP_RATES_AT }
+        : lead?.sign === ARRIVALS && more.inboxAt
         ? { text: OPEN_THEM, href: more.inboxAt }
         : aboutCopies(named) && more.backupsAt
           ? { text: BACKUPS, href: more.backupsAt }

@@ -1,8 +1,9 @@
 {
   "pack": "rates-open-er-api-com",
-  "version": "1.1.1",
+  "version": "1.1.2",
+  "title": "Daily exchange rates",
   "icon": "trending-up",
-  "changes": "Draws its own icon in the store and in the installed list. Nothing in it changed.",
+  "changes": "Has a plain title, Daily exchange rates. Nothing else in it changed.",
   "summary": "Polls open.er-api.com every 1d for what one USD is worth in each other currency the record holds, named when it is installed.",
   "fill": {
     "id": "A name for the address, lower case, digits and hyphens. The pack is rates-<id> and its poll rates_<id>, cut to 32 characters.",

@@ -3689,13 +3689,40 @@
     {
       "kind": "pack",
       "id": "rates-open-er-api-com",
-      "title": "rates-open-er-api-com",
+      "title": "Daily exchange rates",
       "summary": "Polls open.er-api.com every 1d for what one USD is worth in each other currency the record holds, named when it is installed.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.1.1",
+      "latest": "1.1.2",
       "versions": [
+        {
+          "version": "1.1.2",
+          "checksum": "e16a2b3f14ea842d49dbd6db0cdd5d144933a780434c1e731d9d3a6eddea18f0",
+          "bytes": 1476,
+          "published_at": "2026-10-27T14:27:09.940Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "open.er-api.com",
+                "line": "CALLS OUT open.er-api.com · every 1d · grant \"none\"",
+                "key": null
+              }
+            ]
+          },
+          "notes": "Has a plain title, Daily exchange rates. Nothing else in it changed.",
+          "yanked": {
+            "reason": "Keep rates current, on Money's add-on page",
+            "at": "2026-10-27T14:27:09.940Z"
+          }
+        },
         {
           "version": "1.1.1",
           "checksum": "90faac6cedd8bd46e1c3f3233ea433edc38020b8f71bd28df900ab4d966a1500",
@@ -3719,7 +3746,7 @@
           },
           "notes": "Draws its own icon in the store and in the installed list. Nothing in it changed.",
           "yanked": {
-            "reason": "Set up exchange rates, on Money's add-on page",
+            "reason": "Keep rates current, on Money's add-on page",
             "at": "2026-10-25T20:51:43.807Z"
           }
         },
@@ -3745,7 +3772,7 @@
             ]
           },
           "yanked": {
-            "reason": "Set up exchange rates, on Money's add-on page",
+            "reason": "Keep rates current, on Money's add-on page",
             "at": "2026-09-28T15:05:40.127Z"
           }
         },
@@ -3771,7 +3798,7 @@
             ]
           },
           "yanked": {
-            "reason": "Set up exchange rates, on Money's add-on page",
+            "reason": "Keep rates current, on Money's add-on page",
             "at": "2026-09-28T15:05:40.127Z"
           }
         }

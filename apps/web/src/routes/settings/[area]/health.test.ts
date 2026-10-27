@@ -175,3 +175,9 @@ test('BACKUPS SAYS WHY A NIGHT FAILED, in plain words, with how long it has been
   assert.match(backups, /call<\{ faults: Fault\[\] \}>\('faults'\)/u);
   assert.match(backups, /<StateRow [^>]*title=\{failedNight\.said\} line=\{failedNight\.why\}/u);
 });
+
+test('AN OLD EXCHANGE RATE LINKS TO THE SWITCH THAT KEEPS RATES CURRENT', async () => {
+  const { healthSaid } = await import('./health.ts');
+  const parts = healthSaid('ok' as never, {} as never, { signs: [{ sign: 'rate-age', state: 'red', said: 'The newest exchange rate is 28 days old. A feed would keep them current.' }], signsAt: '/p/health' });
+  assert.deepEqual(parts?.at(-1), { text: 'Keep rates current', href: '/addons/money-core#keep-rates' });
+});

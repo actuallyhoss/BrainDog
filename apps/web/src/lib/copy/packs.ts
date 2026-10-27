@@ -22,7 +22,8 @@ export const packs = {
   ratesHeading: 'Exchange rates, fetched every day',
   ratesWhy:
     'BrainDog can fetch what your currencies are worth from a public address once a day, so money in more than one currency adds up in your home currency. One action fetches every currency your money is in. Open it again when you start using a new currency.',
-  ratesSetUp: 'Set up exchange rates',
+  ratesKeep: 'Keep rates current',
+  ratesTurnedOff: 'Exchange rates are no longer fetched. Turn it on again to bring them back.',
   noPacksYet: 'No add-ons installed',
   /* The Keychain's words are in `record/keychain.ts`, which only its two routes load. */
 

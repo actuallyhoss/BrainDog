@@ -45,6 +45,8 @@
   import { heldNames, holdName, waitingIn, waitingLine } from './waiting.ts';
   import { answersIn, declarationsOf, holdsFoot, savedSaid, type TakesHold } from './takes-hold.ts';
   import { foldOf, sharedNotes } from './fold.ts';
+  import { KEEP_RATES_ASK, ratesFeedOf, ratesKept } from './rates-switch.ts';
+  import { goto } from '$app/navigation';
   import { lineSaid, pairsOf, rateNote, rateSaid, readRates, type PairRead } from './rates.ts';
   import { Sparkline } from '$lib/viz/index.ts';
   import { kennelFetch, publishedText } from '$lib/market/publish.ts';
@@ -238,10 +240,39 @@
   /** The record's sentence when it refused the switch; the cascade that answers a dependent is offered on /packs. */
   let turnSaid = $state('');
 
+  /** The rates add-on this record holds, for the "Keep rates current" switch; `null` until one is set up. */
+  let feed = $state<PackState | null>(null);
+  let keeping = $state(false);
+  const keptOn = $derived(ratesKept(feed));
+
+  /** Off and never set up opens the rates ask (it asks for the address as usual); otherwise the switch turns the feed off or on, and off is undone. */
+  async function pressKeep() {
+    const s = source;
+    if (keeping) return;
+    if (feed === null) return void goto(at(KEEP_RATES_ASK));
+    if (!s) return;
+    keeping = true;
+    try {
+      const was = feed;
+      const on = was.disabled_at !== null;
+      const out = on ? await s.enable(was.id) : await s.disable(was.id);
+      if (!out.ok) {
+        turnSaid = out.refusal.fix;
+        return;
+      }
+      if (!on && out.value.changed) toasts.push(copy.ratesTurnedOff, { undo: () => void pressKeep() });
+      const got = await s.packs();
+      if (got.ok) feed = ratesFeedOf(got.value);
+    } finally {
+      keeping = false;
+    }
+  }
+
   async function readHeld(s: Source, want: string) {
     const got = await s.packs();
     if (got.ok && id === want) {
       installed = got.value.find((p) => p.id === want) ?? null;
+      feed = ratesFeedOf(got.value);
       void readWaiting(got.value, want);
       void readPairs(installed?.registers ?? [], want);
     }
@@ -753,9 +784,11 @@
             </ul>
           {/if}
           <p class="rates-why">{copy.ratesWhy}</p>
-          <div class="settings-actions">
-            <Button weight="quiet" href={at('/automations?new=action&preset=rates')}>{copy.ratesSetUp}</Button>
-          </div>
+          <label class="keep-rates" id="keep-rates">
+            <span class="head-switch-word">{copy.ratesKeep}</span>
+            <button type="button" class="switch" role="switch" aria-checked={keptOn} aria-label={copy.ratesKeep} disabled={keeping} onclick={pressKeep}
+              ><span class="switch-track"></span></button>
+          </label>
         </Tile>
       {/if}
     {:else if !(pack && (pack.registers.length || shownPages.length))}
@@ -899,6 +932,13 @@
   .about:empty,
   .turn-said:empty {
     display: none;
+  }
+
+  .keep-rates {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    cursor: pointer;
   }
 
   .head-switch {

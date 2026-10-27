@@ -36,7 +36,7 @@ export const suggestWords = {
   ratesLine: 'Fetches what one dollar is worth in each currency you hold, once a day. A setting in Money.',
   ratesCue: 'Set up',
   /** Where the rates feed is set up: the scheduled action for rates, filled in. */
-  ratesAt: '/automations?new=action&preset=rates',
+  ratesAt: '/addons/money-core#keep-rates',
   asked: (question: string): string => `Needs you asks: "${question}"`,
   add: 'Add',
 } as const;
