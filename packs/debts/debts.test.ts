@@ -51,11 +51,18 @@ const usd = (amount: number): Json => ({ amount, currency: 'USD' });
 const debt = (name: string, balance: number, apr: number, minimum: number, currency = 'USD'): Row =>
   row('debts', { name, balance: { amount: balance, currency }, apr, minimum: { amount: minimum, currency } });
 
+type Leaf = { field?: string; gt?: number; lte?: number; all?: Leaf[] };
+const flat = (w: Leaf | null | undefined): Leaf[] => (w ? (w.all ? w.all.flatMap(flat) : [w]) : []);
 const hostOf = (rows: Row[]): CtxHost => ({
   fetch: async () => {
     throw new Error('paying debts off fetches nothing');
   },
-  list: async (register) => rows.filter((r) => r.register === register) as unknown as Json[],
+  /* A script's list is one page of fifty, in no order of seq, and takes no cursor; a script asks for rows by seq range. */
+  list: async (register, where) => {
+    const leaves = flat(where as Leaf | null);
+    const has = (r: Row, l: Leaf) => (l.field === 'seq' ? (l.gt === undefined || r.seq > l.gt) && (l.lte === undefined || r.seq <= l.lte) : true);
+    return rows.filter((r) => r.register === register && leaves.every((l) => has(r, l))).sort((a, b) => ((a.seq * 7919) % 1009) - ((b.seq * 7919) % 1009)).slice(0, 50) as unknown as Json[];
+  },
   now: () => NOW,
   tz: 'UTC',
   input: {},
@@ -103,6 +110,15 @@ test('TWO DEBTS AT NO INTEREST: 300 and 600, 50 minimum each and 100 extra, clea
     assert.deepEqual(p.saved, usd(0));
     assert.equal(p.sooner, 7, 'the minimums alone take 12 months, the Sofa');
     assert.equal(p.order, 'Phone (2 months), then Sofa (5 months)');
+  }
+});
+
+test('MORE THAN FIFTY DEBTS ARE ALL IN THE PLAN, not the first page', async () => {
+  const many = Array.from({ length: 60 }, (_, i) => debt(`Debt ${i + 1}`, 10_000, 0, 10_000));
+  const w = writesOf(await runInQuickJs(decl(), hostOf(many)));
+  for (const method of ['avalanche', 'snowball']) {
+    const order = String(planOf(w, method).order);
+    for (let i = 1; i <= 60; i++) assert.match(order, new RegExp(`Debt ${i} \\(`), `${method} left out Debt ${i}`);
   }
 });
 
