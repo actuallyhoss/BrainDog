@@ -3161,9 +3161,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Who a door's deposit or read is by: the run the caller names, `S12`, while it is live, and otherwise the
    * agent. Never the person who approved the grant, whose name on an agent's act is the attribution a run replaces.
    */
-  const keychainActor = (hints: SessionHints): string => {
+  const keychainActor = async (hints: SessionHints, grant: KeychainGrant | null): Promise<string> => {
     const run = hints.spoken ? kernel.findRun({ spoken: hints.spoken }) : null;
-    return run && run.seq !== null ? `${PREFIX}${run.seq}` : `agent:${hints.agent ?? 'other'}`;
+    const fallback = `agent:${hints.agent ?? 'other'}`;
+    if (!run || run.seq === null) return fallback;
+    /* A GRANT SIGNS AS A RUN ONLY ON ITS OWN MACHINE. A keychain grant has no run of its own and no token, so a run it
+       names is any live one: another key's, on another machine, whose name then went on the owner's ask and on the
+       key's reads. The run must say the machine the grant was approved for, by the name the owner approved it under. */
+    if (grant !== null) {
+      const device = (await kernel.deviceList()).find((d) => d.handle === grant.handle);
+      const machine = device?.label?.split(' · ')[0]?.trim() ?? '';
+      const host = typeof run.fields.host === 'string' ? run.fields.host.trim() : '';
+      if (machine === '' || host === '' || machine !== host) return fallback;
+    }
+    return `${PREFIX}${run.seq}`;
   };
 
   /**
@@ -3172,7 +3183,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The machine list is read only for a key set to ask, so a key with no rule costs one indexed read and nothing more.
    */
   const keyGateFor = async (row: Entry, grant: KeychainGrant, hints: SessionHints): Promise<KeyGate> => {
-    const actor = keychainActor(hints);
+    const actor = await keychainActor(hints, grant);
     const run = actor.startsWith(PREFIX) ? actor : null;
     let machineName: string | null = null;
     if (kernel.keyAccess(row.id).some((r) => r.rule !== 'always')) {
@@ -14807,7 +14818,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
         /* An agent's deposit is signed by its run, and a person's by the person: a person's name on an agent's
            act is the attribution a run replaces, and an agent's name on a person's act is the same mistake back. */
-        { actor: signer ?? (ctx ? actorOf(ctx) : keychainActor(hints)) },
+        { actor: signer ?? (ctx ? actorOf(ctx) : await keychainActor(hints, grant)) },
       );
       if (!out.ok) return tail(out);
       return tail(ok({ credential: kernel.nameOf(out.value.entry.id), label, version: out.value.grant.version, rotated: version > 1 }));
@@ -14844,7 +14855,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const gate = await keyGateFor(row, grant, hints);
         if (!gate.open) return tail(no<OpenedForGrant>(gate.refusal.code, gate.refusal.fix, { at: gate.refusal.at }));
       }
-      const out = kernel.openGrant({ id: held, kek_id }, ctx ? actorOf(ctx) : keychainActor(hints));
+      const out = kernel.openGrant({ id: held, kek_id }, ctx ? actorOf(ctx) : await keychainActor(hints, grant));
       if (!out.ok) return out;
       return ok({ ...out.value, credential: kernel.nameOf(row.id), label: typeof row.fields.label === 'string' ? row.fields.label : label });
     },

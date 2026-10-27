@@ -410,3 +410,28 @@ test('A SCHEDULED RUN IS NEVER ASKED: its opener reaches a key set to ask, or to
     await s.close();
   }
 });
+
+test("A GRANT NAMING A RUN ON ANOTHER MACHINE IS NOT SIGNED AS THAT RUN, so the owner's ask and the key's reads name nobody else", async () => {
+  const s = await stack();
+  try {
+    const kiln = s.project('Kiln');
+    const bearer = await s.grant(kiln);
+    const login = await s.login();
+    /* THE OWNER'S OWN RUN, on the owner's machine; the grant was approved for test-laptop. */
+    const theirs = { 'x-braindog-agent': 'claude', 'x-braindog-host': 'owner-mac', 'x-braindog-repo': 'kiln' };
+    const attached = await s.call('/api/attach', { bearer: login, body: { source: 'startup', client_id: 'cc-owner' }, headers: theirs });
+    assert.equal(attached.status, 200, attached.raw);
+    const spoken = String(attached.body?.value?.spoken);
+
+    const put = await s.call(door('deposit'), { bearer, headers: { ...theirs, 'x-braindog-session': spoken }, body: { label: 'Kiln deploy', opens: 'Deploys kiln.example', value: fake() } });
+    assert.equal(put.status, 200, put.raw);
+    const got = await s.call(door('open'), { bearer, headers: { ...theirs, 'x-braindog-session': spoken }, body: { label: 'Kiln deploy' } });
+    assert.equal(got.status, 200, got.raw);
+
+    const signed = s.running.sql.all<{ actor: string }>("SELECT actor FROM event WHERE kind IN ('grant.read', 'grant.deposit') OR to_v LIKE '%grant%'");
+    assert.ok(signed.length > 0, 'nothing was signed, so this case proves nothing');
+    for (const e of signed) assert.notEqual(e.actor, spoken, "the grant signed as another machine's run");
+  } finally {
+    await s.close();
+  }
+});
