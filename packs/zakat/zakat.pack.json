@@ -919,7 +919,7 @@
           "heading": "What you set",
           "icon": "sliders-horizontal",
           "span": 12,
-          "body": "Open the row to choose silver, give a silver price, give the day your year began, add cash due to you or add debts that are due.",
+          "body": "Open your figures to choose silver, give a silver price, give the day your year began, add cash due to you or add debts that are due.",
           "source": "register.zakat_basis",
           "columns": [
             {
@@ -946,7 +946,7 @@
             }
           ],
           "limit": 1,
-          "empty": "The first daily run makes this row."
+          "empty": "Your figures are made on the first daily run."
         },
         {
           "kind": "capture",

@@ -944,7 +944,7 @@
           "heading": "Buys",
           "icon": "hand-coins",
           "span": 12,
-          "body": "Each buy stays a row with its own day, so how long each piece has been held can always be said.",
+          "body": "Each buy is kept with its own day, so how long each piece has been held can always be said.",
           "source": "register.holding_buys",
           "columns": [
             {
