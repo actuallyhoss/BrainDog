@@ -194,8 +194,10 @@ test('THE PAGE: fund value, cover and premiums a year in one currency, and the p
   assert.equal(cents(cell(tiles, 'policies-year')), 3000 * 100);
   assert.equal(cents(cell(tiles, 'policies-paid')), 3000 * 100);
   assert.equal(under(page, 'Policies').rows?.length, 2);
-  const age = page.blocks.find((b) => b.heading === 'Fund values from' && b.why !== 'when');
-  assert.equal(age?.readings?.[0]?.metric, 'policies-fund-on', 'the age of the oldest fund value is on the page');
+  /* THE CALM LINE IS DRAWN AND THE WARNING IS NOT, while every fund value is fresh. */
+  const lines = page.blocks.filter((b) => b.kind === 'note' && b.why !== 'when').map((b) => b.body ?? '');
+  assert.equal(lines.filter((t) => /policies-fund-on/u.test(t) && !/over 90 days/u.test(t)).length, 1, 'the age of the oldest fund value is said');
+  assert.equal(lines.filter((t) => /over 90 days/u.test(t)).length, 0);
   sql.close();
 });
 
@@ -221,12 +223,13 @@ test('EACH POLICY HAS A PAGE with its fund, its age, the premiums paid so far an
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
   const fund = under(page, 'Fund and cover');
   assert.equal(cents(cell(fund, 'policy-fund-at:Harbour Life')), 4_100 * 100);
-  assert.ok(cell(fund, 'policy-fund-on-at:Harbour Life'), 'the day the fund value is from is read');
+  const lines = page.blocks.filter((b) => b.kind === 'note' && b.why !== 'when').map((b) => b.body ?? '');
+  assert.ok(lines.some((t) => /policy-fund-on-at:Harbour Life/u.test(t)), 'the day the fund value is from is said');
+  assert.ok(lines.some((t) => /policy-matures-at:Harbour Life/u.test(t)), 'the maturity is said');
   const paid = under(page, 'Premiums');
   assert.equal(cents(cell(paid, 'policy-paid-at:Harbour Life')), 3000 * 100);
   assert.equal(cell(paid, 'policy-payments-at:Harbour Life')?.value, 12);
   const end = under(page, 'Maturity');
-  assert.equal(cell(end, 'policy-term-at:Harbour Life')?.value, 5);
   assert.equal(cents(cell(end, 'policy-benefit-at:Harbour Life')), 90_000 * 100);
   sql.close();
 });

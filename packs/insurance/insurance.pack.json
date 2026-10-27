@@ -511,7 +511,7 @@
             "metric": "policies-live",
             "gt": 0
           },
-          "body": "{{policies-fund}} in funds across {{policies-live}} live policies, with {{policies-year}} going in as premiums each year."
+          "body": "{{policies-fund}} in funds across {{policies-live}} live policies. Next maturity {{policies-next}}."
         },
         {
           "kind": "note",
@@ -548,28 +548,17 @@
             {
               "metric": "policies-paid",
               "label": "Premiums paid so far"
-            },
-            {
-              "metric": "policies-next",
-              "label": "Next maturity"
             }
           ]
         },
         {
-          "kind": "stat",
-          "heading": "Fund values from",
-          "icon": "calendar-clock",
+          "kind": "note",
           "span": 12,
           "when": {
             "metric": "policies-fund-stale",
             "is": 0
           },
-          "cells": [
-            {
-              "metric": "policies-fund-on",
-              "label": "Oldest fund value is from"
-            }
-          ]
+          "body": "The oldest fund value here is from {{policies-fund-on}}. Type the value from the insurer's next statement to keep them current."
         },
         {
           "kind": "note",
@@ -725,10 +714,6 @@
               "label": "Fund value"
             },
             {
-              "metric": "policy-fund-on-at:{{name}}",
-              "label": "Fund value as of"
-            },
-            {
               "metric": "policy-cover-at:{{name}}",
               "label": "Cover"
             },
@@ -737,6 +722,15 @@
               "label": "Illustrated fund this year"
             }
           ]
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "metric": "policy-fund-on-at:{{name}}",
+            "gt": 0
+          },
+          "body": "This fund value is from {{policy-fund-on-at:{{name}}}}. Type the value from the insurer's latest statement to bring it up to date."
         },
         {
           "kind": "stat",
@@ -759,19 +753,20 @@
           ]
         },
         {
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "metric": "policy-matures-at:{{name}}",
+            "gt": 0
+          },
+          "body": "Matures on {{policy-matures-at:{{name}}}}, with {{policy-term-at:{{name}}}} percent of the term gone."
+        },
+        {
           "kind": "stat",
           "heading": "Maturity",
           "icon": "calendar-clock",
           "span": 12,
           "cells": [
-            {
-              "metric": "policy-matures-at:{{name}}",
-              "label": "Matures"
-            },
-            {
-              "metric": "policy-term-at:{{name}}",
-              "label": "Percent of term gone"
-            },
             {
               "metric": "policy-benefit-at:{{name}}",
               "label": "Paid out at maturity"
