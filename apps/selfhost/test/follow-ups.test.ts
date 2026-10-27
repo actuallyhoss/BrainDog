@@ -295,7 +295,7 @@ test('A SCRIPT PAUSED BY THREE REFUSED RUNS IS NOT STARTED AGAIN BY THE RULE THA
     await s.settle();
     assert.equal(jobs().length, 3, 'the rule queued a paused script');
     const last = s.running.sql.all<{ state: string; say: string | null }>("SELECT state, say FROM automation_run WHERE rule = 'throws_on_done' ORDER BY started_at, rowid").at(-1);
-    assert.equal(last?.state, 'failed');
+    assert.equal(last?.state, 'cancelled', 'a run that met a paused script counted as a failed automation');
     assert.match(last?.say ?? '', /script\.throws_on_done is paused/);
   } finally {
     await s.close();
