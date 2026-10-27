@@ -10735,6 +10735,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* ONE ROW PER KEY ON PEOPLE AND ORGANISATIONS: a key another row holds is that row, met again (`keyHeld`). */
       const known = keyHeld(ctx, args.register, args.fields, null);
       if (known) return { ok: false, refusal: known };
+      /* A FIELD ONLY A DECISION SETS (`by: decide`) IS NOT SET BY ANYONE ELSE'S NEW ROW EITHER: a skill's text reaches
+         every agent of the owner's, so a colleague's skill is proposed and he accepts it. The owner and his own agents
+         write as he decides. */
+      const level = ctx.principal.kind === 'person' || ctx.principal.kind === 'token' ? ctx.principal.level : null;
+      if (level !== 'owner' && ctx.principal.kind !== 'system' && args.fields && typeof args.fields === 'object') {
+        const given = args.fields as Record<string, unknown>;
+        const set = (v: unknown): boolean => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0);
+        const decided = kernel.register(args.register)?.fields.find((f) => f.by === 'decide' && !f.retired && set(given[f.id]));
+        if (decided) return no('FORBIDDEN', `${decided.id} is set only by an accepted proposal. Propose the row, and the owner decides.`, { at: decided.id });
+      }
       /* HELD TO THE ROWS SHE MAY WRITE (`sight.ts`): no hidden field, and the new row inside her predicate, which
          the kernel asks once the row is made, in the same transaction (`within`). */
       const sighted = sight.writable(ctx, args.register, null, args.fields as Record<string, unknown>, { code: 'REF_UNKNOWN', fix: '' });
