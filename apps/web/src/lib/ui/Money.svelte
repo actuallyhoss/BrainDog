@@ -23,6 +23,11 @@
   `£4,8…` is a different number and a cut figure is worse than a missing one. The full figure stays in
   the text a screen reader reads, and in the title on a pointer.
 
+  A FOREIGN AMOUNT CAN SAY WHAT IT IS AT HOME (`approx`): "≈ EGP 49,608" on a quiet line under "$1,000.00", converted
+  at the record's own rates (`lib/money/rates.ts`), rounded, and never drawn for the home currency or with no rate. How
+  old the rates are is said ONCE A SCREEN, beside the first such line (`lib/money/rates.svelte.ts`), and not under every
+  figure. Off unless the caller asks: an amount inside a sentence has no line under it to give.
+
   Tabular figures on the PROPORTIONAL face, never mono. A monospace face gives the thousands
   separator a full cell, and the comma floats in the middle of the number (13 §3.2).
 -->
@@ -74,6 +79,9 @@
   import { AMOUNT_SPACE, integer, moneySet, moneyWhole, writeAmount, type WrittenAmount } from 'braindog-render';
   import { page } from '$app/state';
   import { homeCurrency } from '$lib/record/api.ts';
+  import { recordToday } from '$lib/record/zone.ts';
+  import { ageSaid, approxOf } from '$lib/money/rates.ts';
+  import { held } from '$lib/money/rates.svelte.ts';
   import { frameResizeObserver } from './resize.ts';
 
   let {
@@ -82,6 +90,7 @@
     weight = 'normal',
     form = 'auto',
     home,
+    approx = false,
   }: {
     minor: number;
     currency: string;
@@ -90,6 +99,8 @@
     form?: 'auto' | 'exact' | 'whole';
     /** The record's home currency, when the caller holds it; else the shell's. */
     home?: string | null | undefined;
+    /** Say a foreign amount in the home currency on a line under it, with the rates' age once a screen. */
+    approx?: boolean | undefined;
   } = $props();
 
   /* THE SHELL SAYS THE RECORD'S CURRENCY ONCE `boot` HAS ANSWERED (`index.currency`, `null` for a record with none). Before
@@ -115,6 +126,27 @@
   );
   const text = $derived(w ? w.text : Number.isInteger(minor) ? integer(minor) : '');
   const whole = $derived(parts ? `${parts.lead}${parts.whole}${parts.fraction}${parts.iso ? ` ${parts.iso}` : ''}` : text);
+
+  /* THE AMOUNT AT HOME, when asked for and a rate reaches it. The rates are asked of the record the first time. */
+  const foreign = $derived(approx && !!currency && told.known && told.home !== null && currency.toUpperCase() !== told.home.toUpperCase());
+  $effect(() => {
+    if (foreign) held.ask();
+  });
+  const athome = $derived(foreign ? approxOf(minor, currency, told.home, held.rates, recordToday()) : null);
+  const athomeSaid = $derived(athome ? (moneyWhole(athome.minor, athome.currency, told.home)?.text ?? null) : null);
+  /* THE ONE LINE THAT SAYS HOW OLD THE RATES ARE: claimed while this amount restates itself, given back when it stops. */
+  let ticket = $state<number | null>(null);
+  const restates = $derived(athome !== null);
+  $effect(() => {
+    if (!restates) return;
+    const t = held.claim();
+    ticket = t;
+    return () => {
+      held.release(t);
+      ticket = null;
+    };
+  });
+  const aged = $derived(athome && ticket !== null && held.says(ticket) ? ageSaid(athome.as_of, recordToday()) : null);
 
   let node = $state<HTMLSpanElement | null>(null);
   /** `whole` at the caller's size, `step` one type step down, `cut` a step down and cut at the block's edge. */
@@ -145,7 +177,7 @@
   });
 </script>
 
-{#if currency && !told.known}<span class="money num money-held" aria-hidden="true" style={`inline-size: ${Math.max(3, whole.length - 3)}ch`}></span>{:else}<span class="money num" data-weight={weight} data-fit={fit} bind:this={node} title={fit === 'cut' ? whole : undefined}>{#if parts}<span class="amount">{parts.lead}{parts.whole}{parts.fraction}</span>{#if parts.iso}<span class="code">{parts.iso}</span>{/if}{:else}<span class="amount">{text}</span>{/if}</span>{/if}
+{#if currency && !told.known}<span class="money num money-held" aria-hidden="true" style={`inline-size: ${Math.max(3, whole.length - 3)}ch`}></span>{:else}<span class="money num" data-weight={weight} data-fit={fit} bind:this={node} title={fit === 'cut' ? whole : undefined}>{#if parts}<span class="amount">{parts.lead}{parts.whole}{parts.fraction}</span>{#if parts.iso}<span class="code">{parts.iso}</span>{/if}{:else}<span class="amount">{text}</span>{/if}</span>{/if}{#if athomeSaid}<span class="money-approx num">≈ {athomeSaid}{#if aged}<span class="money-age"> · {aged}</span>{/if}</span>{/if}
 
 <style>
   .money {
@@ -160,6 +192,16 @@
     vertical-align: -0.1em;
     background: var(--tile-2);
     border-radius: var(--r-xs);
+  }
+
+  /* THE AMOUNT AT HOME, a line of its own under the figure, quiet and smaller, so a column of foreign amounts still
+     reads by the figure first. */
+  .money-approx {
+    display: block;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+    white-space: nowrap;
   }
 
   .money[data-fit='step'] {

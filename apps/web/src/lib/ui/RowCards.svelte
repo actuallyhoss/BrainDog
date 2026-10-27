@@ -353,7 +353,7 @@
             <span class="card-figure" dir={dirOf(register, figure)}>
               {#if figureLabel}<span class="card-figure-label">{figureLabel}</span>{/if}
               <!-- AND WHICH WAY IT WENT (Y19), as Money's page says it: "−EGP 279.03" out and "+EGP 600.00" in. -->
-              {#if isMoney(value)}{@const way = signs ? wayOf(decl, e.fields) : null}{#if way === 'in'}+{/if}<Money minor={way === 'out' ? -Math.abs(value.amount) : value.amount} currency={value.currency} form={pence ? 'exact' : 'auto'} />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
+              {#if isMoney(value)}{@const way = signs ? wayOf(decl, e.fields) : null}{#if way === 'in'}+{/if}<Money minor={way === 'out' ? -Math.abs(value.amount) : value.amount} currency={value.currency} form={pence ? 'exact' : 'auto'} approx />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
             </span>
           {/if}
           <!-- THE DOT AND ITS WORD, THE DATE THE WORD IS ABOUT, AND ONE DETAIL. `data-intent` is on the
