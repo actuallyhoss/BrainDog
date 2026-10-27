@@ -18,7 +18,10 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import publicClean, { ALLOWED, ALLOWED_SPELLING, WORDS, licenceFindings, readmeFindings, filesOf, textOf } from '../public-clean.mjs';
+import publicClean, { ALLOWED, ALLOWED_SPELLING, FROZEN, WORDS, licenceFindings, readmeFindings, filesOf, textOf } from '../public-clean.mjs';
+
+/* AND NO CALL IN THIS PROCESS READS IT EITHER: `publicClean` called here reads the list from the same variable. */
+process.env.BRAINDOG_PRIVATE_TERMS = join(tmpdir(), 'braindog-no-such-private-list.txt');
 
 const gates = join(import.meta.dirname, '..');
 const root = join(gates, '..', '..');
@@ -137,6 +140,34 @@ test('(d) a private term is found whole, printed by its line in the list and nev
     'bank.test.ts:3  holds a term from the private list (its line 4)',
   ]);
   assert.doesNotMatch(r.out, /4417|quillon/iu);
+});
+
+test('(d) a frozen file: at or under its number is green, over it is red, under it says so, and a planted tree has none', (t) => {
+  const at = tree(t, { 'old.pack.json': '"card 4417"\n"card 4417 again"\n' });
+  const list = join(at, '..', `frozen-${process.pid}.txt`);
+  t.after(() => rmSync(list, { force: true }));
+  writeFileSync(list, '4417\n');
+  const was = process.env.BRAINDOG_PRIVATE_TERMS;
+  process.env.BRAINDOG_PRIVATE_TERMS = list;
+  t.after(() => (process.env.BRAINDOG_PRIVATE_TERMS = was));
+  const logged = [];
+  const said = [];
+  t.mock.method(console, 'log', (l) => logged.push(l));
+  t.mock.method(console, 'error', (l) => said.push(l));
+  assert.equal(publicClean(at, {}, { 'old.pack.json': ['first', 'second'] }), undefined);
+  assert.equal(publicClean(at, {}, { 'old.pack.json': ['first', 'second', 'third'] }), undefined);
+  assert.ok(logged.some((l) => l.includes('old.pack.json: frozen with 3, now 2')));
+  assert.equal(publicClean(at, {}, { 'old.pack.json': ['first'] }), 1);
+  assert.equal(publicClean(at, {}), 1, 'a planted tree is read with nothing frozen');
+  assert.ok(said.some((l) => l.includes('old.pack.json:2')));
+});
+
+test('(d) only published catalogue files are frozen, and each still holds what it is frozen with', () => {
+  for (const [rel, lines] of Object.entries(FROZEN)) {
+    assert.match(rel, /^apps\/web\/static\/catalogue\//u, `${rel} is not a published catalogue file`);
+    assert.ok(lines.length > 0 && lines.every((l) => typeof l === 'string' && l !== ''), `${rel} says what it holds`);
+    assert.notEqual(textOf(root, rel), null, `${rel} is gone; take it off FROZEN`);
+  }
 });
 
 test('(b) and (c) hold on this repository as it is', () => {

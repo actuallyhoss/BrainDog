@@ -181,11 +181,24 @@ export function termHits(text, terms) {
 
 /**
  * TODAY'S HITS OF (a), EACH FILE WITH THE NUMBER OF ITS LINES THAT NAME ONE OF THE WORDS. See the header: a file off
- * this list or over its number is a finding, and a file under it may come down. Nothing is added here; the sweep of
- * LCH-C11 jobs 3 to 9 takes lines off until it is empty, and then this goes. Batches 44 to 46 took 80 files off, and
- * batch 47 the record's own index, the last. Empty, it still holds: a file that names a word is a finding.
+ * this list or over its number is a finding, and a file under it may come down. Nothing is added here; lines came off
+ * until it was empty. Empty, it still holds: a file that names a word is a finding.
  */
 export const ALLOWED = {};
+
+/**
+ * (d)'S FROZEN FILES, EACH WITH ITS LINES THAT HOLD A TERM FROM THE PRIVATE LIST, one entry a line. These are add-on
+ * versions already published to the catalogue, and the index line that describes one. A reader holds a published
+ * version to the checksum the index gives, so these bytes are never edited, and they keep the card number their
+ * examples were first written with. Money watch 1.3.2 says an invented one. A file with more such lines than entries,
+ * or one not here, is a finding as before, and this list only shrinks.
+ */
+export const FROZEN = {
+  'apps/web/static/catalogue/index.json': ["money watch 1.2.0's changes"],
+  'apps/web/static/catalogue/packs/money-watch/1.2.0.pack.json': ['its changes', "twice's note", "repeats' note"],
+  'apps/web/static/catalogue/packs/money-watch/1.3.0.pack.json': ["twice's note", "repeats' note"],
+  'apps/web/static/catalogue/packs/money-watch/1.3.1.pack.json': ["twice's note", "repeats' note"],
+};
 
 /**
  * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned (`52 §5.1` step 3). Nothing here happens on
@@ -194,11 +207,13 @@ export const ALLOWED = {};
 export default function publicClean(
   root = process.env.BRAINDOG_GATE_ROOT ?? join(fileURLToPath(new URL('.', import.meta.url)), '..', '..'),
   allowance,
+  frozen,
 ) {
   const ROOT = resolve(root);
   const files = filesOf(ROOT);
   /* THE ALLOWANCE IS THIS REPOSITORY'S, so a planted tree is read with none: its paths are not these. */
   const allowed = allowance ?? (isRepository(ROOT) ? ALLOWED : {});
+  const held = frozen ?? (isRepository(ROOT) ? FROZEN : {});
   /* A GATE THAT READ NOTHING HAS NOT PASSED. Exit 3 is "could not run". */
   if (files === null || files.length === 0) {
     console.log(`  public-clean: no file to read under ${ROOT}${files === null ? ' (git ls-files failed)' : ''}`);
@@ -240,14 +255,17 @@ export default function publicClean(
   if (terms !== null)
     for (const rel of files) {
       const text = read(rel);
-      if (text !== null) for (const { line, at } of termHits(text, terms)) findings.push(`  ${rel}:${line}  holds a term from the private list (its line ${at})`);
+      const hits = text === null ? [] : termHits(text, terms);
+      const may = Object.hasOwn(held, rel) ? held[rel].length : 0;
+      if (hits.length > may) for (const { line, at } of hits) findings.push(`  ${rel}:${line}  holds a term from the private list (its line ${at})`);
+      else if (hits.length < may) shrink.push(`  ${rel}: frozen with ${may}, now ${hits.length}`);
     }
   const privately = terms === null ? 'no private list here, so (a) to (c)' : `(a) to (d), ${terms.length} private term(s)`;
   const still = Object.keys(allowed).length;
   const where = `${files.length} file(s), ${privately}; ${still} file(s) still allowed, ${allowedLines} line(s)`;
 
   if (shrink.length > 0) {
-    console.log('  public-clean: these allowed files name the words less often now. Lower or remove their entries in ALLOWED:');
+    console.log('  public-clean: these files hold less than they are allowed now. Lower or remove their entries in ALLOWED or FROZEN:');
     for (const s of shrink) console.log(s);
   }
   if (findings.length === 0) {
