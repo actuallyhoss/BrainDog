@@ -39,6 +39,7 @@ import {
   evaluateMetric,
   groupNames,
   heldVerdict,
+  isSumOf,
   largestFirst,
   predicateOf,
   scopeCurrency,
@@ -972,6 +973,7 @@ export function figureLists(
   decl: Pick<MetricDecl, 'source' | 'value' | 'legs' | 'opening' | 'group_by'>,
   figure?: (id: string) => Pick<MetricDecl, 'source' | 'value' | 'legs' | 'opening' | 'group_by'> | null,
   pointsAt?: PointsAt,
+  depth = 0,
 ): string[] {
   /* THE COUNT OF OPEN QUESTIONS (`built-in-figures.ts`) READS THE WHOLE RECORD, as the queue over the same source does,
      so it names `*`, which only somebody who reads every list may: named by no list, the record's `metric` answered a
@@ -1040,6 +1042,15 @@ export function figureLists(
   if (checked && !isCrosscheck(checked.value)) add(checked);
   const named = pointsAt && typeof decl.group_by === 'string' && decl.source.startsWith('register.') ? pointsAt(decl.source.slice('register.'.length), decl.group_by) : null;
   if (named) out.add(named);
+  /* A SUM OF FIGURES READS EVERY LIST ITS PARTS READ. Named by its source alone, Not in the ledger (`account-gap`, an
+     account's balance less its Ledger lines) was answered to a member invited to Accounts alone, who may read neither
+     part. A part this record does not hold names the whole record; eight sums deep at most, as `where` is read. */
+  if (isSumOf(decl.value))
+    for (const p of decl.value.sum_of) {
+      const part = typeof p?.metric === 'string' ? figure?.(p.metric.split(':')[0] ?? '') : null;
+      if (!part || depth >= 8) out.add('*');
+      else for (const list of figureLists(part, figure, pointsAt, depth + 1)) out.add(list);
+    }
   return [...out];
 }
 

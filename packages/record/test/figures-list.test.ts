@@ -82,14 +82,17 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      how they are going (projects-lanes-lines-101), made it 116, and money-core's three of the next unpaid part of each plan (the day, what is left and what is left after it; the UI pass of 20 October) made it 119, and portfolio 1.19.0's kpis-held and kpi-stale, the key numbers kept and the days since a measure was read, made it 121, and money-core 3.18.0's installments-late, the parts whose day has gone (the audit of 22 October, U4), made it 122, and portfolio 1.22.0's project-staged, project-plan-path and project-plan-roadmap, a project's stages and the shape its plan is kept in, made it 125, and money-core 3.20.0's card-to-pay and card-to-pay-on, what the card has
      to pay and as of when, made it 127, and people 3.9.0's organisations-from-card-texts, the shops a card text named,
      made it 128, and money-core 3.27.0's in-ahead-by-month and out-ahead-by-month, what the cash walk moves in each
-     month ahead, made it 130. The number is
+     month ahead, made it 130, and money-core 3.29.0's five figures of one account (its balance, its Ledger lines, the gap
+     between them and its money in and out by month), lines-by-account, and the ten of a month against its budgets (what
+     is left, what came in, what is unfiled and unfiled spent, the budgets' total and the categories with none, the share
+     kept, and who was paid, how often and when last), made it 146. The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 130);
+  assert.equal(declared.length, 146);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
-     a project's own figures and its monthly series, a book's cash, the day it runs out, its month, its months and what is due to and from it, a category's budget passed and one plan's eight, and since portfolio 1.19.0 the days since one measure was read, and since portfolio 1.22.0 a project's stages and the shape its plan is kept in. */
-  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['book-cash', 'book-in-by-month', 'book-in-month', 'book-lasts-until', 'book-net-by-month', 'book-net-month', 'book-out-by-month', 'book-out-month', 'book-owed-by', 'book-owed-to', 'book-spent-month', 'budget-passed-on', 'kpi-stale', 'plan-last-due', 'plan-left', 'plan-next-due', 'plan-paid', 'plan-parts', 'plan-parts-open', 'plan-parts-paid', 'project-in-by-month', 'project-in-month', 'project-kept-month', 'project-out-by-month', 'project-out-month', 'project-owed', 'project-plan-path', 'project-plan-roadmap', 'project-said', 'project-staged']);
+     a project's own figures and its monthly series, a book's cash, the day it runs out, its month, its months and what is due to and from it, a category's budget passed and one plan's eight, one account's five since money-core 3.29.0, and since portfolio 1.19.0 the days since one measure was read, and since portfolio 1.22.0 a project's stages and the shape its plan is kept in. */
+  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['account-gap', 'account-in-by-month', 'account-lines', 'account-now', 'account-out-by-month', 'book-cash', 'book-in-by-month', 'book-in-month', 'book-lasts-until', 'book-net-by-month', 'book-net-month', 'book-out-by-month', 'book-out-month', 'book-owed-by', 'book-owed-to', 'book-spent-month', 'budget-passed-on', 'kpi-stale', 'plan-last-due', 'plan-left', 'plan-next-due', 'plan-paid', 'plan-parts', 'plan-parts-open', 'plan-parts-paid', 'project-in-by-month', 'project-in-month', 'project-kept-month', 'project-out-by-month', 'project-out-month', 'project-owed', 'project-plan-path', 'project-plan-roadmap', 'project-said', 'project-staged']);
   for (const f of listed) {
     const row = declared.find((d) => d.id === `metric.${f.id}`)!;
     assert.equal(f.pack, row.pack_id, f.id);
@@ -147,6 +150,9 @@ test('SOMEBODY INVITED TO ONE LIST IS LISTED EXACTLY THE FIGURES metric ADMITS T
   /* NOR HOW MANY NIGHTS CASH NOW MISSED: a kept line names the lists its figure reads (`figureLists`), so the line of a
      figure held from her is held from her too. Named here because it was listed to her while its line named none. */
   assert.ok(declared.some((d) => d.id === 'metric.nights-missed-30d') && !listed.includes('nights-missed-30d'));
+  /* NOR A SUM OF FIGURES SHE MAY NOT READ: Not in the ledger is over Accounts and adds an account's balance less its Ledger
+     lines, and was listed to her, and answered, while both of its parts were held from her. */
+  assert.ok(declared.some((d) => d.id === 'metric.account-gap') && !listed.includes('account-gap'));
   sql.close();
 });
 
@@ -176,7 +182,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 130);
+  assert.equal(listed.length, 146);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });
