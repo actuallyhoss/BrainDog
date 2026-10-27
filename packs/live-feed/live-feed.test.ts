@@ -388,7 +388,7 @@ for (const numbers of ['portfolio', 'diary'] as const)
     r.sql.close();
   });
 
-test('A KEY NAMED BUT NOT IN THE VAULT IS REFUSED AT INSTALL, so nothing is ever sent without it', async () => {
+test('A KEY NAMED BUT NOT IN THE KEYCHAIN IS REFUSED AT INSTALL, so nothing is ever sent without it', async () => {
   /* WRITTEN EXPECTING A PAUSE AT THE FIRST RUN, AND MEASURED EARLIER THAN THAT: the install itself is refused, in a
      sentence that tells the owner what to add. */
   const r = await recordWith({ vault: false });
