@@ -179,7 +179,9 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
     const day = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(raw) ? Date.parse(`${raw}T00:00:00Z`) / 86_400_000 : null;
     const amount = day ?? (typeof raw === 'object' ? (raw as { amount: number }).amount : Number(raw));
     if (typeof raw === 'object') units.add((raw as { currency: string }).currency);
-    const factor = product ? LOOKUPS[product[1].lookup]?.[String(e.fields[product[1].by] ?? '')] : 1;
+    /* A TABLE THE FIGURE DECLARES BESIDE IT IS THE ONE IT READS, as the record reads it (`lookups:`), else the seed's. */
+    const tables = (decl as { lookups?: Record<string, Record<string, number>> }).lookups ?? LOOKUPS;
+    const factor = product ? (tables[product[1].lookup] ?? LOOKUPS[product[1].lookup])?.[String(e.fields[product[1].by] ?? '')] : 1;
     if (factor === undefined) continue;
     values.push(Math.round(amount * factor));
   }

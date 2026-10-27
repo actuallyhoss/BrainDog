@@ -124,6 +124,9 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
      money-core 3.17.0). */
   make('installments', { what: `Kiln, part 1 in ${side.word}`, plan: KILN, number: 1, direction: 'out', amount: at(900), due: day(-20), state: 'paid' });
   make('installments', { what: `Kiln, part 2 in ${side.word}`, plan: KILN, number: 2, direction: 'out', amount: at(900), due: day(200), state: 'open' });
+  /* AND A CATEGORY WITH A BUDGET IN THIS CURRENCY, for what the budgets add up to (`budgets-total`, money-core 3.29.0). A
+     category keeps no book, so it is made without one. */
+  value(k.create('categories', { name: `Food in ${side.word}`, direction: 'out', state: 'live', budget: at(5_000) }, OWNER));
 }
 
 /** A record holding the rows of each side, standing as `stands` says. */

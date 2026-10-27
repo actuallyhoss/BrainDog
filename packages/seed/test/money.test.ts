@@ -905,7 +905,9 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
     if (walk < 0) {
       /* NOR AN ACCOUNT'S OR A BILL'S (money-core 3.19.0): each is one thing, said first, and not a walk of the money. */
       /* NOR, SINCE money-core 3.29.0, THE SECTION'S PAGES THAT ARE STILL THEIR LINE ALONE. */
-      assert.ok(['money-plan', 'money-rules', 'money-account', 'money-bill'].includes(slug) || lineAlone, `${slug}: the page draws no Cash ahead`);
+      /* NOR BUDGETS, REPORTS OR PAYEES (money-core 3.29.0): each is a job of the section, and Cash ahead is Money's and
+         Forecast's. */
+      assert.ok(['money-plan', 'money-rules', 'money-account', 'money-bill', 'money-budgets', 'money-reports', 'money-payees'].includes(slug) || lineAlone, `${slug}: the page draws no Cash ahead`);
     } else if ((page as { layout?: unknown }).layout !== undefined) {
       assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole main column`);
       assert.equal((blocks[stat] as { area?: string }).area, 'rail', `${slug}: the figure is not in the side column`);
