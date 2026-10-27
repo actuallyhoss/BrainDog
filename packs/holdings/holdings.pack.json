@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Now Investments and gold. A holding can be gold with a karat, a fund or shares, and keeps its buys: the day, how many, the price and the fees. Gold is worth its grams at the gold rate you set for its karat, or 24k by purity. Each holding says its gain and its percent, and the page shows how everything splits by kind. Holdings you already had keep every number.",
+  "changes": "Every buy, gold rate and holding is read, however many there are, where the page and the figures stopped at fifty.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {

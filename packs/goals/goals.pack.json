@@ -1,10 +1,10 @@
 {
   "pack": "goals",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "icon": "star",
   "title": "Goals",
   "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
-  "changes": "First version.",
+  "changes": "The monthly pace reads every goal and every account, however many there are.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
