@@ -710,6 +710,16 @@ function neighbours(day: string): [string, string] | undefined {
  */
 export const UNVERIFIED = 'nothing verified this arrival, so no pattern was offered it';
 
+/**
+ * How many arrivals nothing verified the inbox keeps, and how many bytes of them: the newest are kept and the oldest go.
+ *
+ * THE HOUR'S COUNT BOUNDS HOW FAST AND THIS BOUNDS HOW MUCH. A stranger who knows a webhook address stores a row a
+ * post, hour after hour, and nothing ever read or removed those rows, so the record grew until its storage ran out.
+ * Nothing was offered these rows, nothing points at them, and a sender whose signature is fixed sends again.
+ */
+export const UNVERIFIED_KEPT = 200;
+export const UNVERIFIED_BYTES = 25_000_000;
+
 /** The field a bank door reads the payee into, as printed (`loop/contract-17.md`), and the one an arrival keeps. */
 export const COUNTERPARTY = 'counterparty_text';
 
@@ -957,6 +967,14 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
          pattern here recognised this"; untriaged with `UNVERIFIED` on it is "nothing was tried",
          and only the second is answered by fixing the sender's signature rather than the pattern. */
       store('untriaged', unverified ? UNVERIFIED : null);
+      if (unverified && !already)
+        deps.sql.exec(
+          `DELETE FROM inbox_raw WHERE id IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER w AS n, SUM(length(CAST(body AS BLOB)) + length(CAST(headers AS BLOB))) OVER w AS bytes
+             FROM inbox_raw WHERE state = 'untriaged' AND reason = ? WINDOW w AS (ORDER BY ts DESC, rowid DESC)) WHERE n > ? OR bytes > ?)`,
+          UNVERIFIED,
+          UNVERIFIED_KEPT,
+          UNVERIFIED_BYTES,
+        );
       /* A NAMED DOOR'S TEXT THAT NO PATTERN READ IS WRITTEN DOWN AGAINST THE DOOR, once, so the report of what each
          pattern did (`patternReport`) has a line for it: the inbox row keeps no ingest, and a door whose texts all go
          unread looked, in every count, like a door nothing was sent to. Only a verified arrival, the first time it was
