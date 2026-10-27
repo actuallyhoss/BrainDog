@@ -193,6 +193,7 @@ const BOOT = {
   record: optional(or(keys({ slug: 'string', name: 'string', locale: 'string', currency: optional(or('string', 'null')), money: optional(list('string')) }), 'null')),
   currency: optional(or('string', 'null')),
   money: optional(list('string')),
+  zone: optional('string'),
   me: optional(
     keys({
       kind: is('person', 'token', 'system'),
