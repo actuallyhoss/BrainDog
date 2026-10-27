@@ -6625,7 +6625,20 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const by = madeByIn(sql, id);
     if (by === null) return false;
     const levels = sql.all<{ level: string }>('SELECT level FROM member WHERE person_id = ?', by).map((m) => m.level);
-    return levels.length > 0 && !levels.includes('owner');
+    if (levels.length > 0) return !levels.includes('owner');
+    /* AND A GUEST, who holds the record by a share and no member row: their row folded into another person's would move
+       their sign-in key there, and `$me` in their share with it. */
+    return (
+      sql.one(
+        `SELECT 1 AS y FROM share s WHERE s.revoked_at IS NULL AND (
+           (s.who_kind = 'person' AND s.who = ?)
+           OR (s.who_kind = 'group' AND s.who IN (SELECT group_id FROM share_group_member WHERE person_id = ?))
+           OR (s.who_kind = 'email' AND lower(s.who) = (SELECT lower(email) FROM person WHERE id = ?)))`,
+        by,
+        by,
+        by,
+      ) !== undefined
+    );
   }
 
   /** Whether a live row of a list that holds money points at this one: a merge of two such is always asked. */
