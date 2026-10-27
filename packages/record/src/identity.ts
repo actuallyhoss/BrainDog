@@ -520,7 +520,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     : null;
   /* THE SERVER KEY IS HELD AS ITS DIGEST, and a presented one is digested too, so the compare is over two
      32-byte values and takes the same time whatever either of them is. */
-  const wanted: Promise<ArrayBuffer> | null = config?.key ? crypto.subtle.digest('SHA-256', encoder.encode(config.key.serverKey)) : null;
+  /* A BLANK SERVER KEY OPENS NOTHING: its digest is the digest of a missing one. */
+  const wanted: Promise<ArrayBuffer> | null = config?.key && config.key.serverKey.trim() !== '' ? crypto.subtle.digest('SHA-256', encoder.encode(config.key.serverKey)) : null;
 
   const hmac = async (kind: 's:' | 'l:' | 'c:' | 'p:', value: string): Promise<string> => {
     const tag = new Uint8Array(await crypto.subtle.sign('HMAC', await macKey!, encoder.encode(kind + value)));

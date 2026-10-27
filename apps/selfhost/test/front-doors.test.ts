@@ -104,3 +104,13 @@ test('A 101ST PARAMETER NEVER REACHES THE DRIVER, AND A SAVEPOINT STILL DOES', (
     sql.close();
   }
 });
+
+test('AN EMPTY SERVER KEY IS REFUSED BEFORE ANYTHING LISTENS', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'braindog-front-doors-'));
+  try {
+    for (const token of ['', '  '])
+      await assert.rejects(start({ file: join(dir, 'record.sqlite'), port: 0, token, now: () => NOW, pollMs: 0 }), /empty server key/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

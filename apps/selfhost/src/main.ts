@@ -636,6 +636,9 @@ async function serve(): Promise<void> {
   /* THE DIRECTORY'S MAC KEY, `12 §8`'s lever: derived from the key file unless `BRAINDOG_SESSION_SECRET`
      names one, for a deployment that wants sessions to outlive a new key file, or to die without one.
      Either way it is 32 bytes by HKDF, and it is zero-filled once the Directory holds its own copy. */
+  /* AN EMPTY SERVER KEY IS NO KEY: set but blank, it would open every interface to anyone presenting nothing. */
+  if (env.BRAINDOG_TOKEN !== undefined && env.BRAINDOG_TOKEN.trim() === '')
+    return refuse('BRAINDOG_TOKEN is set but empty. Put a long random value in it (openssl rand -base64 32), or remove the line to run on loopback only with nobody signing in.');
   const secret = env.BRAINDOG_SESSION_SECRET;
   if (secret !== undefined && secret.length < 32)
     return refuse('BRAINDOG_SESSION_SECRET is shorter than 32 characters. Make it 32 random bytes in base64url, or unset it to derive one from the key file.');

@@ -1244,6 +1244,8 @@ export async function start(options: {
         deliver?: undefined;
       }
   )) {
+  /* AN EMPTY SERVER KEY IS NO KEY: it would bind every interface and match anyone who presents nothing. */
+  if (options.token !== undefined && options.token.trim() === '') throw new Error('An empty server key is no key: leave the token unset, or give it a long random value.');
   /* ONE CLOCK FOR THE RECORD AND THE DIRECTORY. A test that moves it a day forward moves both, which is how
      rotation and the keychain's fifteen minutes are tested against a real socket. */
   const pinned = options.now;

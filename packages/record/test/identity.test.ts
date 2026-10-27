@@ -281,6 +281,17 @@ test('A SUSPENDED PERSON IS REFUSED EVERYWHERE, including by the session they al
 
 /* ── the lockout ──────────────────────────────────────────────────────── */
 
+test('A BLANK SERVER KEY OPENS NOTHING: an empty configured key refuses every exchange, the empty one too', async () => {
+  for (const blank of ['', '   ']) {
+    const { d } = setup((c) => ({ ...c, key: { serverKey: blank } }));
+    for (const sent of ['', '   ', undefined]) {
+      const r = await d.auth({ flow: 'key.exchange', serverKey: sent as string, ip: nextIp() });
+      assert.equal(r.status, 404, `a blank key ${JSON.stringify(blank)} took ${JSON.stringify(sent)}`);
+      assert.equal(r.session, undefined);
+    }
+  }
+});
+
 test('THE LOCKOUT: ten wrong keys are compared, the eleventh is not, and the right key waits it out', async () => {
   const { sql, clock, d, lines } = setup();
   const ip = '198.51.100.7';
