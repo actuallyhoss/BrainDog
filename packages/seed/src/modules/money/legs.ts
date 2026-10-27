@@ -91,6 +91,26 @@ const DATED: Leg[] = [
     where: 'state is not cancelled',
     every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
   },
+  {
+    /* A CERTIFICATE'S PAYOUTS, WALKED FROM THE ADD-ON THAT HOLDS THEM (Certificates), and left out of a record without it
+       the way the subscriptions leg is (`installSeed`, `firstPartyDocument` and an install all drop a leg over a list the
+       record does not hold). Money in on each payout day, every month, quarter or year, until the day it matures. */
+    register: 'certificates',
+    on: 'next_payout',
+    amount: 'payout',
+    where: 'state is live',
+    incoming: { field: 'direction', is: 'in' },
+    every: { field: 'every', months: { monthly: 1, quarterly: 3, yearly: 12 } },
+    ends: 'ends',
+  },
+  {
+    /* AND THE PRINCIPAL COMING BACK, once, on the day it matures. No `every`: the row has one maturity day. */
+    register: 'certificates',
+    on: 'ends',
+    amount: 'principal',
+    where: 'state is live, ends is set',
+    incoming: { field: 'direction', is: 'in' },
+  },
 ];
 
 /**
@@ -138,14 +158,14 @@ const GOING_OUT: Record<string, string> = {
  * THE SAME WALK WITH NOTHING COMING IN, SINCE money-core 3.17.0, for how long the cash lasts with no income
  * (`lasts-no-income`): every dated leg narrowed to the money it takes off, then everyday spending as Cash ahead walks it.
  *
- * MONEY ON ITS WAY INTO AN ACCOUNT IS LEFT OUT WHOLE, because that leg is only ever money in. A subscription is only ever
+ * MONEY ON ITS WAY INTO AN ACCOUNT, AND A CERTIFICATE'S PAYOUTS, ARE LEFT OUT WHOLE, because those legs are only ever money in. A subscription is only ever
  * money out, so its leg stays as it is. Everyday spending measures what went out and walks it out, and what it counts as
  * already walked is the legs beside it, which are now the money-out legs alone. `CASH_LEGS` does not change: Cash ahead
  * and every figure over it still walk both ways.
  */
 export const OUT_LEGS: Leg[] = [
   ...DATED.flatMap((leg): Leg[] => {
-    if (leg.register === 'accounts') return [];
+    if (leg.register === 'accounts' || leg.register === 'certificates') return [];
     const out = GOING_OUT[leg.register];
     return [out === undefined ? leg : { ...leg, where: `${leg.where}, ${out}` }];
   }),

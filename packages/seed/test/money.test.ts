@@ -12,6 +12,7 @@
  * figure in the currency the record chose. The card alerts are `packs/card-alerts` now, and their tests went with them.
  */
 
+import { ADDON_LEG_LISTS, withoutLegs } from '../src/modules/held-legs.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -415,7 +416,11 @@ test('AN INSTALMENT IS A DATED AMOUNT AND THE WALK HAD NEVER READ ONE, so the ba
      about the same thirty days. The bridge that walked them on the page went in REC-B23; the figures a use case's page
      draws still read the walk, so they are held to it here. */
   for (const id of ['arriving-30d', 'leaving-30d'])
-    assert.equal((METRICS[id] as { legs?: unknown }).legs, from, `${id} and the walk are handed the ONE array, not two copies a deepEqual holds level`);
+    assert.deepEqual(
+      (METRICS[id] as { legs?: unknown }).legs,
+      from.filter((leg) => !ADDON_LEG_LISTS.has(leg.register)),
+      `${id} and the walk are handed the same legs, less a leg over a list only an add-on holds`,
+    );
 });
 
 /**
@@ -1233,7 +1238,7 @@ test('EVERY MONEY FIGURE IT DECLARES COMES BACK IN THE CURRENCY ITS OWN ROWS CAR
   assert.ok(read.length > 0, 'no money figure was read, so this test would pass over nothing');
 
   for (const m of read) {
-    const out = k.metric(m as never);
+    const out = k.metric(withoutLegs(m, (register) => !ADDON_LEG_LISTS.has(register)) as never);
     assert.ok(out.ok, `${m.metric}: ${sayOf(out)}`);
     assert.equal(out.value.parts, undefined, `${m.metric} came back one amount per currency over rows in one`);
     assert.ok(out.value.unit === null || out.value.unit === sample, `${m.metric} came back in ${String(out.value.unit)} over rows in ${sample}`);

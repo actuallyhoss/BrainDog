@@ -100,7 +100,7 @@ test('THE CASH WALK HAS ONE EVERYDAY LEG over the moves, cleared and not a trans
   /* UNSAID IS EVERY OTHER LEG OF THE WALK IT IS IN. A leg written out here rides onto a record that does not hold its
      list, and every figure over the walk is refused (the tests below are on such a record). */
   assert.equal(leg.everyday!.already, undefined);
-  assert.deepEqual(CASH_LEGS.filter((l) => !l.everyday).map((l) => l.register), ['obligations', 'recurring', 'installments', 'accounts', 'services']);
+  assert.deepEqual(CASH_LEGS.filter((l) => !l.everyday).map((l) => l.register), ['obligations', 'recurring', 'installments', 'accounts', 'services', 'certificates', 'certificates']);
 });
 
 test('A RECORD WITH NOTHING AHEAD OF IT AND NO SPENDING TO MEASURE has money that lasts, as before', async () => {

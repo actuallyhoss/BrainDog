@@ -22,6 +22,7 @@ import type { Result } from '@braindog/ports';
 import { install, normalise, plan, type Applied, type Installed } from '@braindog/declare';
 import { KERNEL_WRITTEN, type Declaration, type FieldDecl, type IngestDecl, type Json, type Kernel } from '@braindog/kernel';
 
+import { withoutLegs } from './modules/held-legs.ts';
 import { AGENTS_PACK, AGENTS_REGISTERS, agentsPackDocument } from './packs/agents.ts';
 
 export { AGENTS_METRICS, AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, agentsPackDocument, type PackManifest } from './packs/agents.ts';
@@ -176,7 +177,9 @@ export { METRICS };
 
 /* ── the pages it ships with ────────────────────────────────────── */
 
-export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES, ...SCRIPTS_PAGES, ...BASE_PAGES };
+export const PAGES: Record<string, SeedPage> = Object.fromEntries(
+  Object.entries({ ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES, ...SCRIPTS_PAGES, ...BASE_PAGES }).map(([id, body]) => [id, heldLegs(body)]),
+);
 
 /* ── installing it ────────────────────────────────────────────────────────── */
 
@@ -187,7 +190,23 @@ export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES
  * the two words the kernel needs to file it — not a translation with a chance to be wrong.
  */
 export const declarations = (): Declaration[] =>
-  Object.values(REGISTERS).map((body) => ({ id: `register.${body.id}`, kind: 'register' as const, body: withTags(body) as never }));
+  Object.values(REGISTERS).map((body) => ({ id: `register.${body.id}`, kind: 'register' as const, body: heldLegs(withTags(body)) as never }));
+
+/**
+ * A DECLARATION WITH EVERY FORECAST LEG OVER A LIST THIS RECORD DOES NOT HOLD TAKEN OFF, as `firstPartyDocument` does for
+ * a pack and `legsKept` does for an install. The cash walk names the lists an add-on holds (Certificates), and the sample
+ * holds none of them: left in, a figure over the walk is refused `REGISTER_UNKNOWN` at install and the whole sample with it.
+ *
+ * A LEG IS AN OBJECT WITH A `register` IN AN ARRAY CALLED `legs` (a figure) OR `from` (a block), wherever that array is.
+ * What the sample holds is its own lists, the agents' and the kernel's `session`.
+ */
+function HELD(): Set<string> {
+  return new Set([...Object.keys(REGISTERS), ...Object.keys(AGENTS_REGISTERS), 'session']);
+}
+
+export function heldLegs<T>(body: T, held: ReadonlySet<string> = HELD()): T {
+  return withoutLegs(body, (register) => held.has(register));
+}
 
 /**
  * The pages and the metrics, as declarations.

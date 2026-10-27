@@ -13,6 +13,7 @@
 
 import type { SeedMetric } from './base.ts';
 import { ESTATE_METRICS } from './estate.ts';
+import { ADDON_LEG_LISTS, withoutLegs } from './held-legs.ts';
 import { MONEY_METRICS } from './money/figures/index.ts';
 import { PEOPLE_METRICS } from './people.ts';
 import { PROJECT_METRICS } from './portfolio.ts';
@@ -26,4 +27,5 @@ const FIGURES: readonly { pack: string; metrics: Record<string, SeedMetric> }[] 
   { pack: 'people', metrics: PEOPLE_METRICS },
 ];
 
-export const METRICS: Record<string, SeedMetric> = Object.assign({}, ...FIGURES.map((f) => f.metrics));
+/** WITHOUT A LEG OVER A LIST ONLY AN ADD-ON HOLDS: the sample holds none, and a figure over the walk would be refused it. A record that holds the add-on gets the leg from the pack's own document. */
+export const METRICS: Record<string, SeedMetric> = withoutLegs(Object.assign({}, ...FIGURES.map((f) => f.metrics)), (register) => !ADDON_LEG_LISTS.has(register));
