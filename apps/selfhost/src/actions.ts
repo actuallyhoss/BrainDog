@@ -150,7 +150,8 @@ const sendPinned = (url: URL, init: RequestInit, pinned: Pinned, ca?: string): P
   new Promise<Response>((resolve, reject) => {
     const headers: Record<string, string> = {};
     new Headers(init.headers).forEach((value, name) => {
-      headers[name] = value;
+      /* THE HOST IS THE URL'S, so the name the address and the certificate were checked for is the one asked for. */
+      if (name !== 'host') headers[name] = value;
     });
     const literal = isIP(url.hostname.replace(/^\[|\]$/g, '')) !== 0;
     const req = httpsRequest(

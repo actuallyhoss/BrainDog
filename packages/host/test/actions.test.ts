@@ -79,6 +79,21 @@ test('IT SENDS TO A DECLARED ORIGIN with the key as a bearer, and follows no red
   assert.equal(net.calls[0]?.pinned, undefined, 'a host with no pin was handed something to connect to');
 });
 
+test('A HOST THE CALLER WRITES NEVER REACHES THE WIRE, with a key or without, so the request goes only where it was checked', async () => {
+  for (const grant of [{ id: 'g_1', label: 'example read' }, null]) {
+    const net = wire(new Response('ok'));
+    const answer = await sendAction({ origins: declaring(ORIGIN), openKey, send: net.send })(
+      request({ grant, headers: { accept: 'application/json', host: 'undeclared.example', Connection: 'close', 'transfer-encoding': 'chunked' } }),
+    );
+    assert.equal(codeOf(answer), 200);
+    const sent = new Headers(net.calls[0]?.init.headers);
+    assert.equal(sent.get('host'), null, 'the caller chose the Host the request travels under');
+    assert.equal(sent.get('connection'), null);
+    assert.equal(sent.get('transfer-encoding'), null);
+    assert.equal(sent.get('accept'), 'application/json');
+  }
+});
+
 test('THE KEY IS SCRUBBED FROM WHAT COMES BACK, when a provider echoes the header in its answer', async () => {
   const echo = wire(async (_url, init) => new Response(`{"seen":"${new Headers(init.headers).get('authorization')}","again":"${FAKE}"}`));
   const answer = await sendAction({ origins: declaring(ORIGIN), openKey, send: echo.send })(request());

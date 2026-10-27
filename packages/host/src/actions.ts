@@ -842,6 +842,9 @@ export type SendOptions<P> = {
  * key opens, `pin`, the key, and then the request. A refused address ends the run as `PULL_ORIGIN_REFUSED` with one sentence, which the
  * kernel writes on the run's event as a failure that pauses nothing and is not retried.
  */
+/** The headers that say how a request travels, which only the transport sets. */
+const WIRE_HEADERS = ['host', 'connection', 'keep-alive', 'proxy-authorization', 'proxy-connection', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'content-length'] as const;
+
 export function sendAction<P extends object | undefined = undefined>(options: SendOptions<P>): Execute {
   const pinOf = async (at: URL, signal: AbortSignal): Promise<P | string> =>
     options.pin ? within(options.pin(at, signal), signal) : (undefined as P);
@@ -889,6 +892,10 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
       if (typeof pinned === 'string') return refuse('PULL_ORIGIN_REFUSED', pinned);
 
       const headers = new Headers(request.headers);
+      /* THE WIRE REQUEST IS THE CHECKED URL'S, WHATEVER THE CALLER WROTE. A `Host` a script supplies reached the socket
+         in place of the URL's authority, so a request checked against one origin, and a key bound to that host, could be
+         read by another site behind the same address. These are the transport's to set, never a caller's. */
+      for (const name of WIRE_HEADERS) headers.delete(name);
       if (request.grant) {
         if (!options.openKey) return refuse('WRONG_KEY', `${NO_KEY_STORE} "${request.grant.label}" was not opened and nothing was sent.`);
         const opened = await options.openKey(request.grant);
