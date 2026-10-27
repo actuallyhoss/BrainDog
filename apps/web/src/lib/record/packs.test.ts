@@ -409,3 +409,11 @@ test('a module turned on by itself is offered its newer version on /packs, as a 
   const out = await moduleUpdates([held('work', '1.0.0'), held('people', FIRST_PARTY_VERSIONS.people), held('estate', '1.0.0', true), held('bookshelf', '0.1.0'), held('portfolio', null)]);
   assert.deepEqual(out, [{ id: 'work', from: '1.0.0', to: FIRST_PARTY_VERSIONS.work }]);
 });
+
+test('core is part of BrainDog: never offered as an update, and not counted among the add-ons', async () => {
+  const { moduleUpdates } = await import('./packs.ts');
+  const { installedCount } = await import('../../routes/addons/words.ts');
+  const held = (id: string, version: string | null) => ({ id, version, disabled_at: null, registers: [] });
+  assert.deepEqual(await moduleUpdates([held('core', '0.0.1')]), []);
+  assert.equal(installedCount([held('core', '1.0.0'), held('work', '1.0.0')]), 1);
+});

@@ -584,7 +584,8 @@
   const starterId = $derived(speakingPack(installed));
   const starter = $derived(starterId === null ? null : (listed.find((l) => l.installedId === starterId) ?? null));
   const coreHeld = $derived(installed.filter((s) => isCore(s.id)));
-  const addons = $derived(installed.filter((s) => !isCore(s.id) && s.id !== starterId));
+  /* THE PAGES BRAINDOG KEEPS FOR EVERY RECORD (`core`) ARE NO ADD-ON'S: not a row, and not named in the folded line. */
+  const addons = $derived(installed.filter((s) => !isCore(s.id) && s.id !== 'core' && s.id !== starterId));
   /** Why an update waits, in one line: what its version says it changes, or that one is there. */
   const reasonOf = (u: { id: string; kind: ListingKind; to: string; entry: CatalogueEntry | null }): string => {
     const l = listed.find((x) => x.installedId === u.id || (x.kind === u.kind && x.id === u.id));

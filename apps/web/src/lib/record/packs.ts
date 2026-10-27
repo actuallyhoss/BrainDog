@@ -177,7 +177,8 @@ export async function moduleUpdates(states: readonly PackState[]): Promise<{ id:
   const shipped = new Map<string, string>([...seed.FIRST_PARTY.map((id) => [id, seed.FIRST_PARTY_VERSIONS[id]] as const), [seed.AGENTS_PACK.manifest.id, seed.AGENTS_PACK.manifest.version]]);
   return states.flatMap((s) => {
     const to = shipped.get(s.id);
-    return to !== undefined && s.version !== null && s.disabled_at === null && compareVersions(s.version, to) < 0 ? [{ id: s.id, from: s.version, to }] : [];
+    /* CORE IS PART OF BRAINDOG, not an add-on: it is kept current by the night and never offered as an update. */
+    return s.id !== 'core' && to !== undefined && s.version !== null && s.disabled_at === null && compareVersions(s.version, to) < 0 ? [{ id: s.id, from: s.version, to }] : [];
   });
 }
 

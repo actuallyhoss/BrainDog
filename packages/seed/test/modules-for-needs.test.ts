@@ -77,18 +77,19 @@ test('A USE CASE STANDS ON ITS NEEDS, and on all of its modules when it says non
   for (const u of USE_CASES) {
     const first: readonly string[] = MODULE_ORDER;
     const stands = u.needs ?? u.modules;
-    assert.deepEqual(modulesFor(u), [...first.filter((m) => stands.includes(m)), ...stands.filter((m) => !first.includes(m))], u.usecase);
+    assert.deepEqual(modulesFor(u), ['core', ...first.filter((m) => stands.includes(m)), ...stands.filter((m) => !first.includes(m))], u.usecase);
   }
 });
 
 test('MODULES FOR A USE CASE ARE ITS NEEDS AND WHAT WAS NAMED, in install order', () => {
   const u = pottery();
-  assert.deepEqual(modulesFor(u), ['money-core'], 'said nothing: only what it cannot stand without');
-  assert.deepEqual(modulesFor(u, ['people']), ['people', 'money-core'], 'People named comes in, and before Money, which points at it');
-  assert.deepEqual(modulesFor(u, ['work', 'people']), ['people', 'money-core', 'work'], 'a module it does not name, named, comes in too');
-  assert.deepEqual(modulesFor(u, ['money-core']), ['money-core'], 'named twice is once');
+  /* CORE IS FIRST ON EVERY RECORD: the pages that are no add-on's. */
+  assert.deepEqual(modulesFor(u), ['core', 'money-core'], 'said nothing: core and only what it cannot stand without');
+  assert.deepEqual(modulesFor(u, ['people']), ['core', 'people', 'money-core'], 'People named comes in, and before Money, which points at it');
+  assert.deepEqual(modulesFor(u, ['work', 'people']), ['core', 'people', 'money-core', 'work'], 'a module it does not name, named, comes in too');
+  assert.deepEqual(modulesFor(u, ['money-core']), ['core', 'money-core'], 'named twice is once');
   /* A CATALOGUE PACK THAT IS NOT FIRST-PARTY STILL GOES AFTER THE FIRST-PARTY ONES. */
-  assert.deepEqual(modulesFor(u, ['tide-tables', 'portfolio']), ['portfolio', 'money-core', 'tide-tables']);
+  assert.deepEqual(modulesFor(u, ['tide-tables', 'portfolio']), ['core', 'portfolio', 'money-core', 'tide-tables']);
 });
 
 /* ── on a record ──────────────────────────────────────────────────────── */

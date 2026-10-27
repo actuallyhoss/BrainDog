@@ -181,7 +181,8 @@ export const standsOn = (u: UseCase): readonly string[] => u.needs ?? u.modules;
 export function modulesFor(u: UseCase, named: readonly string[] = []): string[] {
   const wanted = new Set([...standsOn(u), ...named]);
   const first = new Set<string>(MODULE_ORDER);
-  return [...MODULE_ORDER.filter((id) => wanted.has(id)), ...[...wanted].filter((id) => !first.has(id))];
+  /* CORE FIRST ON EVERY RECORD, whatever the use case names: Health, Scripts, Calendar and Activity are not an add-on's. */
+  return ['core', ...MODULE_ORDER.filter((id) => wanted.has(id)), ...[...wanted].filter((id) => !first.has(id))];
 }
 
 /** The pages and rail sections a use case's own pack declares, for the proposal to say. Its Home is not one: it is Home. */

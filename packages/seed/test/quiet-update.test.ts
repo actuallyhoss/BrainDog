@@ -1886,8 +1886,7 @@ test('THE NIGHT UPDATES THE AGENTS PACK AND THE USE CASE A RECORD HOLDS, after i
       [
         /* PROJECTS FIRST ON A FOUNDER'S RECORD, SINCE portfolio 1.19.0: it takes Numbers over from the use case before it. */
         ...(id === 'founder' ? [{ pack: 'portfolio', from: '1.18.0', to: FIRST_PARTY_VERSIONS.portfolio, did: 'updated' }] : []),
-        /* CORE FOR A RECORD THAT HOLDS PEOPLE, which is where its four pages used to live. */
-        { pack: 'core', from: '0.0.0', to: FIRST_PARTY_VERSIONS.core, did: 'updated' },
+        /* NO STEP FOR CORE: a record made by the first run holds it from the start (`modulesFor`). */
         { pack: 'agents', from: '1.7.0', to: AGENTS_PACK.manifest.version, did: 'updated' },
         { pack, from: USECASE_BEFORE[id]!.version, to: u.version, did: 'updated' },
       ],

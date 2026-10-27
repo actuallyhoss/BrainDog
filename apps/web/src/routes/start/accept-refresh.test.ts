@@ -231,7 +231,8 @@ test('A TAB CLOSED AFTER THE PRESS LEAVES A RECORD THAT, OPENED AGAIN, HOLDS EVE
   void accept(client, a);
   for (let i = 0; i < 200 && sent.length === 0; i++) await new Promise((r) => setTimeout(r, 5));
   assert.equal(sent.length, 1, 'the press is more than one call, so a closed tab leaves the rest undone');
-  assert.deepEqual(held.parts, ['portfolio', 'people', 'money-core']);
+  /* CORE IS INSTALLED FIRST ON EVERY RECORD. */
+  assert.deepEqual(held.parts, ['core', 'portfolio', 'people', 'money-core']);
   assert.equal(held.me, 'Sam');
   assert.equal(held.rows.length, a.proposal.rows.length, 'an entry the sentence filled is not in the record');
   assert.ok(held.rows.some((r) => r.fields.name === 'Fenwick'));
@@ -311,7 +312,7 @@ test('WHAT THE RECORD REFUSED IS SAID BY NAME WITH ITS OWN SENTENCE, the rest st
   const a = sam();
   const out = await accept(client, a);
   assert.deepEqual(out.failed[0], { said: 'Money was not added.', why: 'It needs a list this BrainDog does not hold.' });
-  assert.deepEqual(held.parts, ['portfolio', 'people'], 'the two before the refusal were not kept');
+  assert.deepEqual(held.parts, ['core', 'portfolio', 'people'], 'core and the two before the refusal were not kept');
   assert.deepEqual(out.refused, [{ part: 'money-core', why: 'It needs a list this BrainDog does not hold.' }], 'the tile for Money has no sentence to say');
   /* THE ENTRIES FOR THE LIST THAT IS NOT THERE ARE STILL TO MAKE, and only those: the rest went in. */
   const owed = a.proposal.rows.filter((r) => r.register === 'obligations');
@@ -326,7 +327,7 @@ test('A RECORD THAT IS SET UP ALREADY IS ASKED ONLY FOR WHAT IS MISSING, by the 
   const out = await accept(client, sam());
   assert.deepEqual(out.failed, []);
   assert.deepEqual(sent.map((s) => s.again), [undefined, true]);
-  assert.deepEqual(held.parts, ['people', 'portfolio', 'money-core']);
+  assert.deepEqual(held.parts, ['people', 'core', 'portfolio', 'money-core']);
 });
 
 test('A HOST WITH NO SUCH CALL GETS THE SCRIPT, for this one release', async () => {

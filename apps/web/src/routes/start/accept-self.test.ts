@@ -119,7 +119,7 @@ test('THE BODY SAYS WHO THE PERSON IS: the name typed, the address signed in wit
 test('THE BODY ASKS FOR THE LISTS KEPT, THE CURRENCY BY ITS KEY, AND THE PERSON’S OWN WORDS, and rewrites no declaration', () => {
   const a = asked("I'm Sam, I run Kiln and we bill Fenwick £2,000 a month on the 1st", 'sam@example.com');
   const body = bodyOf({ ...a, modules: ['people', 'money-core'], currency: 'GBP', proposal: { ...a.proposal, names: { things: 'Shops' } } });
-  assert.deepEqual(body.packs, { install: ['people', 'money-core'] });
+  assert.deepEqual(body.packs, { install: ['core', 'people', 'money-core'] });
   assert.deepEqual(body.settings, [{ values: { home_currency: 'GBP' } }]);
   assert.deepEqual(body.names, { things: 'Shops' });
   assert.equal(body.again, undefined);

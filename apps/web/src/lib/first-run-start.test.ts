@@ -68,9 +68,10 @@ test('THE FILE MAKE IT MINE HANDS THE RECORD HOLDS NO EXAMPLE, and the modules t
 
 test('A USE CASE IS INSTALLED WITH EVERY MODULE IT STANDS ON, whatever was switched off', () => {
   const founder = useCase('founder');
-  assert.deepEqual(withNeeds(founder, []), [...(founder.needs ?? founder.modules)]);
-  assert.deepEqual(withNeeds(founder, ['estate']), ['portfolio', 'money-core', 'estate'], 'a module the person kept comes in beside what it stands on');
-  assert.deepEqual(withNeeds(null, ['people']), ['people']);
+  /* CORE FIRST, which every record holds. */
+  assert.deepEqual(withNeeds(founder, []), ['core', ...(founder.needs ?? founder.modules)]);
+  assert.deepEqual(withNeeds(founder, ['estate']), ['core', 'portfolio', 'money-core', 'estate'], 'a module the person kept comes in beside what it stands on');
+  assert.deepEqual(withNeeds(null, ['people']), ['core', 'people']);
 });
 
 /* AND THE ONE PLACE THE ARRANGER IS ASKED FOR ALL FOUR PEOPLE, so a use case that stops being picked

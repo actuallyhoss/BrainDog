@@ -70,7 +70,7 @@ test('SOMETHING NOT MADE AND NO ENTRY LEFT: Try again asks for what is missing a
   o.refuse = [];
   const second = await accept(client, pressAgain(asked, first));
   assert.deepEqual(second.failed, []);
-  assert.deepEqual(held.parts, ['usecase-guide', 'money-core'], 'what was missing was not asked for again');
+  assert.deepEqual(held.parts, ['usecase-guide', 'core', 'money-core'], 'what was missing was not asked for again');
   assert.equal(sent.at(-1)?.again, true);
   assert.equal(sent.at(-1)?.rows, undefined, 'the plan was sent again though every entry of it is in');
   assert.equal(held.rows.length, wrote, 'Try again wrote the plan a second time');

@@ -152,10 +152,10 @@ export function pressAgain(asked: Accepting, out: Accepted | null): Accepting {
 const fixOf = (r: Wire<unknown>, otherwise: string): string => (!r.ok && 'refusal' in r ? r.refusal.fix : otherwise);
 
 /**
- * THE MODULES A USE CASE IS INSTALLED WITH: every one it stands on, and the ones the person kept beside them, in the
+ * THE MODULES A USE CASE IS INSTALLED WITH: core first, which every record holds, then every one it stands on, and the ones the person kept beside them, in the
  * order each list a later one points at comes first (`modulesFor`).
  */
-export const withNeeds = (u: UseCase | null, kept: readonly string[]): string[] => (u ? modulesFor(u, kept) : [...kept]);
+export const withNeeds = (u: UseCase | null, kept: readonly string[]): string[] => (u ? modulesFor(u, kept) : ['core', ...kept.filter((id) => id !== 'core')]);
 
 /**
  * THE USE CASE AS A SHARED FILE, WITH NOTHING IN IT BUT WHAT THE PERSON ASKED FOR.

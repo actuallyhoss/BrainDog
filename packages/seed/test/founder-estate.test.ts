@@ -205,7 +205,8 @@ test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither 
 
   /* THE ORDER `planFile` TAKES: each module the use case names and the record lacks, then the use case's own pack. */
   const lacking = modulesFor(u, u.modules).filter((m) => !k.packs().some((p) => p.id === m));
-  assert.deepEqual(lacking, ['estate'], 'the step offers exactly one module');
+  /* CORE IS EVERY RECORD'S, so a record made before it lacks it beside Estate. */
+  assert.deepEqual(lacking, ['core', 'estate'], 'the step offers core and the one module');
   const holds = new Set([...held(k), 'services']);
   await put(k, moduleDocument(u, 'estate', { today: TODAY, holds, examples: true }));
   /* AND SINCE FOUNDER 2.0.0, People 3.0.0 FIRST, told what the use case is about to hand it (`hands`), which is the
