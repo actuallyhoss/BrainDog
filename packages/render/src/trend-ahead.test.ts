@@ -51,3 +51,12 @@ test('CASH AHEAD NUMBERS EACH PART OF A PLAN THE LINE DROPS BY, on the line and 
   assert.match(none, /forecast-chart/u, 'the walk is drawn');
   assert.doesNotMatch(none, /forecast-drop/u);
 });
+
+test('THE TWO DAYS UNDER A LINE AHEAD NEVER RUN TOGETHER: a gap between them, neither wraps, and the line keeps room for both', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../../skin/kinds/stat.css', import.meta.url), 'utf8');
+  const days = /\.trend-days \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+  assert.match(days, /gap:\s*[\d.]+(em|px|rem)/u, 'the days are parted by a gap');
+  assert.match(css, /\.trend-days > span \{[^}]*white-space:\s*nowrap/u, 'a day never wraps');
+  assert.match(css, /\.cell-trend-ahead \{[^}]*inline-size:\s*clamp\(\d+px,/u, 'the line has a floor wide enough for both days');
+});
