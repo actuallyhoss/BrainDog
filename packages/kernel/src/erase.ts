@@ -48,7 +48,9 @@ export type EraseDeps = {
   mint: () => string;
   at: string;
   actor: string;
-  enqueue: (payload: { erase: string; key: string }) => void;
+  enqueue: (payload: { erase: string; key: string; page?: true }) => void;
+  /** The pages of visuals whose text names a subject, by their SHA-256: the host read them before the transaction. */
+  pages?: ReadonlySet<string>;
 };
 
 /** The subjects as they are matched: trimmed, lower-cased, each once. */
@@ -82,6 +84,17 @@ function scrubbed(text: string, subjects: readonly string[]): string {
     return v;
   };
   return JSON.stringify(walk(value));
+}
+
+/** The page a visual's version line names, or `null` for any other line. */
+function pageOf(field: string | null, toV: string | null): string | null {
+  if (field === null || !field.startsWith('visual:') || toV === null) return null;
+  try {
+    const said = JSON.parse(toV) as { page?: unknown };
+    return typeof said.page === 'string' && /^[0-9a-f]{64}$/.test(said.page) ? said.page : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Every attachment key a field value holds: a `file` value, or a list of them. */
@@ -180,11 +193,17 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
 
   /* ── event: the payload of every event that names the subject or is about a row that was erased ── */
   const about = new Set(erasedEntries.map((e) => `entry:${e}`));
+  /* A VISUAL'S PAGE IS TEXT KEPT OUTSIDE THE FILE, which the scan of columns never reads. One the host found naming a
+     subject has its version line tombstoned here, so it is never served again, and its bytes deleted after the commit. */
+  const pagesErased = new Set<string>();
   let events = 0;
   for (const ev of sql.all<{ id: string; target: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null }>(
     'SELECT id, target, field, from_v, to_v, note FROM event',
   )) {
-    const hit = (ev.target !== null && about.has(ev.target)) || names(ev.field, subjects) || names(ev.from_v, subjects) || names(ev.to_v, subjects) || names(ev.note, subjects);
+    const page = pageOf(ev.field, ev.to_v);
+    const pageHit = page !== null && (deps.pages?.has(page) ?? false);
+    if (pageHit) pagesErased.add(page);
+    const hit = pageHit || (ev.target !== null && about.has(ev.target)) || names(ev.field, subjects) || names(ev.from_v, subjects) || names(ev.to_v, subjects) || names(ev.note, subjects);
     if (!hit) continue;
     sql.exec(
       'UPDATE event SET field = CASE WHEN field IS NULL OR NOT ? THEN field ELSE ? END, from_v = CASE WHEN from_v IS NULL THEN NULL ELSE ? END, to_v = CASE WHEN to_v IS NULL THEN NULL ELSE ? END, note = CASE WHEN note IS NULL THEN NULL ELSE ? END WHERE id = ?',
@@ -255,7 +274,12 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
      address goes can no longer be accepted, since acceptance matches the address. */
   tomb('invitation', 'id', ['email']);
   tomb('view', 'rowid', ['name', 'search', 'filter'], ['filter']);
-  tomb('automation_run', 'id', ['vars', 'say'], ['vars']);
+  /* A RULE'S RUN STILL TO FINISH THAT WAS HANDED THE SUBJECT IS STOPPED, before its words go. Its trigger is what a
+     later step fills its templates from, so a run waiting out an hour wrote the erased name back into the activity
+     after the erasure said it was gone. */
+  for (const r of sql.all<{ id: string; trigger: string; vars: string }>("SELECT id, trigger, vars FROM automation_run WHERE state IN ('pending', 'running', 'waiting')"))
+    if (names(r.trigger, subjects) || names(r.vars, subjects)) sql.exec("UPDATE automation_run SET state = 'cancelled', finished_at = ? WHERE id = ?", at, r.id);
+  tomb('automation_run', 'id', ['trigger', 'vars', 'say'], ['trigger', 'vars']);
   tomb('automation_step', 'rowid', ['answer']);
   tomb('token', 'id', ['label']);
   tomb('pack_removed', 'pack', ['settings'], ['settings']);
@@ -317,6 +341,8 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
 
   /* ── the twentieth store, through the outbox ── */
   for (const key of keys) deps.enqueue({ erase: id, key });
+  for (const key of pagesErased) deps.enqueue({ erase: id, key, page: true });
+  if (pagesErased.size > 0) bump('visual_page', pagesErased.size);
 
   const rows = Object.values(counts).reduce((a, b) => a + b, 0);
   sql.exec(
