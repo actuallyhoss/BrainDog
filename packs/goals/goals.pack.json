@@ -337,7 +337,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "You are saving for {{goals-saving}} goals. Each one counts what an account, a currency or a value holds, so nothing is typed to say how far you have got."
+          "body": "Saving for {{goals-saving}} goals, each counted from what you hold."
         },
         {
           "kind": "stat",
