@@ -172,6 +172,9 @@ export const BINDINGS: Binding[] = [
   // Shift, not bare `e`: bare `e` means edit in place inside a grid, and a key's meaning must be a
   // function of the object in focus, not of the page you happen to be on.
   { id: 'block-source-code', scope: 'page', key: '⇧E', label: 'Open the source', bare: false },
+  /* THE QUICK ADD (`lib/money/QuickHost.svelte`): one line of money out, in, or between your own accounts, on any page
+     while the record keeps a ledger. A single character, so the Character keys switch silences it with the rest. */
+  { id: 'money-add', scope: 'page', key: '+', label: 'Add money out, money in, or a move between your accounts', bare: true },
 
   /* ONE PRESS ANSWERS: Enter gives the suggested answer or Accept, Backspace declines and `e` changes
      what accepting takes, and no reason is asked for first. Enter never sends money or a change that is hard to undo:

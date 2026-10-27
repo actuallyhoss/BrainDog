@@ -487,6 +487,15 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       'page-menu': { route: '/p/work', setup: onTask, press: ['m'] },
       'page-new': { route: '/p/work', press: ['n'] },
       'page-answer': { route: '/p/questions', setup: held(onQuestion), press: ['1'] },
+      /* `+` OPENS THE QUICK-ADD SHEET over a page once the record's ledger is found, which is a dialog opening. Money's
+         own page, so the record's ledger is on the screen it is added from; nothing is written by opening it. */
+      'money-add': {
+        route: '/p/money',
+        setup: async (page) => {
+          await page.locator('.qa-fab').waitFor({ state: 'attached', timeout: 4000 }).catch(() => undefined);
+        },
+        press: ['+'],
+      },
 
       /* The gate is a question, and a question has an address. There is no `/gate` route. SG5 is the
          seeded record's Kiln licensing question (the sample's SG31): open, with three options. */

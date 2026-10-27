@@ -1,0 +1,145 @@
+/**
+ * What the quick-add sheet reads from the record and writes to it. A route-only module: it carries the client, so it
+ * is loaded when the sheet is, never with a page.
+ *
+ * READS: the declarations the tab already asked beside `boot`, the ledger's accounts and categories, its newest lines
+ * (whom money usually goes to, and which categories were used last), and the rates.
+ *
+ * WRITES: one line is the record's ordinary `create`, and its way back is an archive at the version it answered, as the
+ * palette's own add is. Two lines or more (a split, or the two legs of a move) are one `capture`, kept all or none
+ * under one batch, and the way back takes the batch back.
+ */
+
+import { createClient } from '@braindog/client';
+
+import { copy } from '../copy.ts';
+import { REGISTERS } from '../record/held.ts';
+import { learn, type RecordRow } from '../record/remote.ts';
+import { ledgerAmong, type Ledger } from './ledger.ts';
+import type { Line, Option, Past } from './quick.ts';
+import { ratesFrom, ratesListOf, type Rate } from './rates.ts';
+
+/** What a row with no name is called in the sheet. */
+const UNNAMED = 'No name';
+
+const rowsOf = (v: unknown): RecordRow[] => ((v as { rows?: unknown } | null)?.rows as RecordRow[] | undefined) ?? [];
+
+/** The lists a tab may hold declarations for, less the kernel's own. */
+type Listed = { id: string; kernel?: true };
+
+/** Every non-kernel list's declaration this tab holds, asked once (they arrive with `boot`, so asking costs nothing). */
+async function declarations(base: string, lists: readonly Listed[]) {
+  const client = createClient({ base });
+  const ids = lists.filter((l) => l.kernel !== true).map((l) => l.id);
+  const asked = new Map<string, Promise<void>>();
+  await Promise.all(ids.map((id) => learn((r) => client.schema(r), id, asked).catch(() => undefined)));
+  return ids.map((id) => REGISTERS[id]).filter((d) => d !== undefined);
+}
+
+/** The ledger of the record at `base`, or `null` where it keeps none. */
+export async function findLedger(base: string, lists: readonly Listed[]): Promise<Ledger | null> {
+  return ledgerAmong(await declarations(base, lists));
+}
+
+/** What the sheet draws from: the open accounts, the categories, the newest lines, and the rates. */
+export type Held = { accounts: Option[]; categories: Option[]; past: Past[]; rates: Rate[] };
+
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+const idOf = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+const open = (row: RecordRow, state: string | null, done: readonly string[]): boolean => !state || !done.includes(text(row.fields[state]));
+
+/** The rows of one list, newest first where an order is named, at most `limit`. */
+async function list(client: ReturnType<typeof createClient>, register: string, limit: number, order?: { field: string; dir: 'asc' | 'desc' }) {
+  const got = await client.list({ register, limit, ...(order ? { order: [order] } : {}) });
+  return got.ok ? rowsOf(got.value) : [];
+}
+
+/** Everything the sheet reads, at once. A list that will not answer is read as empty, and the sheet says so. */
+export async function readHeld(base: string, l: Ledger, lists: readonly Listed[]): Promise<Held> {
+  const client = createClient({ base });
+  const ratesAt = ratesListOf(await declarations(base, lists));
+  const [accountRows, categoryRows, lineRows, rateRows] = await Promise.all([
+    list(client, l.account.list, 200),
+    l.category ? list(client, l.category.list, 300) : Promise.resolve([]),
+    list(client, l.list, 400, { field: l.day, dir: 'desc' }),
+    ratesAt ? list(client, ratesAt.list, 200) : Promise.resolve([]),
+  ]);
+  const a = l.account;
+  const accounts: Option[] = accountRows
+    .filter((r) => open(r, a.state, a.done))
+    .map((r) => {
+      const money = a.money ? (r.fields[a.money] as { currency?: unknown } | null) : null;
+      return { id: r.id, name: text(r.fields[a.title]) || UNNAMED, currency: typeof money?.currency === 'string' ? money.currency : null, kind: a.kind ? idOf(r.fields[a.kind]) : null };
+    });
+  const c = l.category;
+  const categories: Option[] = c
+    ? categoryRows
+        .filter((r) => open(r, c.state, c.done))
+        .map((r) => ({
+          id: r.id,
+          name: text(r.fields[c.title]) || UNNAMED,
+          icon: c.icon ? idOf(r.fields[c.icon]) : null,
+          colour: c.colour ? idOf(r.fields[c.colour]) : null,
+          way: c.way ? idOf(r.fields[c.way.field]) : null,
+        }))
+        .sort((x, y) => x.name.localeCompare(y.name))
+    : [];
+  const past: Past[] = lineRows.map((r) => {
+    const way = text(r.fields[l.way.field]);
+    return {
+      title: text(r.fields[l.title]),
+      category: c ? idOf(r.fields[c.field]) : null,
+      account: idOf(r.fields[a.field]),
+      way: way === l.way.out ? 'out' : way === l.way.in ? 'in' : null,
+      day: text(r.fields[l.day]),
+      move: l.mark ? r.fields[l.mark] === true : false,
+    };
+  });
+  return { accounts, categories, past, rates: ratesAt ? ratesFrom(rateRows.map((r) => r.fields), ratesAt.fields) : [] };
+}
+
+/** The record's rates, from the list that declares it holds them; none where no list does. */
+export async function readRates(base: string, lists: readonly Listed[]): Promise<Rate[]> {
+  const at = ratesListOf(await declarations(base, lists));
+  if (!at) return [];
+  return ratesFrom((await list(createClient({ base }), at.list, 200)).map((r) => r.fields), at.fields);
+}
+
+/** What a write answered: how to take it back, or the record's sentence. */
+export type Wrote = { ok: true; back: () => Promise<{ ok: boolean; fix?: string }> } | { ok: false; fix: string };
+
+type Refused = { ok: false; refusal?: { code?: string; fix?: string } };
+const fixOf = (out: unknown): string => {
+  const r = (out as Refused).refusal;
+  return r?.code === 'UNREACHABLE' || !r?.fix ? copy.writeNotReached : r.fix;
+};
+
+/** Write the lines: one through `create`, more through one `capture`. */
+export async function writeLines(base: string, l: Ledger, lines: readonly Line[]): Promise<Wrote> {
+  const client = createClient({ base });
+  if (lines.length === 1) {
+    const out = await client.create({ register: l.list, fields: lines[0]! });
+    if (!out.ok) return { ok: false, fix: fixOf(out) };
+    const row = out.value as RecordRow;
+    return {
+      ok: true,
+      back: async () => {
+        if (row.seq === null) return { ok: false, fix: copy.writeNotReached };
+        const undone = await client.update({ register: l.list, seq: row.seq, patch: { deleted_at: new Date().toISOString() }, version: row.version });
+        return undone.ok ? { ok: true } : { ok: false, fix: fixOf(undone) };
+      },
+    };
+  }
+  const out = await client.capture({ rows: lines.map((fields) => ({ register: l.list, fields })) });
+  if (!out.ok) return { ok: false, fix: fixOf(out) };
+  const batch = (out.value as { batch?: unknown }).batch;
+  return {
+    ok: true,
+    back: async () => {
+      if (typeof batch !== 'string') return { ok: false, fix: copy.writeNotReached };
+      const { undoChange } = await import('../record/undo-write.ts');
+      const u = await undoChange(base, batch);
+      return u.from === 'undone' ? { ok: true } : { ok: false, fix: u.fix };
+    },
+  };
+}

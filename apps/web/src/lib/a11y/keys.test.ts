@@ -85,7 +85,8 @@ test('`bare` means the row holds a single CHARACTER key, which is what the switc
      What reads it now is `ui/Keymap.svelte`, which dims and marks the rows the switch has silenced,
      and the test after this one holds it to that. Two readers that must agree is a reason for a
      stored flag; one reader that recomputes it is not. */
-  const character = (token: string) => /^[\p{L}\p{N},./?]$/u.test(token) || /^[0-9]–[0-9]$/u.test(token);
+  /* `+` IS A CHARACTER TOO: the quick add's key is one, and `chars.ts` silences it like any letter. */
+  const character = (token: string) => /^[\p{L}\p{N},./?+]$/u.test(token) || /^[0-9]–[0-9]$/u.test(token);
   for (const b of BINDINGS) {
     const tokens = b.key.split(/\s+/u).filter((t) => t !== '');
     const holds = tokens.some((t) => character(t));
