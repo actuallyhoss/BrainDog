@@ -733,7 +733,7 @@ function endedOf(sql: Sql): Ended {
   const has = new Set(sql.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'").map((t) => t.name));
   const out: Ended = {};
   for (const e of ENDED) if (has.has(e.table)) out[e.table] = sql.all<Record<string, string | number | null>>(e.read);
-  out.closed = sql.all<Record<string, string | number | null>>("SELECT * FROM event WHERE kind = 'share.close'");
+  out.closed = sql.all<Record<string, string | number | null>>("SELECT id, ts, actor, target, target_kind, field FROM event WHERE kind = 'share.close'");
   return out;
 }
 
@@ -752,13 +752,19 @@ function endAgain(sql: Sql, ended: unknown): void {
       : [];
   };
   for (const e of ENDED) for (const row of rowsOf(e.table)) if (typeof row.id === 'string') sql.exec(e.write, ...e.columns.map((c) => row[c] ?? null), row.id);
-  const columns = new Set(sql.all<{ name: string }>("SELECT name FROM pragma_table_info('event')").map((c) => c.name));
   for (const row of rowsOf('closed')) {
-    if (row.kind !== 'share.close' || typeof row.target !== 'string') continue;
-    const cols = Object.keys(row).filter((c) => columns.has(c));
+    if (typeof row.id !== 'string' || typeof row.target !== 'string') continue;
     if (!sql.one("SELECT 1 AS n FROM event WHERE target = ? AND kind = 'share.open'", row.target)) continue;
     if (sql.one("SELECT 1 AS n FROM event WHERE target = ? AND kind = 'share.close'", row.target)) continue;
-    sql.exec(`INSERT OR IGNORE INTO event (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, ...cols.map((c) => row[c] ?? null));
+    sql.exec(
+      "INSERT OR IGNORE INTO event (id, ts, actor, kind, target, target_kind, field) VALUES (?, ?, ?, 'share.close', ?, ?, ?)",
+      row.id,
+      row.ts ?? null,
+      row.actor ?? null,
+      row.target,
+      row.target_kind ?? null,
+      row.field ?? null,
+    );
   }
 }
 

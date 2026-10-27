@@ -231,9 +231,10 @@ async function withoutEnded(out: Response): Promise<Response> {
     .catch(() => null)) as { ok?: unknown; value?: Record<string, unknown> } | null;
   if (said?.ok !== true || said.value === null || typeof said.value !== 'object' || !('ended' in said.value)) return out;
   const { ended: _, ...value } = said.value;
-  const headers = new Headers(out.headers);
-  headers.delete('content-length');
-  return new Response(JSON.stringify({ ...said, value }), { status: out.status, statusText: out.statusText, headers });
+  /* THE RECORD'S OWN HEADERS, `no-store` among them, less a length that was the longer body's. */
+  const answer = new Response(JSON.stringify({ ...said, value }), { status: out.status, statusText: out.statusText, headers: out.headers });
+  answer.headers.delete('content-length');
+  return answer;
 }
 
 /**
