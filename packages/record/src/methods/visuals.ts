@@ -13,7 +13,6 @@ import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import {
   PICTURE_NAME,
-  PROFILE_KINDS,
   VISUAL_PAGE_MOST,
   VISUAL_PICTURE_TYPES,
   VISUAL_PICTURES_BYTES_MOST,
@@ -432,14 +431,17 @@ export function methods(deps: RecordDeps) {
         const row = /^S[1-9][0-9]*$/u.test(one.by) ? kernel.get(one.by) : null;
         const run = row !== null && row.register === 'session' ? row : null;
         if (run === null) return no('TRANSITION_ILLEGAL', `Version ${version} of "${title}" was not drawn by an agent, so there is nobody to ask to draw it again.`, { at: 'version' });
-        const agent = typeof run.fields.agent === 'string' && (PROFILE_KINDS as readonly string[]).includes(run.fields.agent) ? run.fields.agent : null;
         const open = run.state === 'active' || run.state === 'idle';
-        const said = `Draw "${title}" again: version ${version} on ${at.words} was not it. Hand the new one in as a draft, with braindog attach --draft --visual ${whole.id}, or log with page and draft: true.`;
-        const to = open || agent === null ? { to_run: one.by } : { to: 'agent' as const, to_agent: agent };
-        const task = at.list === null ? null : kernel.nameOf(at.id);
-        const asked = kernel.instruct(writerOf(ctx), { said, ...to, ...(task === null ? {} : { task }) });
-        if (!asked.ok) return asked as Result<never>;
-        told = asked.value.id;
+        /* ONLY THE OWNER'S PRESS IS AN INSTRUCTION, as only the owner instructs (`instruct`), and only to the run that drew
+           it while it is open: an ended run's kind reaches anyone's next run, the owner's own among them. The words name the
+           visual by id and never by what its author wrote, which would reach that run in the presser's voice. */
+        if (ctx.principal.kind === 'person' && ctx.principal.level === 'owner' && open) {
+          const said = `Draw visual ${whole.id} again: version ${version} was not it. Hand the new one in as a draft, with braindog attach --draft --visual ${whole.id}, or log with page and draft: true.`;
+          const task = at.list === null ? null : kernel.nameOf(at.id);
+          const asked = kernel.instruct(writerOf(ctx), { said, to_run: one.by, ...(task === null ? {} : { task }) });
+          if (!asked.ok) return asked as Result<never>;
+          told = asked.value.id;
+        }
       }
       let batch: string | null = null;
       if (waits) {
@@ -460,7 +462,9 @@ export function methods(deps: RecordDeps) {
           ? `Kept version ${version} of "${title}".`
           : a.as === 'throw'
             ? `Threw away version ${version} of "${title}"${kept === null ? '' : `. It stands at version ${kept}`}.`
-            : `Asked ${one.by} to draw "${title}" again. The new version comes as a draft.`;
+            : told !== undefined
+              ? `Asked ${one.by} to draw "${title}" again. The new version comes as a draft.`
+              : `${one.by} is not at work now, so nobody was asked to draw "${title}" again. Ask its next run in the conversation.`;
       return tail(ok({ visual: whole.id, kept, batch, said, ...(told === undefined ? {} : { told }) }));
     },
   };

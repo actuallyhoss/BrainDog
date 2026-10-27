@@ -128,7 +128,9 @@ test('TRY AGAIN THROWS THE DRAFT AWAY AND ASKS THE RUN THAT DREW IT, whose next 
 
   const context = value<Context>(await api.context({}, drew));
   const line = context.told?.find((i) => i.id === again.told)?.line ?? '';
-  assert.match(line, /Draw "Launch week" again: version 2 on .* was not it\. Hand the new one in as a draft/u);
+  /* THE VISUAL BY ID, AND NOTHING ITS AUTHOR WROTE, which would reach the run in the owner's voice. */
+  assert.match(line, new RegExp(`Draw visual ${one.visual} again: version 2 was not it\\. Hand the new one in as a draft`, 'u'));
+  assert.ok(!line.includes('Launch week'), line);
 
   /* ITS NEW VERSION ARRIVES AS A DRAFT, and waits. */
   const three = value<Attached>(await api.attachVisual({ on: task, page: '<h1>C</h1>', title: 'Launch week', draft: true, visual: one.visual }, drew));
@@ -138,6 +140,19 @@ test('TRY AGAIN THROWS THE DRAFT AWAY AND ASKS THE RUN THAT DREW IT, whose next 
   /* A VERSION A PERSON DREW has nobody to ask. */
   const mine = value<Attached>(await api.attachVisual({ on: task, page: '<h1>Mine</h1>', title: 'My week' }, owner));
   assert.equal(refused(await api.settleVisual({ id: mine.visual, version: 1, as: 'again' }, owner)).code, 'TRANSITION_ILLEGAL');
+  sql.close();
+});
+
+test('TRY AGAIN BY ANYONE BUT THE OWNER, OR ON A RUN THAT HAS ENDED, ASKS NOBODY', async () => {
+  const { api, task, sql } = await record();
+  const drew = agent();
+  const run = value<{ spoken: string }>(await api.attach({ source: 'startup', doing: 'Drawing the week' }, drew)).spoken;
+  const one = value<Attached>(await api.attachVisual({ on: task, page: '<h1>A</h1>', title: 'Launch week', draft: false }, drew));
+  value(await api.attachVisual({ on: task, page: '<h1>B</h1>', title: 'Launch week', draft: true }, drew));
+  value(await api.handoff({ state: 'done', next: 'Nothing more on the week' }, drew));
+  const again = value<{ said: string; told?: string }>(await api.settleVisual({ id: one.visual, version: 2, as: 'again' }, owner));
+  assert.equal(again.told, undefined, `an ended run's kind was asked: ${run}`);
+  assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM entry WHERE register = 'instruction'")?.n ?? 0, 0);
   sql.close();
 });
 
