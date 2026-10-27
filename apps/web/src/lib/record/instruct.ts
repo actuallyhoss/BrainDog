@@ -322,7 +322,7 @@ export const appSaid = (r: Pick<LiveRun, 'app' | 'agent'>): string => r.app?.tri
 
 /**
  * A RUN BY NAME: its app and where it works, the project's name where it has one, else its repository, else the folder
- * it opened in. "Claude Code in Encore", "Claude in the Developer folder". Never "Claude run".
+ * it opened in. "Claude Code in Lanternfish", "Claude in the Developer folder". Never "Claude run".
  */
 export function runTitle(r: Pick<LiveRun, 'app' | 'agent' | 'repo' | 'cwd'>, project: string | null): string {
   const who = appSaid(r);
@@ -393,8 +393,8 @@ export function openNow(rows: readonly LiveRun[]): { shown: LiveRun[]; idle: Liv
 const KIND_SAID = /\b(?:Windows|Mac|MacBook|iMac|Linux|Ubuntu|Debian|Fedora|Arch|NixOS|Mint|Pop!_OS|Raspberry)\b/u;
 
 /**
- * A MACHINE AS A PERSON SAYS IT, from its name and the folders its runs opened in: a host named after its owner ("Sam")
- * whose runs open on D:\ is the Windows PC, not "Sam", which `machineSaid` reads from the name alone.
+ * A MACHINE AS A PERSON SAYS IT, from its name and the folders its runs opened in: a host named after its owner ("Mara")
+ * whose runs open on D:\ is the Windows PC, not "Mara", which `machineSaid` reads from the name alone.
  */
 export function machineNamed(host: string | null, rows: readonly Pick<LiveRun, 'machine' | 'cwd'>[], among: readonly string[] = []): string {
   if (host === null) return 'A machine not named';

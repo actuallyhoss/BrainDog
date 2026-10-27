@@ -301,13 +301,13 @@ test('HOW A RUN STANDS, AND WHICH RUNS ARE AT WORK: working now, then the ones q
 });
 
 /* THE PASS OF 27 OCTOBER: three rows of "Claude / Claude Code run" on Today and "Has not said what it is
-   doing" four times on Agents, "On MacBook Pro and Sam" for a Windows PC silent nine hours, and the screenshot run
+   doing" four times on Agents, "On MacBook Pro and Mara" for a Windows PC silent nine hours, and the screenshot run
    itself counted at work. A run is named by its app and where it works, says the last thing it did, and is counted
    only once it wrote, asked or said what it does. */
 test('A RUN IS ITS APP AND WHERE IT WORKS, and says the last thing it did', () => {
   const dev = run({ project: null, repo: null, branch: null, doing: 'Claude Code run', app: 'Claude Code', cwd: '/Users/teo/Developer' });
   assert.equal(runTitle(dev, null), 'Claude Code in the Developer folder');
-  assert.equal(runTitle({ ...dev, app: null }, 'Encore'), 'Claude in Encore');
+  assert.equal(runTitle({ ...dev, app: null }, 'Lanternfish'), 'Claude in Lanternfish');
   assert.equal(runTitle({ ...dev, cwd: 'D:\\' }, null), 'Claude Code in D:\\');
   assert.equal(folderSaid('C:\\Users\\teo\\work'), 'the work folder');
   assert.equal(lastSaid({ ...dev, asked: 'Mark Wave 0: nav, the Agents page redo and the record overload fix done, and close the three tasks it took over?', wrote: 1 }), 'Asked you: “Mark Wave 0: nav, the Agents page redo and the record overload fix done, and…”');

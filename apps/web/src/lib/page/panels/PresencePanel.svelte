@@ -7,7 +7,7 @@
   and the other panel is told to read again (`told`).
 
   ON THE AGENTS PAGE, ONE LINE A RUN (the pass of 27 October, `openNow`): each run is named by its app and where it
-  works ("Claude Code in Encore", "Claude in the Developer folder"), with the last thing it did under it ("Asked you: …",
+  works ("Claude Code in Lanternfish", "Claude in the Developer folder"), with the last thing it did under it ("Asked you: …",
   "Wrote 3 changes"), how many changes it wrote and when it was last heard. Only those runs are counted. The ones open
   with nothing written fold into one line ("2 open, nothing written") that opens onto them; each machine silent over an
   hour is one quiet row ("Windows PC, 3 Claude sessions on D:\"); a run whose key only reads is never counted and is
@@ -121,7 +121,7 @@
     return { ...v, href: v.href ? at(v.href) : null, busy: pressing.has(r.run) };
   };
 
-  /* THE ONE-LINE ROW (the pass of 27 October): who and where ("Claude Code in Encore"), the last thing it did under it,
+  /* THE ONE-LINE ROW (the pass of 27 October): who and where ("Claude Code in Lanternfish"), the last thing it did under it,
      how many changes it wrote, and when it was last heard; never "Working now" again on every row. */
   const projectOf = (r: LiveRun): string | null => (r.project === null ? null : (projects.get(r.project)?.name ?? null));
   const lineOf = (r: LiveRun): PresenceView => ({
