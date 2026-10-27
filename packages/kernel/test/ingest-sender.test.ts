@@ -13,7 +13,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Arrived, type Declaration, type Json, type Kernel } from '../src/index.ts';
-import { senderOf } from '../src/ingest.ts';
+import { senderOf, shapeOf } from '../src/ingest.ts';
+import { mailboxes, splitMailboxes } from '../src/mail-read.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 6, 12);
@@ -202,4 +203,15 @@ test('A ROW FOUND BY ITS PRINTED TAIL IS NAMED BY ITS LIST’S WORD FOR ONE, and
   assert.equal(plain, 'Filed to the account ending 518 by its last digits 518. Confirm it once and later ones file straight away.');
   assert.doesNotMatch(plain, /\brow\b/u, 'the record’s own word reached a person');
   assert.equal(await tail('card')(), 'Filed to the card ending 518 by its last digits 518. Confirm it once and later ones file straight away.');
+});
+
+test('A STRANGER\'S LONG FROM HEADER IS READ IN ONE PASS: commas outside quotes still split, and a megabyte of them costs milliseconds', () => {
+  assert.deepEqual(splitMailboxes('"Ali, Sara" <sara@example.com>, b@example.com'), ['"Ali, Sara" <sara@example.com>', ' b@example.com']);
+  assert.equal(senderOf('"Ali, Sara" <sara@example.com>, b@example.com').name, 'Ali, Sara');
+  const long = `${'x, '.repeat(400_000)}"a" <a@example.com>`;
+  const started = performance.now();
+  senderOf(long);
+  mailboxes(long);
+  shapeOf('email', { from: '<'.repeat(400_000) });
+  assert.ok(performance.now() - started < 500, `a long header took ${Math.round(performance.now() - started)} ms`);
 });

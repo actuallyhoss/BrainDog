@@ -35,10 +35,35 @@ export const MOST_NAMED = 5;
 
 const ADDRESS = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/u;
 
+/** The longest header value an address is read from: past it a stranger's header is cut, not parsed. */
+export const HEADER_READ = 8192;
+
+/**
+ * A header value cut at its commas outside quotes, in one pass: a comma splits when an even number of quotes follows
+ * it. A lookahead that counted them again at every comma cost the length times the commas, which a stranger's long
+ * From header turned into minutes of a record's time.
+ */
+export function splitMailboxes(header: string): string[] {
+  const text = header.slice(0, HEADER_READ).replace(/\r?\n[ \t]+/gu, ' ');
+  const parts: string[] = [];
+  let after = 0;
+  for (let i = 0; i < text.length; i++) if (text[i] === '"') after += 1;
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '"') after -= 1;
+    else if (text[i] === ',' && after % 2 === 0) {
+      parts.push(text.slice(from, i));
+      from = i + 1;
+    }
+  }
+  parts.push(text.slice(from));
+  return parts;
+}
+
 /** Mailboxes in a header value, split at commas outside quotes. Only a real address counts; a name alone is dropped. */
 export function mailboxes(header: string | undefined): MailPerson[] {
   const out: MailPerson[] = [];
-  const parts = (header ?? '').replace(/\r?\n[ \t]+/gu, ' ').split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/u);
+  const parts = splitMailboxes(header ?? '');
   for (const part of parts) {
     const angled = /^(.*?)<\s*(?:mailto:)?([^<>\s]+@[^<>\s]+?)\s*>/u.exec(part);
     const email = (angled?.[2] ?? /([^\s<>"(),;]+@[^\s<>"(),;]+)/u.exec(part)?.[1] ?? '').toLowerCase().replace(/\.$/u, '');

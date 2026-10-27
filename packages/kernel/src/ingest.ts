@@ -48,6 +48,7 @@ import { SLASH, slashMayWrite } from './slash.ts';
 import { parseAnswer, readRow, type Mapping } from './map.ts';
 import { startAtDoor } from './script.ts';
 import { mayBeCut, payeeName } from './identity-keys.ts';
+import { HEADER_READ, splitMailboxes } from './mail-read.ts';
 
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -3854,8 +3855,10 @@ const SCAN = 500;
  */
 export function shapeOf(channel: Channel, headers: Record<string, string>): string {
   const h = lower(headers);
-  const who = (h.from ?? '').trim() || (h.to ?? '').trim();
-  const address = (/<([^>]+)>/.exec(who)?.[1] ?? who).trim().toLowerCase();
+  const who = ((h.from ?? '').trim() || (h.to ?? '').trim()).slice(0, HEADER_READ);
+  const open = who.indexOf('<');
+  const close = open === -1 ? -1 : who.indexOf('>', open + 1);
+  const address = (close > open + 1 ? who.slice(open + 1, close) : who).trim().toLowerCase();
   return address ? `${channel}:${address}` : channel;
 }
 
@@ -4863,7 +4866,7 @@ export function senderOf(header: string | undefined): Sender {
   /* THE FIRST MAILBOX, split at the commas outside quotes, so `"Ali, Sara" <sara@…>` stays one name; and a piece with
      no address in it is the front of the next one's name, so the unquoted `Ali, Sara <sara@…>` a mail client also
      sends is still "Ali, Sara" and not "Sara". A header that is not text is no sender, never a throw out of `arrive`. */
-  const parts = (typeof header === 'string' ? header : '').replace(/\r?\n[ \t]+/g, ' ').split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+  const parts = splitMailboxes(typeof header === 'string' ? header : '');
   const first = parts.findIndex((part) => part.includes('@'));
   const text = first === -1 ? '' : parts.slice(0, first + 1).join(',').trim();
   const angled = /<\s*(?:mailto:)?([^<>\s@]+@[^<>\s@]+?)\s*>/i.exec(text);
