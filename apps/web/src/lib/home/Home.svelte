@@ -1693,7 +1693,7 @@
       margin-block-start: calc(var(--tile-gap) * -1);
       border-start-start-radius: 0;
       border-start-end-radius: 0;
-      box-shadow: inset 0 1px 0 var(--rule);
+      border-block-start: 1px solid var(--rule);
     }
 
     /* TWO LISTS OF TASKS AT THE FOOT (Handed back, Urgent) SIT SIDE BY SIDE, not each a full row of one line; one alone
