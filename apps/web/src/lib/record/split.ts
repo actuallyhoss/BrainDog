@@ -19,7 +19,7 @@ export type SplitAt = { field: string; of: string };
 export function splitAtOf(decl: Pick<RegisterDecl, 'fields'> | undefined): SplitAt | null {
   for (const f of decl?.fields ?? []) {
     const of = (f as { parts_of?: unknown }).parts_of;
-    if ((f.type as string) === 'json' && f.retired !== true && typeof of === 'string' && of !== '') return { field: f.id, of };
+    if (f.type === 'json' && f.retired !== true && typeof of === 'string' && of !== '') return { field: f.id, of };
   }
   return null;
 }

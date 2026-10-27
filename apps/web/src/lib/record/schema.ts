@@ -36,8 +36,8 @@
  * closes the code in this build and closes nothing at the boundary, where the declarations
  * actually arrive, and there is no way to ask it at run time what it admits. As an array the test
  * can hold it against `@braindog/kernel`'s own `FIELD_TYPES`, which is the authority: this list is
- * a SUBSET of the record's eighteen, and `quantity`, `file` and `json` are not here because no
- * register this app draws declares one.
+ * a SUBSET of the record's eighteen, and `quantity` and `file` are not here because no register
+ * this app draws declares one. `json` is, since the Ledger keeps a split line's parts in one.
  */
 export const FIELD_TYPES = [
   'text',
@@ -55,6 +55,7 @@ export const FIELD_TYPES = [
   'url',
   'email',
   'list',
+  'json',
 ] as const;
 
 export type FieldType = (typeof FIELD_TYPES)[number];

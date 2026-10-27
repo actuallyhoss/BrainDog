@@ -56,7 +56,7 @@ test('A SPLIT LINE IN A LIST IS ONE ROW THAT SAYS SO, in place of its one catego
   try {
     const entry = { id: 'e1', seq: 4, fields: RUN, version: 1 } as unknown as Entry;
     const plain = { id: 'e2', seq: 5, fields: { ...RUN, pieces: undefined }, version: 1 } as unknown as Entry;
-    const rows = toRows('till', [entry, plain], [{ field: 'label' }, { field: 'kind' }]);
+    const rows = toRows('till', [entry, plain], [{ field: 'label', label: 'Label', width: '1fr' }, { field: 'kind', label: 'Kind', width: '1fr' }]);
     assert.equal(rows.length, 2);
     assert.equal(rows[0]!.cells[1], 'Split · 2 categories');
     assert.notEqual(rows[1]!.cells[1], 'Split · 2 categories');
