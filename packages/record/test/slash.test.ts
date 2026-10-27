@@ -609,6 +609,8 @@ test('THE SKILLS A USE CASE NAMES are offered to the agents once each, as rows o
   await install({ install: 'agents' });
   uses('tickets', [20, 11, 6, 2]);
   /* THREE RUNS LEFT THE SAME STEPS FOR BOTH SKILLS, so each is offered with them and never as a bare name (`stepsFrom`). */
+  sql.exec("INSERT OR IGNORE INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('tok_team', 'p_owner', 'h', 'write', 'Team', '2026-01-01T00:00:00.000Z')");
   for (const [i, n] of [5, 4, 3].entries()) {
     day(n);
     const run: CallContext = { principal: { kind: 'token', id: 'tok_team', scope: 'write', person: 'p_owner', level: 'owner' }, session: { client_id: `c-${i}`, host: 'team-mac', repo: 'tickets', agent: 'claude' } };

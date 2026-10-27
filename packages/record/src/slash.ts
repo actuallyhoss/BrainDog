@@ -647,6 +647,14 @@ function handoffsOf(sql: Sql, kernel: Kernel, nowMs: number): RunLeft[] {
     instantOf(nowMs - HANDOFF_DAYS * DAY_MS),
     HANDOFFS_MOST,
   );
+  /* ONLY THE OWNER'S OWN AGENTS, AND ONLY RUNS THAT READ NOTHING FROM OUTSIDE: what Slash quotes becomes a skill "your
+     agents" follow, so a colleague's run, or a run another person's or a feed's words reached, is not one it learns from. */
+  const owners = new Set(
+    sql
+      .all<{ id: string }>("SELECT t.id FROM token t JOIN member m ON m.person_id = t.person_id WHERE m.register = '*' AND m.level = 'owner'")
+      .map((t) => t.id),
+  );
+  const marked = new Set(sql.all<{ key: string }>("SELECT key FROM pref WHERE person_id = 'ladder:untrusted'").map((m) => m.key));
   const out: RunLeft[] = [];
   for (const row of rows.reverse()) {
     let f: Record<string, unknown>;
@@ -655,6 +663,7 @@ function handoffsOf(sql: Sql, kernel: Kernel, nowMs: number): RunLeft[] {
     } catch {
       continue;
     }
+    if (typeof f.token_id !== 'string' || !owners.has(f.token_id) || (row.seq !== null && marked.has(`${prefix}${row.seq}`))) continue;
     const lines = [f.next, ...(Array.isArray(f.tried) ? f.tried : []), ...(Array.isArray(f.notes) ? f.notes : [])].filter(
       (x): x is string => typeof x === 'string' && x.trim() !== '',
     );
