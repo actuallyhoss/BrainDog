@@ -17,9 +17,11 @@
      ends in an ellipsis; its entry holds the rest. */
   /* THE AMOUNTS END ON THE TILE'S PADDING, as every other column does: a 720px cap ended them 50px short of the edge on a
      wide tile, with the hairlines running on past. The name's own track still takes what the amount leaves. */
+  /* NO STATE TRACK: a timeline row has none, and an empty track's gap ended its amount a step short of the day's net
+     over it. A row with its own actions takes its track from `List.svelte`. */
   .list[data-kind='timeline'] > .item {
-    grid-template-areas: 'marker title detail state';
-    grid-template-columns: 7ch minmax(0, 1fr) auto auto;
+    grid-template-areas: 'marker title detail';
+    grid-template-columns: 7ch minmax(0, 1fr) auto;
     align-items: center;
     min-block-size: 44px;
   }
@@ -76,13 +78,185 @@
     padding-block-start: var(--sp-1);
   }
 
+  /* THE DAY ON THE LEFT AND ITS NET ON THE RIGHT (`timelineNets`), so a day reads as a total before its lines. The name
+     a step darker than the rows' quiet lines, the net in the quiet ink: it is a sum of what is under it, not a figure
+     of its own, so it is never in colour. */
+  .list[data-kind='timeline'] > .item-day {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-4);
+  }
+
+  .list[data-kind='timeline'] > .item-day:first-child {
+    padding-block-start: var(--sp-1);
+  }
+
+  .item-day-name {
+    color: var(--ink-2);
+    font-weight: var(--fw-semi);
+  }
+
+  .item-day-net {
+    margin-inline-start: auto;
+    color: var(--ink-3);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+  }
+
   .list[data-kind='timeline'][data-days] > .item {
-    grid-template-areas: 'title detail state';
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'title detail';
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .list[data-kind='timeline'][data-days] > .item > .item-marker {
     display: none;
+  }
+
+  /* MONEY COMING IN IS THE ONE AMOUNT IN COLOUR. Money going out stays ink: red is for late, over and owed. */
+  .list[data-kind='timeline'] > .item > .item-detail[data-sign='in'] {
+    color: var(--good);
+  }
+
+  /**
+   * THE MONEY ROW (`timelineRich`): a chip, the title over its quiet line, and the amount over the same amount in the
+   * home currency. Every row the same height, two lines tall, so a ledger reads as one column of equal steps whatever
+   * a row says, and the chip stands across both lines.
+   */
+  .list[data-kind='timeline'] > .item[data-rich] {
+    grid-template-areas:
+      'chip title detail'
+      'chip under approx';
+    grid-template-columns: calc(var(--well) + var(--sp-1)) minmax(0, 1fr) auto;
+    column-gap: var(--sp-3);
+    row-gap: 1px;
+    align-items: center;
+    min-block-size: var(--row-h-2);
+  }
+
+  .list[data-kind='timeline'] > .item[data-rich] > .item-title {
+    align-self: end;
+    font-weight: var(--fw-medium);
+  }
+
+  .list[data-kind='timeline'] > .item[data-rich] > .item-detail {
+    align-self: end;
+  }
+
+  /* A ROW WITH NOTHING UNDER IT CENTRES ITS ONE LINE ON THE CHIP, rather than sitting on a second line that is empty. */
+  .list[data-kind='timeline'] > .item[data-rich]:not(:has(> .item-under:not(:empty), > .item-approx)) {
+    grid-template-areas: 'chip title detail';
+  }
+
+  .list[data-kind='timeline'] > .item[data-rich]:not(:has(> .item-under:not(:empty), > .item-approx)) > :is(.item-title, .item-detail) {
+    align-self: center;
+  }
+
+  .item-under {
+    grid-area: under;
+    align-self: start;
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .list > .item > .item-under:empty {
+    display: none;
+  }
+
+  /* A LINE THAT IS LATE SAYS SO UNDER ITS TITLE IN THE RED, beside the dot its tone draws: red is for late. */
+  .list[data-kind='timeline'] > .item[data-rich][data-intent='bad'] > .item-under {
+    color: var(--red);
+  }
+
+  /* THE SAME AMOUNT IN THE HOME CURRENCY, under it and quiet: a guide, never a second figure to add. */
+  .item-approx {
+    grid-area: approx;
+    align-self: start;
+    justify-self: end;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* THE CHIP: a circle a step wider than a well (32), the category's glyph in its colour on its tint, or the title's first letter on the
+     quiet fill where the row names no glyph, and a dashed ring with a `?` round a line nothing has filed yet. */
+  .item-chip {
+    grid-area: chip;
+    display: grid;
+    place-items: center;
+    inline-size: calc(var(--well) + var(--sp-1));
+    block-size: calc(var(--well) + var(--sp-1));
+    border-radius: var(--r-round);
+    background: var(--tile-2);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
+    line-height: 1;
+  }
+
+  .item-chip > svg {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+  }
+
+  .item-chip[data-slot='blue'] {
+    background: var(--cat-blue-tint);
+    color: var(--cat-blue);
+  }
+
+  .item-chip[data-slot='violet'] {
+    background: var(--cat-violet-tint);
+    color: var(--cat-violet);
+  }
+
+  .item-chip[data-slot='pink'] {
+    background: var(--cat-pink-tint);
+    color: var(--cat-pink);
+  }
+
+  .item-chip[data-slot='teal'] {
+    background: var(--cat-teal-tint);
+    color: var(--cat-teal);
+  }
+
+  .item-chip[data-slot='sky'] {
+    background: var(--cat-sky-tint);
+    color: var(--cat-sky);
+  }
+
+  .item-chip[data-slot='yellow'] {
+    background: var(--cat-yellow-tint);
+    color: var(--cat-yellow);
+  }
+
+  .item-chip[data-slot='lime'] {
+    background: var(--cat-lime-tint);
+    color: var(--cat-lime);
+  }
+
+  .item-chip[data-slot='slate'] {
+    background: var(--cat-slate-tint);
+    color: var(--cat-slate);
+  }
+
+  .item-chip[data-unfiled] {
+    border: 1.5px dashed var(--ink-3);
+    background: none;
+    color: var(--ink-3);
+  }
+
+  /* THE TILE'S HEAD STANDS OVER A HAIRLINE ACROSS THE TILE, as a ledger's head does, so the rows under it read as the
+     tile's body and not as more of its heading. */
+  .block-slot:has(> .block[data-kind='timeline'] > .list > .item[data-rich]) > .block-bar {
+    margin-inline: calc(-1 * var(--tile-pad));
+    padding-inline: var(--tile-pad);
+    padding-block-end: var(--sp-3);
+    border-block-end: 1px solid var(--rule);
   }
 
   /* A DATED ROW NEVER WEARS THE ARRIVAL TINT (`[data-arrived]` in `blocks.css`). A timeline is history in date order,

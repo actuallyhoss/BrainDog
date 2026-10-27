@@ -37,7 +37,20 @@
   import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import { TODO_META_JOIN, todoLines, todoTitle } from '../../src/todo.ts';
-  import { timelineCell, timelineDays, timelineDetails, timelineTitle } from '../../src/timeline.ts';
+  import {
+    TIMELINE_CHIP,
+    timelineCell,
+    timelineChip,
+    timelineDayHead,
+    timelineDays,
+    timelineDetails,
+    timelineIn,
+    timelineNets,
+    timelineRich,
+    timelineTitle,
+    timelineUnder,
+  } from '../../src/timeline.ts';
+  import { glyphPath, glyphWaits } from '../../src/inline.ts';
   import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
@@ -108,6 +121,9 @@
   /* A TIMELINE'S AMOUNTS AS ONE SET: pence on every one where one has them (`timelineDetails`). */
   const details = $derived(block.kind === 'timeline' ? timelineDetails(block.rows, opts.now, opts.home) : []);
   const grouped = $derived(days.some((d) => d !== null));
+  const nets = $derived(block.kind === 'timeline' ? timelineNets(days, details) : []);
+  const rich = $derived(block.kind === 'timeline' && timelineRich(block.rows));
+
 
   /** One listener on the list, so a row reports focus however deep the control that took it. */
   function focused(e: FocusEvent) {
@@ -154,6 +170,18 @@
     drawn = block.raw;
     ticks = new Map();
     at = 0;
+  });
+
+  /* A CHIP'S GLYPH THAT ONLY THE SET HOLDS IS ASKED AGAIN ONCE THE SET LANDS, as `Section.svelte`'s well waits on it: a
+     chip that asked once would keep its letter for good. A host that still has no drawing then keeps the letter. */
+  let landed = $state(0);
+  $effect(() => {
+    if (!rich) return;
+    const waits = block.rows.some((r) => {
+      const glyph = timelineChip(r.cells[TIMELINE_CHIP], '').glyph;
+      return glyph !== null && glyphWaits(glyph, opts);
+    });
+    if (waits) void opts.iconSet?.().then(() => landed++, () => {});
   });
 
   function tick(i: number, row: Row) {
@@ -313,9 +341,44 @@
     {:else if block.kind === 'timeline'}
       {@const title = takeWorking(timelineTitle(row.cells[1]))}
       {@const day = days[i] ?? null}
+      {@const net = nets[i] ?? null}
+      {@const said = details[i] ?? ''}
       <!-- A GROUPED TIMELINE SAYS EACH DAY ONCE, as a small heading over its rows, and the rows under it leave their own
-           date blank (`../../src/timeline.ts`). The heading is an item, so the list stays a list of its children. -->
-      {#if day !== null}<li class="item-day num"><Text nodes={inline(timelineCell(day, opts.now), opts)} {opts} /></li>{/if}
+           date blank (`../../src/timeline.ts`). The heading is an item, so the list stays a list of its children. It says
+           the weekday, and the day's net at its end where the day's lines are in one currency (`timelineNets`). -->
+      {#if day !== null}<li class="item-day num"
+          ><span class="item-day-name"><Text nodes={inline(timelineDayHead(day, opts.now), opts)} {opts} /></span
+          >{#if net}<span class="item-day-net">{net}</span>{/if}</li
+        >{/if}
+      {#if rich}
+        <!-- THE MONEY ROW (`timelineRich`): the chip, the title, the amount, and under them the quiet line and the amount
+             restated in the home currency where the host can say it (`opts.approx`). `html.ts` draws the same tree. -->
+        {@const chip = timelineChip(row.cells[TIMELINE_CHIP], text(inline(title.text ?? '', opts)))}
+        {@const art = chip.glyph ? (void landed, glyphPath(chip.glyph, opts)) : null}
+        {@const approx = said && opts.approx ? opts.approx((row.cells[2] ?? '').trim()) : null}
+        <li class="item" data-rich="" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
+          <span class="item-chip" data-slot={chip.colour ?? undefined} data-unfiled={chip.unfiled ? '' : undefined} aria-hidden="true"
+            >{#if art}<svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"><path d={art}></path></svg
+              >{:else}{chip.unfiled ? '?' : chip.letter}{/if}</span
+          >
+          <span class="item-title"
+            >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text
+              nodes={inline(title.text ?? '', opts)}
+              {opts}
+            />{#if row.tone}{' '}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
+          >
+          <span class="item-detail" data-sign={timelineIn(said) ? 'in' : undefined}><Text nodes={inline(said, opts)} {opts} /></span>
+          <span class="item-under"><Text nodes={inline(timelineUnder(row.cells, opts.now, grouped), opts)} {opts} /></span>
+          {#if approx}<span class="item-approx num">{approx}</span>{/if}
+          {@render rowActs(row)}
+        </li>
+      {:else}
       <li class="item" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
@@ -331,9 +394,10 @@
           />{#if row.tone}{' '}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
         >
         <!-- Each cell as it is said (`timelineCell`): a day this year without its year, an amount of nothing not at all. -->
-        <span class="item-detail"><Text nodes={inline(details[i] ?? '', opts)} {opts} /></span>
+        <span class="item-detail" data-sign={timelineIn(said) ? 'in' : undefined}><Text nodes={inline(said, opts)} {opts} /></span>
         {@render rowActs(row)}
       </li>
+      {/if}
     {:else}
       {@const title = takeWorking(row.cells[0] ?? '')}
       <li class="item" data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
@@ -380,5 +444,13 @@
   :global(.list > .item > .item-acts) {
     grid-area: acts;
     align-self: center;
+  }
+
+  /* A LEDGER'S MONEY ROW (`data-rich`) KEEPS ITS CHIP AND ITS TWO LINES, with the actions across both at its end. */
+  :global(.list > .item[data-rich]:has(> .item-acts)) {
+    grid-template-areas:
+      'chip title detail acts'
+      'chip under approx acts';
+    grid-template-columns: calc(var(--well) + var(--sp-1)) minmax(0, 1fr) auto auto;
   }
 </style>
