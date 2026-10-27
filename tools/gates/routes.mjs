@@ -46,8 +46,9 @@ export const SAMPLE_OF = {
   'web:/automations/[id]': { asks: (s) => s.automations.map((id) => fill('[id]', id)), was: [fill('[id]', 'SG5')] },
   'web:/scripts/[id]': { asks: (s) => s.scripts.map((id) => fill('[id]', id)), was: [fill('[id]', 'no-script')] },
   'web:/jobs/[id]': { asks: (s) => s.jobs.map((id) => fill('[id]', id)), was: [fill('[id]', 'j_none')] },
-  'web:/packs/[id]': { asks: (s) => s.addOns.map((id) => fill('[id]', id)), was: [fill('[id]', 'people')] },
-  'web:/packs/browse/[id]': { asks: (s) => s.entries.map((id) => fill('[id]', id)), was: [fill('[id]', 'SG5')] },
+  /* ONE PAGE FOR AN ADD-ON SINCE THEY MOVED TO `/addons` (`routes/addons/moved.ts`): an installed one and an entry the
+     catalogue offers are both opened there, as `/packs/<id>` and `/packs/browse/<id>` opened them before. */
+  'web:/addons/[id]': { asks: (s) => [...new Set([...s.addOns, ...s.entries])].map((id) => fill('[id]', id)), was: [fill('[id]', 'people')] },
   'web:/v/[view]': { asks: (s) => s.views.map((id) => fill('[view]', id)), was: [fill('[view]', 'obligations.open')] },
   'web:/p/[slug]': { asks: (s) => s.pages.map((slug) => fill('[slug]', slug)), was: [fill('[slug]', 'money')] },
   'web:/r/[register]': { asks: (s) => s.rows.map((r) => fill('[register]', r.register)), was: [fill('[register]', 'obligations')] },
