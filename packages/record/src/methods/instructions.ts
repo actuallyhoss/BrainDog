@@ -521,6 +521,12 @@ export function methods(deps: RecordDeps) {
     const fault = kind !== 'options' && (chosen === 'reject' || chosen === 'apart') ? null : deps.wordFault(weighed);
     if (fault !== null) return no('FORBIDDEN', fault, { at: 'answer' });
     const { by, byName, said: words } = word.value;
+    /* A QUESTION SOMEBODY ELSE OPENED IS THEIR WORDS, which the run had to read to answer: another person's, a feed's or
+       a project key's, or an agent of somebody else's. It is answered in BrainDog, never on a word carried past them. */
+    const opener = String(row.opened_by ?? '');
+    const openerPerson = opener.startsWith('t_') ? (sql.one<{ person_id: string }>('SELECT person_id FROM token WHERE id = ?', opener)?.person_id ?? opener) : opener;
+    if (opener.startsWith('ingest:') || opener.startsWith('report:') || (openerPerson.startsWith('p_') && openerPerson !== by))
+      return no('FORBIDDEN', `${given} was asked by somebody else, so it is answered in BrainDog and not on a word. Ask ${byName} to answer it there.`, { at: 'answer' });
     const as: CallContext = { principal: { kind: 'person', id: by, level: 'owner' }, registers: '*', credentialed: true, onWord: run };
     const out = await deps.decideAs({ id, decide: { option: chosen, reason: `${byName} told ${run}: "${words}"` } }, as);
     if (!out.ok) return out as Result<never>;
