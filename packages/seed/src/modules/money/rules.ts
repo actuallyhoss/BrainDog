@@ -15,6 +15,7 @@ import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { FILE_BACK_SCRIPT } from './scripts/file-back.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
+import { OFFER_BUDGETS_SCRIPT } from './scripts/offer-budgets.js';
 import { MATCH_PAYMENT_SCRIPT } from './scripts/match-payment.js';
 import { CARD_OWED } from './scripts/card-owed.js';
 import { MOVE_LINE } from './scripts/move-line.js';
@@ -474,6 +475,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'learn_category', as: 'making', input: { answer: '{{trigger.option}}' } } }],
   },
   LEARN_CATEGORY_SCRIPT,
+  OFFER_BUDGETS_SCRIPT,
 ];
 
 /**
