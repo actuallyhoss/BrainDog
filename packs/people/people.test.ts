@@ -187,14 +187,14 @@ function waits(doc: File): { at: string; holds: unknown }[] {
 
 const kindOf = (d: Body): string => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else';
 
-test('THE FILE IS DATA AND ONLY ITS OWN: no script, two lists, seven pages, six figures over those lists, three rules', () => {
+test('THE FILE IS DATA AND ONLY ITS OWN: no script, two lists, three pages, seven figures over those lists, three rules', () => {
   const doc = file();
   assert.equal(doc.pack, 'people');
   const kinds = doc.declarations.map(kindOf);
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 2, page: 7, metric: 6, rule: 3 },
-    'two lists, seven pages, six figures and three rules',
+    { register: 2, page: 3, metric: 7, rule: 3 },
+    'two lists, three pages, seven figures and three rules',
   );
   assert.ok(!kinds.includes('script') && !kinds.includes('something else'), 'the file declares a script, or something that is none of the four');
   assert.doesNotMatch(JSON.stringify(doc.declarations), /"script":|"egress"|"hosts"/u, 'a step that runs a script or reaches out');
@@ -217,8 +217,10 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
      the version the module is at and nothing a record already holds is changed in place. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.people);
   /* 3.6.0 SINCE 24 October (things, not rows): Everyone as faces, the owner left off. 3.5.0 is released. 3.7.0
-     SINCE 24 October (C33): Scripts is a page. 3.8.0 SINCE 25 October (Y2): an organisation can be retired. */
-  assert.equal(doc.version, '3.8.0');
+     SINCE 24 October (C33): Scripts is a page. 3.8.0 SINCE 25 October (Y2): an organisation can be retired. 3.9.0
+     SINCE 27 October: one line a person, and shops from card texts apart. 4.0.0 SINCE 27 October: Health, Scripts,
+     Calendar and Activity leave for core. */
+  assert.equal(doc.version, '4.0.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');
@@ -232,12 +234,13 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
   assert.equal(doc.config, undefined);
 });
 
-test('PROJECTS AND MONEY ARE ASKED FOR ONLY WHERE THEY ARE READ: five parts wait, and nothing else', () => {
+test('PROJECTS AND MONEY ARE ASKED FOR ONLY WHERE THEY ARE READ: six parts wait, and nothing else', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'People installs on a record with no other add-on');
   assert.deepEqual(waits(doc), [
     { at: '"People", "Met in"', holds: [PROJECTS] },
     { at: '"Organisations", "Projects"', holds: [PROJECTS] },
+    { at: '"People", "Everyone", "Met in"', holds: [PROJECTS] },
     { at: '"someone", "cards", "Met in"', holds: [PROJECTS] },
     { at: '"relation", "Projects"', holds: [PROJECTS] },
     { at: '"relation", "Money"', holds: [MONEY] },
@@ -269,9 +272,11 @@ async function waitingParts(holds: readonly string[]): Promise<Waiting[]> {
   const block = (page: string, test: (b: Body) => boolean): number => (body(`page.${page}`).blocks as Body[]).findIndex(test);
   const column = (page: string, at: number): number => (((body(`page.${page}`).blocks as Body[])[at]!.columns as Body[]) ?? []).findIndex((c) => c.field === 'projects');
   const lead = block('someone', (b) => b.lead === true);
+  const everyone = block('people', (b) => b.heading === 'Everyone');
   const all: Waiting[] = [
     { at: `register.people.fields[${field('people')}]`, holds: [PROJECTS] },
     { at: `register.organisations.fields[${field('organisations')}]`, holds: [PROJECTS] },
+    { at: `page.people.blocks[${everyone}].columns[${column('people', everyone)}]`, holds: [PROJECTS] },
     { at: `page.someone.blocks[${lead}].columns[${column('someone', lead)}]`, holds: [PROJECTS] },
     { at: `page.relation.blocks[${block('relation', (b) => b.source === `register.${PROJECTS}`)}]`, holds: [PROJECTS] },
     { at: `page.relation.blocks[${block('relation', (b) => b.source === `register.${MONEY}`)}]`, holds: [MONEY] },
@@ -300,7 +305,7 @@ for (const { name, holds } of SUBSETS) {
     assert.deepEqual(pack.seeds, built.seeds, 'the examples are not the module\'s');
     const mine = pack.manifest as unknown as Body;
     const theirs = built.manifest as unknown as Body;
-    for (const key of ['pack', 'version', 'summary', 'author', 'license', 'requires', 'config'])
+    for (const key of ['pack', 'version', 'summary', 'author', 'license', 'requires', 'hands', 'config'])
       assert.deepEqual(mine[key], theirs[key], `the file's ${key} is not the module's:\n  ${differences(mine[key], theirs[key], key).join('\n  ')}`);
     close();
   });
@@ -348,14 +353,14 @@ function project(api: Api, name: string): string {
 const PERSON = { name: 'Ines Varga', email: 'ines@kiln.example', note: 'Draws the plans.' };
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same eighteen parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same fifteen parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const people = await ours();
-    assert.equal(people.length, 18);
+    assert.equal(people.length, 15);
     for (const id of people) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

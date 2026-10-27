@@ -1,12 +1,13 @@
 {
   "pack": "people",
-  "version": "3.8.0",
+  "version": "4.0.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "An organisation can be retired: it keeps its payments and is no longer listed on People. A shop met by a name a card text cut short is asked about once in Needs you, to fold it into the shop whose whole name it is, or retire it.",
+  "changes": "Health, Scripts, Calendar and Activity moved out of People into the pages BrainDog itself keeps. Nothing you see changes, and your sidebar order and hides stay as they were.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "hands": { "page.health": "core", "page.scripts": "core", "page.calendar": "core", "page.activity": "core" },
   "words": { "people": { "name": "People", "one": "person" } },
   "declarations": [
     {
@@ -165,8 +166,8 @@
           "where": "merged_into is empty, self is not true",
           "columns": [
             { "field": "name", "label": "Name", "as": "who" },
-            { "field": "role", "label": "Role", "as": "fact" },
-            { "field": "org", "label": "With", "as": "fact" },
+            { "field": "note", "label": "Who they are", "as": "reply" },
+            { "field": "projects", "label": "Met in", "as": "fact", "when": { "holds": [ "things" ] } },
             { "field": "in_touch", "label": "Last spoke", "as": "when" }
           ],
           "order": [ { "field": "in_touch", "dir": "desc" }, { "field": "seq", "dir": "desc" } ],
@@ -179,13 +180,19 @@
           "icon": "building",
           "span": 6,
           "source": "register.organisations",
-          "where": "merged_into is empty, retired_on is empty",
+          "where": "merged_into is empty, retired_on is empty, kind is set",
           "when": { "metric": "organisations-count", "gt": 0 },
           "columns": [
             { "field": "name", "label": "Organisation", "width": "minmax(14ch,2fr)" },
             { "field": "kind", "label": "Kind", "width": "10ch" }
           ],
           "order": [ { "field": "name", "dir": "asc" } ]
+        },
+        {
+          "kind": "note",
+          "span": 6,
+          "when": { "metric": "organisations-from-card-texts", "gt": 0 },
+          "body": "{{organisations-from-card-texts}} shop(s) from card texts, {{organisations-from-card-texts.names}}, kept apart from the organisations. [See them](/r/organisations)."
         },
         {
           "kind": "agents",
@@ -325,210 +332,6 @@
       ]
     },
     {
-      "page": "health",
-      "title": "Health",
-      "icon": "heart-pulse",
-      "pack": "people",
-      "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "signs-red", "is": 0 },
-          "body": "Nothing on this record needs a look."
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "signs-red", "is": 1 },
-          "body": "One thing on this record needs a look."
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "signs-red", "gt": 1 },
-          "body": "{{signs-red}} things on this record need a look."
-        },
-        {
-          "kind": "note",
-          "span": 12,
-          "when": { "metric": "signs-unread", "is": 1 },
-          "body": "One check has not run yet."
-        },
-        {
-          "kind": "note",
-          "span": 12,
-          "when": { "metric": "signs-unread", "gt": 1 },
-          "body": "{{signs-unread}} checks have not run yet."
-        },
-        {
-          "kind": "cards",
-          "heading": "Needs a look",
-          "icon": "octagon-alert",
-          "span": 12,
-          "source": "signs",
-          "where": "state is red",
-          "columns": [ { "field": "name", "as": "title" }, { "field": "said", "as": "reply" } ]
-        },
-        {
-          "kind": "cards",
-          "heading": "All good",
-          "icon": "circle-check",
-          "span": 12,
-          "source": "signs",
-          "where": "state is green",
-          "columns": [ { "field": "name", "as": "title" }, { "field": "said", "as": "reply" } ]
-        },
-        {
-          "kind": "cards",
-          "heading": "Not checked yet",
-          "icon": "circle-dashed",
-          "span": 12,
-          "source": "signs",
-          "where": "state is none",
-          "columns": [ { "field": "name", "as": "title" }, { "field": "said", "as": "reply" } ]
-        },
-        {
-          "kind": "note",
-          "span": 12,
-          "when": { "metric": "green-days", "is": 1 },
-          "body": "Every check passed yesterday."
-        },
-        {
-          "kind": "note",
-          "span": 12,
-          "when": { "metric": "green-days", "gt": 1 },
-          "body": "Every check has passed for {{green-days}} days, up to yesterday."
-        }
-      ]
-    },
-    {
-      "page": "scripts",
-      "title": "Scripts",
-      "icon": "code",
-      "pack": "people",
-      "blocks": [
-        { "kind": "note", "lead": true, "span": 12, "body": "Every script on this record, and where it stands." },
-        {
-          "kind": "table",
-          "key": "scripts",
-          "span": 12,
-          "source": "scripts",
-          "columns": [ { "field": "title", "label": "Script" }, { "field": "every", "label": "Runs" }, { "field": "last_at", "label": "Where it stands" } ],
-          "empty": "No scripts yet. A script is a short program an agent writes and you accept."
-        }
-      ]
-    },
-    {
-      "page": "calendar",
-      "title": "Calendar",
-      "icon": "calendar",
-      "pack": "people",
-      "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "Everything with a day it is due, this month and the next two."
-        },
-        {
-          "kind": "calendar",
-          "span": 12,
-          "source": "deadlines",
-          "columns": [ { "field": "title" }, { "field": "day" } ],
-          "back": 0,
-          "ahead": 2,
-          "empty": "Nothing is due in these three months."
-        }
-      ]
-    },
-    {
-      "page": "activity",
-      "title": "Activity",
-      "icon": "activity",
-      "pack": "people",
-      "layout": { "rail": 4 },
-      "filters": [
-        { "field": "who", "control": "chips" },
-        { "field": "kind", "control": "chips" },
-        { "field": "list", "control": "chips" }
-      ],
-      "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "key": "line",
-          "span": 12,
-          "body": "Everything that changed, a day at a time, newest first."
-        },
-        {
-          "kind": "feed",
-          "key": "feed",
-          "span": 12,
-          "source": "activity",
-          "group": "day",
-          "fold": "run",
-          "since": "seen",
-          "first": 50,
-          "empty": "Nothing has changed yet."
-        },
-        {
-          "kind": "split",
-          "key": "who-worked",
-          "heading": "Who worked",
-          "icon": "people",
-          "span": 12,
-          "area": "rail",
-          "source": "metric.activity-by-who"
-        },
-        {
-          "kind": "bar",
-          "key": "what-changed",
-          "heading": "What changed",
-          "icon": "activity",
-          "span": 12,
-          "area": "rail",
-          "source": "metric.activity-by-kind"
-        },
-        {
-          "kind": "bar",
-          "key": "busy-hours",
-          "heading": "Busy hours",
-          "icon": "clock",
-          "span": 12,
-          "area": "rail",
-          "source": "metric.activity-by-hour"
-        },
-        {
-          "kind": "queue",
-          "key": "agents-asked",
-          "heading": "Agents asked",
-          "icon": "ask",
-          "span": 12,
-          "area": "rail",
-          "source": "governance.open",
-          "where": {
-            "any": [
-              { "field": "who", "starts": "agent:" },
-              { "field": "who", "starts": "s1" },
-              { "field": "who", "starts": "s2" },
-              { "field": "who", "starts": "s3" },
-              { "field": "who", "starts": "s4" },
-              { "field": "who", "starts": "s5" },
-              { "field": "who", "starts": "s6" },
-              { "field": "who", "starts": "s7" },
-              { "field": "who", "starts": "s8" },
-              { "field": "who", "starts": "s9" }
-            ]
-          },
-          "limit": 3,
-          "when": { "metric": "questions-open", "gt": 0 }
-        }
-      ]
-    },
-    {
       "metric": "people-count",
       "name": "People",
       "source": "register.people",
@@ -577,7 +380,18 @@
       "metric": "organisations-count",
       "name": "Organisations",
       "source": "register.organisations",
-      "where": "merged_into is empty, retired_on is empty",
+      "where": "merged_into is empty, retired_on is empty, kind is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "organisations-from-card-texts",
+      "name": "Shops from card texts",
+      "source": "register.organisations",
+      "where": "merged_into is empty, retired_on is empty, kind is empty",
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
