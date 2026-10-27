@@ -23,8 +23,8 @@
  * deleted, or moved to another holding, works out every holding, since which holding it left is not said); a gold rate is marked and
  * every gold holding worked out. STARTED BY THE CLOCK once a day, with no row, it marks the rates and works out every
  * holding nothing has worked out yet, which is how a record that held holdings before this version gains its gains with
- * nobody writing a row again, then the gold holdings and the first page of the rest. A script reads one page of fifty of
- * a list, so a record with more holdings to catch up is done fifty a day.
+ * nobody writing a row again, then the gold holdings and the first page of the rest. The unvalued and the gold are read past
+ * the first fifty, by number; only that last page is one page of fifty.
  *
  * A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY in `priced_on`, and a price said again is dated again when the rule
  * says the price moved and the day did not (`changed`, the fields the write moved, comma separated). A day somebody
@@ -89,7 +89,7 @@ function markRates(ctx, rates, today) {
 async function work(ctx, row, current, today, repriced) {
   if (!row) return;
   const f = row.fields;
-  const buys = await ctx.record.list('holding_buys', { field: 'holding', is: row.id });
+  const buys = await every(ctx, 'holding_buys', { field: 'holding', is: row.id });
   const next = {};
 
   let qty = f.qty;
@@ -137,12 +137,57 @@ async function work(ctx, row, current, today, repriced) {
   if (Object.keys(next).length > 0) ctx.update('holdings#' + row.seq, next, row.version);
 }
 
+/**
+ * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with
+ * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,
+ * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.
+ */
+async function every(ctx, register, where) {
+  const PAGE = 50;
+  const READS = 60;
+  let reads = 0;
+  const ask = (above, upto) => {
+    reads += 1;
+    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];
+    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });
+  };
+  const first = await ask(0, null);
+  if (first.length < PAGE) return first;
+  const seen = new Map(first.map((r) => [r.id, r]));
+  let top = Math.max(...first.map((r) => r.seq));
+  for (;;) {
+    if (reads >= READS) break;
+    const above = await ask(top, null);
+    for (const r of above) seen.set(r.id, r);
+    if (above.length < PAGE) break;
+    top = Math.max(...above.map((r) => r.seq));
+  }
+  const spans = [[0, top]];
+  let short = false;
+  while (spans.length > 0) {
+    if (reads >= READS) {
+      short = true;
+      break;
+    }
+    const [a, b] = spans.pop();
+    const page = await ask(a, b);
+    for (const r of page) seen.set(r.id, r);
+    if (page.length >= PAGE && b - a > 1) {
+      const mid = Math.floor((a + b) / 2);
+      spans.push([a, mid], [mid, b]);
+    }
+  }
+  const rows = [...seen.values()];
+  rows.short = short;
+  return rows;
+}
+
 export default async function run(ctx) {
   const input = ctx.input !== null && typeof ctx.input === 'object' ? ctx.input : {};
   const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);
   const moved = typeof input.changed === 'string' ? input.changed.split(',') : [];
   const repriced = moved.includes('price') && !moved.includes('priced_on');
-  const rates = await ctx.record.list('gold_rates');
+  const rates = await every(ctx, 'gold_rates');
   const id = typeof input.id === 'string' ? input.id : null;
 
   if (id !== null && input.register === 'holding_buys') {
@@ -152,7 +197,7 @@ export default async function run(ctx) {
     if (buy !== null && paid !== null && !same(buy.fields.paid, paid)) ctx.update('holding_buys#' + buy.seq, { paid }, buy.version);
     /* GONE, OR MOVED FROM ONE HOLDING TO ANOTHER: which holding it left is not said, so every holding is worked out. */
     if (buy === null || (input.op === 'update' && moved.includes('holding'))) {
-      for (const row of await ctx.record.list('holdings')) await work(ctx, row, current, today, false);
+      for (const row of await every(ctx, 'holdings')) await work(ctx, row, current, today, false);
       return;
     }
     const holding = typeof buy.fields.holding === 'string' ? await ctx.record.get(buy.fields.holding) : null;
@@ -161,7 +206,7 @@ export default async function run(ctx) {
   }
   if (id !== null && input.register === 'gold_rates') {
     const current = markRates(ctx, rates, today);
-    for (const row of await ctx.record.list('holdings', { field: 'kind', is: 'gold' })) await work(ctx, row, current, today, false);
+    for (const row of await every(ctx, 'holdings', { field: 'kind', is: 'gold' })) await work(ctx, row, current, today, false);
     return;
   }
   if (id !== null) {
@@ -174,7 +219,7 @@ export default async function run(ctx) {
   const done = new Set();
   const lists = [{ field: 'valued_by', empty: true }, { field: 'kind', is: 'gold' }, null];
   const rows = [];
-  for (const where of lists) rows.push(...(await (where === null ? ctx.record.list('holdings') : ctx.record.list('holdings', where))));
+  for (const where of lists) rows.push(...(await (where === null ? ctx.record.list('holdings') : every(ctx, 'holdings', where))));
   for (const row of rows) {
     if (done.has(row.id)) continue;
     done.add(row.id);

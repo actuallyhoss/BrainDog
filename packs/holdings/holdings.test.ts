@@ -326,6 +326,16 @@ test('A BUY IS PAID ITS COUNT TIMES ITS PRICE AND ITS FEES, and its holding coun
   close();
 });
 
+test('A HOLDING WITH MORE THAN FIFTY BUYS COUNTS AND COSTS EVERY ONE', async () => {
+  const { api, close } = await inPounds();
+  const gold = hold(api, { label: 'Gold 21k', kind: 'gold', karat: '21k', unit: 'gram' });
+  for (let i = 0; i < 70; i++) buy(api, { holding: gold, bought_on: '2026-03-01', qty: 1, price: egp(100_000) });
+  for (let i = 0; i < 3; i++) await settle(api);
+  const h = fields(api, gold);
+  assert.deepEqual([h.qty, h.cost], [70, egp(7_000_000)]);
+  close();
+});
+
 test('A HOLDING CANNOT BE DELETED WHILE A BUY POINTS AT IT, so no buy is left belonging to nothing', async () => {
   const { api, close } = await inPounds();
   const fund = hold(api, { label: 'World index fund', kind: 'fund', unit: 'share' });
@@ -627,16 +637,11 @@ test('A RECORD ON 1.0.0 UPDATES STRAIGHT TO 2.0.0, and every holding it held is 
   close();
 });
 
-test('THE CATCH-UP TAKES FIFTY A RUN, the one page a script can read, and the rest the next day', async () => {
+test('THE CATCH-UP READS PAST THE FIRST PAGE OF FIFTY, so sixty unvalued holdings are all worked out in one run', async () => {
   const lots = Array.from({ length: 60 }, (_, i): Body => ({ label: `Lot ${i + 1}`, kind: 'commodity', qty: 2, unit_cost: eur(1_000 + i) }));
   const { api, clock, ids, close } = await upgraded(v100(), lots);
   const done = (): number => ids.filter((id) => fields(api, id).valued_by !== undefined).length;
   clock.advance(SPREAD_MS + 1);
-  await settle(api);
-  assert.equal(done(), 50);
-  await settle(api);
-  assert.equal(done(), 50, 'the run came round again the same day');
-  clock.advance(24 * 60 * 60_000 + SPREAD_MS);
   await settle(api);
   assert.equal(done(), 60);
   for (const [i, id] of ids.entries()) assert.deepEqual(fields(api, id).cost, eur(2 * (1_000 + i)));
