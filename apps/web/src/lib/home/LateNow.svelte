@@ -111,8 +111,9 @@
       {@const amount = amountSaid(line)}
       <li class="ln" data-row={line.key} data-bill={bill ? '' : undefined} data-done={done.has(line.key) ? '' : undefined}>
         {#if !bill && verb}
-          <!-- A TASK IS A QUIET TICK at the line's start: the row's own verb is its name for a screen reader. -->
-          <button type="button" class="ln-tick tap" aria-label={`${verb}: ${line.title}`} title={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}
+          <!-- A TASK IS A QUIET TICK at the line's start: the row's own verb is its name for a screen reader. A box, as
+               Today's other ticks are, so `x` presses it from the keyboard (`PageBody.svelte`). -->
+          <button type="button" class="ln-tick tap" role="checkbox" aria-checked={done.has(line.key)} aria-label={`${verb}: ${line.title}`} title={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}
             ><Icon name="check" size="s" /></button
           >
         {/if}
