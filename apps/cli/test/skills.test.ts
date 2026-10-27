@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -402,6 +402,29 @@ test('A PROJECT SKILL is written into the repository and reported as not committ
   const path = join(h.top, '.claude', 'skills', 'kiln-release', 'SKILL.md');
   assert.deepEqual(await h.sync(), [`Skill kiln-release written to ${path} (in the repository, not committed).`]);
   assert.ok(existsSync(path));
+});
+
+test('A LINK A REPOSITORY PLANTS IS NEVER FOLLOWED: a temporary name or a linked folder leaves the file it points at untouched', async (t) => {
+  const h = await setup(t, { project: true });
+  h.add({ ...RELEASE, name: 'deploy', kind: 'command' }, 'project');
+  const victim = join(h.dir, 'victim.txt');
+  writeFileSync(victim, 'ORIGINAL\n');
+  const commands = join(h.top, '.claude', 'commands');
+  mkdirSync(commands, { recursive: true });
+  symlinkSync(victim, join(commands, 'deploy.md.tmp'));
+  await h.sync();
+  assert.equal(readFileSync(victim, 'utf8'), 'ORIGINAL\n', 'the planted temporary link was written through');
+  assert.ok(!lstatSync(join(commands, 'deploy.md')).isSymbolicLink(), 'the skill landed as a link');
+
+  const h2 = await setup(t, { project: true });
+  h2.add({ ...RELEASE, name: 'deploy', kind: 'command' }, 'project');
+  const elsewhere = join(h2.dir, 'elsewhere');
+  mkdirSync(elsewhere);
+  mkdirSync(join(h2.top, '.claude'), { recursive: true });
+  symlinkSync(elsewhere, join(h2.top, '.claude', 'commands'));
+  const lines = await h2.sync();
+  assert.ok(!existsSync(join(elsewhere, 'deploy.md')), 'the write went through a linked folder');
+  assert.ok(lines.some((l) => l.includes('goes through a link in this repository')), lines.join('\n'));
 });
 
 /* ── the whole list (AGT-C15) ──────────────────────────────────────────── */

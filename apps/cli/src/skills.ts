@@ -26,8 +26,8 @@
  * project.
  */
 
-import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { chmodSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -301,11 +301,50 @@ function filesIn(base: string): { path: string; name: string; kind: Kind }[] {
   return out;
 }
 
-/** Written whole and renamed, so a failed write never leaves half a skill. */
-function writeText(path: string, text: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(`${path}.tmp`, text);
-  renameSync(`${path}.tmp`, path);
+/**
+ * Whether every folder from `top` down to `path`, and `path` itself, is what it says and no link: `false` when one is a
+ * symbolic link, which in a repository somebody else wrote could point the write anywhere on this machine.
+ */
+export function linkFree(top: string, path: string): boolean {
+  const rel = relative(resolve(top), resolve(path));
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return false;
+  let at = resolve(top);
+  for (const part of rel.split(sep)) {
+    at = join(at, part);
+    try {
+      if (lstatSync(at).isSymbolicLink()) return false;
+    } catch {
+      return true;
+    }
+  }
+  return true;
+}
+
+/**
+ * Written whole and renamed, so a failed write never leaves half a skill; `false` when a link under `top` would have
+ * carried it out of the folder, and nothing was written.
+ *
+ * THE TEMPORARY FILE IS NEW AND NAMED AT RANDOM, opened so it must not exist and is never a link followed. A fixed
+ * `<name>.md.tmp` was a name a repository could plant as a link, and the write went wherever it pointed.
+ */
+function writeText(path: string, text: string, top: string | null): boolean {
+  if (top !== null && !linkFree(top, path)) return false;
+  if (top !== null) {
+    let at = resolve(top);
+    for (const part of relative(at, dirname(resolve(path))).split(sep).filter((p) => p !== '')) {
+      at = join(at, part);
+      if (!existsSync(at)) mkdirSync(at);
+    }
+  } else mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.${randomBytes(6).toString('hex')}.tmp`;
+  const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644);
+  try {
+    writeSync(fd, text);
+  } finally {
+    closeSync(fd);
+  }
+  renameSync(tmp, path);
+  return true;
 }
 
 /** How many skills one page of the list read asks for: under the hundred a long read has been cut at. */
@@ -468,7 +507,9 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
   const reread = async (row: Brief, name: string, base: string, held: string | undefined): Promise<{ trigger: string; version: number } | null> => {
     const seq = Number(row.spoken.slice(row.spoken.indexOf('#') + 1));
     if (!row.spoken.startsWith('skills#') || !Number.isInteger(seq)) return null;
-    const path = [held, skillPath(base, 'skill', name), skillPath(base, 'command', name)].find((p): p is string => typeof p === 'string' && existsSync(p));
+    const path = [held, skillPath(base, 'skill', name), skillPath(base, 'command', name)].find(
+      (p): p is string => typeof p === 'string' && existsSync(p) && !linked(p),
+    );
     if (path === undefined) return null;
     const described = describedAs(readFileSync(path, 'utf8'));
     if (described === undefined) return null;
@@ -484,11 +525,23 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
 
   /* The paths written inside the repository in this sync, which its exclude file is told about at the end. */
   const wrote: string[] = [];
-  const write = (path: string, text: string, spoken: string, rev: number) => {
-    if (s.dryRun) return;
-    writeText(path, text);
+  /** Whether a path in the repository reaches through a link, so the sync neither reads nor writes it. */
+  const linked = (path: string): boolean => s.top !== null && projectBase !== null && inside(path, projectBase) && !linkFree(s.top, path);
+  const unlinked = (path: string): boolean => {
+    if (!linked(path)) return true;
+    lines.push(`${nameAt(path)}: ${path} goes through a link in this repository, so the sync left it alone.`);
+    return false;
+  };
+  const write = (path: string, text: string, spoken: string, rev: number): boolean => {
+    if (s.dryRun) return true;
+    const repo = s.top !== null && projectBase !== null && inside(path, projectBase);
+    if (!writeText(path, text, repo ? s.top : null)) {
+      lines.push(`${nameAt(path)}: ${path} goes through a link in this repository, so the sync left it alone.`);
+      return false;
+    }
     lock[path] = { spoken, version: rev, sha256: sha256(text) };
-    if (projectBase !== null && inside(path, projectBase)) wrote.push(path);
+    if (repo) wrote.push(path);
+    return true;
   };
 
   /** Whether git already tracks this file of the repository: somebody committed it, so it is theirs and not the sync's. */
@@ -601,6 +654,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         if (again !== null) [trigger, row] = [again.trigger, { ...row, version: again.version }];
       }
 
+      if (locked !== undefined && !unlinked(locked[0])) continue;
       if (locked !== undefined && existsSync(locked[0])) {
         const [path, entry] = locked;
         const text = readFileSync(path, 'utf8');
@@ -618,7 +672,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           }
           const got = await fetchRow(row.spoken, name, trigger);
           if (got === null || !got.managed) continue;
-          write(path, got.text, row.spoken, rev);
+          if (!write(path, got.text, row.spoken, rev)) continue;
           tell(`Skill ${name} updated to version ${String(rev)} in ${where(path)}.`, `Skill ${name} would be updated to version ${String(rev)} in ${where(path)}.`);
           continue;
         }
@@ -659,6 +713,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         lines.push(`${row.spoken} was not written, because its name is not one a skill folder may have.`);
         continue;
       }
+      if (!unlinked(path)) continue;
       if (!existsSync(path)) {
         /* Tracked and not in the folder: the repository's own skill, taken out here on purpose or not yet checked out. */
         if (await tracked(path)) {
@@ -666,7 +721,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           if (!told) lines.push(`Skill ${name} was not written to ${path}, because git already tracks that file in this repository.`);
           continue;
         }
-        write(path, got.text, row.spoken, rev);
+        if (!write(path, got.text, row.spoken, rev)) continue;
         tell(`Skill ${name} written to ${where(path)}.`, `Skill ${name} would be written to ${where(path)}.`);
         continue;
       }
