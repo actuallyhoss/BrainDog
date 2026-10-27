@@ -2409,7 +2409,7 @@ function markHolder(kernel: Kernel, people: { register: string; self: string }, 
 
 /**
  * THE RECORD'S OWN STEP THAT MARKS ITS OWNER'S ROW, for a host holding a kernel and the address its owner signs in with
- * (the deploy, and `tools/understand-eval/run.mjs`): the step the nightly tick takes (`selfTick` in `createRecordApi`),
+ * (the deploy): the step the nightly tick takes (`selfTick` in `createRecordApi`),
  * on the address alone. The one person in People holding `signIn` is marked as the owner, as one decision with Undo.
  * Nothing is marked when People has no `self` part, somebody is marked already, the mark was made once before (an Undo
  * holds), nobody or several hold the address, the one who holds it was met only in mail or commits (`vouchedHolder`),
