@@ -2563,6 +2563,13 @@ function context(deps: FlowDeps, trigger: RunTrigger, subject: Entry | null): Re
   const turn = trigger.at === undefined ? NaN : Date.parse(trigger.at);
   if (Number.isFinite(turn)) out.day = dayIn(turn, deps.tz);
   if (subject) out.row = subject.fields;
+  /* A RUN BOUND TO A MOVED-DOWN MAKER'S LENS READS NO MORE THROUGH ITS TRIGGER than through its steps: an arrival is the
+     owner's inbox and a figure's value is read over the whole list, so both are withheld as `{{metric.*}}` is. */
+  if (deps.bounded !== undefined) {
+    if (trigger.value !== undefined) out.value = WITHHELD;
+    if (trigger.arrival) out.body = WITHHELD;
+    return out;
+  }
   if (trigger.arrival) {
     const raw = deps.sql.one<{ body: string | null; channel: string; headers: string | null }>('SELECT body, channel, headers FROM inbox_raw WHERE id = ?', trigger.arrival);
     let body: unknown = raw?.body ?? null;
