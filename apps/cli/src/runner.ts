@@ -54,7 +54,7 @@ import { createInterface } from 'node:readline/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
-import { JOB_MCP_PREFIX, MACHINE_NAME, SEAT_NAME, fillPrompt, jobBody, type ClaimedJob } from '@braindog/kernel';
+import { JOB_MCP_PREFIX, JOB_NO_REPO, JOB_REPO_SLOT, MACHINE_NAME, SEAT_NAME, fillPrompt, jobBody, type ClaimedJob } from '@braindog/kernel';
 import { refused, type Result } from '@braindog/ports';
 
 import { tomlString } from './clients/codex.ts';
@@ -111,6 +111,8 @@ export const CLAUDE_LEAST = [2, 1, 248] as const;
 const CLAIM_WAIT_S = 20;
 /** The most profiles one claim names, the record's own ceiling (`SEATS_MOST` in `@braindog/kernel`). */
 const SEATS_SENT_MOST = 32;
+/** The most folder names one claim says this machine maps, the record's own ceiling. */
+const REPOS_SENT_MOST = 64;
 const CLAIM_SLACK_MS = 10_000;
 /** The longest wait between claims when the host answers at once with nothing (a proxy that cannot hold twenty seconds). */
 const IDLE_MOST_MS = 30_000;
@@ -130,6 +132,17 @@ const RETRY_MS = 1_000;
  */
 const RENEW_TICK_MS = 5_000;
 const RENEW_AFTER_MS = 14_000;
+/**
+ * THE LONGEST ONE JOB RUNS ON THIS MACHINE, wall clock, unless `BRAINDOG_JOB_MINUTES` says another (1 to 600). A run
+ * past it is stopped and ends as one that ran out (`limit`): turns hold a run to its kind, and this holds one that
+ * waits on a tool that never answers. The record's own ceiling is a day.
+ */
+export const JOB_WALL_MS = 45 * 60_000;
+export const wallOf = (env: Env): number => {
+  const said = Number((env.BRAINDOG_JOB_MINUTES ?? '').trim());
+  return Number.isInteger(said) && said >= 1 && said <= 600 ? said * 60_000 : JOB_WALL_MS;
+};
+
 /** How long `claude --version` and `claude --help` may take, and the most of their output that is read. */
 const PROBE_MS = 15_000;
 const PROBE_CHARS_MOST = 256 * 1024;
@@ -569,15 +582,32 @@ const terminalAsk = async (question: string, signal: AbortSignal): Promise<boole
 const askerOf = (io: RunnerIo): ((question: string, signal: AbortSignal) => Promise<boolean>) | null =>
   io.ask === undefined ? (process.stdin.isTTY ? terminalAsk : null) : io.ask;
 
+/**
+ * The folder a job works in, by the name this machine maps: the kind's own, or the one the job names when its kind
+ * takes its folder as an argument (`%repo%`), `null` for an empty folder of its own. `undefined` when the job names a
+ * folder in a shape no map could hold, which refuses it.
+ */
+export function folderNameOf(job: Pick<ClaimedJob, 'repo' | 'args'>): string | null | undefined {
+  if (job.repo === null) return null;
+  const slot = JOB_REPO_SLOT.exec(job.repo)?.[1];
+  if (slot === undefined) return job.repo;
+  const named = Object.hasOwn(job.args, slot) ? (job.args[slot] ?? '') : '';
+  if (named === JOB_NO_REPO) return null;
+  return REPO_NAME.test(named) ? named : undefined;
+}
+
 /** A kind, said whole to the person about to allow it: where it works, what it may use, how it asks, and its prompt. */
 function describe(job: Pinned, folders: Record<string, string>, say: (line: string) => void): void {
   const mapped = job.repo !== null && Object.hasOwn(folders, job.repo) ? folders[job.repo] : undefined;
+  const names = Object.keys(folders).sort();
   const where =
     job.repo === null
       ? 'an empty folder of its own, removed when it ends'
-      : mapped === undefined
-        ? `${job.repo}, which names no folder on this machine yet`
-        : `${job.repo}, which is ${mapped} on this machine`;
+      : JOB_REPO_SLOT.test(job.repo)
+        ? `the folder each request names, one of those this machine maps (${names.length === 0 ? 'none yet' : names.join(', ')}), or an empty folder of its own when it names none`
+        : mapped === undefined
+          ? `${job.repo}, which names no folder on this machine yet`
+          : `${job.repo}, which is ${mapped} on this machine`;
   const codex = job.agent === 'codex';
   say(`${job.kind}, ${visible(job.title)}, has not run on this machine before.`);
   say(`  Runs on ${AGENT_NAME[job.agent]}, and works in ${where}.`);
@@ -1125,9 +1155,16 @@ export function seatsHere(home: string, env: Env): Map<string, string[]> {
  * under, by name and never by folder. A host that does not read them yet ignores them, and hands over only jobs placed
  * nowhere, as before.
  */
-export function claimArgs(home: string, env: Env, host: string): { wait: number; host?: string; seats: string[] } {
+export function claimArgs(home: string, env: Env, host: string): { wait: number; host?: string; seats: string[]; repos: string[] } {
   const seats = [...seatsHere(home, env).keys()].sort().slice(0, SEATS_SENT_MOST);
-  return { wait: CLAIM_WAIT_S, ...(MACHINE_NAME.test(host) ? { host } : {}), seats };
+  /* AND THE FOLDERS IT MAPS, BY NAME AND NEVER BY PATH, so the app can offer them for a request sent here. */
+  let repos: string[] = [];
+  try {
+    repos = Object.keys(readRunnerFile(runnerFile(home)).repos).sort().slice(0, REPOS_SENT_MOST);
+  } catch {
+    repos = [];
+  }
+  return { wait: CLAIM_WAIT_S, ...(MACHINE_NAME.test(host) ? { host } : {}), seats, repos };
 }
 
 /**
@@ -1179,16 +1216,18 @@ function refusalOf(job: ClaimedJob, file: RunnerFile, agents: Agents): string | 
   if (fault !== null) return `${fault.fix} So it was not run on this machine.`;
   if (Object.values(job.args).some((v) => v.length > ARG_MOST || /[\p{Cc}]/u.test(v)))
     return `An argument was longer than ${ARG_MOST} characters or more than one line, which no kind allows, so it was not run.`;
-  if (job.repo !== null) {
-    const folder = Object.hasOwn(file.repos, job.repo) ? file.repos[job.repo] : undefined;
-    if (folder === undefined) return `This machine has no folder called ${job.repo}. Map one with braindog runner repos add ${job.repo} <folder>, then start the job again.`;
+  const named = folderNameOf(job);
+  if (named === undefined) return 'The job named its folder in a shape no folder on this machine could have, so it was not run.';
+  if (named !== null) {
+    const folder = Object.hasOwn(file.repos, named) ? file.repos[named] : undefined;
+    if (folder === undefined) return `This machine has no folder called ${named}. Map one with braindog runner repos add ${named} <folder>, then start the job again.`;
     let there = false;
     try {
       there = statSync(folder).isDirectory();
     } catch {
       there = false;
     }
-    if (!there) return `${job.repo} is mapped to ${folder} on this machine, and that folder is gone. Map it again, then start the job again.`;
+    if (!there) return `${named} is mapped to ${folder} on this machine, and that folder is gone. Map it again, then start the job again.`;
   }
   if (job.agent === 'claude' && !knowsMode(runs.help, job.permission))
     return `Claude Code ${runs.version} on this machine does not know the permission mode ${job.permission}, so it was not run. Update Claude Code, then start the job again.`;
@@ -1280,7 +1319,8 @@ async function runJob(to: RunnerTarget, claim: Claim, agents: Agents, io: Runner
     }
 
     /* THE FOLDER: the one this machine mapped the kind's repository to, or an empty one of its own. */
-    const folder = job.repo === null ? (temp = mkdtempSync(join(tmpdir(), 'braindog-job-'))) : (held.repos[job.repo] ?? '');
+    const named = folderNameOf(job) ?? null;
+    const folder = named === null ? (temp = mkdtempSync(join(tmpdir(), 'braindog-job-'))) : (held.repos[named] ?? '');
     const codex = job.agent === 'codex';
     const name = AGENT_NAME[job.agent];
     /* THE RUN SAYS ITS MACHINE AND ITS PROFILE, BY NAME, as a session's bridge does, so the record shows where it ran. */
@@ -1288,6 +1328,9 @@ async function runJob(to: RunnerTarget, claim: Claim, agents: Agents, io: Runner
     const where = {
       ...(MACHINE_NAME.test(machine) ? { 'x-braindog-host': machine } : {}),
       ...(under.seat !== null && SEAT_NAME.test(under.seat) ? { 'x-braindog-profile': under.seat } : {}),
+      /* AND THE FOLDER IT WORKS IN, BY NAME, so its run says where it was, as a session's does. */
+      ...(named !== null && REPO_NAME.test(named) ? { 'x-braindog-repo': named } : {}),
+      ...(codex ? {} : { 'x-braindog-agent': 'claude' }),
     };
     /* THE MACHINE'S LOGIN STAYS OUT OF THE RUN. The job reaches the record with its own bearer and nothing else. */
     const env: Env = under.env;
@@ -1327,7 +1370,7 @@ async function runJob(to: RunnerTarget, claim: Claim, agents: Agents, io: Runner
     const plan = planCommand(job.agent, flags, env, { platform, isFile: aFile });
     if (typeof plan === 'string') return await refuse(`${name} could not be started safely on this machine, so it was not run.`);
 
-    io.say(`Running ${job.kind}, ${visible(job.title)}, in ${job.repo === null ? 'an empty folder' : `${job.repo} (${folder})`}${job.seat === null ? '' : `, as ${job.seat}`}.`);
+    io.say(`Running ${job.kind}, ${visible(job.title)}, in ${named === null ? 'an empty folder' : `${named} (${folder})`}${job.seat === null ? '' : `, as ${job.seat}`}.`);
     const s = freshStream();
     let stderr = '';
     let child: ChildProcess;
@@ -1339,6 +1382,13 @@ async function runJob(to: RunnerTarget, claim: Claim, agents: Agents, io: Runner
     const onHalt = () => stopChild(child, platform);
     if (report.halt.aborted) onHalt();
     else report.halt.addEventListener('abort', onHalt, { once: true });
+    /* THE WALL CLOCK: a run past `wallOf` is stopped, and ends as one that ran out. */
+    const wall = wallOf(io.env);
+    let late = false;
+    const clock = setTimeout(() => {
+      late = true;
+      stopChild(child, platform);
+    }, wall);
 
     const closed = new Promise<{ code: number | null; failed: boolean }>((done) => {
       child.on('error', () => done({ code: null, failed: true }));
@@ -1361,6 +1411,7 @@ async function runJob(to: RunnerTarget, claim: Claim, agents: Agents, io: Runner
       }
     });
     const exit = await closed;
+    clearTimeout(clock);
     report.halt.removeEventListener('abort', onHalt);
 
     const why = report.why();
@@ -1383,6 +1434,11 @@ async function runJob(to: RunnerTarget, claim: Claim, agents: Agents, io: Runner
 
     if (why === 'cancelled') return await finish({ status: 'cancelled', ...kept, ...session, ...turns, ...cost, ...ms });
     if (why === 'stopped') return await finish({ status: 'interrupted', ...kept, ...session, ...turns, ...cost, ...ms });
+    if (late && (r === null || r.subtype !== 'success')) {
+      const error = `It ran past ${String(Math.round(wall / 60_000))} minutes on this machine, so it was stopped.`;
+      report.post('limit', { turns: r !== null && isCount(r.num_turns) ? r.num_turns : job.turns, text: error });
+      return await finish({ status: 'limit', error, ...kept, ...session, ...turns, ...cost, ...ms });
+    }
     if (r !== null && r.subtype === 'success' && r.is_error !== true)
       return await finish({ status: s.filed.length > 0 ? 'needs_decision' : 'ok', ...kept, ...session, ...turns, ...cost, ...ms });
     if (r !== null && r.subtype === 'error_max_turns') {
