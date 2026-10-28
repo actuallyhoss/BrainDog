@@ -837,6 +837,10 @@ RETURNING n, until`;
 
 /** How long a fact a read is written from is held while the record's version stands (`heldFor`): 30 s, plan §4.1. */
 const HELD_MS = 30_000;
+/** How old a Today drawn before may be and still be answered first, marked `behind`, while it is drawn again (`today`). */
+const TODAY_BEHIND_MS = 1_800_000;
+/** The most Todays held at once, one for each body and reader; past it the oldest goes. */
+const TODAY_KEPT_MOST = 8;
 /** The most field names one `list` may ask for (`fields`). */
 const LIST_FIELDS_MOST = 64;
 
@@ -10622,6 +10626,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** The methods `today` asks for each tile's part (`today.ts`); set once `api` and its wrappers are. */
   let todayAsks: TodayAsks | null = null;
+
+  /**
+   * TODAY AS IT WAS LAST DRAWN, BY WHO ASKED AND WHAT BODY (`today`). On a lived-in record Today's body is the slowest
+   * read there is, and an agent's write lands every few minutes, so a version-held answer was almost never there when a
+   * person opened the app: every cold open waited for the whole body. A first read of a screen is now answered what was
+   * drawn last, marked `behind` when the record has moved since or it is older than `HELD_MS`, and the app asks again
+   * at once with `fresh`, which is always drawn now. Held in this object's memory only, never stored, for the same day
+   * where the record is and at most `TODAY_BEHIND_MS`, so a stale body is never older than that.
+   */
+  const todayKept = new Map<string, { version: string; at: number; day: string; value: TodayAnswer }>();
+  /** A drawing of Today out now, by the same key, so an ask that must be fresh waits for it rather than drawing twice. */
+  const todayOut = new Map<string, Promise<Result<TodayAnswer>>>();
   /** The methods a project's page asks for its shape (`project-shape.ts`); set once `api` and its wrappers are. */
   let shapeAsks: ShapeAsks | null = null;
   /** `page` as it reads one address, for its read by a row's spoken id to ask again (`page` below); set once `api` is. */
@@ -11987,13 +12003,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
-      const extra = stray(said, ['body']);
+      const extra = stray(said, ['body', 'fresh']);
       if (extra) return { ok: false as const, refusal: extra };
       const body = said.body;
       if (body === null || typeof body !== 'object' || Array.isArray(body))
         return no('REQUIRED_MISSING', "body is Today's body, a page declaration's body as braindog:grammar/page says.", { at: 'body' });
+      if (said.fresh !== undefined && typeof said.fresh !== 'boolean') return no('VALUE_MALFORMED', 'fresh is true to have Today drawn now, never as it was last drawn.', { at: 'fresh' });
       if (todayAsks === null) return no('NOT_IN_THIS_BUILD', 'Today is not answered by this record yet.');
-      return todayOf(todayAsks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx);
+      const asks = todayAsks;
+      const draw = () => todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), ctx);
+      /* HELD ONLY FOR THE OWNER, who opens Today the most and whose answer nobody else is handed; anybody else is drawn now. */
+      if (allows(ctx, 'owner') !== null) return draw();
+      const { batch: _batch, provedAt: _proved, ...caller } = ctx;
+      const key = JSON.stringify([caller, body]);
+      const now = clock.now();
+      const day = localDays(readableZone(kernel.identity()?.tz))(now);
+      const version = stamp();
+      const kept = todayKept.get(key);
+      const usable = kept !== undefined && kept.day === day && kept.at <= now && now - kept.at < TODAY_BEHIND_MS;
+      if (usable && kept.version === version && now - kept.at < HELD_MS) return ok(structuredClone(kept.value));
+      if (usable && said.fresh !== true) return ok({ ...structuredClone(kept.value), behind: true });
+      const out = todayOut.get(key);
+      if (out !== undefined) return out.then((r) => (r.ok ? ok(structuredClone(r.value)) : r));
+      const drawing = draw().then((r) => {
+        if (r.ok) {
+          todayKept.delete(key);
+          todayKept.set(key, { version, at: now, day, value: structuredClone(r.value) });
+          if (todayKept.size > TODAY_KEPT_MOST) todayKept.delete(todayKept.keys().next().value as string);
+        }
+        return r;
+      });
+      todayOut.set(key, drawing);
+      try {
+        return await drawing;
+      } finally {
+        if (todayOut.get(key) === drawing) todayOut.delete(key);
+      }
     },
 
     /** One figure, by the id a `stat` cell names. */

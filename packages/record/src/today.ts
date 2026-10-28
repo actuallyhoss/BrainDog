@@ -104,7 +104,14 @@ export type TodayCards = {
 };
 
 /** What `today` answers: the page as `previewPage` draws it, and each tile's part, or `null` where that part was refused. */
-export type TodayAnswer = { page: unknown; handled: unknown; shared: unknown; cards: TodayCards | null };
+export type TodayAnswer = {
+  page: unknown;
+  handled: unknown;
+  shared: unknown;
+  cards: TodayCards | null;
+  /** Set when this is Today as it was last drawn and the record may have moved since: ask again with `fresh`. */
+  behind?: true;
+};
 
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);
 const asking = <A>(ask: Ask, args: A, ctx: unknown): Promise<Result<unknown> | null> => ask(args as never, ctx as never).catch(() => null);
