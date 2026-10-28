@@ -57,6 +57,9 @@ export const SAMPLE_OF = {
     was: [{ ...fill('[register]', 'obligations'), ...fill('[seq]', '1') }],
   },
   'web:/settings/[area]': { fixed: [...AREAS.keys()].map((area) => fill('[area]', area)) },
+  /* AN OPTIONAL SEGMENT LEFT EMPTY IS THE ROUTE WITHOUT IT: `/agents/summary` is every summary the record sends, which
+     is the page a summary's own address draws one tile of. */
+  'web:/agents/summary/[[id]]': { fixed: [fill('[[id]]', '')] },
   'site:/packs/[id]': { fixed: [fill('[id]', 'bank-hsbc-eg')] },
   'site:/legal/[name]': { fixed: [fill('[name]', 'terms')] },
   'site:/docs/[section]/[slug]': { fixed: [{ ...fill('[section]', 'start'), ...fill('[slug]', 'welcome') }] },
@@ -173,7 +176,10 @@ export async function routesFor(appRoot, record = null, { every = false, extra =
         unsampled.push(`${pattern} has no sample for ${missing}`);
         break;
       }
-      const address = `/${segments.map((s) => (s.startsWith('[') ? encodeURIComponent(f[s]) : s)).join('/')}`;
+      const address = `/${segments
+        .map((s) => (s.startsWith('[') ? encodeURIComponent(f[s]) : s))
+        .filter((s, i) => s !== '' || !segments[i].startsWith('[['))
+        .join('/')}`;
       routes.add(address);
       if (nothing) unseen.push(address);
       if (nothing || entry.missing === true) notFound.push(address);
