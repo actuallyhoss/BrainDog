@@ -148,7 +148,7 @@ export const account = {
      for any of them to say: five greyed segments, two hints about the greying, and a red erasure
      aimed at the reader. This sentence and the invitation below it are what is left, and everything
      else comes back the day there is somebody to compare with. */
-  onlyPerson: 'You are the only person on this record.',
+  onlyPerson: 'Only you, for now.',
   levelFor: (name: string) => `What ${name} can do`,
   /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
      the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
@@ -175,7 +175,7 @@ export const account = {
      refused is doing it to yourself, alone, from the screen you would then be locked out of. */
   ownLevel: 'You cannot change your own level here. Another owner can.',
   inviteTitle: 'Invite somebody',
-  inviteHow: 'The link is single-use, good for 24 hours, and bound to the one address you send it to.',
+  inviteHow: 'One use, one address, good for 24 hours.',
   invitePerson: 'Invite a person',
   erasePerson: 'Erase a person',
   eraseWhat: 'Everything one person wrote, removed from sixteen places in one go. It cannot be undone.',
@@ -377,23 +377,23 @@ export const account = {
   staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
 
   /* notifications: `09` specifies the mechanism and one setting, the quiet hours, so the rest of this reports */
-  whenWeInterrupt: 'When BrainDog interrupts you',
+  whenWeInterrupt: 'Interruptions',
   /* QUIET HOURS ARE THE RECORD'S AND AN OWNER SETS THEM (`09 §5` rule 3). One sentence with the two times in it
      and a switch beside it; a member reads the same sentence with no control. A summary due inside them waits for
      their end, and an urgent notice never does. */
   quietHours: 'Quiet hours',
   quietHold: 'Hold notices from',
   quietUntil: 'to',
-  quietWhy: 'Anything not urgent waits until they end, in this record’s time zone. Urgent notices still reach you.',
+  quietWhy: 'Urgent notices still come through.',
   quietHeld: (from: string, to: string) => `Notices are held from ${from} to ${to}.`,
-  quietOff: 'Off. Your summary goes when it is due, day or night.',
-  quietOwner: 'Only an owner can change these.',
+  quietOff: 'Off',
+  quietOwner: 'Only an owner can change them.',
   quietDefault: 'Put back 21:00 to 08:00',
 
   /* notifications on this device: Web Push, drawn only where the host has a key.
      THE LINE NEVER SAYS WHAT HAPPENED, because a push passes through a push service nobody here runs (`09 §3`). */
   pushTitle: 'Notifications on this device',
-  pushHow: 'When something in this record interrupts you, this device shows one line, and pressing it opens BrainDog. The line never says what happened: the record tells you once it is open.',
+  pushHow: 'One line that opens BrainDog, never what happened.',
   pushTurnOn: 'Turn on for this device',
   pushTurnOff: 'Turn off for this device',
   pushAsking: 'Asking the browser',
@@ -459,15 +459,15 @@ export const account = {
   /* THE RECORD'S NAME, NOT ITS SLUG (UI pass 20 Oct, agents F15 Δ): names, never ids; compared without case. */
   typeSlug: (name: string) => `Type ${name} to confirm`,
 
-  keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
-  keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
+  keptCloud: (n: number) => `Every night. The ${n} newest are kept, plus the latest.`,
+  keptSelfHost: (n: number) => `Every night, on this machine. The ${n} newest are kept.`,
   snapshotFailed: 'Nothing kept',
   /* A COPY OF NOTHING SAYS SO, rather than "0 B": render's `bytes(0)` is pinned, so the line is chosen here. */
   snapshotEmpty: 'Empty',
   download: 'Download',
   rowsAndSize: (rows: number, size: string) => `${rows === 1 ? '1 item' : `${rows.toLocaleString('en')} items`} · ${size}`,
   snapshotNow: 'Back up now',
-  theKey: 'The key',
+  theKey: 'Backup key',
   /* `49 §8` asks for exactly this line. */
   /**
    * IT TOLD SOMEBODY TO BACK UP A KEY IT WOULD NOT SHOW THEM.
@@ -481,12 +481,11 @@ export const account = {
    * than anything this screen could print. `12 §8` keeps the age identity outside the product on
    * purpose, so the fix is not to reveal it here; it is to say where it lives.
    */
-  theKeyIs:
-    'These copies are locked with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
+  theKeyIs: 'Locked with a key kept outside BrainDog, which cannot show it to you.',
   /* NAMED BY ITS FILE ON A SELF-HOST: it began "If you run BrainDog yourself", said only to the
      person who does. `kek` in the data folder is where `braindog init` writes it (`apps/selfhost/src/main.ts`). */
-  theKeyWhere: "The key is the file named kek in BrainDog's data folder, made at set-up. Keep a copy somewhere else, or these copies cannot be opened.",
-  restore: 'Going back',
+  theKeyWhere: 'It is the file named kek in the data folder. Keep a copy somewhere else.',
+  restore: 'Restore',
   /**
    * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.
    *
@@ -502,7 +501,7 @@ export const account = {
    */
   restoreNotHere: `Going back to an earlier copy is asked for rather than pressed: write to ${SUPPORT_EMAIL} and say which day.`,
   /* AND ON A SELF-HOST, HOW: the copy and the going back are two commands on the machine it runs on. */
-  restoreSelfHost: 'On the machine BrainDog runs on, braindog backup <folder> keeps a copy of all of it, and braindog restore <folder> puts that copy back.',
+  restoreSelfHost: 'On this machine, braindog backup <folder> saves a copy and braindog restore <folder> puts it back.',
 
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
   billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
@@ -663,10 +662,10 @@ export const account = {
   inviteMaking: 'Making a link',
   /* Same words as `TEAMS_HELD_SAID` in the record's directory; a test holds them equal. */
   inviteHeld: 'Inviting colleagues opens soon. Nobody else can join this record yet.',
-  inviteNoMail: 'No email is sent. Copy the link and send it to them yourself.',
-  inviteLinkReady: (email: string) => `This link is for ${email}. It is shown once, so copy it now.`,
+  inviteNoMail: 'No email is sent; you pass the link on.',
+  inviteLinkReady: (email: string) => `For ${email}. Shown once, so copy it now.`,
   inviteCopyLink: 'Copy link',
-  inviteAddsOnlyNext: 'You add to this record through an agent of your own. Make its key next, then give it to your agent.',
+  inviteAddsOnlyNext: 'You add through your own agent. Make its key next.',
   inviteMakeAgentKey: "Make your agent's key",
   inviteLinkLabel: 'the invitation link',
   inviteDone: 'Done',
@@ -683,10 +682,10 @@ export const account = {
   inviteAccepting: 'Joining',
   inviteJoined: (record: string | null) => (record ? `You're in ${record}` : "You're in"),
   inviteKeepWay: 'Add a passkey now, so you can sign in again on this device.',
-  inviteNoLink: 'This page needs an invitation link',
+  inviteNoLink: 'Open your invitation link',
   inviteChecking: 'Checking the link',
   inviteFailed: 'That did not work. Open the link again, or ask for a new one.',
-  inviteAskNew: 'Open the link in your invitation email. If it does not work, ask whoever sent it for a new one.',
+  inviteAskNew: 'Not working? Ask the sender for a new one.',
   /* Under a link the host refused: the link was opened, so only a new one helps. */
   inviteAskAgain: 'Ask whoever sent it for a new link.',
   inviteSignInFirst: 'Sign in',
@@ -694,7 +693,7 @@ export const account = {
   inviteNameLabel: 'Your name',
   inviteOptional: 'Optional',
   inviteCheckMail: 'Check your email',
-  inviteMailSent: (email: string) => `A link to finish accepting is on its way to ${email}. Open it to prove the address is yours. It works once, within a day.`,
+  inviteMailSent: (email: string) => `We sent a link to ${email}. Open it within a day to finish.`,
   inviteFromMail: 'You opened the link from your email. Join to finish.',
   /* A key taken out of service from the Keychain screen: the bytes go, its line on the screen stays. */
   keyRevoked: (label: string) => label + ' is out of service. It stays listed, because what it opened is a fact.',
@@ -797,7 +796,7 @@ export const account = {
   inviteWholeRecord: 'The whole record',
   inviteChosenLists: 'Only some of it',
   inviteListNothing: 'Nothing',
-  inviteListsHint: 'Give each part they need a level. A part left at Nothing stays closed to them.',
+  inviteListsHint: 'A part left at Nothing stays closed.',
   inviteAddsOnlyLeavesOut:
     'Adds only on the whole record leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
   inviteNewLink: 'New link',

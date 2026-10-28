@@ -17,7 +17,6 @@
   import Button from '$lib/ui/Button.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import PushToggle from '$lib/ui/PushToggle.svelte';
-  import IconWell from '$lib/ui/IconWell.svelte';
   import { ownsRecord } from '../../levels.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
@@ -32,13 +31,13 @@
     notHereYet: 'Not on this record yet',
     urgentAre: 'Keys about to expire, runs held back, and anything a rule marks urgent.',
     tellers: 'Rules that tell you',
-    tellersWhere: 'Each rule turns its notices off for you on its own page, in Automations',
-    openRules: 'Open Automations',
+    tellersWhere: 'Mute each one on its own page',
+    openRules: 'Automations',
     /* WHAT INTERRUPTS, AS ONE SENTENCE (agents F20): three rows that looked like settings and changed nothing were three
        facts, so they are said once, as the facts they are. */
-    interrupts: 'Only urgent things interrupt you, at most once an hour: keys about to expire, runs held back, and anything a rule marks urgent. The rest waits for your summary.',
+    interrupts: 'Urgent only, at most hourly: expiring keys, held runs, urgent rules.',
     mac: 'Mac notifications',
-    macLine: 'A new question or handoff rings once, and not while this window is in front.',
+    macLine: 'New questions and handoffs, once each',
   } as const;
 
   /**
@@ -169,7 +168,6 @@
   {:else if quiet !== null}
     {#if owner}
       <div class="quiet">
-        <IconWell name="moon" />
         <p class="quiet-said" id="quiet-said">
           {#if on}
             <label class="quiet-word" for="quiet-from">{copy.quietHold}</label>
@@ -247,7 +245,7 @@
      lands where the switches of the other areas land. */
   .quiet {
     display: grid;
-    grid-template-columns: var(--well) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     column-gap: var(--sp-3);
     min-block-size: var(--row-h-2);
@@ -333,10 +331,6 @@
   }
 
   /* WHAT FOLLOWS THE ROW STARTS WHERE ITS SENTENCE STARTS. */
-  .quiet-after {
-    padding-inline-start: calc(var(--well) + var(--sp-3));
-  }
-
   .quiet-refused {
     margin: 0 0 var(--sp-2);
     color: var(--ink-2);

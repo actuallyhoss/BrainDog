@@ -37,10 +37,8 @@
    */
   const words = {
     /* THE REWRITES OF THE UI PASS OF 20 OCTOBER (agents F27): what a person can do, not what a deployment lacks. */
-    keyOutside: 'Kept outside BrainDog',
-    askForIt: 'Going back to a copy',
     /* NEEDS YOU, AS THE BAR CALLS IT: the page said Decide, a name nothing else on screen uses. */
-    missedLine: 'Run it now from Needs you, or let tonight try again.',
+    missedLine: 'Tries again tonight.',
     answer: 'Answer it',
     /* THE NIGHT'S COPY AND HIS EXPORTS, AS ROWS: a host whose copies a browser cannot list
        still copies the record each night, and the exports he took are his backups too. "No backups here yet" stood
@@ -475,7 +473,7 @@
          purpose, so the fix is not to print it here; it is to say where it already is. -->
     <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
          both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
-    <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere} />
+    <p class="hint">{shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere}</p>
   </div>
 </Tile>
 
@@ -507,7 +505,7 @@
     <!-- EACH GOING BACK SAYS HOW: on the Cloud by writing to us, on a self-host by the command on
          its machine, and over a list with no copy yet, what Restore this will do once there is one. -->
     {#if copiesFrom === 'refused'}
-      <StateRow icon="history" title={words.askForIt} line={shell.host === 'cloud' ? copy.restoreNotHere : copy.restoreSelfHost} />
+      <p class="hint">{shell.host === 'cloud' ? copy.restoreNotHere : copy.restoreSelfHost}</p>
     {:else if copiesFrom === 'live'}
       <p class="hint">{copyLines.length > 0 ? copy.restoreLive : copy.restoreFirst}</p>
     {/if}

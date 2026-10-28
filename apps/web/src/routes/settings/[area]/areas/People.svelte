@@ -449,10 +449,6 @@
   const colleagues = $derived(people.filter((p) => !self(p)));
   const tileWords = {
     title: 'Colleagues',
-    none: 'none yet',
-    /* THE BOARD'S SENTENCE, SAID TO AN OWNER, who is the one who can act on it: every change a colleague makes is
-       signed with their name, which is what makes asking somebody in safe. */
-    invite: 'Invite someone, and every change they make carries their name.',
   };
 </script>
 
@@ -491,8 +487,8 @@
   </Tile>
 {:else if alone}
   <!-- ONE PERSON IS THE TILE'S SENTENCE AND NOTHING ELSE: there is nobody to list and nobody to compare. -->
-  <Tile icon="users" title={tileWords.title} count={tileWords.none}>
-    <p class="reading">{copy.onlyPerson}{#if anOwner}{' '}{tileWords.invite}{/if}</p>
+  <Tile icon="users" title={tileWords.title}>
+    <p class="reading">{copy.onlyPerson}</p>
   </Tile>
 {:else}
   <Tile icon="users" title={tileWords.title} count={colleagues.length}>
@@ -778,10 +774,9 @@
 {:else if anOwner}
 <Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle}>
   <div class="section-body">
-    <p class="hint">{copy.inviteHow}</p>
-    <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:
-         the owner sends the link themselves, and somebody expecting an email would wait for one that never comes. -->
-    <p class="hint">{copy.inviteNoMail}</p>
+    <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
+         the link themselves, and somebody expecting an email would wait for one that never comes. -->
+    <p class="hint">{copy.inviteHow} {copy.inviteNoMail}</p>
     <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
          row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
     <form class="code-form invite-form" onsubmit={makeInvite}>

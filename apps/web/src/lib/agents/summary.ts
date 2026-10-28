@@ -14,7 +14,7 @@ export const summaryWords = {
   all: 'Summaries',
   nothing: 'Nothing to send now.',
   none: 'No summaries yet.',
-  offer: 'Agent notes sends one at 08:00 and 17:00.',
+  offer: 'Two a day, at 08:00 and 17:00, from Agent notes.',
   getIt: 'Get Agent notes',
   /* WHAT THE STORE IS SEARCHED FOR, the add-on's name as a person would type it, so the button lands on whichever
      add-on goes by it today and the web holds no add-on's id. */
@@ -22,7 +22,7 @@ export const summaryWords = {
   open: 'Open',
   decide: 'Open Decide',
   upNext: 'Open Agents',
-  sentAt: 'Sent here and to your phone, held through quiet hours.',
+  sentAt: 'Held through quiet hours.',
   more: (n: number) => `and ${n} more`,
 } as const;
 
