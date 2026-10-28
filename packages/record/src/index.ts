@@ -10127,18 +10127,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * THE RED SIGNS NOW, AS THE ALARM KEPT THEM (`keptNow`, W1-D): what `lintTick` read on the record's last alarm, while
-   * that is under a quarter of an hour old. Older or never kept, they are read here and held as every briefing fact is
-   * (`heldFor`), never written: a briefing writes nothing. A record that cannot read its signs briefs none.
+   * that is under a quarter of an hour old. Older or never kept, they are read here and held in this object's memory
+   * under the same quarter of an hour, never written: a briefing writes nothing. They were held by the version, and
+   * every agent's start moves it, so on a record whose alarm had not kept them every start read every sign again.
+   * A record that cannot read its signs briefs none.
    */
-  const signsRead = new Map<string, Held<KeptSign[]>>();
+  let signsRead: ReturnType<typeof keptSigns> | null = null;
   const signsKept = (): KeptSign[] => {
     const now = clock.now();
-    const kept = keptNow(kernel.prefsOf(LINT_HOLDER)[SIGNS_KEPT], now);
+    const kept = keptNow(kernel.prefsOf(LINT_HOLDER)[SIGNS_KEPT], now) ?? keptNow(signsRead, now);
     if (kept !== null) return kept;
-    return heldFor(signsRead, '', () => {
-      const read = kernel.signs();
-      return read.ok ? keptSigns(read.value.signs, now).red : [];
-    });
+    const read = kernel.signs();
+    if (!read.ok) return [];
+    signsRead = keptSigns(read.value.signs, now);
+    return signsRead.red;
   };
 
   /** The alarm keeps the red signs (`signsKept`). One that cannot be read keeps nothing, and the briefing reads them itself. */
