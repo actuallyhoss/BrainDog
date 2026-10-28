@@ -346,6 +346,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       },
       'goto-nav': { route: '/inbox', press: ['g', '1'] },
       help: { route: '/', press: ['?'] },
+      sidebar: { route: '/', press: ['['] },
 
       /* TODAY, the declared page `/` opens on, drawn by PageView in home mode (`lib/page/PageBody.svelte` `homeKey`). The
          cursor starts on nothing, so `j` alone is the move; `k` is pressed from the second row, since on the first it
