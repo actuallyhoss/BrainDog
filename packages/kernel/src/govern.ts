@@ -390,6 +390,12 @@ export function apartOn(sql: Sql): boolean {
 /** A question one of the record's people asked rather than an agent, a rule or Slash: never on the shelf. */
 const PERSON_ID = /^p_/u;
 
+/**
+ * A question an arrival asked (`ingest:<door>`): never on the shelf either. It is about money or a person that came in
+ * from outside and did not read cleanly, which is his to look at; a doubtful one waits in To review.
+ */
+const ARRIVAL = /^ingest:/u;
+
 /** A folder or a service asked about as a project ("A run worked in kiln. Is that Kiln?"), asked once a place. */
 const PLACE_KEY = /^(run|service)-project:/u;
 
@@ -406,7 +412,7 @@ export function apartOf(
   withheld: ReturnType<typeof costRows>,
   readers: Map<string, KindReader>,
 ): boolean {
-  if (PERSON_ID.test(q.opened_by)) return false;
+  if (PERSON_ID.test(q.opened_by) || ARRIVAL.test(q.opened_by)) return false;
   const body = isMap(q.body) ? q.body : typeof q.body === 'string' ? parse(q.body) : null;
   if (body === null) return false;
   /* A DOUBTFUL ARRIVAL WAITS IN TO REVIEW, which is its own place and not this shelf. */
