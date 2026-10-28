@@ -25,15 +25,15 @@
 
   const words = {
     nav: 'Navigation',
-    navLine: 'Where your pages live on a laptop.',
+    navLine: 'On a laptop',
     bar: 'Top bar',
     menu: 'One button',
     phone: 'Phone bar',
-    phoneLine: (most: number) => `Today, then up to ${most} pages you pick.`,
+    phoneLine: (most: number) => `Today, then up to ${most} more`,
     usual: 'Back to the usual',
-    full: (most: number) => `The phone bar holds ${most} besides Today. Take one off first.`,
+    full: (most: number) => `Only ${most} besides Today. Take one off first.`,
     words: 'Words',
-    wordsLine: 'What your lists are called, and your currency',
+    wordsLine: 'List names, currency',
   };
 
   /* TODAY, THEN THREE: the shell draws `tabsOf(places, 4, tabs)`, Today and three more, then Menu. */

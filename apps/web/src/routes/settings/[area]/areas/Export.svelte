@@ -95,14 +95,14 @@
    */
   const words = {
     oneFile: 'Everything, in one file',
-    checkLine: 'Checked in this browser against its own fingerprint. The file is sent nowhere.',
+    checkLine: 'Checked in this browser. Sent nowhere.',
     checkGo: 'Check a file',
     wayTitle: 'The way you work',
-    wayLine: (things: string) => `How ${things} are set up, with your pages, figures and rules, and nothing you wrote in them.`,
+    wayLine: (things: string) => `How ${things} are set up, without their entries.`,
     rowsTitle: 'What you wrote',
-    rowsLine: (things: string) => `Everything you have written in ${things}, without the pages around it.`,
-    setupTitle: 'A starter somebody else can install',
-    setupLine: 'Published as an add-on, with what you wrote left out.',
+    rowsLine: (things: string) => `Your entries in ${things}, without the pages.`,
+    setupTitle: 'A starter for someone else',
+    setupLine: 'An add-on without your entries.',
     /** What the record keeps, when it keeps nothing it can name yet. */
     yourThings: 'your things',
   };

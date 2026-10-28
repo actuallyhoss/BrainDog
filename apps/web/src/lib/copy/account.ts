@@ -20,7 +20,7 @@ export const account = {
   perPerson: 'Kept for you on this record, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
 
-  sourcesAdd: 'A new source comes with an add-on, or is set up by an agent you connect.',
+  sourcesAdd: 'Sources come with add-ons or agents.',
   sourcesAddGo: 'Browse add-ons',
 
   /**
@@ -61,8 +61,7 @@ export const account = {
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
      the two disagreeing about what the record is called. */
   /* "THIS RECORD", NEVER ITS NAME, IN THE TITLE: a record named after its owner read "Delete Marta". */
-  deleteWhat: (record: string): string =>
-    `Deleting the record named ${record} removes every list and page, and everything they hold. It cannot be undone.`,
+  deleteWhat: (record: string): string => `Deletes every list and page in ${record}, and all they hold. It cannot be undone.`,
   deleteRecord: 'Delete this record',
   holdingPen: 'Not placed. Nothing moved.',
 
@@ -90,8 +89,7 @@ export const account = {
      from nowhere. So a reader deciding whether to turn this off was told it affected one list, and
      what it actually takes is the help sheet, the palette shortcut and every goto. The sentence a
      person needs before pressing Off is what stops working and what does not. */
-  characterKeysHint:
-    'Off silences every shortcut that is a single letter, digit or punctuation mark, including ? for this list, / for the search and g to go somewhere. Shortcuts that use Ctrl or Alt keep working.',
+  characterKeysHint: 'Off silences one-key shortcuts like ?, / and g. Ctrl and Alt ones keep working.',
 
   /* the record's own colour */
 
@@ -182,7 +180,7 @@ export const account = {
 
   /* recovery — the way back in */
   passkeys: 'Passkeys',
-  passkeyHow: 'A passkey is how you get back in. Keep more than one, on more than one device.',
+  passkeyHow: 'Keep more than one, on more than one device.',
   noPasskeys: 'No passkey yet',
   /**
    * `13 §5.2`: be specific about what will be here. On this screen that sentence is the stakes —
@@ -205,7 +203,7 @@ export const account = {
   addPasskey: 'Add a passkey',
   addedWhen: (ago: string) => `added ${ago}`,
   remove: 'Remove',
-  lastPasskey: 'This is your only passkey, so it cannot be removed. Add a second one first.',
+  lastPasskey: 'Your only passkey. Add another before removing it.',
   /* A passkey the host holds with no name, which is every one this browser adds. */
   passkeyUnnamed: 'Passkey',
   passkeysUnread: 'Your passkeys could not be read just now.',
@@ -213,22 +211,21 @@ export const account = {
   magicLink: 'If you lose them all',
   /* `49 §5.6`. It is the ONLY other way in — there are no recovery codes anywhere in this product,
      and saying so is kinder than letting somebody look for them. */
-  magicHow:
-    'A link is emailed to the address on this record. It lasts fifteen minutes and works once. There are no recovery codes.',
+  magicHow: 'An emailed link, good once for 15 minutes. There are no recovery codes.',
   lockout: 'After too many tries',
   /* `49 §5.5`: ten strikes, fifteen minutes, sticky, fail-closed. */
-  lockoutHow: 'Ten failed attempts locks sign-in for fifteen minutes. Waiting is the only way through it.',
+  lockoutHow: '10 failed tries lock sign-in for 15 minutes.',
 
   /* export — `03 §1`'s three layers, and the two containers `03 §2.1` keeps apart */
   yourData: 'The whole record',
   /* IT IS A SQLITE FILE AND THAT IS THE WHOLE TRICK (`03 §2`): `sqlite3 portfolio.brain "select …"`
      works with no SDK and no reader of ours. The screen says it as "any database tool", because the
      format's name means nothing to most of the people reading it. */
-  exportWhat: 'One file with everything in it, readable by any database tool.',
+  exportWhat: 'Readable by any database tool.',
   /* `03 §1`: the three layers are addressable independently, and the governance layer alone IS a
      pack. A product whose only exit is all-or-nothing has three exits it is not offering. */
   takeAway: 'Part of it',
-  takeAwayWhat: 'The way you work and what you have written are separate things, and either can leave on its own.',
+  takeAwayWhat: 'Take the setup or what you wrote, on its own.',
   exportPack: 'Export the way you work',
   exportRows: 'Export your items only',
 
@@ -236,8 +233,7 @@ export const account = {
   you: 'You',
   signedInAs: 'Signed in as',
   onThisRecord: 'On this record',
-  identityOutside:
-    'Your sign-in belongs to you rather than to this record, so it is the same across every record you hold.',
+  identityOutside: 'One sign-in for every record you hold.',
   yourRecords: 'Records you can open',
   thisOne: 'you are here',
 
@@ -371,10 +367,9 @@ export const account = {
   connectInboxHint: 'May read the inbox: the bank texts and other arrivals no rule has filed yet. It cannot file or archive them.',
 
   /* ingest — `25 §9` draws this screen */
-  sources: 'Where new items come in from',
-  sourcesHow: 'Each of these fetches on its own schedule. Everything they add is logged.',
+  sources: 'Sources',
   /* `25 §9`'s own blockquote, and it outranks the screen it is on. */
-  staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
+  staleShows: 'A stale source shows a gap, never an old number.',
 
   /* notifications: `09` specifies the mechanism and one setting, the quiet hours, so the rest of this reports */
   whenWeInterrupt: 'Interruptions',
@@ -429,8 +424,7 @@ export const account = {
 
   /* THE CHECK, RUN IN THIS BROWSER over a file somebody picks: the same `checkBrainl` an import runs before it writes
      a row. It proves the file is whole and signed by the key inside it, and not whose key that is, so it says no more. */
-  fileChecked: (name: string) =>
-    `${name} is whole and signed. Nothing in it has changed since it was written, and the signature holds for the key inside the file.`,
+  fileChecked: (name: string) => `${name} is whole, signed and unchanged since it was written.`,
   fileFailed: (name: string, fix: string) => `${name} did not pass. ${fix}`,
   fileUnread: (name: string) => `${name} could not be read as text. Only a .brainl file can be checked here.`,
 
@@ -454,8 +448,7 @@ export const account = {
 
      `deleteWhat` carries "It cannot be undone" one line above this, in the section whose own comment
      condemns *"three lines, two of them the same sentence"*, so this one does not say it twice. */
-  deleteCosts:
-    'The name is given up for good, and no record here can use it again. One final copy is kept for 30 days and then deleted, and it cannot be opened from here, so export a copy first if you want to keep what is in it.',
+  deleteCosts: 'The name is gone for good. A final copy is kept 30 days, out of reach, so export first to keep anything.',
   /* THE RECORD'S NAME, NOT ITS SLUG (UI pass 20 Oct, agents F15 Δ): names, never ids; compared without case. */
   typeSlug: (name: string) => `Type ${name} to confirm`,
 
@@ -504,7 +497,7 @@ export const account = {
   restoreSelfHost: 'On this machine, braindog backup <folder> saves a copy and braindog restore <folder> puts it back.',
 
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
-  billingSelfHost: 'This record runs on your own machine. There is nothing to bill and no subscription to lapse.',
+  billingSelfHost: 'Runs on your own machine. Nothing to bill.',
 
   /* SAID ONLY UNDER AN AREA WHOSE CHOICES NEVER LEAVE THIS BROWSER (`KEEPS` in `settings/[area]/+page.svelte`), which
      today is Keyboard. It read "The settings above are kept on this device." under Appearance too, where the code keeps
@@ -732,17 +725,17 @@ export const account = {
   /* SESSIONS: every browser this person is signed in on, this one first. A session has no device name, so a row
      says when it was proved and when it was last used, which is what tells a stranger's session from your own. */
   sessions: 'Where you are signed in',
-  sessionsHow: 'Each browser you are signed in on. Signing the others out ends them there at once; this one stays.',
+  sessionsHow: 'Signing the others out ends them at once.',
   sessionThis: 'This browser',
   sessionOther: 'Another browser',
   sessionWhen: (proved: string, used: string) => `Signed in ${proved} · last used ${used}`,
   sessionsEndOthers: 'Sign out everywhere else',
   sessionsEnding: 'Signing out',
-  sessionsEnded: (n: number) => (n === 1 ? 'One other session was signed out.' : `${n} other sessions were signed out.`),
+  sessionsEnded: (n: number) => (n === 1 ? '1 other browser signed out.' : `${n} other browsers signed out.`),
   sessionsNoneElse: 'You are not signed in anywhere else.',
   sessionsFailed: 'Nothing was signed out. Try again.',
   sessionsUnread: 'Where you are signed in could not be read just now. Try again in a minute.',
-  sessionsSignedOut: 'Sign in to see where else you are signed in.',
+  sessionsSignedOut: 'Sign in to see your other browsers.',
 
   /* RECOVERY: what a lost passkey costs, which is nothing while another way in is left. */
   passkeyLost: 'If you lose a passkey',

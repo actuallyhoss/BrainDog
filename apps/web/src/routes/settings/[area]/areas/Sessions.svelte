@@ -102,7 +102,8 @@
 
 <Tile icon="monitor" class="section" data-surface="tile" title={copy.sessions} count={(ordered?.length ?? 0) || undefined}>
   <div class="section-body">
-    <p class="hint">{copy.sessionsHow}</p>
+    <!-- WHAT SIGNING OUT DOES, only where there is somebody signed in to do it. -->
+    {#if me !== null}<p class="hint">{copy.sessionsHow}</p>{/if}
     {#if me === null}
       {#if s.hostAuth !== null}<Empty kind="no-data-yet" compact title={copy.sessionsSignedOut} />{/if}
     {:else if unread}

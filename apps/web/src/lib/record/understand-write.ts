@@ -41,7 +41,7 @@ export type Read =
 
 export const understandWords = {
   title: 'Read what you already have',
-  hint: 'Link your old payments, runs and services to who and what they are about. Nothing changes until you say.',
+  hint: 'Link old payments, runs and services to who they are about. Nothing changes until you say.',
   look: 'Look first',
   looking: 'Reading',
   doIt: 'Do it',

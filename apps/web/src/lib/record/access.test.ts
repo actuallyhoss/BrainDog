@@ -178,15 +178,15 @@ test('THERE ARE NO RECOVERY CODES, AND THE SCREEN SAYS SO', () => {
      would leave somebody hunting for a sheet of codes that has never existed. */
   assert.match(copy.magicHow, /no recovery codes/i);
   /* `49 §5.6`: fifteen minutes, single use. */
-  assert.match(copy.magicHow, /fifteen minutes/);
+  assert.match(copy.magicHow, /15 minutes/);
   assert.match(copy.magicHow, /once/);
 });
 
 test('the lockout is stated before it happens, not after', () => {
   /* `49 §5.5`: ten strikes, fifteen minutes, sticky, fail-closed. Somebody locked out has, by
      definition, no way to read a message that only appears once they are. */
-  assert.match(copy.lockoutHow, /Ten failed attempts/);
-  assert.match(copy.lockoutHow, /fifteen minutes/);
+  assert.match(copy.lockoutHow, /10 failed tries/);
+  assert.match(copy.lockoutHow, /15 minutes/);
 });
 
 test('a passkey says when it was last used, because that is the one that matters', () => {
