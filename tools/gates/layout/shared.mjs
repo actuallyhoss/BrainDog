@@ -48,12 +48,12 @@ export async function breakpoints(root) {
   return [...found];
 }
 
-/* THE THREE SHAPES `19 §3` OFFERS, by what the shell writes on `.shell[data-shape]` and what the record keeps to ask
-   for each. The top bar is the default (the owner's choice 1, 20 October) and asks for nothing; the record's word for the side
-   rail is `side`, not the shell's. The default comes first, as the one a seeded pass draws. */
+/* THE SHAPES THE SHELL DRAWS (`NavShape` in `nav-prefs.svelte.ts`), by what it writes on `.shell[data-shape]` and what
+   the record keeps to ask for each. The top bar is the default (the owner's choice 1, 20 October) and asks for nothing.
+   The side rail is gone from the app, and a record that still keeps `side` is drawn the top bar, so it is no shape here.
+   The default comes first, as the one a seeded pass draws. */
 export const SHAPES = [
   { name: 'the top bar', drawn: 'bar', keeps: null },
-  { name: 'the rail', drawn: 'rail', keeps: { 'nav.shape': 'side' } },
   { name: 'the menu', drawn: 'menu', keeps: { 'nav.shape': 'menu' } },
 ];
 

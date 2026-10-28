@@ -20,7 +20,7 @@ import { mark, openFor, reach, SHAPES, UNFOLD } from './shared.mjs';
  * the panel takes a quarter of a second to arrive, so a strip of bare ground shows where it will be.
  *
  * AT 1,280, 1,440 AND 1,728 (`dockedAtPx`): where the panel first docks, where blocks begin to pair, and the owner's
- * wide laptop. On all three shapes, because the panel's column is a track of each shape's own grid.
+ * wide laptop. On every shape, because the panel's column is a track of each shape's own grid.
  *
  * TWO SCREENS, ONE FOR EACH WAY A PANEL OPENS: a task's title on Work (`.item-open`, the renderer's row verb) and `p`
  * on a list (the register's peek). An open that does not take is a finding and not a skip, for the reason `ACTS`

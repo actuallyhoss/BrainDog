@@ -30,7 +30,7 @@ import { mark, openFor, reach, SHAPES } from './shared.mjs';
  * whole window, right with the panel shut and 400 too wide with it open. The track is what
  * the shell gave and not what the page took, so a page capping itself is still the short one.
  *
- * ON ALL THREE SHAPES, because each lays the work out on its own grid and only one of them was ever drawn. A shape
+ * ON EVERY SHAPE, because each lays the work out on its own grid and only one of them was ever drawn. A shape
  * the record keeps is kept through its own `setPref` (`openPage`'s `prefs`), and a pass that asked for the top bar and got the rail says so
  * rather than measuring the rail three times.
  *
