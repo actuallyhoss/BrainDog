@@ -66,9 +66,9 @@
         <button type="button" class="cs-line" aria-expanded={open} onclick={() => (opened[c.key] = !open)} disabled={i === 0}>
           <span class="cs-arrow" aria-hidden="true">↗</span>
           <span class="cs-to" dir="auto">{sendWords.sentTo(c.to.label)}</span>
-          <span class="cs-sep" aria-hidden="true">·</span>
+          <span class="cs-sep" aria-hidden="true">{' · '}</span>
           <span class="cs-when">{ago(c.at, now)}</span>
-          <span class="cs-sep" aria-hidden="true">·</span>
+          <span class="cs-sep" aria-hidden="true">{' · '}</span>
           <span class="cs-state" data-dot={w.dot ?? undefined}>{w.word}{#if w.dot && w.dot !== 'done'}<span class="cs-dot" aria-hidden="true"></span>{/if}</span>
         </button>
         {#if open}
