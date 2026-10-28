@@ -583,6 +583,12 @@ export type BlockResult = PageBlock & {
    */
   read_as?: Record<string, ReadAs>;
   /**
+   * HOW OLD EACH FILLED `{{path}}` IS, by the path as written: the day its value was stated on, where the record knows one.
+   * A rolled figure's oldest stated balance (`Reading.as_of`), or the `as_of` day of the row a field is read from. A host
+   * says the age beside a figure in a sentence once it is old, as a tile does. Absent when no path has a day.
+   */
+  values_as_of?: Record<string, string>;
+  /**
    * Every `{{path}}` of the block that names nothing the record has: no figure, list, row, field or value of a list's
    * state. A host draws each as the author wrote it, marked, and leaves it out of a chip, a tile or a bar, where a path
    * that names something and holds nothing keeps its `—`. Absent when every path names something.
@@ -2833,10 +2839,11 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* THE PAGE'S LIVE FIGURES ARE THE RECORD'S TO SAY, so the host does not answer them from a copy of
      its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
-  const { values, values_fx, read_as, unnamed } = valuesOf(deps, block);
+  const { values, values_fx, read_as, values_as_of, unnamed } = valuesOf(deps, block);
   if (values) base.values = values;
   if (values_fx) base.values_fx = values_fx;
   if (read_as) base.read_as = read_as;
+  if (values_as_of) base.values_as_of = values_as_of;
   if (unnamed) base.unnamed = unnamed;
 
   /* THE PAGE WORDS THE INSTALL CHECKS ARE CHECKED AGAIN HERE, for a page installed under an earlier build, in the
@@ -5444,7 +5451,7 @@ function figure(v: Json | undefined): Json | undefined {
  * AND WHICH RULE READ IT, on `how.as` (`ReadAs`), for every path that holds a value: what the block answers as
  * `read_as`, so a later check can list a path two rules match.
  */
-function valueAt(deps: PageDeps, path: string, how: { fx?: FxRead; as?: ReadAs } = {}): Json | undefined {
+function valueAt(deps: PageDeps, path: string, how: { fx?: FxRead; as?: ReadAs; asOf?: string } = {}): Json | undefined {
   const here = deps.here;
   const parsed = pathOf(path, here ? deps.schemaOf(here.register)?.fields : undefined);
   if (!parsed) return undefined;
@@ -5481,7 +5488,11 @@ function valueAt(deps: PageDeps, path: string, how: { fx?: FxRead; as?: ReadAs }
   const decl = Object.hasOwn(schema.fields, parsed.field) ? schema.fields[parsed.field] : undefined;
   if (!decl || !FIGURES.has(decl.type)) return undefined;
   const row = rowAt(deps, parsed.register, parsed.seq);
-  return row && Object.hasOwn(row.fields, parsed.field) ? figure(row.fields[parsed.field]) : undefined;
+  if (!row || !Object.hasOwn(row.fields, parsed.field)) return undefined;
+  /* A ROW THAT SAYS WHEN IT WAS STATED (`as_of`, a balance's day) dates every field read from it. */
+  const stated = parsed.field !== 'as_of' && Object.hasOwn(row.fields, 'as_of') ? row.fields.as_of : undefined;
+  if (typeof stated === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(stated)) how.asOf = stated.slice(0, 10);
+  return figure(row.fields[parsed.field]);
 }
 
 /** A row by its spoken id's number, `tasks#3`, or `null` when the list holds none. */
@@ -5491,9 +5502,11 @@ function rowAt(deps: PageDeps, register: string, seq: number): Entry | null {
 }
 
 /** One figure's reading as a sentence says it: a number, an amount, its amounts in several currencies, or a day. */
-function figureValue(deps: PageDeps, decl: MetricDecl, how?: { fx?: FxRead }): Json | undefined {
+function figureValue(deps: PageDeps, decl: MetricDecl, how?: { fx?: FxRead; asOf?: string }): Json | undefined {
   const read = deps.read(decl);
   if (!read.ok) return undefined;
+  /* A ROLLED FIGURE'S OLDEST STATED BALANCE IS ITS AGE (`Reading.as_of`), in parts or in one amount. */
+  if (how && typeof read.value.as_of === 'string') how.asOf = read.value.as_of.slice(0, 10);
   /* A FIGURE IN SEVERAL CURRENCIES IS EACH OF ITS AMOUNTS, which the host writes one after another. */
   if (read.value.parts) return read.value.parts.map((p) => ({ amount: p.amount, currency: p.currency }));
   if (read.value.value === null) return undefined;
@@ -6079,13 +6092,17 @@ function rowNamed(deps: PageDeps, row: Entry | undefined, read: BlockResult): Bl
  * this the two answered the same, so 48 paths on the owner's record drew a dash for a typo. Only a path with no value is
  * asked whether it names anything, so a block whose paths all hold values costs no read more than it did.
  */
-function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, Json>; values_fx?: Record<string, FxRead>; read_as?: Record<string, ReadAs>; unnamed?: string[] } {
+function valuesOf(
+  deps: PageDeps,
+  block: PageBlock,
+): { values?: Record<string, Json>; values_fx?: Record<string, FxRead>; read_as?: Record<string, ReadAs>; values_as_of?: Record<string, string>; unnamed?: string[] } {
   const out: Record<string, Json> = {};
   const fx: Record<string, FxRead> = {};
   const as: Record<string, ReadAs> = {};
+  const aged: Record<string, string> = {};
   const unnamed: string[] = [];
   for (const path of pathsOf(block, (id) => figureNamed(deps, id))) {
-    const how: { fx?: FxRead; as?: ReadAs } = {};
+    const how: { fx?: FxRead; as?: ReadAs; asOf?: string } = {};
     const v = valueAt(deps, path, how);
     if (v !== undefined) out[path] = v;
     else if (!namedAt(deps, path)) unnamed.push(path);
@@ -6093,8 +6110,16 @@ function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, J
     if (v !== undefined && how.as) as[path] = how.as;
     /* A FIGURE'S CONVERSION GOES OUT BESIDE ITS AMOUNT (rates-foot-note-80), so a sentence can say its rates are old. */
     if (v !== undefined && how.fx) fx[path] = how.fx;
+    /* AND THE DAY IT WAS STATED ON, so a sentence can say its age once it is old. */
+    if (v !== undefined && how.asOf) aged[path] = how.asOf;
   }
-  return { ...(Object.keys(out).length ? { values: out } : {}), ...(Object.keys(fx).length ? { values_fx: fx } : {}), ...(Object.keys(as).length ? { read_as: as } : {}), ...(unnamed.length ? { unnamed } : {}) };
+  return {
+    ...(Object.keys(out).length ? { values: out } : {}),
+    ...(Object.keys(fx).length ? { values_fx: fx } : {}),
+    ...(Object.keys(as).length ? { read_as: as } : {}),
+    ...(Object.keys(aged).length ? { values_as_of: aged } : {}),
+    ...(unnamed.length ? { unnamed } : {}),
+  };
 }
 
 /** A figure by its id, declared or built in, as `registersOf` finds one. */
