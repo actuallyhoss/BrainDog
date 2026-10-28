@@ -56,9 +56,9 @@ export const words = {
         ? `${waiting} waits on your answer.`
         : ''
       : `${firstRun.and(on)} ${on.length === 1 ? 'is' : 'are'} on${waiting ? `, and ${waiting} waits on your answer` : ''}.`,
-  nothingSaved: 'Nothing is saved yet.',
-  /** The build tile before a word is typed: what will appear in it. */
-  beforeTyping: 'Its places appear here as you type.',
+  nothingSaved: 'Nothing is saved until you finish.',
+  /** The build tile before a word is typed: one line, what will appear in it. */
+  beforeTyping: 'Fills in as you type.',
   /** Why a part is on, as the meta at the right of its tile. */
   fromWords: 'from your words',
   byHand: 'turned on by you',

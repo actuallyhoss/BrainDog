@@ -1060,13 +1060,16 @@
             {:else if proposal === null && !anyOn}
               <p class="reading">{words.beforeTyping}</p>
             {/if}
-            {#if anyOn || proposal !== null}<p class="reading">
-              {#if anyOn}{words.onReading(
+            <!-- NOTHING SAVED IS SAID ONCE THERE IS SOMETHING TO SAVE, so the empty tile is one line. -->
+            {#if anyOn}
+              <p class="reading">
+                {words.onReading(
                   steps.filter((p) => p.state !== 'waiting').map((p) => p.name),
                   steps.find((p) => p.state === 'waiting')?.name ?? null,
-                )}{/if}
-              {words.nothingSaved}
-            </p>{/if}
+                )}
+                {words.nothingSaved}
+              </p>
+            {/if}
             {#if proposal}
               <!-- WHY THE PRIMARY IS OFF sits above the bar, not in it, so the bar a phone keeps on screen stays one button tall. -->
               {#if nothing}<p class="quiet" id="make-why">{firstRun.makeSomething}</p>{/if}
