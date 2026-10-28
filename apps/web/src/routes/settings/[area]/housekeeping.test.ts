@@ -64,7 +64,7 @@ test('X25, X26: What comes in gives a self-host its one command, and the web add
   assert.match(ingest, /<CodeLine text=\{addressCommand\(origin, shell\.index\.slug\)\} \/>/u, 'the self-host card has no command to copy');
   assert.doesNotMatch(ingest, /mailWords\.unroutedDoes/u);
   assert.doesNotMatch(automations.doorsHow, /token/iu);
-  assert.match(automations.doorsHow, /private/u);
+  assert.match(automations.doorsHow, /private/iu);
   /* THE BUTTON FOLLOWS ITS LINE, in the body, not in the heading's corner where it wrapped above the line. */
   const body = markup(doors);
   assert.ok(body.indexOf('{copy.doorsHow}') < body.indexOf('{actionWords.newDoor}'), 'New web address stands above its line');
@@ -76,7 +76,8 @@ test('X20: Backups says Needs you, one line per state, and how each going back i
   const { SUPPORT_EMAIL } = await import('../../../lib/copy/shell.ts');
   const backups = src('./areas/Backups.svelte');
   assert.doesNotMatch(backups, /in Decide/u, 'the missed night still sends him to Decide, which the bar calls Needs you');
-  assert.match(backups, /Needs you/u);
+  /* A MISSED NIGHT SAYS WHAT HAPPENS NEXT IN ONE LINE: tonight tries again, with no errand to run before then. */
+  assert.match(backups, /missedLine: 'Tries again tonight\.'/u);
   /* THE SELF-HOST'S KEY IS NAMED, on a self-host, never "if you run BrainDog yourself". */
   assert.doesNotMatch(account.theKeyWhere, /If you run BrainDog yourself/u);
   assert.match(account.theKeyWhere, /kek/u, 'the key file is not named');

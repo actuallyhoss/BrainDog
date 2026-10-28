@@ -25,7 +25,7 @@ test('NO AREA IS CALLED HEALTH: the housekeeping is Tidy up, and the old address
   assert.ok(![...AREAS.values()].some((a) => a.label === 'Health'));
   const tidy = AREAS.get('tidy');
   assert.equal(tidy?.label, 'Tidy up');
-  assert.equal(tidy?.line, 'What the record found to tidy in itself');
+  assert.equal(tidy?.line, 'Stale and doubled');
   assert.equal(areaOf('health')?.id, 'tidy');
   const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /area === 'tidy'/u);
