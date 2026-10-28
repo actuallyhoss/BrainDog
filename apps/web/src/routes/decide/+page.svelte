@@ -430,6 +430,10 @@
     quick: Math.max(0, (shaped?.groups.quick ?? 0) - (led?.group === GROUP_KEY.quick ? 1 : 0)),
     handled: handledCount,
   });
+  /* THE LEAD'S OWN COLUMN, where that column has a tab: on a phone the lead is drawn under its tab only, so the tab's
+     count holds it and the head's "3 about money" and the tab's "Money 3" agree. */
+  const ledColumn = $derived<Column | null>(led?.group === GROUP_KEY.money ? 'money' : led?.group === GROUP_KEY.quick ? 'quick' : null);
+  const tabCount = (c: Column): number => counts[c] + (c === ledColumn ? 1 : 0);
   /* WHERE EACH SITS ON A WIDE BOARD (`boardOf`): a third each, or a half, or the row, for those that hold something. */
   const board = $derived(boardOf({ money: counts.money > 0, quick: counts.quick > 0, handled: counts.handled > 0 }, shaped?.first));
   const columns = $derived((shaped?.first === 'quick' ? (['quick', 'money', 'handled'] as const) : (['money', 'quick', 'handled'] as const)).filter((c) => counts[c] > 0));
@@ -513,7 +517,7 @@
           <Segmented role="group" aria-label={WORDS.columns} full>
             {#each columns as c (c)}
               <button type="button" class="segment" data-on={showing === c ? '' : undefined} aria-pressed={showing === c} onclick={() => (chosenColumn = c)}
-                >{GROUP_WORDS[c]} <span class="num switch-n">{counts[c]}</span></button
+                >{GROUP_WORDS[c]} <span class="num switch-n">{tabCount(c)}</span></button
               >
             {/each}
           </Segmented>
@@ -527,6 +531,7 @@
         data-switch={columns.length > 1 ? '' : undefined}
         data-showing={showing ?? undefined}
         data-led={led?.group ? '' : undefined}
+        data-led-column={ledColumn !== null && columns.includes(ledColumn) ? ledColumn : undefined}
         style:--col-money={board.money ?? 'auto'}
         style:--col-quick={board.quick ?? 'auto'}
         style:--col-handled={board.handled ?? '1 / -1'}
@@ -705,6 +710,12 @@
     .body[data-showing='quick'] :global(.block-slot[data-key='decide-money']),
     .body[data-showing='handled'] :global(:is(.block-slot[data-key='decide-money'], .block-slot[data-key='decide-quick'])),
     .body:not([data-showing='handled']) :global(.page-strip[data-opens]) {
+      display: none;
+    }
+
+    /* THE LEAD BELONGS TO ITS TAB: under another tab it is not drawn, as its column's other cards are not. */
+    .body[data-led-column='money']:not([data-showing='money']) :global(.block-slot[data-key='decide-lead']),
+    .body[data-led-column='quick']:not([data-showing='quick']) :global(.block-slot[data-key='decide-lead']) {
       display: none;
     }
   }
