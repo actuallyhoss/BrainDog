@@ -53,6 +53,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import NotFound from '$lib/ui/NotFound.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import { saidPlainly } from '$lib/record/blocks.ts';
@@ -373,9 +374,8 @@
     <!-- A VIEW THIS RECORD DOES NOT HOLD, IN THE RECORD'S OWN WORDS AND WITH THE RECORD'S OWN
          ADDRESSES. Listing the seeded studio's two names here once answered the question with two
          links that open somebody else's list. -->
-    <Empty kind="error" heading title={missing.said} body={copy.theseExist('Saved views', missing.addresses)}>
-      {#snippet actions()}<Button href="/">{copy.home}</Button>{/snippet}
-    </Empty>
+    <PageHead title={missing.said} headless />
+    <NotFound title={missing.said} body={copy.theseExist('Saved views', missing.addresses)} />
   </div>
 {:else if !register || !decl || !name}
   <div class="page">

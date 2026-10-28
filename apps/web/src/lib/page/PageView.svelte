@@ -858,9 +858,12 @@
          about something that did not happen. It names the thing, says it is not here, and lists what is: `10 §7`'s
          fourth rule, the refusal is the teacher. WHAT IS HERE IS THE FIVE NEAREST PAGES, AS LINKS (`record/nearest.ts`):
          the whole index in one sentence was thirty-eight addresses, none of them a thing to press. -->
-    <Empty kind="error" heading title={copy.noPageCalled(slug)} body={pages.length === 0 ? copy.theseExist('Pages', []) : undefined}>
-      {#snippet actions()}{#await Promise.all([import('$lib/ui/NearLinks.svelte'), import('$lib/record/nearest.ts')]) then [{ default: NearLinks }, { nearest }]}<NearLinks places={nearest(slug, pages)} said={copy.nearPages} />{/await}<Button href="/">{copy.home}</Button>{/snippet}
-    </Empty>
+    <!-- AND ONE SCREEN FOR EVERY ADDRESS THAT LEADS NOWHERE (`NotFound`): the same head, words and two ways on as a
+         mistyped address and a number that names nothing, so a page not here is not a second design. -->
+    {#if mode === 'page'}<PageHead title={copy.noPageCalled(slug)} headless />{/if}
+    {#await Promise.all([import('$lib/ui/NotFound.svelte'), import('$lib/record/nearest.ts')]) then [{ default: NotFound }, { nearest }]}
+      <NotFound title={copy.noPageCalled(slug)} body={pages.length === 0 ? copy.theseExist('Pages', []) : undefined} near={nearest(slug, pages)} />
+    {/await}
   </div>
 {:else if mode === 'page'}
   <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
