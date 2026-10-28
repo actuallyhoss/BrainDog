@@ -254,7 +254,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       const first = filed[0];
       if (first === undefined) {
         const why = isObject(out.value) && Array.isArray(out.value.dropped) ? out.value.dropped.filter((d): d is string => typeof d === 'string') : [];
-        return { ok: false, refusal: { code: 'NOTHING_DRAFTED', fix: why[0] ?? 'Nothing came of that draft. Try describing it another way.' } };
+        return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: why[0] ?? 'Nothing came of that draft. Try describing it another way.', at: 'what' } };
       }
       const question = text(first['question']);
       return { ok: true, value: { receipt: `Drafted “${clip(question, 100)}”. It waits for you in Decide.`, href: `/decide/${encodeURIComponent(text(first['id']))}` } };
