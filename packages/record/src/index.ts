@@ -4810,13 +4810,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return [{ draft: { key: stableKey({ register: orgs.register, understand_key: one.key }), question: one.question, body_kind: 'rowset', body, by: 'rules' }, choice: null }];
   };
 
-  /** The list projects are kept in, and its field of repositories: the one list declaring `scopes:`, as `slashProjects` reads it. */
-  const projectsList = (): { register: string; repos: string | null } | null => {
+  /** The list projects are kept in, and its fields of repositories and folders: the one list declaring `scopes:`, as `slashProjects` reads it. */
+  const projectsList = (): { register: string; repos: string | null; folders: string | null } | null => {
     const homes = [...kernel.registers()].filter(([, r]) => r.scopes !== undefined);
     if (homes.length !== 1) return null;
     const [register, decl] = homes[0]!;
-    const repos = decl.scopes?.repos;
-    return { register, repos: repos !== undefined && decl.fields.some((f) => f.id === repos && f.retired !== true) ? repos : null };
+    const live = (id: string | undefined): string | null => (id !== undefined && decl.fields.some((f) => f.id === id && f.retired !== true) ? id : null);
+    return { register, repos: live(decl.scopes?.repos), folders: live(decl.scopes?.folders) };
   };
 
   /** One thing the walk would not do on its own, as the draft Slash files and, for a choice, what answering it does. */
@@ -4873,7 +4873,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const wheres = one.kind === 'run-project' ? placesOf(one) : [];
         const choice: UnderstoodChoice =
           one.kind === 'service-project' ? { kind: one.kind, service: one.service.id, projects } : { kind: one.kind, place: one.place, projects, wheres };
-        return [{ draft: draft(one.question, 'options', body), choice }];
+        /* ASKED ONCE A PLACE: its cause is the place itself, whole, so the record joins a second asking to the one open,
+           and answers one asked again from what he said last time (`govern.ts` `remembered`), whatever runs it counts. */
+        const cause = `place:${sha256(new TextEncoder().encode(one.kind === 'run-project' && wheres.length > 0 ? wheres.join('\n') : one.key)).slice(0, 24)}`;
+        return [{ draft: { ...draft(one.question, 'options', body), cause }, choice }];
       }
     }
   };
@@ -4940,6 +4943,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
         if (adding.length > 0) {
           const out = kernel.write(home.register, row.id, { [repos]: [...listed, ...adding] }, { actor: BACKFILL_ACTOR, batch: minted, cascade: false, version: row.version });
+          if (out.ok) wrote += 1;
+        }
+      }
+      /* AND A FOLDER WITH NO REMOTE IS LEARNED THE SAME WAY: listed on the project, in the same batch, so every later run
+         in that very folder is placed by it (`backfill.ts` `placedFor`) and the folder is never asked about again. Only a
+         whole folder the question was about, and never one the project lists already. */
+      if (home.folders !== null) {
+        const folders = home.folders;
+        const fresh = kernel.get(row.id);
+        const listed = fresh && Array.isArray(fresh.fields[folders]) ? (fresh.fields[folders] as unknown[]).filter((v): v is string => typeof v === 'string') : [];
+        const held = new Set(listed.map((v) => keyOf('folder', v)).filter((k): k is string => k !== null));
+        const adding: string[] = [];
+        for (const r of runs) {
+          const at = whereOf(r.fields);
+          const spelled = typeof r.fields.cwd === 'string' ? r.fields.cwd.trim() : '';
+          if (at === null || !at.startsWith('folder:') || !wheres.has(at) || held.has(at) || spelled === '') continue;
+          held.add(at);
+          adding.push(spelled);
+        }
+        if (fresh && adding.length > 0) {
+          const out = kernel.write(home.register, row.id, { [folders]: [...listed, ...adding] }, { actor: BACKFILL_ACTOR, batch: minted, cascade: false, version: fresh.version });
           if (out.ok) wrote += 1;
         }
       }
