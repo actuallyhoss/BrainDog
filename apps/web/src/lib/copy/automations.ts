@@ -16,17 +16,17 @@ export const automations = {
      NO SENDER IS NAMED. These keys were `shortcut*` and said "your bank", "an iPhone Shortcut" and "withdrawals", so a
      record whose only door took a build server's results read a section about bank texts. The
      sender is whatever posts, and `webhook-doors.test.ts` fails if a use case comes back into these words. */
-  doorsTitle: 'Web addresses that take things in',
+  doorsTitle: 'Web addresses',
   /* NO "TOKEN": what a person needs to know is that the address is private. */
-  doorsHow: 'Each private address files what is posted to it in a list.',
+  doorsHow: 'Private addresses a phone or script posts to. Anyone holding one can post.',
   /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
      token back, and a blank where a value would go reads as "you have none". */
-  doorsUnknown: 'This screen cannot show a token the record already has. Only a fingerprint of it is kept, so if you no longer have it, make a new one and the old one stops working.',
+  doorsUnknown: 'Shown only when made. Lost it? Make a new one; the old one stops.',
   doorsReading: 'Reading the web addresses this record takes things in at.',
   /* THE EMPTY STATE SAYS WHAT FILLS IT AND WHO ADDS ONE, because nothing on this screen can: a door arrives as a
      change somebody approves. It said "an ingest with channel webhook and verify kind path", which is the file's
      spelling and not the person's; those words stay in the prompt, which is handed to an agent. */
-  doorsNone: 'Nothing is posted in yet',
+  doorsNone: 'Nothing posts in yet',
   doorsNoneWhy: 'Ask an agent to set one up.',
   doorsPrompt: 'read my record, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
   doorsWrites: (list: string) => `Writes to ${list}.`,

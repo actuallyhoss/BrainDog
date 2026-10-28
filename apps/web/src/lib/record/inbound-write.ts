@@ -144,30 +144,30 @@ export const revokeInbound = (base: string, io?: Fetch): Promise<Said> => press(
  * with the rest of Settings are still `copy.ts`'s, and this object does not repeat them.
  */
 export const words = {
-  title: 'Mail forwarded to this record',
+  title: 'Forwarded mail',
   /* WHAT IT IS, IN THE ORDER A PERSON NEEDS IT: what they get, what they do with it, and what it costs them. */
-  how: 'A forwarding rule at your mail provider can post messages to this record, and each one arrives in the Inbox. One record takes one address at a time.',
+  how: 'Forward mail to one address and it lands in the Inbox.',
   /**
    * THE FACT THIS SCREEN CANNOT HIDE. There is no route that reads an address back, because a route that answered
    * one would have to keep the token to answer with. So a screen that drew "your address is ..." would be drawing
    * something nothing on this host knows, and a screen that drew nothing would read as "you have none".
    */
-  unknown: 'This screen cannot show an address the record already has. Nothing keeps the address after it is shown, here or on the server, so there is nothing to read back: if you no longer have it, make a new one and the old one stops working.',
+  unknown: 'An address is shown only when made. Lost it? Make a new one; the old one stops.',
   mint: 'Make an address',
   minting: 'Making',
-  once: 'Shown once, now. Copy it before you leave this screen: it cannot be shown again.',
+  once: 'Shown once. Copy it now.',
   copyAddress: 'Copy the address',
   addressCopied: 'Address copied',
-  forwardHow: 'Point a forwarding rule at it, posting the raw message as the body. A message whose forwarder did not report a DKIM or SPF pass is kept unfiled rather than matched against your rules.',
-  lost: 'Made. Making another replaces this one, which is also how a leaked address is dealt with.',
+  forwardHow: 'Forward the raw message. Mail that fails DKIM and SPF waits unfiled.',
+  lost: 'Made. A new one replaces it.',
   /* REVOKING IS THE QUIETER ACT AND THE MORE DAMAGING ONE: a bank's mail silently not arriving. It says what
      stops, in the present tense, rather than congratulating anybody. */
   revoke: 'Stop taking forwarded mail',
   revoking: 'Stopping',
-  revoked: 'This record now takes no forwarded mail. Anything still posted to the old address is refused. Make an address to start again.',
-  freshWhy: 'Making an address or stopping one needs a sign-in from the last fifteen minutes, because whoever can change where a record takes its mail can redirect its statements.',
+  revoked: 'Stopped. The old address is refused.',
+  freshWhy: 'Needs a sign-in from the last 15 minutes.',
   /* THE FILE'S NAME ON A LINE OF ITS OWN: in the middle of the sentence it read as a name from the code (the printed
      gate's `dev-name`), and set apart it is the thing a person types. */
-  unrouted: 'This host does not make forwarding addresses over the web. On a self-host the address is a file beside the record, named:',
+  unrouted: 'On a self-host the address is a file beside the record:',
   tokenFile: 'inbound.token',
 } as const;

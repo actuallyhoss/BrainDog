@@ -177,14 +177,14 @@
     stepMake: 'An address for this record',
     stepForward: 'Point your mail at it',
     stepTest: 'Send one to test it',
-    testLine: 'Forward one message to the address. It lands in your Inbox, so look there.',
+    testLine: 'It lands in your Inbox.',
     openInbox: 'Open the Inbox',
     /* WHERE THE HOST HAS NO DOOR (agents F27): one plain sentence, and on the hosted service no file a person cannot
        reach. */
     /* THE SELF-HOST CARD IS ONE SENTENCE AND THE COMMAND TO COPY: it named a file and what
        writing and deleting it do, and never the address. */
-    unrouted: "This BrainDog's mail address is kept on the machine it runs on. Run this there to print it:",
-    unroutedHosted: 'Forwarding addresses are not offered here yet.',
+    unrouted: 'Show the command that prints it',
+    unroutedHosted: 'Not offered here yet.',
   };
 </script>
 
@@ -218,7 +218,6 @@
 
 <Tile icon="globe" class="section" data-surface="tile" title={copy.sources}>
   <div class="section-body">
-    <p class="hint">{copy.sourcesHow}</p>
     <!-- A RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write.
 
          AND A SHELL WITH NO RECORD LISTS NOTHING. This arm drew the sample's `SOURCES`, three
@@ -289,8 +288,11 @@
       {#if shell.host === 'cloud'}
         <p class="hint">{words.unroutedHosted}</p>
       {:else}
-        <p class="hint">{words.unrouted}</p>
-        <CodeLine text={addressCommand(origin, shell.index.slug)} />
+        <!-- THE COMMAND BEHIND A FOLD: the person who runs the machine opens it, and nobody else reads a shell line. -->
+        <details class="command">
+          <summary>{words.unrouted}</summary>
+          <CodeLine text={addressCommand(origin, shell.index.slug)} />
+        </details>
       {/if}
     {:else if mintsHere === true && !anOwner}
       <!-- AND THE PERSON ONLY ONCE THE HOST HAS ANSWERED, which `mintsHere === true` is what
@@ -380,6 +382,22 @@
 <WebhookDoors owner={anOwner} />
 
 <style>
+  .command > summary {
+    cursor: pointer;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    padding-block: var(--sp-2);
+  }
+
+  @media (pointer: coarse) {
+    .command > summary {
+      box-sizing: border-box;
+      min-block-size: var(--tap);
+      padding-block: max(var(--sp-2), calc((var(--tap) - 1lh) / 2));
+    }
+  }
+
   /* THE ADDRESS, SHOWN ONCE, in the block the agents area shows a bearer in. Nothing here sets a
      colour: the answer's tone comes from `[data-intent]`. */
   .code-form {
