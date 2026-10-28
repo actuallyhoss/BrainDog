@@ -119,7 +119,7 @@ test('THE KEY-NUMBER BACKFILL RUNS THROUGH THE REAL HOST: one question a project
     const line = s.line('kpi_backfill');
     assert.equal(line.outcome, 'ok', `${line.note} ${line.log}`);
     assert.match(line.log, /^Offered key numbers for Kiln and Linework\.\n?$/u);
-    assert.match(line.note, /wrote nothing\. 2 questions it proposed wait in Needs you\./u);
+    assert.match(line.note, /wrote nothing\. 2 questions it proposed wait on Decide\./u);
 
     /* ONE QUESTION A PROJECT, A ROWSET OF DRAFTS ON KEY NUMBERS, SIGNED AS THE RUN. Atoll keeps one already. */
     const asked = s.questions().filter((q) => String(q.cause ?? '').startsWith('kpi-backfill:'));

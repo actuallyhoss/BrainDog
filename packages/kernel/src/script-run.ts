@@ -700,10 +700,11 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
           : put.joined
             ? ' Its question was already waiting on Decide, so it asked nothing new.'
             : ' It asked one question, which waits on Decide.';
-  /* WHAT IT PROPOSED, IN COUNTS: new questions first, since they are what the person has to answer. */
+  /* WHAT IT PROPOSED, IN COUNTS: new questions first, since they are what the person has to answer. On Decide, since one
+     a press puts back waits on the agents' shelf there and the rest in Needs you. */
   const plural = (k: number, one: string, many: string) => (k === 1 ? one : many.replace('#', String(k)));
   const offered = [
-    proposed.asked > 0 ? ` ${plural(proposed.asked, 'One question it proposed waits', '# questions it proposed wait')} in Needs you.` : '',
+    proposed.asked > 0 ? ` ${plural(proposed.asked, 'One question it proposed waits', '# questions it proposed wait')} on Decide.` : '',
     proposed.waiting > 0 ? ` ${plural(proposed.waiting, 'One was', '# were')} already waiting.` : '',
     proposed.answered > 0 ? ` ${plural(proposed.answered, 'One was', '# were')} answered before, so not asked again.` : '',
   ].join('');

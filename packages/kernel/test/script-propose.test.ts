@@ -126,7 +126,7 @@ test(`MORE THAN ${PROPOSALS_PER_RUN} HANDED BACK IS REFUSED WHOLE, and a proposa
   assert.equal(r.k.count('numbers'), 0);
 });
 
-test('A GOOD RUN FILES ITS PROPOSALS WITH ITS WRITES, signed as the run, never applied, and the line says Needs you', async () => {
+test('A GOOD RUN FILES ITS PROPOSALS WITH ITS WRITES, signed as the run, never applied, and the line says Decide', async () => {
   const r = await record();
   const metered = run(r, [rowset('numbers', 'Players'), rowset('numbers', 'Revenue a month')], WRITE);
   assert.equal(metered.outcome, 'ok', `${noteOf(r.sql)} ${lastRun(r.sql).log}`);
@@ -134,6 +134,6 @@ test('A GOOD RUN FILES ITS PROPOSALS WITH ITS WRITES, signed as the run, never a
   const asked = open(r);
   assert.deepEqual(asked.map((q) => q.cause).sort(), ['offer:Players', 'offer:Revenue-a-month']);
   assert.equal(asked.every((q) => q.opened_by === ACTOR && q.body_kind === 'rowset'), true);
-  assert.match(noteOf(r.sql), /wrote one line\. 2 questions it proposed wait in Needs you\./u);
+  assert.match(noteOf(r.sql), /wrote one line\. 2 questions it proposed wait on Decide\./u);
   assert.doesNotMatch(noteOf(r.sql), /—/u, 'no em dash in what a person reads');
 });
