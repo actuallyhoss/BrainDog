@@ -7,7 +7,7 @@
 -->
 <script lang="ts">
   import { at } from '../at.ts';
-  import { happened } from './alerts.ts';
+  import { bellLines } from './alerts.ts';
   import Icon from '../ui/Icon.svelte';
   import Menu from '../ui/Menu.svelte';
   import { frame } from './frame.svelte.ts';
@@ -18,11 +18,11 @@
   const words = {
     arrivals: 'Arrivals',
     fresh: 'Something new arrived',
-    none: 'Nothing new since you last looked',
-    activity: 'All in Activity',
+    none: 'Nothing new',
+    activity: 'Activity',
   } as const;
 
-  const told = $derived(happened(frame.news));
+  const told = $derived(bellLines(frame.news));
 
   let open = $state(false);
   let SentTray = $state<typeof SentTrayView | null>(null);
@@ -42,7 +42,7 @@
     {/snippet}
     {#if open && SentTray}<SentTray />{/if}
     {#each told.slice(0, 6) as n, i (i)}
-      <a class="bell-mi bell-news" role="menuitem" href={at(n.href)}><span class="mi-name">{n.text}</span></a>
+      <a class="bell-mi bell-news" role="menuitem" href={at(n.href)}><span class="mi-name">{n.text}</span>{#if n.n > 1}<span class="bell-n num">{n.n}</span>{/if}</a>
     {:else}
       <span class="bell-mi" role="menuitem" aria-disabled="true">{words.none}</span>
     {/each}
@@ -120,6 +120,14 @@
   /* AN ARRIVAL IS ONE LINE, its end cut. */
   .bell-news {
     max-inline-size: 360px;
+  }
+
+  .bell-n {
+    flex: none;
+    margin-inline-start: auto;
+    padding-inline-start: var(--sp-3);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .bell-news .mi-name {

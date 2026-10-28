@@ -8,6 +8,59 @@ export type Alert = { id: string; title: string; body: string; goto: string };
 /** THE BELL HOLDS WHAT HAPPENED, NEVER WHAT WAS ASKED (frame A): a question is said once, in Needs you. */
 export const happened = <N extends { asked?: true | undefined }>(news: readonly N[]): N[] => news.filter((n) => n.asked !== true);
 
+/**
+ * A NAME IN CAPITALS AS A PERSON WRITES IT: "LEDGER POST" is "Ledger Post", as `readable` in the renderer says it (only a
+ * run with no small letter and more than three letters; a word of three or fewer stays, an initialism more often than
+ * not). Written here so the bell, which is in the shell's first chunk, does not bring the renderer with it.
+ */
+const unshout = (t: string): string =>
+  (t.match(/\p{L}/gu) ?? []).length <= 3 || /\p{Ll}/u.test(t) ? t : t.replace(/\p{L}[\p{L}'’]*/gu, (w) => (w.replace(/['’]/gu, '').length <= 3 ? w : w.charAt(0) + w.slice(1).toLowerCase()));
+
+/**
+ * ONE LINE OF THE BELL: the name before its colon out of capitals, and the name said once ("Halden licence: Halden
+ * licence is due" is "Halden licence is due").
+ */
+export function bellSaid(text: string, year: number = new Date().getFullYear()): string {
+  const i = text.indexOf(': ');
+  const head = i <= 0 ? '' : unshout(text.slice(0, i));
+  const rest = i <= 0 ? unshout(text) : text.slice(i + 2);
+  const line = head === '' || rest.toLowerCase().startsWith(head.toLowerCase()) ? rest : `${head}: ${rest}`;
+  return plain(line, year).replace(/\.$/u, '');
+}
+
+const SIGNS: Readonly<Record<string, string>> = { GBP: '£', USD: '$', EUR: '€' };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A RECORD'S WAY OF WRITING MONEY AND DAYS, AS A PERSON READS THEM: "GBP 2,400.00" is "£2,400" and "2026-09-10" is
+ * "10 Sep" (with its year when it is not this one). A currency with no sign of its own keeps its code.
+ */
+function plain(line: string, year: number): string {
+  return line
+    .replace(/\b([A-Z]{3}) (-?[\d,]+)(?:\.(\d{2}))?\b/gu, (_, code: string, whole: string, cents?: string) => {
+      const sign = SIGNS[code];
+      const n = cents === undefined || cents === '00' ? whole : `${whole}.${cents}`;
+      return sign === undefined ? `${code} ${n}` : `${sign}${n}`;
+    })
+    .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/gu, (all, y: string, m: string, d: string) => {
+      const month = MONTHS[Number(m) - 1];
+      if (month === undefined) return all;
+      return `${Number(d)} ${month}${Number(y) === year ? '' : ` ${y}`}`;
+    });
+}
+
+/** WHAT HAPPENED, EACH LINE ONCE: the same line twice is one, with how many times it happened. */
+export function bellLines<N extends { text: string; href: string; asked?: true | undefined }>(news: readonly N[]): { text: string; href: string; n: number }[] {
+  const out: { text: string; href: string; n: number }[] = [];
+  for (const item of happened(news)) {
+    const text = bellSaid(item.text);
+    const same = out.find((o) => o.text === text);
+    if (same) same.n += 1;
+    else out.push({ text, href: item.href, n: 1 });
+  }
+  return out;
+}
+
 /** The first hearing only seeds what is already there, so opening the app never rings for old questions. */
 export function sift(seen: ReadonlySet<string> | null, items: readonly Alert[]): { seen: Set<string>; fresh: Alert[] } {
   const next = new Set(seen ?? []);
