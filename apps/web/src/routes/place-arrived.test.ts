@@ -2,7 +2,7 @@
  * A place that comes into the rail is said once.
  *
  * A place is drawn once it has something to show, so on a new record Money is not in the rail until the first account
- * is typed. The day it comes, one toast says so: "Money is in your rail now." Nothing is said on the first draw of a
+ * is typed. The day it comes, one toast says so: "Money is in your sidebar now." Nothing is said on the first draw of a
  * tab, nothing for a place that was already there, and the place carries no badge and no count for having come.
  *
  * THE RULE IS READ OUT OF THE SHELL AND RUN, because the shell is a `.svelte` file and this runner is `node --test`
@@ -108,9 +108,9 @@ test('the shell hands the rule the rail as it is drawn, addresses and all', () =
 });
 
 test('the words: one sentence, the place by its name', () => {
-  assert.equal(copy.placeArrived(['Money']), 'Money is in your rail now.');
-  assert.equal(copy.placeArrived(['Work', 'Money']), 'Work and Money are in your rail now.');
-  assert.equal(copy.placeArrived(['Work', 'Money', 'People']), 'Work, Money and People are in your rail now.');
+  assert.equal(copy.placeArrived(['Money']), 'Money is in your sidebar now.');
+  assert.equal(copy.placeArrived(['Work', 'Money']), 'Work and Money are in your sidebar now.');
+  assert.equal(copy.placeArrived(['Work', 'Money', 'People']), 'Work, Money and People are in your sidebar now.');
 });
 
 test('the shell says it in one toast, with no mark of alarm, and only where a rail is drawn', () => {

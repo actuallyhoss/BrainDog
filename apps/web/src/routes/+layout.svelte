@@ -472,7 +472,7 @@
 
   /**
    * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE: a place is drawn when it has something to show, so the day
-   * the first account is typed Money appears, and one toast says "Money is in your rail now." No badge and no count.
+   * the first account is typed Money appears, and one toast says "Money is in your sidebar now." No badge and no count.
    *
    * `arrivedIn` IS THE WHOLE RULE, and `place-arrived.test.ts` cuts it out of this file and runs it, so it stays one
    * pure arrow. A place is Work or a section, first seven or under More, told by its key: a place somebody renamed or
@@ -547,12 +547,7 @@
    * `ACCENTS` entry passes `recordTheme`, so a lookup against that row can never hit for a colour
    * that got this far. Dead flexibility, left out.
    *
-   * AND THE SENTENCE IS BORROWED FROM THE SWATCH ROW, which is the one part of this that is not
-   * finished. `copy.accentRefused` closes with "The other colours are unaffected", which is written
-   * for somebody looking at a row of swatches and says nothing about the house colour being back or
-   * where to choose another; a key of its own belongs in `copy.ts`. What it does carry is the colour
-   * and the reason, which is the half a reader cannot get from anywhere else, so it is the right
-   * thing to say until that key exists.
+   * AND THE SENTENCE SAYS THE HOUSE COLOUR IS BACK, the colour that was refused and why, in one line.
    */
   /* LOADED ONLY WHEN THE COOKIE HOLDS A COLOUR: the contrast checks behind `restoreAccent` are the theme builder's, and a
      browser on the house colour has nothing for them to check. */

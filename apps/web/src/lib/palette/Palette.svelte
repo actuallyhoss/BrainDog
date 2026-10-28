@@ -838,9 +838,10 @@
     if (blank)
       for (const [i, asked] of questionsOf(slashHere).entries())
         out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: ASK_TODAY, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
+    /* OPENED ON THIS DEVICE, SO TOLD BY THIS DEVICE'S CLOCK: the record's could be behind it, and said "in 8w". */
     if (blank)
       for (const place of openedList)
-        out.push({ id: `o-${place.href}`, title: place.title, detail: since(new Date(place.at).toISOString(), shell.now ?? Date.now()), href: place.href, group: RECENT, icon: 'arrow', complete: place.title });
+        out.push({ id: `o-${place.href}`, title: place.title, detail: since(new Date(place.at).toISOString(), Date.now()), href: place.href, group: RECENT, icon: 'arrow', complete: place.title });
     if (blank && openedList.length === 0)
       for (const place of goPlaces)
         out.push({ id: `g-${place.key}`, title: place.label, href: place.href, group: GO_TO, icon: place.icon as IconName, complete: place.label });

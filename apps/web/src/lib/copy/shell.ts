@@ -122,16 +122,18 @@ export const shell = {
   /* THE ERROR PAGE, ONE LINE OF WHAT HAPPENED AND ONE BUTTON FOR WHAT TO DO. No request id and no status word: a person
      cannot act on either. Support is named only on the last one, where waiting and retrying are not going to fix it. */
   errorPage: {
-    offline: { title: 'You are offline', body: 'Check your connection and this loads again.', action: 'Try again' },
+    offline: { title: 'You are offline', body: 'Check your connection.', action: 'Try again' },
     wait: (seconds: number) => ({
       title: 'Too many requests',
       body: `Try again in ${seconds} ${seconds === 1 ? 'second' : 'seconds'}.`,
       action: 'Try again',
     }),
-    rolling: { title: 'BrainDog is updating', body: 'It will be back in a minute. Try again then.', action: 'Try again' },
-    broken: { title: 'This screen did not load', body: 'Nothing was changed. Try again.', action: 'Try again' },
+    rolling: { title: 'BrainDog is updating', body: 'Back in a minute.', action: 'Try again' },
+    broken: { title: 'This screen did not load', body: 'Nothing was changed.', action: 'Try again' },
     stuck: (address: string) => `Still not working? Write to ${address}.`,
     home: 'Go to Today',
+    /** An address that leads to nothing (`NotFound.svelte`). */
+    missing: 'No page here',
   },
   /* WHAT A FIGURE SAYS WHEN THE LIST UNDER IT IS EMPTY. Not a verdict — there is nothing to judge —
      and not silence either, because a bare `GBP 0.00` with no note beside it is the same tile a
@@ -254,13 +256,13 @@ export const shell = {
    */
   accentRefused: (name: string, codes: readonly string[]): string => {
     const why = codes.includes('CONTRAST_FLOOR')
-      ? 'text on some of its surfaces would not be readable'
+      ? 'some text would not be readable'
       : codes.includes('INTENT_INSEPARABLE')
-        ? 'two of the four meanings, good and wrong, would look the same to somebody who does not see red and green apart'
+        ? 'good and wrong would look alike to some eyes'
         : codes.includes('THEME_LADDER_ORDER')
-          ? 'its surfaces would not stack in order, so a card would not read as sitting on the page'
-          : 'a full set of colours cannot be made from it';
-    return `${name} cannot be this record's colour: ${why}. The other colours are unaffected.`;
+          ? 'its cards would not stand off the page'
+          : 'no full set of colours fits it';
+    return `${name} is back to the house colour: ${why}.`;
   },
   /* WHAT THIS DEPLOYMENT IS, IN A WORD, AND NOT ONLY IN A COLOUR. `13 §5.1`: meaning may not live
      in the styling alone, so an accent a colour-blind reader cannot tell from production is a
@@ -435,7 +437,7 @@ export const shell = {
   arrangeMovesTo: (name: string, pack: string) => `${name} moves to ${pack}, which is not installed; it keeps working until you remove it.`,
   /* A PLACE THE RAIL DID NOT HOLD AT ITS LAST DRAW, named once in a toast (`routes/+layout.svelte`): a page stays off the
      rail until one of its lists holds something, so the first thing typed can bring a place nobody saw arrive. */
-  placeArrived: (names: readonly string[]) => `${list([...names])} ${names.length === 1 ? 'is' : 'are'} in your rail now.`,
+  placeArrived: (names: readonly string[]) => `${list([...names])} ${names.length === 1 ? 'is' : 'are'} in your sidebar now.`,
 
   /* ── WORDS THE FRAME DRAWS FROM OTHER AREAS, kept here so the frame's copy (`frame.ts`) is this file and not theirs ── */
 
