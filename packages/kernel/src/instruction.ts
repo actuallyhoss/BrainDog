@@ -86,6 +86,7 @@ export const INSTRUCTION_KERNEL_WRITTEN: readonly string[] = [
   'taken_at',
   'reply',
   'replied_at',
+  'job',
 ];
 
 const DAY_MS = 86_400_000;
@@ -134,7 +135,15 @@ export type Instr = {
   taken_at: string | null;
   reply: string | null;
   replied_at: string | null;
+  /**
+   * The job that carries it to Claude on his machine (`sendTo` in the record), `j_…`: such an instruction reaches the
+   * run that job's own bearer opened, and no other (`reaches`).
+   */
   job: string | null;
+  /** The rows he sent with it, as spoken refs (`tasks#12`), for the run to read through the record. Empty for most. */
+  attach: string[];
+  /** Whether he let the run change files for it: `true`, `false`, or `null` when he said neither (an older send). */
+  may_change: boolean | null;
   /**
    * The questions he named for the run that takes it to answer, each with the answer he gave (`InstrAnswer`), and the
    * ones it already answered (`answered`, by question). Empty for nearly every instruction.
@@ -161,6 +170,17 @@ export const ANSWERS_MOST = 10;
 /** The line on an instruction that names its questions (`field`), and the line on it that spends one. */
 export const ANSWERS_FIELD = 'answers';
 export const ANSWERED_FIELD = 'answered';
+
+/** The lines on an instruction that name the rows sent with it, and whether it may change files (`sendTo`). */
+export const ATTACH_FIELD = 'attach';
+export const MAY_CHANGE_FIELD = 'may_change';
+
+/** The most rows one instruction may carry, and the longest ref of one. */
+export const ATTACH_MOST = 20;
+export const ATTACH_REF_MOST = 120;
+
+/** A job's id, as `createJob` mints it. */
+const JOB_REF = /^j_[0-9A-Z]{26}$/u;
 
 /** The line on a decision made on his order (`field`), the instruction in `to_v`. */
 export const ORDERED_FIELD = 'answered_on';
@@ -212,6 +232,12 @@ export type InstructInput = {
   waits_ms?: number | undefined;
   /** The questions the run that takes it may answer, each with his answer. Only on a tell. */
   answers?: InstrAnswer[] | undefined;
+  /** The job that carries it to Claude on his machine (`j_…`), which must be on the record. Only on a tell. */
+  job?: string | undefined;
+  /** The rows he sends with it, as spoken refs (`tasks#12`). Only on a tell. */
+  attach?: string[] | undefined;
+  /** Whether the run may change files for it. Only on a tell. */
+  may_change?: boolean | undefined;
 };
 
 /* ── the writes, wired by the record ─────────────────────────────────────── */
@@ -246,6 +272,8 @@ type Row = {
   by: string | null;
   answers?: string | null;
   answered?: string | null;
+  attach?: string | null;
+  may_change?: string | null;
 };
 
 /** A line's JSON, or `null` when it is not what it should be. */
@@ -275,7 +303,9 @@ function answersIn(v: string | null | undefined): InstrAnswer[] {
 const COLUMNS = `e.id, e.seq, e.state, e.fields, e.created_at, e.updated_at,
   (SELECT actor FROM event WHERE target = 'entry:' || e.id AND kind = 'create' ORDER BY ts LIMIT 1) AS by,
   (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ANSWERS_FIELD}' ORDER BY rowid DESC LIMIT 1) AS answers,
-  (SELECT json_group_array(to_v) FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ANSWERED_FIELD}') AS answered`;
+  (SELECT json_group_array(to_v) FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ANSWERED_FIELD}') AS answered,
+  (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${ATTACH_FIELD}' ORDER BY rowid DESC LIMIT 1) AS attach,
+  (SELECT to_v FROM event WHERE target = 'entry:' || e.id AND kind = 'note' AND field = '${MAY_CHANGE_FIELD}' ORDER BY rowid DESC LIMIT 1) AS may_change`;
 
 function instrOf(row: Row): Instr {
   const f = JSON.parse(row.fields) as Record<string, Json>;
@@ -304,6 +334,8 @@ function instrOf(row: Row): Instr {
     reply: text(f.reply),
     replied_at: text(f.replied_at),
     job: text(f.job),
+    attach: ((v) => (Array.isArray(v) ? v.filter((r): r is string => typeof r === 'string').slice(0, ATTACH_MOST) : []))(parsed(row.attach)),
+    may_change: ((v) => (typeof v === 'boolean' ? v : null))(parsed(row.may_change)),
     answers: answersIn(row.answers),
     answered: ((v) => (Array.isArray(v) ? v.filter((q): q is string => typeof q === 'string') : []))(parsed(row.answered)),
     by: row.by,
@@ -366,8 +398,21 @@ export function runOf(sql: Sql, ref: string): RunOf | null {
 
 const OPEN_RUN = ['active', 'idle'];
 
+/**
+ * The job whose bearer opened a run, `j_…`, or `null` for a run no job opened. Read off the token that opened it
+ * (`token_id`, stamped as the run opens and never written after), whose label a claim set to `job:<id>`, so nothing a
+ * caller says makes a run a job's.
+ */
+export function jobOfRun(sql: Sql, run: RunOf): string | null {
+  const token = text(run.fields.token_id);
+  if (token === null) return null;
+  const label = sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', token)?.label ?? '';
+  const job = label.startsWith('job:') ? label.slice('job:'.length) : '';
+  return JOB_REF.test(job) ? job : null;
+}
+
 /** The place a run stands in and who it is, its own fields first and the hints for what they lack. */
-function placeOf(run: RunOf, hints: RunHints = {}) {
+function placeOf(run: RunOf, hints: RunHints = {}, job: string | null = null) {
   const f = run.fields;
   const pick = (own: Json | undefined, said: string | undefined): string | null => text(own) ?? (typeof said === 'string' && said.trim() !== '' ? said : null);
   return {
@@ -378,6 +423,7 @@ function placeOf(run: RunOf, hints: RunHints = {}) {
     host: pick(f.host, hints.host),
     seat: pick(f.seat, hints.seat),
     parent: text(f.parent),
+    job,
     started: Date.parse(text(f.started) ?? run.created_at),
     called: Date.parse(text(f.last_seen) ?? ''),
   };
@@ -402,7 +448,11 @@ const onSeat = (i: Instr, at: ReturnType<typeof placeOf>): boolean =>
 function reaches(i: Instr, run: RunOf, at: ReturnType<typeof placeOf>, nowMs: number, holder: string | null): boolean {
   if (!OPEN_RUN.includes(run.state ?? '')) return false;
   if (i.expires_at !== null && Date.parse(i.expires_at) < nowMs) return false;
+  /* ONE SENT BY JOB REACHES THAT JOB'S RUN AND NO OTHER, and a job's run is told only what was sent to it by its job or
+     to it by name: it was started for one request, and a word for whoever is next is not that request. */
+  if (i.job !== null) return at.job === i.job;
   if (i.to === 'run') return i.to_run === run.spoken;
+  if (at.job !== null) return false;
   /* A HELPER IS NEVER TOLD A TELL: it works for its parent, which is told. It obeys its parent's stop (`stopOf`). */
   if (at.parent !== null) return false;
   /* ON THAT MACHINE AND AS THAT PROFILE, WHERE IT SAYS ONE, whatever else it is aimed at: a run elsewhere is not told,
@@ -445,7 +495,7 @@ function holders(sql: Sql, tasks: readonly string[]): Map<string, string> {
 export function instructionFor(sql: Sql, hints: RunHints, runRef: string, nowMs: number): Instr[] {
   const run = runOf(sql, runRef);
   if (!run) return [];
-  const at = placeOf(run, hints);
+  const at = placeOf(run, hints, jobOfRun(sql, run));
   const open = openInstructions(sql);
   const held = holders(sql, open.filter((i) => i.to === 'task' && i.task !== null).map((i) => i.task!));
   const mine = open.filter((i) => {
@@ -584,6 +634,28 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
       answers.push({ question: q, option, version: o.version });
     }
   }
+  /* WHAT GOES WITH IT, on a tell alone: the rows he sent, whether it may change files, and the job carrying it. */
+  const attach: string[] = [];
+  if (input.attach !== undefined && input.attach !== null) {
+    if (!Array.isArray(input.attach) || input.attach.length > ATTACH_MOST)
+      return no('VALUE_MALFORMED', `attach is a list of at most ${String(ATTACH_MOST)} rows, as ["tasks#12"].`, { at: 'attach' });
+    for (const [n, r] of input.attach.entries()) {
+      const ref = typeof r === 'string' ? r.trim() : '';
+      if (ref === '' || ref.length > ATTACH_REF_MOST || /[\p{Cc}]/u.test(ref))
+        return no('VALUE_MALFORMED', 'Each row sent with it is named as the record says it, like tasks#12.', { at: `attach[${String(n)}]` });
+      if (!attach.includes(ref)) attach.push(ref);
+    }
+  }
+  if (input.may_change !== undefined && input.may_change !== null && typeof input.may_change !== 'boolean')
+    return no('VALUE_MALFORMED', 'may_change is true or false.', { at: 'may_change' });
+  const job = typeof input.job === 'string' && input.job.trim() !== '' ? input.job.trim() : null;
+  if (input.job !== undefined && input.job !== null && (job === null || !JOB_REF.test(job)))
+    return no('VALUE_MALFORMED', 'job is a job as the record names it, j_ and twenty-six letters and digits.', { at: 'job' });
+  if ((job !== null || attach.length > 0 || typeof input.may_change === 'boolean') && kind !== 'tell')
+    return no('VALUE_MALFORMED', 'Only an instruction to do something carries rows, a job or leave to change files.', { at: job !== null ? 'job' : attach.length > 0 ? 'attach' : 'may_change' });
+  if (job !== null && d.sql.one('SELECT 1 AS y FROM job WHERE id = ?', job) === undefined)
+    return no('ROW_UNKNOWN', 'There is no such job on this record.', { at: 'job' });
+
   const place: { machine?: string; seat?: string } = {};
   for (const [key, grammar, fix] of [
     ['machine', MACHINE_NAME, 'Name the machine as its runs name it, like Adas-MacBook-Pro.local.'],
@@ -645,6 +717,8 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
     if (to !== 'run') Object.assign(patch, place);
     if (task !== null) patch.task = task;
     if (replaced) patch.replaces = replaced.id;
+    /* THE JOB IS THE KERNEL'S FIELD, written here through the door only this file opens, so no caller's patch names one. */
+    if (job !== null) patch.job = job;
 
     const made = d.write(null, { patch, stamp: {}, note: null, actor });
     if (!made.ok) return made;
@@ -660,6 +734,22 @@ export function instruct(d: InstructionDeps, actor: string, input: InstructInput
         ANSWERS_FIELD,
         JSON.stringify(answers),
         `Lets the run that takes it answer ${answers.map((a) => a.question).join(', ')}.`,
+      );
+
+    /* WHAT GOES WITH IT, two lines on the row in his name, as the questions it names are: no migration, no patch. */
+    const line = "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note) VALUES (?, ?, ?, 'note', ?, 'entry', ?, ?, ?)";
+    if (attach.length > 0)
+      d.sql.exec(line, d.mint(), iso(d.now), actor, `entry:${i.row}`, ATTACH_FIELD, JSON.stringify(attach), `Sent with ${attach.join(', ')}.`);
+    if (typeof input.may_change === 'boolean')
+      d.sql.exec(
+        line,
+        d.mint(),
+        iso(d.now),
+        actor,
+        `entry:${i.row}`,
+        MAY_CHANGE_FIELD,
+        JSON.stringify(input.may_change),
+        input.may_change ? 'May change files for it.' : 'Changes no file for it.',
       );
 
     if (replaced) {
@@ -716,7 +806,7 @@ export function withdrawInstruction(d: InstructionDeps, actor: string, ref: stri
 function forRun(sql: Sql, i: Instr, run: RunOf, nowMs: number): boolean {
   if (i.taken_by !== null) return i.taken_by === run.spoken;
   const holder = i.task === null ? null : (holders(sql, [i.task]).get(i.task) ?? null);
-  return reaches(i, run, placeOf(run), nowMs, holder === run.spoken ? null : holder);
+  return reaches(i, run, placeOf(run, {}, jobOfRun(sql, run)), nowMs, holder === run.spoken ? null : holder);
 }
 
 /** The refusal for an instruction that is not there, and for one that is not the run's: the same words. */
@@ -915,6 +1005,64 @@ export function expireInstructions(d: InstructionDeps, limit = 100): number {
     if (late && d.write(i.row, { patch: { state: 'expired' }, stamp: {}, note: EXPIRED_NOTE, actor: 'system' }).ok) n++;
   }
   return n;
+}
+
+/* ── a job that carried one ended ────────────────────────────────────────── */
+
+/** What an instruction its job left unanswered ends as, by how the job ended, and the line said when the job said none. */
+const JOB_SETTLES: Readonly<Record<string, { state: ReplyState; said: string }>> = {
+  ok: { state: 'done', said: 'Finished on the machine, with nothing more to say.' },
+  needs_decision: { state: 'needs_you', said: 'It filed a proposal for you to decide.' },
+  refused: { state: 'needs_you', said: 'The machine would not run it.' },
+  limit: { state: 'needs_you', said: 'It ran out of turns before it finished.' },
+  error: { state: 'needs_you', said: 'It failed on the machine.' },
+  interrupted: { state: 'needs_you', said: 'It was interrupted on the machine before it finished.' },
+  cancelled: { state: 'declined', said: 'Stopped from the app.' },
+};
+
+/**
+ * A job that carried instructions has ended: each it carried that is still open is answered for it, signed `system`,
+ * with what the run said last (the job's `result.text`), else the job's error, else a line for how it ended. Done when
+ * it finished, Needs you when it stopped short or filed a proposal, Declined when he stopped it. One the run answered
+ * itself is left as it answered. Answers how many moved; a job still waiting or running moves none.
+ */
+export function settleJobInstructions(d: InstructionDeps, job: string): number {
+  const row = d.sql.one<{ status: string; result: string | null; error: string | null }>('SELECT status, result, error FROM job WHERE id = ?', job);
+  const settle = row === undefined ? undefined : JOB_SETTLES[row.status];
+  if (row === undefined || settle === undefined) return 0;
+  const result = parsed(row.result);
+  const said = (typeof result === 'object' && result !== null && typeof (result as { text?: unknown }).text === 'string' ? (result as { text: string }).text : '').trim();
+  const reply = [...(said !== '' ? said : (row.error ?? '').trim() !== '' ? row.error!.trim() : settle.said)].slice(0, SAID_MOST).join('');
+  let n = 0;
+  for (const i of openInstructions(d.sql)) {
+    if (i.job !== job) continue;
+    const note = `Its job ended ${row.status.replace('_', ' ')}.`;
+    if (settle.state !== 'declined' && i.state !== 'working') {
+      const moved = d.write(i.row, { patch: { state: 'working' }, stamp: {}, note: null, actor: 'system' });
+      if (!moved.ok) continue;
+    }
+    const closed = d.write(i.row, { patch: { state: settle.state }, stamp: { reply, replied_at: iso(d.now) }, note, actor: 'system' });
+    if (!closed.ok) continue;
+    n++;
+    const run = i.taken_by === null ? null : runOf(d.sql, i.taken_by);
+    if (run && run.fields.instruction === i.id) d.runWrite(run.id, { instruction: null }, 'system', null);
+  }
+  return n;
+}
+
+/**
+ * The sweep's part for jobs: every job that ended while an instruction it carried is still open settles it
+ * (`settleJobInstructions`), so one the queue ended by itself (waited a day, or its machine went silent) is answered
+ * within the hour. Answers how many moved.
+ */
+export function settleEndedJobs(d: InstructionDeps): number {
+  const ended = d.sql.all<{ job: string }>(
+    `SELECT DISTINCT j.id AS job FROM entry e JOIN job j ON j.id = json_extract(e.fields, '$.job')
+     WHERE e.register = ? AND e.deleted_at IS NULL AND e.state IN ('sent', 'seen', 'working') AND j.status NOT IN ('queued', 'claimed')
+     LIMIT 100`,
+    INSTRUCTIONS,
+  );
+  return ended.reduce((n, r) => n + settleJobInstructions(d, r.job), 0);
 }
 
 /** Whether a run could be told something now (open and heard from), for the app's "Now" chip: `isPresent`. */
