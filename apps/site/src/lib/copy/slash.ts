@@ -25,16 +25,16 @@ export const slashPage = {
   head: {
     title: 'Slash knows your whole business.',
     lead:
-      'Press / anywhere in BrainDog and ask in plain words. Slash answers from what you keep, shows what it read, and ' +
-      'drafts what you ask for. Nothing it makes goes in until you say yes.',
+      'Press / anywhere in BrainDog and talk to it in plain words. Slash reads your record, answers with your numbers ' +
+      'and makes the changes you ask for, each with an undo. Anything with money, keys, sharing or deletes waits for your yes.',
   },
   /** The label a screen reader hears on each list of examples. */
   examples: 'Try typing',
   ask: {
     title: 'Ask',
     body: [
-      "Ask the way you'd ask someone who knows your business. Slash looks through your projects, money, people " +
-        'and notes, and answers in a few lines.',
+      "Ask the way you'd ask someone who knows your business. Slash reads your projects, money, people " +
+        'and notes, and answers with your numbers in a few lines. Ask a follow-up and it carries on from there.',
       'Every figure opens what it came from, and under the answer you see what Slash read. When nothing in ' +
         'BrainDog answers, it says so instead of guessing.',
     ],
@@ -49,15 +49,15 @@ export const slashPage = {
   make: {
     title: 'Make',
     body: [
-      'Ask for a page, a list or a rule, and Slash drafts it from what is already in BrainDog. You see what it ' +
-        'will look like, what it reads and where it goes.',
-      'Add it with one press, or say not now and nothing changes. Everything it makes carries its name and can be undone.',
+      'Ask for a change, a page, a list or a rule, and Slash makes it from what is already in BrainDog. You see ' +
+        'what it changed and where it went.',
+      'Everything it makes carries its name and has an undo. Anything with money, keys, sharing or deletes waits for your yes first.',
     ],
   },
   tally: {
     title: 'How asks are counted',
     say:
-      'Each question or draft is one ask, however much reading it takes. Finding things, your brief and the work ' +
+      'Each question or change is one ask, however much reading it takes. Finding things, your brief and the work ' +
       `Slash does in the background cost nothing. Early access includes ${FREE} asks a month, or no limit with your ` +
       'own AI key.',
     after: "When the month's asks run out, Slash says when they come back. Everything else keeps working.",
@@ -69,15 +69,15 @@ export const slashPage = {
     lines: [
       ['Where', 'In BrainDog. Press /', 'In the apps you connect'],
       ['What it reads', 'Your BrainDog', 'What you allowed it'],
-      ['What it writes', 'Drafts you add with one press', 'Notes and changes, each with an undo'],
+      ['What it writes', 'Changes you ask for, each with an undo', 'Notes and changes, each with an undo'],
       ['Who pays', 'Your included asks, or your own key', "Your AI tool's own plan"],
     ],
   },
   faq: {
     title: 'Questions',
     questions: [
-      { q: 'Does Slash change things on its own?', a: 'No. What it makes is a draft until you add it, and anything added can be undone.' },
-      { q: 'Can it move money or delete things?', a: 'Never. Money, keys, sharing and deletes always wait for you.' },
+      { q: 'Does Slash change things on its own?', a: 'No. It changes what you ask for, and every change has an undo.' },
+      { q: 'Can it move money or delete things?', a: 'Not without you. Money, keys, sharing and deletes always wait for your yes.' },
       { q: 'Can I use my own AI key?', a: 'Yes, in Settings under Agents. Asks on your own key have no monthly limit.' },
       { q: 'Can I turn it off?', a: 'Yes. Set the monthly limit to zero and Slash stays quiet. Finding still works.' },
     ],
@@ -116,7 +116,7 @@ export const slashDrawing = {
       empty: 'Make a page, a list or a rule',
       enter: 'to draft',
       think: 'Drafting',
-      note: 'One ask per draft. Nothing goes in until you add it.',
+      note: 'One ask per change. Each one has an undo.',
     },
   },
   move: 'to move',

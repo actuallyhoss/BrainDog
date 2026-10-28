@@ -91,7 +91,7 @@ export const home = {
   slash: {
     name: 'Slash',
     title: 'Press / and ask anything.',
-    say: 'Ask about your business in plain words, find anything as you type, or have it draft a page. Nothing goes in without your yes.',
+    say: 'Ask about your business in plain words and it answers with your numbers. Ask for a change and it makes it, with an undo. Money, keys, sharing and deletes wait for your yes.',
     tries: 'Try',
     more: 'How Slash works',
   },

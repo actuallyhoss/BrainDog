@@ -45,14 +45,14 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'agents-leave-a-note', said: "leaves a note when it's done", where: 'tools.say', state: 'true' },
   { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'chores.say', state: 'true' },
   { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'chores.floor', state: 'true' },
-  { id: 'slash-card-yes', said: 'Nothing goes in without your yes.', where: 'slash.say', state: 'true' },
+  { id: 'slash-card-yes', said: 'Money, keys, sharing and deletes wait for your yes.', where: 'slash.say', state: 'true' },
   { id: 'undo-any-change', said: 'Every change has a name on it, and an undo.', where: 'yours.points.0.text', state: 'true' },
   { id: 'export-any-time', said: 'Export everything as one file, any time.', where: 'yours.points.1.text', state: 'true' },
   { id: 'keys-unseen', said: 'AI tools use your keys without ever seeing them.', where: 'yours.points.2.text', state: 'true' },
   { id: 'invite-only', said: 'BrainDog is invite only for now.', where: 'free.say', state: 'true', flag: 'signup' },
 
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
-  { id: 'slash-asks-first', said: 'Nothing it makes goes in until you say yes.', where: 'slashPage.head.lead', state: 'true' },
+  { id: 'slash-asks-first', said: 'Anything with money, keys, sharing or deletes waits for your yes.', where: 'slashPage.head.lead', state: 'true' },
   { id: 'own-key-no-limit', said: 'or no limit with your own AI key', where: 'slashPage.tally.say', state: 'true' },
   { id: 'finding-free', said: 'Finding is free and never spends an ask.', where: 'slashPage.find.body.1', state: 'true' },
   { id: 'own-key-unlimited', said: 'Asks on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },

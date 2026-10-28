@@ -18,8 +18,8 @@ export const shell = {
     slash: {
       title: 'Slash · BrainDog',
       description:
-        'Press / anywhere in BrainDog and ask in plain words. Slash answers from what you keep, finds ' +
-        'anything, and drafts what you ask for.',
+        'Press / anywhere in BrainDog and ask in plain words. Slash reads your record, answers with your numbers, ' +
+        'and makes the changes you ask for, each with an undo.',
     },
     pricing: {
       title: 'Pricing · BrainDog',
