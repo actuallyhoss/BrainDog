@@ -331,6 +331,9 @@ const OPTIONS = { options: [{ id: 'raise', label: 'Raise it', because: 'Covers t
 
 test('A QUEUE READS LEAD, and its first question carries what was proposed and what accepting does', async () => {
   const { k, sql } = await record();
+  /* EVERY QUESTION IN NEEDS YOU, the agents' shelf turned off: Slash's undoable asks would wait there,
+     and the lead of Needs you is what this tests. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_1', 'decide.agents_apart', 'false', '2026-10-01T00:00:00.000Z')");
   value(k.propose({ question: 'Raise the retainer?', body_kind: 'options', body: OPTIONS }, 'slash'));
   value(k.propose({ question: 'Add the two jobs?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: 'Glaze test' }, { what: 'Kiln wash' }] } }, 'slash'));
 

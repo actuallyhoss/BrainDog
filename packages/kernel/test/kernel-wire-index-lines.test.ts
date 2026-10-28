@@ -188,6 +188,9 @@ test('AGT-C08 THE ORDER: a question that moves money leads the queue over an old
   const { k, sql, clock } = await record();
   /* A QUESTION THAT STAYS OPEN is what this tests, so BrainDog settling its own arranging (the Handled list) is turned off. */
   sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('record:handled', 'on', 'false', '2026-10-01T00:00:00.000Z')");
+  /* EVERY QUESTION IN NEEDS YOU, the agents' shelf turned off: Slash's undoable rename would wait there,
+     and the order of Needs you is what this tests. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_1', 'decide.agents_apart', 'false', '2026-10-01T00:00:00.000Z')");
   value(k.create('tasks', { what: 'Glaze test' }, OWNER));
   const old = value<{ id: string }>(
     k.propose({ question: 'Rename it?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: 'tasks#1', version: 1, patch: { what: 'Glaze two' } }] } }, 'slash'),

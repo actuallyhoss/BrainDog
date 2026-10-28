@@ -489,6 +489,9 @@ test('AN `actions` BLOCK LISTS THE RECORD’S SCHEDULED ACTIONS, keys by label, 
  */
 test('GOVERNANCE.OPEN IS THE QUESTIONS STILL OPEN, newest first as the register keeps them, with the options their bodies carry', async () => {
   const { k, sql } = await record();
+  /* EVERY QUESTION IN NEEDS YOU, the agents' shelf turned off: Slash's undoable asks would wait there,
+     and the mapping from a row to a question is what this tests. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_1', 'decide.agents_apart', 'false', '2026-10-01T00:00:00.000Z')");
   const opt = (id: string, label: string, because: string, recommended?: boolean) => ({ id, label, because, ...(recommended ? { recommended } : {}) });
   const first = value<{ id: string }>(
     k.propose(
