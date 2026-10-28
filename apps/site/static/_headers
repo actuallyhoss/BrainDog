@@ -20,3 +20,8 @@
 # name, so a browser keeps it for a day and refreshes it in the background for a week after.
 /shots/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# The fonts are asked for by version (`?v=` in `tokens.css`), so a new face is a new address. A browser keeps
+# one for a week and refreshes it in the background for a month after, rather than asking on every visit.
+/fonts/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
