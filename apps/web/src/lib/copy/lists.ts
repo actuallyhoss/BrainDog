@@ -115,9 +115,9 @@ export const lists = {
   anotherField: 'another field',
   /* THE SAME ANSWER `/decide` GIVES TO THE SAME QUESTION. A disabled control says why it is
      disabled, and the register's own declaration is what says which fields cannot be left out — so
-     the sentence names them rather than saying "some fields". */
+     the line names them rather than saying "some fields", in as few words as that takes. */
   rowRequired: (names: string[]): string =>
-    `${list(names)} cannot be left out. Fill ${names.length === 1 ? 'it' : 'them'} in, and the button turns on.`,
+    `${list(names)} needed.`,
   /* AND IT POINTS RATHER THAN REPEATS. A money field already prints its own sentence under itself;
      copying that sentence into the footer put the same words on screen twice, six inches apart —
      which is the thing `/decide` was just fixed for. This one names the field and says where the

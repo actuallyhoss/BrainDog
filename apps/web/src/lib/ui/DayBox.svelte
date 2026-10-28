@@ -95,10 +95,12 @@
   /* ROOM FOR `30 September 2026` AND NO MORE, and the whole line on a phone once the buttons beside it wrap. The width
      is for a form that stacks its boxes rather than setting them in a row, as the new-row sheet does: there the box
      is the line's whole width, as every box in that sheet is, and in a row the basis decides and the width is unused. */
+  /* AND ONE LINE TALL WHEREVER IT SITS: in a column the basis is a height, and the new-row sheet drew the box 18ch tall. */
   .day[data-fit='field'] {
     flex: 1 1 18ch;
     inline-size: 100%;
     min-block-size: max(40px, var(--ctl-h));
+    max-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     border: 0;
     border-radius: var(--r-pop);

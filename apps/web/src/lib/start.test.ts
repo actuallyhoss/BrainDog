@@ -11,10 +11,10 @@ import assert from 'node:assert/strict';
 import { copy } from './copy.ts';
 
 test('THE DEAD BUTTON SAYS WHICH FIELDS, and reads as English for one and for three', () => {
-  assert.equal(copy.rowRequired(['Due']), 'Due cannot be left out. Fill it in, and the button turns on.');
+  assert.equal(copy.rowRequired(['Due']), 'Due needed.');
   assert.equal(
     copy.rowRequired(['Description', 'Amount', 'Due']),
-    'Description, Amount and Due cannot be left out. Fill them in, and the button turns on.',
+    'Description, Amount and Due needed.',
   );
 
   /* AND IT POINTS AT THE FIELD RATHER THAN REPEATING IT. The money sentence is already under the
