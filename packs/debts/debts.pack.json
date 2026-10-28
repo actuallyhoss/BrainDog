@@ -1,10 +1,10 @@
 {
   "pack": "debts",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "credit-card",
   "title": "Debts",
   "summary": "List what you are paying off, with its balance, yearly rate and minimum, and see how long the avalanche and the snowball each take to clear it, with an extra amount a month, and how much interest each saves.",
-  "changes": "Renames fields: balance is left, method is how, months is mos. The first version: a list of debts, two plans worked out from it, and a page that shows them side by side.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -232,7 +232,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Two ways to clear what you are paying off, and what each saves in interest."
+          "body": "Two ways to clear your debts."
         },
         {
           "kind": "cards",
@@ -278,7 +278,7 @@
             }
           ],
           "limit": 2,
-          "empty": "No plan yet. Add a debt below with its balance, yearly rate and minimum, and both plans appear here."
+          "empty": "No debts yet."
         },
         {
           "kind": "table",
@@ -334,12 +334,12 @@
             }
           ],
           "limit": 2,
-          "empty": "Nothing to compare yet. The extra you pay each month is typed here once a plan exists, and both plans are worked again."
+          "empty": "Nothing to compare yet."
         },
         {
           "kind": "note",
           "span": 12,
-          "body": "The avalanche pays the highest rate first and costs the least interest. The snowball pays the smallest balance first and clears a debt soonest. Type a new extra on either plan and both are worked again."
+          "body": "Avalanche: highest rate first, least interest. Snowball: smallest balance first."
         },
         {
           "kind": "table",
@@ -383,7 +383,7 @@
             }
           ],
           "limit": 50,
-          "empty": "No debts yet. Add a card, a loan or an instalment plan with what is left on it and its minimum."
+          "empty": "No debts yet."
         },
         {
           "kind": "capture",

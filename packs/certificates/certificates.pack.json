@@ -1,10 +1,10 @@
 {
   "pack": "certificates",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "icon": "landmark",
   "title": "Certificates",
   "summary": "Bank certificates and fixed deposits: the rate, what each has earned so far, when it pays next and when it matures. Its payouts and the principal coming back are walked into Cash ahead.",
-  "changes": "Says its dates as words, labels its columns, and no longer gives a certificate that compounds a next payout.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -388,7 +388,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{certificates-count}} certificates hold {{certificates-principal}} and have earned {{certificates-accrued}} so far. Next payout {{day:certificates-next-payout}}, next to mature {{day:certificates-next-matures}}.",
+          "body": "{{certificates-principal}} in {{certificates-count}} certificates, {{certificates-accrued}} earned. Next payout {{day:certificates-next-payout}}.",
           "when": {
             "metric": "certificates-count",
             "gt": 0
@@ -398,7 +398,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "No certificate yet. Add one below with what was put in, the rate and when it pays, and its payouts and the principal coming back appear in Cash ahead.",
+          "body": "No certificates yet.",
           "when": {
             "metric": "certificates-count",
             "is": 0
@@ -500,7 +500,7 @@
             }
           ],
           "limit": 100,
-          "empty": "No live certificate."
+          "empty": "None live."
         },
         {
           "kind": "capture",

@@ -1,10 +1,10 @@
 {
   "pack": "zakat",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "icon": "scale",
   "title": "Zakat",
   "summary": "Works out zakat step by step in plain words: the nisab from your gold rate, the year from your first gold buy or a day you set, each cash account at its lowest over 354 days, your gold and metals, less bills due, and 2.5% of the total. Keeps a list of what you have given.",
-  "changes": "Says the year's dates as words and words the note about other currencies.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -696,7 +696,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Zakat is worked out from your cash, your gold and metals, and the bills due. Set today's gold rate on Investments and gold, and the steps below fill in.",
+          "body": "Set today's gold rate to work it out.",
           "when": {
             "metric": "zakat-nisab-set",
             "lt": 1
@@ -706,7 +706,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Your zakatable wealth is {{zakat-total}}, at or above the nisab of {{zakat-nisab}}. Two and a half percent of it is {{zakat-due}}.",
+          "body": "{{zakat-due}} due: {{zakat-total}} is at or above the nisab of {{zakat-nisab}}.",
           "when": {
             "metric": "zakat-met",
             "gt": 0
@@ -716,7 +716,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Your zakatable wealth is {{zakat-total}}, below the nisab of {{zakat-nisab}}, so no zakat is due this year.",
+          "body": "{{zakat-total}} is below the nisab of {{zakat-nisab}}, so no zakat is due.",
           "when": {
             "all": [
               {
@@ -766,7 +766,7 @@
           "heading": "Step 1. The nisab",
           "icon": "scale",
           "span": 12,
-          "body": "The nisab is the least wealth zakat applies to: {{zakat-grams}} g, which is 85 g of 24k gold at your gold rate, or 595 g of silver if you chose silver and gave a silver price. Today that is {{zakat-nisab}}.",
+          "body": "{{zakat-grams}} g at your rate: {{zakat-nisab}} today.",
           "when": {
             "metric": "zakat-nisab-set",
             "gt": 0
@@ -777,7 +777,7 @@
           "heading": "Step 2. The year",
           "icon": "calendar-clock",
           "span": 12,
-          "body": "Your year began on {{day:zakat-hawl-from}}, taken from your first gold buy unless you gave a day. It is 354 days long, and it is complete: {{good:the year has run}}. Zakat is due now.",
+          "body": "Began {{day:zakat-hawl-from}}. {{good:The year has run}}, so zakat is due now.",
           "when": {
             "metric": "zakat-hawl-done",
             "gt": 0
@@ -788,7 +788,7 @@
           "heading": "Step 2. The year",
           "icon": "calendar-clock",
           "span": 12,
-          "body": "Your year began on {{day:zakat-hawl-from}} and ends on {{day:zakat-hawl-ends}}, 354 days on. The figure below is what 2.5% comes to today.",
+          "body": "{{day:zakat-hawl-from}} to {{day:zakat-hawl-ends}}.",
           "when": {
             "all": [
               {
@@ -807,7 +807,7 @@
           "heading": "Step 2. The year",
           "icon": "calendar-clock",
           "span": 12,
-          "body": "No day is known for your year yet. Buy gold on Investments and gold, or give the day it began in your own figures below.",
+          "body": "No start day yet. Set one in your figures below.",
           "when": {
             "metric": "zakat-hawl-known",
             "lt": 1
@@ -818,7 +818,7 @@
           "heading": "Step 3. Cash at its lowest over 354 days",
           "icon": "wallet",
           "span": 12,
-          "body": "Each cash account counts at the least it stood at on any day of the last 354 days, which is the part that stayed the whole year. A card is not counted.",
+          "body": "Each account at its lowest over the year. Cards are left out.",
           "source": "register.zakat_cash",
           "where": "taken is true",
           "columns": [
@@ -844,7 +844,7 @@
             }
           ],
           "limit": 30,
-          "empty": "No cash account yet. Add an account that counts as cash on Money."
+          "empty": "No cash accounts yet."
         },
         {
           "kind": "stat",
@@ -891,7 +891,7 @@
           "heading": "Step 6. The total and the 2.5%",
           "icon": "calculator",
           "span": 12,
-          "body": "Cash, plus gold and metals, plus cash due to you, less bills due, is {{zakat-total}}. At or above {{zakat-nisab}}, zakat is two and a half percent of it, {{zakat-due}}.",
+          "body": "{{zakat-total}} in all. 2.5% of it is {{zakat-due}}.",
           "when": {
             "metric": "zakat-nisab-set",
             "gt": 0
@@ -901,7 +901,7 @@
           "kind": "note",
           "tone": "warn",
           "span": 12,
-          "body": "Amounts in another currency from the gold rate are left out, not added in: {{zakat-left-out}}.",
+          "body": "Left out, in other currencies: {{zakat-left-out}}.",
           "when": {
             "metric": "zakat-left-out",
             "gt": 0
@@ -919,7 +919,6 @@
           "heading": "What you set",
           "icon": "sliders-horizontal",
           "span": 12,
-          "body": "Open your figures to choose silver, give a silver price, give the day your year began, add cash due to you or add debts that are due.",
           "source": "register.zakat_basis",
           "columns": [
             {
@@ -946,7 +945,7 @@
             }
           ],
           "limit": 1,
-          "empty": "Your figures are made on the first daily run."
+          "empty": "Made on the first daily run."
         },
         {
           "kind": "capture",
@@ -987,12 +986,12 @@
             }
           ],
           "limit": 30,
-          "empty": "Nothing given yet. When you give, mark it here and it stays as your history."
+          "empty": "Nothing given yet."
         },
         {
           "kind": "note",
           "span": 12,
-          "body": "This is a working, not a ruling. Ask a scholar you trust about your own case, such as what counts as cash or how to treat a debt."
+          "body": "A working, not a ruling."
         }
       ]
     }

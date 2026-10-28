@@ -1,10 +1,10 @@
 {
   "pack": "trips",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "icon": "plane",
   "title": "Trips",
   "summary": "Name a trip with its dates and file the Ledger's lines into it, and each trip says what it cost in total, by category and in each currency.",
-  "changes": "Says a trip's days as words.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -240,7 +240,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{trips-count}} trips, each with the Ledger's lines from its days filed into it."
+          "body": "{{trips-count}} trips."
         },
         {
           "kind": "bar",
@@ -248,7 +248,7 @@
           "icon": "chart-bar",
           "span": 12,
           "source": "metric.trip-spent-by-trip",
-          "empty": "Nothing is filed in a trip yet."
+          "empty": "Nothing filed yet."
         },
         {
           "kind": "table",
@@ -285,7 +285,7 @@
             }
           ],
           "limit": 100,
-          "empty": "No trip yet. Add one with its name and the days it ran."
+          "empty": "No trips yet."
         },
         {
           "kind": "capture",
@@ -415,7 +415,7 @@
             }
           ],
           "limit": 100,
-          "empty": "Nothing is filed in {{name}} yet. Lines dated {{from}} to {{to}} are filed when the trip is saved."
+          "empty": "Nothing filed yet."
         }
       ],
       "nav": {

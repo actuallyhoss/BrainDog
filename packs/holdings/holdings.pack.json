@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Says once when a holding's price is over 30 days old, and when a gold rate in use is over 7 days old.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -824,7 +824,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Funds, shares, certificates and gold you own, with what you paid and what each is worth now. Add a holding to start, then its buys.",
+          "body": "Nothing held yet.",
           "when": {
             "metric": "holdings-count",
             "lt": 1
@@ -834,7 +834,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "What you own beyond cash, at what you paid until each one has a price.",
+          "body": "{{holdings-count}} holding(s).",
           "when": {
             "metric": "holdings-count",
             "gt": 0
@@ -915,7 +915,7 @@
           "heading": "Gold rate",
           "icon": "vault",
           "span": 4,
-          "body": "21k is priced at 21/24 of the 24k rate and 18k at 18/24, unless you give a rate for that karat.",
+          "body": "21k and 18k follow the 24k rate unless you set their own.",
           "source": "register.gold_rates",
           "where": "live is true",
           "columns": [
@@ -957,7 +957,7 @@
           "kind": "note",
           "tone": "warn",
           "span": 12,
-          "body": "The gold rate is from {{gold-rate-on}}, {{bad:over a week ago}}. Set today's rate and your gold is worth today's money.",
+          "body": "The gold rate is from {{gold-rate-on}}, {{bad:over a week ago}}.",
           "when": {
             "metric": "gold-rates-old",
             "gt": 0
@@ -980,7 +980,6 @@
           "heading": "Buys",
           "icon": "hand-coins",
           "span": 12,
-          "body": "Each buy is kept with its own day, so how long each piece has been held can always be said.",
           "source": "register.holding_buys",
           "columns": [
             {
@@ -1017,7 +1016,7 @@
             }
           ],
           "limit": 50,
-          "empty": "No buys yet. Add each one with its day, grams or shares, the price and the fees."
+          "empty": "No buys yet."
         },
         {
           "kind": "cards",
@@ -1058,7 +1057,7 @@
             }
           ],
           "limit": 100,
-          "empty": "Nothing held yet. A fund, some shares, a certificate or a buy of gold goes here."
+          "empty": "Nothing held yet."
         },
         {
           "kind": "stat",
@@ -1080,7 +1079,7 @@
           "kind": "note",
           "tone": "warn",
           "span": 12,
-          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}. That is the oldest price here. Say what each holding is worth now and the value above is today's.",
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}.",
           "when": {
             "metric": "holdings-stale",
             "gt": 0
@@ -1223,7 +1222,7 @@
             }
           ],
           "limit": 50,
-          "empty": "No buys yet. Its count and cost are the ones typed on it."
+          "empty": "No buys yet."
         }
       ]
     }

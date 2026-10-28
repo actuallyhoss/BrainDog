@@ -380,8 +380,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.0.2",
       "versions": [
+        {
+          "version": "2.0.2",
+          "checksum": "c87116ef9ca0bb6869f2bb3d756e3471c59f0acfcc12c1bf931ab29515250317",
+          "bytes": 24053,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "e6208fc17c6c55bb458fdef264d404fae6fd9fdf0d5e7f9059b768ea2da65ad9",
@@ -539,8 +566,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "3.0.2",
+      "latest": "3.0.3",
       "versions": [
+        {
+          "version": "3.0.3",
+          "checksum": "865828c06f83a36b5a5cc0f824594fe50e92420e2e65bedc8e03feaaf322a8b5",
+          "bytes": 27989,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its page. A count can now be made by note and coin, each currency with its own set, and the difference is filed as you say.",
+          "preview": true
+        },
         {
           "version": "3.0.2",
           "checksum": "0f5a0027eda634953e3d319982367865c78b5e4292425314a1139fa85b0b57ba",
@@ -975,8 +1028,36 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "version": "2.0.1",
+          "checksum": "2415fbb248d6094acacf80ca40fc3994a5c4493174e1154dab9d1f3538bdf9f8",
+          "bytes": 19970,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Debts",
+              "Payoff plans"
+            ],
+            "pages": [
+              "Debts"
+            ],
+            "rules": [
+              "Work out the plans when a debt changes",
+              "Work out the plans when the extra changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "2.0.0",
           "checksum": "34099c571e01ba65e720afe825d38178549c771fe20741f494a8b8107a97a773",
@@ -1286,8 +1367,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.0.2",
       "versions": [
+        {
+          "version": "2.0.2",
+          "checksum": "8bf8e09f450f3a7e49e8e32be0984745ad1aa7cec9949d0be942f57382456839",
+          "bytes": 17619,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Goals"
+            ],
+            "pages": [
+              "Goals"
+            ],
+            "rules": [
+              "goals_pace",
+              "goals_pace_on_balance"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "c81d313b8291d5d7a2b03c2bb4338b1ef2b7433f2b3ea4bb3bf3cea88f1cf157",
@@ -1546,8 +1654,41 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.1.0",
+      "latest": "3.1.1",
       "versions": [
+        {
+          "version": "3.1.1",
+          "checksum": "a81967ab9e76a8d8f191bb8c42882863300e20d31984b1e2da5bac7a32c7a058",
+          "bytes": 44490,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "3.1.0",
           "checksum": "1729f8a18e0735412b71262744ba43bfb74d3b666919400eb1b6da477c957639",
@@ -1881,8 +2022,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.0.2",
       "versions": [
+        {
+          "version": "2.0.2",
+          "checksum": "38b811e75e8f61f41fb6674142138494c2ab7a223ac7068977c143f10dd5125a",
+          "bytes": 35076,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "04fb23b927be6626b7dd10833721f6284eabd15d3ca0d2545d412c43d3b592dd",
@@ -4164,8 +4333,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.1",
+      "latest": "1.0.2",
       "versions": [
+        {
+          "version": "1.0.2",
+          "checksum": "d3871230b7bc4bd06b2f63e7ac0c9482f01b5a52d6e7cb6a6c4d38a48c206978",
+          "bytes": 39032,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Property",
+              "{{name}}, property"
+            ],
+            "rules": [
+              "Make the parts of a plan",
+              "Read a pasted plan",
+              "Add up a plan when a part changes",
+              "Add up a plan when its price changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "1.0.1",
           "checksum": "cacad2889cc7cab07fea43d082cf61f7e6c29fa3cf850e97d303ea930fae5a6d",
@@ -5770,8 +5967,35 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.0.2",
       "versions": [
+        {
+          "version": "2.0.2",
+          "checksum": "704d3f9687c64f9c42ee6d00cf40c2f5bac475aa09c8699b76cd349a16794b90",
+          "bytes": 15374,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Trips"
+            ],
+            "pages": [
+              "Trips",
+              "{{name}}"
+            ],
+            "rules": [
+              "File the Ledger's lines of a trip's days into it"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "2a3c57c58d896bd5ebcff8544d9265373a3773b203a6e3a0c0d0dfad6ea10d47",
@@ -6033,8 +6257,39 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.0.2",
       "versions": [
+        {
+          "version": "2.0.2",
+          "checksum": "26cf35c843bba0f473447b53527cf81dc6c0432c912cbc063d169c446cc7c4dd",
+          "bytes": 35415,
+          "published_at": "2026-10-28T15:42:06.488Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core",
+              "holdings"
+            ],
+            "lists": [
+              "Zakat working",
+              "Cash at its lowest",
+              "Zakat given"
+            ],
+            "pages": [
+              "Zakat"
+            ],
+            "rules": [
+              "zakat_inputs",
+              "zakat_rate",
+              "zakat_metals"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "7b47c5ae0e340878d7d0e146882580049917db356d8da16317380ba9864e3c28",

@@ -140,7 +140,7 @@ const SPREAD_MS = 15 * 60_000;
 test('THE FILE IS 2.0.0, Investments and gold, and every field and kind 1.4.2 held is still there as it was', () => {
   const doc = file();
   const old = v142();
-  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.1.0', 'Investments and gold']);
+  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.1.1', 'Investments and gold']);
   assert.equal(old.version, '1.4.2', 'the frozen 1.4.2 moved');
   assert.equal(v100().version, '1.0.0', 'the frozen 1.0.0 moved');
   assert.deepEqual(doc.requires, old.requires);
@@ -222,13 +222,13 @@ test('INSTALLED FROM THE FILE: three lists, five rules, two scripts, eighteen fi
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ADDS);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.1');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.1.0']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.1.1']);
 });
 
 test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so every amount reads in the money somebody chose', () => {
@@ -542,7 +542,7 @@ test('A FRESH PAGE SAYS WHAT GOES HERE AND OFFERS THE FIRST HOLDING, and draws n
   const { api, close } = await inPounds();
   const on = (await pageOf(api)).blocks.filter(drawn);
   assert.deepEqual(on.map((b) => [b.kind, b.heading ?? null]).slice(0, 2), [['note', null], ['capture', 'Add a holding']]);
-  assert.match(String(on[0]!.body), /^Funds, shares, certificates and gold you own/u);
+  assert.equal(String(on[0]!.body), 'Nothing held yet.');
   assert.ok(!on.some((b) => b.heading === 'What you hold' || b.kind === 'split'), 'a tile was drawn over nothing held');
   close();
 });
@@ -595,7 +595,7 @@ async function upgraded(doc: Doc, rows: readonly Body[] = HELD): Promise<Awaited
   const diff = await planOf(made.api, file());
   assert.deepEqual(diff.conflicts, [], 'the update met a conflict');
   said(await put(made.api, file()));
-  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.0');
+  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.1.1');
   return { ...made, ids, before };
 }
 

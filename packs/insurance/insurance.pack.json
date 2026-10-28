@@ -1,10 +1,10 @@
 {
   "pack": "insurance",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "icon": "shield",
   "title": "Insurance",
   "summary": "Your life and savings policies: who the insurer is, what the premium is and where it is paid, the cover, what the fund is worth and from when, and when it matures.",
-  "changes": "Says its dates as words and labels the illustration columns.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -595,7 +595,7 @@
             "metric": "policies-live",
             "gt": 0
           },
-          "body": "{{policies-fund}} in funds across {{policies-live}} live policies. Next maturity {{day:policies-next}}."
+          "body": "{{policies-fund}} across {{policies-live}} policies. Next maturity {{day:policies-next}}."
         },
         {
           "kind": "note",
@@ -605,7 +605,7 @@
             "metric": "policies-live",
             "lt": 1
           },
-          "body": "Add a policy with its insurer, premium and cover, and its fund value shows here with the day it is from."
+          "body": "No policies yet."
         },
         {
           "kind": "stat",
@@ -642,7 +642,7 @@
             "metric": "policies-fund-stale",
             "is": 0
           },
-          "body": "The oldest fund value here is from {{day:policies-fund-on}}. Type the value from the insurer's next statement to keep them current."
+          "body": "Oldest fund value from {{day:policies-fund-on}}."
         },
         {
           "kind": "note",
@@ -652,7 +652,7 @@
             "metric": "policies-fund-stale",
             "gt": 0
           },
-          "body": "A fund value here is from {{day:policies-fund-on}}, {{bad:over 90 days ago}}. That is the oldest. Type the value from the insurer's latest statement and the fund above is today's."
+          "body": "Oldest fund value from {{day:policies-fund-on}}, {{bad:over 90 days ago}}."
         },
         {
           "kind": "cards",
@@ -693,7 +693,7 @@
             }
           ],
           "limit": 24,
-          "empty": "No policies yet. Add the first one, with its insurer, premium and cover."
+          "empty": "No policies yet."
         },
         {
           "kind": "table",
@@ -815,7 +815,7 @@
             "metric": "policy-fund-on-at:{{name}}",
             "gt": 0
           },
-          "body": "This fund value is from {{day:policy-fund-on-at:{{name}}}}. Type the value from the insurer's latest statement to bring it up to date."
+          "body": "Fund value from {{day:policy-fund-on-at:{{name}}}}."
         },
         {
           "kind": "stat",
@@ -844,7 +844,7 @@
             "metric": "policy-matures-at:{{name}}",
             "gt": 0
           },
-          "body": "Matures on {{day:policy-matures-at:{{name}}}}, with {{policy-term-at:{{name}}}} percent of the term gone."
+          "body": "Matures {{day:policy-matures-at:{{name}}}}, {{policy-term-at:{{name}}}}% of the term gone."
         },
         {
           "kind": "stat",
@@ -938,7 +938,7 @@
             }
           ],
           "limit": 100,
-          "empty": "The insurer's illustration is not entered, so there are no years to show.",
+          "empty": "No illustration entered.",
           "when": {
             "metric": "policy-years-at:{{name}}",
             "gt": 0

@@ -79,7 +79,7 @@ const read = (api: Api, id: string): Body => api.kernel.get(id)!.fields as Body;
 test('THE FILE DECLARES THE LIST, THE TWO RULES, THE SCRIPT, THE FIGURES AND THE PAGE', () => {
   const doc = file();
   assert.equal(doc.pack, 'goals');
-  assert.equal(doc.version, '2.0.1');
+  assert.equal(doc.version, '2.0.2');
   const list = doc.declarations.find((d) => d.register === 'money_goals')!;
   const ids = (list.fields as Body[]).map((f) => f.id);
   /* THE WORDS PERSONAL'S SAVINGS GOALS USES, kept so the two read alike. */
@@ -106,7 +106,7 @@ test('BEFORE THE PACK THE RECORD HAS NO GOALS, AND THE FILE INSTALLS WITH NOTHIN
     ['metric.goals-behind', 'metric.goals-have-by-name', 'metric.goals-held', 'metric.goals-need', 'metric.goals-reached', 'metric.goals-saving', 'page.goals', 'register.money_goals', 'rule.goals_pace', 'rule.goals_pace_on_balance', 'script.goals_pace'],
   );
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'goals')?.version, '2.0.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'goals')?.version, '2.0.2');
   sql.close();
 });
 

@@ -1,10 +1,10 @@
 {
   "pack": "count-cash",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "icon": "hand-coins",
   "title": "Count the cash",
   "summary": "Count the cash note by note and coin by coin, or by its total, and the record keeps it as a balance check and files the difference from what it thought was there, as lines you describe or as Discrepancy.",
-  "changes": "Reconcile is now filed. A count can now be made by note and coin: each currency has its own set (EGP, USD, EUR, GBP, SAR and AED), the total is worked out for you, and the count keeps what was counted. When the cash is out, you choose how the difference is recorded: as the lines you describe, with whatever is left filed as Discrepancy, or all of it as Discrepancy. The Cash counts page now opens with a line saying what a count is.",
+  "changes": "Shorter words on its page. A count can now be made by note and coin, each currency with its own set, and the difference is filed as you say.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -140,7 +140,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Each count is the notes and coins you counted in a box, set against what the account says. Any difference is filed in the Ledger, so the balance matches the box."
+          "body": "Any difference is filed in the Ledger."
         },
         {
           "kind": "table",
@@ -187,7 +187,7 @@
               "dir": "desc"
             }
           ],
-          "empty": "Nothing has been counted yet. Add a count with the notes and coins in the box, or just its total, and the difference goes into the ledger."
+          "empty": "Nothing counted yet."
         }
       ]
     }

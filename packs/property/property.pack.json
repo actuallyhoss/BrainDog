@@ -1,10 +1,10 @@
 {
   "pack": "property",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "icon": "building",
   "title": "Property",
   "summary": "A flat or a house paid in parts: what it is worth, what you have paid, what is left and what you own beyond that, with the parts to come and the parts paid. Makes the parts for you, or reads a plan you paste.",
-  "changes": "Shows the next six parts on a plan and folds the rest.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -553,7 +553,7 @@
             "metric": "property-count",
             "lt": 1
           },
-          "body": "No property yet. Open a plan on Plans, say what it is worth now and its price, and it shows up here with what you have paid and what you own beyond what is left."
+          "body": "No property yet."
         },
         {
           "kind": "note",
@@ -563,7 +563,7 @@
             "metric": "property-count",
             "gte": 1
           },
-          "body": "{{property-equity}} equity in {{property-value}} of property. {{property-paid}} paid, {{property-left}} left to pay."
+          "body": "{{property-equity}} equity in {{property-value}}. {{property-left}} left to pay."
         },
         {
           "kind": "stat",
@@ -649,7 +649,7 @@
             }
           ],
           "limit": 50,
-          "empty": "No plan has a value yet. Say what a plan is worth now and it is listed here."
+          "empty": "No plan has a value yet."
         }
       ]
     },
@@ -679,7 +679,7 @@
             "metric": "plan-parts:{{name}}",
             "lt": 1
           },
-          "body": "{{property-equity-of:{{name}}}} is not worked out until {{name}} has parts. Generate them below, or paste a plan, and this page counts them."
+          "body": "No parts yet."
         },
         {
           "kind": "note",
@@ -697,7 +697,7 @@
               }
             ]
           },
-          "body": "{{property-equity-of:{{name}}}} equity in {{name}}. {{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, {{property-left-of:{{name}}}} left to pay."
+          "body": "{{property-equity-of:{{name}}}} equity. {{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, {{property-left-of:{{name}}}} left."
         },
         {
           "kind": "stat",
@@ -746,7 +746,7 @@
             "metric": "plan-parts:{{name}}",
             "gte": 1
           },
-          "empty": "No part of {{name}} is on Instalments yet."
+          "empty": "No parts yet."
         },
         {
           "kind": "series",
@@ -764,7 +764,7 @@
             "metric": "plan-parts-paid:{{name}}",
             "gt": 0
           },
-          "empty": "Nothing is paid on {{name}} yet."
+          "empty": "Nothing paid yet."
         },
         {
           "kind": "stat",
@@ -824,7 +824,7 @@
             }
           ],
           "limit": 6,
-          "empty": "Nothing left to pay on {{name}}."
+          "empty": "Nothing left to pay."
         },
         {
           "kind": "section",
@@ -913,7 +913,7 @@
             }
           ],
           "limit": 120,
-          "empty": "No part of {{name}} is paid yet."
+          "empty": "Nothing paid yet."
         }
       ]
     }

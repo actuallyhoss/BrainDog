@@ -1,10 +1,10 @@
 {
   "pack": "goals",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "icon": "star",
   "title": "Goals",
   "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
-  "changes": "Labels the columns of the goals table.",
+  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -337,7 +337,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Saving for {{goals-saving}} goals, each counted from what you hold."
+          "body": "Saving for {{goals-saving}} goals."
         },
         {
           "kind": "stat",
@@ -366,7 +366,7 @@
           "kind": "note",
           "tone": "warn",
           "span": 12,
-          "body": "{{goals-behind}} {{bad:behind}}. Each is holding less than a straight line from where it began to its target has reached today. Put by what each goal asks each month and it catches up.",
+          "body": "{{goals-behind}} {{bad:behind}}.",
           "when": {
             "metric": "goals-behind",
             "gt": 0
@@ -398,7 +398,7 @@
             }
           ],
           "limit": 12,
-          "empty": "No goal yet. Add one with a target and a day, and how close you are shows here."
+          "empty": "No goals yet."
         },
         {
           "kind": "table",
@@ -442,7 +442,7 @@
             }
           ],
           "limit": 100,
-          "empty": "No goals yet. A goal says what you are saving for, the target, and the day you want it by. Give it an account, a currency or a value to count."
+          "empty": "No goals yet."
         }
       ]
     }
