@@ -3051,7 +3051,10 @@ function aggregate(
     /* Hoisted for the same reason as the ratio above: the gate that counts emitted codes will not
        cross a ternary condition carrying a quote, and both arms below are codes it has to see. */
     const money = type === 'money';
-    if (groups.length === 0) return ok({ value: kind === 'sum' ? 0 : null, unit: null, rows, refusals: [] });
+    /* A SUM OF NO MONEY IS NOUGHT IN THE CURRENCY THE FIGURE IS ADDED UP IN, so it is drawn "EGP 0" and never a bare "0"
+       a person cannot tell from a count. With no currency to add up in, it names none. */
+    const none = money && kind === 'sum' ? (fx?.into ?? fx?.home ?? null) : null;
+    if (groups.length === 0) return ok({ value: kind === 'sum' ? 0 : null, unit: none, rows, refusals: [] });
     /* A SUM OF MONEY IN A CURRENCY OTHER THAN THE ONE THE FIGURE IS ADDED UP IN is read row by row, each amount with
        the day its row is about, and converted at the rate as of that day, or said one amount per currency (`fx.ts`). */
     const foreign = groups.length > 1 || (fx?.into != null && groups[0]!.u !== fx.into);
