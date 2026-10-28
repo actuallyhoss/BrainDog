@@ -24,13 +24,13 @@ const READING: Reading = {
 
 test('THE LINE IS THE STATE: what waits in Needs you leads, in red, and who drafts is never the headline', () => {
   const s = sentenceOf(1, 2, 4, slash.emptyTitle);
-  assert.deepEqual(s, { text: 'One suggestion waits for you in Needs you.', needs: 'One suggestion waits for you in Needs you' });
-  assert.equal(sentenceOf(3, 0, 3, slash.emptyTitle).needs, 'Three suggestions wait for you in Needs you');
+  assert.deepEqual(s, { text: '1 suggestion waits in Needs you.', needs: '1 suggestion waits in Needs you' });
+  assert.equal(sentenceOf(3, 0, 3, slash.emptyTitle).needs, '3 suggestions wait in Needs you');
   assert.ok(!s.text.includes(slash.byRules));
 });
 
 test('NOTHING WAITING, NO RED: what is new, else everything answered, else nothing yet', () => {
-  assert.deepEqual(sentenceOf(0, 2, 3, slash.emptyTitle), { text: 'Slash has two new suggestions.', needs: undefined });
+  assert.deepEqual(sentenceOf(0, 2, 3, slash.emptyTitle), { text: '2 new suggestions.', needs: undefined });
   assert.deepEqual(sentenceOf(0, 0, 3, slash.emptyTitle), { text: words.allSettled, needs: undefined });
   assert.deepEqual(sentenceOf(0, 0, 0, 'Nothing to suggest yet'), { text: 'Nothing to suggest yet.', needs: undefined });
   assert.deepEqual(sentenceOf(0, 0, 0, 'Nothing to suggest yet.'), { text: 'Nothing to suggest yet.', needs: undefined });

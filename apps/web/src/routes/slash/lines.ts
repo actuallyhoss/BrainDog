@@ -17,12 +17,12 @@ import { suggestionsOf, words as slashWords, type Reading, type Suggestion } fro
 export const words = {
   /* The groups this screen adds to `slash.ts`'s. */
   answeredTitle: 'What you answered',
-  allAnswered: 'You have answered everything Slash suggested. What it notices next is drafted here.',
+  allAnswered: 'All answered.',
   /* The title row's red phrase. */
-  waitOn: (n: number) => (n === 1 ? 'One suggestion waits for you in Needs you' : `${counted(n)} suggestions wait for you in Needs you`),
+  waitOn: (n: number) => `${n} ${n === 1 ? 'suggestion waits' : 'suggestions wait'} in Needs you`,
   /* The title row with nothing waiting: what is new, else that everything was answered, else that there is nothing. */
-  fresh: (n: number) => (n === 1 ? 'Slash has one new suggestion.' : `Slash has ${counted(n).toLowerCase()} new suggestions.`),
-  allSettled: 'You have answered everything Slash suggested.',
+  fresh: (n: number) => `${n} new ${n === 1 ? 'suggestion' : 'suggestions'}.`,
+  allSettled: 'All answered.',
   /* The empty tile's one thing to do, where a model can answer it: the Ask field's own example, asked. */
   tryAsk: (q: string) => `Try: ${q}`,
   /* The tile. */
@@ -37,7 +37,7 @@ export const words = {
   /* How many it read, said without the system's word for them. */
   rowsRead: (n: number) => (n === 1 ? 'one found' : `${n.toLocaleString('en')} found`),
   /* The hint under "What Slash suggests". */
-  press: 'Put these in Needs you and each waits there for your yes. Nothing changes until then.',
+  press: 'Nothing changes until you say yes.',
   /* Who drafted a suggestion: Slash's own rules, or the model it names. */
   byRules: 'From how you use BrainDog',
   byModel: (name: string) => `Drafted by ${name}`,
@@ -60,10 +60,6 @@ export const words = {
 /** The title row's sentence, and the phrase inside it that needs him. */
 export type Sentence = { text: string; needs: string | undefined };
 
-const SPELLED = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'] as const;
-
-/** A count that opens a sentence: a word to ten, figures after. */
-const counted = (n: number): string => SPELLED[n] ?? n.toLocaleString('en-GB');
 
 /**
  * THE LINE UNDER "Slash" IS THE STATE, never the host: what waits for him on Decide, in red; else how many are new; else

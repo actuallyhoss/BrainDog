@@ -526,7 +526,7 @@
             ><Icon name="slash" size="s" /><span>{pageWords.tryAsk(askWords.placeholder)}</span></button
           >
         {/if}
-      {:else if reading.quiet !== null}
+      {:else if reading.quiet !== null && stillOpen.length === 0}
         <p class="slash-said">{reading.quiet}</p>
       {:else if stillOpen.length === 0}
         <p class="slash-said">{suggestions.length === 0 ? words.suggestsNone : pageWords.allAnswered}</p>

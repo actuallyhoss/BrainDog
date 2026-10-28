@@ -20,11 +20,12 @@
 
   const words = {
     title: 'Slash',
-    sentence: 'Your conversations with Slash, newest first. Open one to go on with it.',
-    none: 'Nothing asked yet. Ask Slash about anything in this BrainDog, and the conversation is kept here.',
+    /* A FIGURE AND ITS AGE, or nothing: what the list is for is the list. */
+    sentence: (n: number, ago: string) => `${n} ${n === 1 ? 'conversation' : 'conversations'}, the last ${ago}.`,
+    none: 'Nothing asked yet.',
     fresh: 'New conversation',
     list: 'Conversations',
-    history: 'What Slash suggested, and what came of it',
+    history: 'Past suggestions',
   } as const;
 
   let threads = $state<KeptThread[]>([]);
@@ -54,7 +55,7 @@
   }
 </script>
 
-<PageHead icon="slash" title={words.title} sentence={words.sentence} />
+<PageHead icon="slash" title={words.title} sentence={threads.length > 0 ? words.sentence(threads.length, since(new Date(threads[0].at).toISOString(), now)) : undefined} />
 <div class="page">
   <div class="lead">
     <Button weight="primary" kbd="⌘J" onclick={fresh}><Icon name="plus" size="m" />{words.fresh}</Button>
@@ -66,7 +67,6 @@
       {#each threads as t (t.id)}
         <li>
           <button type="button" class="thread tap" onclick={() => openThread(t.id)}>
-            <span class="mark"><Icon name="slash" size="m" /></span>
             <span class="q" dir="auto">{t.title}</span>
             <span class="when">{since(new Date(t.at).toISOString(), now)}</span>
           </button>
@@ -106,7 +106,7 @@
     border-block-end: 1px solid var(--rule);
   }
 
-  /* ONE CONVERSATION A ROW: Slash's glyph, the question that opened it, and when it was last asked in. */
+  /* ONE CONVERSATION A ROW: the question that opened it, and when it was last asked in. */
   .thread {
     display: flex;
     align-items: center;
@@ -127,12 +127,6 @@
     .thread:hover {
       background: var(--hover);
     }
-  }
-
-  .mark {
-    display: inline-grid;
-    flex: none;
-    color: var(--ink-3);
   }
 
   .q {
