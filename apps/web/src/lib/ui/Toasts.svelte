@@ -191,9 +191,8 @@
 
 <style>
   /**
-   * THE WORK'S WIDTH, between what the rail takes at the start and what the docked panel takes at the end, with the
-   * toasts at its start. `--toast-start` is nothing until the shell says it draws a rail, and then the rail's width as
-   * `Sidebar.svelte` declares it on the root (`--rail-w`), so the stack follows the rail at either width.
+   * THE WORK'S WIDTH, from the window's start to what the docked panel takes at the end, with the toasts at its start.
+   * No rail stands at the start any more, so `--toast-start` is the window's edge.
    *
    * `--dock-w` WITH ITS FALLBACK, because only `Panel.svelte`'s stylesheet declares it, and a screen that draws no
    * panel has not loaded that sheet. An unset variable throws out the whole `inset-inline`, both edges.
@@ -223,11 +222,6 @@
     background: none;
     border: 0;
     color: inherit;
-  }
-
-  /* THE RAIL'S WIDTH AS THE RAIL SAYS IT, `--rail-w` (`Sidebar.svelte`), at whichever of its widths it is drawn. */
-  :global(:root:has(.shell[data-shape='rail'])) .stack {
-    --toast-start: calc(var(--inset) + var(--rail-w, var(--rail)));
   }
 
   .stack > :global(*) {
