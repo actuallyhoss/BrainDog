@@ -202,6 +202,7 @@
 <div
   class="card"
   data-flow-card
+  data-menu-host
   data-key={node.key}
   data-list={list}
   data-at={at}

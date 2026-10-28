@@ -1133,11 +1133,11 @@
             rowKey = `${ids}b-${i + 1}|${r.register}#${r.seq}`;
             host.open(r);
           },
-          onmenu: (row: Row, anchor: HTMLElement) => {
+          onmenu: (row: Row, anchor: HTMLElement, point?: { x: number; y: number; height: number }): boolean => {
             const r = host.rowOf(row);
-            if (!r) return;
+            if (!r) return false;
             rowKey = `${ids}b-${i + 1}|${r.register}#${r.seq}`;
-            host.openMenu(r, anchor);
+            return host.openMenu(r, anchor, 'row', point);
           },
         }
       : null;
@@ -1188,6 +1188,7 @@
     <div
       class="block-slot"
       id="{ids}b-{slot.i + 1}"
+      data-menu-host
       data-key={keys[slot.i]}
       aria-labelledby={arranging || block.heading ? `${ids}h-${slot.i + 1}` : undefined}
       style="--span:{spans.get(slot.i) ?? slot.span}"

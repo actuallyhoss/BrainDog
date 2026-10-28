@@ -198,7 +198,7 @@
     <ul class="kpi-rows">
       {#each plan.rows as k (k.key)}
         {@const to = onopen ? null : (href?.(k.input) ?? null)}
-        <li class="kpi kpi-row" style={hue(k)} data-state={state(k)} data-kind={k.kind}>
+        <li class="kpi kpi-row" data-menu-host={menu ? '' : undefined} style={hue(k)} data-state={state(k)} data-kind={k.kind}>
           <div class="kpi-row-text">
             <p class="kpi-who">
               {#if to}<a class="kpi-open" href={to}
@@ -247,7 +247,7 @@
     {#if tiles.length}
       <ul class="kpi-grid">
         {#each tiles as k (k.key)}
-          <li class="kpi kpi-tile" style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
+          <li class="kpi kpi-tile" data-menu-host={menu ? '' : undefined} style={hue(k)} data-state={state(k)} data-kind={k.kind} data-chart={k.chart?.form}>
             {@render title(k)}
             {#if !lead && leads && k.headline}<p class="kpi-leads">{leads}</p>{/if}
             <div class="kpi-tile-figure">

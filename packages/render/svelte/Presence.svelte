@@ -27,6 +27,7 @@
 <script lang="ts">
   import { agentMarkFill } from '../src/index.ts';
   import type { ControlMark, PresenceView } from './types.ts';
+  import { pointed } from './menu-at.ts';
 
   let {
     rows,
@@ -100,7 +101,7 @@
     {#each rows as r (r.key)}
       {@const m = r.agent && mark ? mark(r.agent) : null}
       {@const open = asking?.key === r.key ? asking : null}
-      <li class="pres-row" data-live={r.live} data-stopped={r.stopped ?? undefined} style={hue(r.agent)}>
+      <li class="pres-row" data-menu-host={onmenu ? '' : undefined} data-live={r.live} data-stopped={r.stopped ?? undefined} style={hue(r.agent)}>
         {@render face(r, m)}
         <div class="pres-body">
           {#if r.stands !== undefined && r.last}
@@ -128,7 +129,7 @@
           >{/if}
         </p>
         {#if onmenu}
-          <button type="button" class="pres-more" aria-haspopup="menu" aria-label="Tell, pause or stop {r.name}" disabled={r.busy} onclick={(e) => onmenu(r.key, rectOf(e))}
+          <button type="button" class="pres-more" aria-haspopup="menu" aria-label="Tell, pause or stop {r.name}" disabled={r.busy} {@attach pointed((p) => onmenu(r.key, p))} onclick={(e) => onmenu(r.key, rectOf(e))}
             ><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25" /><circle cx="8" cy="8" r="1.25" /><circle cx="12.5" cy="8" r="1.25" /></svg></button
           >
         {/if}
@@ -140,7 +141,7 @@
   {#each rows as r (r.key)}
     {@const m = r.agent && mark ? mark(r.agent) : null}
     {@const open = asking?.key === r.key ? asking : null}
-    <li class="pres-row" data-live={r.live} data-stopped={r.stopped ?? undefined} style={hue(r.agent)}>
+    <li class="pres-row" data-menu-host={onmenu ? '' : undefined} data-live={r.live} data-stopped={r.stopped ?? undefined} style={hue(r.agent)}>
       <span class="pres-face" aria-hidden="true"
         >{#if m}<svg class="agent-mark" data-tone={m.tone} viewBox="0 0 24 24" fill="currentColor" style={agentMarkFill(m.tone) ?? undefined}
             ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule}></path></svg

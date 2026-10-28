@@ -60,6 +60,7 @@
   import type { RoadmapDrop } from './roadmap-drag.ts';
   import Text from '../Text.svelte';
   import Actions from '../Actions.svelte';
+  import { pointed, type Point } from '../menu-at.ts';
   import type { OnAct } from '../../src/actions.ts';
 
   let {
@@ -82,7 +83,8 @@
     /** Where a task's title opens it. Its absence is what keeps the title words. */
     onopen?: ((row: Row) => void) | undefined;
     /** Where a task's menu opens, with the control pressed to anchor it to. Its absence is what keeps the control away. */
-    onmenu?: ((row: Row, anchor: HTMLElement) => void) | undefined;
+    /** The row's menu, at its "…", or at `point` where a right-click or a held thumb opened it. */
+    onmenu?: ((row: Row, anchor: HTMLElement, point?: Point) => unknown) | undefined;
     /** A queue's: where a question is chosen or let go for one answer in bulk, and which the host holds as chosen. */
     onselect?: ((row: Row, on: boolean) => void) | undefined;
     selected?: readonly string[] | undefined;
@@ -237,7 +239,7 @@
       {@const lines = todoLines(row.cells, opts.now, row.done === true)}
       {@const meta = lines.meta}
       {@const named = text(inline(title.text ?? '', opts)) || TASK}
-      <li class="item" data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
+      <li class="item" data-menu-host={onmenu ? '' : undefined} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         {#if ontick}
           <!-- `role="checkbox"` and not a bare button: what it does is set a state, not run a verb,
                and `aria-checked` is the only way a screen reader is told which state it is in
@@ -331,6 +333,7 @@
             aria-label="{MORE} {named}"
             tabindex={i === at ? 0 : -1}
             onfocus={() => (at = i)}
+            {@attach pointed((p) => onmenu?.(row, document.body, p))}
             onclick={(e) => onmenu?.(row, e.currentTarget)}
             ><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"
               ><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg
@@ -356,7 +359,7 @@
         {@const chip = timelineChip(row.cells[TIMELINE_CHIP], text(inline(title.text ?? '', opts)))}
         {@const art = chip.glyph ? (void landed, glyphPath(chip.glyph, opts)) : null}
         {@const approx = said && opts.approx ? opts.approx((row.cells[2] ?? '').trim()) : null}
-        <li class="item" data-rich="" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
+        <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-rich="" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
           <span class="item-chip" data-slot={chip.colour ?? undefined} data-unfiled={chip.unfiled ? '' : undefined} aria-hidden="true"
             >{#if art}<svg
                 viewBox="0 0 24 24"
@@ -379,7 +382,7 @@
           {@render rowActs(row)}
         </li>
       {:else}
-      <li class="item" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
+      <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
              its own source. -->
@@ -400,7 +403,7 @@
       {/if}
     {:else}
       {@const title = takeWorking(row.cells[0] ?? '')}
-      <li class="item" data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
+      <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         <span class="item-title"
           >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
         >

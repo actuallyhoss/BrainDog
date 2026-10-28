@@ -112,7 +112,7 @@
      * control only when each is passed, and to the grid, whose `board` cards draw the same two the same way.
      */
     onopen?: ((row: Row) => void) | undefined;
-    onmenu?: ((row: Row, anchor: HTMLElement) => void) | undefined;
+    onmenu?: ((row: Row, anchor: HTMLElement, point?: { x: number; y: number; height: number }) => unknown) | undefined;
     /**
      * A QUEUE'S BULK CHOICE: a box on each question only when `onselect` is passed, and which questions the host holds
      * as chosen, by `rowKey`, where it holds them. Handed to the list primitive, which hands it to the queue alone.

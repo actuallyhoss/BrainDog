@@ -431,10 +431,11 @@ export class RowHost {
   }
 
   /** Opens the row's menu at the element it was asked from: the row under the cursor, or the control pressed. */
-  openMenu(row: RowAt | null, from: HTMLElement | null, mode: MenuMode = 'row') {
+  openMenu(row: RowAt | null, from: HTMLElement | null, mode: MenuMode = 'row', point?: { x: number; y: number; height: number }) {
     if (!row || !from || !this.entry(row) || !this.shapeOf(row.register)) return false;
     const r = from.getBoundingClientRect();
-    this.menu = { row, mode, at: { x: r.left, y: r.top, height: r.height } };
+    /* AT THE POINTER where a right-click or a held thumb opened it, and at the row's "…" otherwise. */
+    this.menu = { row, mode, at: point ? { x: point.x, y: point.y, height: point.height } : { x: r.left, y: r.top, height: r.height } };
     this.menuOpen = true;
     return true;
   }

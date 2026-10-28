@@ -25,6 +25,7 @@
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
   import Heat from './Heat.svelte';
+  import { pointed, type Point } from '../menu-at.ts';
   import Trend from '../Trend.svelte';
 
   let {
@@ -53,7 +54,8 @@
      * the markup it always was, which is what `toHTML` draws.
      */
     onopen?: ((row: Row) => void) | undefined;
-    onmenu?: ((row: Row, anchor: HTMLElement) => void) | undefined;
+    /** The row's menu, at its "…", or at `point` where a right-click or a held thumb opened it. */
+    onmenu?: ((row: Row, anchor: HTMLElement, point?: Point) => unknown) | undefined;
   } = $props();
 
   /* Local, because `packages/render` is MIT, embeddable and imports nothing, and `copy.ts` lives in
@@ -454,6 +456,7 @@
           {@const stop = live ? (card.at === focus ? 0 : -1) : undefined}
           <div
             class="card"
+            data-menu-host={onmenu ? '' : undefined}
             data-arrived={card.row.arrived ? '' : undefined}
             data-at={live ? card.at : undefined}
             data-moved={card.moved ? '' : undefined}
@@ -505,6 +508,7 @@
                 aria-haspopup="menu"
                 aria-label="{MORE} {text(inline(takeWorking(card.row.cells[1] ?? null).text ?? '', opts)) || CARD}"
                 tabindex={stop}
+                {@attach pointed((p) => onmenu?.(card.row, root ?? document.body, p))}
                 onclick={(e) => onmenu?.(card.row, e.currentTarget)}
                 ><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"
                   ><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg

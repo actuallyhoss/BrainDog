@@ -136,7 +136,7 @@
      * the control pressed. `null` where the page does not host rows (a home, a preview), and the markup is then what
      * it always was.
      */
-    verbs?: { onopen: (row: Row) => void; onmenu: (row: Row, anchor: HTMLElement) => void } | null;
+    verbs?: { onopen: (row: Row) => void; onmenu: (row: Row, anchor: HTMLElement, point?: { x: number; y: number; height: number }) => boolean } | null;
     /** The page's choice of questions to answer at once, which a queue of two or more questions adds to. */
     pick?: Picked | null;
     /**
