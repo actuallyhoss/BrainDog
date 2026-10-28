@@ -8,12 +8,15 @@
  * THE LAPSE GOES THROUGH THE HOST'S OWN DOOR, Stripe's webhook, signed as Stripe signs it, IN TEST MODE ONLY. A Free
  * record has no billing row and nothing caps it (`apps/worker/src/lapse.ts`), so the drill sends what Stripe sends when
  * a Free record is paid for (`checkout.session.completed`, naming the drill's own record and person) with a subscription
- * Stripe reads as cancelled: the host writes the row lapsed and flips the record's switch. Billing resumes by
- * `invoice.paid` for the same subscription, which the host applies without asking Stripe anything.
+ * Stripe reads as cancelled: the host writes the row lapsed and flips the record's switch. Billing resumes the way a
+ * person resumes it, by paying again: a second `checkout.session.completed` for the same record and customer, naming a
+ * subscription Stripe reads as active. A paid invoice alone never resumes it, since a cancelled subscription stays
+ * cancelled when its last invoice is paid.
  *
  * WHAT IT NEEDS, READ BY NAME AND NEVER PRINTED (`lapseFrom`): `DRILL_LAPSE_SECRET`, the host's webhook signing secret in
- * test mode, and `DRILL_LAPSE_SUBSCRIPTION`, a subscription in the same Stripe test account that is cancelled (the host
- * reads it from Stripe before it writes the row, so a made-up one is refused there). On the Cloud harness both are made
+ * test mode, `DRILL_LAPSE_SUBSCRIPTION`, a subscription in the same Stripe test account that is cancelled, and
+ * `DRILL_LAPSE_RESUME_SUBSCRIPTION`, one there that is active (the host reads each from Stripe before it writes the row,
+ * so a made-up one is refused there). On the Cloud harness both are made
  * up and Stripe is answered by the test. A host whose `/healthz` does not say `billing: test` is never sent an event.
  *
  * THE RECORD IS LEFT WRITABLE. Whatever went wrong after the lapse, the step resumes billing before it answers, so the
@@ -31,7 +34,7 @@ export const NAME = 'lapsed';
 export const LAPSED_FIX = 'Read-only until billing resumes. Export is available.';
 
 /** The environment's names, read by name and never printed. */
-export const LAPSE_NAMES = { secret: 'DRILL_LAPSE_SECRET', subscription: 'DRILL_LAPSE_SUBSCRIPTION' };
+export const LAPSE_NAMES = { secret: 'DRILL_LAPSE_SECRET', subscription: 'DRILL_LAPSE_SUBSCRIPTION', resume: 'DRILL_LAPSE_RESUME_SUBSCRIPTION' };
 
 /** The list the step makes in the drill's record: an invented kiln's bookings, and a field to say one. */
 export const FIRINGS = {
@@ -49,7 +52,7 @@ const AFTER = 'Raku firing, kiln one';
 /** `{ secret, subscription }` from the environment, each null when it is not set. */
 export function lapseFrom(env = process.env) {
   const v = (k) => String(env[k] ?? '').trim() || null;
-  return { secret: v(LAPSE_NAMES.secret), subscription: v(LAPSE_NAMES.subscription) };
+  return { secret: v(LAPSE_NAMES.secret), subscription: v(LAPSE_NAMES.subscription), resume: v(LAPSE_NAMES.resume) };
 }
 
 /** Stripe's `Stripe-Signature` header for `body`, signed at `at` (seconds) under `secret`. */
@@ -86,10 +89,12 @@ export async function lapsedHolds(d) {
   const health = await ask(d, '/healthz', { method: 'GET', cookie: null });
   const mode = health.said?.launch?.billing ?? null;
   if (mode !== 'test') return skip(d, NAME, mode === null ? 'the host did not say how it bills, so it is sent no payment event.' : `billing here is ${mode}, and the drill lapses a record only in Stripe test mode.`);
-  const { secret = null, subscription = null } = d.lapse ?? {};
+  const { secret = null, subscription = null, resume = null } = d.lapse ?? {};
   if (!secret) return skip(d, NAME, `no signing secret is named (${LAPSE_NAMES.secret}), so the host cannot be sent a payment event it would believe.`);
   if (!subscription) return skip(d, NAME, `no cancelled test subscription is named (${LAPSE_NAMES.subscription}) for the host to read the lapse from.`);
-  d.secrets.push(secret, subscription);
+  /* ASKED BEFORE THE LAPSE, so a drill that could not resume never leaves its record lapsed for the steps after it. */
+  if (!resume) return skip(d, NAME, `no active test subscription is named (${LAPSE_NAMES.resume}) for billing to resume on.`);
+  d.secrets.push(secret, subscription, resume);
 
   const boot = await api(d, 'boot');
   const person = boot.said?.value?.me?.person ?? null;
@@ -103,16 +108,18 @@ export async function lapsedHolds(d) {
 
   const customer = `cus_drill${randomBytes(6).toString('hex')}`;
   d.secrets.push(customer);
-  const lapse = await deliver(d, secret, 'checkout.session.completed', {
-    id: `cs_drill${randomBytes(8).toString('hex')}`,
-    object: 'checkout.session',
-    mode: 'subscription',
-    payment_status: 'paid',
-    customer,
-    subscription,
-    client_reference_id: person,
-    metadata: { person, record },
-  });
+  const paid = (sub) =>
+    deliver(d, secret, 'checkout.session.completed', {
+      id: `cs_drill${randomBytes(8).toString('hex')}`,
+      object: 'checkout.session',
+      mode: 'subscription',
+      payment_status: 'paid',
+      customer,
+      subscription: sub,
+      client_reference_id: person,
+      metadata: { person, record },
+    });
+  const lapse = await paid(subscription);
   if (lapse.status !== 200) return red(d, NAME, `the host refused the payment event that lapses the record (${lapse.status}): ${fixOf(lapse)}.`);
   const marked = await stateOf(d);
   if (marked?.state !== 'lapsed') return red(d, NAME, `the payment event was taken, and the record reads ${marked?.state ?? 'nothing'} where it must read lapsed.`);
@@ -121,7 +128,7 @@ export async function lapsedHolds(d) {
   try {
     said = await underLapse(d);
   } finally {
-    const back = await deliver(d, secret, 'invoice.paid', { id: `in_drill${randomBytes(8).toString('hex')}`, object: 'invoice', customer, subscription });
+    const back = await paid(resume);
     const now = await stateOf(d);
     /* A RESUME THAT FAILED IS ALWAYS SAID, after a red check too: the steps after this one meet a record still lapsed. */
     if (back.status !== 200 || now?.state !== 'active') {

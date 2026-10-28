@@ -23,9 +23,10 @@ import { capturedMail, drill, NOTE } from './steps.mjs';
 
 const SECRET = 'whsec_made_up_for_the_drill';
 const SUBSCRIPTION = 'sub_drillmadeup0001';
+const RESUME = 'sub_drillmadeup0002';
 const ADDRESS = 'drill-kiln@example.test';
 
-/** Stripe's answers while `run` runs: the subscription, cancelled, and every other Stripe call answered empty. */
+/** Stripe's answers while `run` runs: the lapsed subscription cancelled, the one paid again active, and every other Stripe call answered empty. */
 async function withStripe(run) {
   const real = globalThis.fetch;
   const asked = [];
@@ -35,6 +36,8 @@ async function withStripe(run) {
     asked.push(`${init?.method ?? 'GET'} ${u.pathname}`);
     if (u.pathname === `/v1/subscriptions/${SUBSCRIPTION}`)
       return Response.json({ id: SUBSCRIPTION, object: 'subscription', customer: { id: 'cus_drill', object: 'customer' }, status: 'canceled', items: { object: 'list', data: [{ id: 'si_drill', price: { id: 'price_drill_made_up' } }] } });
+    if (u.pathname === `/v1/subscriptions/${RESUME}`)
+      return Response.json({ id: RESUME, object: 'subscription', customer: { id: 'cus_drill', object: 'customer' }, status: 'active', items: { object: 'list', data: [{ id: 'si_drill2', price: { id: 'price_drill_made_up' } }] } });
     return Response.json({ error: { type: 'invalid_request_error', message: 'No such thing here.' } }, { status: 404 });
   };
   try {
@@ -53,7 +56,7 @@ async function cloudWithCode() {
 }
 
 /** A drill on `c` with its lapse names set, run to its record and then the lapse. */
-async function lapseOn(c, code, lapse = { secret: SECRET, subscription: SUBSCRIPTION }) {
+async function lapseOn(c, code, lapse = { secret: SECRET, subscription: SUBSCRIPTION, resume: RESUME }) {
   const d = drill({ host: c.base, publicHost: HOST, address: ADDRESS, code, mail: capturedMail(c.letters), ip: '203.0.113.42', waitMs: 3_000, quietMs: 100 });
   d.lapse = lapse;
   const lines = [];
@@ -63,7 +66,7 @@ async function lapseOn(c, code, lapse = { secret: SECRET, subscription: SUBSCRIP
 
 /** No line holds a value the drill was handed or made. */
 function clean(d, text) {
-  for (const v of [SECRET, SUBSCRIPTION, d.code, d.cookie, d.link?.token, ...d.secrets].filter((v) => typeof v === 'string' && v.length >= 4)) assert.ok(!text.includes(v), 'a line holds a value');
+  for (const v of [SECRET, SUBSCRIPTION, RESUME, d.code, d.cookie, d.link?.token, ...d.secrets].filter((v) => typeof v === 'string' && v.length >= 4)) assert.ok(!text.includes(v), 'a line holds a value');
   assert.doesNotMatch(text, /@|https?:\/\/|rec_|p_0|cus_|sub_|whsec_|—/u);
 }
 
@@ -76,6 +79,7 @@ test('THE LAPSE STEP IS GREEN ON A WORKING CLOUD: export, refusal word for word,
     assert.ok(!r.skipped, r.said);
     assert.match(r.said, /refused in the lapse’s own words/u);
     assert.ok(asked.some((a) => a === `GET /v1/subscriptions/${SUBSCRIPTION}`), 'the host never read the subscription from Stripe');
+    assert.ok(asked.some((a) => a === `GET /v1/subscriptions/${RESUME}`), 'billing resumed without the host reading the subscription paid again');
     clean(out.d, out.lines.join('\n'));
   } finally {
     await c.close();
@@ -155,6 +159,13 @@ test('ON A REAL HOST WITH NO SECRET THE STEP SKIPS WITH ITS REASON, AND NO PAYME
   assert.doesNotMatch(s.said, /whsec_/u);
   assert.deepEqual(noSub.asked, ['/healthz']);
 
+  const noResume = realHost('test');
+  noResume.d.lapse = lapseFrom({ [LAPSE_NAMES.secret]: 'whsec_made_up_value_never_said', [LAPSE_NAMES.subscription]: SUBSCRIPTION });
+  const n = await lapsedHolds(noResume.d);
+  assert.equal(n.skipped, true);
+  assert.match(n.said, new RegExp(`\\(${LAPSE_NAMES.resume}\\)`, 'u'));
+  assert.deepEqual(noResume.asked, ['/healthz'], 'a drill that could not resume billing lapsed its record anyway');
+
   for (const mode of ['live', 'off']) {
     const live = realHost(mode);
     live.d.lapse = { secret: 'whsec_made_up_value_never_said', subscription: SUBSCRIPTION };
@@ -176,5 +187,6 @@ test('--lapse PUTS THE STEP AFTER THE RECORD EXISTS AND BEFORE erase, AND A PLAI
   assert.deepEqual(asked.steps, EVERY);
   assert.deepEqual(argsOf(['--host', 'https://alpha.brain.dog', '--lapse', '--steps', 'signup,mail,verify-build']).steps, ['signup', 'mail', 'verify-build', 'lapsed']);
   assert.equal(argsOf(['--host', 'https://alpha.brain.dog', '--steps', 'lapsed']).lapse, true);
-  assert.deepEqual(lapseFrom({ [LAPSE_NAMES.secret]: '  ', [LAPSE_NAMES.subscription]: SUBSCRIPTION }), { secret: null, subscription: SUBSCRIPTION });
+  assert.deepEqual(lapseFrom({ [LAPSE_NAMES.secret]: '  ', [LAPSE_NAMES.subscription]: SUBSCRIPTION }), { secret: null, subscription: SUBSCRIPTION, resume: null });
+  assert.equal(lapseFrom({ [LAPSE_NAMES.resume]: RESUME }).resume, RESUME);
 });
