@@ -29,7 +29,9 @@ export type Raw = Readonly<Record<string, unknown>>;
  * each was told (`instruct`, his alone), and the runs open now with Pause and Stop (`presence`, drawn for anyone who
  * reads the runs, the presses only for him), every run in one list (`run-list`, drawn for anyone who reads), the steps
  * runs left for the next one with Take and Drop (`left-steps`, the presses only for him), and the machines and profiles his
- * agents run on (`machines`, drawn for anyone who reads the runs).
+ * agents run on (`machines`, drawn for anyone who reads the runs); the share of each agent's suggestions accepted
+ * unchanged, by kind of change (`kept`, his alone, as the ladder is); and how the brain changed as one timeline of
+ * learnings arriving and fading and skills changing, each change before and after (`evolution`, for anyone who reads).
  *
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
@@ -56,7 +58,9 @@ export type Panel =
   | 'presence'
   | 'run-list'
   | 'left-steps'
-  | 'machines';
+  | 'machines'
+  | 'kept'
+  | 'evolution';
 
 /** What a host panel is about, who it is drawn for and what it is, in one line. */
 export type PanelEntry = Readonly<{ needs: 'row' | 'none'; level: 'read' | 'write' | 'owner'; says: string }>;
@@ -78,6 +82,8 @@ export const PANEL_TABLE: Readonly<Record<Panel, PanelEntry>> = {
   'run-list': { needs: 'none', level: 'read', says: 'Every run, newest first, and the day as lanes' },
   'left-steps': { needs: 'none', level: 'read', says: 'The steps left for the next run, with take and drop' },
   machines: { needs: 'none', level: 'read', says: 'The machines and profiles agents run on' },
+  kept: { needs: 'none', level: 'owner', says: 'How much of what each agent suggests is accepted unchanged' },
+  evolution: { needs: 'none', level: 'read', says: 'Learnings arriving and fading and skills changing, over time' },
 };
 
 /* THE KEYS IN THE TABLE'S ORDER, the four of before first, as the refusal lists them and the web's list equals. */

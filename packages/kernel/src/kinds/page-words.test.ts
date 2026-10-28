@@ -218,7 +218,7 @@ test('a roadmap over a list that names no columns is refused, naming the three i
 
 test('A SECTION MAY NAME THE RUN PANEL, drawn on a run’s own page, and any other word is refused naming the four', async () => {
   const { panelFault, PANELS } = await import('./words.ts');
-  assert.deepEqual([...PANELS], ['actions', 'reporting', 'run', 'seen', 'job', 'look-editor', 'slash-model', 'trust', 'slash-reads', 'my-keys', 'new-action', 'instruct', 'presence', 'run-list', 'left-steps', 'machines']);
+  assert.deepEqual([...PANELS], ['actions', 'reporting', 'run', 'seen', 'job', 'look-editor', 'slash-model', 'trust', 'slash-reads', 'my-keys', 'new-action', 'instruct', 'presence', 'run-list', 'left-steps', 'machines', 'kept', 'evolution']);
   assert.equal(panelFault('run', true), null);
   const odd = panelFault('runs', true);
   assert.equal(odd?.at, 'panel');

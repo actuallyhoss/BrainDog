@@ -534,6 +534,19 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         span: 12,
         panel: 'run-list',
       },
+      /* ACCEPTED UNCHANGED, SINCE 1.24.0 (the agent directions' "one number judges the agent side: the share of
+         suggestions accepted unchanged, by kind of change"): one row an agent, its share over 90 days and the counts,
+         opening onto the same share by kind of change. The host's (`panel: kept`), the owner's alone as the ladder is,
+         read from what each question was stamped with when it was filed; the panel leaves the tile out while nothing
+         an agent suggested has been answered. */
+      {
+        kind: 'section',
+        key: 'kept',
+        heading: 'Accepted unchanged',
+        icon: 'circle-check',
+        span: 12,
+        panel: 'kept',
+      },
       /* THE PAGE'S FOOT, ONE QUIET LINE OF DOORS, SINCE 1.17.0: What the brain learned and Machines and profiles were two
          more tiles of the same weight at the foot, each folded or half empty. How the brain changed has no place of its
          own in the rail, so this line is how a person reaches it (AGT-C17 job b), and the lists the agents keep are beside
@@ -634,8 +647,8 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
      took a version in as its second series, on the learnings' weeks. The chart is still drawn on the learnings' three
      weeks alone, since a `when:` holds every leaf it names and a chart of skills alone would need a figure of its own.
 
-     WHAT IT DOES NOT DRAW YET, and says nowhere that it does: a skill's text before and after. A skill's own page draws
-     its versions, each against the one before. */
+     A SKILL'S TEXT BEFORE AND AFTER, SINCE 1.24.0, is on the timeline (`panel: evolution`), each version against the
+     one before; a skill's own page still draws its versions too. */
   brain: {
     page: 'brain',
     title: 'How the brain changed',
@@ -690,6 +703,10 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         order: [{ field: 'created_at', dir: 'desc' }],
         limit: 12,
       },
+      /* THE TIMELINE, SINCE 1.24.0 (the evolution view): week by week, each learning that arrived with the failure
+         that taught it, each version a skill took with its text before and after, and each learning that faded, marked
+         where it faded. The host's (`panel: evolution`), for anyone who reads the learnings. */
+      { kind: 'section', key: 'timeline', heading: 'Over time', icon: 'history', span: 12, panel: 'evolution' },
       { kind: 'section', key: 'faded', heading: 'Faded', icon: 'clock', span: 12, source: 'register.learnings', where: FADED, limit: 1, when: { metric: 'learnings-faded', gt: 0 } },
       {
         kind: 'cards',
@@ -817,8 +834,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      value or one in plain text say Keychain where they said vault, and the links go to /keychain. No list, field or
      figure goes.
      1.23.0 ADDS A FIELD, SO IT IS MINOR (Keychain works like a keychain): a key says which account it is for, as a
-     keychain item does, in a text field that is never secret. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.23.0', requires: ['register.things'] },
+     keychain item does, in a text field that is never secret. No list, field or figure goes.
+     1.24.0 ADDS TWO SECTIONS, SO IT IS MINOR: Accepted unchanged on the agents home (`panel: kept`), and Over time on
+     How the brain changed (`panel: evolution`), the timeline of learnings and skills. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.24.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

@@ -46,6 +46,8 @@ export const PANELS = [
   'run-list',
   'left-steps',
   'machines',
+  'kept',
+  'evolution',
 ] as const;
 
 export type Panel = (typeof PANELS)[number];
@@ -79,6 +81,10 @@ export const PANEL_WHO: Readonly<Record<Panel, { needs: 'row' | 'none'; level: '
   'left-steps': { needs: 'none', level: 'read' },
   /* THE MACHINES AND PROFILES AGENTS RUN ON, the Agents page's foot (`MachinesPanel.svelte`). */
   machines: { needs: 'none', level: 'read' },
+  /* THE SHARE OF EACH AGENT'S SUGGESTIONS ACCEPTED UNCHANGED (`KeptPanel.svelte`), his alone, as the ladder it is read with. */
+  kept: { needs: 'none', level: 'owner' },
+  /* HOW THE BRAIN CHANGED AS ONE TIMELINE (`EvolutionPanel.svelte`), for anyone who reads the learnings. */
+  evolution: { needs: 'none', level: 'read' },
 };
 
 /* A `Set`, so a `panel:` of `constructor` names nothing. */

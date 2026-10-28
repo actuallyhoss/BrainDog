@@ -36,6 +36,8 @@ export const PANEL_LOADERS: Readonly<Record<Panel, () => Promise<Loaded>>> = {
   'run-list': () => import('./RunsPanel.svelte'),
   'left-steps': () => import('./StepsPanel.svelte'),
   machines: () => import('./MachinesPanel.svelte'),
+  kept: () => import('./KeptPanel.svelte'),
+  evolution: () => import('./EvolutionPanel.svelte'),
 };
 
 /** What `panel` is about: the row the page is drawn for, or nothing, so it stands on any page. */

@@ -395,6 +395,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.24.0',
+      notes: 'The agents page shows how much of what each agent suggests you accept unchanged, overall and by kind of change. How the brain changed gains a timeline: learnings as they arrive with the failure behind each, skills with their text before and after, and learnings marked where they fade.',
+    },
     { version: '1.23.0', notes: 'A key says which account it is for, such as a user name or an address, as a keychain item does. It is never the key itself.' },
     {
       version: '1.22.0',
