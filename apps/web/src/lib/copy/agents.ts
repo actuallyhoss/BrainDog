@@ -16,13 +16,13 @@
 export const agents = {
   /* THE WAYS IN, as the connect sheet (`agents/ConnectSheet.svelte`) draws them: an address any MCP client takes, the
      command that sets Claude Code up with its hooks and skills, and a key for a program that has no browser to sign in from. */
-  doorAnyHint: 'Give an app this address where it asks for a server. The app then sends you here to allow it.',
-  doorSetupHint: 'Install the braindog command on the computer, then set it up for this record. It shows six digits for you to approve here.',
+  doorAnyHint: 'Paste this where an app asks for a server.',
+  doorSetupHint: 'Install the command, then set it up. It shows six digits to approve here.',
   doorInstall: 'Install the command',
   doorOs: 'The computer it goes on',
   osNames: { windows: 'Windows', unix: 'macOS or Linux' },
   doorSetupRun: 'Set it up for this record',
-  doorKeyHint: 'For a program with no browser to sign in from. The key can read and change your record for ninety days.',
+  doorKeyHint: 'For a program with no browser. Reads and changes your record for 90 days.',
   doorKeyLabel: 'Name the script or server',
   doorKeyGo: 'Make a key',
   doorKeyHeader: 'Send it in this header',
@@ -35,7 +35,7 @@ export const agents = {
   /* WHAT IS CONNECTED: every machine, key and app on one list (`record/device.ts` `connected`). */
   connectedNone: 'No agent is connected yet',
   /* IT NAMES WHAT FILLS THE LIST, not where on the screen the ways to fill it are. */
-  connectedNoneWhy: 'Connect one and it shows here with what it did.',
+  connectedNoneWhy: 'Connected agents show here.',
   agentOn: (agent: string, machine: string) => `${agent} on ${machine}`,
   canAndInbox: (can: string) => `${can}, and may read the inbox`,
   unnamedKey: 'A key with no name',
@@ -56,13 +56,13 @@ export const agents = {
   consentTitle: 'Connect an agent',
   consentNamed: (app: string) => `Connect ${app}`,
   consentNone: 'No app is asking to connect',
-  consentNoneWhy: 'When you add BrainDog to an app, the app sends you to this page to allow it.',
+  consentNoneWhy: 'Add BrainDog in an app and it sends you here.',
   /* NOT A DEAD END (first F11): the way into BrainDog's agent settings from this side. */
   consentOpenAgents: 'Open agent settings',
   consentGone: 'This sign-in has ended',
   /* THE BRAINDOG IT WOULD REACH IS NAMED, because it is the fact being decided (first F11). */
   consentAsks: (app: string, record: string | null, host: string) =>
-    `${app} wants to reach ${record ?? 'your BrainDog'}. After you answer, you go back to ${host}.`,
+    `${app} wants to reach ${record ?? 'your BrainDog'}, then returns you to ${host}.`,
   consentRecord: 'Which BrainDog',
   consentReach: 'What it may do',
   consentScope: {
@@ -70,7 +70,7 @@ export const agents = {
     propose: 'Read and suggest changes. You decide each one.',
     write: 'Read and change things directly',
   },
-  consentLasts: 'This lasts 90 days. Remove it any time in Settings, Agents.',
+  consentLasts: 'Lasts 90 days. Remove it in Settings, Agents.',
   consentAllow: (app: string) => `Allow ${app}`,
   consentDeny: (app: string) => `Deny ${app}`,
   consentNotOwner: "Only a record's owner can connect an app to it, and you own no record here. You can still turn the app away.",

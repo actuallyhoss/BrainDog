@@ -124,7 +124,6 @@
       <p class="quiet">{copy.approvedUndo} <a class="quiet-link" href={at('/settings/agents')}>{copy.approvedUndoGo}</a>.</p>
     {:else}
       <header class="who">
-        <IconWell name="session" size="card" />
         <h1 class="entry-title">{copy.approveTitle}</h1>
       </header>
 
@@ -134,25 +133,22 @@
         <p class="entry-lede">{copy.codeLede}</p>
         <CodeForm id="user-code" size="lead" autofocus {approve} onapproved={approved} />
 
-        {#if machines !== null}
+        <!-- ONLY WHEN A MACHINE WAITS: with none, the six boxes are the whole page and nothing says so twice. -->
+        {#if machines !== null && asking.length > 0}
           <section class="asking" aria-labelledby="asking-title">
             <h2 class="fact-label" id="asking-title">{copy.codeWaitingTitle}</h2>
-            {#if asking.length === 0}
-              <p class="quiet">{copy.codeWaitingNone}</p>
-            {:else}
-              <ul class="ask-rows">
-                {#each asking as m (m.handle)}
-                  <li class="ask-row">
-                    <IconWell name="monitor" size="l" />
-                    <span class="ask-text">
-                      <span class="ask-name" dir="auto">{askerOf(m.label, m.reach)}</span>
-                      <span class="ask-line">{canOf(m.reach, m.scope)}</span>
-                    </span>
-                    <span class="ask-left">{copy.codeWaitingLeft(minutesLeft(m.expires, now))}</span>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
+            <ul class="ask-rows">
+              {#each asking as m (m.handle)}
+                <li class="ask-row">
+                  <IconWell name="monitor" size="l" />
+                  <span class="ask-text">
+                    <span class="ask-name" dir="auto">{askerOf(m.label, m.reach)}</span>
+                    <span class="ask-line">{canOf(m.reach, m.scope)}</span>
+                  </span>
+                  <span class="ask-left">{copy.codeWaitingLeft(minutesLeft(m.expires, now))}</span>
+                </li>
+              {/each}
+            </ul>
           </section>
         {/if}
 
@@ -174,7 +170,7 @@
     min-inline-size: 0;
   }
 
-  /* THE WELL AND THE HEADING ON ONE LINE, as the consent screen's are. */
+  /* THE HEADING ALONE ON ITS LINE, no well beside it. */
   .who {
     display: flex;
     align-items: center;
