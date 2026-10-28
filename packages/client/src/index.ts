@@ -1249,7 +1249,7 @@ export type SlashChatEvent =
   | ({ type: 'action' } & Omit<SlashChatAction, 'state'>)
   | { type: 'navigate'; href: string; label: string }
   | { type: 'error'; text: string }
-  | { type: 'done'; spent: { asks: number; left: number | null } };
+  | { type: 'done'; spent: { asks: number; left: number | null }; figures?: { ref: string; label: string }[] };
 
 /** What a person sends: the words, the conversation they continue, and where they are. */
 export type SlashChatInput = { thread?: string; message: string; page?: { path: string; title?: string; row?: string } };
@@ -1259,6 +1259,9 @@ export type SlashActed = { ok: true; receipt?: string; undo?: { batch: string } 
 
 /** One conversation read back (`GET /api/slash/thread/<id>`), its turns oldest first. */
 export type SlashThread = { id: string; turns: { role: 'you' | 'slash'; text: string; actions: SlashChatAction[] }[] };
+
+/** A person's conversations, newest first, each titled by its first words (`GET /api/slash/threads`). */
+export type SlashThreads = { threads: { id: string; title: string; at: string }[] };
 
 /** What matters now, up to three short lines for an empty palette (`GET /api/slash/now`). No model is asked. */
 export type SlashNow = { lines: { text: string; href?: string }[] };
@@ -2286,7 +2289,7 @@ export function createClient(options: ClientOptions) {
     );
   }
 
-  async function hostGet<T>(path: 'slash/status' | 'slash/now' | `slash/thread/${string}` | `slash/asks?limit=${number}`): Promise<Result<T>> {
+  async function hostGet<T>(path: 'slash/status' | 'slash/now' | 'slash/threads' | `slash/thread/${string}` | `slash/asks?limit=${number}`): Promise<Result<T>> {
     return hostAnswer<T>(() => doFetch(`${base}/api/${path}`, { method: 'GET' }));
   }
 
@@ -2459,6 +2462,8 @@ export function createClient(options: ClientOptions) {
     slashAct: (id: string, accept: boolean) => hostDoor<SlashActed>('slash/act', { id, accept }),
     /** One conversation, its turns oldest first, for the person who had it. */
     slashThread: (id: string) => hostGet<SlashThread>(`slash/thread/${encodeURIComponent(id)}`),
+    /** This person's conversations, newest first, so one started on another device can be picked up here. */
+    slashThreads: () => hostGet<SlashThreads>('slash/threads'),
     /** Up to three short lines of what matters now, for the palette opened empty. Asks no model and spends no ask. */
     slashNow: () => hostGet<SlashNow>('slash/now'),
     /**

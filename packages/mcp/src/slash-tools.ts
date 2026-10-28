@@ -44,7 +44,7 @@ export type SlashChatTools = {
   list: readonly SlashTool[];
   call(name: string, args: Args, run: SlashToolRun): Promise<SlashToolRan>;
   apply(op: Args): Promise<Result<{ receipt: string; undo?: { batch: string }; href?: string }>>;
-  ref(id: string): Promise<string | null>;
+  ref(id: string): Promise<{ ref: string; label: string } | null>;
   /** Up to three short lines of what matters now, for an empty palette: no model is asked. */
   now(): Promise<{ text: string; href?: string }[]>;
 };
@@ -460,9 +460,9 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     }
   };
 
-  const ref = async (id: string): Promise<string | null> => {
+  const ref = async (id: string): Promise<{ ref: string; label: string } | null> => {
     const row = await rowOf(id);
-    return row === null || row.seq === null ? null : `${row.register}#${row.seq}`;
+    return row === null || row.seq === null ? null : { ref: `${row.register}#${row.seq}`, label: titleOf(row.fields) };
   };
 
   /**

@@ -436,6 +436,8 @@ export interface Slash {
   act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
   /** One conversation, its turns oldest first, for the person who had it and nobody else. */
   thread(id: string, ctx: CallContext): Result<ChatThread>;
+  /** This person's conversations, newest first, each titled by its first words. */
+  threads(ctx: CallContext): Result<ChatThreads>;
 }
 
 /* ── a conversation ──────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -465,7 +467,10 @@ export type ChatEvent =
   | ({ type: 'action' } & Omit<ChatAction, 'state'>)
   | { type: 'navigate'; href: string; label: string }
   | { type: 'error'; text: string }
-  | { type: 'done'; spent: { asks: number; left: number | null } };
+  | { type: 'done'; spent: { asks: number; left: number | null }; figures?: ChatFigure[] | undefined };
+
+/** A row the answer links to, by the `register#seq` in its brace and the row's own name. */
+export type ChatFigure = { ref: string; label: string };
 
 /** One tool as the model is told of it: its name, the arguments it takes as they read in a line, and what it does. */
 export type ChatTool = { name: string; args: string; about: string; writes?: boolean | undefined };
@@ -499,11 +504,15 @@ export type ChatTools = {
   list: readonly ChatTool[];
   call(name: string, args: Record<string, unknown>, run: ChatRun): Promise<ChatRan>;
   apply(op: Record<string, unknown>): Promise<Result<{ receipt: string; undo?: { batch: string } | undefined; href?: string | undefined }>>;
-  ref?(id: string): Promise<string | null>;
+  /** An id a result printed, as the `register#seq` a link is drawn from and the row's own name, or `null`. */
+  ref?(id: string): Promise<{ ref: string; label: string } | null>;
 };
 
 /** A held action answered. */
 export type ChatActed = { ok: true; receipt?: string | undefined; undo?: { batch: string } | undefined };
+
+/** A person's conversations, newest first. */
+export type ChatThreads = { threads: { id: string; title: string; at: string }[] };
 
 /** One conversation read back. */
 export type ChatThread = { id: string; turns: { role: 'you' | 'slash'; text: string; actions: ChatAction[] }[] };

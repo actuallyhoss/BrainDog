@@ -28,7 +28,7 @@ import { codeOf, fixOf, no, ok, type Result, type Sql } from '@braindog/ports';
 import { ulid, type Core } from './call.ts';
 import { PROMPTS } from './prompts.ts';
 import { firstBytes, isRecord, tokens } from './project.ts';
-import type { CallContext, ChatAction, ChatActed, ChatEvent, ChatInput, ChatRan, ChatRun, ChatThread, ChatTool, ChatTools, Inference } from './types.ts';
+import type { CallContext, ChatAction, ChatActed, ChatEvent, ChatFigure, ChatInput, ChatRan, ChatRun, ChatThread, ChatThreads, ChatTool, ChatTools, Inference } from './types.ts';
 
 /** The most model calls one turn makes: read, read again, answer, and one to spare. */
 export const STEPS_MOST = 4;
@@ -164,21 +164,24 @@ const QUALIFIED = /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u;
 
 /**
  * Every `{{ref:ID}}` made the `register#seq` a link is drawn from, through the host's own lookup, and every other brace
- * taken out: the answer is prose, and a brace the screen cannot draw would print as itself.
+ * taken out: the answer is prose, and a brace the screen cannot draw would print as itself. `figures` names each row
+ * linked, so the screen draws a link by the row's own name.
  */
-const linked = async (answer: string, tools: ChatTools): Promise<string> => {
+const linked = async (answer: string, tools: ChatTools): Promise<{ text: string; figures: ChatFigure[] }> => {
   const asked = [...new Set([...answer.matchAll(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu)].map((m) => m[1] ?? ''))].slice(0, REFS_MOST);
   const to = new Map<string, string | null>();
+  const figures: ChatFigure[] = [];
   for (const id of asked) {
-    let at: string | null = null;
+    let at: { ref: string; label: string } | null = null;
     try {
-      at = tools.ref ? await tools.ref(id) : QUALIFIED.test(id) ? id : null;
+      at = tools.ref ? await tools.ref(id) : QUALIFIED.test(id) ? { ref: id, label: '' } : null;
     } catch {
       at = null;
     }
-    to.set(id, at);
+    to.set(id, at?.ref ?? null);
+    if (at !== null && at.label !== '' && !figures.some((f) => f.ref === at.ref)) figures.push({ ref: at.ref, label: at.label });
   }
-  return answer
+  const text = answer
     .replace(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu, (_, id: string) => {
       const at = to.get(id);
       return at ? `{{ref:${at}}}` : '';
@@ -187,6 +190,7 @@ const linked = async (answer: string, tools: ChatTools): Promise<string> => {
     .replace(/[ \t]{2,}/gu, ' ')
     .replace(/\s+([.,;:!?])/gu, '$1')
     .trim();
+  return { text, figures };
 };
 
 /* ── calc ────────────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -281,7 +285,13 @@ export type Chat = {
   chat(input: ChatInput, ctx: CallContext, tools: ChatTools, emit: (event: ChatEvent) => void, inference?: Inference): Promise<void>;
   act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
   thread(id: string, ctx: CallContext): Result<ChatThread>;
+  threads(ctx: CallContext): Result<ChatThreads>;
 };
+
+/** The conversations `threads` lists, newest first. */
+const THREADS_LISTED = 30;
+/** A conversation's title: its first words, this long at most. */
+const TITLE_CHARS = 80;
 
 const ASKED = { purpose: 'ask', spends: 'person' } as const;
 const STEPPED = { purpose: 'ask', spends: 'none' } as const;
@@ -476,9 +486,12 @@ export const chats = (core: Core): Chat => {
     }
 
     let text = '';
+    let cited: ChatFigure[] = [];
     if (answer !== null && answer !== '') {
       const checked = checkFigures(answer, figures);
-      text = await linked(checked.text, tools);
+      const drawn = await linked(checked.text, tools);
+      text = drawn.text;
+      cited = drawn.figures;
       if (checked.dropped > 0)
         text =
           text === ''
@@ -491,7 +504,7 @@ export const chats = (core: Core): Chat => {
     if (text !== '') for (const piece of sentences(text)) emit({ type: 'delta', text: `${piece} ` });
     if (failed !== null) emit({ type: 'error', text: failed });
     addTurn(thread.id, 'slash', text !== '' ? text : (failed ?? ''), actions);
-    emit({ type: 'done', spent: { asks: reached ? 1 : 0, left: left() } });
+    emit({ type: 'done', spent: { asks: reached ? 1 : 0, left: left() }, ...(cited.length === 0 ? {} : { figures: cited }) });
   };
 
   const act: Chat['act'] = async (id, accept, ctx, tools) => {
@@ -557,5 +570,23 @@ export const chats = (core: Core): Chat => {
     return ok({ id, turns });
   };
 
-  return { chat, act, thread };
+  /* THIS PERSON'S CONVERSATIONS, NEWEST FIRST, each titled by the first thing they said in it, so a conversation
+     started on one device is there on the next. */
+  const threads: Chat['threads'] = (ctx) => {
+    open();
+    const rows = sql.all<{ id: string; updated: string; first: string | null }>(
+      `SELECT t.id AS id, t.updated AS updated,
+              (SELECT text FROM slash_turn WHERE thread = t.id AND role = 'you' ORDER BY n LIMIT 1) AS first
+       FROM slash_thread t WHERE t.person = ? ORDER BY t.updated DESC LIMIT ?`,
+      who(ctx),
+      THREADS_LISTED,
+    );
+    return ok({
+      threads: rows
+        .filter((r) => r.first !== null && r.first.trim() !== '')
+        .map((r) => ({ id: r.id, title: cut(r.first!.replace(/\s+/gu, ' ').trim(), TITLE_CHARS).replace(/ \(cut here\)$/u, ''), at: r.updated })),
+    });
+  };
+
+  return { chat, act, thread, threads };
 };

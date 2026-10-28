@@ -84,10 +84,12 @@ export type {
   ChatActed,
   ChatAction,
   ChatEvent,
+  ChatFigure,
   ChatInput,
   ChatRan,
   ChatRun,
   ChatThread,
+  ChatThreads,
   ChatTool,
   ChatTools,
   Citable,
@@ -425,6 +427,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     chat: talk.chat,
     act: talk.act,
     thread: talk.thread,
+    threads: talk.threads,
   };
 }
 
