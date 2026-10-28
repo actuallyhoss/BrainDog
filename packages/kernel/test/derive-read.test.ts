@@ -133,7 +133,7 @@ test('a link the reader cannot open derives null, on a page and on one row', asy
   assert.equal(k.get(lamp.id)?.fields.holder, COMPANIES[1], 'the record itself sees it');
 });
 
-test('a sort or a filter on a derived field is refused in one sentence', async () => {
+test('a sort or a filter on a derived field is refused in one sentence, and one read through a link is asked of the linked row', async () => {
   const { k } = await record();
   const out = k.list({ register: 'orders', order: [{ field: 'total', dir: 'desc' }] }) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(out.ok, false);
@@ -141,10 +141,13 @@ test('a sort or a filter on a derived field is refused in one sentence', async (
   assert.equal(out.refusal?.fix, 'total is worked out at read and never stored, so it cannot be filtered or sorted on.');
   const filtered = k.list({ register: 'orders', where: { field: 'quantity', present: true } as never }) as { ok: boolean };
   assert.equal(filtered.ok, true, 'a stored field beside it still filters');
-  const over = k.list({ register: 'orders', where: { field: 'holder', empty: true } as never }) as { ok: boolean; refusal?: { code: string; fix: string } };
+  const over = k.list({ register: 'orders', where: { field: 'total', gt: 5 } as never }) as { ok: boolean; refusal?: { code: string; fix: string } };
   assert.equal(over.ok, false);
   assert.equal(over.refusal?.code, 'MATCH_OP_UNSUPPORTED');
-  assert.equal(over.refusal?.fix, 'holder is worked out at read and never stored, so it cannot be filtered or sorted on.');
+  assert.equal(over.refusal?.fix, 'total is worked out at read and never stored, so it cannot be filtered or sorted on.');
+  /* THROUGH A LINK IT IS ASKED OF THE LINKED ROW (`through` in `where`): an order with no account holds nothing there. */
+  const through = k.list({ register: 'orders', where: { field: 'holder', empty: true } as never }) as { ok: boolean };
+  assert.equal(through.ok, true, 'a field read through a link filters on the row it names');
 });
 
 test('a malformed derive is refused at install, by the field it is on', async () => {

@@ -64,6 +64,7 @@ import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobod
 import { maskMoneyText } from './mail-read.ts';
 import { containsMatched, maskedMatched, project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, searchWords, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
+import { throughOf } from './derive.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
 import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
 import { scanKeys } from './key-scan.ts';
@@ -2532,6 +2533,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             /* AND WHETHER IT IS WORKED OUT AT READ, which `where` refuses a filter or a sort over: nothing is stored
                under it to compare (`derivedFault`). */
             ...(f.derived === true ? { derived: true } : {}),
+            /* AND THE LINK IT IS READ THROUGH, when it is read through one, so a filter over it is asked of the linked row
+               (`through` in `where`) and a figure over the Ledger can leave out what a category says is no spending. */
+            ...(f.derived === true && throughOf(f.derive) ? { through: throughOf(f.derive)! } : {}),
             /* AND WHERE A ROW'S PARTS ARE, so a figure that adds up their money reads a split row as its parts (`row-parts.ts`). */
             ...(typeof (f as { parts_of?: unknown }).parts_of === 'string' ? { parts_of: (f as { parts_of: string }).parts_of } : {}),
           },
@@ -7651,7 +7655,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }, scopeFor(undefined, q.register, viewer, anyHiddenFrom(viewer, q.register)));
       return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched, cursor: out.value.cursor }) : out;
     },
-    schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
+    /* WITH THE HOP, as a figure has it (`hopSchemaOf`): a block's `where` may read a field through a link (`through`),
+       the Ledger's `stays` among them, and a block over the Ledger reads what a figure beside it reads. */
+    schemaOf: (register) => hopSchemaOf(register) ?? null,
     titleOf: (register) => registers.get(register)?.title ?? null,
     listName: (register) => registers.get(register)?.name ?? null,
     /* WITHOUT THIS LINE `readPage` NEVER LAYS ANOTHER PACK'S BLOCKS ON A PAGE, because `deps.adds` is
@@ -7681,7 +7687,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const key = JSON.stringify([opening, legs, horizon, only, into]);
       if (walked.has(key)) return structuredClone(walked.get(key)!);
       const out = runway(
-        { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
+        { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
         opening,
         legs,
         horizon,
@@ -8014,7 +8020,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        is built from and in one query, so a strip of chips over a long list does not read the list. */
     tally: (q) => {
       if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-      const schema = schemaOf(q.register);
+      const schema = hopSchemaOf(q.register)!;
       const said = predicateOf(q.where, schema, evalContext());
       if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
       const c = compile(said.predicate, schema);
@@ -8034,7 +8040,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        of what is added, and by the day a money amount is dated, so the page converts a sum a day and never a row. */
     whole: (q) => {
       if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-      const schema = schemaOf(q.register);
+      /* WITH THE HOP, as every other read of a page has it, so a sum over the Ledger may leave out what stays yours. */
+      const schema = hopSchemaOf(q.register)!;
       const c = compile(q.where, schema);
       if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
       const by = q.by.map(({ field, day }) => (day ? `substr(${fieldSqlIn(schema, field)}, 1, 10)` : `NULLIF(${fieldSqlIn(schema, field, 'text')}, '')`));
@@ -10197,7 +10204,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     runway: (opening: number, legs: readonly Leg[], horizon?: Horizon, into?: string): Result<Runway> =>
       runway(
-        { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
+        { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
         opening,
         legs,
         horizon,

@@ -82,6 +82,13 @@ export function sourcesOf(derive: unknown): string[] {
 /** True when the field is worked out at read: it declares `derive`, or carries the kernel's own flag. */
 export const isDerived = (f: { derive?: unknown; derived?: unknown }): boolean => f.derive !== undefined || f.derived === true;
 
+/** The link a `via` field is read through and the field it reads there, or `null` for any other shape. */
+export function throughOf(derive: unknown): { ref: string; field: string } | null {
+  if (derive === null || typeof derive !== 'object') return null;
+  const via = (derive as { via?: unknown }).via as { ref?: unknown; field?: unknown } | undefined;
+  return via !== null && typeof via === 'object' && typeof via.ref === 'string' && typeof via.field === 'string' ? { ref: via.ref, field: via.field } : null;
+}
+
 /** The pairs and lists a numeric shape reads: `sum` takes two or more, the others exactly two. */
 function pairFault(id: string, shape: DeriveShape, body: unknown): Refusal | null {
   const many = shape === 'sum';
