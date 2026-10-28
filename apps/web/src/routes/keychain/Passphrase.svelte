@@ -54,7 +54,7 @@
   let asking = $state(false);
   const unasked = $derived(lock.state === 'reading' && !asking && onask !== undefined);
   const local = {
-    unasked: 'Put a keychain password on, and only you can open your keys.',
+    unasked: 'Lock your keys so only you can open them.',
     set: 'Set a keychain password',
   } as const;
 
