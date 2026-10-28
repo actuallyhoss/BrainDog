@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "made_at": "2026-10-28T15:42:06.488Z",
+  "made_at": "2026-10-28T15:57:25.412Z",
   "pages": [
     {
       "blocks": [
         {
-          "body": "Saving for {{goals-saving}} goals.",
+          "body": "{{goals-behind}} of {{goals-saving}} goals {{bad:behind}}.",
           "kind": "note",
           "lead": true,
           "span": 12,
@@ -14,9 +14,11 @@
           "matched": 0,
           "refusals": [],
           "values": {
+            "goals-behind": 0,
             "goals-saving": 0
           },
           "read_as": {
+            "goals-behind": "figure",
             "goals-saving": "figure"
           }
         },
@@ -122,22 +124,6 @@
           ],
           "drawn": false,
           "why": "empty"
-        },
-        {
-          "body": "{{goals-behind}} {{bad:behind}}.",
-          "kind": "note",
-          "span": 12,
-          "tone": "warn",
-          "when": {
-            "gt": 0,
-            "metric": "goals-behind"
-          },
-          "key": "k08lez9h-2",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
         },
         {
           "columns": [
@@ -256,7 +242,7 @@
         "register.money_goals"
       ],
       "title": "Goals",
-      "read_at": "2026-10-28T15:42:06.488Z",
+      "read_at": "2026-10-28T15:57:25.412Z",
       "zone": "UTC",
       "look": {
         "look": "goals",

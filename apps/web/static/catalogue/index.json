@@ -384,9 +384,9 @@
       "versions": [
         {
           "version": "2.0.2",
-          "checksum": "c87116ef9ca0bb6869f2bb3d756e3471c59f0acfcc12c1bf931ab29515250317",
-          "bytes": 24053,
-          "published_at": "2026-10-28T15:42:06.488Z",
+          "checksum": "dfd8ce6eb849d4fd0592816a09fbec063309c4da647d6e92de609e500a5818a8",
+          "bytes": 23835,
+          "published_at": "2026-10-28T15:57:25.412Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -1032,9 +1032,9 @@
       "versions": [
         {
           "version": "2.0.1",
-          "checksum": "2415fbb248d6094acacf80ca40fc3994a5c4493174e1154dab9d1f3538bdf9f8",
-          "bytes": 19970,
-          "published_at": "2026-10-28T15:42:06.488Z",
+          "checksum": "b0d2f9ec334e68bd9f09ecbbc5d1afcc08ceb20faff39df3f3c061385fe76c69",
+          "bytes": 19958,
+          "published_at": "2026-10-28T15:57:25.412Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -1371,9 +1371,9 @@
       "versions": [
         {
           "version": "2.0.2",
-          "checksum": "8bf8e09f450f3a7e49e8e32be0984745ad1aa7cec9949d0be942f57382456839",
-          "bytes": 17619,
-          "published_at": "2026-10-28T15:42:06.488Z",
+          "checksum": "11b97fb61e27a84867a395be1b56408c17edfeaa1171bf218ad9768d7677d1e3",
+          "bytes": 17404,
+          "published_at": "2026-10-28T15:57:25.412Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -2026,9 +2026,9 @@
       "versions": [
         {
           "version": "2.0.2",
-          "checksum": "38b811e75e8f61f41fb6674142138494c2ab7a223ac7068977c143f10dd5125a",
-          "bytes": 35076,
-          "published_at": "2026-10-28T15:42:06.488Z",
+          "checksum": "30e038b1484ced174e09029ca8728979d4eda555086d78d6ee66bf5da7a5e4a4",
+          "bytes": 35051,
+          "published_at": "2026-10-28T15:57:25.412Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -6261,9 +6261,9 @@
       "versions": [
         {
           "version": "2.0.2",
-          "checksum": "26cf35c843bba0f473447b53527cf81dc6c0432c912cbc063d169c446cc7c4dd",
-          "bytes": 35415,
-          "published_at": "2026-10-28T15:42:06.488Z",
+          "checksum": "a054435bef5f1b82a337c02c95c9d8b43fe5ddafc8d36aceadf48bc09e318bc9",
+          "bytes": 35406,
+          "published_at": "2026-10-28T15:57:25.412Z",
           "bump": "patch",
           "reach": {
             "modules": [

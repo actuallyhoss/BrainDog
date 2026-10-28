@@ -595,7 +595,7 @@
             "metric": "policies-live",
             "gt": 0
           },
-          "body": "{{policies-fund}} across {{policies-live}} policies. Next maturity {{day:policies-next}}."
+          "body": "{{policies-fund}} in funds. Next maturity {{day:policies-next}}."
         },
         {
           "kind": "note",

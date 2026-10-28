@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "made_at": "2026-10-28T15:42:06.488Z",
+  "made_at": "2026-10-28T15:57:25.412Z",
   "pages": [
     {
       "blocks": [
         {
-          "body": "{{certificates-principal}} in {{certificates-count}} certificates, {{certificates-accrued}} earned. Next payout {{day:certificates-next-payout}}.",
+          "body": "Next payout {{day:certificates-next-payout}}.",
           "kind": "note",
           "lead": true,
           "span": 12,
@@ -51,10 +51,6 @@
             {
               "label": "Worth at maturity",
               "metric": "certificates-maturity"
-            },
-            {
-              "label": "Next payout",
-              "metric": "certificates-next-payout"
             },
             {
               "label": "Next to mature",
@@ -246,7 +242,7 @@
         "register.certificates"
       ],
       "title": "Certificates",
-      "read_at": "2026-10-28T15:42:06.488Z",
+      "read_at": "2026-10-28T15:57:25.412Z",
       "zone": "UTC",
       "look": {
         "look": "certificates",

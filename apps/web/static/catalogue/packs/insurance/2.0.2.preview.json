@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "made_at": "2026-10-28T15:42:06.488Z",
+  "made_at": "2026-10-28T15:57:25.412Z",
   "pages": [
     {
       "blocks": [
         {
-          "body": "{{policies-fund}} across {{policies-live}} policies. Next maturity {{day:policies-next}}.",
+          "body": "{{policies-fund}} in funds. Next maturity {{day:policies-next}}.",
           "kind": "note",
           "lead": true,
           "span": 12,
@@ -203,7 +203,7 @@
         "register.policies"
       ],
       "title": "Insurance",
-      "read_at": "2026-10-28T15:42:06.488Z",
+      "read_at": "2026-10-28T15:57:25.412Z",
       "zone": "UTC",
       "look": {
         "look": "insurance",

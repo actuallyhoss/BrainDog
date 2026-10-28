@@ -388,7 +388,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "{{certificates-principal}} in {{certificates-count}} certificates, {{certificates-accrued}} earned. Next payout {{day:certificates-next-payout}}.",
+          "body": "Next payout {{day:certificates-next-payout}}.",
           "when": {
             "metric": "certificates-count",
             "gt": 0
@@ -425,10 +425,6 @@
             {
               "metric": "certificates-maturity",
               "label": "Worth at maturity"
-            },
-            {
-              "metric": "certificates-next-payout",
-              "label": "Next payout"
             },
             {
               "metric": "certificates-next-matures",

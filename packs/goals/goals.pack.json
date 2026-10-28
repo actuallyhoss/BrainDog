@@ -337,7 +337,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Saving for {{goals-saving}} goals."
+          "body": "{{goals-behind}} of {{goals-saving}} goals {{bad:behind}}."
         },
         {
           "kind": "stat",
@@ -361,16 +361,6 @@
               "label": "Reached"
             }
           ]
-        },
-        {
-          "kind": "note",
-          "tone": "warn",
-          "span": 12,
-          "body": "{{goals-behind}} {{bad:behind}}.",
-          "when": {
-            "metric": "goals-behind",
-            "gt": 0
-          }
         },
         {
           "kind": "progress",

@@ -229,7 +229,7 @@ async function fresh(): Promise<{ api: Api; sql: ReturnType<typeof openSqlite>; 
 test('INSTALLED BESIDE MONEY-CORE: a debt written by a person makes both plans, and the Debts page shows them and the debt', async () => {
   const { api, sql, close } = await fresh();
   const page0 = said<Page>(await api.page({ slug: 'debts' }, owner));
-  assert.deepEqual(page0.blocks.map((b) => b.heading), [undefined, 'Two ways to be debt-free', 'The two compared', undefined, 'What you are paying off', 'Add a debt']);
+  assert.deepEqual(page0.blocks.map((b) => b.heading), [undefined, 'Payoff plans', 'The two compared', undefined, 'What you are paying off', 'Add a debt']);
   assert.deepEqual(page0.blocks.map((b) => b.refusals), [[], [], [], [], [], []]);
   assert.equal(page0.blocks[1]!.rows.length, 0, 'no plan until there is a debt');
 
@@ -237,7 +237,7 @@ test('INSTALLED BESIDE MONEY-CORE: a debt written by a person makes both plans, 
     said(await api.create({ register: 'debts', fields: { name, left: usd(balance), apr, minimum: usd(minimum) } }, owner));
   await settle(api);
   const page = said<Page>(await api.page({ slug: 'debts' }, owner));
-  const plans = page.blocks.find((b) => b.heading === 'Two ways to be debt-free')!;
+  const plans = page.blocks.find((b) => b.heading === 'Payoff plans')!;
   assert.deepEqual(plans.rows.map((r) => [r.fields.how, r.fields.takes]).sort(), [['avalanche', '9 months'], ['snowball', '9 months']]);
   assert.equal(page.blocks.find((b) => b.heading === 'What you are paying off')!.rows.length, 2);
 
@@ -246,7 +246,7 @@ test('INSTALLED BESIDE MONEY-CORE: a debt written by a person makes both plans, 
   const av = seqs.find((r) => (JSON.parse(r.fields) as { how: string }).how === 'avalanche')!;
   said(await api.update({ register: 'payoff_plans', seq: av.seq, patch: { extra: usd(25_000) } } as never, owner));
   await settle(api);
-  const again = said<Page>(await api.page({ slug: 'debts' }, owner)).blocks.find((b) => b.heading === 'Two ways to be debt-free')!;
+  const again = said<Page>(await api.page({ slug: 'debts' }, owner)).blocks.find((b) => b.heading === 'Payoff plans')!;
   assert.deepEqual(again.rows.map((r) => [r.fields.how, r.fields.takes, r.fields.extra]).sort(), [
     ['avalanche', '3 months', usd(25_000)],
     ['snowball', '3 months', usd(25_000)],

@@ -777,7 +777,7 @@
           "heading": "Step 2. The year",
           "icon": "calendar-clock",
           "span": 12,
-          "body": "Began {{day:zakat-hawl-from}}. {{good:The year has run}}, so zakat is due now.",
+          "body": "Began {{day:zakat-hawl-from}}. The year has run, so zakat is due now.",
           "when": {
             "metric": "zakat-hawl-done",
             "gt": 0

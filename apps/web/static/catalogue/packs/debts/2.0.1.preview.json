@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-28T15:42:06.488Z",
+  "made_at": "2026-10-28T15:57:25.412Z",
   "pages": [
     {
       "blocks": [
@@ -48,7 +48,7 @@
             }
           ],
           "empty": "No debts yet.",
-          "heading": "Two ways to be debt-free",
+          "heading": "Payoff plans",
           "kind": "cards",
           "limit": 2,
           "order": [
@@ -59,7 +59,7 @@
           ],
           "source": "register.payoff_plans",
           "span": 12,
-          "key": "k1sweo6h",
+          "key": "k0po1xcw",
           "rows": [],
           "matched": 0,
           "refusals": [],
@@ -211,14 +211,14 @@
         "register.payoff_plans"
       ],
       "title": "Debts",
-      "read_at": "2026-10-28T15:42:06.488Z",
+      "read_at": "2026-10-28T15:57:25.412Z",
       "zone": "UTC",
       "look": {
         "look": "debts",
-        "basis": "r1alcvje",
+        "basis": "r1tcy3vl",
         "by": "rule",
         "hide": [
-          "k1sweo6h",
+          "k0po1xcw",
           "k0uq5y7w",
           "k0r6kygi"
         ]

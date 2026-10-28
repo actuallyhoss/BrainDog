@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-28T15:42:06.488Z",
+  "made_at": "2026-10-28T15:57:25.412Z",
   "pages": [
     {
       "blocks": [
@@ -191,7 +191,7 @@
           "why": "when"
         },
         {
-          "body": "Began {{day:zakat-hawl-from}}. {{good:The year has run}}, so zakat is due now.",
+          "body": "Began {{day:zakat-hawl-from}}. The year has run, so zakat is due now.",
           "heading": "Step 2. The year",
           "icon": "calendar-clock",
           "kind": "note",
@@ -582,7 +582,7 @@
         "register.holdings"
       ],
       "title": "Zakat",
-      "read_at": "2026-10-28T15:42:06.488Z",
+      "read_at": "2026-10-28T15:57:25.412Z",
       "zone": "UTC",
       "look": {
         "look": "zakat",
