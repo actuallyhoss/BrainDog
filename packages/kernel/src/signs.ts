@@ -469,12 +469,13 @@ const everAsked = (sql: Sql): boolean => sql.one('SELECT 1 AS x FROM suggestion 
 function readCauses(sql: Sql, nowMs: number): SignReading {
   if (!everAsked(sql)) return reading('none', null, 'Nothing has been asked on this record yet.');
   /* THE CAUSE IS THE QUESTION'S OWN, the column `propose` keeps every cause it filed or derived in (migration 31), else
-     the body's (a tail question from before the column writes it), ELSE THE KIND OF CHANGE STAMPED ON IT WITH WHAT IT IS
-     ABOUT, ELSE NONE. Read off the body alone, every question an agent gave a cause was counted as carrying none.
-     `system` opens a question only when the record itself failed (`0001_kernel.ts`). */
+     the body's (a tail question from before the column writes it, and Slash's reading keeps its key, `understand_key`),
+     ELSE THE KIND OF CHANGE STAMPED ON IT WITH WHAT IT IS ABOUT, ELSE NONE. Read off the body alone, every question an
+     agent gave a cause was counted as carrying none. `system` opens a question only when the record itself failed
+     (`0001_kernel.ts`). */
   const open = sql.all<{ id: string; cause: string | null; kind: string | null; about: string | null; opened_by: string }>(
     `SELECT id, opened_by, kind,
-            COALESCE(cause, CASE WHEN json_valid(body) THEN json_extract(body, '$.cause') END) AS cause,
+            COALESCE(cause, CASE WHEN json_valid(body) THEN COALESCE(json_extract(body, '$.cause'), json_extract(body, '$.understand_key')) END) AS cause,
             CASE WHEN json_valid(body) THEN json_extract(body, '$.about') END AS about
        FROM suggestion WHERE ${OPEN} ORDER BY rowid`,
     new Date(nowMs).toISOString(),
