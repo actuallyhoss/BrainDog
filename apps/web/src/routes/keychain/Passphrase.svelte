@@ -320,6 +320,13 @@
     .lock-how {
       padding-inline-start: 0;
     }
+
+    /* A BUTTON TOO WIDE FOR THE ROW'S END GOES UNDER THE WORDS, so the line is not squeezed into a column a word wide.
+       The switch is narrow and stays at the end. */
+    .lock-row > :global(.btn) {
+      grid-column: 2 / -1;
+      justify-self: start;
+    }
   }
 
   .lock-text,
