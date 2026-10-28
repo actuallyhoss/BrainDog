@@ -257,23 +257,42 @@ function countsOf(kernel: RecordSignsKernel, sinceMs: number): DoorCounts | null
   return value !== null && typeof value.hello === 'number' && typeof value.listed === 'number' ? value : null;
 }
 
-/** Each client's sessions in the window, read from the marks themselves: said hello, given the list, and the newest. */
-type ClientSessions = { client: string | null; hello: number; listed: number; waiting: number; newestRun: string; newestAt: string };
+/**
+ * How long a client may keep the tool list it was given without asking again: the `ttlMs` the door's own `tools/list`
+ * answer grants, private to the caller (`packages/mcp/src/rpc.ts`).
+ */
+export const TOOLS_KEPT_MS = HOUR;
+
+/**
+ * Each client's sessions in the window, read from the marks themselves: said hello, had the tool list, and the newest.
+ *
+ * A SESSION HAD THE LIST when the door gave it one; when it called a tool, which it can only name from a list; or when
+ * the same app was given the list in the hour before it said hello, the hour the door's answer says a list may be kept.
+ * An app that keeps its list as the door allows asks once an hour, not once a session, and each session in between read
+ * as one the door had failed.
+ */
+type ClientSessions = { client: string | null; hello: number; listed: number; waiting: number; newestAt: string; newestListed: boolean };
 function byClient(sql: Sql, since: string, nowMs: number): ClientSessions[] {
   if (!hasTable(sql, 'door_mark')) return [];
+  const client = (h: string) => `coalesce(${h}.client, (SELECT d.client FROM door_mark d WHERE d.run = ${h}.run AND d.client IS NOT NULL LIMIT 1))`;
   const hellos = sql.all<{ run: string; at: string; client: string | null; listed: number }>(
-    `SELECT h.run, h.at, coalesce(h.client, (SELECT d.client FROM door_mark d WHERE d.run = h.run AND d.client IS NOT NULL LIMIT 1)) AS client,
-       EXISTS (SELECT 1 FROM door_mark l WHERE l.run = h.run AND l.kind = 'listed') AS listed
+    `SELECT h.run, h.at, ${client('h')} AS client,
+       (EXISTS (SELECT 1 FROM door_mark l WHERE l.run = h.run AND l.kind IN ('listed', 'called'))
+        OR EXISTS (SELECT 1 FROM door_mark l JOIN door_mark o ON o.run = l.run AND o.kind = 'hello'
+                   WHERE l.kind = 'listed' AND l.run <> h.run AND l.at <= h.at AND julianday(h.at) - julianday(l.at) <= ?
+                     AND ${client('o')} = ${client('h')})) AS listed
      FROM door_mark h WHERE h.kind = 'hello' AND h.at >= ? ORDER BY h.at DESC`,
+    TOOLS_KEPT_MS / DAY,
     since,
   );
   const out = new Map<string, ClientSessions>();
   for (const h of hellos) {
     const key = clientName(h.client);
-    const c = out.get(key) ?? { client: h.client, hello: 0, listed: 0, waiting: 0, newestRun: h.run, newestAt: h.at };
+    const had = Number(h.listed) === 1;
+    const c = out.get(key) ?? { client: h.client, hello: 0, listed: 0, waiting: 0, newestAt: h.at, newestListed: had };
     c.hello += 1;
     /* A SESSION STILL INSIDE ITS TEN MINUTES WITH NO LIST IS NOT JUDGED YET, either way. */
-    if (Number(h.listed) === 1) c.listed += 1;
+    if (had) c.listed += 1;
     else if (nowMs - Date.parse(h.at) <= TOOLS_LIST_WITHIN_MS) c.waiting += 1;
     out.set(key, c);
   }
@@ -288,10 +307,12 @@ export function readToolsSign(kernel: RecordSignsKernel, sql: Sql, nowMs: number
   const sinceMs = nowMs - TOOLS_WINDOW_DAYS * DAY;
   const counts = countsOf(kernel, sinceMs);
   if (counts === null) return reading('none', null, 'This BrainDog does not yet keep what happens when an agent connects.');
-  const { hello, listed } = counts;
+  const { hello } = counts;
   /* A LIST SENT WITH NO HELLO HEARD is nothing to judge by either: the count it would be held against is not kept. */
   if (hello === 0) return reading('none', null, 'No agent connected this week.');
   const clients = byClient(sql, new Date(sinceMs).toISOString(), nowMs);
+  /* THE SESSIONS THAT HAD THE LIST as `byClient` reads them, a call or a kept list included; the kernel's count without it. */
+  const listed = Math.min(hello, clients.length === 0 ? counts.listed : clients.reduce((n, c) => n + c.listed, 0));
   const judged = Math.max(0, hello - clients.reduce((n, c) => n + c.waiting, 0));
   /* EVERY SESSION STILL INSIDE ITS TEN MINUTES is not judged yet, so it is not green. */
   if (judged === 0)
@@ -300,9 +321,8 @@ export function readToolsSign(kernel: RecordSignsKernel, sql: Sql, nowMs: number
 
   /* THE NEWEST SESSION OF EACH CLIENT, given ten minutes to be sent the list. */
   for (const c of clients) {
-    const listedNewest = sql.one("SELECT 1 AS n FROM door_mark WHERE run = ? AND kind = 'listed'", c.newestRun) !== undefined;
     const waited = nowMs - Date.parse(c.newestAt);
-    if (!listedNewest && waited > TOOLS_LIST_WITHIN_MS)
+    if (!c.newestListed && waited > TOOLS_LIST_WITHIN_MS)
       return reading('red', listed, `The newest ${clientName(c.client)} session connected ${ago(waited)} ago and was not given the tool list.`, facts);
   }
   if (judged >= TOOLS_SESSIONS_LEAST && listed * 10 < judged * TOOLS_LISTED_TENTHS) {
