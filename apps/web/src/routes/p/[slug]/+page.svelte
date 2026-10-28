@@ -394,6 +394,9 @@
    * the record's own runs (`register.session`).
    */
   const ofRuns = $derived(got?.from === 'live' && got.page.blocks.some((b) => b.kind === 'lanes' && (b as { source?: unknown }).source === 'register.session'));
+  /* THE AGENTS PAGE, KNOWN THE SAME WAY, by the list of every run it draws (`panel: run-list`), opens on the plain head the
+     hand-written screens beside it have (Needs you, Automations), not the lead tile (`PageView`'s `plain`). */
+  const plainHead = $derived(got?.from === 'live' && got.page.blocks.some((b) => (b as { panel?: unknown }).panel === 'run-list'));
   let told = $state<{ base: string; tile: LessonsTile | null } | null>(null);
   $effect(() => {
     if (!ofRuns) return;
@@ -430,7 +433,7 @@
     <div class="shaped-body">{@render shaped()}</div>
   </div>
 {:else}
-  <div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer || lessons ? offerCard : undefined} waiting={known ? shaped : undefined} /></div>
+  <div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer || lessons ? offerCard : undefined} waiting={known ? shaped : undefined} plain={plainHead} /></div>
 {/if}
 
 <style>

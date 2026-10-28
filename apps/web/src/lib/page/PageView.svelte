@@ -110,7 +110,13 @@
     opens,
     between,
     waiting,
+    plain = false,
   }: {
+    /**
+     * A page that opens on the plain head every hand-written screen has (Decide, Automations): the name at 28 with its
+     * icon and its sentence once under it, never the lead tile. The route's choice, for a page it knows by what it draws.
+     */
+    plain?: boolean;
     /**
      * What a project's page draws while its shape's code is on its way (`shape-hold.svelte.ts`), the project in its own shape (`ProjectWaiting`,
      * handed in by the route so this file's chunk does not carry it). Left out, nothing is drawn there, as before.
@@ -447,7 +453,7 @@
    * tile's first row and the sentence under them at 40, in place of a 28px name over a 17px line floating on the board.
    * Not on a project's page, whose hero already holds its name and its line (`ProjectPart`).
    */
-  const tiled = $derived(led && !projectPage);
+  const tiled = $derived(led && !projectPage && !plain);
 
   /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
