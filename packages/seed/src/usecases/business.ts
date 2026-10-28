@@ -61,10 +61,11 @@ export const BUSINESS = {
      names no word for Home, so the rail says the house's). One word on a page that is already there, so a patch step.
      1.7.0 is live. Still unreleased (commit 63423720 holds 1.7.0), it takes batch 88's block with no version of its
      own: Home draws Gone quiet, what stopped reporting, straight under What you have (founder-home-quiet-88), a sixth
-     tile on a page held to six. A block added, nothing taken away. */
-  version: '1.7.1',
+     tile on a page held to six. A block added, nothing taken away.
+     1.7.2: the card's summary is one short line. Words only, so a patch step. */
+  version: '1.7.2',
   title: 'Small business',
-  summary: 'Money in and out, the hosting and subscriptions you run on, the people involved and the work.',
+  summary: 'Money in and out, clients and subscriptions.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'individual',

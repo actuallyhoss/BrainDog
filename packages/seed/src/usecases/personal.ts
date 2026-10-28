@@ -152,10 +152,11 @@ export const PERSONAL = {
      project steps point at; People comes when a name is said, and anything else is offered when its moment comes. Home already leads from
      Money's own figures and this pack's lists, and a block or a role over a list the record does not hold is cut at
      install (`fitted`). 2.5.0 is published in the catalogue and frozen, and the file it shares changes (`needs`), so
-     this is a version beside it. Nothing is declared, taken away or reworded, so a record on 2.5.0 keeps all it holds. */
-  version: '2.6.0',
+     this is a version beside it. Nothing is declared, taken away or reworded, so a record on 2.5.0 keeps all it holds.
+     2.6.1: the card's summary is one short line. Words only, so a patch step. */
+  version: '2.6.1',
   title: 'Personal',
-  summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
+  summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'individual',

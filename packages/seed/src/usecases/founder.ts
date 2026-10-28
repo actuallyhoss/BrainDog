@@ -503,10 +503,11 @@ export const FOUNDER = {
      hero beside its lane's tile, its numbers beside its work, then its dates, who is on it, what it runs on, the agents,
      what was decided and what happened; the plan and Key numbers move under More about, What changed goes for those
      parts, the Numbers lines and Where it was seen go from the project page, and Send numbers here is folded last.
-     Projects 1.30.0 leads with its board. No id added or taken away, so a minor step. */
-  version: '3.7.0',
+     Projects 1.30.0 leads with its board. No id added or taken away, so a minor step.
+     3.7.1: the card's summary is one short line. Words only, so a patch step. */
+  version: '3.7.1',
   title: 'Solo founder',
-  summary: 'The organisations you run, the money across them, and the numbers your projects report.',
+  summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'founder',

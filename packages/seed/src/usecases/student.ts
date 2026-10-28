@@ -26,10 +26,11 @@ export const STUDENT = {
      the Courses list"), not by its id ("Label: courses"), and every list's name is declared before any
      singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
      1.6.0: Studies is part of Student now. A piece of work can carry a mark as a number, and a reading list of books and
-     papers sits beside the courses. A field and a list added and nothing taken away, so a minor step. */
-  version: '1.6.0',
+     papers sits beside the courses. A field and a list added and nothing taken away, so a minor step.
+     1.6.1: the card's summary is one short line. Words only, so a patch step. */
+  version: '1.6.1',
   title: 'Student',
-  summary: 'Your courses, what is due and when, and how each piece of work went.',
+  summary: 'Your courses, assignments and grades.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'individual',

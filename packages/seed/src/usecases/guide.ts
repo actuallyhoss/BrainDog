@@ -55,10 +55,11 @@ export const GUIDE = {
      while it has them. Only counts are added, so a minor step.
      1.6.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
      the Steps list"), not by its id ("Label: steps"), and every list's name is declared before any
-     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
-  version: '1.7.0',
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
+     1.7.1: the card's summary is one short line. Words only, so a patch step. */
+  version: '1.7.1',
   title: 'New project guide',
-  summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
+  summary: 'Milestones and next steps for a new project.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'starter',

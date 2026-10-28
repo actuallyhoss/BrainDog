@@ -6146,12 +6146,30 @@
       "kind": "usecase",
       "id": "business",
       "title": "Small business",
-      "summary": "Money in and out, the hosting and subscriptions you run on, the people involved and the work.",
+      "summary": "Money in and out, clients and subscriptions.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.7.1",
+      "latest": "1.7.2",
       "versions": [
+        {
+          "version": "1.7.2",
+          "checksum": "cdb500b1fbdbf624733a10d67b1bdf6cf8afe6bfb18604137ce7f6153d463d05",
+          "bytes": 4493,
+          "published_at": "2026-10-28T15:53:04.230Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.7.1",
           "checksum": "44ccbd018fd4fa58e537cf05c47514f39f21427cf6dd7f62dc3fbafd98b845e9",
@@ -6212,12 +6230,41 @@
       "kind": "usecase",
       "id": "founder",
       "title": "Solo founder",
-      "summary": "The organisations you run, the money across them, and the numbers your projects report.",
+      "summary": "Your companies, their revenue and metrics.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "3.7.0",
+      "latest": "3.7.1",
       "versions": [
+        {
+          "version": "3.7.1",
+          "checksum": "0c762a3a8fc9e5dc516172df8fdb762aad544ca64cc580eff36a52f40efea4ad",
+          "bytes": 42256,
+          "published_at": "2026-10-28T15:53:04.230Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Today",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "3.7.0",
           "checksum": "d7b5353d42ae30c43a93980a0134660ab19fc792109c3672eb8f9f0fe5cf299c",
@@ -6541,12 +6588,44 @@
       "kind": "usecase",
       "id": "guide",
       "title": "New project guide",
-      "summary": "The milestones of your project, the next step to take, the choices to make and what helps along the way.",
+      "summary": "Milestones and next steps for a new project.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "starter",
-      "latest": "1.7.0",
+      "latest": "1.7.1",
       "versions": [
+        {
+          "version": "1.7.1",
+          "checksum": "67f41891afdbfe0d64467a6b7130e4932f18fdb77656af3286cde7f25d79c316",
+          "bytes": 37842,
+          "published_at": "2026-10-28T15:53:04.230Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Milestones",
+              "Choices",
+              "Resources",
+              "Steps"
+            ],
+            "pages": [
+              "Your project",
+              "Guide",
+              "{{what}}"
+            ],
+            "rules": [
+              "Mark a milestone passed on the path once it is reached",
+              "Take a milestone off the path as passed when it is moved back"
+            ],
+            "examples": 0,
+            "skills": [
+              "project-coach",
+              "step-taker",
+              "choice-recorder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.7.0",
           "checksum": "d41d8cb36578d03c275ed1c27c532ed52cfc4ab2f1fa2aa500ccb92901bf6bdd",
@@ -6791,12 +6870,44 @@
       "kind": "usecase",
       "id": "personal",
       "title": "Personal",
-      "summary": "Your money and bills, what you are saving for, and the projects and goals you care about.",
+      "summary": "Your money, bills, savings and goals.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.6.0",
+      "latest": "2.6.1",
       "versions": [
+        {
+          "version": "2.6.1",
+          "checksum": "c7f4572d426ccef38bb500d368bfe61c086dc53125e97a032eae6a5d5d6b4945",
+          "bytes": 32033,
+          "published_at": "2026-10-28T15:53:04.230Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Log",
+              "Put by",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.6.0",
           "checksum": "5af9097b503097022b1d72b6ee1c4d49bd4a3129c32b9b1508749f5432383d22",
@@ -7059,12 +7170,35 @@
       "kind": "usecase",
       "id": "shop",
       "title": "Shop",
-      "summary": "The orders you take, who they are for and when they are due, what has been paid, and the things you sell.",
+      "summary": "Your orders, products and what is paid.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.4.0",
+      "latest": "1.4.1",
       "versions": [
+        {
+          "version": "1.4.1",
+          "checksum": "b05f1b833586f7991e0bf6c32b6f476372b174019324e0203be524090d82a0f8",
+          "bytes": 11976,
+          "published_at": "2026-10-28T15:53:04.230Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Orders",
+              "Products"
+            ],
+            "pages": [
+              "Orders"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.4.0",
           "checksum": "10be42e13a237f7cecbcfa8778aca057c7268b36588b28c67db353723d46b6d5",
@@ -7166,12 +7300,38 @@
       "kind": "usecase",
       "id": "student",
       "title": "Student",
-      "summary": "Your courses, what is due and when, and how each piece of work went.",
+      "summary": "Your courses, assignments and grades.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.6.0",
+      "latest": "1.6.1",
       "versions": [
+        {
+          "version": "1.6.1",
+          "checksum": "1c17b17c0688bdac3bd7437914f6440ac7e5673c7e1e8bd889412e502a133b6b",
+          "bytes": 16572,
+          "published_at": "2026-10-28T15:53:04.230Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Study sessions",
+              "Reading list"
+            ],
+            "pages": [
+              "Today",
+              "Studies"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "study-planner"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.6.0",
           "checksum": "add8001f34a8fe4b5061c2ff0b3089590f6fd61d7b022b4285198988b39f3048",
@@ -7341,12 +7501,48 @@
       "kind": "usecase",
       "id": "team",
       "title": "Team board",
-      "summary": "Tickets with an owner and a status, the cycle each is in, and the work your agents took on.",
+      "summary": "Tickets, cycles and the agents on them.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.29.0",
+      "latest": "2.29.1",
       "versions": [
+        {
+          "version": "2.29.1",
+          "checksum": "6d4176d027b97c7136015c112fff393f8bea2487b8b69249bef2510d582c5212",
+          "bytes": 37483,
+          "published_at": "2026-10-28T15:53:04.230Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Cycles",
+              "Cycle plan",
+              "Cycle days"
+            ],
+            "pages": [
+              "Team",
+              "Cycles",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.29.0",
           "checksum": "c5b29c93b5cdea6e52b239c84f8a4f8de17b4675b76ff3263d02299a59512ac2",

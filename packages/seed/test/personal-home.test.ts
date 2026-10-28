@@ -245,7 +245,7 @@ test('A RECORD ON 2.5.0 TAKES 2.6.0 AND LOSES NOTHING, in the order the record p
   const next = carriedDocument(u, TODAY, null)!;
   assert.equal(frozen.version, '2.5.0');
   assert.deepEqual([next.declarations, next.extends], [frozen.pack.declarations, frozen.pack.extends], '2.6.0 declares what the published 2.5.0 declares');
-  assert.equal(useCaseDocument('personal', TODAY)?.version, '2.6.0');
+  assert.equal(useCaseDocument('personal', TODAY)?.version, '2.6.1');
 
   const k = await personal('2.5.0');
   const lists = held(k).sort();
@@ -261,7 +261,7 @@ test('A RECORD ON 2.5.0 TAKES 2.6.0 AND LOSES NOTHING, in the order the record p
   assert.deepEqual({ adds: diff.adds.length, changes: diff.changes.length, retires: diff.retires.length, conflicts: diff.conflicts.length }, { adds: 0, changes: 0, retires: 0, conflicts: 0 });
   value(await install(pack, diff, hostFor(k), diff.planHash));
 
-  assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, '2.6.0');
+  assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, '2.6.1');
   assert.deepEqual(held(k).sort(), lists, 'every list is still held');
   assert.deepEqual(k.declarations().filter((d) => d.kind === 'page').map((d) => d.id).sort(), pages, 'every page is still there');
   assert.equal(k.count('savings_goals'), 1, 'the goal is still there');

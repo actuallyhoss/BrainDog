@@ -56,10 +56,11 @@ export const SHOP = {
      THE CATALOGUE (published by batch 99), so this is a version of its own.
      1.4.0: the Orders page opens on a box to add an order, where a new shop's first tab said
      "Nothing here yet" over nothing to press. A block added to a page that is already there, so a minor step. 1.3.0 is
-     master's. */
-  version: '1.4.0',
+     master's.
+     1.4.1: the card's summary is one short line. Words only, so a patch step. */
+  version: '1.4.1',
   title: 'Shop',
-  summary: 'The orders you take, who they are for and when they are due, what has been paid, and the things you sell.',
+  summary: 'Your orders, products and what is paid.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'individual',

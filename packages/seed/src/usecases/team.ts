@@ -253,10 +253,11 @@ export const TEAM = {
      for those parts. Projects 1.30.0 leads with its board. No id added or taken away, so a minor step.
 
      2.29.0: Team task list is part of Team board now. A cycle carries a retro, a document for how it went. One field
-     added and nothing taken away, so a minor step. */
-  version: '2.29.0',
+     added and nothing taken away, so a minor step.
+     2.29.1: the card's summary is one short line. Words only, so a patch step. */
+  version: '2.29.1',
   title: 'Team board',
-  summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
+  summary: 'Tickets, cycles and the agents on them.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'team',
