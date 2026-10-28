@@ -77,7 +77,7 @@ export type ModelRate = { in: number; out: number };
  * an automation's question, `setup` and `mapping` are the first run's two asks, and the other five of the eight have no
  * caller here yet.
  */
-export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping';
+export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping' | 'chat';
 
 export type PromptTemplate = {
   /** The purpose the host's route is asked for; every template in `PROMPTS` says one (`SlashPurpose` below). */
@@ -426,4 +426,84 @@ export interface Slash {
   status(): Status;
   /** The owner's latest asks, newest first, at most `limit` of them (`ASKS_MOST` in `index.ts`). */
   history(limit: number, ctx: CallContext): Result<{ asks: Asked[] }>;
+  /**
+   * One turn of a conversation (`chat.ts`): the model reads the record through `tools`, does what the person asked
+   * through them, and answers. Every event goes to `emit` as it happens, and the last is always `done`. One ask a turn,
+   * on the same month's count as a question, however many steps it took.
+   */
+  chat(input: ChatInput, ctx: CallContext, tools: ChatTools, emit: (event: ChatEvent) => void, inference?: Inference): Promise<void>;
+  /** A held action answered: `accept` applies it through `tools.apply`, and either way it is settled and never asked again. */
+  act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
+  /** One conversation, its turns oldest first, for the person who had it and nobody else. */
+  thread(id: string, ctx: CallContext): Result<ChatThread>;
 }
+
+/* ── a conversation ──────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** What a person sent: the words, the conversation it continues, and where they were when they sent it. */
+export type ChatInput = { thread?: string | undefined; message: string; page?: { path: string; title?: string | undefined; row?: string | undefined } | undefined };
+
+/**
+ * One thing Slash did, or wants to do and waits for a yes on. `done` has happened, with `undo` its batch where the record
+ * keeps one; `ask` is held (`act` answers it). `state` is said once an `ask` is answered, on a thread read back.
+ */
+export type ChatAction = {
+  id: string;
+  kind: 'done' | 'ask';
+  title: string;
+  detail?: string | undefined;
+  undo?: { batch: string } | undefined;
+  href?: string | undefined;
+  state?: 'open' | 'accepted' | 'declined' | undefined;
+};
+
+/** The events of one turn, in the order they happen, one a line on the wire. */
+export type ChatEvent =
+  | { type: 'thread'; id: string }
+  | { type: 'step'; text: string }
+  | { type: 'delta'; text: string }
+  | ({ type: 'action' } & Omit<ChatAction, 'state'>)
+  | { type: 'navigate'; href: string; label: string }
+  | { type: 'error'; text: string }
+  | { type: 'done'; spent: { asks: number; left: number | null } };
+
+/** One tool as the model is told of it: its name, the arguments it takes as they read in a line, and what it does. */
+export type ChatTool = { name: string; args: string; about: string; writes?: boolean | undefined };
+
+/**
+ * What one tool call came back with.
+ *
+ * `text` IS WHAT THE MODEL READS NEXT, already short. `outside` names text from outside the record the call handed back,
+ * which drops the rest of the turn to asking. `action` is a write's outcome; an `ask` carries `op`, the write to make on
+ * the person's yes, which the engine keeps and never shows. `figures` are numbers worked out in code (`calc`), which the
+ * answer may say though no result printed them.
+ */
+export type ChatRan = {
+  text: string;
+  outside?: string | null | undefined;
+  action?: (Omit<ChatAction, 'id' | 'state'> & { op?: Record<string, unknown> | undefined }) | undefined;
+  navigate?: { href: string; label: string } | undefined;
+  figures?: readonly number[] | undefined;
+  /** The words the step says while it runs, "Reading Money". */
+  step?: string | undefined;
+};
+
+/** How the run stands when a tool is called: whether it may write at once, and the person's words it acts on. */
+export type ChatRun = { askOnly: boolean; asked: boolean; said: string; outside: string | null };
+
+/**
+ * The tools a host hands a conversation, over the record and as the asker: reads, writes through the record's own write
+ * path, and `ref`, which turns an id a result printed into the `register#seq` a link is drawn from.
+ */
+export type ChatTools = {
+  list: readonly ChatTool[];
+  call(name: string, args: Record<string, unknown>, run: ChatRun): Promise<ChatRan>;
+  apply(op: Record<string, unknown>): Promise<Result<{ receipt: string; undo?: { batch: string } | undefined; href?: string | undefined }>>;
+  ref?(id: string): Promise<string | null>;
+};
+
+/** A held action answered. */
+export type ChatActed = { ok: true; receipt?: string | undefined; undo?: { batch: string } | undefined };
+
+/** One conversation read back. */
+export type ChatThread = { id: string; turns: { role: 'you' | 'slash'; text: string; actions: ChatAction[] }[] };

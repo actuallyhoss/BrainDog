@@ -45,6 +45,7 @@
 import { no, ok, type Result } from '@braindog/ports';
 
 import { answering } from './answer.ts';
+import { chats } from './chat.ts';
 import { core as makeCore, openStore, TIERS } from './call.ts';
 import { patterns } from './jobs.ts';
 import { palette, setups } from './propose.ts';
@@ -66,6 +67,7 @@ import {
 } from './types.ts';
 
 export { eraseSlash } from './erase.ts';
+export { CALLS_MOST, STEPS_MOST, calc, checkFigures, numbersIn, openChat } from './chat.ts';
 export { health as engineHealth, said as engineSaid, ANSWER_STALE_DAYS, FAILS_DOWN, HEALTH_DAYS, LEDGER_ANSWERED, LEDGER_FAILED } from './health.ts';
 export type { EngineFacts, EngineHealth, EngineSaid } from './health.ts';
 export { STORE_VERSION } from './call.ts';
@@ -73,12 +75,21 @@ export { core as ledgerCore, openStore as openLedger } from './call.ts';
 export type { Charge, StoreStep } from './call.ts';
 export { cite, citable, shapeOf, tokens } from './project.ts';
 export { answerSchema } from './answer.ts';
-export { ANSWER_SYSTEM, MODELS, PROMPTS, SYSTEM } from './prompts.ts';
+export { ANSWER_SYSTEM, CHAT_SYSTEM, MODELS, PROMPTS, SYSTEM } from './prompts.ts';
 export type { ModelId, ModelRate, PromptId, PromptTemplate, Routed, TemplatePurpose } from './prompts.ts';
 export type {
   Ask,
   Asked,
   CallContext,
+  ChatActed,
+  ChatAction,
+  ChatEvent,
+  ChatInput,
+  ChatRan,
+  ChatRun,
+  ChatThread,
+  ChatTool,
+  ChatTools,
   Citable,
   Inference,
   InferenceCall,
@@ -226,6 +237,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
   const pattern = patterns(core, deps.record, deps.inference, options.wait);
   const automation = answering(core, deps.inference);
   const firstRun = setups(core, deps.inference);
+  const talk = chats(core);
 
   /** Where the own key is asked, as the owner last saved it, whatever the tier is now. */
   const own = (): { provider: Provider | null; base_url: string | null } => {
@@ -409,6 +421,10 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     configure,
     status,
     history,
+    /* A CONVERSATION (`chat.ts`), on the same ledger and the same month's count as a question. */
+    chat: talk.chat,
+    act: talk.act,
+    thread: talk.thread,
   };
 }
 

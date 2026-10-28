@@ -1,0 +1,561 @@
+/**
+ * A conversation with Slash: a thread of turns, a model that reads the record through tools and does what it is asked
+ * through them, and an answer held to what the tools said.
+ *
+ * WHY THIS AND NOT THE PALETTE'S TWO PASSES. Those read one fixed projection, drafted once, and answer in braces with no
+ * digit allowed; a follow-up starts from nothing and nothing can be done. Here a turn is a short loop: the model asks for
+ * a read, the host runs it over the record's own methods as the asker, the model reads the result and asks again or
+ * answers. The palette's passes are left as they were.
+ *
+ * TOOLS BY JSON. The call shape has no `tools` field and that is kept (`types.ts`): each step is one JSON answer under
+ * `CHAT_SCHEMA`, `{ calls, say }`, which every host's model already speaks.
+ *
+ * TRUTH IS CHECKED, NOT BANNED. The answer may say a figure; every figure it says must stand in something this turn
+ * read, a calc it ran, the person's own words or the conversation before. One that does not is taken out with the
+ * sentence it was in, and the answer says a figure was left out (`held`).
+ *
+ * ONE ASK A TURN. The first model call holds the person's ask, as `read` holds one (`core.reserve`), before anything is
+ * awaited; every later step of the same turn is its own ledger row and spends nobody's month, as a question's second
+ * pass does. The steps are bounded (`STEPS_MOST`, `CALLS_MOST`) and the prompt is fitted under the template's cap.
+ *
+ * WHAT IS KEPT. The conversation, in Slash's own store beside the ledger (`slash_thread`, `slash_turn`), for the person
+ * who had it; and each action held for a yes, with the write it would make (`slash_act`), which never leaves this store.
+ * `eraseSlash` takes a person's words out of all three.
+ */
+
+import { codeOf, fixOf, no, ok, type Result, type Sql } from '@braindog/ports';
+
+import { ulid, type Core } from './call.ts';
+import { PROMPTS } from './prompts.ts';
+import { firstBytes, isRecord, tokens } from './project.ts';
+import type { CallContext, ChatAction, ChatActed, ChatEvent, ChatInput, ChatRan, ChatRun, ChatThread, ChatTool, ChatTools, Inference } from './types.ts';
+
+/** The most model calls one turn makes: read, read again, answer, and one to spare. */
+export const STEPS_MOST = 4;
+/** The most tool calls one turn runs, across its steps. */
+export const CALLS_MOST = 6;
+/** What a person may send in one message, in bytes. */
+const MESSAGE_BYTES = 1_000;
+/** The most of one result the model reads; a longer one is cut and says so. */
+const RESULT_CHARS = 2_400;
+/** An older result this turn, once the prompt is too long, is cut to this. */
+const RESULT_SHORT = 500;
+/** The turns before this one the model is shown, newest kept when the prompt is too long. */
+const TURNS_READ = 8;
+/** The most of one earlier turn the model is shown. */
+const TURN_CHARS = 1_200;
+/** The turns one thread keeps; the oldest go first. */
+const TURNS_KEPT = 40;
+/** The most ids one answer has turned into links. */
+const REFS_MOST = 10;
+
+/** Slash's own tables for a conversation, beside the ledger, each made once and never altered. */
+const DDL: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS slash_thread (
+     id      TEXT PRIMARY KEY,
+     person  TEXT NOT NULL,
+     ts      TEXT NOT NULL,
+     updated TEXT NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS slash_turn (
+     thread  TEXT NOT NULL,
+     n       INTEGER NOT NULL,
+     role    TEXT NOT NULL CHECK (role IN ('you','slash')),
+     text    TEXT NOT NULL,
+     actions TEXT NOT NULL DEFAULT '[]',
+     ts      TEXT NOT NULL,
+     PRIMARY KEY (thread, n)
+   )`,
+  `CREATE TABLE IF NOT EXISTS slash_act (
+     id      TEXT PRIMARY KEY,
+     thread  TEXT NOT NULL,
+     person  TEXT NOT NULL,
+     title   TEXT NOT NULL,
+     op      TEXT NOT NULL,
+     state   TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','accepted','declined')),
+     receipt TEXT,
+     undo    TEXT,
+     ts      TEXT NOT NULL
+   )`,
+];
+
+/** Make the conversation's tables where they are not yet. */
+export const openChat = (sql: Sql): void => {
+  for (const statement of DDL) sql.exec(statement);
+};
+
+/** The tool the engine answers itself: arithmetic, so a total the answer says is one code worked out. */
+const CALC: ChatTool = { name: 'calc', args: 'expr', about: 'Work out a sum: + - * / and brackets over figures the results showed, e.g. "1250.50 + 300"' };
+
+/**
+ * Whether the person's words ask for something to be done, and not only to be told: the one condition on which a write
+ * lands at once. A question that happens to make the model want to write gets a held action instead.
+ */
+const DOING =
+  /\b(add|adds|create|make|new|put|log|record|note|track|remind|schedule|set|change|update|edit|rename|move|mark|close|finish|complete|assign|draft|write|build|start|plan|open|go|take me|show me|bring up|file|book|save|keep|do it|go ahead|yes|yep|sure|please do|ok|okay)\b/iu;
+
+const who = (ctx: CallContext): string => ctx.principal.id;
+
+/* ── checking an answer ──────────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * A figure as it is written in prose: digits with their thousands commas and decimals, and a `k` or `m` after, never one
+ * inside a word or an id (`TK3`, `Q4`, `2nd` are not figures).
+ */
+const FIGURE = /(?<![A-Za-z0-9#_.])(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(?:\s?([kKmM])\b)?(?![A-Za-z0-9_])/gu;
+/** Any number at all, as evidence: digit runs with commas and decimals, wherever they sit. */
+const ANY_NUMBER = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/gu;
+
+const valueOf = (whole: string, decimals: string | undefined, scale: string | undefined): number => {
+  const n = Number(`${whole.replaceAll(',', '')}${decimals ?? ''}`);
+  const s = scale?.toLowerCase();
+  return s === 'k' ? n * 1_000 : s === 'm' ? n * 1_000_000 : n;
+};
+
+/** Every number a text holds, as values. */
+export const numbersIn = (text: string): number[] => {
+  const out: number[] = [];
+  for (const m of text.matchAll(ANY_NUMBER)) {
+    const n = Number(m[0].replaceAll(',', ''));
+    if (Number.isFinite(n)) out.push(n);
+  }
+  return out;
+};
+
+/**
+ * Whether a figure the answer says stands in the evidence: the same value, or the same value rounded the way a person
+ * rounds when they speak (to the whole number, or to the thousand behind a `k`). A small whole number is a count or a
+ * day of the month and is let through; a calc's result is evidence like any other.
+ */
+const holds = (value: number, evidence: readonly number[], scaled: boolean): boolean => {
+  if (Number.isInteger(value) && value >= 0 && value <= 12 && !scaled) return true;
+  return evidence.some((e) => {
+    if (Math.abs(e - value) < 1e-9) return true;
+    if (Math.abs(e) >= 100 && Math.round(e) === value) return true;
+    if (scaled) return Math.abs(e - value) <= Math.max(Math.abs(e) * 0.05, 1);
+    return false;
+  });
+};
+
+/** The sentences of an answer, each with the space that followed it. */
+const sentences = (text: string): string[] => text.split(/(?<=[.!?])\s+/u).filter((s) => s.trim() !== '');
+
+/**
+ * The answer with every figure no evidence holds taken out, the sentence it stood in with it, and how many went.
+ * Braces are not read: an id inside `{{ref:…}}` is not a figure.
+ */
+export const checkFigures = (answer: string, evidence: readonly number[]): { text: string; dropped: number } => {
+  let dropped = 0;
+  const kept = sentences(answer).filter((sentence) => {
+    const bare = sentence.replace(/\{\{[^}]*\}\}/gu, ' ');
+    for (const m of bare.matchAll(FIGURE)) {
+      const value = valueOf(m[1] ?? '', m[2], m[3]);
+      if (!Number.isFinite(value) || holds(value, evidence, m[3] !== undefined)) continue;
+      dropped++;
+      return false;
+    }
+    return true;
+  });
+  return { text: kept.join(' ').trim(), dropped };
+};
+
+/** `tasks#41`, the one form a link is drawn from. */
+const QUALIFIED = /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u;
+
+/**
+ * Every `{{ref:ID}}` made the `register#seq` a link is drawn from, through the host's own lookup, and every other brace
+ * taken out: the answer is prose, and a brace the screen cannot draw would print as itself.
+ */
+const linked = async (answer: string, tools: ChatTools): Promise<string> => {
+  const asked = [...new Set([...answer.matchAll(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu)].map((m) => m[1] ?? ''))].slice(0, REFS_MOST);
+  const to = new Map<string, string | null>();
+  for (const id of asked) {
+    let at: string | null = null;
+    try {
+      at = tools.ref ? await tools.ref(id) : QUALIFIED.test(id) ? id : null;
+    } catch {
+      at = null;
+    }
+    to.set(id, at);
+  }
+  return answer
+    .replace(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu, (_, id: string) => {
+      const at = to.get(id);
+      return at ? `{{ref:${at}}}` : '';
+    })
+    .replace(/\{\{(?!ref:)[^}]*\}\}/gu, '')
+    .replace(/[ \t]{2,}/gu, ' ')
+    .replace(/\s+([.,;:!?])/gu, '$1')
+    .trim();
+};
+
+/* ── calc ────────────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** `+ - * /` and brackets over decimal numbers, worked out in code. `null` for anything else. */
+export const calc = (expr: string): number | null => {
+  const src = expr.replace(/(\d),(?=\d{3}\b)/gu, '$1').replace(/[\s ]/gu, '');
+  if (src === '' || src.length > 200 || !/^[0-9+\-*/().]+$/u.test(src)) return null;
+  let at = 0;
+  const peek = (): string => src.charAt(at);
+  const sum = (): number => {
+    let v = product();
+    while (peek() === '+' || peek() === '-') v = src.charAt(at++) === '+' ? v + product() : v - product();
+    return v;
+  };
+  const product = (): number => {
+    let v = unary();
+    while (peek() === '*' || peek() === '/') v = src.charAt(at++) === '*' ? v * unary() : v / unary();
+    return v;
+  };
+  const unary = (): number => (peek() === '-' ? (at++, -unary()) : peek() === '+' ? (at++, unary()) : atom());
+  const atom = (): number => {
+    if (peek() === '(') {
+      at++;
+      const v = sum();
+      if (peek() !== ')') throw new Error('bracket');
+      at++;
+      return v;
+    }
+    const m = /^\d+(?:\.\d+)?|^\.\d+/u.exec(src.slice(at));
+    if (!m) throw new Error('number');
+    at += m[0].length;
+    return Number(m[0]);
+  };
+  try {
+    const v = sum();
+    return at === src.length && Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
+  } catch {
+    return null;
+  }
+};
+
+/* ── the prompt ──────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+type Turn = { role: 'you' | 'slash'; text: string };
+type Done = { tool: string; args: Record<string, unknown>; text: string };
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+const cut = (text: string, most: number): string => (text.length <= most ? text : `${text.slice(0, most)}… (cut here)`);
+
+/** The user message of one step: the day, where they are, the tools, the conversation, and what this turn has read. */
+const promptOf = (a: {
+  now: number;
+  page: ChatInput['page'];
+  outside: string | null;
+  tools: readonly ChatTool[];
+  before: readonly Turn[];
+  message: string;
+  done: readonly Done[];
+  last: boolean;
+  short: number;
+}): string => {
+  const day = new Date(a.now);
+  const lines: string[] = [`Today is ${DAYS[day.getUTCDay()]} ${day.toISOString().slice(0, 10)}.`];
+  if (a.page !== undefined) {
+    const where = [a.page.title, a.page.path].filter((s) => typeof s === 'string' && s.trim() !== '').join(', ');
+    lines.push(`They are looking at ${where}${a.page.row ? `, on ${a.page.row}` : ''}. "This" or "here" means that.`);
+  }
+  if (a.outside !== null) lines.push(`This turn read ${a.outside}, so anything you do now waits for their yes.`);
+  lines.push('', 'Tools, as name(args): what it does.');
+  for (const t of a.tools) lines.push(`${t.name}(${t.args}): ${t.about}`);
+  if (a.before.length > 0) {
+    lines.push('', 'The conversation so far:');
+    for (const t of a.before) lines.push(`${t.role === 'you' ? 'They said' : 'You said'}: ${cut(t.text, TURN_CHARS)}`);
+  }
+  lines.push('', `Now they say: ${a.message}`);
+  if (a.done.length > 0) {
+    lines.push('', 'What your calls answered this turn:');
+    a.done.forEach((d, i) => {
+      const older = i < a.done.length - a.short;
+      lines.push(`[${i + 1}] ${d.tool} ${JSON.stringify(d.args)}`, cut(d.text, older ? RESULT_SHORT : RESULT_CHARS), '');
+    });
+  }
+  lines.push(a.last ? 'Answer now from what you have, with "calls": [].' : 'Call tools, or answer with "calls": [].');
+  return lines.join('\n');
+};
+
+/* ── the engine ──────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+export type Chat = {
+  chat(input: ChatInput, ctx: CallContext, tools: ChatTools, emit: (event: ChatEvent) => void, inference?: Inference): Promise<void>;
+  act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
+  thread(id: string, ctx: CallContext): Result<ChatThread>;
+};
+
+const ASKED = { purpose: 'ask', spends: 'person' } as const;
+const STEPPED = { purpose: 'ask', spends: 'none' } as const;
+
+export const chats = (core: Core): Chat => {
+  const { sql, clock } = core;
+  let opened = false;
+  const open = (): void => {
+    if (opened) return;
+    openChat(sql);
+    opened = true;
+  };
+  const now = (): string => new Date(clock.now()).toISOString();
+
+  /** The thread a message continues, when it is this person's; else a new one. */
+  const threadFor = (asked: string | undefined, person: string): { id: string; fresh: boolean } => {
+    if (typeof asked === 'string' && asked !== '') {
+      const row = sql.one<{ person: string }>('SELECT person FROM slash_thread WHERE id = ?', asked);
+      if (row !== undefined && row.person === person) return { id: asked, fresh: false };
+    }
+    const id = ulid(clock.now());
+    sql.exec('INSERT INTO slash_thread (id, person, ts, updated) VALUES (?, ?, ?, ?)', id, person, now(), now());
+    return { id, fresh: true };
+  };
+
+  const turnsOf = (thread: string, most: number): Turn[] =>
+    sql
+      .all<Turn>('SELECT role, text FROM slash_turn WHERE thread = ? ORDER BY n DESC LIMIT ?', thread, most)
+      .reverse();
+
+  const addTurn = (thread: string, role: 'you' | 'slash', text: string, actions: readonly ChatAction[] = []): void => {
+    const n = (sql.one<{ n: number | null }>('SELECT MAX(n) AS n FROM slash_turn WHERE thread = ?', thread)?.n ?? 0) + 1;
+    sql.exec('INSERT INTO slash_turn (thread, n, role, text, actions, ts) VALUES (?, ?, ?, ?, ?, ?)', thread, n, role, text, JSON.stringify(actions), now());
+    sql.exec('DELETE FROM slash_turn WHERE thread = ? AND n <= ?', thread, n - TURNS_KEPT);
+    sql.exec('UPDATE slash_thread SET updated = ? WHERE id = ?', now(), thread);
+  };
+
+  const left = (): number | null => {
+    const s = core.settings();
+    return s.tier === 'a' ? Math.max(0, s.ask_cap - core.asksUsed()) : null;
+  };
+
+  const chat: Chat['chat'] = async (input, ctx, tools, emit, inference) => {
+    open();
+    const person = who(ctx);
+    const message = firstBytes((typeof input.message === 'string' ? input.message : '').trim(), MESSAGE_BYTES);
+    if (message === '') {
+      emit({ type: 'error', text: 'Say something first.' });
+      emit({ type: 'done', spent: { asks: 0, left: left() } });
+      return;
+    }
+
+    /* THE MONTH'S CHECK AND THE HOLD, WITH NO `await` BETWEEN THEM, for `read`'s reason (`propose.ts`). */
+    const s = core.settings();
+    if (s.tier === 'a' && core.asksUsed() >= s.ask_cap) {
+      core.turnedAway('read', s.tier);
+      emit({ type: 'error', text: `Slash is out of asks until ${core.resets().slice(0, 10)}. Add your own key in Settings, or wait.` });
+      emit({ type: 'done', spent: { asks: 0, left: 0 } });
+      return;
+    }
+    if (s.tier === 'b' && inference === undefined) {
+      emit({ type: 'error', text: 'Your key is not open in this session. Open the keychain, or switch Slash to the included model.' });
+      emit({ type: 'done', spent: { asks: 0, left: null } });
+      return;
+    }
+    const model = s.model ?? PROMPTS.chat.model;
+    const holds: string[] = [core.reserve('read', s.tier, model, ASKED)];
+
+    const thread = threadFor(input.thread, person);
+    emit({ type: 'thread', id: thread.id });
+    const before = thread.fresh ? [] : turnsOf(thread.id, TURNS_READ);
+    addTurn(thread.id, 'you', message);
+
+    const list = [...tools.list.filter((t) => t.name !== CALC.name), CALC];
+    const named = new Map(list.map((t) => [t.name, t]));
+    const run: ChatRun = { askOnly: false, asked: DOING.test(message), said: message, outside: null };
+    const done: Done[] = [];
+    const actions: ChatAction[] = [];
+    const figures: number[] = [...numbersIn(message), ...before.flatMap((t) => numbersIn(t.text)), ...numbersIn(now().slice(0, 10))];
+    let reached = false;
+    let calls = 0;
+    let answer: string | null = null;
+    let failed: string | null = null;
+
+    try {
+      for (let step = 0; step < STEPS_MOST && answer === null; step++) {
+        const last = step === STEPS_MOST - 1 || calls >= CALLS_MOST;
+        /* FITTED UNDER THE TEMPLATE'S CAP, the conversation's oldest turns first and then this turn's older results, so a
+           result the model is about to read is never the part that goes. */
+        let kept = [...before];
+        let short = done.length;
+        const prompt = (): string =>
+          promptOf({ now: clock.now(), page: input.page, outside: run.outside, tools: list, before: kept, message, done, last, short });
+        let text = prompt();
+        const room = PROMPTS.chat.capIn - tokens(PROMPTS.chat.system) - 100;
+        while (tokens(text) > room && kept.length > 0) {
+          kept = kept.slice(1);
+          text = prompt();
+        }
+        while (tokens(text) > room && short > 1) {
+          short--;
+          text = prompt();
+        }
+
+        const id = step === 0 ? holds[0]! : core.reserve('read', s.tier, model, STEPPED);
+        if (step > 0) holds.push(id);
+        const ran = await core.run({ id: 'chat', slots: { '%TRANSCRIPT%': text }, inference, model: s.model ?? undefined });
+        reached ||= ran.served;
+        core.account({
+          id,
+          kind: 'read',
+          tier: s.tier,
+          model: ran.model,
+          usage: ran.usage,
+          ms: ran.ms,
+          status: ran.out.ok ? 'ok' : 'error',
+          code: ran.out.ok ? undefined : codeOf(ran.out),
+          ...(step === 0 ? { question: message } : {}),
+          read: done.map((d) => ({ register: `@${d.tool}`, rows: 1, predicate: 'tool' })),
+          ...(step === 0 ? ASKED : STEPPED),
+          served: ran.served,
+          candidate: ran.candidate,
+          raw: ran.raw,
+        });
+        if (!ran.out.ok) {
+          failed = codeOf(ran.out) === 'UNREACHABLE' ? "Slash couldn't reach its model just now. Try again in a moment." : "Slash's model answered in a shape it could not read. Try asking again.";
+          break;
+        }
+
+        const said = typeof ran.out.value['say'] === 'string' ? ran.out.value['say'].trim() : '';
+        const wanted = (Array.isArray(ran.out.value['calls']) ? ran.out.value['calls'] : []).filter(isRecord).slice(0, 3);
+        if (wanted.length === 0 || last) {
+          answer = said;
+          break;
+        }
+
+        for (const call of wanted) {
+          if (calls >= CALLS_MOST) break;
+          calls++;
+          const name = typeof call['tool'] === 'string' ? call['tool'] : '';
+          const args = isRecord(call['args']) ? call['args'] : {};
+          const tool = named.get(name);
+          if (tool === undefined) {
+            done.push({ tool: name, args, text: `There is no tool called ${name}. The tools are ${list.map((t) => t.name).join(', ')}.` });
+            continue;
+          }
+          if (tool.name === CALC.name) {
+            const expr = typeof args['expr'] === 'string' ? args['expr'] : '';
+            const v = calc(expr);
+            emit({ type: 'step', text: 'Working it out' });
+            if (v !== null) figures.push(v);
+            done.push({ tool: name, args, text: v === null ? 'calc takes numbers with + - * / and brackets, such as "1250.50 + 300".' : `= ${String(v)}` });
+            continue;
+          }
+          let out: ChatRan;
+          try {
+            out = await tools.call(name, args, { ...run });
+          } catch (e) {
+            out = { text: `${name} could not be read just now: ${e instanceof Error ? e.message : String(e)}.` };
+          }
+          emit({ type: 'step', text: out.step ?? tool.about.split(/[.:,]/u)[0] ?? name });
+          /* OUTSIDE TEXT DROPS THE REST OF THE TURN TO ASKING, whatever the model reads next (the record's own rule). */
+          if (out.outside) {
+            run.outside ??= out.outside;
+            run.askOnly = true;
+          }
+          figures.push(...numbersIn(out.text), ...(out.figures ?? []));
+          done.push({ tool: name, args, text: out.text });
+          if (out.action !== undefined) {
+            const { op, ...shown } = out.action;
+            const action: ChatAction = { id: ulid(clock.now()), ...shown };
+            if (action.kind === 'ask')
+              sql.exec(
+                'INSERT INTO slash_act (id, thread, person, title, op, ts) VALUES (?, ?, ?, ?, ?, ?)',
+                action.id,
+                thread.id,
+                person,
+                action.title,
+                JSON.stringify(op ?? {}),
+                now(),
+              );
+            actions.push(action);
+            emit({ type: 'action', ...action });
+          }
+          if (out.navigate !== undefined) emit({ type: 'navigate', href: out.navigate.href, label: out.navigate.label });
+        }
+      }
+    } catch (e) {
+      failed = `Slash stopped partway: ${e instanceof Error ? e.message : String(e)}.`;
+    } finally {
+      for (const id of holds) core.release(id);
+    }
+
+    let text = '';
+    if (answer !== null && answer !== '') {
+      const checked = checkFigures(answer, figures);
+      text = await linked(checked.text, tools);
+      if (checked.dropped > 0)
+        text =
+          text === ''
+            ? "I found something, but I couldn't check its figures against the record, so I've left them out. Ask me to look again."
+            : `${text} (I left out a figure I couldn't check.)`;
+    } else if (failed === null) {
+      text = actions.length > 0 ? 'Done.' : "I couldn't find that in the record.";
+    }
+
+    if (text !== '') for (const piece of sentences(text)) emit({ type: 'delta', text: `${piece} ` });
+    if (failed !== null) emit({ type: 'error', text: failed });
+    addTurn(thread.id, 'slash', text !== '' ? text : (failed ?? ''), actions);
+    emit({ type: 'done', spent: { asks: reached ? 1 : 0, left: left() } });
+  };
+
+  const act: Chat['act'] = async (id, accept, ctx, tools) => {
+    open();
+    const row = sql.one<{ person: string; op: string; state: string }>('SELECT person, op, state FROM slash_act WHERE id = ?', id);
+    if (row === undefined || row.person !== who(ctx)) return no('REF_UNKNOWN', 'There is nothing waiting under that name. It may have been answered already.', { at: 'id' });
+    if (row.state !== 'open') return no('ALREADY_KNOWN', `You ${row.state === 'accepted' ? 'said yes to' : 'turned down'} this already.`, { at: 'id' });
+    if (!accept) {
+      sql.exec("UPDATE slash_act SET state = 'declined' WHERE id = ?", id);
+      return ok({ ok: true });
+    }
+    /* TAKEN BEFORE THE WRITE, so two presses at once write once; given back if the write is refused. */
+    sql.exec("UPDATE slash_act SET state = 'accepted' WHERE id = ? AND state = 'open'", id);
+    let op: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(row.op);
+      if (isRecord(parsed)) op = parsed;
+    } catch {
+      op = {};
+    }
+    let applied: Awaited<ReturnType<ChatTools['apply']>>;
+    try {
+      applied = await tools.apply(op);
+    } catch (e) {
+      applied = no('INTERNAL', `That could not be done: ${e instanceof Error ? e.message : String(e)}.`);
+    }
+    if (!applied.ok) {
+      sql.exec("UPDATE slash_act SET state = 'open' WHERE id = ?", id);
+      return no(codeOf(applied) || 'INTERNAL', fixOf(applied) || 'That could not be done.');
+    }
+    sql.exec('UPDATE slash_act SET receipt = ?, undo = ? WHERE id = ?', applied.value.receipt, applied.value.undo?.batch ?? null, id);
+    return ok({ ok: true, receipt: applied.value.receipt, ...(applied.value.undo === undefined ? {} : { undo: applied.value.undo }) });
+  };
+
+  const thread: Chat['thread'] = (id, ctx) => {
+    open();
+    const row = sql.one<{ person: string }>('SELECT person FROM slash_thread WHERE id = ?', id);
+    if (row === undefined || row.person !== who(ctx)) return no('REF_UNKNOWN', 'There is no conversation under that name.', { at: 'id' });
+    const held = new Map(
+      sql
+        .all<{ id: string; state: string; receipt: string | null; undo: string | null }>('SELECT id, state, receipt, undo FROM slash_act WHERE thread = ?', id)
+        .map((a) => [a.id, a] as const),
+    );
+    const turns = sql.all<{ role: 'you' | 'slash'; text: string; actions: string }>('SELECT role, text, actions FROM slash_turn WHERE thread = ? ORDER BY n', id).map((t) => {
+      let actions: ChatAction[] = [];
+      try {
+        const parsed: unknown = JSON.parse(t.actions);
+        actions = Array.isArray(parsed) ? (parsed.filter(isRecord) as unknown as ChatAction[]) : [];
+      } catch {
+        actions = [];
+      }
+      return {
+        role: t.role,
+        text: t.text,
+        actions: actions.map((a) => {
+          const h = held.get(a.id);
+          if (h === undefined) return a;
+          const state = h.state === 'accepted' ? 'accepted' : h.state === 'declined' ? 'declined' : 'open';
+          return { ...a, state, ...(h.undo === null ? {} : { undo: { batch: h.undo } }), ...(h.receipt === null ? {} : { detail: h.receipt }) } as ChatAction;
+        }),
+      };
+    });
+    return ok({ id, turns });
+  };
+
+  return { chat, act, thread };
+};

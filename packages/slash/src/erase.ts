@@ -14,7 +14,8 @@
  * WHICH COLUMNS HOLD A PERSON'S WORDS, as each new store's owner is asked to say:
  * `slash_call.question`, the question as it was typed; `slash_call.predicate`, the drafted filter, which carries the values
  * a question named; and the `predicate` of each trace in `slash_call.read`. `slash_settings` holds a tier, a model name, a
- * grant id and a cap, and `slash_meta` a version, and neither holds anybody's words.
+ * grant id and a cap, and `slash_meta` a version, and neither holds anybody's words. A conversation's turns
+ * (`slash_turn.text`, `slash_turn.actions`) and its held actions (`slash_act.title`, `op`, `receipt`) hold them too.
  */
 
 import type { Sql } from '@braindog/ports';
@@ -70,9 +71,31 @@ export function eraseSlash(sql: Sql, subjects: readonly string[]): number {
       if (last === undefined || page.length < ERASE_PAGE) break;
       after = last.rowid;
     }
+    touched += conversationsErased(sql, names);
   });
   return touched;
 }
+
+/**
+ * A conversation's words (`chat.ts`): what was said each turn, the actions it showed, and what an action held for a yes
+ * would write. A held action that names a subject is erased and declined, so a yes later cannot write the words back.
+ * Read whole, a conversation at a time, for the walk's reason above. A store with no conversations has nothing here.
+ */
+const conversationsErased = (sql: Sql, names: (text: string | null) => boolean): number => {
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_turn'") === undefined) return 0;
+  let touched = 0;
+  for (const t of sql.all<{ thread: string; n: number; text: string; actions: string }>('SELECT thread, n, text, actions FROM slash_turn')) {
+    if (!names(t.text) && !names(t.actions)) continue;
+    sql.exec('UPDATE slash_turn SET text = ?, actions = ? WHERE thread = ? AND n = ?', names(t.text) ? ERASED : t.text, names(t.actions) ? '[]' : t.actions, t.thread, t.n);
+    touched++;
+  }
+  for (const a of sql.all<{ id: string; title: string; op: string; receipt: string | null }>('SELECT id, title, op, receipt FROM slash_act')) {
+    if (!names(a.title) && !names(a.op) && !names(a.receipt)) continue;
+    sql.exec("UPDATE slash_act SET title = ?, op = '{}', receipt = NULL, state = CASE state WHEN 'open' THEN 'declined' ELSE state END WHERE id = ?", ERASED, a.id);
+    touched++;
+  }
+  return touched;
+};
 
 /**
  * `slash_call.read` with the predicate of each trace that names a subject erased, and the register and the count kept.
