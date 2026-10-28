@@ -19,7 +19,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { PROPOSALS_PER_RUN, type Entry } from '@braindog/kernel';
+import { APART_PREF, PROPOSALS_PER_RUN, type Entry } from '@braindog/kernel';
 import { KPI_BACKFILL_SCRIPT, firstPartyDocument } from '@braindog/seed';
 
 import type { Send } from '../src/actions.ts';
@@ -58,6 +58,9 @@ async function selfhost(scripts: Record<string, unknown>[]) {
   said(await running.api.installPack({ doc, source: { kind: 'local' }, planHash: planned.diff.planHash, approve: planned.diff.approve } as never, owner));
   const k = running.api.kernel;
   said(await k.install(scripts as never));
+  /* EVERY QUESTION IN NEEDS YOU, the owner's switch for the agents' shelf turned off: what a run files and how it is
+     filed is what this measures, not which of the two places on Decide a draft waits in. */
+  running.sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES (?, ?, 'false', '2026-09-01T00:00:00.000Z')", person.value.id, APART_PREF);
   const as = { actor: person.value.id };
   const questions = (): Question[] => said<Question[]>(k.openSuggestions());
   const bodyOf = (q: Question) => (typeof q.body === 'string' ? JSON.parse(q.body) : q.body) as Rowset & { options?: unknown[] };
