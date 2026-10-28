@@ -109,12 +109,14 @@ export function nobodysPlace(hints: Pick<SessionHints, 'repo' | 'cwd'>): boolean
 }
 
 /**
- * Whether a later session from a place that no project holds should form a draft: the place can be a project at all,
- * and a session from the same repository was seen before (one-off folders never spawn projects). `earlier` is how many
- * sessions the record already holds from that same repository or remote.
+ * Whether a later session from a place that no project holds should form a draft, quietly, rather than ask: the place
+ * can be a project at all, and it is a repository (one with a name or a remote), which forms at first sight. A folder
+ * with no repository behind it forms on its second session (`earlier` is how many sessions the record already holds
+ * from that same place), so a one-off folder spawns nothing. A place that only partly matches a project is not formed
+ * here: that is the record's question to ask (`backfill.ts`), and a draft beside it would be the same work twice.
  */
 export function formsOnRepeat(hints: Pick<SessionHints, 'repo' | 'remote' | 'cwd'>, earlier: number): boolean {
   if (nobodysPlace(hints)) return false;
-  if ((hints.repo ?? '').trim() === '' && (hints.remote ?? '').trim() === '') return false;
-  return earlier >= 1;
+  if ((hints.repo ?? '').trim() !== '' || (hints.remote ?? '').trim() !== '') return true;
+  return (hints.cwd ?? '').trim() !== '' && earlier >= 1;
 }

@@ -34,11 +34,11 @@ describe('the first project formed from a first session', () => {
     assert.equal(nobodysPlace({ cwd: '/Users/sam/Code/tidepool', repo: 'tidepool' }), false);
   });
 
-  it('forms a later project only from the second session out of the same repository', () => {
+  it('forms a later project from a new repository at once, and from a bare folder on its second session', () => {
     const at = { repo: 'tidepool', cwd: '/Users/sam/Code/tidepool' };
-    assert.equal(formsOnRepeat(at, 0), false);
-    assert.equal(formsOnRepeat(at, 1), true);
-    assert.equal(formsOnRepeat({ cwd: '/Users/sam/Code/tidepool' }, 3), false);
+    assert.equal(formsOnRepeat(at, 0), true);
+    assert.equal(formsOnRepeat({ cwd: '/Users/sam/Code/tidepool' }, 0), false);
+    assert.equal(formsOnRepeat({ cwd: '/Users/sam/Code/tidepool' }, 1), true);
     assert.equal(formsOnRepeat({ ...at, cwd: '/tmp/tidepool' }, 3), false);
   });
 });
