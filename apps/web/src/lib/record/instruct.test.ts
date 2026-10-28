@@ -100,7 +100,7 @@ const ctx = { now: NOW, zone: UTC, runs: runsOf(ROWS), projects: PROJECTS };
 
 test('TO OFFERS WHOEVER IS NEXT, EACH KIND OF AGENT AND EACH LIVE RUN BY NAME, never a handle, and no helper', () => {
   const c = composerOf(PICK_FIRST, ROWS, PROJECTS);
-  assert.equal(c.to[0]!.label, 'Whoever’s next');
+  assert.equal(c.to[0]!.label, 'Any agent');
   assert.ok(c.to.some((x) => x.key === 'agent:codex' && x.label === 'Codex'));
   const runs = c.to.filter((x) => x.key.startsWith('run:'));
   assert.deepEqual(

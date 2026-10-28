@@ -141,7 +141,7 @@ export const AGENT_KINDS = ['claude', 'codex', 'cursor', 'gemini', 'copilot', 'w
 export const WAIT_DAYS = 14;
 
 export const controlWords = {
-  anyone: 'Whoever’s next',
+  anyone: 'Any agent',
   anywhere: 'Any project',
   anyMachine: 'Any machine',
   anyProfile: 'Any profile',
