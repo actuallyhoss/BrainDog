@@ -831,9 +831,26 @@ const registers22 = (): typeof AGENTS_REGISTERS => {
   const credentials = AGENTS_REGISTERS.credentials!;
   return { ...AGENTS_REGISTERS, credentials: { ...credentials, fields: credentials.fields.filter((f) => f.id !== 'account') } };
 };
+/** 1.24.0'S TWO SECTIONS, by their keys and the page each stands on: Accepted unchanged on Agents, Over time on How the brain changed. */
+const ADDED_24: [string, string][] = [
+  ['agents', 'kept'],
+  ['brain', 'timeline'],
+];
+/** Agents 1.23.0, which is 1.24.0 without Accepted unchanged and Over time. */
+const doc23 = (): { version: string; declarations: Record<string, unknown>[] } => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const declarations = doc.declarations.map((d) => {
+    const keys = ADDED_24.filter(([page]) => page === d.page).map(([, key]) => key);
+    if (keys.length === 0) return d;
+    const blocks = d.blocks as { key?: string }[];
+    for (const key of keys) assert.ok(blocks.some((b) => b.key === key), `doc23 was handed a document whose ${String(d.page)} page has no ${key}`);
+    return { ...d, blocks: blocks.filter((b) => !keys.includes(b.key ?? '')) };
+  });
+  return { ...doc, version: '1.23.0', declarations };
+};
 /** Agents 1.22.0, which is 1.23.0 with no `account` field on Keys. */
 const doc22 = (): { version: string; declarations: Record<string, unknown>[] } => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc23();
   const declarations = doc.declarations.map((d) => {
     if (d.register !== 'credentials') return d;
     const fields = d.fields as { id: string }[];
@@ -997,16 +1014,18 @@ test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figu
 test('NOTHING IS FOLDED SINCE 1.17.0, and the foot is one line of doors, How the brain changed first', async () => {
   const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; key?: string; heading?: string; fold?: boolean; box?: boolean; body?: string; when?: unknown }[];
   assert.equal(blocks.filter((b) => b.fold === true || b.box === true).length, 0, 'a part of the page is folded or boxed');
-  /* THE FOOT: right after Recent runs, one line, drawn on a quiet record too, its first door How the brain changed. */
+  /* THE FOOT: after Recent runs and, since 1.24.0, Accepted unchanged under it, one line, drawn on a quiet record too,
+     its first door How the brain changed. */
   const runs = blocks.findIndex((b) => b.heading === 'Recent runs');
-  const foot = blocks[runs + 1]!;
+  assert.equal(blocks[runs + 1]!.key, 'kept', 'Accepted unchanged is not right under Recent runs');
+  const foot = blocks[runs + 2]!;
   assert.deepEqual([foot.kind, foot.key, foot.when], ['note', 'brain-link', undefined]);
   assert.deepEqual(
     [...String(foot.body).matchAll(/\]\(([^)]+)\)/gu)].map((m) => m[1]),
     ['/p/brain', '/r/learnings', '/r/skills', '/r/tools', '/r/credentials'],
   );
   /* AFTER IT ONLY THE KEY AND TOOL LINES, each drawn only while its figure is above nought. */
-  for (const b of blocks.slice(runs + 2)) assert.deepEqual([b.kind, typeof b.when], ['note', 'object'], 'something but a warning line follows the foot');
+  for (const b of blocks.slice(runs + 3)) assert.deepEqual([b.kind, typeof b.when], ['note', 'object'], 'something but a warning line follows the foot');
   /* A FRESH RECORD DRAWS THE FOOT AND NO WARNING. */
   const fresh = await empty();
   value(await fresh.k.install(declarations().filter((d) => d.id === 'register.things')));
@@ -1164,7 +1183,7 @@ test('AGENTS 1.22.0 SAYS KEYCHAIN WHERE 1.21.0 SAID VAULT, and changed those wor
    field that is never secret, as a keychain item names its account. No list, field or figure goes. */
 const MARK_23 = 'bf08c50a4214038a';
 test('AGENTS 1.23.0 GIVES A KEY ITS ACCOUNT, and changed the Keys list only', async () => {
-  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  const doc = doc23();
   assert.equal(doc.version, '1.23.0', 'a new version takes a mark of its own beside this one');
   assert.equal(mark(doc.declarations), MARK_23, 'the Agents add-on changed what it declares with no new version');
   const was = doc22().declarations;
@@ -1184,6 +1203,22 @@ test('AGENTS 1.23.0 GIVES A KEY ITS ACCOUNT, and changed the Keys list only', as
   const shaped = k.create('credentials', { label: 'Other login', opens: 'other.example', kind: 'api_token', account: 'sk_live_51HxQwErTyUiOpAsDfGhJkLzXcVbNm1234567890abcd' }, { actor: 'p_seed' });
   assert.equal(shaped.ok, false, 'an account shaped like a key was kept');
   sql.close();
+});
+
+/* WHAT 1.24.0 DECLARES, AS ONE MARK: 1.23.0 with Accepted unchanged on Agents and Over time on How the brain changed
+   (`doc23` takes both away), each a section the host draws. No list, field or figure goes. */
+const MARK_24 = '8d0db59cbe536d16';
+test('AGENTS 1.24.0 ADDS ACCEPTED UNCHANGED AND OVER TIME, and changed those two pages only', () => {
+  const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
+  assert.equal(doc.version, '1.24.0', 'a new version takes a mark of its own beside this one');
+  assert.equal(mark(doc.declarations), MARK_24, 'the Agents add-on changed what it declares with no new version');
+  const was = doc23().declarations;
+  assert.equal(was.length, doc.declarations.length, '1.24.0 put in or took out a declaration');
+  assert.deepEqual(
+    doc.declarations.filter((d, i) => mark(d) !== mark(was[i])).map((d) => d.page ?? d.metric ?? d.register),
+    ['agents', 'brain'],
+    '1.24.0 changed more than the Agents page and How the brain changed',
+  );
 });
 
 test('A LEARNING BROUGHT IN THIS MONTH WITH AN OLD DAY OF ITS OWN DID NOT ARRIVE THIS MONTH', async () => {
