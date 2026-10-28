@@ -93,6 +93,13 @@ export type FieldSpec = {
    * that names it would match nothing or sort by nothing; `derivedFault` refuses both in one sentence.
    */
   derived?: boolean;
+  /**
+   * A FIELD WORKED OUT THROUGH A LINK (`derive: { via }`): the ref on this list and the field read on the row it names.
+   * Nothing is stored under it either, and a filter over it is answered on that row, as a semi-join, wherever the
+   * schema can name the other list (`schemaOf`). So "filed under a category that says so" is a clause of the row's
+   * own sentence, and a figure over the Ledger can leave such rows out.
+   */
+  through?: { ref: string; field: string };
   /** A `json` field of parts, each a patch over its row, adding up to this money field (the kernel's `parts.ts`). */
   parts_of?: string;
 };
@@ -864,6 +871,51 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
     );
   };
 
+  /**
+   * A CLAUSE OVER A FIELD READ THROUGH A LINK, COMPILED AS A SEMI-JOIN ON THE ROW THE LINK NAMES.
+   *
+   * The test is asked of the far field on the linked row, by this same function against that list's schema, and the row
+   * here passes when its link names a live row that passes. A row whose link names nothing, or a row that is gone, has
+   * no value there, and is answered as a row with nothing in the field is (`evaluate` over no fields), which is what
+   * `derive-rows.ts` shows it as: null. So `kept is false` holds for an entry with no category, and a figure that says
+   * it still counts every entry nobody filed.
+   *
+   * A LIST THE READER MAY NOT READ IN FULL (`schemaOf` answering nothing) IS READ AS NULL TOO, as the derived value is
+   * read for that reader, so nothing about the far rows is learnt from which near rows come back. A COMPILE WITH NO
+   * `schemaOf` AT ALL refuses, as a hop does: a rule is evaluated in memory, where the far row is not to hand.
+   */
+  const through = (leaf: Record<string, unknown>, field: string, via: { ref: string; field: string }, level: number): string => {
+    const no = (code: string, fix: string): string => {
+      bad.push(refuse(code, fix, field));
+      return '';
+    };
+    const link = Object.hasOwn(schema.fields, via.ref) ? schema.fields[via.ref]! : undefined;
+    if (link === undefined || link.type !== 'ref' || typeof link.to !== 'string' || !IDENT.test(via.ref) || !IDENT.test(via.field))
+      return no('MATCH_OP_UNSUPPORTED', `${field} reads through ${via.ref}, which is not a link ${schema.register} holds.`);
+    const asked = { ...leaf, field: via.field } as Node;
+    const type = schema.fields[field]?.type ?? 'text';
+    const bare: Schema = { register: link.to, fields: { [via.field]: { type, ...(schema.fields[field]?.values ? { values: schema.fields[field]!.values } : {}) } } };
+    const there = schema.schemaOf!(link.to);
+    const far = there && (there.subject ?? 'entry') === 'entry' ? there : undefined;
+    let missing = false;
+    try {
+      missing = evaluate(asked, {}, far ?? bare);
+    } catch {
+      missing = false;
+    }
+    if (far === undefined) return missing ? '1 = 1' : '0 = 1';
+    const inner = compileAt(asked, far, level + 1);
+    if (inner.bad.length) {
+      bad.push(...inner.bad);
+      return '';
+    }
+    const alias = `via${level}`;
+    const held = fieldSql(via.ref, 'ref');
+    const live = `SELECT ${alias}.id FROM entry AS ${alias} WHERE ${alias}.register = ? AND ${alias}.deleted_at IS NULL`;
+    params.push(link.to, ...inner.params, link.to);
+    return `(CASE WHEN ${held} IN (${live} AND (${inner.sql})) THEN 1 WHEN ${held} IN (${live}) THEN 0 ELSE ${missing ? 1 : 0} END = 1)`;
+  };
+
   const walk = (node: Node, level: number): string => {
     /* A `where` THAT IS NOT A PREDICATE IS A REFUSAL AND NOT A THROW. `null`, `5` and `[1]` all
        reached the `'matches' in leaf` test below and came out of `k.list` as a TypeError. */
@@ -1064,9 +1116,12 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
       return '';
     }
 
-    /* A FIELD WORKED OUT AT READ HOLDS NOTHING IN THE STORE, so a clause over it is a filter that matches no row. */
+    /* A FIELD WORKED OUT AT READ HOLDS NOTHING IN THE STORE, so a clause over it is a filter that matches no row, UNLESS
+       it is read through a link and this compile may hop: then it is asked of the linked row (`through`). */
     const worked = schema.subject === 'inbox_raw' ? null : derivedFault(schema, field);
     if (worked) {
+      const via = schema.fields[field]?.through;
+      if (via !== undefined && schema.schemaOf !== undefined) return through(leaf, field, via, level);
       bad.push(worked);
       return '';
     }
@@ -1551,13 +1606,13 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
   return { sql: compiled || '0 = 1', params, bad };
 }
 
-/** Does this predicate hop to another register anywhere? Bounded as `namesColumn` is, below the compile check. */
-const hops = (node: unknown, level = 1): boolean => {
+/** Does this predicate hop to another register anywhere, by `pointed` or by a field read through a link? Bounded as `namesColumn` is, below the compile check. */
+const hops = (node: unknown, schema: Schema, level = 1): boolean => {
   if (level > MAX_DEPTH || !isNode(node as Node)) return false;
   const n = node as Record<string, unknown>;
   if ('pointed' in n) return true;
-  for (const q of QUANTIFIERS) if (Array.isArray(n[q])) return (n[q] as unknown[]).some((k) => hops(k, level + 1));
-  return false;
+  for (const q of QUANTIFIERS) if (Array.isArray(n[q])) return (n[q] as unknown[]).some((k) => hops(k, schema, level + 1));
+  return typeof n.field === 'string' && Object.hasOwn(schema.fields, n.field) && schema.fields[n.field]?.through !== undefined;
 };
 
 /**
@@ -1646,7 +1701,7 @@ export function evaluate(
   /* A HOP READS OTHER ENTRIES, AND THIS IS HANDED ONE. `pointed` compiles when the schema can name the
      other register, and a row in memory has no table to look in, so the predicate is refused here as a
      whole: answering `false` for the hop alone would make `none: [pointed]` true of every row. */
-  if (hops(where)) return false;
+  if (hops(where, schema)) return false;
 
   /* AND A QUESTION ABOUT A COLUMN NEEDS THE ROW, which is the fourth argument's paragraph above.
      It is asked AFTER the compile check so that a predicate the compiler already refuses answers
