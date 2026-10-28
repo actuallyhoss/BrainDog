@@ -492,6 +492,7 @@ answers 404 `ROUTE_UNKNOWN`.
 | `/account/billing` | GET | Cloud | each record the signed-in person owns, whether it is paid for, and whether this host takes payment at all |
 | `/account/billing/checkout` | POST | Cloud | a payment page for a new record, `{ slug, name?, tz? }`, or for paying again, `{ record }` |
 | `/account/billing/portal` | POST | Cloud | the payment provider's page for a record the person owns, `{ record }` |
+| `/account/billing/extra` | POST | Cloud | extra usage past the allowance for a paid record the person owns, under a monthly cap, `{ record, cap_cents }`; 0 turns it off |
 | `/account/billing/webhook` | POST | Cloud | the payment provider saying a payment happened, checked by its signature over the body as sent; no cookie |
 | `/account/close` | POST | Cloud | closes the account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes |
 | `/account/email` | POST | both | `{ email }`: always `200 {}`. Mails a single-use link, good for 24 hours, to the new address (`<origin>/app/settings/identity#email=<token>`, the token in the fragment as a sign-in link's is); nothing moves until it is pressed, and asking again takes the last link back. An address another person signs in with is `ALREADY_KNOWN`, in one sentence that names nobody. A host that cannot send mail is handed no door and answers 404 |

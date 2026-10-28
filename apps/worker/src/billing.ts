@@ -24,6 +24,12 @@
  * ask"): paid once, for any record its owner is signed in to, Free included. A pack makes no subscription and
  * writes no billing row; the webhook adds its credits to the Directory's ledger once, and a refund takes back the rest.
  *
+ * EXTRA USAGE IS SOLD BESIDE THE TWO PLANS, OFF UNTIL THE OWNER SETS A MONTHLY CAP: past the allowance a record's actions
+ * go on running, at the table's price, until the month comes to the cap, and then wait with the cap named (the
+ * Directory's `mayRun`). The cap is set through `extra` below, which puts the host's metered price on the record's
+ * subscription; the night reports what each month came to as meter events (`reportExtra`), and Stripe charges it on the
+ * next invoice. Sold only while `STRIPE_PRICE_EXTRA` and `STRIPE_METER_EXTRA` are both set, beside billing being on.
+ *
  * A GIFT (`comp`) IS A ROW NO STRIPE EVENT MOVES: it has no customer and no subscription, never lapses, is
  * never charged, offers no portal, and can buy packs.
  *
@@ -39,8 +45,8 @@
 import { personName, type AccountDoor, type Provisioned } from '@braindog/host/auth';
 import { httpStatus } from '@braindog/host';
 import { verifyStripe } from '@braindog/host/stripe-sign';
-import { CURRENCY, PACKS, PLAN_TABLE, priceOf as centsAsPrice, type Pack } from '@braindog/record/plans';
-import { badSlug, type AccountUsage, type BillingAnswers, type BillingCall, type BillingRow, type BillingSet, type BillingState } from '@braindog/record/directory';
+import { CURRENCY, EXTRA_CAP_MOST, PACKS, PLAN_TABLE, priceOf as centsAsPrice, type Pack } from '@braindog/record/plans';
+import { badSlug, type ExtraDue, type AccountUsage, type BillingAnswers, type BillingCall, type BillingRow, type BillingSet, type BillingState } from '@braindog/record/directory';
 import { no, ok, refused, type Refusal, type Result, type Who } from '@braindog/ports';
 
 import { SIGNUP_CLOSED, signupMode } from './launch.ts';
@@ -51,6 +57,7 @@ import {
   customerFor,
   endSubscription,
   idAt,
+  listOf,
   metadataOf,
   objectAt,
   sessionOfPayment,
@@ -158,6 +165,12 @@ export type BillingEnv = MailEnv & {
   /** The Stripe prices of the two packs of Slash credits (`PACK_SETTINGS`). Empty, that pack is not sold. */
   STRIPE_PRICE_PACK_100?: string | undefined;
   STRIPE_PRICE_PACK_500?: string | undefined;
+  /**
+   * Extra usage (`sellsExtra`): the metered Stripe price a subscription carries it on, one cent a unit, and the event name
+   * of the Stripe meter that price reads, which the night reports cents to. Either empty, extra usage is not sold.
+   */
+  STRIPE_PRICE_EXTRA?: string | undefined;
+  STRIPE_METER_EXTRA?: string | undefined;
   PUBLIC_HOST?: string | undefined;
   /** Who may make an account (`launch.ts`): while it is `closed`, nobody makes a free record either. */
   SIGNUP?: string | undefined;
@@ -310,6 +323,101 @@ async function packPriceRefused(stripe: Stripe, id: PackId, pack: Pack, price: s
   return no('NOT_IN_THIS_BUILD', `${name} are ${centsAsPrice(pack.cents)} here and Stripe's price for them is not that, paid once, so no payment page opens until the two agree.`, { at: 'pack' });
 }
 
+/* ── extra usage ─────────────────────────────────────────────────────────── */
+
+/** The metered price and the meter extra usage is sold under, each `null` while its setting is empty. */
+export const extraOf = (env: BillingEnv): { price: string | null; meter: string | null } => {
+  const price = (env.STRIPE_PRICE_EXTRA ?? '').trim();
+  const meter = (env.STRIPE_METER_EXTRA ?? '').trim();
+  return { price: price === '' ? null : price, meter: meter === '' ? null : meter };
+};
+
+/** Whether this host sells extra usage: it sells the plans (`sells`), and the metered price and the meter are both set. */
+export const sellsExtra = (env: BillingEnv): boolean => {
+  const { price, meter } = extraOf(env);
+  return sells(env) && price !== null && meter !== null;
+};
+
+/** The sentence a door says while this host does not sell extra usage. */
+const EXTRA_UNSOLD = 'Extra usage is not sold on this host yet: STRIPE_PRICE_EXTRA and STRIPE_METER_EXTRA are not both set.';
+
+/**
+ * Whether the metered price extra usage is sold under charges what is reported: one cent of `CURRENCY` a unit, metered,
+ * monthly, on sale. `null` when it does; otherwise the refusal, said before anything is put on a subscription, because
+ * the night reports cents and a price of any other figure would charge a person a sum no screen showed them.
+ */
+async function extraPriceRefused(stripe: Stripe, price: string): Promise<Result<never> | null> {
+  const got = await stripe.read(`/v1/prices/${encodeURIComponent(price)}`);
+  if (!got.ok) {
+    op({ op: 'billing', door: 'extra', ok: false, why: 'price', status: got.status, code: got.code }, 'error');
+    if (got.status === 404) return no('NOT_IN_THIS_BUILD', 'STRIPE_PRICE_EXTRA names a price Stripe does not know, so extra usage is not sold on this host until it names one.', { at: 'cap_cents' });
+    return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
+  }
+  const currency = typeof got.body['currency'] === 'string' ? got.body['currency'].toUpperCase() : '';
+  const recurring = objectAt(got.body, 'recurring');
+  const metered = recurring !== null && textAt(recurring, 'usage_type') === 'metered' && textAt(recurring, 'interval') === 'month';
+  const cent = got.body['unit_amount'] === 1 || got.body['unit_amount_decimal'] === '1';
+  if (currency === CURRENCY && metered && cent && got.body['active'] === true) return null;
+  op({ op: 'billing', door: 'extra', ok: false, why: 'price_differs' }, 'error');
+  return no('NOT_IN_THIS_BUILD', `Extra usage is reported in cents, and Stripe's price for it is not one cent a unit, metered monthly in ${CURRENCY}, so it is not turned on until the two agree.`, { at: 'cap_cents' });
+}
+
+/**
+ * The metered price on a subscription: `true` when it is there already or was put there now, `false` when Stripe could
+ * not be asked. Put on once and left there, so what was reported while it stood is still charged after a cap is taken
+ * off; a month with no usage reported charges nothing for it.
+ */
+async function meteredOn(stripe: Stripe, subscription: string, price: string): Promise<boolean> {
+  if (!/^sub_[A-Za-z0-9]{1,250}$/u.test(subscription)) return false;
+  const got = await stripe.read(`/v1/subscriptions/${subscription}`);
+  if (!got.ok) return false;
+  if (listOf(objectAt(got.body, 'items') ?? {}).some((item) => idAt(item, 'price') === price)) return true;
+  return (await stripe.create('/v1/subscription_items', { subscription, price })).ok;
+}
+
+/** What one night's report of extra usage came to: months owed a report, reported, and failed. */
+export type ExtraReport = { due: number; reported: number; failed: number };
+
+/**
+ * Each month's extra usage told to Stripe, as meter events of the cents not yet reported: the night's call, after the
+ * runs are counted. Nothing while extra usage is not sold.
+ *
+ * ONCE PER FIGURE: the event's `identifier` is the record, the month and the total it brings the month to, so a night
+ * that reported and then failed to remember it reports the same identifier again and Stripe takes it once. The month
+ * before is reported with a time inside it, so its last day still lands on it.
+ *
+ * NEVER A STOP: a failure is a line at `error` and the month is reported again the next night.
+ */
+export async function reportExtra(env: BillingEnv, deps: Pick<BillingDeps, 'billing' | 'stripe' | 'clock'>): Promise<ExtraReport> {
+  const out: ExtraReport = { due: 0, reported: 0, failed: 0 };
+  const key = billingKey(env);
+  const { meter } = extraOf(env);
+  if (!sellsExtra(env) || !key.ok || meter === null) return out;
+  const due = ((await deps.billing({ op: 'extraDue' })) as ExtraDue[] | null) ?? [];
+  const stripe = deps.stripe(key.value);
+  for (const d of due) {
+    out.due++;
+    const at = Math.floor(Math.min(deps.clock(), d.ends - 1_000) / 1_000);
+    const sent = await stripe.create('/v1/billing/meter_events', {
+      event_name: meter,
+      'payload[stripe_customer_id]': d.customer,
+      'payload[value]': d.cents - d.reported,
+      identifier: `${d.record}-${d.month}-${d.cents}`,
+      timestamp: at,
+    });
+    if (!sent.ok) {
+      out.failed++;
+      op({ op: 'billing', did: 'extra', ok: false, rec: d.record, month: d.month, status: sent.status, code: sent.code }, 'error');
+      continue;
+    }
+    const kept = await deps.billing({ op: 'extraReported', record: d.record, month: d.month, cents: d.cents });
+    if (!kept.ok) op({ op: 'billing', did: 'extra', ok: false, why: 'row', rec: d.record, month: d.month }, 'error');
+    out.reported++;
+  }
+  if (out.due > 0) op({ op: 'billing', did: 'extra', ok: out.failed === 0, due: out.due, reported: out.reported, failed: out.failed });
+  return out;
+}
+
 /** A gift's row (`comp`): the operator's, which no Stripe event moves. */
 export const isGift = (row: Pick<BillingRow, 'state'>): boolean => row.state === 'comp';
 
@@ -400,7 +508,7 @@ export type BillingDeps = {
 };
 
 /** The doors `serveAccount` is handed for billing's four rows. */
-export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | 'portal' | 'webhook'>>;
+export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | 'portal' | 'extra' | 'webhook'>>;
 
 /**
  * A row whose record went back to Free when its plan was cancelled: it keeps its customer and has no subscription. Any
@@ -633,7 +741,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p) }));
     const open = sells(env);
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
-    return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), canMake, teams_held: (env as { TEAMS_HELD?: string }).TEAMS_HELD === '1' });
+    return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), extra: sellsExtra(env), canMake, teams_held: (env as { TEAMS_HELD?: string }).TEAMS_HELD === '1' });
   };
 
   /* ── POST /account/billing/checkout ───────────────────────────────────── */
@@ -1149,7 +1257,47 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     }
   };
 
-  return { billing, checkout, portal, webhook };
+  /* ── POST /account/billing/extra ──────────────────────────────────────── */
+
+  /**
+   * Extra usage on a paid record this person owns, `{ record, cap_cents }`: the monthly cap in whole cents, 0 turning
+   * it off. Answers `{ record, extra }`, the record's month as the Directory reads it after.
+   *
+   * CLOUD AND CLOUD PLUS, PAID AND NOT LAPSED: Free sells none, a gift is never charged, and a lapsed record pays for its
+   * plan first. Turning it on puts the metered price on the subscription before the cap is kept, so a cap never stands
+   * on a subscription that could not be charged for it.
+   */
+  const extra = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
+    const key = billingKey(env);
+    if (!key.ok) return key;
+    const { price } = extraOf(env);
+    if (!sellsExtra(env) || price === null) return no('NOT_IN_THIS_BUILD', EXTRA_UNSOLD, { at: 'cap_cents' });
+    const cap = body['cap_cents'];
+    if (typeof cap !== 'number' || !Number.isSafeInteger(cap) || cap < 0 || cap > EXTRA_CAP_MOST)
+      return no('VALUE_MALFORMED', `cap_cents is whole cents from 0, which turns extra usage off, to ${EXTRA_CAP_MOST}.`, { at: 'cap_cents' });
+    const row = await ownedRow(who.person, body['record']);
+    if (row === null) return no('OUT_OF_BOUNDS', 'There is no paid record of yours by that id.', { at: 'record' });
+    if (isGift(row)) return no('VALUE_MALFORMED', 'This plan is a gift and is never charged, so it has no extra usage.', { at: 'record' });
+    if (row.subscription === null || row.state === 'lapsed')
+      return no('VALUE_MALFORMED', `Extra usage is part of ${planName('cloud')} and ${planName('plus')}, and this record is not paid for on either just now.`, { at: 'record' });
+    if (cap > 0) {
+      const stripe = deps.stripe(key.value);
+      const differs = await extraPriceRefused(stripe, price);
+      if (differs !== null) return differs;
+      if (!(await meteredOn(stripe, row.subscription, price))) {
+        op({ op: 'billing', door: 'extra', ok: false, why: 'item', rec: row.record }, 'error');
+        return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
+      }
+    }
+    /* A DIRECTORY OF AN OLDER BUILD ANSWERS AN OP IT DOES NOT KNOW WITH `null`. */
+    const set = (await deps.billing({ op: 'extraSet', record: row.record, person: who.person, cap })) as Result<unknown> | null;
+    if (set === null) return no('NOT_IN_THIS_BUILD', EXTRA_UNSOLD, { at: 'cap_cents' });
+    if (!set.ok) return set;
+    op({ op: 'billing', door: 'extra', ok: true, rec: row.record, on: cap > 0 });
+    return ok({ record: row.record, extra: set.value });
+  };
+
+  return { billing, checkout, portal, extra, webhook };
 }
 
 /* ── a record deleted while it is paid for ───────────────────────────────── */

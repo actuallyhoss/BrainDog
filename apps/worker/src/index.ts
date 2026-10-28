@@ -134,7 +134,7 @@ import { codeOf, guarded } from '@braindog/ports';
 import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
 /* BILLING: the account's four billing doors, and the Stripe client they call through. */
-import { billingDoors, endForDeleted, sells, type BillingDeps } from './billing.ts';
+import { billingDoors, endForDeleted, reportExtra, sells, type BillingDeps } from './billing.ts';
 import { opsPlan, type OpsPlanDeps } from './ops-plan.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
@@ -3362,6 +3362,11 @@ async function nightly(env: Env): Promise<void> {
     await keepNight(directory, stoppedNight(directoryFailed));
     await opsAlert(env, { op: 'night', why: 'the walk stopped' }, alertClaim(env));
     throw e;
+  });
+  /* AND EACH MONTH'S EXTRA USAGE REPORTED TO STRIPE, after the replay has counted every run (`reportExtra`). Nothing
+     while extra usage is not sold, and never a stop: a month that failed is reported again tomorrow. */
+  await reportExtra(env, { billing, clock: () => Date.now(), stripe: (key) => stripeOf(key, () => Date.now()) }).catch((e: unknown) => {
+    op({ op: 'walk', rec: 'directory', extra: 'failed', why: e instanceof Error ? e.message : String(e) }, 'error');
   });
   /* AND A NIGHT THAT COPIED NOTHING MAKES THE INVOCATION ITSELF RED. Every per-record failure is
      already in the tail, but a tail is read by somebody who is already worried; a failed cron run
