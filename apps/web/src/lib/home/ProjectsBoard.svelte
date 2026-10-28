@@ -158,7 +158,7 @@
   <Waiting rows={4} />
 {/if}
 
-<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} />
+<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} send={menuRow?.key ?? null} />
 
 {#snippet week(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'])}
   <section class="wk" role="listitem" aria-label={title} data-tone={t.count > 0 ? tone : undefined}>

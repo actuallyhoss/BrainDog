@@ -25,6 +25,7 @@
   import { rowWriter } from '$lib/record/rows-write.ts';
   import Button from '$lib/ui/Button.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { refOfHref } from '$lib/send/send.ts';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import { shownName } from '$lib/shell/side.ts';
   import { agentsOn, slotStyle, takenBackFree, type ProjectCard as Card } from './project-cards.ts';
@@ -192,7 +193,7 @@
 {/if}
 
 <!-- A CARD'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). -->
-<ItemMenu label={menuCard ? shownName(menuCard.name) : words.all} bind:at={point} href={menuCard?.href}>
+<ItemMenu label={menuCard ? shownName(menuCard.name) : words.all} bind:at={point} href={menuCard?.href} send={menuCard ? refOfHref(menuCard.row) : null}>
   {#if menuCard}
     {@const c = menuCard}
     {#if c.draft}

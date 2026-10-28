@@ -10,6 +10,8 @@
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { display } from '$lib/record/api.ts';
+  import SendItem from '$lib/send/SendItem.svelte';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
   import RowMenu from '$lib/ui/RowMenu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -78,6 +80,8 @@
 <RowMenu {open} at={rect} label={copy.rowMenu} {onclose} hand={row && onhanded ? { register, row, decl, onhanded } : null}>
   {#if row}
     {@const seq = row.seq}
+    <!-- SEND TO… LEADS, the row attached, as its `s` and its page's Send button do. -->
+    <SendItem kind={register} attach={[{ ref: `${register}#${seq}`, label: display(register, decl.title, row.fields[decl.title]) ?? copy.thisRow }]} />
     <!-- A glyph per verb. The rail's menu has always had them and this one never did, so four
          rows of identical grey text carried the whole distinction between opening a row and
          throwing it away. -->

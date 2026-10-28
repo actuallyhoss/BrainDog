@@ -49,6 +49,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { foldAsk, sameOf } from '../twice-fold.ts';
   import { openSheet } from '$lib/send/open.ts';
+  import SendItem from '$lib/send/SendItem.svelte';
   import { sendWords, type Attached } from '$lib/send/send.ts';
 
   let {
@@ -227,6 +228,7 @@
 </div>
 
 <Menu label="{count} {copy.selected}" bind:open={menuOpen} at={menuRect} onclose={() => (menuRect = null)}>
+  {#if send.length > 0}<SendItem kind={decl?.id ?? ''} attach={send} />{/if}
   {#each states as state}
     <button role="menuitem" type="button" onclick={() => setPickedState(state)}>
       <Icon name="edit" size="s" /><span class="mi-name">{copy.setTo(saidInLine(decl?.state ?? '', state))}</span>

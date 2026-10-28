@@ -84,6 +84,7 @@
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { refs as sendRefs } from '$lib/send/send.ts';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import { amountAnswer, moneyRowOf, outcomeOf } from './money-row.ts';
   import { presses } from '$lib/data/held.svelte.ts';
@@ -679,7 +680,7 @@
 
 <!-- ASK ME LATER (today F11): a quiet clock and its words at the row's end, opening the question's own page at the step
      that puts it off. The clock alone floated under the answers on every card and said nothing until it was pressed. -->
-<ItemMenu label={card.question} bind:at={point} href={card.href}>
+<ItemMenu label={card.question} bind:at={point} href={card.href} send={sendRefs.question(question.id)}>
   {#if notNow && !kept}<a role="menuitem" href={at(`${card.href}?defer`)}><Icon name="clock" size="s" /><span class="mi-name">{queueWords.notNow}</span></a>{/if}
   {#if pick && drawn && !kept}<button role="menuitemcheckbox" type="button" aria-checked={chosenForAll} onclick={() => pick?.toggle(question)}><Icon name="check" size="s" /><span class="mi-name">{copy.select}</span></button>{/if}
 </ItemMenu>
