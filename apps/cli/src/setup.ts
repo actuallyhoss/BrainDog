@@ -305,6 +305,15 @@ async function toolRows(conn: Connected): Promise<ToolRow[]> {
 const needsKey = (fields: Record<string, unknown>): boolean =>
   Array.isArray(fields.needs) && fields.needs.some((n) => typeof n === 'string' && /=credentials#\d+$/u.test(n));
 
+/**
+ * THE CLAUDE CODE PLUGIN, OFFERED IN ONE LINE (`plugins/claude-code`, listed by the repository's
+ * `.claude-plugin/marketplace.json`): the same MCP server by its address with sign-in, the session's start and end
+ * hooks calling this command, and the BrainDog skill, for a machine or a profile set up from inside Claude Code
+ * rather than by this command. Said, never run: a plugin is the person's to add.
+ */
+export const PLUGIN_LINE =
+  'Claude Code also takes BrainDog as a plugin, for a profile this command did not set up: /plugin marketplace add actuallyhoss/BrainDog, then /plugin install braindog@braindog.';
+
 /** Names as a sentence says them: `A`, `A and B`, `A, B and C`. */
 const listOf = (names: string[]): string => (names.length < 2 ? (names[0] ?? 'no app') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
 
@@ -697,6 +706,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
 
   /* WHAT IS LEFT, IN THE WORDS TO TYPE, before the closing line, so the last thing read is whether anything changed. */
   for (const line of whatIsLeft(rows, tools, key, io)) io.out(line);
+  if (claude) io.out(PLUGIN_LINE);
   if (dryRun) io.out('That was a dry run, so nothing was signed in, written, registered or proposed.');
   else if (!changed) io.out(`Nothing changed: this machine was already set up from ${key}.`);
   else io.out(`This machine is set up from ${key}. Every session started from now on in ${listOf(here.map((c) => c.title))} has it.`);

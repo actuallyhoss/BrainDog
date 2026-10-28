@@ -48,6 +48,10 @@ The client is given a token that lasts ninety days, and after that it asks you a
 claude mcp add --transport http braindog https://app.brain.dog/mcp
 ```
 
+## As a Claude Code plugin
+
+Inside Claude Code, `/plugin marketplace add actuallyhoss/BrainDog` then `/plugin install braindog@braindog` adds the MCP server by its address, the start and end hooks (which use the command line when it is installed) and the BrainDog skill in one step.
+
 ## As a process
 
 A client that starts its servers as commands runs the command line instead, which uses the machine's sign-in:
