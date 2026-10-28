@@ -1,6 +1,6 @@
 # Starter jobs
 
-Three kinds of job a record can run on its owner's own machine, through `braindog runner`. Installing the add-on asks
+Kinds of job a record can run on its owner's own machine, through `braindog runner`. Installing the add-on asks
 the owner in Decide, and each kind runs only once the install is accepted and the machine has allowed it
 (`braindog runner allow job.week-in-review`).
 
@@ -12,5 +12,15 @@ the owner in Decide, and each kind runs only once the install is accepted and th
   step. It works in the folder the machine maps to the name `project`:
   `braindog runner repos add project <folder>`.
 
-Every kind asks nothing while it runs (`dontAsk`), uses only the tools it names, changes no file, and ends by proposing:
-the owner decides. None of them can skip its permissions, because the record refuses a kind that would.
+Those kinds ask nothing while they run (`dontAsk`), use only the tools they name, change no file, and end by
+proposing: the owner decides. None of them can skip its permissions, because the record refuses a kind that would.
+
+Two more carry a request the owner sends from any row ("Send to…", Claude on a machine):
+
+- **Claude on your machine, reading** (`job.claude`) takes the request through the record's own `instructions` tool,
+  reads the rows sent with it and the folder it works in, proposes what should change, and replies on the request.
+- **Claude on your machine, changing files** (`job.claude-change`) does the same and may change files in that folder
+  (`acceptEdits`), and only there. It never commits, pushes or deletes a file.
+
+Each works in the folder the request names, which the machine maps (`braindog runner repos add <name> <folder>`), or in
+an empty folder of its own when the request names none. Money, keys, sharing and deleting stay proposals.

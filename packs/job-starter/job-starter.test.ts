@@ -1,5 +1,5 @@
 /**
- * Jobs on your machine (Starter jobs): four kinds of job a person gets by installing one add-on, each approved once in Decide.
+ * Jobs on your machine (Starter jobs): six kinds of job a person gets by installing one add-on, each approved once in Decide.
  *
  * WHAT IT IS FOR. A record could queue a run on its owner's machine and no add-on declared a single kind, so the sheet
  * "Run a job" had nothing to offer on a fresh record. This file is the first way a stranger reaches a real run: three
@@ -27,7 +27,11 @@ const TEXT = readFileSync(new URL('job-starter.pack.json', import.meta.url), 'ut
 type Kind = { args?: unknown[]; job: string; title: string; prompt: string; repo?: string; tools: string[]; turns: number; permission: string; writes?: boolean };
 const PACK = JSON.parse(TEXT) as { pack: string; version: string; title: string; summary: string; declarations: Kind[] };
 const KINDS = PACK.declarations;
-const IDS = ['week-in-review', 'inbox-triage', 'repo-status', 'slash-desk'];
+const IDS = ['week-in-review', 'inbox-triage', 'repo-status', 'slash-desk', 'claude', 'claude-change'];
+/** The two kinds a request sent from a row runs as on a machine: each names its folder per run, as `%repo%`. */
+const SENT = ['claude', 'claude-change'];
+/** The four starters, which only read and propose. */
+const STARTERS = KINDS.filter((k) => !SENT.includes(k.job));
 
 const NOW = Date.UTC(2026, 9, 14, 9);
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -45,7 +49,8 @@ async function recordOf(doc: unknown = PACK) {
   const ask = async (): Promise<Out> => (await api.propose({ question: 'Add Starter jobs?', body_kind: 'pack', body: { install: 'job-starter' } } as never, owner)) as Out;
   const accept = async (filed: Out): Promise<Out> =>
     (await api.decide({ id: (filed.value as { id: string }).id, decide: { option: 'accept', reason: 'Three jobs to try.' } } as never, owner)) as Out;
-  const start = async (kind: string): Promise<Out> => (await api.createJob({ kind, ...(kind === 'job.slash-desk' ? { args: { page: 'Kiln firings' } } : {}) } as never, owner)) as Out;
+  const argsOf = (kind: string) => (kind === 'job.slash-desk' ? { args: { page: 'Kiln firings' } } : SENT.includes(kind.slice('job.'.length)) ? { args: { repo: '-' } } : {});
+  const start = async (kind: string): Promise<Out> => (await api.createJob({ kind, ...argsOf(kind) } as never, owner)) as Out;
   return { sql, api, ask, accept, start };
 }
 
@@ -66,11 +71,11 @@ test('A FRESH RECORD HOLDS NO KIND OF JOB, so "Run a job" has nothing to offer b
 
 /* ── The file ──────────────────────────────────────────────────────────────────────────────────── */
 
-test('THE FILE READS AS A RECORD READS IT, and holds the four kinds and nothing else', async () => {
+test('THE FILE READS AS A RECORD READS IT, and holds the six kinds and nothing else', async () => {
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'job-starter');
-  assert.equal(file.value.pack.manifest.version, '1.1.0');
+  assert.equal(file.value.pack.manifest.version, '1.2.0');
   assert.equal(PACK.title, 'Jobs on your machine');
   assert.deepEqual(KINDS.map((k) => k.job), IDS);
   assert.ok(KINDS.every((k) => Object.keys(k).includes('job')), 'a declaration here is not a job');
@@ -82,18 +87,24 @@ test('EACH KIND PASSES THE LINT, under the kernel name rule, and its card reads 
     assert.equal(jobFault({ id: `job.${k.job}`, body: k as never }), null, `job.${k.job}: ${JSON.stringify(jobFault({ id: `job.${k.job}`, body: k as never }))}`);
     const card = jobCard(k);
     assert.ok(card);
-    assert.equal(card.permissionSays, 'Uses only the tools listed, and asks nothing.');
-    assert.equal(card.writes, false);
-    assert.deepEqual(card.asks, k.job === 'slash-desk' ? [{ id: 'page', label: 'Page' }] : [], 'a starter kind asks a person for nothing before it runs, but the page the composer reads');
+    const changes = k.job === 'claude-change';
+    assert.equal(card.permissionSays, changes ? 'Changes files without asking.' : 'Uses only the tools listed, and asks nothing.');
+    assert.equal(card.writes, changes);
+    assert.deepEqual(
+      card.asks,
+      k.job === 'slash-desk' ? [{ id: 'page', label: 'Page' }] : SENT.includes(k.job) ? [{ id: 'repo', label: 'Folder' }] : [],
+      'a starter kind asks a person for nothing before it runs, but the page the composer reads and the folder a sent request works in',
+    );
   }
 });
 
-test('NO KIND SKIPS ASKING, CHANGES A FILE OR FILES ANYTHING ITSELF: each one reads and proposes', () => {
+test('NO KIND SKIPS ASKING OR FILES ANYTHING ITSELF, AND ONLY claude-change CHANGES A FILE: each one proposes', () => {
   /* THE RECORD'S TOOLS THAT CHANGE IT. `propose` changes nothing; the owner decides in BrainDog. */
   const changing = ['create', 'update', 'triage', 'log', 'handoff', 'meet'].map((t) => `mcp__braindog__${t}`);
   for (const k of KINDS) {
-    assert.equal(k.permission, 'dontAsk', `${k.job} asks some other way`);
-    assert.notEqual(k.writes, true, `${k.job} says it changes files`);
+    const changes = k.job === 'claude-change';
+    assert.equal(k.permission, changes ? 'acceptEdits' : 'dontAsk', `${k.job} asks some other way`);
+    assert.equal(k.writes === true, changes, `${k.job} says otherwise of whether it changes files`);
     assert.ok(k.tools.includes('mcp__braindog__propose'), `${k.job} has no way to propose`);
     assert.deepEqual(k.tools.filter((t) => changing.includes(t)), [], `${k.job} names a tool that changes the record`);
     assert.ok(!k.tools.includes('Bash'), `${k.job} runs any command`);
@@ -104,7 +115,7 @@ test('NO KIND SKIPS ASKING, CHANGES A FILE OR FILES ANYTHING ITSELF: each one re
   assert.doesNotMatch(`${PACK.title} ${PACK.summary}`, /—/u);
 });
 
-test('ONLY repo-status WORKS IN A REPOSITORY, and only with the file tools and two git commands that read', () => {
+test('ONLY repo-status WORKS IN A FIXED REPOSITORY, and only with the file tools and two git commands that read', () => {
   const [week, inbox, repo] = KINDS as [Kind, Kind, Kind, Kind];
   assert.equal(week.repo, undefined);
   assert.equal(inbox.repo, undefined);
@@ -113,6 +124,11 @@ test('ONLY repo-status WORKS IN A REPOSITORY, and only with the file tools and t
   assert.equal(repo.repo, 'project', 'the name each machine maps with braindog runner repos add project <folder>');
   assert.deepEqual(repo.tools, ['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git status:*)', 'mcp__braindog__propose']);
   for (const k of [week, inbox]) assert.ok(k.tools.every((t) => t.startsWith('mcp__braindog__')), `${k.job} reaches past the record`);
+  for (const k of KINDS.filter((x) => SENT.includes(x.job))) {
+    assert.equal(k.repo, '%repo%', `${k.job} works in the folder each request names, which the machine maps`);
+    assert.ok(k.tools.includes('mcp__braindog__instructions'), `${k.job} cannot take or answer the request`);
+  }
+  assert.equal(STARTERS.length, 4);
 });
 
 /* ── Approved once, in Decide ──────────────────────────────────────────────────────────────────── */
@@ -136,7 +152,14 @@ test('INSTALLING IT WAITS IN DECIDE, AND NO KIND CAN BE STARTED UNTIL THE OWNER 
     assert.ok(out.ok, `job.${id}: ${said(out)}`);
   }
   const queued = sql.all<{ kind: string; status: string }>('SELECT kind, status FROM job ORDER BY kind').map((r) => `${r.kind} ${r.status}`);
-  assert.deepEqual(queued, ['job.inbox-triage queued', 'job.repo-status queued', 'job.slash-desk queued', 'job.week-in-review queued']);
+  assert.deepEqual(queued, [
+    'job.claude queued',
+    'job.claude-change queued',
+    'job.inbox-triage queued',
+    'job.repo-status queued',
+    'job.slash-desk queued',
+    'job.week-in-review queued',
+  ]);
   sql.close();
 });
 

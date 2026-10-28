@@ -2012,12 +2012,29 @@
       "kind": "pack",
       "id": "job-starter",
       "title": "Jobs on your machine",
-      "summary": "Four kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, and composing a page of this record. Each one only reads and proposes, and you approve each kind once before it can run.",
+      "summary": "Six kinds of job to run on your own machine: a review of your week, a sort of what arrived, where a repository stands, composing a page of this record, and Claude taking a request you send from a row, reading only or changing files in the folder you pick. You approve each kind once before it can run.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "55381ba8e26b95bbd20eb99e8134297fb3a87dcdee8fe9f2f85745d0d7c9c748",
+          "bytes": 8338,
+          "published_at": "2026-10-28T12:41:01.208Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Claude on your machine can take a request you send from any row: one kind that reads and proposes, and one that may change files in the folder you pick. Each is approved here once, and once on the machine."
+        },
         {
           "version": "1.1.0",
           "checksum": "840e852d352f741037cec60ccdf6980f251bb35a23c919f88136d9822c987f49",

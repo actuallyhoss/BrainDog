@@ -93,6 +93,8 @@ function portOf(k: Kernel, sql: NodeSql): QuietPort & { asked: unknown[] } {
 const file = (path: string): Body => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as Body;
 const ROADMAP = (): Body => file('../../../packs/roadmap/roadmap.pack.json');
 const JOBS = (): Body => file('../../../packs/job-starter/job-starter.pack.json');
+/* THE MERGE WAS JOBS ON YOUR MACHINE 1.1.0, as published: a later version adds kinds the night never installs unasked. */
+const JOBS_MERGED = (): Body => file('../../../apps/web/static/catalogue/packs/job-starter/1.1.0.pack.json');
 const SLASH = (): Body => file('../../../packs/slash-desk/slash-desk.pack.json');
 const WORK_BEFORE = (): Body => ({ ...file('./fixtures/released/work-1.18.0.json'), seeds: undefined });
 const ROADMAP_BEFORE = (): Body => file('./fixtures/released/roadmap-1.1.0.json');
@@ -150,7 +152,7 @@ async function withJobs(slash: boolean, jobs: boolean): Promise<{ k: Kernel; sql
   const k = await openRecord(sql, fixedClock(NOW));
   for (const m of ['portfolio', 'people', 'work']) await put(k, sql, documentFor(k, m));
   await put(k, sql, agentsPackDocument());
-  const all = JOBS() as Body & { declarations: Body[] };
+  const all = JOBS_MERGED() as Body & { declarations: Body[] };
   const kind = all.declarations.find((d) => d.job === 'slash-desk')!;
   if (jobs) await put(k, sql, { ...all, version: '1.0.1', title: 'Starter jobs', declarations: all.declarations.filter((d) => d.job !== 'slash-desk') });
   if (slash) await put(k, sql, { pack: 'slash-desk', version: '1.0.1', title: 'Slash on your machine', summary: 'Composes a page on your machine.', author: 'BrainDog', license: 'Apache-2.0', requires: { format: 1, primitives: 1, packs: { agents: '^1.0.0' } }, declarations: [kind] });
@@ -162,7 +164,7 @@ const jobsHeld = (k: Kernel): string[] => (k.declarations() as { id: string; kin
 test('A RECORD HOLDING SLASH ON YOUR MACHINE AND STARTER JOBS KEEPS THE JOB, now from Jobs on your machine, and asks nothing', async () => {
   const { k, sql } = await withJobs(true, true);
   assert.ok(jobsHeld(k).includes('job.slash-desk'));
-  const port = { ...portOf(k, sql), addons: () => [lent('job-starter', 'Starter jobs', '1.0.1', JOBS()), lent('slash-desk', 'Slash on your machine', '1.0.1', SLASH())] };
+  const port = { ...portOf(k, sql), addons: () => [lent('job-starter', 'Starter jobs', '1.0.1', JOBS_MERGED()), lent('slash-desk', 'Slash on your machine', '1.0.1', SLASH())] };
   const steps = await updateFirstParty(port);
   assert.equal(steps.find((s) => s.pack === 'slash-desk')?.did, 'updated', JSON.stringify(steps));
   assert.equal(steps.find((s) => s.pack === 'job-starter')?.did, 'updated', JSON.stringify(steps));
@@ -185,7 +187,7 @@ test('A RECORD HOLDING SLASH ON YOUR MACHINE ALONE KEEPS THE JOB when the old id
 
 test('A RECORD HOLDING STARTER JOBS ALONE IS NOT GIVEN A NEW KIND OF JOB BY THE NIGHT: it waits for the person', async () => {
   const { k, sql } = await withJobs(false, true);
-  const port = { ...portOf(k, sql), addons: () => [lent('job-starter', 'Starter jobs', '1.0.1', JOBS())] };
+  const port = { ...portOf(k, sql), addons: () => [lent('job-starter', 'Starter jobs', '1.0.1', JOBS_MERGED())] };
   const steps = await updateFirstParty(port);
   const step = steps.find((s) => s.pack === 'job-starter');
   assert.ok(step?.did === 'updated' || step?.did === 'refused', JSON.stringify(steps));
