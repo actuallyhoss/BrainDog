@@ -111,7 +111,20 @@ export type SlashAskEngine<C> = {
   /** The first run's two asks (`packages/slash/src/propose.ts`), each handed the body whole: the engine reads it itself. */
   proposeSetup?(ask: unknown, ctx: C, inference?: unknown): Promise<Result<unknown>>;
   proposeMapping?(ask: unknown, ctx: C, inference?: unknown): Promise<Result<unknown>>;
+  /** A conversation's turn, its held actions and the conversation read back (`packages/slash/src/chat.ts`). */
+  chat?(input: SlashChatInput, ctx: C, tools: unknown, emit: (event: Record<string, unknown>) => void, inference?: unknown): Promise<void>;
+  act?(id: string, accept: boolean, ctx: C, tools: unknown): Promise<Result<unknown>>;
+  thread?(id: string, ctx: C): Result<unknown>;
 };
+
+/** What a person sends in a conversation, as the door has checked it. */
+export type SlashChatInput = { thread?: string; message: string; page?: { path: string; title?: string; row?: string } };
+
+/**
+ * The tools a conversation reads and writes through, built by the host for one asker (`@braindog/mcp/slash-tools`). The
+ * door hands them to the engine unread, and asks `now` itself, which needs no model.
+ */
+export type SlashChatTools = { now?(): Promise<readonly { text: string; href?: string }[]> };
 
 /**
  * A host's half.
@@ -149,10 +162,12 @@ export type SlashAskDoor<C> = {
   health?: (() => Promise<unknown>) | undefined;
   /** The day's ceiling on asks that spend the person's allowance (`slashDayStop`): a refusal to answer 429, or `null` to go on. */
   day?: (() => Promise<Refusal | null>) | undefined;
+  /** The tools of a conversation, for this asker (`SlashChatTools`). Absent, the conversation's doors answer `NOT_IN_THIS_BUILD`. */
+  chat?: ((ctx: C) => SlashChatTools) | undefined;
 };
 
 /** What a host hands `slashAskDoor` beside the builder: the keychain's gate, the inbox's reader and the day's ceiling (`SlashAskDoor`). */
-export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'keychain' | 'samples' | 'health' | 'day'>;
+export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'keychain' | 'samples' | 'health' | 'day' | 'chat'>;
 
 /**
  * A door over a builder that is asked once, which is what each host's `slash.ts` hands this file.
@@ -193,14 +208,15 @@ export function slashAskDoor<C>(
     ...(reads.samples === undefined ? {} : { samples: reads.samples }),
     ...(reads.health === undefined ? {} : { health: reads.health }),
     ...(reads.day === undefined ? {} : { day: reads.day }),
+    ...(reads.chat === undefined ? {} : { chat: reads.chat }),
   };
 }
 
 /** A Slash door this file answers. */
-export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern' | 'setup' | 'mapping' | 'health';
+export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern' | 'setup' | 'mapping' | 'health' | 'chat' | 'act' | 'now' | 'thread';
 
-/** The three doors that are a GET: they read and change nothing, so a browser sends them with no `Origin`. */
-const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks', 'health']);
+/** The doors that are a GET: they read and change nothing, so a browser sends them with no `Origin`. */
+const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks', 'health', 'now', 'thread']);
 
 /**
  * Which Slash door a path is, or `null`.
@@ -211,8 +227,10 @@ const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks', 'health']);
  * the router on `!== null`. `packages/host/test/slash-ask.test.ts` reads both hosts' wiring as text for it.
  */
 export function servesSlash(pathname: string): SlashRoute | null {
-  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern|setup|mapping|health)\/*$/.exec(pathname);
-  return hit ? (hit[1] as SlashRoute) : null;
+  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern|setup|mapping|health|chat|act|now)\/*$/.exec(pathname);
+  if (hit) return hit[1] as SlashRoute;
+  /* A CONVERSATION IS READ BACK AT ITS OWN ADDRESS, `thread/<id>`, the id one this door minted. */
+  return /^\/+api\/+slash\/+thread\/+[0-9A-Z]{26}\/*$/.test(pathname) ? 'thread' : null;
 }
 
 /**
@@ -319,7 +337,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   if (route === null)
     return refusal(404, {
       code: 'ROUTE_UNKNOWN',
-      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks, /api/slash/pattern, /api/slash/setup, /api/slash/mapping and /api/slash/health.",
+      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks, /api/slash/pattern, /api/slash/setup, /api/slash/mapping, /api/slash/health, /api/slash/chat, /api/slash/act, /api/slash/thread/<id> and /api/slash/now.",
     });
   const path = `/api/slash/${route}`;
   const verb = GETS.has(route) ? 'GET' : 'POST';
@@ -354,7 +372,24 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
     return answer(async () => ({ ok: true, value: await health() }));
   }
 
+  /* WHAT MATTERS NOW, read from the record's own briefing with no model, so it answers on a host with none. */
+  if (route === 'now') {
+    const tools = door.chat?.(ctx);
+    if (tools?.now === undefined) return refusal(501, NO_CHAT);
+    const now = tools.now.bind(tools);
+    return flat(async () => ({ ok: true, value: { lines: await now() } }));
+  }
+
   if (!door.engine) return refusal(501, NO_MODEL);
+
+  if (route === 'thread') {
+    const id = /([0-9A-Z]{26})\/*$/.exec(url.pathname)?.[1] ?? '';
+    const engine = await built(door.engine);
+    if (engine instanceof Response) return engine;
+    const thread = engine.thread?.bind(engine);
+    if (thread === undefined) return refusal(501, NO_CHAT);
+    return flat(() => thread(id, ctx));
+  }
 
   if (route === 'status') {
     const engine = await built(door.engine);
@@ -378,7 +413,9 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   if ((request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() !== 'application/json')
     return refusal(400, { code: 'BODY_MALFORMED', fix: `${path} takes a JSON object, sent as application/json.` });
   const raw = await request.text();
-  if (raw.length > (route === 'setup' || route === 'mapping' ? FIRST_RUN_BODY_LIMIT : BODY_LIMIT))
+  if (route === 'chat' && raw.length > CHAT_BODY_LIMIT)
+    return refusal(400, { code: 'BODY_MALFORMED', fix: 'A message to Slash is a few sentences, and this is far longer.', at: 'message' });
+  if (route !== 'chat' && raw.length > (route === 'setup' || route === 'mapping' ? FIRST_RUN_BODY_LIMIT : BODY_LIMIT))
     return route === 'setup'
       ? refusal(400, { code: 'BODY_MALFORMED', fix: 'The first run sends what you said and what it offered, and this is far longer than both.' })
       : route === 'mapping'
@@ -427,6 +464,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   }
 
   if (route === 'pattern') return pattern(body, door, ctx);
+  if (route === 'chat' || route === 'act') return conversation(route, body, door, ctx);
   if (route === 'setup' || route === 'mapping') return firstRun(route, body, door, ctx);
 
   /* THE TYPE AND NOT THE CONTENTS. A blank question is the engine's own refusal, in the engine's own
@@ -565,6 +603,125 @@ const refusedKey = (value: unknown): value is { ok: false; refusal: Refusal } =>
   typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === false && typeof (value as { refusal?: unknown }).refusal === 'object';
 
 const shown = (value: unknown): string => JSON.stringify(value) ?? String(value);
+
+/** The sentence a host that hands no conversation tools answers at its doors. */
+const NO_CHAT: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'Talking with Slash is not answered by this host yet. Ask from the palette instead.' };
+
+/** The most a message to Slash may weigh as sent, its page and thread included: the engine reads the first 1,000 bytes of the words. */
+const CHAT_BODY_LIMIT = 8_000;
+
+/**
+ * An answer whose value is also its top level: `{ ok, value, ...value }`. The conversation's doors are read by the
+ * palette as their contract names them, flat, and by this repository's client through its one envelope (`answered`), and
+ * both read the same body.
+ */
+async function flat(run: () => Result<unknown> | Promise<Result<unknown>>): Promise<Response> {
+  try {
+    const out = await run();
+    if (!out.ok) return slashReply(out);
+    const value = out.value !== null && typeof out.value === 'object' && !Array.isArray(out.value) ? (out.value as Record<string, unknown>) : {};
+    return reply(200, { ...value, ok: true, value: out.value });
+  } catch (e) {
+    return refusal(500, { code: 'INTERNAL', fix: `Slash could not answer that: ${e instanceof Error ? e.message : String(e)}.` });
+  }
+}
+
+/**
+ * `POST /api/slash/chat` and `POST /api/slash/act`: a conversation's turn, and a held action answered.
+ *
+ * A TURN IS STREAMED, ONE JSON EVENT A LINE (`application/x-ndjson`), as it happens: the thread, each step, each action,
+ * the answer in pieces and `done` last, which always comes. Everything the door checks is checked before the stream
+ * opens, so a refusal before the engine runs is an ordinary JSON answer with its status; once the stream is open a
+ * failure is an `error` event and then `done`.
+ *
+ * THE MONTH, THE DAY AND THE KEY ARE THE ENGINE'S AND THE DOOR'S AS FOR A QUESTION: the day's ceiling and his own key
+ * are asked here before anything is held, and the engine holds the month's ask before its first model call.
+ */
+async function conversation<C>(route: 'chat' | 'act', body: Record<string, unknown>, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
+  if (door.chat === undefined || door.engine === undefined) return refusal(501, NO_CHAT);
+  const tools = door.chat(ctx);
+
+  if (route === 'act') {
+    const id = body['id'];
+    const accept = body['accept'];
+    if (typeof id !== 'string' || id === '') return refusal(422, { code: 'VALUE_MALFORMED', fix: 'id is the action Slash held, as its event named it.', at: 'id' });
+    if (typeof accept !== 'boolean') return refusal(422, { code: 'VALUE_MALFORMED', fix: 'accept is true to do it, or false to drop it.', at: 'accept' });
+    const engine = await built(door.engine);
+    if (engine instanceof Response) return engine;
+    const act = engine.act?.bind(engine);
+    if (act === undefined) return refusal(501, NO_CHAT);
+    return flat(() => act(id, accept, ctx, tools));
+  }
+
+  const message = body['message'];
+  if (typeof message !== 'string' || message.trim() === '')
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: 'message is what you want to say to Slash, in words.', at: 'message' });
+  const thread = body['thread'];
+  if (thread !== undefined && thread !== null && typeof thread !== 'string')
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: 'thread is the id the conversation started with, as text.', at: 'thread' });
+  const page = body['page'];
+  const at = typeof page === 'object' && page !== null && !Array.isArray(page) ? (page as Record<string, unknown>) : null;
+  if (page !== undefined && page !== null && (at === null || typeof at['path'] !== 'string'))
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: 'page is where you are, { path, title?, row? }, with path as text.', at: 'page' });
+  const words = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim().slice(0, 200) : undefined);
+  const input: SlashChatInput = {
+    message,
+    ...(typeof thread === 'string' && thread !== '' ? { thread } : {}),
+    ...(at === null
+      ? {}
+      : {
+          page: {
+            path: String(at['path']).slice(0, 300),
+            ...(words(at['title']) === undefined ? {} : { title: words(at['title'])! }),
+            ...(words(at['row']) === undefined ? {} : { row: words(at['row'])! }),
+          },
+        }),
+  };
+
+  const engine = await built(door.engine);
+  if (engine instanceof Response) return engine;
+  const chat = engine.chat?.bind(engine);
+  if (chat === undefined) return refusal(501, NO_CHAT);
+  const day = await door.day?.();
+  if (day) return slashReply({ ok: false, refusal: day });
+  const own = await opened(door, ctx);
+  if (own instanceof Response) return own;
+
+  const lines = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      let closed = false;
+      let ended = false;
+      const send = (event: Record<string, unknown>): void => {
+        if (closed) return;
+        if (event['type'] === 'done') ended = true;
+        try {
+          controller.enqueue(lines.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          closed = true;
+        }
+      };
+      /* NOT AWAITED, so the response goes out with its first line and the turn writes into it as it runs. */
+      void chat(input, ctx, tools, send, own)
+        .catch((e: unknown) => send({ type: 'error', text: `Slash stopped: ${e instanceof Error ? e.message : String(e)}.` }))
+        .finally(() => {
+          if (!ended) send({ type: 'done', spent: { asks: 0, left: null } });
+          if (closed) return;
+          closed = true;
+          try {
+            controller.close();
+          } catch {
+            /* The reader went away first; nothing is left to tell. */
+          }
+        });
+    },
+  });
+  const headers = new Headers();
+  for (const [k, v] of KEYCHAIN_HEADERS) headers.append(k, v);
+  headers.set('content-type', 'application/x-ndjson; charset=utf-8');
+  headers.set('cache-control', 'no-store');
+  return new Response(stream, { status: 200, headers });
+}
 
 /** The engine, or the refusal a person gets for a builder that threw or a host that configured no model. */
 async function built<C>(engine: () => Promise<SlashAskEngine<C> | undefined>): Promise<SlashAskEngine<C> | Response> {

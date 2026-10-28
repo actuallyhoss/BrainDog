@@ -1346,6 +1346,7 @@ type Guarded = {
   answer?(ask: SlashAsk, inference?: SlashInference): Promise<Result<{ text: string }>>;
   proposeSetup?(ask: unknown, ctx: CallContext, inference?: SlashInference): Promise<Result<unknown>>;
   proposeMapping?(ask: unknown, ctx: CallContext, inference?: SlashInference): Promise<Result<unknown>>;
+  chat?(input: unknown, ctx: CallContext, tools: unknown, emit: (event: Record<string, unknown>) => void, inference?: SlashInference): Promise<void>;
 };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1442,6 +1443,18 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
           fix: `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this month's asks are spent until ${until}. Raise the monthly limit, or wait.`,
         },
       });
+    };
+  }
+  /* A CONVERSATION'S TURN IS AN ASK LIKE A QUESTION, held to the same count before its first step is asked. The turn says
+     why in its own stream, and ends as every turn does. */
+  if (typeof engine.chat === 'function') {
+    const chat = engine.chat.bind(engine);
+    guarded.chat = (input, ctx, tools, emit, inference) => {
+      const stop = spent();
+      if (stop === null) return chat(input, ctx, tools, emit, inference);
+      emit({ type: 'error', text: stop.fix });
+      emit({ type: 'done', spent: { asks: 0, left: 0 } });
+      return Promise.resolve();
     };
   }
   /* A SAVE ON HIS OWN KEY MUST PICK A KEY THE KEYCHAIN HOLDS. `configure` checks a grant id's shape and never the keychain, so an

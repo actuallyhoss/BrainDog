@@ -33,7 +33,7 @@ export { SHAPE_HEADERS, serveShape, servesShape, type ShapeDoor } from './shape.
    this answer comes out of the engine the HOST built. It is exported from here for the reason the keychain, key, session and
    ingest doors are: both hosts import one module to get the whole surface, and a door one host can find and the other cannot
    is the drift this file's header is about. */
-export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, type SlashAskEngine } from './slash-ask.ts';
+export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, type SlashAskEngine, type SlashChatInput, type SlashChatTools } from './slash-ask.ts';
 /* `slashRecordMeter` IS HERE FOR THE SAME REASON, AND IT WAS ONCE MISSING FROM HERE. `d16d9d35` built the meter
    that holds the record's press and first plan in Slash's ledger and exported it from `slash-ask.ts` alone, which no
    app imports, so both hosts built the record without it and every press stayed unmetered.
