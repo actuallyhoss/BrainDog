@@ -117,6 +117,30 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
   }),
 };
 
+/**
+ * The most a monthly cap on extra usage may be set to, in cents of `CURRENCY`. A ceiling on a mistyped figure, not a
+ * price: the owner of a record sets their own cap anywhere from one cent to this, and 0 turns extra usage off.
+ */
+export const EXTRA_CAP_MOST = 100_000;
+
+/**
+ * What a month's usage past a plan's allowance costs, in whole cents, rounded down: each meter's excess at the table's
+ * price for it, summed before rounding. 0 on a plan with no allowance or no extra usage, and for a month inside it.
+ *
+ * NOT CAPPED HERE: the cap is the record's, and the Directory charges the lesser of this and the month's cap.
+ */
+export function extraCents(plan: Plan, used: Allowance): number {
+  const { allowance, extra } = PLAN_TABLE[plan];
+  if (allowance === null || extra === null) return 0;
+  let cents = 0;
+  for (const k of ['runs', 'requests', 'bytes', 'ms'] as const) {
+    const over = Math.max(0, Number(used[k]) - allowance[k]);
+    if (Number.isFinite(over)) cents += (over * extra[k].cents) / extra[k].per;
+  }
+  /* A HAIR ABOVE THE FLOOR, so a sum that is a whole number in exact arithmetic is not a cent short in floating point. */
+  return Math.max(0, Math.floor(cents + 1e-9));
+}
+
 /** Whether a plan takes a second person. A plan nobody could name (`null`, or one this build does not know) is let through. */
 export const teamsOn = (plan: string | null): boolean => plan === null || !(plan in PLAN_TABLE) || PLAN_TABLE[plan as Plan].teams;
 

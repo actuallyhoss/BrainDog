@@ -27,7 +27,7 @@ import type { AccountCall, AccountClosed, AuthCall, AuthResult, Suspended, Who }
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
-import { PACKS, PLANS, PLAN_TABLE, type Allowance, type Plan } from './plans.ts';
+import { EXTRA_CAP_MOST, PACKS, PLANS, PLAN_TABLE, extraCents, priceOf as centsSaid, type Allowance, type Plan } from './plans.ts';
 import { SIGNUP_UNCHECKED, codeHash, createAuth, signInForgotten, type AuthConfig, type Rule } from './identity.ts';
 import { ipBucket, mailCanon } from './signup-keys.ts';
 import type { DirectoryAuth, SessionAsk } from './identity.ts';
@@ -432,6 +432,28 @@ CREATE TABLE IF NOT EXISTS dir_credit (
 );
 CREATE INDEX IF NOT EXISTS dir_credit_record ON dir_credit(record, bought_at);
 
+-- EXTRA USAGE: the monthly cap a record's owner set on usage past the plan's allowance, in cents. No row is off, which
+-- every record starts at: at the allowance its scheduled actions wait for the next month, as before. Written only by
+-- the Worker's billing door, which refuses while the host sells no extra usage, so a self-host never holds a row.
+-- NEW TABLES AND NOT COLUMNS, for the reason dir_inbound gives above: created on the next open, DIRECTORY_VERSION unmoved.
+CREATE TABLE IF NOT EXISTS dir_extra (
+  record TEXT PRIMARY KEY,                  -- rec_...
+  cap    INTEGER NOT NULL,                  -- cents of the plans' currency a calendar month, UTC; above 0
+  person TEXT NOT NULL,                     -- who set it
+  set_at INTEGER NOT NULL                   -- epoch ms
+) WITHOUT ROWID;
+
+-- EACH MONTH'S EXTRA USAGE: the highest cap that stood in it, which is the most the month can be charged, and how many
+-- cents of it have been reported to the payment provider. A month nobody turned extra usage on in has no row, and is
+-- charged nothing however far past the allowance it ran.
+CREATE TABLE IF NOT EXISTS dir_extra_month (
+  record   TEXT NOT NULL,
+  month    TEXT NOT NULL,                   -- 'YYYY-MM', UTC
+  cap      INTEGER NOT NULL,                -- the highest cap set in this month, in cents
+  reported INTEGER NOT NULL DEFAULT 0,      -- cents already reported, never more than what the month came to
+  PRIMARY KEY (record, month)
+) WITHOUT ROWID;
+
 -- A webhook event already applied, by its evt_ id, so Stripe delivering one twice changes the account once.
 -- Pruned after forty days by the write that adds the next, the window dir_usage_run keeps a counted run's id for.
 CREATE TABLE IF NOT EXISTS dir_stripe_event (
@@ -600,7 +622,23 @@ export type RecordUsage = {
    * `included` and `left` are `null` on a plan whose credits are `null`. `used` lags by up to a day (`dir_usage_slash`).
    */
   slash: { included: number | null; used: number; packs: number; left: number | null; asks: number; neurons: number; days: SlashDay[] };
+  /** The month's extra usage, at the Directory's clock and not over the range: `null` on a plan that sells none. */
+  extra: ExtraUsage | null;
 };
+
+/**
+ * A record's extra usage for one calendar month, UTC: usage past the plan's allowance, charged per unit under a cap the
+ * owner sets (`dir_extra`).
+ *
+ * `on` IS WHETHER A CAP STANDS NOW, and `cap_cents` is it, 0 when off. `cents` is what the month has come to: the
+ * table's price for its usage past the allowance (`extraCents`), never more than `month_cap_cents`, the highest cap that
+ * stood in the month, so a month extra usage was never on in comes to 0. `reported_cents` is how much of it the payment
+ * provider has been told; what is charged is what was reported.
+ */
+export type ExtraUsage = { on: boolean; cap_cents: number; cents: number; reported_cents: number; month: string; month_cap_cents: number };
+
+/** A month whose extra usage has come to more than was reported: what the night tells the payment provider. */
+export type ExtraDue = { record: string; month: string; cents: number; reported: number; customer: string; ends: number };
 
 /** One UTC day of a record's Slash asks, as the record's own ledger totals it: what `meterSlash` takes and `usage` answers. */
 export type SlashDay = { day: string; asks: number; neurons: number };
@@ -837,6 +875,10 @@ export const CARRIED = [
   /* THE PACKS BOUGHT AND WHAT IS LEFT OF EACH: money paid, which a restore must not forget. Before `dir_inbound`, so a
      copy still ends on a forwarding digest, as copies before it did; `load` reads the tables in any order. */
   'dir_credit',
+  /* EXTRA USAGE: the cap a record's owner set, and each month's cap and what was reported of it. A restore that lost
+     them would turn extra usage off for everybody, and one that lost what was reported would report a month again. */
+  'dir_extra',
+  'dir_extra_month',
   /* WHO ASKED FOR AN INVITATION, AND WHAT BECAME OF IT. Not a credential: a restore that lost it would forget every
      person waiting, and one that lost the decided ones would let a declined address apply as new before its 90 days. */
   'dir_apply',
@@ -883,13 +925,15 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_stripe_event: 'rowid',
   dir_inbound: 'token_sha256',
   dir_credit: 'rowid',
+  dir_extra: 'record',
+  dir_extra_month: 'record, month',
   dir_apply: 'rowid',
   dir_seen: 'day, page, came',
   dir_step: 'record, step',
 };
 
 /** The carried tables a copy written before they existed does not name (new tables at the same Directory version). */
-const ADDED_LATER: readonly Carried[] = ['dir_apply', 'dir_seen', 'dir_step'];
+const ADDED_LATER: readonly Carried[] = ['dir_apply', 'dir_seen', 'dir_step', 'dir_extra', 'dir_extra_month'];
 
 /** A copy's first line, then its version: `#dogdir 4`. Not `#dogl`, so `checkBrainl` and `verify` never take one for a record. */
 const COPY_HEAD = '#dogdir';
@@ -1001,7 +1045,11 @@ export type BillingCall =
   | { op: 'credits'; record: string }
   | { op: 'spend'; record: string; at: number }
   | { op: 'mayAsk'; record: string; at: number }
-  | { op: 'unbill'; record: string };
+  | { op: 'unbill'; record: string }
+  | { op: 'extra'; record: string }
+  | { op: 'extraSet'; record: string; person: string; cap: number }
+  | { op: 'extraDue' }
+  | { op: 'extraReported'; record: string; month: string; cents: number };
 
 /**
  * What each `op` answers.
@@ -1025,6 +1073,10 @@ export type BillingAnswers = {
   spend: Result<{ left: number | null }>;
   mayAsk: { ok: boolean; left: number | null };
   unbill: Result<{ removed: boolean }>;
+  extra: ExtraUsage | null;
+  extraSet: Result<ExtraUsage>;
+  extraDue: ExtraDue[];
+  extraReported: Result<{ reported: number }>;
 };
 export type BillingAnswer = BillingAnswers[BillingCall['op']];
 
@@ -1696,6 +1748,122 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     return { ok: left === null || left > 0, left };
   };
 
+  /* ── extra usage ── */
+
+  const monthOf = (ms: number): string => dayOf(ms).slice(0, 7);
+
+  /** What a record's limited rows used in the calendar month that begins at `first`, the rows `mayRun` reads. */
+  const usedIn = (record: string, first: number): UsageTotals =>
+    totalsOf(sql.one(`SELECT ${SUMS} FROM dir_usage_day WHERE record = ? AND day >= ? AND day < ? AND ${LIMITED}`, record, dayOf(first), dayOf(nextMonth(first))));
+
+  /** The cap that stands on a record now, in cents: 0 is off. */
+  const capOf = (record: string): number => Number(sql.one<{ cap: number }>('SELECT cap FROM dir_extra WHERE record = ?', record)?.cap ?? 0);
+
+  /** A month's row holds at least `cap`: the most it can be charged is the highest cap that stood in it. */
+  const capHeld = (record: string, month: string, cap: number): void => {
+    if (cap > 0)
+      sql.exec(
+        'INSERT INTO dir_extra_month (record, month, cap, reported) VALUES (?, ?, ?, 0) ON CONFLICT (record, month) DO UPDATE SET cap = MAX(cap, excluded.cap)',
+        record,
+        month,
+        cap,
+      );
+  };
+
+  /**
+   * A record's extra usage for the month `at` falls in, or `null` on a plan that sells none.
+   *
+   * THE MONTH'S ROW IS MADE HERE when a cap stands and the month has none yet, so a cap set in one month carries into the
+   * next without anybody setting it again.
+   */
+  const extraMonth = (record: string, plan: Plan, at: number): ExtraUsage | null => {
+    if (PLAN_TABLE[plan].extra === null || PLAN_TABLE[plan].allowance === null) return null;
+    const first = monthStart(at);
+    const month = monthOf(first);
+    const cap = capOf(record);
+    capHeld(record, month, cap);
+    const row = sql.one<{ cap: number; reported: number }>('SELECT cap, reported FROM dir_extra_month WHERE record = ? AND month = ?', record, month);
+    const most = Number(row?.cap ?? 0);
+    return {
+      on: cap > 0,
+      cap_cents: cap,
+      cents: Math.min(extraCents(plan, usedIn(record, first)), most),
+      reported_cents: Number(row?.reported ?? 0),
+      month,
+      month_cap_cents: most,
+    };
+  };
+
+  /**
+   * The owner's cap set, or turned off with 0: the record's extra usage as it reads after.
+   *
+   * ASKED BY THE WORKER'S DOOR ONLY, which has already checked the person owns the record, pays for it and that the host
+   * sells extra usage. Here: the figure, the record, and a plan that sells it. A cap lowered below what the month has
+   * already come to holds the record's actions from now; the month is still charged what it came to.
+   */
+  const extraSet = (call: Extract<BillingCall, { op: 'extraSet' }>): Result<ExtraUsage> =>
+    sql.transactionSync(() => {
+      for (const key of ['record', 'person'] as const)
+        if (typeof call[key] !== 'string' || call[key] === '') return no<ExtraUsage>('VALUE_MALFORMED', `${key} is an id, written as text.`, { at: key });
+      if (!Number.isSafeInteger(call.cap) || call.cap < 0 || call.cap > EXTRA_CAP_MOST)
+        return no<ExtraUsage>('VALUE_MALFORMED', `cap_cents is whole cents from 0, which turns extra usage off, to ${EXTRA_CAP_MOST}.`, { at: 'cap_cents' });
+      const row = sql.one<{ plan: string; closed_at: string | null }>('SELECT plan, closed_at FROM dir_record WHERE id = ?', call.record);
+      if (!row || row.closed_at !== null)
+        return no<ExtraUsage>('OUT_OF_BOUNDS', row ? 'This record is closed, so it runs nothing.' : `There is no record ${call.record}.`, { at: 'record' });
+      const plan = planOf(row.plan);
+      if (PLAN_TABLE[plan].extra === null)
+        return no<ExtraUsage>('VALUE_MALFORMED', `${PLAN_TABLE[plan].name} has no extra usage. It is part of ${PLAN_TABLE.hosted.name} and ${PLAN_TABLE.plus.name}.`, { at: 'record' });
+      const now = clock.now();
+      if (call.cap === 0) sql.exec('DELETE FROM dir_extra WHERE record = ?', call.record);
+      else
+        sql.exec(
+          'INSERT INTO dir_extra (record, cap, person, set_at) VALUES (?, ?, ?, ?) ON CONFLICT (record) DO UPDATE SET cap = excluded.cap, person = excluded.person, set_at = excluded.set_at',
+          call.record,
+          call.cap,
+          call.person,
+          now,
+        );
+      const after = extraMonth(call.record, plan, now);
+      return after === null ? no<ExtraUsage>('VALUE_MALFORMED', `${PLAN_TABLE[plan].name} has no extra usage.`, { at: 'record' }) : ok(after);
+    });
+
+  /**
+   * The months whose extra usage came to more than was reported, this month and the one before: what the night tells
+   * the payment provider. Only records with a paying customer; the month before is asked so its last day is reported
+   * once the night after it has counted it.
+   */
+  const extraDue = (): ExtraDue[] => {
+    const now = clock.now();
+    const out: ExtraDue[] = [];
+    for (const first of [monthStart(monthStart(now) - 1), monthStart(now)]) {
+      const month = monthOf(first);
+      if (first === monthStart(now))
+        for (const r of sql.all<{ record: string; cap: number }>('SELECT record, cap FROM dir_extra')) capHeld(r.record, month, Number(r.cap));
+      const rows = sql.all<{ record: string; cap: number; reported: number; plan: string; customer: string }>(
+        `SELECT m.record AS record, m.cap AS cap, m.reported AS reported, r.plan AS plan, b.customer AS customer
+           FROM dir_extra_month m JOIN dir_record r ON r.id = m.record JOIN dir_billing b ON b.record = m.record
+          WHERE m.month = ? AND b.customer != '' ORDER BY m.record`,
+        month,
+      );
+      for (const r of rows) {
+        const plan = planOf(r.plan);
+        if (PLAN_TABLE[plan].extra === null) continue;
+        const cents = Math.min(extraCents(plan, usedIn(r.record, first)), Number(r.cap));
+        if (cents > Number(r.reported)) out.push({ record: r.record, month, cents, reported: Number(r.reported), customer: r.customer, ends: nextMonth(first) });
+      }
+    }
+    return out;
+  };
+
+  /** What the payment provider has been told of a month, in cents. Never moves back, so a late answer cannot undo a newer one. */
+  const extraReported = (call: Extract<BillingCall, { op: 'extraReported' }>): Result<{ reported: number }> => {
+    if (typeof call.record !== 'string' || !/^\d{4}-\d{2}$/.test(String(call.month)) || !Number.isSafeInteger(call.cents) || call.cents < 0)
+      return no('VALUE_MALFORMED', 'A report is a record, a month written YYYY-MM and whole cents.', { at: 'cents' });
+    sql.exec('UPDATE dir_extra_month SET reported = MAX(reported, ?) WHERE record = ? AND month = ?', call.cents, call.record, call.month);
+    const row = sql.one<{ reported: number }>('SELECT reported FROM dir_extra_month WHERE record = ? AND month = ?', call.record, call.month);
+    return row ? ok({ reported: Number(row.reported) }) : no('OUT_OF_BOUNDS', `${call.month} has no extra usage for that record.`, { at: 'month' });
+  };
+
   /**
    * The billing group's one entry, as the doors and the night call it. Not generic, so each `op` narrows the call;
    * `billing` below gives the caller the answer its `op` asked for.
@@ -1792,6 +1960,20 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
 
       case 'mayAsk':
         return mayAsk(call.record, call.at);
+
+      case 'extra': {
+        const plan = planFor(call.record);
+        return plan === null ? null : extraMonth(call.record, plan, clock.now());
+      }
+
+      case 'extraSet':
+        return extraSet(call);
+
+      case 'extraDue':
+        return extraDue();
+
+      case 'extraReported':
+        return extraReported(call);
 
       /* A GIFT TAKEN BACK: its row goes, and the record is unbilled again, as one the operator provisioned. Only a
          `comp` row: a paid record leaves its billing through Stripe's own events, never by this. No row is done. */
@@ -2400,6 +2582,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         sql.exec('UPDATE dir_slug SET released_at = ? WHERE record = ? AND released_at IS NULL', now, record);
         /* A PACK'S CREDITS END WITH THE RECORD, and nothing else ends them: the delete screen says how many go. */
         sql.exec('DELETE FROM dir_credit WHERE record = ?', record);
+        /* AND EXTRA USAGE IS OFF: a closed record runs nothing. Its months stay, so what it used is still told. */
+        sql.exec('DELETE FROM dir_extra WHERE record = ?', record);
         return ok(null);
       }),
 
@@ -2761,6 +2945,15 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       const over = (['runs', 'requests', 'bytes', 'ms'] as const).find((k) => used[k] >= allowance[k]);
       if (over === undefined) return null;
       const turns = new Date(until);
+      /* PAST THE ALLOWANCE WITH EXTRA USAGE ON, IT RUNS UNTIL THE MONTH COMES TO THE CAP, and then waits with the cap named. */
+      const extra = row ? extraMonth(record, planOf(row.plan), now) : null;
+      if (extra !== null && extra.on) {
+        if (extra.cents < extra.cap_cents) return null;
+        return {
+          until,
+          say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This record has reached the ${centsSaid(extra.cap_cents)} cap set on its extra usage for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
+        };
+      }
       return {
         until,
         say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This record has used ${SPENT[over](allowance[over])} for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
@@ -2790,9 +2983,26 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         /* THE METER NEAREST ITS LIMIT is the one the sentence names, because it is the one that will stop the record. */
         const binding = [...meters].sort((a, b) => used[b] / allowance[b] - used[a] / allowance[a])[0] ?? 'runs';
         const share = used[binding] / allowance[binding];
-        const kind = used.held > 0 || share >= 1 ? 'held' : share >= NOTICE_AT ? 'near' : null;
+        /* WITH EXTRA USAGE ON, PAST THE ALLOWANCE THE CAP IS THE LIMIT, told by its own two rows (`notice:extra-near`,
+           `notice:extra-held`), so a record told it neared its allowance is told again as it nears the cap. */
+        const extra = extraMonth(record, planOf(row.plan), now);
+        const extraOn = extra !== null && extra.on;
+        const past = extraOn && share >= 1;
+        const capShare = past ? extra.cents / extra.cap_cents : 0;
+        const kind = past
+          ? capShare >= 1
+            ? 'held'
+            : capShare >= NOTICE_AT
+              ? 'near'
+              : null
+          : used.held > 0 || (share >= 1 && !extraOn)
+            ? 'held'
+            : share >= NOTICE_AT
+              ? 'near'
+              : null;
         if (kind === null) return null;
-        const told = (k: 'near' | 'held'): boolean => sql.one('SELECT 1 AS x FROM dir_usage_day WHERE record = ? AND day = ? AND scope = ? AND action = ?', record, first, '', `${NOTICE}${k}`) !== undefined;
+        const prefix = past ? `${NOTICE}extra-` : NOTICE;
+        const told = (k: 'near' | 'held'): boolean => sql.one('SELECT 1 AS x FROM dir_usage_day WHERE record = ? AND day = ? AND scope = ? AND action = ?', record, first, '', `${prefix}${k}`) !== undefined;
         if (told(kind)) return null;
         for (const k of kind === 'held' ? (['near', 'held'] as const) : (['near'] as const))
           if (!told(k))
@@ -2801,22 +3011,28 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
               record,
               first,
               '',
-              `${NOTICE}${k}`,
+              `${prefix}${k}`,
             );
         const turns = new Date(until);
         const month = MONTHS[new Date(now).getUTCMonth()] ?? '';
         const again = `${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}`;
         const person = sql.one<{ email: string | null }>('SELECT email FROM dir_person WHERE id = ?', row.owner);
+        const cap = extraOn ? centsSaid(extra.cap_cents) : '';
         return {
           kind,
           record,
           slug: slugOf(record),
           person: row.owner,
           email: person?.email ?? null,
-          say:
-            kind === 'held'
+          say: past
+            ? kind === 'held'
+              ? `This record has reached the ${cap} cap set on its extra usage for ${month}, so its scheduled actions and automations wait until ${again}.`
+              : `This record's extra usage for ${month} has come to ${centsSaid(extra.cents)} of its ${cap} cap. At the cap its scheduled actions and automations wait until ${again}.`
+            : kind === 'held'
               ? `This record has used ${SPENT[binding](allowance[binding])} for ${month}, so its scheduled actions and automations wait until ${again}.`
-              : `This record has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. At the limit its scheduled actions and automations wait until ${again}.`,
+              : extraOn
+                ? `This record has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. Past it, extra usage carries on up to the ${cap} cap set for the month.`
+                : `This record has used ${Math.floor(share * 100)}% of ${SPENT[binding](allowance[binding])} for ${month}. At the limit its scheduled actions and automations wait until ${again}.`,
         };
       }),
 
@@ -2886,6 +3102,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
             .all<{ action: string }>(`SELECT action, ${SUMS} ${ranged} AND (${COUNTED}) GROUP BY action ORDER BY action`, r.id, range.from, range.to)
             .map((g) => ({ action: g.action, ...totalsOf(g) })),
           slash: slashOf(r.id, plan, range),
+          extra: extraMonth(r.id, plan, now),
         };
       });
       const totals = totalsOf({});
