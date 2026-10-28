@@ -132,6 +132,29 @@ function laterBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: A
 }
 
 /**
+ * A `queue` over `governance.apart`: agents' suggestions on their shelf beside Needs you (`govern.ts` `apartOf`),
+ * oldest first. The shape and the `where` an open question has, so a page draws them with the queue it draws Needs you
+ * with, and one press takes each; they are not counted as needing anybody.
+ */
+function apartBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
+  const { predicateOf, listOf } = kit;
+  const OPEN = openSchema(kit);
+  if (!deps.apartQuestions)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read agents\' suggestions onto a page yet.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.apart comes oldest first, so it takes no order:.', at: 'order' }) };
+  const said = predicateOf(block.where, OPEN, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
+  const read = deps.apartQuestions(Math.max(limit, QUEUE_CEILING));
+  const kept = read.questions
+    .map((q) => familyOf({ ...q, list: listOf(q.about) ?? q.rows_on ?? null }))
+    .filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, list: q.list }, OPEN));
+  const matched = said.predicate === undefined && read.questions.length < read.apart ? read.apart : kept.length;
+  return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched };
+}
+
+/**
  * What a `governance.decided` block's `where` and columns may name: one row an answered question. `answer` is the
  * option chosen and `answer_label` its own words; `kind` and `about` are the question's.
  */
@@ -204,4 +227,5 @@ function decidedBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
 
 export const governanceOpen: Source = { whole: true, read: openBlock };
 export const governanceLater: Source = { whole: true, read: laterBlock };
+export const governanceApart: Source = { whole: true, read: apartBlock };
 export const governanceDecided: Source = { whole: true, read: decidedBlock };

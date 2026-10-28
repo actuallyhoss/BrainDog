@@ -247,6 +247,8 @@ export function listGovernance(
     order?: 'wait' | undefined;
     /** `only`: just the doubtful arrivals waiting in To review. Left out, an open list leaves them out (they are not Needs you). */
     review?: 'only' | undefined;
+    /** `only`: just agents' suggestions on their shelf; `with`: those and Needs you together. Left out, an open list leaves them out. */
+    apart?: 'only' | 'with' | undefined;
     /** `false`: the rows without what each costs to get wrong, for a reader that reads no cost (the briefing's places). */
     weigh?: false | undefined;
   } = {},
@@ -268,6 +270,12 @@ export function listGovernance(
          questions every count and queue reads stop at it. `review: 'only'` is the To review list's own read. */
       const marked = "(CASE WHEN json_valid(body) THEN COALESCE(json_extract(body, '$.review'), 0) = 1 ELSE 0 END)";
       where.push(opts.review === 'only' ? marked : `NOT ${marked}`);
+      /* AN AGENT'S SUGGESTION WAITS ON ITS SHELF, NOT IN NEEDS YOU (`apartOf`): left out of the open read every count
+         takes, read alone with `apart: 'only'`, and both with `apart: 'with'` for an agent looking one up. */
+      if (opts.apart !== 'with') {
+        where.push(opts.apart === 'only' ? ONLY_APART : NOT_APART);
+        params.push(apartJson(deps));
+      }
     }
   }
 
@@ -354,11 +362,89 @@ function costOfRow(sql: Sql, row: Record<string, unknown>, withheld: ReturnType<
 export function countOpenQuestions(deps: Pick<GovernDeps, 'sql' | 'nowMs'>): number {
   return (
     deps.sql.one<{ n: number }>(
-      "SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)",
+      `SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?) AND ${NOT_APART}`,
       instant(deps.nowMs),
+      apartJson(deps),
     )?.n ?? 0
   );
 }
+
+/* ── Suggested by agents: the shelf beside Needs you ── */
+
+/**
+ * The owner's switch for the shelf, kept as his pref: `false` puts every question back in Needs you. Absent is on.
+ *
+ * NEEDS YOU IS FOR CALLS ONLY HE CAN MAKE. An agent's "Add this to Tasks?", "Add these two names to Projects?" or "A run
+ * worked in kiln. Is that Kiln?" is a suggestion that one press takes and one Put back undoes: it waits on a quieter
+ * shelf ("Suggested by agents") and is not counted as needing him. What cannot be undone, and what sits on the floor
+ * (money, keys, sharing, deletes, add-ons, anything that runs unattended or goes out), stays in Needs you, and so does
+ * a choice between options that writes nothing, and anything a person asked.
+ */
+export const APART_PREF = 'decide.agents_apart';
+
+/** Whether agents' suggestions wait apart from Needs you: on unless an owner turned it off. */
+export function apartOn(sql: Sql): boolean {
+  return sql.one("SELECT 1 AS y FROM pref WHERE key = ? AND value = 'false' LIMIT 1", APART_PREF) == null;
+}
+
+/** A question one of the record's people asked rather than an agent, a rule or Slash: never on the shelf. */
+const PERSON_ID = /^p_/u;
+
+/** A folder or a service asked about as a project ("A run worked in kiln. Is that Kiln?"), asked once a place. */
+const PLACE_KEY = /^(run|service)-project:/u;
+
+/**
+ * Whether one open question waits on the shelf: asked by an agent, Slash, a rule or a script; and either a place asked
+ * about as a project, or a change whose every answer can be put back and sits on no floor.
+ *
+ * READ WHOLE AND IN THIS PROCESS, since the floor is the kinds a body is (`kindsOfProposal`) and SQL cannot say them.
+ * `readers` and `withheld` are one weighing's, handed in so a queue reads each list's shape once.
+ */
+export function apartOf(
+  sql: Sql,
+  q: { body_kind: string; body: unknown; opened_by: string },
+  withheld: ReturnType<typeof costRows>,
+  readers: Map<string, KindReader>,
+): boolean {
+  if (PERSON_ID.test(q.opened_by)) return false;
+  const body = isMap(q.body) ? q.body : typeof q.body === 'string' ? parse(q.body) : null;
+  if (body === null) return false;
+  if (q.body_kind === 'options' && typeof body.understand_key === 'string' && PLACE_KEY.test(body.understand_key)) return true;
+  /* BRAINDOG ARRANGING ITS OWN PAGES is a suggestion; an add-on installed, turned on or off, or set up is the floor. */
+  if (q.body_kind === 'arrange') {
+    const packs = isMap(body.packs) ? body.packs : {};
+    const touchesPacks = ['install', 'enable', 'disable'].some((v) => listOf(packs[v]).length > 0);
+    return !touchesPacks && listOf(body.settings).length === 0 && costOf('arrange', body, withheld) !== 'undo';
+  }
+  if (!['rowset', 'change', 'options'].includes(q.body_kind)) return false;
+  const cost = costOf(q.body_kind, body, withheld);
+  if (cost === 'undo' || cost === 'call') return false;
+  if (q.body_kind === 'options' && optionCosts(body, withheld).some((o) => o.cost === 'undo')) return false;
+  const reader = readers.get(q.opened_by) ?? recordReader(sql, q.opened_by);
+  readers.set(q.opened_by, reader);
+  return kindsOfProposal(q.body_kind, body, reader).every((k) => k.floor === null);
+}
+
+/** The open questions on the shelf now, by id, oldest first; none when the owner keeps them in Needs you. */
+export function apartIds(deps: Pick<GovernDeps, 'sql' | 'nowMs'>): string[] {
+  if (!apartOn(deps.sql)) return [];
+  const rows = deps.sql.all<{ id: string; body_kind: string; body: string; opened_by: string }>(
+    "SELECT id, body_kind, body, opened_by FROM suggestion WHERE status = 'open' AND body_kind IN ('rowset', 'change', 'options', 'arrange') AND (defer_until IS NULL OR defer_until <= ?) ORDER BY opened_at, rowid",
+    instant(deps.nowMs),
+  );
+  if (rows.length === 0) return [];
+  const withheld = costRowsOnce(deps.sql);
+  const readers = new Map<string, KindReader>();
+  return rows.filter((r) => apartOf(deps.sql, r, withheld, readers)).map((r) => r.id);
+}
+
+/** `apartIds` as the one JSON parameter `NOT_APART` and `ONLY_APART` read. */
+export const apartJson = (deps: Pick<GovernDeps, 'sql' | 'nowMs'>): string => JSON.stringify(apartIds(deps));
+
+/** A suggestion row that is not on the shelf, over `apartJson`'s parameter. */
+export const NOT_APART = 'id NOT IN (SELECT value FROM json_each(?))';
+/** A suggestion row that is on the shelf, over `apartJson`'s parameter. */
+export const ONLY_APART = 'id IN (SELECT value FROM json_each(?))';
 
 /** How many rows one governance register holds, every one of them: a count for a screen that pages. */
 export function countGovernance(sql: Sql, register: GovernRegister): number {

@@ -17,7 +17,7 @@ import { WALK_SOURCE } from './money-figures.ts';
 import { SOURCE_MODULES, type Source } from './sources/index.ts';
 import { activity } from './sources/activity.ts';
 import { figuresHome } from './sources/figures-home.ts';
-import { governanceLater, governanceOpen } from './sources/governance.ts';
+import { governanceApart, governanceLater, governanceOpen } from './sources/governance.ts';
 import { sessionsLive } from './sources/sessions-live.ts';
 import { sessionsWorking } from './sources/sessions-working.ts';
 
@@ -35,6 +35,7 @@ const DRAWN_AS: ReadonlyMap<Source, string> = new Map<Source, string>([
   [activity, 'feed'],
   [governanceOpen, 'queue'],
   [governanceLater, 'queue'],
+  [governanceApart, 'queue'],
   [figuresHome, 'stat'],
   [sessionsLive, 'cards'],
   [sessionsWorking, 'cards'],

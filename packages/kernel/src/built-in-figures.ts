@@ -94,6 +94,7 @@ import { KEYS_IN_TEXT } from './key-scan.ts';
 import { holdDays } from './hold.ts';
 import { isUnknownMark } from './marks.ts';
 import { finderOf, finders, tidied, tidyDays, type Finder } from './tidy.ts';
+import { apartJson, NOT_APART } from './govern.ts';
 /* `tidy-keys.ts` IMPORTS NOTHING AT RUN TIME, only `tidy.ts`'s types, so this adds no load ring. */
 import { countKeysUnopened, fieldOf, sealedLists } from './tidy-keys.ts';
 /* `people.ts` REACHES `ingest.ts` AND THROUGH IT MUCH OF THE KERNEL. Only a function is taken, called on a read and never
@@ -1034,14 +1035,16 @@ export function readOpenQuestions(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'as
   const d = decl as OpenQuestionsDecl | undefined;
   const said = d?.about;
   const about = typeof said === 'string' && said !== PARAM ? said : null;
-  const open = "SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
+  /* AGENTS' SUGGESTIONS ON THEIR SHELF ARE NOT WAITING ON ANYBODY (`govern.ts` `apartOf`), as the queue counts them. */
+  const apart = apartJson({ sql, nowMs: ctx.asOfMs ?? ctx.nowMs });
+  const open = `SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?) AND ${NOT_APART}`;
   const counted = (n: number): Result<Reading> =>
     ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: n <= 0, refusals: [] });
-  if (typeof d?.list === 'string') return counted(openOnList(sql, at, d.list === PARAM ? null : d.list));
+  if (typeof d?.list === 'string') return counted(openOnList(sql, at, d.list === PARAM ? null : d.list, apart));
   const row =
     about === null
-      ? sql.one<{ n: number }>(open, at)
-      : sql.one<{ n: number }>(`${open} AND (CASE WHEN json_valid(body) THEN json_extract(body, '$.about') END) = ?`, at, about);
+      ? sql.one<{ n: number }>(open, at, apart)
+      : sql.one<{ n: number }>(`${open} AND (CASE WHEN json_valid(body) THEN json_extract(body, '$.about') END) = ?`, at, apart, about);
   return counted(Number(row?.n ?? 0));
 }
 
@@ -1056,12 +1059,13 @@ const SPOKEN_ROW = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
  * AND A QUESTION THAT ADDS OR CHANGES ROWS OF A LIST IS ON IT, where it names no row of its own (`ROWSET_LIST_SQL`): "Add Priya to People?" and "Link Priya Raman to Lumen?" are rowsets on People with no `about`,
  * and People's page said "no questions open" while both waited in Needs you.
  */
-function openOnList(sql: Sql, at: string, list: string | null): number {
+function openOnList(sql: Sql, at: string, list: string | null, apart: string): number {
   const rows = sql.all<{ about: string | null; on_list: string | null }>(
     `SELECT CASE WHEN json_valid(body) THEN CASE WHEN json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END END AS about,
             ${ROWSET_LIST_SQL} AS on_list
-       FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)`,
+       FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?) AND ${NOT_APART}`,
     at,
+    apart,
   );
   return rows.filter((r) => {
     const m = r.about === null ? null : SPOKEN_ROW.exec(r.about);

@@ -1023,6 +1023,8 @@ export type PageDeps = {
   ) => { questions: QueueQuestion[]; open: number; matched?: number; stale?: number; hardToUndo?: number };
   /** The questions put off whose day has not come, soonest back first, and how many there are. */
   laterQuestions?: (limit: number) => { questions: QueueQuestion[]; later: number };
+  /** Agents' suggestions waiting on their shelf beside Needs you, oldest first, and how many there are. */
+  apartQuestions?: (limit: number) => { questions: QueueQuestion[]; apart: number };
   /** The answered questions, latest first, and how many there are. */
   decisions?: (limit: number) => { decisions: DecidedQuestion[]; total: number };
   /**

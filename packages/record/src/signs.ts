@@ -16,7 +16,7 @@
  * A READING NAMES THINGS: a repository by its name, a run by what it was doing, a client by its name. Never an id.
  */
 
-import { openHandoffs, quietSign, type SignReading, type VitalSign } from '@braindog/kernel';
+import { apartJson, NOT_APART, openHandoffs, quietSign, type SignReading, type VitalSign } from '@braindog/kernel';
 import type { Result, Sql } from '@braindog/ports';
 
 import type { Build, Context, RecordDeps } from './index.ts';
@@ -147,8 +147,15 @@ const seqOf = (spoken: string): number | null => {
 };
 
 /** Questions open now, deferrals not yet come round left out, counted from the table. */
+/* AGENTS' SUGGESTIONS ON THEIR SHELF ARE LEFT OUT, as the briefing's Waiting leaves them (`apartOf`). */
 const openQuestions = (sql: Sql, nowMs: number): number =>
-  Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)", new Date(nowMs).toISOString())?.n ?? 0);
+  Number(
+    sql.one<{ n: number }>(
+      `SELECT count(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?) AND ${NOT_APART}`,
+      new Date(nowMs).toISOString(),
+      apartJson({ sql, nowMs }),
+    )?.n ?? 0,
+  );
 
 /** Whether a question the briefing names is open now on the table, its deferral come round. */
 function isOpenQuestion(sql: Sql, said: string, nowMs: number): boolean {

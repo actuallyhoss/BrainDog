@@ -30,7 +30,7 @@ import { deadlines } from './deadlines.ts';
 import { exceptions } from './exceptions.ts';
 import { figuresHome } from './figures-home.ts';
 import { forecastRunway } from './forecast-runway.ts';
-import { governanceDecided, governanceLater, governanceOpen } from './governance.ts';
+import { governanceApart, governanceDecided, governanceLater, governanceOpen } from './governance.ts';
 import { handoffsOpen } from './handoffs-open.ts';
 import { kpisSource } from './kpis.ts';
 import { runsOn } from './runs-on.ts';
@@ -87,6 +87,7 @@ export const SOURCE_MODULES: Record<string, Source> = {
   actions,
   'governance.open': governanceOpen,
   'governance.later': governanceLater,
+  'governance.apart': governanceApart,
   'governance.decided': governanceDecided,
   runs_on: runsOn,
   deadlines,

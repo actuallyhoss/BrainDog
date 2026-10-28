@@ -155,6 +155,9 @@ import {
   deciderFault as deciderFaultIn,
   countGovernance,
   countOpenQuestions,
+  apartIds,
+  apartJson,
+  NOT_APART,
   propose as openSuggestion,
   handledOn,
   settleWaiting,
@@ -670,7 +673,7 @@ export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
 export { LIST_PAGE_COLUMNS, LIST_PAGE_ROWS, listPage, type ListPage, type ListPageBlock, type ListPageColumn, type ListPageFilter, type ListPageSaid, type ListPageShape, type ListPageField } from './default-pages.ts';
 /* An arrangement's parts (govern-parts-43), by their ids and needs; `partsOf` is fx.ts's name here, so it goes out as arrangePartsOf. */
-export { ANSWERED_IN, ARRANGING, BODY_KINDS, COVERED, GOVERNANCE, HANDLED_PREF, HANDLED_REASONS, HANDLED_RULE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, handledFault, handledOn, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
+export { ANSWERED_IN, APART_PREF, apartIds, apartJson, NOT_APART, ARRANGING, BODY_KINDS, COVERED, GOVERNANCE, HANDLED_PREF, apartOn, HANDLED_REASONS, HANDLED_RULE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, handledFault, handledOn, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
 /* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent
    stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
@@ -7861,7 +7864,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const nowMs = clock.now();
       const now = instant(nowMs);
       const drawn = Math.max(0, Math.floor(limit));
-      const OPEN = "status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
+      const OPEN = `status = 'open' AND (defer_until IS NULL OR defer_until <= ?) AND ${NOT_APART}`;
+      const apart = apartJson({ sql, nowMs });
       /* ONLY THE QUESTIONS DRAWN ARE READ WHOLE (`questionFrom`). Every other one is ranked and counted by its band in SQL
          (`BAND_SQL`), so no body is read into this process to be counted: before, the newest past two
          thousand were dropped, and the counts beside the queue were counts of the two thousand. */
@@ -7890,6 +7894,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            FROM suggestion WHERE ${OPEN}`,
           ...waitParams(nowMs),
           now,
+          apart,
         )
         .map((r) => ({
           id: r.id,
@@ -7936,6 +7941,30 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       });
       const later = sees ? shown.length : (sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND defer_until > ?", now)?.n ?? 0);
       return { questions, later };
+    },
+    /*
+     * AGENTS' SUGGESTIONS, for Decide's shelf beside Needs you (`govern.ts` `apartOf`): open and not counted as needing
+     * the person, oldest first, each read whole as an open question is, so one press takes it as it takes any.
+     */
+    apartQuestions: (limit) => {
+      const nowMs = clock.now();
+      const ids = apartIds({ sql, nowMs });
+      const shown = sees ? ids.filter((id) => sees.question('suggestion', id)) : ids;
+      const cut = shown.slice(0, Math.min(Math.max(1, Math.floor(limit)), 200));
+      const rows =
+        cut.length === 0
+          ? []
+          : sql.all<Record<string, unknown>>(
+              `SELECT id, body_kind, body, opened_by, opened_at, drafted_by, kind, cause, ${ALIKE_SQL} AS alike, ${WAIT_SQL} AS wait FROM suggestion s WHERE id IN (SELECT value FROM json_each(?))`,
+              ...waitParams(nowMs),
+              JSON.stringify(cut),
+            );
+      const byId = new Map(rows.map((r) => [String(r.id), r]));
+      const questions = cut.flatMap((id) => {
+        const r = byId.get(id);
+        return r ? [questionFrom(r)] : [];
+      });
+      return { questions, apart: shown.length };
     },
     /*
      * WHAT WAS DECIDED, latest first, for a page's Decided: the question as it was asked, the option chosen and the

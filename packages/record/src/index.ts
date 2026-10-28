@@ -1203,10 +1203,13 @@ export const PREF_KEYS = [
   'shelf.kept',
   'agents.answer_in_chat',
   'agents.answer_on_word',
+  'decide.agents_apart',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /** "Agents may answer when you tell them": the owner's own switch, on unless it is `false` (`wordOf`). */
 export const ON_WORD_PREF = 'agents.answer_on_word' satisfies PrefKey;
+/** "Agents' suggestions wait apart": the owner's own switch, on unless it is `false` (`apartOn` in the kernel). */
+export const APART_PREF = 'decide.agents_apart' satisfies PrefKey;
 /**
  * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail (`side`), a
  * bar across the top or one menu, and `rail` is the side rail as builds before the top bar led wrote it, unasked; `pen.dismissed` is the ids of what the pen offered and the person turned down
@@ -1261,6 +1264,8 @@ export type Prefs = {
   'agents.answer_in_chat'?: boolean;
   /** Whether an agent he tells to answer or change something does it on his word. Absent is on. */
   'agents.answer_on_word'?: boolean;
+  /** Whether agents' suggestions wait on their own shelf on Decide, out of Needs you's count. Absent is on. */
+  'decide.agents_apart'?: boolean;
   /** The person's shelf: drawn components they kept, each a name and a block declaration (`shelfFault`). */
   'shelf.kept'?: { id: string; name: string; block: Record<string, unknown> }[];
 };
@@ -12378,9 +12383,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           });
         /* NEWEST LAST AND THE OLDEST LET GO, as `pen.dismissed` is, so the switch that mutes one more never stops working. */
         kept = [...new Set(value)].slice(-MUTED_MOST);
-      } else if (key === 'agents.answer_in_chat' || key === ON_WORD_PREF) {
-        /* THE OWNER'S, IN A BROWSER: each lets somebody other than him answer questions, so each is held to `admin`'s door. */
-        const owner = admin(ctx, key === ON_WORD_PREF ? 'let agents answer on your word' : 'let a chat app answer questions');
+      } else if (key === 'agents.answer_in_chat' || key === ON_WORD_PREF || key === APART_PREF) {
+        /* THE OWNER'S, IN A BROWSER: each lets somebody other than him answer questions, or says what waits on him, so each
+           is held to `admin`'s door. */
+        const owner = admin(
+          ctx,
+          key === ON_WORD_PREF ? 'let agents answer on your word' : key === APART_PREF ? "keep agents' suggestions apart" : 'let a chat app answer questions',
+        );
         if (owner) return { ok: false as const, refusal: owner };
         if (value !== null && typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
         kept = value as boolean | null;
