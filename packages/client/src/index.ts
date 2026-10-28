@@ -1753,6 +1753,8 @@ function keptOr<T>(heard: string, asked: string, marked: boolean, ask: () => Pro
   void flight.then((got) => {
     if (OUT.get(key) === mine) OUT.delete(key);
     if (!got.ok || !KEEPING || READER !== reader || REGRANTS !== regrants || !sameVersion(heard, at.version, at.at) || SENT !== at.sent) return;
+    /* AN ANSWER THE RECORD SAYS IS BEHIND (Today as it was last drawn) is not the record's at this version, so it is not kept. */
+    if ((got.value as { behind?: unknown } | null)?.behind === true) return;
     const carries = marked && carriesMark(got.value);
     if (carries && MARKS !== at.marks) return;
     READS.delete(key);

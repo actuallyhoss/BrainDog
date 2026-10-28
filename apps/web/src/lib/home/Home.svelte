@@ -529,7 +529,7 @@
   });
 
   /** Home's page, from whichever of the three sources the record holds. */
-  async function readBody(slug: string | null, spoken: HomeVoice, held: Holds): Promise<Opened | null> {
+  async function readBody(slug: string | null, spoken: HomeVoice, held: Holds, fresh = false): Promise<Opened | null> {
     if (slug !== null) {
       const m = await import('$lib/record/page-live.ts');
       return m.pageReader(apiBase()).read(slug);
@@ -546,7 +546,7 @@
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
     const [m, t] = await Promise.all([import('../../routes/decide/[id]/proposed.ts'), import('./today-read.ts')]);
     const base = apiBase();
-    const drawn = await m.drawnOf(body, base, undefined, (client) => t.askToday(client, base, body as unknown as Record<string, unknown>));
+    const drawn = await m.drawnOf(body, base, undefined, (client) => t.askToday(client, base, body as unknown as Record<string, unknown>, fresh));
     if (drawn.from === 'live')
       return {
         from: 'live',
@@ -620,6 +620,8 @@
           painted('Today', 'network');
           void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said, at, stamp));
         }
+        /* TODAY AS THE RECORD LAST DREW IT IS DRAWN, AND ASKED FOR AGAIN AT ONCE, drawn now (`fresh`), over it. */
+        if (ok && slug === null) void import('./today-read.ts').then((t) => (t.wasBehind(apiBase()) ? reread() : undefined));
       })
       .catch(() => {
         readFailed = true;
@@ -659,7 +661,7 @@
     const stamp = untrack(asOf);
     const before = untrack(() => feeds) ? newsNow() : null;
     try {
-      const out = await readBody(slug, spoken, held);
+      const out = await readBody(slug, spoken, held, true);
       if (slug === declares && out?.from === 'live') {
         if (slug === null) tilesBeside(apiBase());
         got = out;

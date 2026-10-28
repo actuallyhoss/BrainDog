@@ -38,8 +38,11 @@ export type TodayCards = {
   moved?: Readonly<Record<string, string>>;
 };
 
-/** What `today` answers: the body as `previewPage` draws it, and each tile's part, `null` where it was refused. */
-export type TodayAnswer = { page: PageAnswer; handled: unknown; shared: unknown; cards: TodayCards | null };
+/**
+ * What `today` answers: the body as `previewPage` draws it, and each tile's part, `null` where it was refused. `behind`
+ * when it is Today as the record last drew it, which the record may have moved past: the screen draws it and asks again.
+ */
+export type TodayAnswer = { page: PageAnswer; handled: unknown; shared: unknown; cards: TodayCards | null; behind?: true };
 
 /** How long a held answer is read from, whatever the version says, as a kept read is (`KEPT_READ_MS`). */
 export const TODAY_HELD_MS = 300_000;
@@ -53,17 +56,38 @@ type Held = { base: string; token: string; at: number; answer: Promise<TodayAnsw
 let held: Held | null = null;
 const tokenNow = (): string => `${versionKept()} w${wrote()}`;
 
+/** The record whose last answer to `askToday` was `behind`, until `wasBehind` takes it. */
+let behindAt: string | null = null;
+
+/**
+ * Whether the last Today read from `base` was the record's last drawing rather than one drawn now, said once: the
+ * screen that drew it asks again with `fresh`.
+ */
+export function wasBehind(base: string): boolean {
+  const was = behindAt === base;
+  if (was) behindAt = null;
+  return was;
+}
+
 /**
  * Today's body drawn by the record, as `previewPage` answers it, with each tile's part held here for the tiles. On a
  * host without `today`, `previewPage` itself.
+ *
+ * A FIRST READ MAY BE ANSWERED TODAY AS THE RECORD LAST DREW IT (`behind`), at once, where drawing it took the record
+ * over a second on a lived-in record; `fresh` asks for it drawn now, which every read after the screen's first does.
+ * The tiles take their parts from it as from any answer, so they say what the body says, and the fresh one replaces it.
  */
-export async function askToday(client: Pick<Client, 'call'>, base: string, body: Record<string, unknown>): Promise<PageSaid> {
+export async function askToday(client: Pick<Client, 'call'>, base: string, body: Record<string, unknown>, fresh = false): Promise<PageSaid> {
   if (without.has(base)) return client.call<PageAnswer>('previewPage', { body });
-  const out = client.call<TodayAnswer>('today', { body });
+  const out = client.call<TodayAnswer>('today', fresh ? { body, fresh: true } : { body });
   const entry: Held = { base, token: tokenNow(), at: Date.now(), answer: out.then((o) => (o.ok ? o.value : null), () => null) };
   held = entry;
   const got = await out;
-  if (got.ok) return { ...got, value: got.value.page };
+  if (got.ok) {
+    if (got.value.behind === true) behindAt = base;
+    else if (behindAt === base) behindAt = null;
+    return { ...got, value: got.value.page };
+  }
   if (held === entry) held = null;
   if ('refusal' in got && UNSERVED.has(got.refusal.code)) {
     without.add(base);
