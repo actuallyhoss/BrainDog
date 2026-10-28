@@ -11,10 +11,9 @@
 export const ON_WORD_PREF = 'agents.answer_on_word' as const;
 
 export const onWordWords = {
-  tile: 'Answering for you',
-  title: 'Agents may answer when you tell them',
-  on: 'When you tell an agent to answer a question or make a change, it does, with your words. Each one says it was on your word, and you can undo it. Keys and amounts of money still wait for you here.',
-  off: 'Agents ask, and you answer every question here, even when you tell them to.',
+  title: 'Agents answer when you say so',
+  on: 'Each says it was your word, and you can undo it. Money and keys still wait for you.',
+  off: 'Agents always ask you here.',
 } as const;
 
 /** Whether the switch is on, from the person's prefs as `boot` answered them. Anything but `false` is on. */

@@ -75,7 +75,7 @@
 {/snippet}
 
 {#snippet body(on: Daily)}
-  <p class="slash-daily-said" class:switch-row-line={row} id="slash-daily-said">{dailySaid(on)}</p>
+  <p class={row ? 'switch-row-line' : 'slash-daily-said'} id="slash-daily-said">{dailySaid(on)}</p>
   {#if braked}<p class="slash-daily-brake" data-part="slash-brake">{braked}</p>{/if}
   {#if link}<a class="slash-daily-link tap" href={at('/slash?history')}>{words.dailyMore}<Icon name="arrow" size="s" /></a>{/if}
 {/snippet}

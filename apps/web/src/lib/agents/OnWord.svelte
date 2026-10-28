@@ -1,5 +1,5 @@
 <!--
-  "Agents may answer when you tell them" (Settings > Agents): one switch row, the owner's, in a tile of its own. What it
+  "Agents may answer when you tell them" (Settings > Agents): one switch row, the owner's, in Settings > Agents' Answering tile. What it
   means is `on-word.ts`; the record keeps it as the owner's `agents.answer_on_word` through `setPref`, which refuses
   anybody but an owner in a browser. On until he turns it off.
 -->
@@ -8,7 +8,6 @@
 
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import Tile from '$lib/ui/Tile.svelte';
   import { ON_WORD_PREF, onWordOn, onWordSaid, onWordWords as words } from './on-word.ts';
 
   let { prefs }: { prefs?: Record<string, unknown> | undefined } = $props();
@@ -35,7 +34,7 @@
   }
 </script>
 
-<Tile icon="session" title={words.tile} data-part="on-word">
+<div class="answer-switch" data-part="on-word">
   <div class="switch-row">
     <div class="switch-row-words">
       <span class="switch-row-title">{words.title}</span>
@@ -46,7 +45,7 @@
     >
   </div>
   {#if refusal}<p class="on-word-refused" role="status">{refusal}</p>{/if}
-</Tile>
+</div>
 
 <style>
   .on-word-refused {

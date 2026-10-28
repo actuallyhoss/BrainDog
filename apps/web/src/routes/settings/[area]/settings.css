@@ -54,7 +54,8 @@
   padding-block: var(--sp-3);
 }
 
-.settings-place .switch-row + .switch-row {
+.settings-place .switch-row + .switch-row,
+.settings-place .answer-switch + .answer-switch {
   border-block-start: 1px solid var(--rule);
 }
 
@@ -74,9 +75,9 @@
 .settings-place .switch-row-line {
   margin: 0;
   max-inline-size: 75ch;
-  color: var(--ink-2);
-  font-size: var(--fs-body);
-  line-height: 22px;
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
 }
 
 /* THE SWITCH'S MIDDLE ON THE TITLE'S LINE, whatever height the pointer gives the switch. */

@@ -1,5 +1,5 @@
 <!--
-  "Answer from inside chat apps" (Settings > Agents): one switch row, the owner's, in a tile of its own. What it means is
+  "Answer from inside chat apps" (Settings > Agents): one switch row, the owner's, in Settings > Agents' Answering tile. What it means is
   `chat-answer.ts`; the record keeps it as the owner's `agents.answer_in_chat` through `setPref`, which refuses anybody
   but an owner in a browser. Off until he turns it on.
 -->
@@ -8,7 +8,6 @@
 
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import Tile from '$lib/ui/Tile.svelte';
   import { CHAT_ANSWER_PREF, chatAnswerOn, chatAnswerSaid, chatAnswerWords as words } from './chat-answer.ts';
 
   let { prefs }: { prefs?: Record<string, unknown> | undefined } = $props();
@@ -35,7 +34,7 @@
   }
 </script>
 
-<Tile icon="session" title={words.tile} data-part="chat-answer">
+<div class="answer-switch" data-part="chat-answer">
   <div class="switch-row">
     <div class="switch-row-words">
       <span class="switch-row-title">{words.title}</span>
@@ -46,7 +45,7 @@
     >
   </div>
   {#if refusal}<p class="chat-answer-refused" role="status">{refusal}</p>{/if}
-</Tile>
+</div>
 
 <style>
   .chat-answer-refused {

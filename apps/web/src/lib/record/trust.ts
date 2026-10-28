@@ -25,8 +25,8 @@
 import type { TrustStanding } from '@braindog/client';
 
 export const words = {
-  title: 'What each agent may do on its own',
-  empty: 'No agent has permissions of its own yet, so each one asks you first.',
+  title: 'Permissions',
+  empty: 'None yet, so every agent asks you first.',
   backMark: 'Put back',
   askAgain: 'Ask again',
   asksFirst: 'Asks first: everything else this agent does.',

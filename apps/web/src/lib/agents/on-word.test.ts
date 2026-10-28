@@ -15,7 +15,7 @@ test('on until the pref is false, whatever else it holds', () => {
 test('each state says what telling an agent does, in words and no ids', () => {
   assert.equal(onWordSaid(true), onWordWords.on);
   assert.equal(onWordSaid(false), onWordWords.off);
-  assert.equal(onWordWords.title, 'Agents may answer when you tell them');
+  assert.equal(onWordWords.title, 'Agents answer when you say so');
   assert.match(onWordWords.on, /undo/u);
   for (const said of [onWordWords.on, onWordWords.off]) assert.doesNotMatch(said, /—|agents\.answer/u);
 });

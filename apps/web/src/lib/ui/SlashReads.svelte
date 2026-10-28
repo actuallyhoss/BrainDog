@@ -87,7 +87,7 @@
     <div class="switch-row" data-part="slash-reads">
       <div class="switch-row-words">
         <span class="switch-row-title">{words.title}</span>
-        <p class="slash-reads-said switch-row-line" id="slash-reads-said">{readsSaid(shown, host)}</p>
+        <p class="switch-row-line" id="slash-reads-said">{readsSaid(shown, host)}</p>
       </div>
       {@render toggle(shown.on)}
     </div>

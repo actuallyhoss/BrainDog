@@ -1,5 +1,5 @@
 <!--
-  "Agents' suggestions wait apart" (Settings > Agents): one switch row, the owner's, in a tile of its own. What it means
+  "Agents' suggestions wait apart" (Settings > Agents): one switch row, the owner's, in Settings > Agents' Answering tile. What it means
   is `apart.ts`; the record keeps it as the owner's `decide.agents_apart` through `setPref`, which refuses anybody but
   an owner in a browser. On until he turns it off.
 -->
@@ -8,7 +8,6 @@
 
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import Tile from '$lib/ui/Tile.svelte';
   import { APART_PREF, apartOnIn, apartSaid, apartWords as words } from './apart.ts';
 
   let { prefs }: { prefs?: Record<string, unknown> | undefined } = $props();
@@ -35,7 +34,7 @@
   }
 </script>
 
-<Tile icon="decide" title={words.tile} data-part="apart">
+<div class="answer-switch" data-part="apart">
   <div class="switch-row">
     <div class="switch-row-words">
       <span class="switch-row-title">{words.title}</span>
@@ -46,7 +45,7 @@
     >
   </div>
   {#if refusal}<p class="apart-refused" role="status">{refusal}</p>{/if}
-</Tile>
+</div>
 
 <style>
   .apart-refused {

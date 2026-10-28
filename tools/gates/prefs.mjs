@@ -548,28 +548,28 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       probe: () => getComputedStyle(document.documentElement).getPropertyValue('--red-fill').trim() || 'no accent',
     },
     {
-      /** `agents.answer_in_chat`: the Answer from inside chat apps switch as the record keeps it (Settings > Agents). */
+      /** `agents.answer_in_chat`: the Answer inside Claude and ChatGPT switch as the record keeps it (Settings > Agents). */
       name: 'agents.answer_in_chat',
       record: true,
-      what: 'the Answer from inside chat apps switch, as the record keeps it',
+      what: 'the Answer inside Claude and ChatGPT switch, as the record keeps it',
       route: '/settings/agents',
       values: [{ '@record': {} }, { '@record': { 'agents.answer_in_chat': true } }],
-      probe: () => document.querySelector('#main button[role="switch"][aria-label="Answer from inside chat apps"]')?.getAttribute('aria-checked') ?? 'none',
+      probe: () => document.querySelector('#main button[role="switch"][aria-label="Answer inside Claude and ChatGPT"]')?.getAttribute('aria-checked') ?? 'none',
     },
     {
-      /** `agents.answer_in_chat`: the Answer from inside chat apps switch as the record keeps it (Settings > Agents). */
+      /** `agents.answer_in_chat`: the Answer inside Claude and ChatGPT switch as the record keeps it (Settings > Agents). */
       name: 'agents.answer_in_chat',
       record: true,
-      what: 'the Answer from inside chat apps switch, as the record keeps it',
+      what: 'the Answer inside Claude and ChatGPT switch, as the record keeps it',
       route: '/settings/agents',
       values: [{ '@record': {} }, { '@record': { 'agents.answer_in_chat': true } }],
-      probe: () => document.querySelector('#main button[role="switch"][aria-label="Answer from inside chat apps"]')?.getAttribute('aria-checked') ?? 'none',
+      probe: () => document.querySelector('#main button[role="switch"][aria-label="Answer inside Claude and ChatGPT"]')?.getAttribute('aria-checked') ?? 'none',
     },
     {
-      /** `decide.agents_apart`: the Agents' suggestions wait apart switch as the record keeps it, on until it is off (Settings > Agents). */
+      /** `decide.agents_apart`: the Keep agents' suggestions apart switch as the record keeps it, on until it is off (Settings > Agents). */
       name: 'decide.agents_apart',
       record: true,
-      what: "the Agents' suggestions wait apart switch, as the record keeps it",
+      what: "the Keep agents' suggestions apart switch, as the record keeps it",
       route: '/settings/agents',
       values: [{ '@record': {} }, { '@record': { 'decide.agents_apart': false } }],
       probe: () => document.querySelector('#main [data-part="apart"] button[role="switch"]')?.getAttribute('aria-checked') ?? 'none',

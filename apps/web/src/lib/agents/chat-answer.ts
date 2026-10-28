@@ -11,10 +11,9 @@
 export const CHAT_ANSWER_PREF = 'agents.answer_in_chat' as const;
 
 export const chatAnswerWords = {
-  tile: 'Chat apps',
-  title: 'Answer from inside chat apps',
-  on: 'A question shown in Claude or ChatGPT is answered when you press an option on its card. The chat cannot press for you, and each answer says where it was given.',
-  off: 'The card in Claude or ChatGPT shows each option and what it changes. Its buttons open BrainDog, where you answer.',
+  title: 'Answer inside Claude and ChatGPT',
+  on: 'An option pressed on the card answers it. The chat cannot press for you.',
+  off: "The card's buttons open BrainDog.",
 } as const;
 
 /** Whether the switch is on, from the person's prefs as `boot` answered them. Anything but `true` is off. */

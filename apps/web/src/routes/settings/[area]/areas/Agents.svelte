@@ -39,14 +39,13 @@
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import { movable, placesIn, scopeFieldOf, type Place } from '$lib/record/scope-move.ts';
   import {
-    agentRows, argsOf, chipName, followers, groupRows, heardLine, keepersOf, keyDecides, LEVEL_LINES, LEVEL_WORDS, machinesLine, narrowed, noAgentYet,
+    agentRows, argsOf, chipName, followers, groupRows, heardLine, keepersOf, LEVEL_LINES, LEVEL_WORDS, machinesLine, narrowed, noAgentYet,
     type AgentRow, type ProfileView,
   } from '$lib/agents/profile.ts';
   import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
   import ChatAnswer from '$lib/agents/ChatAnswer.svelte';
   import OnWord from '$lib/agents/OnWord.svelte';
   import Apart from '$lib/agents/Apart.svelte';
-  import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
   import { lineOf as appLineOf, madeByOther, partsOf } from '$lib/record/apps.ts';
   import { foldedAdds, planOf, revoke, words as keychainWords, type Plan } from '$lib/record/keychain.ts';
@@ -311,17 +310,16 @@
     workHere: 'Agents that work here',
     yours: 'Your agents',
     connections: 'Connections',
-    noKeys: 'No machine or key is connected yet',
-    noKeysWorking: (who: string, n: number) => `${who} ${n === 1 ? 'is' : 'are'} working without a machine or key listed here`,
-    noKeysWhy: 'Connect an agent to give it a key of its own. Its settings then hold for that key alone.',
+    noKeys: 'No machines or keys yet',
+    noKeysWorking: (who: string, n: number) => `${who} ${n === 1 ? 'runs' : 'run'} without a key`,
     atWorkNow: (n: number) => `${n} at work now.`,
-    keyDecides: 'Until you set one, an agent does what its key allows.',
     profiles: (name: string) => `${name}'s profiles`,
     seeThem: 'See their runs',
     /* "yesterday", not "1d ago" (P38). */
     lastHeard: (when: string) => `Last heard ${when === '1d ago' ? 'yesterday' : when}`,
     on: ', on ',
     slash: 'Slash',
+    answering: 'Answering',
     scope: { read: 'can read', propose: 'can propose', write: 'can write' } as Record<string, string>,
     /* A GRANT THAT IS NOT A KEY'S SCOPE says what it may do in its own two words, and the sentence under its name says
        for how long; a one-time grant is "once", which is the whole of what makes it one. */
@@ -636,10 +634,9 @@
             </li>
           {/each}
         </ul>
-        {#if legend.length > 0 || keyDecides(agents)}
+        {#if legend.length > 0}
           <div class="legend">
             {#each legend as l (l.word)}<p><span class="legend-word">{l.word}</span> {l.line}</p>{/each}
-            {#if keyDecides(agents)}<p>{words.keyDecides}</p>{/if}
           </div>
         {/if}
         {#if atWorkNow > 0}
@@ -658,7 +655,7 @@
     {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
     {:else if (legacy ? count : rows.length) === 0}
-      <Empty kind="no-data-yet" compact title={legacy ? copy.connectedNone : atWorkNow > 0 ? words.noKeysWorking(workingNames, atWorkNow) : words.noKeys} body={legacy ? copy.connectedNoneWhy : words.noKeysWhy} />
+      <Empty kind="no-data-yet" compact title={legacy ? copy.connectedNone : atWorkNow > 0 ? words.noKeysWorking(workingNames, atWorkNow) : words.noKeys} body={legacy ? copy.connectedNoneWhy : undefined} />
     {:else}
       {@const nowMs = recordNow()}
       <ul class="whos">
@@ -771,17 +768,14 @@
     </Tile>
   {/if}
 
-  <!-- ANSWER FROM INSIDE CHAT APPS, the owner's one switch for the decision card in Claude and ChatGPT
-       (`lib/agents/ChatAnswer.svelte`): off, its buttons open BrainDog. -->
-  <ChatAnswer prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
-
-  <!-- AGENTS MAY ANSWER WHEN YOU TELL THEM, the owner's one switch for answering on his word (`lib/agents/OnWord.svelte`):
-       on until he turns it off, and off every agent asks. -->
-  <OnWord prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
-
-  <!-- AGENTS' SUGGESTIONS WAIT APART, the owner's one switch for Decide's shelf (`lib/agents/Apart.svelte`): on until he
-       turns it off, and off every suggestion waits in Needs you and is counted there. -->
-  <Apart prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+  <!-- THE OWNER'S THREE ANSWERING SWITCHES IN ONE TILE, a row each: answering from the card in a chat app
+       (`ChatAnswer.svelte`), agents answering on his word (`OnWord.svelte`), and agents' suggestions kept apart from
+       Needs you (`Apart.svelte`). Three tiles of one switch each read as three screens. -->
+  <Tile icon="decide" title={words.answering} data-part="answering">
+    <ChatAnswer prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+    <OnWord prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+    <Apart prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+  </Tile>
 
   <!-- CONNECT AN AGENT is the first tile's one primary; the sheet it opens is a chunk of its own, asked for on the first
        press, and the six-digit field rides in it under the setup line while no machine waits above. -->
@@ -797,7 +791,6 @@
 <!-- ONE SLASH TILE (agents F21): its one line while no model is connected, what a model has when one is, and the two
      switch rows. Never "host": the person did not set one up. -->
 <Tile icon="slash" title={words.slash} data-part="slash">
-  {#if page.data.slash !== true}<p class="slash-line">{askWords.noModel}</p>{/if}
   <SlashAsks owner={anOwner} bare />
   <!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in. -->
   <SlashDaily link row />
@@ -1224,14 +1217,5 @@
     flex-wrap: wrap;
     align-items: center;
     white-space: pre-wrap;
-  }
-
-  /* SLASH'S ONE LINE, under its title and over its switch rows. */
-  .slash-line {
-    margin: 0 0 var(--sp-2);
-    max-inline-size: 75ch;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 22px;
   }
 </style>
