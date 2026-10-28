@@ -11889,6 +11889,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       };
 
       const decl = b as { page: string };
+      /* EVERY BLOCK OVER ONE READ (`blocksOf`), so a figure two blocks name and the signs are worked out once. */
+      const drawOne = kernel.blocksOf({ inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx), sees: seesFor(ctx) });
       const drawnBlocks = written.map((block, i) => {
         const plan = plans[i]!;
         const cost = costs[i];
@@ -11901,7 +11903,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [plan.refused] })
                 : cost
                   ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [cost] })
-                  : heldBlock(ctx, kernel.block(previewed(block) as never, { inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx), sees: seesFor(ctx) }));
+                  : heldBlock(ctx, drawOne(previewed(block) as never));
         /* HER NAMES BACK, in place of the ones nobody declared, so the drawing says the figure she wrote. */
         const back = renamed[i]!.back;
         if (back.size === 0) return drawn;

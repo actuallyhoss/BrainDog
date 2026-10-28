@@ -7141,8 +7141,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           : [],
       };
     },
-    /* THE VITAL SIGNS NOW, for the built-in `signs-red`, handed in because `metrics.ts` cannot import `signs.ts` without breaking the kernel's load. */
-    signs: () => readSigns(sql, clock.now(), recordTz()),
+    /* THE VITAL SIGNS NOW, for the built-in `signs-red`, handed in because `metrics.ts` cannot import `signs.ts` without breaking the kernel's load.
+       READ ONCE FOR THE CONTEXT, which lasts one read: Today asked them for `signs-red` and again for `unread-now`, every
+       sign walked twice. Handed out as copies, so a reader that changed one changes nothing the next is handed. */
+    signs: ((): (() => ReturnType<typeof readSigns>) => {
+      let read: ReturnType<typeof readSigns> | undefined;
+      return () => structuredClone((read ??= readSigns(sql, clock.now(), recordTz())));
+    })(),
     /* THE HOST'S BUILD, for the door's `behind`: handed in by `openRecord`'s caller, null when it said none. */
     build: opts.build ?? null,
   });
@@ -10549,6 +10554,16 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         },
         decl,
       ),
+
+    /**
+     * `block` for every block of one read, over one set of deps, as a page's own read draws its blocks: a figure, a walk
+     * and the vital signs are worked out once for the read and not once a block. Today's body is drawn block by block
+     * (`previewPage`), and each block worked out its figures again, the signs among them.
+     */
+    blocksOf: (opts: { inbox?: boolean; viewer?: string | undefined; sees?: PageSees | undefined } = {}): ((decl: PageBlock) => BlockResult) => {
+      const deps: PageDeps = { ...pageDeps(opts.viewer, opts.sees), ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }) };
+      return (decl) => readBlock({ ...deps }, decl);
+    },
 
     /* ── the keychain: what a key opens, never the key ───────────────────── */
 
