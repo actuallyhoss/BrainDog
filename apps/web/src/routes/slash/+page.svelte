@@ -531,7 +531,7 @@
       {:else if stillOpen.length === 0}
         <p class="slash-said">{suggestions.length === 0 ? words.suggestsNone : pageWords.allAnswered}</p>
       {:else}
-        {#if canAsk(reading)}<p class="slash-hint">{pageWords.press}</p>{/if}
+        {#if canAsk(reading)}<p class="slash-hint">{pageWords.press}</p>{:else if reading.quiet !== null}<p class="slash-hint">{reading.quiet}</p>{/if}
         <ul class="ledger ledger-lead slash-list">
           {#each stillOpen as s (s.href ?? s.question)}
             {@const by = byLine(s.by)}

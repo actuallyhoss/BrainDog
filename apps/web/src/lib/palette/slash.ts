@@ -184,17 +184,16 @@ export function drawReading(r: Reading): Drawn {
  * are the palette's and nobody else's, so moving them into its Slash block later changes an import and nothing else.
  */
 export const slashWords = {
-  proposing: 'Slash is writing a proposal about what it found.',
+  proposing: 'Writing a proposal…',
   proposed: 'What Slash proposes',
   /* `23 §8`'s footer: receded, small, and naming the model on every output. */
   drawnBy: (model: string) => `Drawn by ${model}`,
   noModel: 'Drawn by a model this host did not name',
   /* THE VERB AND WHAT IT OPENS, AND NO ID: `Decide SG14` read an address aloud. */
   decide: 'Open the proposal in Needs you',
-  without: 'Everything above this line was drawn without it.',
+  without: 'Everything above was drawn without it.',
   figuresLine: (n: number) => (n === 1 ? 'figures: 1 read' : `figures: ${n.toLocaleString('en')} read`),
-  capLine: (used: number, cap: number, resets: string) =>
-    `Slash has used ${used} of this month's ${cap} asks. The count resets on ${resetsWords(resets)}.`,
+  capLine: (used: number, cap: number, resets: string) => `${used} of ${cap} asks used, resets ${resetsWords(resets)}.`,
   capDismiss: 'Hide until next month',
 } as const;
 

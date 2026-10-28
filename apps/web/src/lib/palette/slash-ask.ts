@@ -55,13 +55,13 @@ export function askedLately(asks: readonly SlashAsked[], now: number = Date.now(
 
 export const askWords = {
   title: 'Ask Slash',
-  label: 'Ask a question about what this BrainDog holds. Slash finds the items that answer it, then says what it makes of them.',
+  label: 'Your question',
   placeholder: 'Which invoices are late this month?',
   ask: 'Ask Slash',
   asking: 'Asking',
   answer: 'The answer',
   lately: 'Asked lately',
-  latelyNone: 'Nothing asked yet. Your questions to Slash are listed here, newest first.',
+  latelyNone: 'Nothing asked yet.',
   again: 'Ask again',
   open: 'Open the proposal',
   /* After the time, as in "2h ago, not answered", so it starts lower case. */

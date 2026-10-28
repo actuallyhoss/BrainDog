@@ -55,14 +55,14 @@
   }
 </script>
 
-<PageHead icon="slash" title={words.title} sentence={threads.length > 0 ? words.sentence(threads.length, since(new Date(threads[0].at).toISOString(), now)) : undefined} />
+<PageHead icon="slash" title={words.title} sentence={threads[0] ? words.sentence(threads.length, since(new Date(threads[0].at).toISOString(), now)) : undefined} />
 <div class="page">
+  <!-- EMPTY, THE LINE THEN THE BUTTON; with conversations, the button leads the list. -->
+  {#if threads.length === 0}<p class="none">{words.none}</p>{/if}
   <div class="lead">
     <Button weight="primary" kbd="⌘J" onclick={fresh}><Icon name="plus" size="m" />{words.fresh}</Button>
   </div>
-  {#if threads.length === 0}
-    <p class="none">{words.none}</p>
-  {:else}
+  {#if threads.length > 0}
     <ul class="threads" aria-label={words.list}>
       {#each threads as t (t.id)}
         <li>
