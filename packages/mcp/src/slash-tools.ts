@@ -47,7 +47,37 @@ export type SlashChatTools = {
   ref(id: string): Promise<{ ref: string; label: string } | null>;
   /** Up to three short lines of what matters now, for an empty palette: no model is asked. */
   now(): Promise<{ text: string; href?: string }[]>;
+  /** One line naming the lists the asker may read, with their ids and counts, for the model to start from. */
+  context(): Promise<string>;
+  /** The reads a question plainly wants, run before the model is first asked (`slashPrefetch`). */
+  prefetch(message: string): { tool: string; args: Args }[];
 };
+
+/* THE WORDS THAT SAY WHICH READ A QUESTION WANTS. Each is a read the model asked for first on nearly every such question,
+   measured on the included model, where a model call costs seconds and a read costs milliseconds. */
+const MONEY_WORDS = /\b(spen[dt]|spending|cash|runway|money|owed?|owes|owing|paid|cost|costs|income|earn\w*|revenue|budget\w*|balance|afford|burn|profit|receivables?|payables?)\b|[£$€]/iu;
+const LATE_WORDS = /\b(late|overdue|due|today|this week|urgent|behind|missed)\b/iu;
+const WAIT_WORDS = /\b(wait\w*|decide|decisions?|approve|on my plate)\b/iu;
+/* A MESSAGE THAT ASKS FOR SOMETHING DONE, by its first word: "add", "mark", "draft", "take me". */
+const DOING_WORDS =
+  /^\s*(?:please\s+)?(add|create|make|put|log|record|note|remind|schedule|set|change|update|edit|rename|move|mark|close|finish|complete|assign|draft|write|build|start|open|go|take me|show me|file|book|save)\b/iu;
+const WHO = /\bwho(?:'s| is| was)\s+([A-Z][\p{L}'.-]+(?:\s+[A-Z][\p{L}'.-]+)*)/u;
+
+/**
+ * The reads a question plainly wants, at most two, before the model is asked: a search for "who is" and a name, the
+ * figures for money, today for what is late or due, Decide for what waits. A message asking for something done wants
+ * none: its first step is the write, and a read before it is a wait for nothing.
+ */
+export function slashPrefetch(message: string): { tool: string; args: Args }[] {
+  if (DOING_WORDS.test(message)) return [];
+  const out: { tool: string; args: Args }[] = [];
+  const who = WHO.exec(message);
+  if (who) out.push({ tool: 'search', args: { q: who[1]! } });
+  if (MONEY_WORDS.test(message)) out.push({ tool: 'figures', args: { words: message } });
+  if (LATE_WORDS.test(message)) out.push({ tool: 'today', args: {} });
+  if (WAIT_WORDS.test(message)) out.push({ tool: 'waiting', args: {} });
+  return out.slice(0, 2);
+}
 
 /** The record's methods this file calls beyond what an agent's surface names. Each optional, as a host may not answer it. */
 export type SlashSurface<C> = McpSurface<C> & {
@@ -61,22 +91,23 @@ export type SlashToolDeps = {
   person: string | null;
 };
 
+/* EACH LINE SAYS WHEN TO REACH FOR IT AND SHOWS ONE CALL, measured on the included model: told only what a tool is, it
+   asked `figures` for "spending month" and read the monthly forecast as what was spent, sent a whole question to
+   `search`, and guessed `where` until it gave up. */
 const TOOLS: readonly SlashTool[] = [
-  { name: 'search', args: 'q', about: 'Find anything by its words, in every list' },
-  { name: 'lists', args: 'list?', about: 'The lists this record keeps, with their counts. With list: its fields, by the ids add and change take' },
-  { name: 'figures', args: 'words', about: 'The figures the record works out (cash, runway, totals, forecast) whose names match, each with its value now' },
-  { name: 'list', args: 'list, where?, limit?', about: 'Rows of one list, newest first. where: {"field":"state","is":"open"}' },
-  { name: 'open', args: 'id', about: 'One row whole with what it links to, by its id or its name; or one figure by its id, such as cash or runway' },
-  { name: 'today', args: '', about: 'What matters now: what is late, what is due, what stopped and what waits on them' },
-  { name: 'waiting', args: '', about: 'The questions waiting on them in Decide' },
-  { name: 'changes', args: '', about: 'What changed lately, and who changed it' },
-  { name: 'people', args: 'name?', about: 'The people they know' },
-  { name: 'projects', args: '', about: 'Their projects' },
+  { name: 'figures', args: 'words', about: 'Totals the record works out, each with its value now. Use for any money or count question: "cash", "runway", "spent this month", "spent last month", "owed to you", "late payables", "renews"' },
+  { name: 'today', args: '', about: 'What is late, due today, stopped or waiting on them' },
+  { name: 'search', args: 'q', about: 'Find rows by a name or one or two key words, in every list: "Ada", "Analytics", "rent". Not a whole sentence' },
+  { name: 'open', args: 'id', about: 'One row whole, by its id (tasks#3) or its name; or one figure by its id (cash-now)' },
+  { name: 'list', args: 'list, where?, limit?', about: 'Rows of one list, newest first. where filters by field ids: {"field":"state","is":"open"}, or several: {"all":[{"field":"state","is":"open"},{"field":"due","before":"today"}]}. Tests: is, not, in, gt, lt, before, after, contains' },
+  { name: 'lists', args: 'list', about: "One list's fields: their ids and the values they take, for list's where, add and change" },
+  { name: 'changes', args: 'about?', about: 'What changed lately and who changed it. With about, a row\'s id or name: what changed on that row' },
+  { name: 'waiting', args: '', about: 'The questions waiting for their answer in Decide' },
   { name: 'pages', args: '', about: 'The pages of this BrainDog' },
-  { name: 'add', args: 'list, fields', about: 'Add a row to a list, its fields by field id: {"what":"Call the bank","by":"2026-11-02"}', writes: true },
-  { name: 'change', args: 'id, fields', about: "Change some fields of one row, by the row's id", writes: true },
+  { name: 'add', args: 'list, fields', about: 'Add a row: the list id and its fields by field id, days as YYYY-MM-DD, money as a plain number (25.50). add("tasks", {"what":"Call the bank","due":"2026-11-02"})', writes: true },
+  { name: 'change', args: 'id, fields', about: 'Change fields of one row by its id, money as a plain number (25.50): change("tasks#3", {"state":"done"})', writes: true },
   { name: 'person', args: 'name, email?, note?', about: 'Add a person they know', writes: true },
-  { name: 'draft', args: 'what, page?', about: 'Draft a new page, a change to a page, or an automation, from what they described, for them to look at in Decide', writes: true },
+  { name: 'draft', args: 'what, page?', about: 'Draft a new page, a change to a page, or an automation from what they described; it waits for them in Decide', writes: true },
   { name: 'go', args: 'to', about: 'Take them to a page, a list, a row, or to decide, inbox, automations, settings or agents' },
 ];
 
@@ -110,6 +141,44 @@ const FLOOR_SAID: Readonly<Record<Floor, string>> = {
 
 const QUALIFIED = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u;
 const NOTE_MOST = 200;
+
+/** The words a question asks a figure with that no figure's name carries, taken out before the names are matched. */
+const ASKING = new Set(['how', 'much', 'many', 'what', 'whats', 'did', 'do', 'does', 'i', 'my', 'me', 'the', 'a', 'an', 'is', 'are', 'have', 'has', 'of', 'on', 'for', 'and', 'we', 'our', 'total', 'it']);
+
+/**
+ * A person's word as a figure's name says it: "spend" and "spending" are "spent", "owe" is "owed", "income" is "in".
+ * MEASURED: asked for "spending month", the figures that named neither word ranked level with the one that was asked for,
+ * and the model read the monthly forecast ("Every month") as what was spent.
+ */
+const SAID_AS: Readonly<Record<string, string>> = {
+  spend: 'spent', spending: 'spent', spends: 'spent', expenses: 'spent', expense: 'spent', outgoings: 'out',
+  owe: 'owed', owes: 'owed', owing: 'owed', debt: 'owed',
+  income: 'in', revenue: 'earn', earned: 'earn', earning: 'earn', earnings: 'earn', received: 'received',
+  balance: 'cash', bank: 'cash', money: 'cash',
+  runway: 'runway', last: 'last', lasts: 'lasts', overdue: 'late', subscriptions: 'renews', subscription: 'renews', renew: 'renews', renewing: 'renews',
+};
+
+/** The words of a figure question, as the figures' names say them. */
+const figureWords = (said: string): string[] =>
+  said
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter((w) => w.length > 1 && !ASKING.has(w))
+    .map((w) => SAID_AS[w] ?? w);
+
+/**
+ * How well a figure's id and name answer the words: one for each word it holds, one more where the words stand in its
+ * name in the order asked ("spent this month" in "Spent this month, by category"), less one where the name has a word
+ * the question did not ask of the two that turn a figure into another ("last", "this").
+ */
+export const figureScore = (words: readonly string[], id: string, name: string): number => {
+  const said = `${id.replaceAll('-', ' ')} ${name}`.toLowerCase();
+  const own = new Set(said.split(/[^a-z0-9]+/u));
+  let score = words.filter((w) => own.has(w) || (w.length > 3 && said.includes(w))).length;
+  if (words.length > 1 && name.toLowerCase().includes(words.join(' '))) score += 1;
+  for (const turn of ['last', 'this']) if (own.has(turn) && !words.includes(turn)) score -= 0.5;
+  return score;
+};
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -161,18 +230,79 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     return hit === undefined ? null : `rows that arrived from outside the record (${hit})`;
   };
 
-  let lists: Promise<{ id: string; name: string }[]> | null = null;
-  const listsNow = (): Promise<{ id: string; name: string }[]> =>
-    (lists ??= surface.boot(ctx).then((b) => (b.ok ? b.value.registers.map((r) => ({ id: r.id, name: r.name })) : [])));
+  let lists: Promise<{ id: string; name: string; count: number | null }[]> | null = null;
+  /** The record's home currency, from the same boot, which a money amount said as a plain number is in. */
+  let home: Promise<string | null> | null = null;
+  const homeNow = (): Promise<string | null> =>
+    (home ??= surface.boot(ctx).then((b) => {
+      const said: unknown = b.ok ? (b.value as { currency?: unknown }).currency : null;
+      return typeof said === 'string' && /^[A-Z]{3}$/u.test(said) ? said : null;
+    }));
+
+  /**
+   * Every money field of a write as the record keeps it, `{ amount, currency }` in minor units, from what the model said:
+   * a plain number or "£25.50" in the main unit, in the row's own currency, the symbol's, or the record's. MEASURED: asked
+   * to set a service to 25 pounds, the model sent `25`, the write was held for a yes, and the yes was refused for the
+   * shape of the amount, so the person said yes to something that could not be done. A value already in the record's
+   * shape, or one this cannot read, is passed as it came, and the record says what is wrong with it.
+   */
+  const moneyed = async (shape: ListShape, fields: Args, was?: Record<string, unknown>): Promise<Args> => {
+    const out: Args = { ...fields };
+    for (const f of shape.fields) {
+      if (f.type !== 'money' || !(f.id in out)) continue;
+      const v = out[f.id];
+      const before = was?.[f.id];
+      const own = isObject(before) && typeof before['currency'] === 'string' ? before['currency'] : null;
+      let amount: number | null = null;
+      let currency: string | null = null;
+      if (typeof v === 'number' && Number.isFinite(v)) amount = v;
+      else if (typeof v === 'string') {
+        const m = /^\s*([£$€])?\s*(-?[\d,]*\.?\d+)\s*([A-Za-z]{3})?\s*$/u.exec(v);
+        if (m) {
+          amount = Number(m[2]!.replaceAll(',', ''));
+          currency = m[3]?.toUpperCase() ?? (m[1] === '£' ? 'GBP' : m[1] === '$' ? 'USD' : m[1] === '€' ? 'EUR' : null);
+        }
+      } else if (isObject(v) && typeof v['amount'] === 'number' && !Number.isInteger(v['amount'])) {
+        amount = v['amount'];
+        currency = typeof v['currency'] === 'string' ? v['currency'] : null;
+      }
+      if (amount === null || !Number.isFinite(amount)) continue;
+      const cur = currency ?? own ?? (await homeNow());
+      if (cur === null) continue;
+      out[f.id] = { amount: Math.round(amount * 100), currency: cur };
+    }
+    return out;
+  };
+
+  const listsNow = (): Promise<{ id: string; name: string; count: number | null }[]> =>
+    (lists ??= surface
+      .boot(ctx)
+      .then((b) =>
+        b.ok
+          ? b.value.registers.map((r) => {
+              const count: unknown = (r as { count?: unknown }).count;
+              return { id: r.id, name: r.name, count: typeof count === 'number' ? count : null };
+            })
+          : [],
+      ));
   const listNamed = async (said: string): Promise<{ id: string; name: string } | null> => {
     const want = said.trim().toLowerCase();
     if (want === '') return null;
     const all = await listsNow();
     return all.find((l) => l.id === want) ?? all.find((l) => l.name.toLowerCase() === want) ?? all.find((l) => l.name.toLowerCase().includes(want)) ?? null;
   };
+  /**
+   * The list a person is kept in, READ OFF THE DECLARATIONS and never by its name: a list whose rows are someone, which
+   * names who a row is (`names`) and holds an email field. The core knows no add-on's list by its id.
+   */
+  const whoList = async (): Promise<{ id: string; name: string } | null> => {
+    for (const l of await listsNow()) {
+      const shape = shapeIn(deps.sql, l.id);
+      if ((shape?.names?.length ?? 0) > 0 && shape?.fields.some((f) => f.type === 'email')) return l;
+    }
+    return null;
+  };
   const nameOfList = async (id: string): Promise<string> => (await listsNow()).find((l) => l.id === id)?.name ?? id;
-  const listFor = async (test: (l: { id: string; name: string }) => boolean): Promise<{ id: string; name: string } | null> =>
-    (await listsNow()).find(test) ?? null;
 
   /** A row by its id or its name, as the asker may read it, or `null`. */
   const rowOf = async (id: string): Promise<Row | null> => {
@@ -191,6 +321,25 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
   const hrefOfRow = (r: { register: string; seq: number | null }): string | undefined =>
     r.seq === null ? undefined : `/r/${encodeURIComponent(r.register)}/${r.seq}`;
   const spokenOfRow = (r: { register: string; seq: number | null; id: string }): string => (r.seq === null ? r.id : `${r.register}#${r.seq}`);
+
+  /**
+   * A new row's fields with the two a person always says put where the list keeps them: its name, said as `what`,
+   * `title` or `name`, in the list's own name field, and its day, said as `due`, `by`, `date` or `when`, in its first day
+   * field. Every other field is the model's to name. SO "ADD A TASK" IS ONE CALL: told the fields only by a refusal, the
+   * included model spent a step reading the list's fields before every add.
+   */
+  const aliased = (shape: ListShape, fields: Args): Args => {
+    const has = new Set(shape.fields.map((f) => f.id));
+    const out: Args = {};
+    const nameField = ['what', 'name', 'title', 'summary', 'subject'].find((id) => has.has(id)) ?? shape.fields.find((f) => f.type === 'text')?.id;
+    const dayField = ['due', 'by', 'when', 'date', 'renews', 'on'].find((id) => has.has(id) && shape.fields.find((f) => f.id === id)?.type === 'day') ?? shape.fields.find((f) => f.type === 'day')?.id;
+    for (const [k, v] of Object.entries(fields)) {
+      const to = has.has(k) ? k : ['what', 'name', 'title', 'summary', 'task'].includes(k) ? nameField : ['due', 'by', 'date', 'when', 'deadline', 'day'].includes(k) ? dayField : undefined;
+      if (to === undefined || to in out) out[k] = v;
+      else out[to] = v;
+    }
+    return out;
+  };
 
   /** Fields a list does not declare, said back with the ones it does, or `null`. */
   const strays = (shape: ListShape, fields: Args): string | null => {
@@ -257,8 +406,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         const why = isObject(out.value) && Array.isArray(out.value.dropped) ? out.value.dropped.filter((d): d is string => typeof d === 'string') : [];
         return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: why[0] ?? 'Nothing came of that draft. Try describing it another way.', at: 'what' } };
       }
-      const question = text(first['question']);
-      return { ok: true, value: { receipt: `Drafted “${clip(question, 100)}”. It waits for you in Decide.`, href: `/decide/${encodeURIComponent(text(first['id']))}` } };
+      return { ok: true, value: { receipt: `Drafted “${clip(text(op['what']), 100)}”. It waits for you in Decide.`, href: `/decide/${encodeURIComponent(text(first['id']))}` } };
     }
     return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'There is nothing to do for that.' } };
   };
@@ -287,7 +435,8 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
   const adding = async (listSaid: string, fields: Args, run: SlashToolRun): Promise<SlashToolRan> => {
     const list = await listNamed(listSaid);
     const shape = list === null ? null : shapeIn(deps.sql, list.id);
-    if (list === null || shape === null) return { text: `There is no list called ${listSaid || 'that'}. Call lists() to see them.` };
+    if (list === null || shape === null) return { text: `There is no list called ${listSaid || 'that'}. The lists are named before the tools.` };
+    fields = await moneyed(shape, aliased(shape, fields));
     const stray = strays(shape, fields);
     if (stray !== null) return { text: stray };
     const kinds = kindsOfWrite({ list: list.id, op: 'create', patch: fields, shape, person: deps.person });
@@ -300,11 +449,25 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
   const call = async (name: string, args: Args, run: SlashToolRun): Promise<SlashToolRan> => {
     switch (name) {
       case 'search': {
-        const q = text(args['q']);
-        const found = await agent.answer('search', { q, limit: 12 }, ctx);
-        const hits = found.result.ok && isObject(found.result.value) && Array.isArray(found.result.value.rows) ? found.result.value.rows : [];
-        const registers = hits.flatMap((h) => (isObject(h) && typeof h.register === 'string' ? [h.register] : []));
-        return { text: found.text, outside: outsideOf(registers), step: `Searching for “${clip(q, 40)}”` };
+        const q = text(args['q'] ?? args['words']);
+        const hitsOf = (found: Awaited<ReturnType<typeof agent.answer>>): unknown[] =>
+          found.result.ok && isObject(found.result.value) && Array.isArray(found.result.value.rows) ? found.result.value.rows : [];
+        let found = await agent.answer('search', { q, limit: 12 }, ctx);
+        let said = found.text;
+        /* NOTHING FOR THE WHOLE PHRASE IS ASKED AGAIN WORD BY WORD, the longest first, since a search wants every word and
+           "Analytics subscription" found nothing where "Analytics" was a row. */
+        if (hitsOf(found).length === 0) {
+          const words = [...new Set(q.split(/[^\p{L}\p{N}&'.-]+/u).filter((w) => w.length > 2 && !ASKING.has(w.toLowerCase())))].sort((a, z) => z.length - a.length);
+          for (const w of words.length > 1 ? words.slice(0, 3) : []) {
+            const again = await agent.answer('search', { q: w, limit: 12 }, ctx);
+            if (hitsOf(again).length === 0) continue;
+            found = again;
+            said = `Nothing for “${q}”. For “${w}”:\n${again.text}`;
+            break;
+          }
+        }
+        const registers = hitsOf(found).flatMap((h) => (isObject(h) && typeof h.register === 'string' ? [h.register] : []));
+        return { text: said, outside: outsideOf(registers), step: `Searching for “${clip(q, 40)}”` };
       }
       case 'lists': {
         const list = text(args['list']);
@@ -313,7 +476,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       }
       case 'list': {
         const one = await listNamed(text(args['list'] ?? args['register']));
-        if (one === null) return { text: `There is no list called ${text(args['list']) || 'that'}. Call lists() to see them.` };
+        if (one === null) return { text: `There is no list called ${text(args['list']) || 'that'}. The lists are named before the tools.` };
         const limit = typeof args['limit'] === 'number' ? Math.min(Math.max(1, Math.floor(args['limit'])), 30) : 20;
         return {
           text: await read('list', { register: one.id, limit, ...(isObject(args['where']) ? { where: args['where'] } : {}) }),
@@ -334,25 +497,23 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         if (!surface.figures) return { text: 'This record does not list its figures here. lists() names the lists instead.' };
         const all = await surface.figures(ctx);
         if (!all.ok) return { text: fixOf(all) };
-        const words = text(args['words'] ?? args['q']).toLowerCase().split(/[^a-z0-9]+/u).filter((w) => w.length > 1);
+        const words = figureWords(text(args['words'] ?? args['q']));
         const scored = all.value
           .filter((f) => f.param !== true)
-          .map((f) => {
-            const said = `${f.id} ${f.name ?? ''}`.toLowerCase();
-            return { f, score: words.length === 0 ? 1 : words.filter((w) => said.includes(w)).length };
-          })
-          .filter((x) => x.score > 0)
-          .sort((a, z) => z.score - a.score)
-          .slice(0, 12);
+          .map((f) => ({ f, score: words.length === 0 ? 1 : figureScore(words, f.id, f.name ?? '') }))
+          .filter((x) => x.score >= 1)
+          /* THE BEST FIRST, AND OF TWO EQUALLY GOOD THE SHORTER NAME, which is the total and not its breakdown. */
+          .sort((a, z) => z.score - a.score || (a.f.name ?? a.f.id).length - (z.f.name ?? z.f.id).length)
+          .slice(0, 10);
         if (scored.length === 0) return { text: `No figure is named like ${words.join(' ') || 'that'}. Try other words, or search.` };
-        /* THE BEST FEW ARE READ NOW, so a question about cash is answered in one call and not two. */
-        const lines: string[] = [];
-        for (const [i, { f }] of scored.entries()) {
-          if (i < 4) {
+        /* THE BEST SIX ARE READ NOW, AT ONCE, so a question about cash is answered in one call and not two. */
+        const lines = await Promise.all(
+          scored.map(async ({ f }, i) => {
+            if (i >= 6) return `${f.name ?? f.id} (${f.id}): open it to read`;
             const read = await agent.answer('get', { spoken: f.id }, ctx);
-            lines.push(read.result.ok ? read.text.split('\n')[0] ?? `${f.name ?? f.id} (${f.id})` : `${f.name ?? f.id} (${f.id})`);
-          } else lines.push(`${f.name ?? f.id} (${f.id}): open it to read`);
-        }
+            return read.result.ok ? (read.text.split('\n')[0] ?? `${f.name ?? f.id} (${f.id})`) : `${f.name ?? f.id} (${f.id})`;
+          }),
+        );
         return { text: lines.join('\n'), step: 'Working out the figures' };
       }
       case 'today': {
@@ -363,22 +524,28 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       }
       case 'waiting':
         return { text: await read('governance', { register: 'suggestion', status: 'open', limit: 15 }), step: 'Checking what waits on you' };
-      case 'changes':
+      case 'changes': {
+        const about = text(args['about'] ?? args['id']);
+        if (about !== '') {
+          /* ONE ROW'S OWN HISTORY, its changes after the row's own lines, and the record's recent lines that name it. */
+          const row = await rowOf(about);
+          if (row === null) return { text: `Nothing you can read is called ${about}. search finds it by its words.` };
+          const said = await read('get', { spoken: row.seq === null ? row.id : spokenOfRow(row), history: true });
+          const lines = said.split('\n');
+          const from = lines.findIndex((l, i) => i > 0 && /· \d+ changes?$/u.test(l));
+          const named = titleOf(row.fields);
+          const recent = (await read('activity', { limit: 40 }))
+            .split('\n')
+            .filter((l) => (named !== '' && l.toLowerCase().includes(named.toLowerCase())) || l.includes(spokenOfRow(row)))
+            .slice(0, 8);
+          const own = from === -1 ? `${lines[0] ?? named}\nNo changes kept for it.` : lines.slice(from).join('\n');
+          return {
+            text: `${lines[0] ?? named}\n${own}${recent.length === 0 ? '' : `\nLately, lines that name it:\n${recent.join('\n')}`}`,
+            outside: outsideOf([row.register]),
+            step: `Reading what changed on ${clip(named || about, 40)}`,
+          };
+        }
         return { text: await read('activity', { limit: 15 }), step: 'Reading what changed' };
-      case 'people': {
-        const people = await listFor((l) => l.id === 'people' || /\bpeople\b|contacts/iu.test(l.name));
-        if (people === null) return { text: 'This record keeps no list of people.' };
-        const who = text(args['name']);
-        return {
-          text: who === '' ? await read('list', { register: people.id, limit: 30 }) : await read('search', { q: who, limit: 10 }),
-          outside: outsideOf([people.id]),
-          step: `Reading ${people.name}`,
-        };
-      }
-      case 'projects': {
-        const projects = await listFor((l) => l.id === 'projects' || l.id === 'things' || /project/iu.test(l.name));
-        if (projects === null) return { text: 'This record keeps no list of projects.' };
-        return { text: await read('list', { register: projects.id, limit: 30 }), step: `Reading ${projects.name}` };
       }
       case 'pages': {
         const pages = await surface.pages(ctx);
@@ -388,7 +555,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       case 'add':
         return adding(text(args['list'] ?? args['register']), isObject(args['fields']) ? args['fields'] : {}, run);
       case 'person': {
-        const people = await listFor((l) => l.id === 'people' || /\bpeople\b|contacts/iu.test(l.name));
+        const people = await whoList();
         if (people === null) return { text: 'This record keeps no list of people.' };
         const shape = shapeIn(deps.sql, people.id);
         const has = (id: string): boolean => shape?.fields.some((f) => f.id === id) ?? false;
@@ -396,9 +563,10 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         const name = text(args['name']);
         if (name === '') return { text: 'person needs a name.' };
         fields[has('name') ? 'name' : (shape?.fields.find((f) => f.type === 'text')?.id ?? 'name')] = name;
-        if (text(args['email']) !== '' && has('email')) fields['email'] = text(args['email']);
+        const mail = shape?.fields.find((f) => f.type === 'email')?.id;
+        if (text(args['email']) !== '' && mail !== undefined) fields[mail] = text(args['email']);
         const note = text(args['note']);
-        if (note !== '') for (const f of ['notes', 'note', 'about']) if (has(f)) {
+        if (note !== '') for (const f of ['note', 'about']) if (has(f)) {
           fields[f] = note;
           break;
         }
@@ -409,10 +577,11 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         const row = await rowOf(id);
         if (row === null) return { text: `Nothing you can read is called ${id || 'that'}. search finds it by its words.` };
         if (row.seq === null) return { text: `${id} is not a row that can be changed here.` };
-        const patch = isObject(args['fields']) ? args['fields'] : isObject(args['patch']) ? args['patch'] : {};
-        if (Object.keys(patch).length === 0) return { text: 'change needs fields: the field ids and their new values.' };
+        const said = isObject(args['fields']) ? args['fields'] : isObject(args['patch']) ? args['patch'] : {};
+        if (Object.keys(said).length === 0) return { text: 'change needs fields: the field ids and their new values.' };
         const shape = shapeIn(deps.sql, row.register);
         if (shape === null) return { text: `${id} is in a list this record no longer keeps.` };
+        const patch = await moneyed(shape, said, row.fields);
         const stray = strays(shape, patch);
         if (stray !== null) return { text: stray };
         const kinds = kindsOfWrite({ list: row.register, op: 'update', patch, shape, madeBy: madeByIn(deps.sql, row.id), person: deps.person, was: row.fields });
@@ -449,11 +618,28 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         }
         const pages = await surface.pages(ctx);
         const want = to.toLowerCase();
-        const page = pages.ok ? (pages.value.find((p) => p.slug === want) ?? pages.value.find((p) => p.title.toLowerCase() === want) ?? pages.value.find((p) => p.title.toLowerCase().includes(want))) : undefined;
-        if (page !== undefined) return { text: `Opened ${page.title}.`, navigate: { href: `/p/${encodeURIComponent(page.slug)}`, label: page.title }, step: `Opening ${page.title}` };
+        /* A NAME SAID WHOLE BEFORE A NAME THAT HOLDS IT: "Services" is the list called that, and not the first page whose
+           title has the word in it, which is where it once took a person. */
+        const openPage = (p: { slug: string; title: string }): SlashToolRan => ({
+          text: `Opened ${p.title}.`,
+          navigate: { href: `/p/${encodeURIComponent(p.slug)}`, label: p.title },
+          step: `Opening ${p.title}`,
+        });
+        const openList = (l: { id: string; name: string }): SlashToolRan => ({
+          text: `Opened ${l.name}.`,
+          navigate: { href: `/r/${encodeURIComponent(l.id)}`, label: l.name },
+          step: `Opening ${l.name}`,
+        });
+        const exact = pages.ok ? (pages.value.find((p) => p.slug === want) ?? pages.value.find((p) => p.title.toLowerCase() === want)) : undefined;
+        if (exact !== undefined) return openPage(exact);
+        const all = await listsNow();
+        const named = all.find((l) => l.id === want) ?? all.find((l) => l.name.toLowerCase() === want);
+        if (named !== undefined) return openList(named);
+        const page = pages.ok ? pages.value.find((p) => p.title.toLowerCase().includes(want)) : undefined;
+        if (page !== undefined) return openPage(page);
         const list = await listNamed(to);
-        if (list !== null) return { text: `Opened ${list.name}.`, navigate: { href: `/r/${encodeURIComponent(list.id)}`, label: list.name }, step: `Opening ${list.name}` };
-        return { text: `Nothing is called ${to || 'that'}. pages() and lists() say what there is.` };
+        if (list !== null) return openList(list);
+        return { text: `Nothing is called ${to || 'that'}. pages() says what pages there are.` };
       }
       default:
         return { text: `There is no tool called ${name}.` };
@@ -489,5 +675,15 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     return waiting > 0 ? [{ text: waiting === 1 ? 'One question waits for you.' : `${waiting} questions wait for you.`, href: '/decide' }] : [];
   };
 
-  return { list: TOOLS, call, apply, ref, now };
+  /**
+   * The lists the asker may read, by name with the id a call takes and how many rows each holds, in one line. HANDED TO
+   * THE MODEL BEFORE ITS FIRST STEP, so a question about subscriptions finds Services without a call to find the lists,
+   * and an `add` names a list that is there.
+   */
+  const context = async (): Promise<string> => {
+    const all = await listsNow();
+    return all.map((l) => `${l.name} (${l.id}${l.count === null ? '' : `, ${l.count}`})`).join(', ');
+  };
+
+  return { list: TOOLS, call, apply, ref, now, context, prefetch: slashPrefetch };
 }
