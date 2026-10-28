@@ -272,11 +272,12 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
   /* AND LASTS SAYS THE DAY, over the figure the update brought with it (money-core 3.12.0): in the sentence under how long
      the money lasts with nothing coming in since 3.27.0, where it was a figure of its own, and since 3.29.0 a cell of the
-     hero, beside the day it runs out on. */
+     hero, beside the day it runs out on. Since 3.29.1 the day is that cell's alone, and the sentence under how long it
+     lasts with nothing coming in says only the day that ends on. */
   const hero = (page.blocks as { lead?: boolean; cells?: { metric: string; note?: string }[] }[]).find((b) => b.lead === true && Array.isArray(b.cells));
   const lasts = hero?.cells?.find((c) => c.metric === 'lasts-no-income');
   assert.ok(hero?.cells?.some((c) => c.metric === 'runs-out-on'), 'the hero says no day the money runs out on');
-  assert.match(lasts?.note ?? '', /\{\{runs-out-on\}\}/u);
+  assert.doesNotMatch(lasts?.note ?? '', /\{\{runs-out-on\}\}/u, 'the day the money runs out is said twice on one tile');
   assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
 });
@@ -1014,6 +1015,16 @@ const withoutSection29 = (doc: Body): Body => {
       ),
   };
 };
+/**
+ * MONEY 3.29.1 COMES OFF BEFORE ALL: the words of 3.29.0 on the pages that outlive the step above, a book's page, the
+ * filing rules and an account's page, as 3.29.0 declared them (`fixtures/money-pages-3.29.0.json`). The other pages
+ * 3.29.1 reworded are taken away or replaced by the step above.
+ */
+const PAGES_3_29 = new Map((JSON.parse(readFileSync(new URL('./fixtures/money-pages-3.29.0.json', import.meta.url), 'utf8')) as Body[]).map((d) => [d.page, d]));
+const withoutWords291 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) => PAGES_3_29.get(d.page) ?? d),
+});
 /** MONEY 3.24.0 COMES OFF FIRST (the look of 26 October): the Accounts split read six accounts at most. */
 const withoutLimit24 = (doc: Body): Body =>
   withPage(doc, 'money', (now) => now.map((x) => (x.heading === 'Accounts' && x.limit === 12 ? { ...x, limit: 6 } : x)));
@@ -1208,7 +1219,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(withoutAhead27(withoutSection29(raw)))))))))))))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(withoutUiPassR3(withoutLatePart(withoutCard20(withoutCalendar21(withoutTwins22(withoutLasts23(withoutLimit24(withoutAhead27(withoutSection29(withoutWords291(raw))))))))))))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

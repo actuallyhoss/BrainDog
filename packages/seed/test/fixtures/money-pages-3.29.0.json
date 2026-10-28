@@ -1,0 +1,822 @@
+[
+  {
+    "page": "money-book",
+    "title": "{{name}}",
+    "for": {
+      "register": "books"
+    },
+    "nav": {
+      "section": "Money",
+      "order": 20
+    },
+    "icon": "book",
+    "requires": [
+      "register.books",
+      "register.accounts",
+      "register.obligations",
+      "register.transactions",
+      "register.recurring",
+      "register.installments"
+    ],
+    "pack": "money-core",
+    "blocks": [
+      {
+        "kind": "note",
+        "lead": true,
+        "tone": "warn",
+        "span": 12,
+        "when": {
+          "metric": "categories-against-direction",
+          "is": 1
+        },
+        "body": "1 category is marked the other way from how the Ledger books it. [See Categories](/r/categories)."
+      },
+      {
+        "kind": "note",
+        "lead": true,
+        "tone": "warn",
+        "span": 12,
+        "when": {
+          "metric": "categories-against-direction",
+          "gt": 1
+        },
+        "body": "{{categories-against-direction}} categories are marked the other way from how the Ledger books them. [See Categories](/r/categories)."
+      },
+      {
+        "kind": "stat",
+        "lead": true,
+        "heading": "What you have",
+        "icon": "wallet",
+        "span": 4,
+        "cells": [
+          {
+            "metric": "book-cash:{{name}}",
+            "label": "Cash now"
+          }
+        ]
+      },
+      {
+        "kind": "forecast",
+        "heading": "Cash ahead",
+        "icon": "chart-line",
+        "span": 8,
+        "source": "forecast.runway",
+        "opening": {
+          "metric": "book-cash:{{name}}"
+        },
+        "from": [
+          {
+            "register": "obligations",
+            "on": "due",
+            "amount": "amount",
+            "where": "state is open or part, repeats is not monthly or quarterly or yearly, book is {{name}}",
+            "incoming": {
+              "field": "direction",
+              "is": "owed_to_me"
+            }
+          },
+          {
+            "register": "recurring",
+            "on": "next_due",
+            "amount": "amount",
+            "where": "state is live, book is {{name}}",
+            "incoming": {
+              "field": "direction",
+              "is": "in"
+            },
+            "every": {
+              "field": "every",
+              "months": {
+                "monthly": 1,
+                "quarterly": 3,
+                "yearly": 12
+              },
+              "weeks": {
+                "weekly": 1,
+                "fortnightly": 2
+              },
+              "twice": {
+                "twice_monthly": [
+                  1,
+                  15
+                ]
+              }
+            },
+            "ends": "ends",
+            "days": "day_of_month",
+            "weekend": "weekend"
+          },
+          {
+            "register": "installments",
+            "on": "due",
+            "amount": "amount",
+            "where": "state is open, book is {{name}}",
+            "incoming": {
+              "field": "direction",
+              "is": "in"
+            },
+            "group": "plan"
+          },
+          {
+            "register": "accounts",
+            "on": "arrives",
+            "amount": "balance",
+            "where": "liquid is false, arrives is set, kind is bank, book is {{name}}",
+            "incoming": {
+              "field": "kind",
+              "is": "bank"
+            }
+          }
+        ],
+        "horizon": 84,
+        "horizons": [
+          84,
+          180,
+          365,
+          730,
+          1825,
+          "last"
+        ],
+        "axis": "fit",
+        "knobs": [
+          "horizon",
+          "late",
+          "spend",
+          "count",
+          "grow",
+          "drift"
+        ],
+        "late": "days-late-in",
+        "under": 30,
+        "empty": "Nothing in {{name}} is dated ahead yet."
+      },
+      {
+        "kind": "stat",
+        "heading": "This month",
+        "icon": "coins",
+        "span": 12,
+        "cells": [
+          {
+            "metric": "book-in-month:{{name}}",
+            "label": "In this month"
+          },
+          {
+            "metric": "book-out-month:{{name}}",
+            "label": "Out this month"
+          },
+          {
+            "metric": "book-net-month:{{name}}",
+            "label": "Net"
+          }
+        ],
+        "when": {
+          "metric": "book-net-month:{{name}}",
+          "empty": false
+        }
+      },
+      {
+        "kind": "stat",
+        "heading": "What is due",
+        "icon": "scale",
+        "span": 12,
+        "cells": [
+          {
+            "metric": "book-owed-to:{{name}}",
+            "label": "Due to come in"
+          },
+          {
+            "metric": "book-owed-by:{{name}}",
+            "label": "Due to go out"
+          },
+          {
+            "metric": "book-lasts-until:{{name}}",
+            "label": "Money lasts until"
+          }
+        ]
+      },
+      {
+        "kind": "note",
+        "span": 12,
+        "when": {
+          "metric": "book-lasts-until:{{name}}",
+          "beyond": true
+        },
+        "body": "Its money lasts the year on what is due."
+      },
+      {
+        "kind": "series",
+        "heading": "In and out, by month",
+        "icon": "chart-column",
+        "span": 12,
+        "series": [
+          {
+            "metric": "book-in-by-month:{{name}}",
+            "label": "Money in"
+          },
+          {
+            "metric": "book-out-by-month:{{name}}",
+            "label": "Money out",
+            "dir": "out"
+          }
+        ],
+        "back": 12,
+        "net": true,
+        "when": {
+          "metric": "book-net-by-month:{{name}}",
+          "empty": false
+        },
+        "empty": "Nothing moved in {{name}} in these months."
+      },
+      {
+        "kind": "cards",
+        "heading": "Accounts",
+        "icon": "landmark",
+        "span": 8,
+        "source": "register.accounts",
+        "where": "book is {{name}}, state is not closed",
+        "columns": [
+          {
+            "field": "name",
+            "as": "title"
+          },
+          {
+            "field": "balance",
+            "as": "figure"
+          },
+          {
+            "field": "kind",
+            "label": "Type",
+            "as": "fact"
+          },
+          {
+            "field": "as_of",
+            "label": "Last confirmed",
+            "as": "when"
+          }
+        ],
+        "order": [
+          {
+            "field": "seq",
+            "dir": "asc"
+          }
+        ],
+        "stale": {
+          "field": "as_of",
+          "after": "7d",
+          "figure": "account-ages"
+        },
+        "empty": "No account is in {{name}} yet. Add one here and it is filed in this book."
+      },
+      {
+        "kind": "capture",
+        "heading": "Add an account",
+        "icon": "plus",
+        "span": 4,
+        "register": "accounts",
+        "where": "book is {{spoken}}"
+      },
+      {
+        "kind": "section",
+        "heading": "Coming and going",
+        "icon": "calendar",
+        "span": 12,
+        "fold": true
+      },
+      {
+        "kind": "calendar",
+        "heading": "Due in the next 30 days",
+        "icon": "calendar",
+        "span": 8,
+        "source": "register.obligations",
+        "where": "state is open or part, due after yesterday, due before +31d, book is {{name}}",
+        "columns": [
+          {
+            "field": "what"
+          },
+          {
+            "field": "due"
+          }
+        ],
+        "back": 0,
+        "ahead": 1,
+        "empty": "Nothing in {{name}} falls due in the next 30 days."
+      },
+      {
+        "kind": "bridge",
+        "heading": "The next 30 days",
+        "icon": "scale",
+        "span": 4,
+        "source": "forecast.runway",
+        "opening": {
+          "metric": "book-cash:{{name}}"
+        },
+        "from": [
+          {
+            "register": "obligations",
+            "on": "due",
+            "amount": "amount",
+            "where": "state is open or part, repeats is not monthly or quarterly or yearly, book is {{name}}",
+            "incoming": {
+              "field": "direction",
+              "is": "owed_to_me"
+            }
+          },
+          {
+            "register": "recurring",
+            "on": "next_due",
+            "amount": "amount",
+            "where": "state is live, book is {{name}}",
+            "incoming": {
+              "field": "direction",
+              "is": "in"
+            },
+            "every": {
+              "field": "every",
+              "months": {
+                "monthly": 1,
+                "quarterly": 3,
+                "yearly": 12
+              },
+              "weeks": {
+                "weekly": 1,
+                "fortnightly": 2
+              },
+              "twice": {
+                "twice_monthly": [
+                  1,
+                  15
+                ]
+              }
+            },
+            "ends": "ends",
+            "days": "day_of_month",
+            "weekend": "weekend"
+          },
+          {
+            "register": "installments",
+            "on": "due",
+            "amount": "amount",
+            "where": "state is open, book is {{name}}",
+            "incoming": {
+              "field": "direction",
+              "is": "in"
+            },
+            "group": "plan"
+          },
+          {
+            "register": "accounts",
+            "on": "arrives",
+            "amount": "balance",
+            "where": "liquid is false, arrives is set, kind is bank, book is {{name}}",
+            "incoming": {
+              "field": "kind",
+              "is": "bank"
+            }
+          }
+        ],
+        "horizon": 30,
+        "empty": "Nothing in {{name}} is dated in the next 30 days."
+      },
+      {
+        "kind": "split",
+        "heading": "Where this month's money went",
+        "donut": true,
+        "icon": "chart-pie",
+        "span": 12,
+        "source": "register.transactions",
+        "where": "state is cleared, transfer is false, direction is out, on at least bom, book is {{name}}",
+        "columns": [
+          {
+            "field": "category"
+          },
+          {
+            "field": "amount"
+          }
+        ],
+        "limit": 6,
+        "unset": "Uncategorised",
+        "when": {
+          "metric": "book-spent-month:{{name}}",
+          "gt": 0
+        }
+      },
+      {
+        "kind": "timeline",
+        "heading": "What moved",
+        "icon": "receipt",
+        "span": 12,
+        "source": "register.transactions",
+        "where": "state is not void, book is {{name}}",
+        "columns": [
+          {
+            "field": "on"
+          },
+          {
+            "field": "what"
+          },
+          {
+            "field": "amount",
+            "sign": {
+              "field": "direction",
+              "minus": "out"
+            }
+          }
+        ],
+        "order": [
+          {
+            "field": "on",
+            "dir": "desc"
+          }
+        ],
+        "limit": 12,
+        "empty": "Nothing has moved in {{name}} yet."
+      }
+    ]
+  },
+  {
+    "page": "money-rules",
+    "title": "Filing rules",
+    "nav": {
+      "section": "Money",
+      "order": 40
+    },
+    "icon": "tag",
+    "requires": [
+      "register.filing_rules",
+      "register.transactions"
+    ],
+    "pack": "money-core",
+    "blocks": [
+      {
+        "kind": "note",
+        "lead": true,
+        "span": 12,
+        "when": {
+          "metric": "rule-filed",
+          "lt": 1
+        },
+        "body": "No rule has filed anything yet. Set a category on an entry and the record offers one."
+      },
+      {
+        "kind": "note",
+        "lead": true,
+        "span": 12,
+        "when": {
+          "metric": "filed-by-rule-30d",
+          "gte": 1
+        },
+        "body": "{{rules-filing-30d}} rule(s) filed {{filed-by-rule-30d}} of your entries in the last 30 days."
+      },
+      {
+        "kind": "note",
+        "lead": true,
+        "span": 12,
+        "when": {
+          "all": [
+            {
+              "metric": "rule-filed",
+              "gte": 1
+            },
+            {
+              "metric": "filed-by-rule-30d",
+              "lt": 1
+            }
+          ]
+        },
+        "body": "No rule has filed anything in the last 30 days. {{rules-filing}} rule(s) filed {{rule-filed}} of your entries before that."
+      },
+      {
+        "kind": "note",
+        "span": 12,
+        "when": {
+          "metric": "txn-uncategorised",
+          "gt": 0
+        },
+        "body": "Entries with no category in the last 91 days: {{txn-uncategorised}}. [File old entries](/automations/txn-categorise?again=1)"
+      },
+      {
+        "kind": "table",
+        "heading": "Rules",
+        "icon": "tag",
+        "span": 12,
+        "source": "register.filing_rules",
+        "columns": [
+          {
+            "field": "match",
+            "label": "Matches",
+            "width": "minmax(14ch,1fr)"
+          },
+          {
+            "field": "match_by",
+            "label": "How it matches",
+            "width": "16ch"
+          },
+          {
+            "field": "category",
+            "label": "Category",
+            "width": "minmax(10ch,18ch)"
+          },
+          {
+            "field": "state",
+            "label": "Status",
+            "width": "8ch"
+          }
+        ],
+        "order": [
+          {
+            "field": "rank",
+            "dir": "asc"
+          },
+          {
+            "field": "match",
+            "dir": "asc"
+          }
+        ],
+        "limit": 120,
+        "empty": "No filing rule yet. Set a category on an entry and the record offers one."
+      },
+      {
+        "kind": "bar",
+        "heading": "Entries each rule filed",
+        "icon": "chart-bar",
+        "span": 12,
+        "source": "metric.rule-filed",
+        "when": {
+          "metric": "rules-filing",
+          "gte": 2
+        },
+        "empty": "No rule has filed anything yet."
+      },
+      {
+        "kind": "table",
+        "heading": "Filed lately",
+        "icon": "history",
+        "span": 12,
+        "source": "register.transactions",
+        "where": "filed_by is set",
+        "columns": [
+          {
+            "field": "filed_by",
+            "label": "Rule",
+            "width": "minmax(12ch,18ch)"
+          },
+          {
+            "field": "what",
+            "label": "Description",
+            "width": "minmax(14ch,1fr)"
+          },
+          {
+            "field": "category",
+            "label": "Category",
+            "width": "minmax(10ch,18ch)"
+          },
+          {
+            "field": "on",
+            "label": "Date",
+            "width": "13ch",
+            "align": "end"
+          }
+        ],
+        "order": [
+          {
+            "field": "created_at",
+            "dir": "desc"
+          }
+        ],
+        "limit": 6,
+        "when": {
+          "metric": "rule-filed",
+          "gte": 1
+        }
+      }
+    ]
+  },
+  {
+    "page": "money-account",
+    "title": "{{name}}",
+    "for": {
+      "register": "accounts",
+      "fleeting": true
+    },
+    "icon": "landmark",
+    "requires": [
+      "register.accounts",
+      "register.transactions",
+      "register.balances",
+      "register.categories"
+    ],
+    "pack": "money-core",
+    "filters": [
+      {
+        "field": "category",
+        "control": "chips"
+      },
+      {
+        "field": "month",
+        "control": "segmented",
+        "options": [
+          {
+            "value": "this",
+            "label": "This month",
+            "where": "on at least bom"
+          },
+          {
+            "value": "last",
+            "label": "Last month",
+            "where": "on at least bom-1m, on before bom"
+          },
+          {
+            "value": "older",
+            "label": "Before that",
+            "where": "on before bom-1m"
+          }
+        ]
+      },
+      {
+        "field": "show",
+        "control": "chips",
+        "options": [
+          {
+            "value": "unfiled",
+            "label": "Not filed yet",
+            "where": "category is empty, parts is empty, transfer is false"
+          },
+          {
+            "value": "moves",
+            "label": "Between your accounts",
+            "where": "transfer is true"
+          },
+          {
+            "value": "in",
+            "label": "Money in",
+            "where": "direction is in, transfer is false"
+          },
+          {
+            "value": "out",
+            "label": "Money out",
+            "where": "direction is out, transfer is false"
+          }
+        ]
+      }
+    ],
+    "blocks": [
+      {
+        "kind": "cards",
+        "lead": true,
+        "span": 12,
+        "source": "register.accounts",
+        "where": "seq is {{seq}}",
+        "columns": [
+          {
+            "field": "name",
+            "as": "title"
+          },
+          {
+            "field": "kind",
+            "label": "Type",
+            "as": "fact"
+          },
+          {
+            "field": "last4",
+            "label": "Digits",
+            "as": "fact"
+          },
+          {
+            "field": "book",
+            "label": "Book",
+            "as": "fact"
+          },
+          {
+            "field": "as_of",
+            "label": "Last confirmed",
+            "as": "when"
+          }
+        ],
+        "stale": {
+          "field": "as_of",
+          "after": "7d",
+          "figure": "account-ages"
+        },
+        "limit": 1
+      },
+      {
+        "kind": "stat",
+        "heading": "Balance",
+        "icon": "wallet",
+        "span": 12,
+        "cells": [
+          {
+            "metric": "account-now:{{name}}",
+            "label": "The bank says",
+            "note": "Its newest balance, and every line after it"
+          },
+          {
+            "metric": "account-lines:{{name}}",
+            "label": "The lines add up to",
+            "note": "The balance typed for it, and every line since"
+          }
+        ]
+      },
+      {
+        "kind": "stat",
+        "heading": "Not in the ledger",
+        "icon": "alert",
+        "span": 12,
+        "tone": "warn",
+        "cells": [
+          {
+            "metric": "account-gap:{{name}}",
+            "label": "Counted by the bank, with no line here",
+            "note": "Lines the bank sent that never reached the Ledger. Find them below, or add them."
+          }
+        ],
+        "when": {
+          "metric": "account-gap:{{name}}",
+          "not": 0
+        }
+      },
+      {
+        "kind": "capture",
+        "heading": "What it holds today",
+        "icon": "check",
+        "span": 12,
+        "register": "balances",
+        "where": "account is {{spoken}}"
+      },
+      {
+        "kind": "series",
+        "heading": "In and out, by month",
+        "icon": "chart-column",
+        "span": 12,
+        "series": [
+          {
+            "metric": "account-in-by-month:{{spoken}}",
+            "label": "Money in"
+          },
+          {
+            "metric": "account-out-by-month:{{spoken}}",
+            "label": "Money out",
+            "dir": "out"
+          }
+        ],
+        "back": 6,
+        "net": true,
+        "when": {
+          "metric": "account-out-by-month:{{spoken}}",
+          "empty": false
+        },
+        "empty": "Nothing moved through {{name}} in these months."
+      },
+      {
+        "kind": "table",
+        "heading": "What moved",
+        "icon": "receipt",
+        "span": 12,
+        "source": "register.transactions",
+        "where": "account is {{spoken}}, state is not void",
+        "columns": [
+          {
+            "field": "on",
+            "label": "Date",
+            "width": "11ch"
+          },
+          {
+            "field": "payee",
+            "or": "what",
+            "label": "Who",
+            "width": "minmax(14ch,1fr)"
+          },
+          {
+            "field": "category",
+            "label": "For",
+            "width": "minmax(10ch,16ch)"
+          },
+          {
+            "field": "amount",
+            "sign": {
+              "field": "direction",
+              "minus": "out"
+            },
+            "label": "Amount",
+            "width": "15ch",
+            "align": "end"
+          },
+          {
+            "field": "balance_after",
+            "label": "Bank says",
+            "width": "15ch",
+            "align": "end"
+          }
+        ],
+        "order": [
+          {
+            "field": "on",
+            "dir": "desc"
+          }
+        ],
+        "limit": 50,
+        "empty": "Nothing has moved through {{name}} yet."
+      }
+    ]
+  }
+]
