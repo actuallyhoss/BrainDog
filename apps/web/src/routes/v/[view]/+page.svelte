@@ -61,6 +61,7 @@
   import { keptColumns, viewReader, type ViewReader, type Viewed } from '$lib/record/views-live.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { deadlineOf, isLate, weighed, wholeMoney } from '../../r/[register]/parts/list.ts';
+  import { amountField, signedSaid, wayField, wayOf } from '$lib/record/money-way.ts';
   import ListTable from '../../r/[register]/parts/ListTable.svelte';
   import ListSummary from '../../r/[register]/parts/ListSummary.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -206,7 +207,19 @@
   const shown = $derived(entries.slice(0, DOM_CAP));
   /* WHAT A DOT MEANS IS WHAT IT MEANS ON THE LIST THIS VIEW NARROWS (`parts/list.ts`): a finished row
      carries none, and the deadline's column carries the rest, beside the date it is about. */
-  const rows = $derived(register ? toRows(register, shown, columns, clock, names) : []);
+  /* AND AN AMOUNT SAYS WHICH WAY IT WENT, "−£9,190" and "+£4,800", as the list this view narrows says it. */
+  const amountAt = $derived.by(() => {
+    const f = wayField(decl) ? amountField(decl) : undefined;
+    return f ? columns.findIndex((c) => c.field === f.id) : -1;
+  });
+  const rows = $derived.by(() => {
+    const drawn = register ? toRows(register, shown, columns, clock, names) : [];
+    if (amountAt < 0) return drawn;
+    return drawn.map((r, n) => {
+      const way = shown[n] ? wayOf(decl, shown[n].fields) : null;
+      return way === null ? r : { ...r, cells: r.cells.map((c, i) => (i === amountAt && typeof c === 'string' ? signedSaid(c, way) : c)) };
+    });
+  });
   const dueField = $derived(deadlineOf(decl));
   /* The number's column holds the digits of the highest id in hand, as on the list this view narrows. */
   /* AND EACH COLUMN AS WIDE AS THE LIST DRAWS IT (`weighed`), the deadline's wide enough for "64 days late · 1 Jul 2026"
