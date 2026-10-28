@@ -37,7 +37,8 @@ export const TABS: readonly { id: Tab; path: string }[] = [
      whichever way it is reached, and `?tab=scripts` still opens the hub's short list for an old link. */
   { id: 'scripts', path: '/scripts' },
   { id: 'doors', path: '/automations?tab=doors' },
-  { id: 'runs', path: '/automations/runs' },
+  /* NO RUNS TAB: every run is one list on the Agents page (`panel: run-list`), and `/automations/runs` goes there, so a
+     tab here left the hub for another screen with its tabs gone. An automation's own runs are its page's Runs. */
 ];
 
 /** What `?new=` asks for: the door sheet, or the scheduled-action sheet with a preset, or nothing. */

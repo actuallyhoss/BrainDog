@@ -1,5 +1,5 @@
 <!--
-  The hub's tabs: Automations, Scheduled, Scripts, Doors and Runs, each a link.
+  The hub's tabs: Automations, Scheduled, Scripts and Inbound, each a link.
 
   A SEGMENTED CONTROL IN THE TOOLBAR, AND THE ONE PART (`lib/ui/Segmented.svelte`): the track is the part's, as a `nav`,
   so the selection slides to the tab chosen next, and it reads as every other choice of view in the product and not as
@@ -8,9 +8,9 @@
   LINKS, NOT A TABLIST. Each tab is an address a person can share, open in a new tab and go back to, so they are `<a>`
   with `aria-current`, the way the rail marks where you are, and not ARIA tabs that only swap a panel.
 
-  ON A PHONE THE CONTROL SCROLLS INSIDE ITSELF. Five words do not fit a phone's width, and wrapping them made two rows
+  ON A PHONE THE CONTROL SCROLLS INSIDE ITSELF. Four words do not always fit a phone's width, and wrapping them made two rows
   of tabs that read as two menus. The pill scrolls sideways on its own, the page never does, and the tab you are on is
-  scrolled into view when it is drawn, so a deep link to Runs does not open with its tab off the edge. The part does not
+  scrolled into view when it is drawn, so a deep link to Inbound does not open with its tab off the edge. The part does not
   hand out its element, so the bar is found by an attachment, which the part passes on to the track with the rest.
 -->
 <script lang="ts">
@@ -24,7 +24,7 @@
 
   /* Run when the track is drawn, and again whenever `here` changes, after the links have been marked. */
   /* AFTER THE TRACK HAS SETTLED, NOT AS IT IS DRAWN: the part decides whether a phone's
-     track scrolls once it has measured its words, so a scroll asked for at once found nothing to scroll and Runs stayed
+     track scrolls once it has measured its words, so a scroll asked for at once found nothing to scroll and Inbound stayed
      off the edge. Two frames, then the bar's own scroll, so the page itself never moves. */
   const inView: Attachment<HTMLElement> = (bar) => {
     void here;
