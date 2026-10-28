@@ -246,6 +246,8 @@
     {#if row && entry}
       {@const r = row}
       <Button size="sm" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="external" size="s" />{words.open}</Button>
+      <!-- SEND TO…, fetched with the first row opened, so a page that only lists its rows carries none of it. -->
+      {#await import('../send/SendButton.svelte') then { default: SendButton }}<SendButton size="sm" kind={r.register} attach={[{ ref: `${r.register}#${r.seq}`, label: titleOf(entry, shape) }]} />{/await}
       <button
         type="button"
         class="more tap"
@@ -325,6 +327,8 @@
     <!-- WHAT THE ROW HOLDS TO LOOK AT, loaded with the drawer's first row and not with the page, so a page that only lists
          its rows carries none of it. -->
     {#await import('../visual/VisualStrip.svelte') then { default: VisualStrip }}<VisualStrip on="{r.register}#{r.seq}" />{/await}
+    <!-- WHAT WAS SENT FROM THIS ROW, and what came back. -->
+    {#await import('../send/SendStrip.svelte') then { default: SendStrip }}<SendStrip ref="{r.register}#{r.seq}" kind={r.register} label={titleOf(entry, shape)} />{/await}
     <form class="p-form" novalidate onsubmit={save}>
       <!-- EVERY FIELD THE LIST DECLARES, in `RowForm`'s boxes, and all of them off for a reader who may not write. A new
            row is a new form: `values` is read once, as the form draws. -->

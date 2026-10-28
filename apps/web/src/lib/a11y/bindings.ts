@@ -46,9 +46,12 @@ export type Binding = {
 export const NEVER_BIND = [
   /* `Mod+J` IS ASK'S, the one chord taken off this list on purpose: ⌘J opens Slash as ⌘K opens the search, the pair
      every palette that answers in words has taught. Where a browser keeps Ctrl+J for its downloads, `/` and the bar's
-     field still reach Ask. `Mod+Shift+J` stays the browser's. */
+     field still reach Ask.
+     `MOD+SHIFT+J` IS SEND'S, taken off on purpose too: ⇧⌘J sends the row in hand to Slash or an agent, beside ⌘J that
+     asks Slash, so the two Slash chords are one key apart. A browser that keeps it for its downloads keeps it; the row's
+     own "Send to" button and its arrow still reach the sheet. */
   ...'TNWLDPSFGOHR'.split('').map((k) => `Mod+${k}`),
-  ...'NWBOJR'.split('').map((k) => `Mod+Shift+${k}`),
+  ...'NWBOR'.split('').map((k) => `Mod+Shift+${k}`),
   'Mod+Shift+Delete',
   ...Array.from({ length: 9 }, (_, i) => `Mod+${i + 1}`),
   'Alt+ArrowLeft',
@@ -80,6 +83,7 @@ export const BINDINGS: Binding[] = [
   { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the search', bare: false },
   { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Search from anywhere', bare: true },
   { id: 'palette-ask', scope: 'document', key: '⌘J', label: 'Ask Slash', bare: false },
+  { id: 'send', scope: 'document', key: '⇧⌘J', label: 'Send the row you are on to Slash or an agent', bare: false },
   /* `g s` IS BACK, BECAUSE SEARCH BECAME A PLACE YOU GO. This row printed it while nothing bound
      it, and the fix at the time was to delete the key: *"search is not a place you go, it is the
      thing under the launcher"* — which was true while the palette was the only search, and which

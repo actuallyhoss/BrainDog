@@ -137,6 +137,7 @@
   import { penWords } from '$lib/design/words.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { forget } from '$lib/record/boot-live.ts';
+  import { openSheet } from '$lib/send/open.ts';
 
 
   const id = $derived(page.params.register ?? '');
@@ -2384,8 +2385,30 @@
     if (cell instanceof HTMLElement) cell.focus();
   }
 
+  /**
+   * ⇧⌘J: SEND WHAT IS PICKED, ELSE THE ROW OPEN BESIDE THE LIST, ELSE THE ROW THE CURSOR IS ON (`$lib/send`). The sheet
+   * hangs from the open row's own send button, or from the row in the list.
+   */
+  function sendRows(): boolean {
+    if (!decl) return false;
+    const seqs = selected.size > 0 ? [...selected] : [host.opened ?? result.entries[focus.row]?.seq].filter((s): s is number => typeof s === 'number');
+    const rows = seqs.flatMap((seq) => result.entries.find((e) => e.seq === seq) ?? []);
+    if (rows.length === 0) return false;
+    const first = rows[0]!.seq;
+    const anchor =
+      host.opened !== null && selected.size === 0
+        ? document.querySelector('dialog.dock[open] .sb')
+        : (document.querySelector(`[data-row-seq="${first}"]`) ?? document.querySelectorAll('.rowgroup .tr')[focus.row] ?? null);
+    void openSheet({ kind: id, attach: rows.map((e) => ({ ref: `${id}#${e.seq}`, label: titleSaid(e) })), anchor });
+    return true;
+  }
+
   function onkeydown(e: KeyboardEvent) {
     if (composed) return;
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'j' && !(covered() && !(host.opened !== null && overlays.depth === 1))) {
+      if (sendRows()) e.preventDefault();
+      return;
+    }
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
        buttons left the page behind it holding its own keyboard.
@@ -3144,6 +3167,7 @@
           archiveSelected={changes ? archiveSelected : undefined}
           onclear={() => (selected = new Set())}
           picked={changes ? picked.map((e) => ({ seq: e.seq, version: e.version, fields: e.fields, name: titleSaid(e) })) : undefined}
+          send={picked.map((e) => ({ ref: `${id}#${e.seq}`, label: titleSaid(e) }))}
           onmoved={refresh}
         />
       {:else}

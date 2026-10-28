@@ -116,6 +116,8 @@
   import TaskEffects from '$lib/record/TaskEffects.svelte';
   import { timelineWords } from './timeline.ts';
   import HandSheet from '$lib/ui/HandSheet.svelte';
+  import SendButton from '$lib/send/SendButton.svelte';
+  import SendStrip from '$lib/send/SendStrip.svelte';
   import MergeSheet from '$lib/ui/MergeSheet.svelte';
   import ShareLazy from '$lib/sharing/ShareLazy.svelte';
   import { canShare } from '$lib/sharing/may-share.ts';
@@ -1064,11 +1066,20 @@
    *
    * `silenced` first: `y` is a bare letter, and `Character keys: off` silences the namespace.
    */
+  /* SEND TO… (`$lib/send`): the head's split button, which ⇧⌘J opens the sheet of. */
+  let sender = $state<ReturnType<typeof SendButton> | null>(null);
+
   function onkeydown(e: KeyboardEvent) {
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
        buttons left the page behind it holding its own keyboard. */
     if (covered()) return;
+    /* ⇧⌘J: THIS ROW, SENT. A chord, so it is read before the bare keys stand down for a modifier. */
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'j' && sender) {
+      e.preventDefault();
+      sender.openHere();
+      return;
+    }
     if (typing() || silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (!row) return;
     if (e.key === 'y' || e.key === 'Y') {
@@ -1322,6 +1333,15 @@
       {#if changes && archived}
         <Button weight="primary" disabled={saving} data-head-primary onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {/if}
+      <!-- SEND TO…: Slash or an agent, the last one in one press and the rest from its arrow (⇧⌘J). -->
+      {#if live && !archived && row.seq !== null}
+        <SendButton
+          bind:this={sender}
+          kind={id}
+          attach={[{ ref: `${id}#${row.seq}`, label: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }]}
+          project={pj ? `${id}#${row.seq}` : null}
+        />
+      {/if}
       <!-- "HAND TO": a teammate or an agent in one press, from the "…"; who holds the row now is in the sentence. -->
       {#if live && !archived}
         <HandSheet bind:open={handOpen} register={id} {row} {decl} onhanded={() => void rowMoved(id, seq)} />
@@ -1369,6 +1389,9 @@
     {#if live && row && isPrivate}
       <p class="archived-note seen-by"><Icon name="lock" size="s" /><span>{copy.rowSeenByOnlyYou}</span></p>
     {/if}
+
+    <!-- THE CONVERSATION: what was sent from this row and what came back, under its head, once something was. -->
+    {#if live && row.seq !== null}<SendStrip ref="{id}#{row.seq}" kind={id} label={String(row.fields[decl.title] ?? '')} />{/if}
 
     <div class="board">
       <div class="main">
