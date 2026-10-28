@@ -189,3 +189,28 @@ export function holdQuiet(): () => void {
 export function quiet(): boolean {
   return q.out === 0 && q.held === 0;
 }
+
+/** How long the screen must stay drawn and quiet before a read that can wait goes (`rested`), and the most it waits. */
+export const REST_MS = 300;
+export const REST_CAP_MS = 5_000;
+
+/**
+ * WHEN THE SCREEN IS DRAWN AND AT REST, for a read that can wait for the screen's own: the sidebar's figures. The record
+ * answers one call at a time, so a read the screen does not draw from, sent first, is a read every one of the screen's
+ * waits behind. Drawn and quiet for `REST_MS` together, or `REST_CAP_MS` at most, so a screen that never rests still
+ * gets it.
+ */
+export function rested(): Promise<void> {
+  return new Promise((done) => {
+    const start = Date.now();
+    let since = 0;
+    const look = (): void => {
+      const now = Date.now();
+      const still = settled() !== undefined && quiet();
+      since = still ? since || now : 0;
+      if ((since !== 0 && now - since >= REST_MS) || now - start >= REST_CAP_MS) return done();
+      setTimeout(look, 100);
+    };
+    look();
+  });
+}

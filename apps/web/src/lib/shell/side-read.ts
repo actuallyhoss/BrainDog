@@ -13,7 +13,7 @@ import { drawnRead, hueOf, projectsOf, type CardDecl, type CardRow } from '../ho
 import { REGISTERS } from '../record/held.ts';
 import { learn } from '../record/remote.ts';
 import { rowHref } from '../record/row-href.ts';
-import { figureReader } from '../../routes/r/[register]/[seq]/figures.ts';
+import { MONEY_IN, monthsOf, type MoneyIn } from '../../routes/r/[register]/[seq]/figures.ts';
 import { lanesOf, type Lanes, type ListFacts, type SideProject } from './side.ts';
 import { keepSide, keptSide, type SideCopy } from './side-copy.ts';
 
@@ -127,6 +127,42 @@ async function readSideOnce(base: string, lists: readonly { id: string }[]): Pro
   return sideOf(copy);
 }
 
+/**
+ * HOW LONG THE PROJECTS' MONEY IN IS HELD, whatever the version says, as a kept read is (`TODAY_HELD_MS`): a figure a
+ * project, and the record moves every few minutes on a day its agents work, so the sidebar asked them all again each
+ * time, a turn of the record's thread a move, to say whether money came in this month.
+ */
+export const MONEY_HELD_MS = 300_000;
+
+type MoneyIns = (MoneyIn | null)[];
+let moneyHeld: { key: string; at: number; ins: Promise<MoneyIns> } | null = null;
+
+/** Each project's money in, month by month, held for `MONEY_HELD_MS` for the same record and the same projects. */
+function moneyOf(base: string, play: readonly SideRow[], now: number): Promise<MoneyIns> {
+  const key = JSON.stringify([base, play.map((p) => p.name)]);
+  if (moneyHeld !== null && moneyHeld.key === key && now >= moneyHeld.at && now - moneyHeld.at < MONEY_HELD_MS) return moneyHeld.ins;
+  const client = createClient({ base });
+  let reached = play.length === 0;
+  const ins = Promise.all(
+    play.map((p) =>
+      client.metric(`${MONEY_IN}:${p.name}`).then(
+        (out) => {
+          if (out.ok || !('refusal' in out) || !AGAIN.has(out.refusal.code)) reached = true;
+          return out.ok ? monthsOf(out.value) : null;
+        },
+        () => null,
+      ),
+    ),
+  );
+  const held = { key, at: now, ins };
+  moneyHeld = held;
+  /* A READ THE RECORD DID NOT ANSWER IS NOT HELD, so the next move asks again. */
+  void ins.then(() => {
+    if (!reached && moneyHeld === held) moneyHeld = null;
+  });
+  return ins;
+}
+
 /** How each in-play project's week went: its late work and whether money came in this month, by key. */
 export type Week = ReadonlyMap<string, { late: number; moved: boolean }>;
 
@@ -134,12 +170,8 @@ export type Week = ReadonlyMap<string, { late: number; moved: boolean }>;
  * THE WEEK, ONE READ A PROJECT: late work as its card and its page count it (`latesOf`), and money in as its page's
  * Money tile reads it, this month's bucket. A read that fails says nothing.
  */
-export async function readWeek(base: string, list: string, play: readonly SideRow[]): Promise<Week> {
-  const f = figureReader(base);
-  const [lates, ins] = await Promise.all([
-    latesOf(base, list, play.map((p) => p.seq)).catch(() => new Map<number, number>()),
-    Promise.all(play.map((p) => f.moneyIn(p.name).catch(() => null))),
-  ]);
+export async function readWeek(base: string, list: string, play: readonly SideRow[], now = Date.now()): Promise<Week> {
+  const [lates, ins] = await Promise.all([latesOf(base, list, play.map((p) => p.seq)).catch(() => new Map<number, number>()), moneyOf(base, play, now)]);
   return new Map(
     play.map((p, i) => {
       const now = ins[i]?.months.find((m) => m.partial);

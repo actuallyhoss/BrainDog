@@ -28,7 +28,7 @@
   import Icon from '../ui/Icon.svelte';
   import { isGlyph, type IconName } from '../ui/icons.ts';
   import PageHead from '../ui/PageHead.svelte';
-  import { drew } from '../ui/screen.svelte.ts';
+  import { drew, rested } from '../ui/screen.svelte.ts';
   import { knowProjects } from '../page/known-project.ts';
   import { keepOrder } from './project-order.ts';
   import { frame } from './frame.svelte.ts';
@@ -203,6 +203,10 @@
           /* EACH PROJECT'S PAGE CAN NOW OPEN IN ITS OWN SHAPE (`known-project.ts`), its way back the Projects place. */
           knowProjects(b, got.rows, model.projects?.href ?? null);
           const play = splitOf(got.rows, got.lanes).play;
+          /* THE WEEK WAITS FOR THE SCREEN'S OWN READS (`rested`): a money figure a project, asked first, held every one
+             of them up behind it in the record's one thread. */
+          await rested();
+          if (n !== asked) return;
           const w = await readWeek(b, got.list, play);
           if (n !== asked) return;
           week = w;
