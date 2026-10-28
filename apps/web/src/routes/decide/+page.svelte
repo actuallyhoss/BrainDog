@@ -127,6 +127,17 @@
   });
   const offlineNow = () => shell.offline === true || poll.state === 'offline';
 
+  /**
+   * THE QUEUE INTO THE LOCAL COPY, patched as the log moves. ONE READ WHILE THE COPY CAUGHT UP (its first claim, an agent's
+   * write) is kept too, marked never current, so the next open draws it and asks again rather than drawing nothing: on a
+   * record its agents write to all day, a first open's queue was never kept.
+   */
+  async function keepQueue(out: Extract<Opened, { from: 'live' }>, kept: KeptDecide, mark: number): Promise<void> {
+    if (localTicket() === mark) return keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS, EVERY], kept, mark, {}, { spots: decideSpots(out) });
+    await settledLocal();
+    keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS, EVERY], kept, localTicket(), {}, { always: true });
+  }
+
   async function read(drawnKept?: () => void): Promise<boolean> {
     reading = true;
     client ??= createClient({ base: apiBase() });
@@ -171,7 +182,7 @@
         if (out.from === 'live') painted('decide', 'network');
       }
       if (out?.from === 'live') keepDecide(apiBase(), { got: out, calls: called.from === 'live' ? called.value : calls });
-      if (out?.from === 'live') keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS, EVERY], { got: out, calls: called.from === 'live' ? called.value : calls }, mark, {}, { spots: decideSpots(out) });
+      if (out?.from === 'live') void keepQueue(out, { got: out, calls: called.from === 'live' ? called.value : calls }, mark);
       return out?.from === 'live' || (fromCopy && offlineNow());
     } finally {
       reading = false;
