@@ -192,7 +192,7 @@ const grouping = (digits: string): string => digits.replace(/\B(?=(\d{3})+(?!\d)
 /**
  * EACH DAY'S NET, OVER THE ROWS UNDER ITS HEADING: the amounts as they are drawn (`timelineDetails`), added where every
  * one is written in the same currency, and signed, `+£4,798.50` or `−£1,200.00`. Null for a row that heads no day, a
- * day of one line (its net is the line beside it), and a day whose amounts are in two currencies or are not figures:
+ * day of one line (its net is the line beside it), a day that nets to nought, and a day whose amounts are in two currencies or are not figures:
  * two currencies are never one sum.
  */
 export function timelineNets(days: readonly (string | null)[], details: readonly string[]): (string | null)[] {
@@ -201,7 +201,9 @@ export function timelineNets(days: readonly (string | null)[], details: readonly
     let end = i + 1;
     while (end < days.length && days[end] === null) end++;
     const said = details.slice(i, end).filter((d) => d.trim() !== '');
-    return said.length < 2 ? null : figureSum(said, true);
+    /* A DAY THAT NETS TO NOUGHT SAYS NOTHING: money moved between your own accounts read "£0.00" over its two lines. */
+    const net = said.length < 2 ? null : figureSum(said, true);
+    return net !== null && /[1-9]/u.test(net) ? net : null;
   });
 }
 
