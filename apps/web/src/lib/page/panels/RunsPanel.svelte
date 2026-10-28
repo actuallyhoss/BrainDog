@@ -34,7 +34,9 @@
 
   const words = {
     more: (n: number) => `Show ${n.toLocaleString('en')} more`,
-    all: (n: number | null) => (n === null ? 'All runs' : `All ${n.toLocaleString('en')} runs`),
+    /* THE DOOR OPENS THE AGENT RUNS ONLY, so its count says so: the list above also holds rules and scripts. */
+    all: (n: number | null) => (n === null ? 'All agent runs' : `All ${n.toLocaleString('en')} agent runs`),
+    times: (n: number) => `${n.toLocaleString('en')}×`,
   } as const;
 
   let lines = $state.raw<RunLine[]>([]);
@@ -92,10 +94,10 @@
           <span class="runs-mark">{#if line.agent}<AgentMark kind={agentKindOf(line.agent)} size="s" />{:else}<Icon name={kindIcon(line.kind)} size="s" />{/if}</span>
           {#if line.path}<a class="runs-name" href={at(line.path)} title={line.name}>{line.name}</a>{:else}<span class="runs-name" title={line.name}>{line.name}</span>{/if}
           <span class="runs-end">
-            <!-- ONE FORMAT FOR EVERY ROW: how many times as a chip where it ran more
-                 than once, its project as a chip, then how it ended and when, in two words. -->
-            {#if (line.times ?? 1) + n - 1 > 1}<span class="runs-proj num">{((line.times ?? 1) + n - 1).toLocaleString('en')} times</span>{/if}
+            <!-- ONE FORMAT FOR EVERY ROW, plain text and no chips: its project, how many times where it ran more
+                 than once, then how it ended and when. -->
             {#if project}<span class="runs-proj">{project}</span>{/if}
+            {#if (line.times ?? 1) + n - 1 > 1}<span class="runs-times num">{words.times((line.times ?? 1) + n - 1)}</span>{/if}
             <span class="runs-said" title={line.said}>{line.outcome ?? firstWord(line.said)}</span>
             <span class="runs-when num">{since(line.at, recordNow())}</span>
           </span>
@@ -192,15 +194,16 @@
     white-space: nowrap;
   }
 
-  /* THE PROJECT AS A QUIET CHIP, as At work and Up next say one. */
+  /* THE PROJECT AS QUIET TEXT, no chip. */
   .runs-proj {
     max-inline-size: 14em;
     overflow: hidden;
-    padding: 1px var(--sp-2);
-    border-radius: var(--r-round);
-    background: var(--tile-2);
-    color: var(--ink-2);
+    color: var(--ink-3);
     text-overflow: ellipsis;
+  }
+
+  .runs-times {
+    color: var(--ink-3);
   }
 
   .runs-said {

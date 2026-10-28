@@ -145,7 +145,7 @@
     const drawnRuns = [...open.shown, ...open.idle];
     const m = machinesOf(drawnRuns.filter(isAtWork), drawnRuns.filter((r) => !isAtWork(r)), NO_PLACES);
     const on = m.lines.map((l) => `${l.name}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
-    return on.length === 0 ? null : `${words.on(on.join(' and '))}.`;
+    return on.length === 0 ? null : words.on(on.join(' and '));
   });
   const quietRows = $derived(
     open.quiet.map((q) => {
