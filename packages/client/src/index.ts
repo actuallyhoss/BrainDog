@@ -1175,6 +1175,11 @@ export type SlashStatus = {
    * `60` the web used to carry as its own copy of `BACKGROUND_JOBS_MONTH`. Absent on a host built before this field.
    */
   background?: { used: number; cap: number };
+  /**
+   * Deep, on the owner's own Anthropic key: whether a key is set for it, its model and the one "Think harder" asks, and
+   * this month's spend against its cap in cents. Absent on a host built before Deep.
+   */
+  deep?: { key: boolean; model: string; harder: string; cap_cents: number; spent_cents: number };
 };
 
 /**
@@ -1191,6 +1196,8 @@ export type SlashSettings = {
   grant_id: string | null;
   ask_cap: number;
   updated_at: string;
+  /** Deep's key, picked from the keychain by its grant (`null`: his own key for Slash, where that is Anthropic's), and its monthly cap in cents. */
+  deep?: { grant_id: string | null; cap_cents: number };
 };
 
 /**
@@ -1206,6 +1213,8 @@ export type SlashSettingsPatch = Partial<{
   grant_id: string | null;
   ask_cap: number;
   tier: SlashTier;
+  deep_grant_id: string | null;
+  deep_cap_cents: number;
 }>;
 
 /**
@@ -1249,10 +1258,26 @@ export type SlashChatEvent =
   | ({ type: 'action' } & Omit<SlashChatAction, 'state'>)
   | { type: 'navigate'; href: string; label: string }
   | { type: 'error'; text: string }
+  /* Which brain answers: `quick` the included model, `deep` the owner's Anthropic key, with the model it asks. */
+  | { type: 'brain'; depth: 'quick' | 'deep'; model?: string }
+  /* Deep was wanted and cannot answer here: offer the turn to Claude on the person's Mac. */
+  | { type: 'route'; to: 'mac' }
   | { type: 'done'; spent: { asks: number; left: number | null }; figures?: { ref: string; label: string }[] };
 
-/** What a person sends: the words, the conversation they continue, and where they are. */
-export type SlashChatInput = { thread?: string; message: string; page?: { path: string; title?: string; row?: string } };
+/**
+ * What a person sends: the words, the conversation they continue, and where they are. `mode` is how deep (absent is
+ * `quick`); `attach` names rows sent with the words, up to eight (`tasks#12`); `rethink` with `thread` asks that
+ * conversation's last question again on the model that thinks harder, and `message` may then be empty.
+ */
+export type SlashChatMode = 'quick' | 'deep' | 'auto';
+export type SlashChatInput = {
+  thread?: string;
+  message: string;
+  page?: { path: string; title?: string; row?: string };
+  mode?: SlashChatMode;
+  attach?: string[];
+  rethink?: boolean;
+};
 
 /** A held action answered (`POST /api/slash/act`). */
 export type SlashActed = { ok: true; receipt?: string; undo?: { batch: string } };
