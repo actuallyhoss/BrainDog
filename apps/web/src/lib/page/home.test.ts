@@ -373,7 +373,8 @@ test('"N MORE" HANDS THE FOCUS TO THE FIRST ROW THAT OPENED, so a keyboard is no
 });
 
 test('THE HEADLINE LINE DROPS A WHOLE AMOUNT’S .00', () => {
-  assert.match(SLOT, /symbolText\(text, homeCurrency\(\), block\.kind === 'note' && block\.lead === true\)/);
+  /* AND EVERY SENTENCE DOES, the headline among them: a sentence is a display figure, as the tile beside it is. */
+  assert.match(SLOT, /symbolText\(text, homeCurrency\(\), block\.kind === 'note'\)/);
 });
 
 /* ── the kernel's cases, through this file ─────────────────────────────────── */
