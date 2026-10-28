@@ -155,7 +155,7 @@ export const firstRun = {
    * SIGNED IN AND ON NO RECORD: the way in is to say who you are on `/signup`, and a paid name is the quieter way
    * beside it, never the lead ("Free leads").
    */
-  noRecordWhy: 'You are signed in and have no BrainDog yet. Say who you are and it builds one for you, free.',
+  noRecordWhy: 'Say who you are and it builds one, free.',
   noRecordDescribe: 'Tell it who you are',
   noRecordPaid: 'Or name one on a paid plan',
 

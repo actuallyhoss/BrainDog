@@ -15,7 +15,7 @@ export const words = {
   /** The tab's title. */
   title: 'Start your BrainDog',
   /** Under "Who are you?": what to say. That nothing is kept yet is the second promise. */
-  lede: 'Say who you are and what you want to keep track of. Your BrainDog builds as you type.',
+  lede: 'Say who you are and what you keep track of.',
   /**
    * THREE PROMISES UNDER THE FIELD (use case 6, step 1), each one the product keeps: a free record takes no card;
    * nothing typed leaves this device until the email is sent; and Settings, Export hands every record
@@ -35,7 +35,7 @@ export const words = {
   next: "That's me",
   /** When nothing in the sentence could be placed: the use cases to choose from, as /start offers them. */
   closest: 'What is it closest to?',
-  closestWhy: 'I could not place what you said yet. Pick the closest, or say a little more.',
+  closestWhy: 'Pick the closest, or say a little more.',
 
   /** The one question (`lib/start/question.ts`), on its own step, with the way back to the words. */
   questionTitle: 'One thing I could not guess',
@@ -62,8 +62,8 @@ export const words = {
   makeNow: 'Make my BrainDog',
   edit: firstRun.whoEdit,
   /** Under "Email me a link": where to open it, and the lock that signs her in after (use case 6, step 4). */
-  openHere: 'Open it on this phone. After that, this phone signs you in with its own lock, with no password to remember.',
-  openHereWide: 'Open it on this device. After that, this device signs you in with its own lock, with no password to remember.',
+  openHere: 'Open it on this phone. From then on its lock signs you in.',
+  openHereWide: 'Open it on this device. From then on its lock signs you in.',
   /** While the mail travels, beside the build that waits for it. What was said rides in the link. */
   sentWhy: 'The link builds what you see here, on this device or another.',
   /** And when what was said was too long for a link to carry whole: said on the device that sent it. */
@@ -84,7 +84,7 @@ export const words = {
    * again with only what is missing. Opening it as it is forgets what you said here.
    */
   madeTitle: 'Your BrainDog is made',
-  madePartly: 'Some of what you said could not be added yet. Try again, or open it and add the rest from inside.',
+  madePartly: 'Some of it could not be added. Try again, or add it from inside.',
   madeUnreached: 'What you said did not reach it yet. Try again, or open it and say it there.',
   tryAgain: 'Try again',
   makingAgain: 'Adding what is missing',
@@ -109,7 +109,7 @@ export const words = {
    * page. The site says nothing about invites; only this page does, and it offers a way in: apply, and be emailed.
    */
   inviteTitle: 'Early access, invite only',
-  inviteWhy: "BrainDog is free while in early access. Ask for an invite and we'll email you when there's room. Already invited? Open the link in your email.",
+  inviteWhy: "Free in early access. Ask, and we'll email you when there's room.",
   applyName: 'Your name',
   applyEmail: 'Your email',
   applyUse: 'What would you use it for?',
@@ -129,8 +129,8 @@ export const words = {
   agreeAnd: 'and',
   privacy: 'Privacy policy',
   /** Under a field left empty when the button was pressed: why it is needed, and nothing more (first F16). */
-  applyNeedsName: 'Add your name so we know who is asking.',
-  applyNeedsEmail: 'Add your email so we can send the invite.',
+  applyNeedsName: 'Add your name.',
+  applyNeedsEmail: 'Add your email.',
   applySending: 'Sending',
   /** In place of the form once the host has it. */
   applied: 'Thanks. Your invite will come to this address.',
@@ -140,7 +140,7 @@ export const words = {
   nextLines: ['We email your invite.', 'Open it and say who you are.', 'Your BrainDog is made as you type.'],
   /** Refused, in this screen's words: too many tries says when to come back, a failed check says to do it again. */
   applyLimit: (seconds: number) => `Too many tries from here. Try again in ${waitOf(seconds)}.`,
-  applyCheck: 'The check that you are a person did not pass. Try the check again, then send it.',
+  applyCheck: 'The person check did not pass. Try the check again.',
   applyFailed: 'That did not go through. Try again in a minute.',
 } as const;
 

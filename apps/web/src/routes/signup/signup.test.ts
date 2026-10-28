@@ -308,7 +308,7 @@ test('STEP 4: WHAT WAS SAID IS SENT WITH THE START, so the link carries it to an
   assert.equal(typeof sent, 'string', 'no said in the start');
   assert.equal(saidFromLink(sent as string)?.said, MARIAM);
   assert.equal(words.send, 'Email me a link');
-  assert.equal(words.openHere, 'Open it on this phone. After that, this phone signs you in with its own lock, with no password to remember.');
+  assert.equal(words.openHere, 'Open it on this phone. From then on its lock signs you in.');
   for (const line of [words.openHere, words.openHereWide, words.lockTitle]) plain(line);
 });
 

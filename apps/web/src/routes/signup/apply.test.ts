@@ -90,7 +90,7 @@ test('THE INVITE-ONLY WORDS: no dash, titles and buttons with no full stop, butt
   }
   /* INVITE ONLY, SAID PLAINLY (first F4): the title says it, and the line under it says what is free and how to get in. */
   assert.equal(words.inviteTitle, 'Early access, invite only');
-  assert.equal(words.inviteWhy, "BrainDog is free while in early access. Ask for an invite and we'll email you when there's room. Already invited? Open the link in your email.");
+  assert.equal(words.inviteWhy, "Free in early access. Ask, and we'll email you when there's room.");
   assert.equal(words.applied, 'Thanks. Your invite will come to this address.');
   for (const title of [words.inviteTitle, words.applySend, words.haveOne]) assert.doesNotMatch(title, /\.$/, `${title} ends with a full stop`);
   /* A VERB, THEN WHAT IT ACTS ON. */

@@ -755,7 +755,7 @@ export const account = {
 
   /* Sign-up for a stranger, a record of your own for somebody signed in with none, and the passkey the first run ends on */
   signupClosedTitle: 'Sign-up is not open yet',
-  signupClosedWhy: 'BrainDog is not taking new sign-ups yet. If you already have one, sign in.',
+  signupClosedWhy: 'Already have a BrainDog? Sign in.',
   signupNameLabel: 'A name for your BrainDog',
   signupNameHint: 'Lower-case letters, digits and hyphens. It is part of your BrainDog\'s address.',
   signupNameChecking: 'Checking the name',
