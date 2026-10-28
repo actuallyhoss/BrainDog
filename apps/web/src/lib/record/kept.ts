@@ -9,7 +9,7 @@
 
 import type { TrustStanding } from '@braindog/client';
 
-type Agent = TrustStanding['agents'][number];
+type Agent = TrustStanding extends { agents: readonly (infer A)[] } ? A : never;
 
 /** Under this many answers a share is said as its counts, not as a percentage. */
 export const FEW = 5;

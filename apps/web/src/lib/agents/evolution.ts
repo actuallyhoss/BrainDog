@@ -40,6 +40,29 @@ export const evolutionWords = {
   week: (start: string) => `Week of ${start}`,
 } as const;
 
+/**
+ * THE TWO LISTS THE TIMELINE READS, BY WHAT EACH DECLARES AND NEVER BY ITS ID, out of `schemas`' answer (`lists`, every
+ * list the reader may read): the learnings are the list whose rows fade (`fade: { field, after }`), and the skills the
+ * list whose rows name the learnings behind them, a field that is a list of links to that list. A record that keeps no
+ * list that fades has no timeline (`null`); one with learnings and no skills draws the learnings alone.
+ */
+export type EvolutionLists = { learnings: string; skills: string | null; fade: { field: string; after: string } };
+
+export function evolutionLists(lists: unknown): EvolutionLists | null {
+  if (typeof lists !== 'object' || lists === null) return null;
+  type Field = { type?: unknown; of?: unknown; to?: unknown; retired?: unknown };
+  type Decl = { fade?: { field?: unknown; after?: unknown }; fields?: unknown };
+  const all = Object.entries(lists as Record<string, Decl>).filter(([, d]) => typeof d === 'object' && d !== null);
+  const fadeOf = (d: Decl): { field: string; after: string } | null =>
+    typeof d.fade?.field === 'string' && typeof d.fade.after === 'string' && /^[1-9][0-9]*d$/u.test(d.fade.after) ? { field: d.fade.field, after: d.fade.after } : null;
+  const fading = all.find(([, d]) => fadeOf(d) !== null);
+  if (fading === undefined) return null;
+  const learnings = fading[0];
+  const fieldsOf = (d: Decl): Field[] => (Array.isArray(d.fields) ? (d.fields as Field[]) : []);
+  const skills = all.find(([id, d]) => id !== learnings && fieldsOf(d).some((f) => f.type === 'list' && f.of === 'ref' && f.to === learnings && f.retired !== true));
+  return { learnings, skills: skills?.[0] ?? null, fade: fadeOf(fading[1])! };
+}
+
 /** One learning as the list answers it, the fields the timeline reads. */
 export type LearningRow = {
   seq: number | null;

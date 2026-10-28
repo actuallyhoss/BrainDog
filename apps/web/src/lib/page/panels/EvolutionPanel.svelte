@@ -17,6 +17,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import {
     evolution,
+    evolutionLists,
     evolutionWords as words,
     skillsToRead,
     versionsOf,
@@ -34,14 +35,18 @@
   let read = $state(false);
   let refused = $state(false);
 
-  /* THE FADED ONES BY THE RECORD'S OWN RULE (`FADED` in the agents add-on), read apart from the newest, since a learning
-     written a year ago may have faded last week. */
-  const FADED = {
+  /* THE FADED ONES BY THE LIST'S OWN RULE (`fade:` on its declaration, `FADED` in the agents add-on), read apart from
+     the newest, since a learning written a year ago may have faded last week. */
+  const fadedBy = (fade: { field: string; after: string }) => ({
     all: [
       { field: 'state', is: 'active' },
-      { any: [{ field: 'confirmed_on', before: '-90d' }, { all: [{ field: 'confirmed_on', empty: true }, { field: 'created_at', before: '-90d' }] }] },
+      { any: [{ field: fade.field, before: `-${fade.after}` }, { all: [{ field: fade.field, empty: true }, { field: 'created_at', before: `-${fade.after}` }] }] },
     ],
-  };
+  });
+
+  /* THE LISTS, READ OFF THE RECORD'S DECLARATIONS (`evolutionLists`), so a record whose learnings go by another id
+     still has its timeline. */
+  let lists = $state.raw<{ learnings: string; skills: string | null } | null>(null);
 
   const rowsOf = (out: unknown): unknown[] => {
     const a = out as { ok?: unknown; value?: { rows?: unknown } } | null;
@@ -50,10 +55,18 @@
 
   async function load(): Promise<void> {
     const client = createClient({ base: apiBase() });
+    const said = (await client.call<{ lists?: unknown }>('schemas', { every: true }).catch(() => null)) as { ok?: unknown; value?: { lists?: unknown } } | null;
+    const found = said?.ok === true ? evolutionLists(said.value?.lists) : null;
+    if (found === null) {
+      refused = true;
+      read = true;
+      return;
+    }
+    lists = found;
     const [recent, faded, skills] = await Promise.all([
-      client.list({ register: 'learnings', where: `created_at after -${WINDOW_DAYS}d`, order: [{ field: 'created_at', dir: 'desc' }], limit: 200 }).catch(() => null),
-      client.list({ register: 'learnings', where: FADED, order: [{ field: 'created_at', dir: 'desc' }], limit: 200 }).catch(() => null),
-      client.list({ register: 'skills', limit: 200 }).catch(() => null),
+      client.list({ register: found.learnings, where: `created_at after -${WINDOW_DAYS}d`, order: [{ field: 'created_at', dir: 'desc' }], limit: 200 }).catch(() => null),
+      client.list({ register: found.learnings, where: fadedBy(found.fade), order: [{ field: 'created_at', dir: 'desc' }], limit: 200 }).catch(() => null),
+      found.skills === null ? Promise.resolve(null) : client.list({ register: found.skills, limit: 200 }).catch(() => null),
     ]);
     if ((recent as { ok?: unknown } | null)?.ok !== true) {
       refused = true;
@@ -66,7 +79,7 @@
     const versions = new Map<number, readonly Version[]>();
     await Promise.all(
       skillsToRead(skillRows).map(async (s) => {
-        const out = (await client.history('skills', s.seq!).catch(() => null)) as { ok?: unknown; value?: unknown } | null;
+        const out = (found.skills === null ? null : await client.history(found.skills, s.seq!).catch(() => null)) as { ok?: unknown; value?: unknown } | null;
         if (out?.ok === true && Array.isArray(out.value)) versions.set(s.seq!, versionsOf(out.value as HistoryLine[], 'body'));
       }),
     );
@@ -85,8 +98,8 @@
     end: 0,
   });
 
-  const learningHref = (seq: number | null): string | null => (seq === null ? null : at(`/r/learnings/${seq}`));
-  const skillHref = (seq: number | null): string | null => (seq === null ? null : at(`/r/skills/${seq}`));
+  const learningHref = (seq: number | null): string | null => (seq === null || lists === null ? null : at(`/r/${lists.learnings}/${seq}`));
+  const skillHref = (seq: number | null): string | null => (seq === null || !lists?.skills ? null : at(`/r/${lists.skills}/${seq}`));
 </script>
 
 {#if !read || refused}
