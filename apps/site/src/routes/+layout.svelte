@@ -26,10 +26,10 @@
   import '@braindog/skin/look-b.css';
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';
-  /* The product's blocks, which the security page, the docs and the pages for one kind of person still draw. */
+  /* The product's blocks, whose rows, icon wells and section heads every page draws with. Their kinds and charts are
+     100 KB more that only a page drawing blocks waits on, so `lib/app/Page.svelte` and `lib/docs/Body.svelte` bring
+     those. */
   import '@braindog/skin/blocks.css';
-  import '@braindog/skin/blocks-kinds.css';
-  import '@braindog/skin/blocks-charts.css';
   import '../app.css';
 
   import { afterNavigate } from '$app/navigation';
@@ -69,15 +69,6 @@
 </script>
 
 <svelte:window onclick={outside} onkeydown={escape} />
-
-<!-- THE TWO FACES EVERY PAGE OPENS IN, asked for beside the stylesheets rather than after them, so the text is drawn in
-     them the first time and nothing moves when they land (the founders' page shifted 0.06 on a phone). The same
-     addresses as `tokens.css`, version and all, or the browser fetches each twice; `crossorigin` because fonts are
-     always fetched that way. Geist Mono and Plex are left to load when a page uses them. -->
-<svelte:head>
-  <link rel="preload" href="/fonts/geist.woff2?v=494f" as="font" type="font/woff2" crossorigin="anonymous" />
-  <link rel="preload" href="/fonts/lexend-600.woff2?v=7865" as="font" type="font/woff2" crossorigin="anonymous" />
-</svelte:head>
 
 <a class="skip" href="#main">Skip to content</a>
 

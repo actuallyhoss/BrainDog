@@ -136,8 +136,13 @@
   }
 
   /* A CARD: flat --paper, radius 24, no edge and no shadow, as the design's plans are. */
+  /* The product's section kind (`kinds/section.css`) used to reach these cards by their class names on every page, and
+     this page drew with what it set: the centring, the UI face on the title and the count's weight. The kind's sheet
+     now loads only where blocks are drawn, so the card says them itself. */
   .sec {
     display: grid;
+    flex-wrap: wrap;
+    align-items: center;
     align-content: start;
     gap: var(--sp-3);
     min-inline-size: 0;
@@ -171,9 +176,13 @@
   }
 
   .sec-title {
+    display: flex;
     flex: 1;
+    align-items: center;
+    gap: var(--sp-3);
     min-inline-size: 0;
     margin: 0;
+    font-family: var(--font-ui);
     color: var(--ink);
     font-size: var(--t-site-21);
     font-weight: 600;
@@ -204,11 +213,13 @@
 
   /* HOW MANY PAGES: the one pill on the card, because it is a count. */
   .sec-count {
+    margin-inline-start: calc(var(--sp-2) - var(--sp-3));
     padding: 2px 10px;
     background: var(--tile);
     border-radius: 999px;
     color: var(--ink2);
     font-size: var(--t-site-15);
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 
