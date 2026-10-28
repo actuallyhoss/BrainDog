@@ -463,6 +463,12 @@ const NO_WORDS = 'A question with no words.';
 /* A sentence joined after a colon starts lower-case, but only a common opening word: a name or a month keeps its capital. */
 const joined = (said: string): string => (/^(The|A|An|This|That|These|Those|There|It|Its|Your|Our|No|Some|One|Nothing|Every|Each|Something|Someone|Many|Few|All|Both|Several) /u.test(said) ? said.charAt(0).toLowerCase() + said.slice(1) : said);
 
+/** A question's words as a sentence of their own: a capital first and a full stop last. */
+const sentence = (said: string): string => {
+  const out = said.charAt(0).toUpperCase() + said.slice(1);
+  return /[.!?]$/u.test(out) ? out : `${out}.`;
+};
+
 /** Whether this record has ever been asked anything: with nothing ever asked, the two question signs have nothing to judge by. */
 const everAsked = (sql: Sql): boolean => sql.one('SELECT 1 AS x FROM suggestion LIMIT 1') !== undefined;
 
@@ -514,10 +520,11 @@ function readCauses(sql: Sql, nowMs: number): SignReading {
   const said = biggest
     ? `${biggest.length} open questions share one cause: ${askedIn(sql, biggest[0]!)} One answer closes them.`
     : faults.length > 0
-      ? /* THE FAULT'S OWN WORDS (P36), not "a fault of the record". */
+      ? /* THE FAULT'S OWN WORDS (P36), not "a fault of the record", and nothing in front of them: the sign's name already
+           says these are problems, so a lead-in of eleven words before the news only pushed it off a phone's line. */
         faults.length === 1
-        ? `Something went wrong, not a choice for you: ${joined(askedIn(sql, faults[0]!.id))}`
-        : `${faults.length} open questions are things that went wrong, not choices for you. The first: ${askedIn(sql, faults[0]!.id)}`
+        ? sentence(askedIn(sql, faults[0]!.id))
+        : `${faults.length} things went wrong. The first: ${joined(askedIn(sql, faults[0]!.id))}`
       : `${uncaused.length} open questions carry no cause.`;
   return reading('red', biggest?.length ?? (faults.length || uncaused.length), said, facts);
 }
