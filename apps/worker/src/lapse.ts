@@ -107,7 +107,10 @@ export function lapseDrops(job: Pick<OutboxRow, 'kind' | 'payload'>): boolean {
   const said = parsed(job.payload);
   if (said === null) return false;
   if (typeof said.because === 'string' && said.because.startsWith('digest.')) return true;
-  if (job.kind === 'notify.push') return typeof said.url === 'string' && said.url.startsWith('/digest/');
+  /* A DIGEST'S PUSH IS KNOWN BY WHERE IT OPENS, its summary's screen, which is what the kernel keeps of it (`open`); an
+     older row kept its `url`, the `/digest/` page of before. */
+  if (job.kind === 'notify.push')
+    return [said.url, said.open].some((u) => typeof u === 'string' && (u.startsWith('/digest/') || u.startsWith('/agents/summary/')));
   if (job.kind === 'notify.webhook' && typeof said.body === 'string') {
     const body = parsed(said.body);
     return body !== null && typeof body.digest === 'string';

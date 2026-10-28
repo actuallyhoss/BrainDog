@@ -87,7 +87,11 @@ sw.addEventListener('push', (e) => {
   } catch {
     open = null;
   }
-  e.waitUntil(sw.registration.showNotification('Something in your BrainDog needs you', { tag: 'braindog', ...(open ? { data: { open } } : {}) }));
+  /* A SUMMARY SAYS IT IS ONE: the 08:00 and 17:00 notes open their own screen, and are not something that needs him. */
+  const summary = open !== null && new URL(open).pathname.includes('/agents/summary/');
+  e.waitUntil(
+    sw.registration.showNotification(summary ? 'Your BrainDog summary is ready' : 'Something in your BrainDog needs you', { tag: 'braindog', ...(open ? { data: { open } } : {}) }),
+  );
 });
 
 /* A TAP OPENS WHAT THE PUSH NAMED, the question in Decide on the record it is about, or else THE RECORD'S HOME,

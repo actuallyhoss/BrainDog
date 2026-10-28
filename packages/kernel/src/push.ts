@@ -29,7 +29,7 @@ export type PushTarget = { id: string; endpoint: string; open?: string; keys?: {
 /**
  * A path a push may open: one of the app's own screens in this record (Decide, Agents, Inbox, a list), made of handle
  * characters, and short. Anything else is no path, so a push that names one opens the record's home, as every push did
- * before: a digest's `/digest/<id>` is no screen of the app. `/decide/sg_01J...`, `/agents`, `/r/tasks/e_9`.
+ * before. A digest opens its summary's screen, `/agents/summary/<id>`. `/decide/sg_01J...`, `/agents`, `/r/tasks/e_9`.
  */
 export const PUSH_OPEN = /^\/(?:decide|agents|inbox|r)(?:\/[A-Za-z0-9_-]{1,64}){0,3}$/u;
 export const pushOpenOf = (url: unknown): string | null => (typeof url === 'string' && PUSH_OPEN.test(url) ? url : null);

@@ -439,8 +439,12 @@ ${sent.text}` : sent.text;
       }
       /* NO CONTENT IN A PUSH. It says how many things and where, and the record is where they are:
          a lock screen is not a place a person chose to read their business on. `because` is the same
-         `digest.<id>` mark the email arm carries; `lapseDrops` also reads this one by its `/digest/` url. */
-      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length + (sent.held?.length ?? 0)} items`, url: `/digest/${sent.digest}`, because: `digest.${sent.digest}` });
+         `digest.<id>` mark the email arm carries.
+
+         WHERE A TAP OPENS IS THE SUMMARY'S OWN SCREEN (`/agents/summary/<id>` in the app), which draws what it says
+         from `digestToday`, so the notice opens what it was about and not the record's home. It is a path
+         `pushOpenOf` admits, so it rides the push as its `open`; `lapseDrops` reads a digest's push by it. */
+      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length + (sent.held?.length ?? 0)} items`, url: `/agents/summary/${sent.digest}`, because: `digest.${sent.digest}` });
       continue;
     }
     if (channel === 'webhook') {
