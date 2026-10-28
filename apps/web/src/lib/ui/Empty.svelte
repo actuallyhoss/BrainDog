@@ -414,6 +414,11 @@
   }
 
   /* THE AGENT'S WAY ON, 16 under the action, the prompt in its copyable line. */
+  /* CODE READS FROM ITS START: a centred empty state centres its words, never a command or a prompt to paste. */
+  .empty :global(.code-line) {
+    text-align: start;
+  }
+
   .empty-prompt {
     display: flex;
     flex-direction: column;
