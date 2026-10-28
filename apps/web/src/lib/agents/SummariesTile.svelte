@@ -11,7 +11,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import { summariesOf, summaryHref, summaryWords as words, type Summary } from './summary.ts';
+  import { offerHref, summariesOf, summaryHref, summaryWords as words, type Summary } from './summary.ts';
 
   let summaries = $state.raw<Summary[] | null>(null);
 
@@ -30,7 +30,7 @@
   <Tile icon="bell" title={words.all}>
     {#if summaries.length === 0}
       <p class="said">{words.offer}</p>
-      <div class="foot"><Button href="/addons/agent-notes">{words.getIt}</Button></div>
+      <div class="foot"><Button href={offerHref}>{words.getIt}</Button></div>
     {:else}
       <ul class="sums">
         {#each summaries as s (s.id)}

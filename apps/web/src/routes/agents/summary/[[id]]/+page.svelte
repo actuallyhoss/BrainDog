@@ -13,7 +13,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { titleOf } from '$lib/title.ts';
-  import { summariesOf, summaryHref, summaryWords as words, type Summary } from '$lib/agents/summary.ts';
+  import { offerHref, summariesOf, summaryHref, summaryWords as words, type Summary } from '$lib/agents/summary.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -44,7 +44,7 @@
     <Tile>
       <p class="said">{words.none}</p>
       <p class="said quiet">{words.offer}</p>
-      <div class="foot"><Button href="/addons/agent-notes">{words.getIt}</Button></div>
+      <div class="foot"><Button href={offerHref}>{words.getIt}</Button></div>
     </Tile>
   {:else}
     {#each summaries as s (s.id)}

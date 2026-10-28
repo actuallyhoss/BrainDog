@@ -1430,7 +1430,7 @@ export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
     for (const f of work.fields as { id?: unknown; type?: unknown; to?: unknown }[]) {
       if (f.type !== 'ref' || f.to !== list || typeof f.id !== 'string') continue;
       const [register, field] = [work.id, f.id];
-      const newest = memo(['tasks', register, field], () => {
+      const newest = memo(['handed', register, field], () => {
         const by = new Map<string, string>();
         for (const r of sql.all<{ v: unknown; at: string | null }>(
           `SELECT v, max(at) AS at FROM (SELECT json_extract(fields, ?) AS v, updated_at AS at, id FROM entry WHERE register = ? AND deleted_at IS NULL${viewer})

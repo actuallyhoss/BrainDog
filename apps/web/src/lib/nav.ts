@@ -12,6 +12,7 @@
  */
 
 import { PLACES } from './nav/rail.ts';
+import { TASKS } from './work/list.ts';
 
 /* NOT EXPORTED. Both callers want the ORDER as well as the grouping, and a bare `group` beside an
    `arrange` is an invitation to reach for the one that skips the reader's arrangement — which is
@@ -246,6 +247,10 @@ export const OVERVIEW = '/?overview';
  * `lib/at.ts`, and the Directory's own list), and a record somebody already called "work" must still open.
  */
 export const WORK = '/?work';
+
+/** Where the Work screen opens on a record whose tasks list holds something, else `null`: what `flatNav` takes as `work`. */
+export const workOf = (registers: readonly { id: string; count: number }[]): string | null =>
+  registers.some((r) => r.id === TASKS && r.count > 0) ? WORK : null;
 
 /**
  * THE PHONE'S MENU, at a word in the query as Work is: the sidebar drawn as a page, every place, the projects and every

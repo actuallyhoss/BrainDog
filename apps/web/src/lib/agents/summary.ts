@@ -16,6 +16,9 @@ export const summaryWords = {
   none: 'No summary is set up on this record yet.',
   offer: 'Agent notes sends two a day, at 08:00 and 17:00 your time: what waits for you, what your agents did, and what is stuck.',
   getIt: 'Get Agent notes',
+  /* WHAT THE STORE IS SEARCHED FOR, the add-on's name as a person would type it, so the button lands on whichever
+     add-on goes by it today and the web holds no add-on's id. */
+  findIt: 'agent notes',
   open: 'Open',
   decide: 'Open Decide',
   upNext: 'Open Agents',
@@ -23,8 +26,8 @@ export const summaryWords = {
   more: (n: number) => `and ${n} more`,
 } as const;
 
-/** The add-on whose two digests are the morning and evening summaries, as the store lists it. */
-export const AGENT_NOTES = 'agent-notes';
+/** Where the offer goes: the store, searched for the add-on that sends the summaries. */
+export const offerHref = `/addons?q=${encodeURIComponent(summaryWords.findIt)}`;
 
 export type SummaryLine = { key: string; text: string; detail: string | null; at: string | null };
 export type SummarySection = { heading: string; source: string; lines: SummaryLine[]; more: number; href: string | null };

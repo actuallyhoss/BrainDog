@@ -50,7 +50,7 @@
   import { ownsRecord } from '../../levels.ts';
   import { shot, shotNow } from '$lib/palette/customise-apply.ts';
   import StateRow from './StateRow.svelte';
-  import NavChoices from './NavChoices.svelte';
+  import NavPicks from './NavPicks.svelte';
 
   /* EVERY AREA TAKES THE SAME PROPS. The device's own choices read none of them; the record's look asks whether the
      person is the owner, whose save installs it, or a member, whose save goes to Decide. */
@@ -361,7 +361,7 @@
         </div>
 
         <!-- NAVIGATION, THE PHONE BAR AND WORDS: the other three of the five (`d8`). -->
-        <NavChoices shell={props.shell} />
+        <NavPicks shell={props.shell} />
 
         <!-- EVERYTHING ELSE, FOLDED: five settings are shown, and the rest is one press away, never gone. -->
         <details class="more">
