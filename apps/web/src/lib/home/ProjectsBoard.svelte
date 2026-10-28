@@ -95,7 +95,7 @@
     <div class="b-week" role="list" aria-label="This week">
       {@render week('Late', 'clock', 'late', b.week.late)}
       {@render week('Due in 7 days', 'calendar', 'plain', b.week.due)}
-      {@render week('Numbers gone quiet', 'activity', 'warn', b.week.quiet)}
+      {@render week('Quiet numbers', 'activity', 'warn', b.week.quiet)}
       {@render week('Renewals', 'globe', 'plain', b.week.renewals)}
     </div>
 

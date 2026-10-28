@@ -43,7 +43,7 @@ export const WIDTHS = budget('a11y').widths;
 /** The headings and words the pages declare, read off the screen by their words. */
 export const EARNING = 'Earning, a month';
 export const WEEK = 'This week';
-export const WEEK_CELLS = ['Late', 'Due in 7 days', 'Numbers gone quiet', 'Renewals, 60 days'];
+export const WEEK_CELLS = ['Late', 'Due in 7 days', 'Quiet numbers', 'Renewals'];
 /** The list's groups: the earning ones first, then the building ones; the group names open the heading's words. */
 export const GROUPS = ['Earning', 'Building'];
 export const TOOLS = 'Tools and servers';

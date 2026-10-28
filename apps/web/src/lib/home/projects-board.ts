@@ -522,7 +522,7 @@ export function boardOf(input: BoardInput): Board {
   const groups: BoardGroup[] = [
     { id: 'earning' as const, name: 'Earning', said: `${earningFs.length}`, rows: earningFs.map(rowOf) },
     { id: 'moving' as const, name: 'Building', said: `${movingFs.length}`, rows: movingFs.map(rowOf) },
-    { id: 'quiet' as const, name: 'Quiet', said: `${quietFs.length} · nothing in ${WEEK_DAYS} days`, rows: quietFs.map(rowOf) },
+    { id: 'quiet' as const, name: 'Building, quiet', said: `${quietFs.length} · nothing in ${WEEK_DAYS} days`, rows: quietFs.map(rowOf) },
   ].filter((g) => g.rows.length > 0);
 
   /* ── this week ── */
