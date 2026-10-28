@@ -62,5 +62,5 @@ export const words = {
   nothingNow: 'Nothing needs you right now.',
   /** Needs you's tile on Today with nothing to ask (today F13). */
   nothingNeedsYou: 'Nothing needs you',
-  fillsWith: 'Questions waiting on you, what falls due and what changed while you were away show up here as your lists fill.',
+  fillsWith: 'What needs you and what falls due land here.',
 } as const;

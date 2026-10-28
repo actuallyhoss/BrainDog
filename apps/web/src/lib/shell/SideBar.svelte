@@ -1119,6 +1119,11 @@
     padding-inline-end: calc(var(--tap) + var(--sp-1));
   }
 
+  /* A PROJECT ON TWO LINES gets its own air, so its next step does not touch the name under it. */
+  .s-phone .s-row:has(.s-two) {
+    padding-block: var(--sp-2);
+  }
+
   .s-phone .s-nested .s-row {
     padding-inline-start: calc(var(--sp-2) + var(--icon-s, 16px) + var(--sp-3));
     font-size: var(--fs-ctl);
