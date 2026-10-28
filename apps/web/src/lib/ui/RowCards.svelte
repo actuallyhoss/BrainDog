@@ -338,7 +338,7 @@
       {@const holder = holderOf(e)}
       <!-- A CARD ADDED OR TAKEN AWAY ARRIVES AND LEAVES WITH THE LIST'S MOTION (motion F7.1), and the cards beside it
            close the gap: no card under it jumps. -->
-      <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined} in:rowIn out:rowOut animate:flip={settle()}>
+      <li class="card-line" data-row-seq={e.seq} data-picked={picked?.has(e.seq) ? '' : undefined} in:rowIn out:rowOut animate:flip={settle()}>
         <a class="card" href={at(to(e))} data-arrived={arrived?.has(e.seq) ? '' : undefined}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
                what the row is before anything about it. ONE THING LEADS IT, the project's mark or, on a

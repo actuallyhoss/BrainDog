@@ -20,6 +20,12 @@
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import type { Receipt } from './list.ts';
+  import { openSheet } from '$lib/send/open.ts';
+
+  /* A PRESS HELD THIS LONG ON A CARD SENDS IT (`$lib/send`): the send sheet rises from the bottom with the row attached. */
+  const HOLD_MS = 500;
+  /* A THUMB THAT MOVES THIS FAR IS SCROLLING, not holding. */
+  const SLOP = 10;
 
   let {
     register,
@@ -47,9 +53,51 @@
     receiptFor: (seq: number) => Receipt | undefined;
     openCardMenu: (seq: number, el: HTMLElement) => void;
   } = $props();
+
+  /* ── THE LONG PRESS ── a held thumb on a card, not on its "…" or its Undo. The click the lift would make is eaten, so the
+     card does not open under the sheet. */
+  let hold: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
+  let held = false;
+
+  function down(ev: PointerEvent) {
+    if (ev.pointerType === 'mouse') return;
+    const line = (ev.target as Element | null)?.closest<HTMLElement>('.card-line');
+    if (!line || (ev.target as Element).closest('button')) return;
+    const seq = Number(line.dataset.rowSeq);
+    const e = entries.find((x) => x.seq === seq);
+    if (!e) return;
+    held = false;
+    hold = {
+      x: ev.clientX,
+      y: ev.clientY,
+      timer: setTimeout(() => {
+        held = true;
+        hold = null;
+        navigator.vibrate?.(10);
+        void openSheet({ kind: register, attach: [{ ref: `${register}#${seq}`, label: display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow }] });
+      }, HOLD_MS),
+    };
+  }
+
+  function up() {
+    if (hold) clearTimeout(hold.timer);
+    hold = null;
+  }
+
+  function move(ev: PointerEvent) {
+    if (hold && Math.hypot(ev.clientX - hold.x, ev.clientY - hold.y) > SLOP) up();
+  }
+
+  function click(ev: MouseEvent) {
+    if (!held) return;
+    held = false;
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
 </script>
 
-<div class="list-cards">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="list-cards" onpointerdown={down} onpointerup={up} onpointercancel={up} onpointermove={move} onclickcapture={click} oncontextmenu={(ev) => (held || hold !== null) && ev.preventDefault()}>
 <RowCards {register} {entries} {now} {names} picked={selected} {arrived}>
   {#snippet action(e)}
     <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
@@ -118,6 +166,11 @@
 {/if}
 
 <style>
+  /* THE HELD CARD IS THE SHEET'S, not the browser's link preview. */
+  .list-cards :global(.card) {
+    -webkit-touch-callout: none;
+  }
+
   /* AN ARCHIVED CARD DIMS WHILE ITS RECEIPT SHOWS, as the grid's row does: its words go to the quiet ink and "Archived"
      and "Put back" under it stay at full ink. It leaves with the list's motion when the way back runs out. The quiet ink
      and not an opacity, for the grid's reason: at 0.45 its words read under 3 to 1. */

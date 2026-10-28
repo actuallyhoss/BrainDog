@@ -27,6 +27,9 @@
   Decide whether they are the same one and opens that question, and folds nobody itself. On a list that says what makes
   two of its things the same (a skill, a key, a learning), it is there for two or more picked: one question folds just
   the ones picked with what they are here twice with, and the answer in Needs you has one Undo.
+
+  "SEND N TO…" opens the send sheet with every one picked attached (`$lib/send`), hung from the button. Sending changes
+  nothing on the list, so it is on the bar of a reader who may not change it too.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -44,6 +47,8 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { foldAsk, sameOf } from '../twice-fold.ts';
+  import { openSheet } from '$lib/send/open.ts';
+  import { sendWords, type Attached } from '$lib/send/send.ts';
 
   let {
     count,
@@ -57,6 +62,7 @@
     onclear,
     picked,
     onmoved,
+    send = [],
   }: {
     count: number;
     decl: RegisterDecl | undefined;
@@ -77,6 +83,8 @@
     picked?: readonly MoveRow[] | undefined;
     /** Called once a move has landed or been put back, so the page reads the list again. */
     onmoved?: (() => void) | undefined;
+    /** The ones picked as the send sheet attaches them. */
+    send?: readonly Attached[] | undefined;
   } = $props();
 
   /* This part's own words: the short Clear at the bar's end, whose name says what it clears. */
@@ -188,6 +196,11 @@
   <Button weight="quiet" onclick={() => copyIds()}>
     <Icon name="copy" size="s" />{copy.copyIds}
   </Button>
+  {#if send.length > 0}
+    <Button weight="quiet" aria-haspopup="dialog" onclick={(e: MouseEvent) => void openSheet({ kind: decl?.id ?? '', attach: [...send], anchor: e.currentTarget instanceof Element ? e.currentTarget : null })}>
+      <Icon name="slash" size="s" />{sendWords.sendMany(send.length)}
+    </Button>
+  {/if}
   {#if canMove}
     <Button weight="quiet" onclick={openMove}>
       <Icon name="arrow" size="s" />{words.moveMany}
