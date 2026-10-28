@@ -17,13 +17,13 @@ Every page is written in a small text format called the dialect: Markdown, with 
 ```comparison | Who changes your record
 Who | How they reach it | What they can do
 You | The app, in a browser | Read and change anything you can see
-Slash | Press / in any record | Answer questions and build pages, asking before anything it writes goes in
+Slash | Press ⌘J in any record | Answer questions with your figures and make the changes you ask for, with an undo
 Your agents | MCP, with a key you give them | Read and write what the key allows, asking you first when they want to change something
 ```
 
 ## Slash
 
-Slash is built into every record. Press / and ask. Ask what you owe this month and it shows the bills. Ask for a page and it builds one. Nothing Slash writes goes in until you say yes.
+Slash is built into every record. Press ⌘J and ask. Ask what you owe this month and it answers with the bills. Ask it to add a task and it does, with an undo. Anything with money, keys, sharing or deletes waits for your yes.
 
 ## Your agents
 

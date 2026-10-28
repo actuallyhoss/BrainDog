@@ -61,7 +61,7 @@ export const pricing = {
       faq: {
         title: 'Questions people ask',
         questions: [
-          { q: 'What is a question to Slash?', a: 'One question or one draft, however much work it takes. Your brief, filing and your rules never spend one.' },
+          { q: 'What is a question to Slash?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
           { q: 'What counts as an AI tool?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
           { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, whenever you like.' },
         ],
@@ -133,7 +133,7 @@ export const pricing = {
       /** `billing: true` is a question drawn only while `LAUNCH.billing` is on: nobody can cancel what nobody sells. */
       questions: [
         // `ASK_CAP_*` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`: the brief and filing spend no ask.
-        { q: 'What is a question to Slash?', a: 'One question or one draft, however much work it takes. Your brief, filing and your rules never spend one.' },
+        { q: 'What is a question to Slash?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
         // An agent key per app (`agents` in `PLAN_TABLE`).
         { q: 'What counts as an agent?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
         // Export is the CLI's and Settings' one file, on every plan.

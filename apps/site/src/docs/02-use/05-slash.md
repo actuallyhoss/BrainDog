@@ -1,25 +1,25 @@
 # Slash
 
-Slash is the assistant built into every record. Ask it what you owe this month and it shows the bills; ask it for a page and it drafts one. It reads your record to answer, shows what it read, and nothing it writes goes in until you say yes in Needs you.
+Slash is the assistant built into every record. Ask it what you spent on food this month and it looks it up and answers with your numbers. Ask it to add a task or change a row and it does, with an undo. Anything with money, keys, sharing or deletes waits for your yes.
 
 ## Ask
 
-Press / anywhere, or Ctrl+K (⌘K on a Mac), and type. The palette searches as you type. To ask instead, choose **Ask Slash** under what you typed, and Slash reads the record.
+Press Ctrl+J (⌘J on a Mac), or click **Ask or change anything** in the bar, and type. The bar widens in place and the answer drops down under it. / and Ctrl+K (⌘K) open the same palette for finding and going places.
 
 ```steps
-Press / and type a question | "What do I owe this month?" or "Which clients have not paid?" | Anywhere
-Choose Ask Slash | Slash searches the record, then reads what it found | In the palette
-Read the answer | Each fact links to the row it came from | Under the question
-Open what it read | Which lists it read, how many rows, and the conditions it used | Under What Slash read
+Ask in plain words | "What did I spend on food this month?" or "What's late?" | In the bar
+Watch it look | Slash says what it is reading as it goes, such as Reading Money | Under the question
+Read the answer | Short, with your figures, and each row it names links to that row | As it arrives
+Ask a follow-up | "And last month?" carries on the same conversation | In the same field
 ```
 
-When nothing in the record answers the question, Slash says so rather than guessing.
+Every figure in an answer comes from your record. A figure Slash could not find there is taken out, and the answer says so. When nothing in the record answers the question, Slash says that rather than guessing.
 
-The **Slash** page in the sidebar is a home for asking: an Ask field at the top, what you asked lately, and each earlier question with a way to ask it again or open what it filed.
+Opened with nothing typed, Slash shows what matters now, or a few questions that fit the page you are on. The **Slash** page in the sidebar lists your conversations, newest first, on every device; open one to carry on.
 
-## Ask for something to be made
+## Ask for a change
 
-Ask for a page, a list, a rule or a change to how the record looks, and Slash drafts it as a proposal in Needs you. It shows what will appear, what it reads from and where it goes, and **From Slash** marks it. Accept it and it is made; reject it and nothing changes. See [Needs you](/docs/use/decide).
+Ask Slash to add a task, change a field, add a person, or draft a page or a rule. What you asked for and can be undone happens at once, with a receipt and **Undo** for a few seconds, and it stays in your history. A change that touches money, keys, sharing, deletes or add-ons comes back as a card instead: press Enter to do it, or Esc to leave it. A draft page or rule waits in [Needs you](/docs/use/decide) until you accept it. When Slash read text from outside your record, such as mail or an import, it asks before every change in that conversation.
 
 ## What Slash notices
 
@@ -29,7 +29,7 @@ Slash also does quieter work in the background: the inbox's patterns, a digest's
 
 ## Asks and the monthly limit
 
-Each question you ask Slash, or each thing you ask it to draft, is one ask, however much reading it takes.
+Each question or change you ask Slash for is one ask, however much reading it takes.
 
 - Free includes 20 asks a month, Cloud 80 and Cloud Plus 400.
 - The owner sets the limit in Settings, under Agents. Zero turns Slash off.
@@ -47,7 +47,7 @@ In Settings, under Agents, the owner can give Slash a key from a model provider 
 Question | Slash | Your agents
 Where it lives | In every record. Press / | Claude, Codex, Cursor and any MCP client you connect
 What it reads | Your record | What the key or sign-in you gave it allows
-What it writes | Nothing directly. Every change is a proposal in Needs you | Proposals for you to decide, or rows directly, as you allowed
+What it writes | What you ask for, with an undo; money, keys, sharing and deletes wait for your yes | Proposals for you to decide, or rows directly, as you allowed
 Who pays for it | Your plan's asks, or your own key | Your agent's own provider
 ```
 
@@ -55,4 +55,4 @@ Agents are covered in [Agents](/docs/agents/connect).
 
 ## The palette, without Slash
 
-The palette does more than ask. It searches every list, every decision and every page by the words in them, jumps to a page, opens a row by its number, and runs actions. ? shows the keyboard, which is help and not Slash.
+The palette does more than ask. Press / or Ctrl+K (⌘K) and it searches every list, every decision and every page by the words in them, jumps to a page, opens a row by its number, and runs actions. ? shows the keyboard, which is help and not Slash.
