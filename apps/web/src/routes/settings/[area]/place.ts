@@ -84,12 +84,12 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     title: 'You',
     icon: 'sliders-horizontal',
     areas: [
-      area('/settings/appearance', 'Appearance', 'sun', 'Theme, density, navigation, phone bar and words'),
-      area('/settings/navigation', 'Pages', 'rows', 'What is in the sidebar and the bar'),
-      area('/settings/words', 'Words and money', 'tag', 'What your lists are called, and your currency'),
-      area('/settings/notifications', 'Notifications', 'bell', 'When BrainDog interrupts you'),
-      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts, and the keys that are one letter'),
-      area('/settings/signing-in', 'Signing in', 'key', 'You, your passkeys and where you are signed in'),
+      area('/settings/appearance', 'Appearance', 'sun', 'Theme, density, phone bar'),
+      area('/settings/navigation', 'Pages', 'rows', 'Sidebar and bar'),
+      area('/settings/words', 'Words and money', 'tag', 'List names, currency'),
+      area('/settings/notifications', 'Notifications', 'bell', 'Quiet hours, summaries'),
+      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts'),
+      area('/settings/signing-in', 'Signing in', 'key', 'Passkeys, devices'),
     ],
   },
   /* WHAT THIS BRAINDOG HOLDS AND WHO WORKS IN IT: the agents, the people it is shared with, what comes in, the keys and
@@ -98,21 +98,21 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     title: 'This BrainDog',
     icon: 'settings',
     areas: [
-      area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
+      area('/settings/agents', 'Agents', 'session', 'Connections, permissions, Slash'),
       /* PEOPLE & SHARING HOLDS WHAT PEOPLE DID, roles and invites, and every share beside them. The
          sharing address opens it too (`MOVED`). */
-      area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and what you share'),
-      area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
+      area('/settings/people', 'People & sharing', 'user-plus', 'Colleagues, invites, shares'),
+      area('/settings/ingest', 'What comes in', 'inbox', 'Mail and feeds'),
       /* ADD-ONS IS AN AREA OF SETTINGS, with the rail beside it, as the store is the place to find more (`/addons`). It
          was a row opening `/packs`, a page of its own with no Settings rail. */
-      area('/settings/addons', 'Add-ons', 'packs', 'What is added to this record, and its updates'),
+      area('/settings/addons', 'Add-ons', 'packs', 'Installed, updates'),
     ],
     /* ONE HEALTH: the record's vital signs, its Health page, with the count Today and the
        sentence above this index say. An area here called Health said "32 things went stale" while that page said 9. */
     outside: [
       /* ONE NAME FOR IT: the page is Keychain, and this row said Keys. */
-      { label: 'Keychain', href: '/keychain', icon: 'vault', line: 'The keys your agents are handed', before: 'addons' },
-      { label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'What on this record needs a look' },
+      { label: 'Keychain', href: '/keychain', icon: 'vault', line: 'Keys for agents', before: 'addons' },
+      { label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'Vital signs' },
     ],
   },
   /* WHAT THE RECORD KEEPS AND COSTS, AND THE ONE IRREVERSIBLE ACT AS ITS LAST ROW, drawn in red. It stood in a
@@ -125,14 +125,14 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY: what it found wrong in its own pages
          and notes, what went stale, what is here twice, what it matched and learned. Read only when it is opened. Called
          Health until 25 October, beside a Health page that counted something else; `/settings/health` still lands. */
-      area('/settings/tidy', 'Tidy up', 'filter', 'What the record found to tidy in itself'),
+      area('/settings/tidy', 'Tidy up', 'filter', 'Stale and doubled'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
-      area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
-      area('/settings/billing', 'Billing', 'money', 'What this record costs'),
-      area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
-      area('/settings/delete', 'Delete this record', 'trash', 'Removes the record for good'),
+      area('/settings/backups', 'Backups', 'history', 'Nightly copies'),
+      area('/settings/billing', 'Billing', 'money', 'Plan'),
+      area('/settings/export', 'Export', 'download', 'A signed copy'),
+      area('/settings/delete', 'Delete this record', 'trash', 'For good'),
     ],
-    outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'What this record used this month', before: 'billing' }],
+    outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'This month', before: 'billing' }],
   },
 ];
 
