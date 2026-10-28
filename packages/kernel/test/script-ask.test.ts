@@ -102,7 +102,8 @@ function ask(r: Rig, at: string[] = ['bills#1', 'bills#2']) {
 }
 
 const run = (r: Rig, a: unknown, writes: ScriptAnswer = { writes: [], log: '', usage: USAGE }) => finishScript(r.deps, prepared(r), { ...writes, ask: a } as ScriptAnswer);
-const open = (r: Rig) => (r.k.governance('suggestion', { status: 'open' }) as { ok: true; value: Record<string, unknown>[] }).value;
+/* EVERY OPEN QUESTION, the agents' shelf with Needs you: where a script's question waits is not what these test. */
+const open = (r: Rig) => (r.k.governance('suggestion', { status: 'open', apart: 'with' }) as { ok: true; value: Record<string, unknown>[] }).value;
 const lastRun = (sql: NodeSql) =>
   JSON.parse(
     sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'pull' AND target = 'declaration:script.month-end' AND to_v IS NOT NULL ORDER BY rowid DESC LIMIT 1")!.to_v,

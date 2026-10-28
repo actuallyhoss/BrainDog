@@ -75,7 +75,8 @@ function prepared(r: Rig): Scripted {
 
 const rowset = (register: string, what: string, cause = `offer:${what.replaceAll(' ', '-')}`) => ({ question: `Keep ${what}?`, body_kind: 'rowset', body: { register, rows: [{ what, draft: true }] }, cause });
 const run = (r: Rig, proposals: unknown, writes: ScriptAnswer = { writes: [], log: '', usage: USAGE }) => finishScript(r.deps, prepared(r), { ...writes, proposals } as ScriptAnswer);
-const open = (r: Rig) => (r.k.governance('suggestion', { status: 'open' }) as { ok: true; value: Record<string, unknown>[] }).value;
+/* EVERY OPEN QUESTION, the agents' shelf with Needs you: where a script's question waits is not what these test. */
+const open = (r: Rig) => (r.k.governance('suggestion', { status: 'open', apart: 'with' }) as { ok: true; value: Record<string, unknown>[] }).value;
 const lastRun = (sql: NodeSql) =>
   JSON.parse(sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'pull' AND target = 'declaration:script.offer' AND to_v IS NOT NULL ORDER BY rowid DESC LIMIT 1")!.to_v) as { outcome: string; log?: string };
 const noteOf = (sql: NodeSql) => sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' AND target = 'declaration:script.offer' ORDER BY rowid DESC LIMIT 1")!.note;

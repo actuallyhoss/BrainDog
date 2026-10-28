@@ -132,7 +132,8 @@ test('THE OPENER WITHDRAWS ITS QUESTION, or a later run of its key, and nobody e
 test('THE QUEUE AND THE ANSWER CARRY THE CAUSE', async () => {
   const { k, sql } = await record();
   const first = value<Filed>(k.propose({ ...done('tasks#1'), cause: 'ship-it' }, CLAUDE));
-  const listed = value<Record<string, unknown>[]>(listGovernance({ sql, nowMs: NOW }, 'suggestion'));
+  /* AN AGENT'S UNDOABLE ASK WAITS ON ITS SHELF, read here with Needs you: the cause rides either way. */
+  const listed = value<Record<string, unknown>[]>(listGovernance({ sql, nowMs: NOW }, 'suggestion', { apart: 'with' }));
   assert.deepEqual(listed.map((q) => [q.id, q.cause]), [[first.id, 'ship-it']]);
   value(k.decide(first.id, { decide: { option: 'accept', reason: 'It shipped.' } }, 'p_owner'));
   const decisions = value<Record<string, unknown>[]>(listGovernance({ sql, nowMs: NOW }, 'decision'));
