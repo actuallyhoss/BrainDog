@@ -36,8 +36,8 @@ export const todoMeta = (cells: readonly string[]): string[] => cells.slice(2, 4
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-/** A day as `format.ts`'s `day` says it, `1 Jul 2026`, standing alone in a cell. */
-const SAID_DAY = new RegExp(`^(\\d{1,2}) (${MONTHS.join('|')}) (\\d{4})$`, 'u');
+/** A day as `format.ts`'s `day` says it, `1 Jul 2026`, standing alone in a cell; `1 Jul` is one in the reader's year. */
+const SAID_DAY = new RegExp(`^(\\d{1,2}) (${MONTHS.join('|')})(?: (\\d{4}))?$`, 'u');
 const DAY_MS = 86_400_000;
 
 /**
@@ -49,11 +49,12 @@ const DAY_MS = 86_400_000;
 export function todoDay(text: string, now: number = Date.now(), done = false): string {
   const m = SAID_DAY.exec(text.trim());
   if (!m) return text;
-  const at = Date.UTC(Number(m[3]), MONTHS.indexOf(m[2]!), Number(m[1]));
   const n = new Date(now);
+  const y = m[3] === undefined ? n.getUTCFullYear() : Number(m[3]);
+  const at = Date.UTC(y, MONTHS.indexOf(m[2]!), Number(m[1]));
   const today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
   const ahead = Math.round((at - today) / DAY_MS);
-  const year = Number(m[3]) === n.getUTCFullYear() ? `${m[1]} ${m[2]}` : text.trim();
+  const year = y === n.getUTCFullYear() ? `${m[1]} ${m[2]}` : text.trim();
   if (done) return year;
   if (ahead < 0) return `{{bad:${-ahead} ${ahead === -1 ? 'day' : 'days'} late}}`;
   if (ahead === 0) return 'Today';
