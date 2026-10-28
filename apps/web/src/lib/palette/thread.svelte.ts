@@ -15,7 +15,7 @@ import { copy } from '../copy.ts';
 import { history } from '../data/undo.ts';
 import type { QueueQuestion } from '@braindog/kernel';
 import type { Reading } from '@braindog/client';
-import { act, chat, chatWords, keepThread, thread as readThread, type ChatAction, type PageContext } from './slash-chat.ts';
+import { act, chat, chatWords, keepThread, thread as readThread, type ChatAction, type ChatBody, type PageContext } from './slash-chat.ts';
 import { drawProposal, drawReading, pass2Refused, secondPass, slashWords, type DrawnRow } from './slash.ts';
 
 /** How long a receipt offers its Undo. */
@@ -52,6 +52,8 @@ export type SlashTurn = {
   error: string | null;
   spent: boolean;
   streaming: boolean;
+  /** Who Slash says can take this instead, when it could not (`mac`: Claude on a machine), else absent. */
+  route?: string | undefined;
   legacy?: Legacy;
 };
 export type YouTurn = { role: 'you'; text: string };
@@ -106,18 +108,40 @@ export async function open(id: string, base = apiBase()): Promise<boolean> {
 
 const fresh = (): SlashTurn => ({ role: 'slash', steps: [], text: '', figures: {}, actions: [], go: [], error: null, spent: false, streaming: true });
 
+/** How an ask is sent: Quick or Deep, and the rows it is about. Left out, the host's own way. */
+export type AskWith = { mode?: 'quick' | 'deep' | 'auto' | undefined; attach?: readonly string[] | undefined };
+
 /** Ask one question in this thread, with the page it was asked on. */
-export async function ask(message: string, page: PageContext, base = apiBase()): Promise<void> {
+export async function ask(message: string, page: PageContext, base = apiBase(), how: AskWith = {}): Promise<void> {
   const said = message.trim();
   if (said === '' || convo.busy) return;
   convo.turns.push({ role: 'you', text: said }, fresh());
   convo.busy = true;
   if (missing) return twoPass(said, base);
+  return stream_({ ...(convo.id ? { thread: convo.id } : {}), message: said, page, ...(how.mode ? { mode: how.mode } : {}), ...(how.attach && how.attach.length > 0 ? { attach: [...how.attach] } : {}) }, said, base);
+}
+
+/** Whether the last answer is finished and whole, so it can be asked again harder. */
+export function rethinkable(): boolean {
+  const t = convo.turns.at(-1);
+  return !convo.busy && convo.id !== null && t?.role === 'slash' && !t.streaming && t.error === null && t.legacy === undefined && t.text !== '';
+}
+
+/** "Think harder": the last answer asked again on the deep model, as a new turn of the same thread. */
+export async function rethink(base = apiBase()): Promise<void> {
+  if (!rethinkable() || convo.id === null) return;
+  convo.turns.push(fresh());
+  convo.busy = true;
+  return stream_({ thread: convo.id, mode: 'deep', rethink: true }, firstQuestion() ?? '', base);
+}
+
+/** One answer streamed into the last turn, for an ask and for a rethink alike. */
+async function stream_(body: ChatBody, said: string, base: string): Promise<void> {
   stream = new AbortController();
   const signal = stream.signal;
   const end = await chat(
     base,
-    { ...(convo.id ? { thread: convo.id } : {}), message: said, page },
+    body,
     (e) => {
       if (signal.aborted) return;
       const turn = live();
@@ -141,6 +165,9 @@ export async function ask(message: string, page: PageContext, base = apiBase()):
         }
         case 'navigate':
           turn.go.push({ href: e.href, label: e.label });
+          break;
+        case 'route':
+          turn.route = e.to;
           break;
         case 'error':
           turn.error = e.text;

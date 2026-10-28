@@ -37,6 +37,8 @@ export type ChatEvent =
   | { type: 'delta'; text: string; figures?: Record<string, unknown> }
   | ({ type: 'action' } & ChatAction)
   | { type: 'navigate'; href: string; label: string }
+  /* SLASH COULD NOT TAKE IT THIS WAY (Deep with no key of one's own) and names who can: `mac`, Claude on a machine. */
+  | { type: 'route'; to: string }
   | { type: 'error'; text: string }
   | { type: 'done'; spent: Spent; figures?: Record<string, unknown> };
 
@@ -103,6 +105,8 @@ export function eventOf(line: string): ChatEvent | null {
       const figures = figuresOf(v.figures);
       return { type: 'delta', text: v.text, ...(figures ? { figures } : {}) };
     }
+    case 'route':
+      return str(v.to) ? { type: 'route', to: v.to as string } : null;
     case 'navigate':
       return str(v.href) ? { type: 'navigate', href: v.href as string, label: str(v.label) ?? (v.href as string) } : null;
     case 'action': {
@@ -183,12 +187,25 @@ function fixIn(body: unknown): { text: string; code: string | null } | null {
 const json = { 'content-type': 'application/json' } as const;
 
 /**
+ * One ask. `mode` is Quick, Deep or Auto, `attach` the rows and things it is about (`send.ts` `refs`), and `rethink` asks
+ * the last answer of `thread` again, harder, with no new message.
+ */
+export type ChatBody = {
+  thread?: string;
+  message?: string;
+  page?: PageContext;
+  mode?: 'quick' | 'deep' | 'auto';
+  attach?: string[];
+  rethink?: boolean;
+};
+
+/**
  * Send one message and hand each event to `on` as it arrives. Never throws: a dead socket, a refusal and a stream that broke
  * off are each one plain line, and a host with no chat door is `missing`.
  */
 export async function chat(
   base: string,
-  body: { thread?: string; message: string; page?: PageContext },
+  body: ChatBody,
   on: (e: ChatEvent) => void,
   signal?: AbortSignal,
 ): Promise<ChatEnd> {
