@@ -58,12 +58,12 @@
               <h2 class="sec-head">{sec.heading}</h2>
               <ul class="lines">
                 {#each sec.lines as l (l.key)}
-                  <li class="line">
+                  <li class="said-line">
                     <span class="line-text" dir="auto">{l.text}</span>
                     {#if l.detail}<span class="line-detail" dir="auto">{l.detail}</span>{/if}
                   </li>
                 {/each}
-                {#if sec.more > 0}<li class="line line-detail">{words.more(sec.more)}</li>{/if}
+                {#if sec.more > 0}<li class="said-line line-detail">{words.more(sec.more)}</li>{/if}
               </ul>
               {#if sec.href}
                 <div class="foot"><Button size="sm" href={sec.href}>{sec.href === '/decide' ? words.decide : words.upNext}</Button></div>
@@ -114,14 +114,14 @@
     list-style: none;
   }
 
-  .line {
+  .said-line {
     display: grid;
     gap: 2px;
     padding-block: var(--sp-2);
     min-inline-size: 0;
   }
 
-  .line + .line {
+  .said-line + .said-line {
     border-block-start: 1px solid var(--rule);
   }
 
