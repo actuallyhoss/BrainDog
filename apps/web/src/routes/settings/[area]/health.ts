@@ -88,6 +88,13 @@ export const KEEP_RATES = 'Keep rates current';
 
 export const OPEN_THEM = 'Open the inbox';
 
+/** The two signs about an old exchange rate, whose line links to what keeps rates current. */
+const RATE_SIGNS: ReadonlySet<string> = new Set(['rates-current', 'rate-age']);
+
+/** The word of the link when the feed of rates is paused, and where scheduled actions are started again. */
+export const OPEN_FEED = 'Open the feed of rates';
+const SCHEDULED_AT = '/automations?tab=scheduled';
+
 /** The sign that counts messages waiting to be filed. */
 const ARRIVALS = 'arrivals-filed';
 
@@ -193,8 +200,12 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     const raw = lead?.said;
     const named = raw === undefined ? 'One check needs a look' : plainSign(raw).replace(/[.!?]$/u, '');
     const link =
-      /* THE NEWEST EXCHANGE RATE BEING OLD LINKS TO THE SWITCH THAT KEEPS RATES CURRENT, in Money's settings. */
-      /\bexchange rates?\b/iu.test(named) && /\bold\b/iu.test(named)
+      /* AN OLD RATE LINKS TO WHAT CURES IT: a feed that is paused to where scheduled actions start again, anything else to
+         the switch that keeps rates current, in Money's settings. Both rate signs, by their ids: "How old is the newest
+         rate" never says "exchange", and its red line had no link. */
+      lead !== undefined && RATE_SIGNS.has(lead.sign) && /\bfeed of rates is paused\b/iu.test(raw ?? '')
+        ? { text: OPEN_FEED, href: SCHEDULED_AT }
+        : (lead !== undefined && RATE_SIGNS.has(lead.sign)) || (/\bexchange rates?\b/iu.test(named) && /\bold\b/iu.test(named))
         ? { text: KEEP_RATES, href: KEEP_RATES_AT }
         : lead?.sign === ARRIVALS && more.inboxAt
         ? { text: OPEN_THEM, href: more.inboxAt }
