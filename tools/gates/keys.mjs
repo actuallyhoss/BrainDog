@@ -384,6 +384,9 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       /* Down first: `k` on the first row has nowhere to go, and silence there is the right answer. */
       'row-up': { route: GRID, setup: focusFirstCell, press: ['j', 'j', 'k'] },
       peek: { route: GRID, setup: focusFirstCell, press: ['p'] },
+      /* `s` WITH NOTHING PICKED SENDS THE ROW THE CURSOR IS ON: the send sheet opens with it attached. Opening it writes
+         nothing; the send is the sheet's own button. */
+      send: { route: GRID, setup: focusFirstCell, press: ['s'] },
       select: { route: GRID, setup: focusFirstCell, press: ['x'] },
       /**
        * ON A CELL THAT HOLDS A VALUE, WHICH THE FIRST ONE DOES NOT.
