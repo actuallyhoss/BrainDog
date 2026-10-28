@@ -545,6 +545,15 @@
     padding-block: var(--sp-2);
   }
 
+  /* UNDER A THUMB A FOLD'S LINE IS A 44px TARGET (`--tap`), its words still one line in the middle of it. */
+  @media (pointer: coarse) {
+    .more > summary {
+      box-sizing: border-box;
+      min-block-size: var(--tap);
+      padding-block: max(var(--sp-2), calc((var(--tap) - 1lh) / 2));
+    }
+  }
+
   .more-body {
     display: grid;
     gap: var(--sp-5);
