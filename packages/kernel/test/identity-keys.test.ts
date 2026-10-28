@@ -56,7 +56,7 @@ test('A REMOTE IS host/owner/name, A FOLDER AN ABSOLUTE PATH, A PHONE E.164', ()
   assert.equal(keyOf('remote', 'git@github.com:OxbowGame/Bot.git'), 'remote:github.com/oxbowgame/bot');
   assert.equal(keyOf('remote', 'https://github.com/oxbowgame/bot'), 'remote:github.com/oxbowgame/bot');
   assert.equal(keyOf('remote', 'bot'), null);
-  assert.equal(keyOf('folder', 'C:\\Repos\\roomy\\'), 'folder:c:/Repos/nook');
+  assert.equal(keyOf('folder', 'C:\\Repos\\nook\\'), 'folder:c:/Repos/nook');
   assert.equal(keyOf('folder', '/Users/mara/Developer/braindog/'), 'folder:/Users/mara/Developer/braindog');
   assert.equal(keyOf('folder', 'braindog'), null);
   assert.equal(keyOf('phone', '+20 100 123 4567'), 'phone:+201001234567');

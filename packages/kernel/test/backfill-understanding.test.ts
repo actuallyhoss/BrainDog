@@ -199,7 +199,7 @@ test('A RUN UNDER AN OWNER WHOSE REPOSITORIES ONE PROJECT HOLDS IS ONE QUESTION 
 });
 
 test('A FOLDER KEPT AMONG A PROJECT’S REPOSITORIES IS READ AS A FOLDER, wherever a run is placed from', () => {
-  const projects = [candidateOf('p1', 'things#1', ['/Users/sam/Code/braindog', 'braindog-site'], []), candidateOf('p2', 'things#2', ['C:\\Repos\\roomy'], [])];
+  const projects = [candidateOf('p1', 'things#1', ['/Users/sam/Code/braindog', 'braindog-site'], []), candidateOf('p2', 'things#2', ['C:\\Repos\\nook'], [])];
   assert.deepEqual(projects[0], { id: 'p1', spoken: 'things#1', repos: ['braindog-site'], folders: ['/Users/sam/Code/braindog'] });
   assert.equal(matchProject(projects, { cwd: '/Users/sam/Code/braindog/apps/web', remote: 'https://github.com/samdev/BrainDog' }).project?.id, 'p1');
   assert.equal(matchProject(projects, { cwd: 'c:/repos/nook' }).project?.how, 'folder');
