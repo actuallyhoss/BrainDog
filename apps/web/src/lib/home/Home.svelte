@@ -817,18 +817,20 @@
   let engine = $state.raw<{ health: EngineHealth | null; month: SlashStatus | null } | null>(null);
   /* ASKED ONCE A VISIT AND NOT ON EVERY MOVE OF THE RECORD (scope 2026-10-24 A16): whether the model answers is not moved
      by an agent's write, and every outside write asked both again. */
+  /* AND ONLY ONCE TODAY'S OWN READ HAS LANDED: the record answers one call at a time, and the engine's health, read
+     beside the body, held Today's body back behind it for up to three seconds on his record. */
+  let engineAsked = false;
+  let engineGone = false;
+  $effect(() => () => (engineGone = true));
   $effect(() => {
-    if (data.refused || page.data.slash !== true) return;
-    let here = true;
+    if (data.refused || page.data.slash !== true || !settled || engineAsked) return;
+    engineAsked = true;
     const client = createClient({ base: apiBase() });
     void Promise.all([client.engineHealth().catch(() => null), client.slashStatus().catch(() => null)]).then(([out, month]) => {
       const v = out?.ok ? (out.value as EngineHealth | null) : null;
       const health = v !== null && typeof v === 'object' && 'health' in v ? v : null;
-      if (here) engine = { health, month: month?.ok ? month.value : null };
+      if (!engineGone) engine = { health, month: month?.ok ? month.value : null };
     });
-    return () => {
-      here = false;
-    };
   });
   const quiet = $derived(quietLine(engine?.health ?? null, engine?.month ?? null, null));
 
