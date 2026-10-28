@@ -170,6 +170,7 @@ import {
   factsBasis,
   figureText,
   filledHeadline,
+  nought,
   hashOf,
   HEADLINE_ASKS_DAY,
   HEADLINE_ITEMS_MOST,
@@ -5294,7 +5295,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       for (const id of holes) {
         if (id.endsWith('.change')) continue;
         const value = figureText(lead.values[id]);
-        if (value === null) continue;
+        /* NOR ONE THAT IS NOUGHT, which the rules line leaves out (`rulesLine`): handed it, the model wrote
+           "with 0 owed on the card", a bare nought the page itself never says. */
+        if (value === null || nought(value)) continue;
         const change = typeof changes[`${id}.change`] === 'string' ? (changes[`${id}.change`] as string) : undefined;
         figures.push({ id, value, ...(change === undefined ? {} : { change }) });
       }

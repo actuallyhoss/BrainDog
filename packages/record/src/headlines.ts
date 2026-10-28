@@ -281,7 +281,7 @@ export function figureText(v: Json | undefined): string | null {
 }
 
 /** A figure that is nought, in any of the shapes `figureText` writes one. */
-const nought = (text: string): boolean => text.split(' · ').every((part) => /^(?:[A-Z]{3} )?[-−]?0+(?:\.0+)?%?$/u.test(part.trim()));
+export const nought = (text: string): boolean => text.split(' · ').every((part) => /^(?:[A-Z]{3} )?[-−]?0+(?:\.0+)?%?$/u.test(part.trim()));
 
 /**
  * The line the rules say, filled: each hole written as a person reads it, a clause whose figure has no value or is
