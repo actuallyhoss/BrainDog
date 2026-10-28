@@ -39,7 +39,7 @@ test('A CLAIM NAMES THIS MACHINE AND ITS PROFILES BY NAME: the default one, each
   const env = { HOME: home };
   assert.deepEqual([...seatsHere(home, env).keys()].sort(), ['default', 'garden', 'harbour']);
   const said = claimArgs(home, env, 'kiln-mbp');
-  assert.deepEqual(said, { wait: 20, host: 'kiln-mbp', seats: ['default', 'garden', 'harbour'] });
+  assert.deepEqual(said, { wait: 20, host: 'kiln-mbp', seats: ['default', 'garden', 'harbour'], repos: [] });
   assert.ok(!JSON.stringify(said).includes(home), 'no folder is in a claim');
   assert.equal(claimArgs(home, env, 'two words').host, undefined, 'a machine name outside the grammar is not sent');
 
