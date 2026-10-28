@@ -64,7 +64,9 @@
      and one the record has not named yet is left unsaid rather than said as "At an organisation with no name yet". */
   const detailOf = (m: Member, at: number | null): string => {
     const r = roleOf(m.entry);
-    const r1 = r ? r.charAt(0).toUpperCase() + r.slice(1) : '';
+    /* A ROLE OF "Other" SAYS NOTHING: "Nordhaven Registry", not "Other at Nordhaven Registry". */
+    const other = role ? m.entry.fields[role] === 'other' : false;
+    const r1 = r && !other ? r.charAt(0).toUpperCase() + r.slice(1) : '';
     const where = at === null ? '' : namedOrg(at);
     if (!where) return r1;
     return r1 ? seenWords.roleAt(r1, where) : seenWords.at(where);

@@ -17,7 +17,7 @@ export const timelineWords = {
   heading: 'Activity',
   composer: 'Write a comment',
   send: 'Comment',
-  empty: 'Nothing has happened here yet.',
+  empty: 'No activity yet.',
 } as const;
 
 const timeOf = (iso: string): number => Date.parse(iso);
