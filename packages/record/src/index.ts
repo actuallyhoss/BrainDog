@@ -7327,9 +7327,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     });
 
   /**
-   * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held while only the runs move (`quietFor`): `boot` read every one three times, for the rail's
-   * count, `waits` and the queue, and `context` twice more, each weighing every question's cost again. Read, never
-   * changed: each reader filters and maps them into its own answer. `waitHeld` is the same queue in the order it waits.
+   * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held while only the runs move (`quietFor`): `boot` read every one three
+   * times, for the rail's count, `waits` and the queue, and `context` twice more, each weighing every question's cost
+   * again. Read, never changed: each reader filters and maps them into its own answer. `waitHeld` is the same queue in
+   * the order it waits.
    */
   const openHeld = new Map<string, Held<ReturnType<Kernel['openSuggestions']>>>();
   const openNow = (): ReturnType<Kernel['openSuggestions']> => quietFor(openHeld, '', () => kernel.openSuggestions());
@@ -9076,9 +9077,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * THE HOLDING PEN, HELD (`heldFor`) for a reader and what they turned down: it weighed every page and every list's use
-   * again on every `boot`, two thirds of `boot`'s time on a seed with nine hundred runs. What moves it without a write is
-   * the clock, which `HELD_MS` bounds.
+   * THE HOLDING PEN, HELD WHILE ONLY THE RUNS MOVE (`quietFor`) for a reader and what they turned down: it weighed every
+   * page and every list's use again on every `boot`, two thirds of `boot`'s time on a seed with nine hundred runs. What
+   * moves it without a write is the clock, which `QUIET_HELD_MS` bounds, and a run's heartbeat, which offers no page.
    */
   const penHeld = new Map<string, Held<ReturnType<typeof penFor>>>();
   /* AND HOW MUCH THE RECORD HAS BEEN USED, which the pen ranks by and which moves without a write: a list opened is a count
@@ -9239,7 +9240,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          they turned it off. A reader held to some lists is offered nothing, because every item is a page over a list. */
       pen:
         person !== null && readsEveryList(ctx) && prefs['pen.suggest'] !== false
-          ? heldFor(penHeld, JSON.stringify([readerKey(ctx), prefs['pen.dismissed'] ?? null, usedNow()]), () => penFor({
+          ? quietFor(penHeld, JSON.stringify([readerKey(ctx), prefs['pen.dismissed'] ?? null, usedNow()]), () => penFor({
               kernel,
               reads: (list) => readable(ctx, list) === null,
               pages: every,
