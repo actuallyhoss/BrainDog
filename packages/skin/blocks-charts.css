@@ -2294,6 +2294,11 @@
     text-decoration: line-through;
   }
 
+  /* IF INCOME STOPPED IS A QUESTION, NOT A LINE LEFT OUT: off, it read struck through, as if income had been crossed out. */
+  .forecast-chip.forecast-income[aria-checked='false'] .forecast-chip-label {
+    text-decoration: none;
+  }
+
   .forecast-chip-label {
     flex: 1 1 auto;
     min-inline-size: 0;
