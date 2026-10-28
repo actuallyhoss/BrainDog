@@ -48,7 +48,7 @@ const midSentence = (one: string): string =>
     .join('');
 
 export const lists = {
-  rowActions: 'What you can do here',
+  rowActions: 'Actions',
   /* A LIST THAT SAYS WHO HOLDS ITS ROWS (`hand:`) offers this view over its own, filtered to what is handed to you. */
   handedToMe: 'Handed to me',
   editValue: (field: string) => `Change ${field.toLowerCase()}`,
@@ -77,7 +77,7 @@ export const lists = {
      than values, and `e` on one of them did nothing and said nothing: `19 §4` is that the sheet
      documents the bindings by reading them, so a key it prints for the grid has to answer wherever
      the caret is. It became reachable the day clicking a cell started moving the caret to it. */
-  cellNoValue: 'That column is a control rather than a value, so there is nothing in it to change.',
+  cellNoValue: 'Nothing to change in this column.',
   setTo: (state: string) => `Set to ${state}`,
   markArchived: 'Archived',
   undoRow: 'Put back',
@@ -123,7 +123,7 @@ export const lists = {
      which is the thing `/decide` was just fixed for. This one names the field and says where the
      reason is. */
   rowFieldProblem: (names: string[]): string =>
-    `${list(names)} cannot be stored as typed. The reason is under the field.`,
+    `${list(names)} ${names.length === 1 ? 'needs' : 'need'} a fix, see under the field.`,
   /* `noFilters` WAS HERE, READING "Nothing here can be filtered yet." IT HAD NO SURFACE AND WANTS
      NONE. The bar is drawn at eight rows (`r/[register]/+page.svelte:2195`, `ENOUGH_TO_SIFT`), and
      what it always carries is the search box and Display; the pills come from the declared enums a
@@ -132,8 +132,8 @@ export const lists = {
   /* THE FILTERS WITH NO NUMBERS ON THEM, said in one line under the bar. The record would not count the list for this
      person (`countsWithheld`) or the count did not come back (`countsUnread`); either way the pills print no figure,
      since a 0 over a list that opens full is a count nobody can trust. The filters themselves still work. */
-  countsWithheld: 'The counts on these filters are not shown to you. The filters still work.',
-  countsUnread: 'The counts on these filters could not be read just now. The filters still work.',
+  countsWithheld: 'Counts are hidden for you.',
+  countsUnread: 'Counts could not be read.',
   /**
    * WHAT THE SEARCH BOX READS, SAID WHERE A SEARCH HAS FOUND NOTHING, because that is where somebody
    * is when it matters. It was also said under the bar on every visit, which is a screen explaining
@@ -147,14 +147,13 @@ export const lists = {
    * halden"* over a list where nine rows are Halden's is a dead end unless the screen says where the
    * words it does read come from.
    */
-  searchesOnly: (fields: string[]): string => `This box reads ${list(fields)}. For anything else, use the filters above.`,
+  searchesOnly: (fields: string[]): string => `Searches ${list(fields)} only. Use the filters for the rest.`,
 
   /* `displayOptions` SAT ON THIS LINE HOLDING THE WORD BELOW IT. One string, two keys, and the
      screen reads the second: `display` is the bar's button and the title of the sheet it opens
      (`r/[register]/+page.svelte:2329` and `:2938`). `dead-copy` excused it as a menu that names its
      sections directly, which is true of the menu and was never what the key was waiting for. */
   display: 'Display',
-  displayNote: 'Only affects your view of this list.',
   columns: 'Columns',
   always: 'always',
   showAll: 'Show every column',
@@ -242,7 +241,7 @@ export const lists = {
      row is read and changed in (`page/RowPanel.svelte`). */
   peek: 'Preview',
   /** Said when a key would move that panel off something typed and not saved. */
-  rowUnsaved: 'Save what you typed, or close the panel, before you move on.',
+  rowUnsaved: 'Save or close the panel first.',
   openRow: 'Open',
   copyId: 'Copy reference',
   copyLink: 'Copy link',
@@ -260,7 +259,7 @@ export const lists = {
      "has a number you can say" — so the sentence says it the way somebody would. */
   noSuchNumber: (one: string, seq: number | string) => `There is no ${one} numbered ${seq}`,
   /* Row writes (lane A) */
-  writeConflict: (row: string) => `${row} was changed somewhere else first. It now shows the latest version, so check it and try again.`,
+  writeConflict: (row: string) => `${row} changed elsewhere. Check the latest and try again.`,
   writeMarkSaved: 'Saved',
   writeBulk: (landed: number, total: number, state: string) =>
     landed === total ? `${total} ${total === 1 ? 'item' : 'items'} set to ${state}.` : `${landed} of ${total} set to ${state}.`,
@@ -268,8 +267,8 @@ export const lists = {
   writeMarkRestored: 'Restored',
   viewEmpty: 'Nothing matches this view yet.',
   viewTitle: (list: string, reads: string) => `${list}: ${reads}`,
-  viewSaved: (title: string) => `Saved ${title}. It is under Views.`,
-  viewNeedsFilter: 'Filter or search the list first. What is on screen is what a view saves.',
+  viewSaved: (title: string) => `Saved ${title} under Views.`,
+  viewNeedsFilter: 'Filter or search first.',
   /* Lane I */
   /**
    * EDITING A ROW WHERE IT IS READ, which is the half this screen did not have.
@@ -303,7 +302,7 @@ export const lists = {
   rowSeeChart: 'See its chart',
   rowRestored: (what: string) => `${what} is back.`,
   /* The row is archived: said on the row, because every list leaves it out and nothing else here would. */
-  rowArchivedNote: 'This is archived. It is left out of every list until it is put back.',
+  rowArchivedNote: 'Archived, so left out of every list.',
   /* What points at this row, when the record refuses that read alone: the sections are absent and the
      reason is said once, rather than the page looking like nothing points here. */
   linksRefused: 'What points here could not be read',
