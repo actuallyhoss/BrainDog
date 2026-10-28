@@ -26,7 +26,7 @@
 import { codeOf, fixOf, no, ok, type Result, type Sql } from '@braindog/ports';
 
 import { ulid, type Core } from './call.ts';
-import { PROMPTS } from './prompts.ts';
+import { CHAT_ANSWER_SCHEMA, PROMPTS } from './prompts.ts';
 import { firstBytes, isRecord, tokens } from './project.ts';
 import type { CallContext, ChatAction, ChatActed, ChatEvent, ChatFigure, ChatInput, ChatRan, ChatRun, ChatThread, ChatThreads, ChatTool, ChatTools, Inference } from './types.ts';
 
@@ -48,6 +48,8 @@ const TURN_CHARS = 1_200;
 const TURNS_KEPT = 40;
 /** The most ids one answer has turned into links. */
 const REFS_MOST = 10;
+/** The most of the line naming the lists the model is shown. */
+const LISTS_CHARS = 1_600;
 
 /** Slash's own tables for a conversation, beside the ledger, each made once and never altered. */
 const DDL: readonly string[] = [
@@ -137,8 +139,12 @@ const holds = (value: number, evidence: readonly number[], scaled: boolean): boo
   });
 };
 
-/** The sentences of an answer, each with the space that followed it. */
-const sentences = (text: string): string[] => text.split(/(?<=[.!?])\s+/u).filter((s) => s.trim() !== '');
+/**
+ * The sentences of an answer, each with the space that followed it, so they join back as they were written. A line is a
+ * sentence too: an answer that lists a few things one to a line keeps its lines, where joining on a space ran them into
+ * one paragraph.
+ */
+const sentences = (text: string): string[] => (text.match(/[^\n]*?(?:[.!?](?=\s|$)|\n|$)\s*/gu) ?? []).filter((s) => s.trim() !== '');
 
 /**
  * The answer with every figure no evidence holds taken out, the sentence it stood in with it, and how many went.
@@ -156,7 +162,7 @@ export const checkFigures = (answer: string, evidence: readonly number[]): { tex
     }
     return true;
   });
-  return { text: kept.join(' ').trim(), dropped };
+  return { text: kept.join('').trim(), dropped };
 };
 
 /** `tasks#41`, the one form a link is drawn from. */
@@ -167,7 +173,12 @@ const QUALIFIED = /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u;
  * taken out: the answer is prose, and a brace the screen cannot draw would print as itself. `figures` names each row
  * linked, so the screen draws a link by the row's own name.
  */
-const linked = async (answer: string, tools: ChatTools): Promise<{ text: string; figures: ChatFigure[] }> => {
+const linked = async (said: string, tools: ChatTools): Promise<{ text: string; figures: ChatFigure[] }> => {
+  /* AN ID AS THE RESULTS PRINT IT, `(tasks#3)` or bare, IS A LINK TOO: the included model copies an id the way it read
+     it as often as it writes the brace it was asked for, and an id left as text is a code a person cannot press. */
+  const answer = said
+    .replace(/\s*\(\s*([a-z][a-z0-9_]*#[1-9][0-9]*)\s*\)/gu, ' {{ref:$1}}')
+    .replace(/(?<![{:\w#])([a-z][a-z0-9_]*#[1-9][0-9]*)(?![\w}])/gu, '{{ref:$1}}');
   const asked = [...new Set([...answer.matchAll(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu)].map((m) => m[1] ?? ''))].slice(0, REFS_MOST);
   const to = new Map<string, string | null>();
   const figures: ChatFigure[] = [];
@@ -181,7 +192,22 @@ const linked = async (answer: string, tools: ChatTools): Promise<{ text: string;
     to.set(id, at?.ref ?? null);
     if (at !== null && at.label !== '' && !figures.some((f) => f.ref === at.ref)) figures.push({ ref: at.ref, label: at.label });
   }
-  const text = answer
+  /* A ROW IS NAMED ONCE, BY ITS LINK. The screen draws a brace as the row's own name, so "Studio rent
+     {{ref:obligations#16}}" printed the name twice, and "Studio rent is late (obligations#16)" printed it at the end. Where
+     the row's name stands in the answer, the first place it stands becomes the link and the brace goes; where it does not,
+     the brace stays where it was written. */
+  let named = answer;
+  for (const [id, at] of to) {
+    const label = figures.find((f) => f.ref === at)?.label;
+    if (label === undefined || label.trim() === '') continue;
+    const escape = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    const brace = new RegExp(`\\s*\\(?\\s*\\{\\{\\s*ref:\\s*${escape(id)}\\s*\\}\\}\\s*\\)?`, 'gu');
+    const bare = named.replace(brace, ' ');
+    const said = new RegExp(`(["“'‘]?)${escape(label)}(["”'’]?)`, 'iu');
+    if (!said.test(bare.replace(/\{\{[^}]*\}\}/gu, (m) => ' '.repeat(m.length)))) continue;
+    named = bare.replace(said, `{{ref:${id}}}`);
+  }
+  const text = named
     .replace(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu, (_, id: string) => {
       const at = to.get(id);
       return at ? `{{ref:${at}}}` : '';
@@ -235,18 +261,40 @@ export const calc = (expr: string): number | null => {
 
 /* ── the prompt ──────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-type Turn = { role: 'you' | 'slash'; text: string };
+type Turn = { role: 'you' | 'slash'; text: string; actions?: string };
 type Done = { tool: string; args: Record<string, unknown>; text: string };
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const;
 
 const cut = (text: string, most: number): string => (text.length <= most ? text : `${text.slice(0, most)}… (cut here)`);
 
-/** The user message of one step: the day, where they are, the tools, the conversation, and what this turn has read. */
+/** A day as a person and as a field both say it: `Thursday 3 September 2026 (2026-09-03)`. */
+const dayOf = (ms: number): string => {
+  const d = new Date(ms);
+  return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} (${d.toISOString().slice(0, 10)})`;
+};
+
+/**
+ * What a turn did, as the next turn's model reads it: each action's title and the row it made or changed, so "mark that
+ * done" after an add names the row in one step. MEASURED: without it the model searched for the task it had just added,
+ * opened it, and only then changed it, three steps for a word.
+ */
+const actionsSaid = (actions: readonly ChatAction[]): string => {
+  const said = actions.map((a) => {
+    const row = /^\/r\/([^/]+)\/([1-9][0-9]*)$/u.exec(a.href ?? '');
+    const at = row ? ` (${decodeURIComponent(row[1]!)}#${row[2]})` : '';
+    return a.kind === 'done' ? `did: ${a.title}${at}` : `waiting for their yes: ${a.title}`;
+  });
+  return said.length === 0 ? '' : ` [${said.join('; ')}]`;
+};
+
+/** The user message of one step: the day, where they are, their lists, the tools, the conversation, and what this turn has read. */
 const promptOf = (a: {
   now: number;
   page: ChatInput['page'];
   outside: string | null;
+  lists: string;
   tools: readonly ChatTool[];
   before: readonly Turn[];
   message: string;
@@ -254,18 +302,20 @@ const promptOf = (a: {
   last: boolean;
   short: number;
 }): string => {
-  const day = new Date(a.now);
-  const lines: string[] = [`Today is ${DAYS[day.getUTCDay()]} ${day.toISOString().slice(0, 10)}.`];
+  const lines: string[] = [`Today is ${dayOf(a.now)}. Tomorrow is ${dayOf(a.now + 86_400_000)}.`];
   if (a.page !== undefined) {
     const where = [a.page.title, a.page.path].filter((s) => typeof s === 'string' && s.trim() !== '').join(', ');
     lines.push(`They are looking at ${where}${a.page.row ? `, on ${a.page.row}` : ''}. "This" or "here" means that.`);
   }
   if (a.outside !== null) lines.push(`This turn read ${a.outside}, so anything you do now waits for their yes.`);
-  lines.push('', 'Tools, as name(args): what it does.');
-  for (const t of a.tools) lines.push(`${t.name}(${t.args}): ${t.about}`);
+  if (a.lists !== '') lines.push('', `Their lists, as name (id, rows): ${a.lists}.`);
+  if (!a.last) {
+    lines.push('', 'Tools, as name(args): what it does.');
+    for (const t of a.tools) lines.push(`${t.name}(${t.args}): ${t.about}`);
+  }
   if (a.before.length > 0) {
     lines.push('', 'The conversation so far:');
-    for (const t of a.before) lines.push(`${t.role === 'you' ? 'They said' : 'You said'}: ${cut(t.text, TURN_CHARS)}`);
+    for (const t of a.before) lines.push(`${t.role === 'you' ? 'They said' : 'You said'}: ${cut(t.text, TURN_CHARS)}${t.actions ?? ''}`);
   }
   lines.push('', `Now they say: ${a.message}`);
   if (a.done.length > 0) {
@@ -275,7 +325,13 @@ const promptOf = (a: {
       lines.push(`[${i + 1}] ${d.tool} ${JSON.stringify(d.args)}`, cut(d.text, older ? RESULT_SHORT : RESULT_CHARS), '');
     });
   }
-  lines.push(a.last ? 'Answer now from what you have, with "calls": [].' : 'Call tools, or answer with "calls": [].');
+  lines.push(
+    a.last
+      ? 'Answer them now from what you have, in "say". If it does not answer them, say what you found and what is missing.'
+      : a.done.length === 0
+        ? 'Call the tools that answer this, or answer with "calls": [] if it needs nothing from the record.'
+        : 'Answer with "calls": [] if this is enough. Otherwise call again.',
+  );
   return lines.join('\n');
 };
 
@@ -319,8 +375,18 @@ export const chats = (core: Core): Chat => {
 
   const turnsOf = (thread: string, most: number): Turn[] =>
     sql
-      .all<Turn>('SELECT role, text FROM slash_turn WHERE thread = ? ORDER BY n DESC LIMIT ?', thread, most)
-      .reverse();
+      .all<{ role: 'you' | 'slash'; text: string; actions: string }>('SELECT role, text, actions FROM slash_turn WHERE thread = ? ORDER BY n DESC LIMIT ?', thread, most)
+      .reverse()
+      .map((t) => {
+        let acted: ChatAction[] = [];
+        try {
+          const parsed: unknown = JSON.parse(t.actions);
+          acted = Array.isArray(parsed) ? (parsed.filter(isRecord) as unknown as ChatAction[]) : [];
+        } catch {
+          acted = [];
+        }
+        return { role: t.role, text: t.text, actions: actionsSaid(acted) };
+      });
 
   const addTurn = (thread: string, role: 'you' | 'slash', text: string, actions: readonly ChatAction[] = []): void => {
     const n = (sql.one<{ n: number | null }>('SELECT MAX(n) AS n FROM slash_turn WHERE thread = ?', thread)?.n ?? 0) + 1;
@@ -366,17 +432,91 @@ export const chats = (core: Core): Chat => {
     addTurn(thread.id, 'you', message);
 
     const list = [...tools.list.filter((t) => t.name !== CALC.name), CALC];
+    let lists = '';
+    try {
+      lists = tools.context ? cut(await tools.context(), LISTS_CHARS) : '';
+    } catch {
+      lists = '';
+    }
     const named = new Map(list.map((t) => [t.name, t]));
     const run: ChatRun = { askOnly: false, asked: DOING.test(message), said: message, outside: null };
     const done: Done[] = [];
     const actions: ChatAction[] = [];
-    const figures: number[] = [...numbersIn(message), ...before.flatMap((t) => numbersIn(t.text)), ...numbersIn(now().slice(0, 10))];
+    /* WHAT A FIGURE MAY STAND IN BESIDE THE RESULTS: their words, the conversation, the lists' counts, today and tomorrow. */
+    const figures: number[] = [
+      ...numbersIn(message),
+      ...before.flatMap((t) => numbersIn(t.text)),
+      ...numbersIn(lists),
+      ...numbersIn(dayOf(clock.now())),
+      ...numbersIn(dayOf(clock.now() + 86_400_000)),
+    ];
     let reached = false;
     let calls = 0;
     let answer: string | null = null;
     let failed: string | null = null;
 
+    /** A tool call the engine runs, by the name the model gave it. */
+    type Asked = { name: string; args: Record<string, unknown> };
+    const runOne = async (c: Asked): Promise<ChatRan> => {
+      const tool = named.get(c.name);
+      if (tool === undefined) return { text: `There is no tool called ${c.name}. The tools are ${list.map((t) => t.name).join(', ')}.` };
+      if (tool.name === CALC.name) {
+        const v = calc(typeof c.args['expr'] === 'string' ? c.args['expr'] : '');
+        return v === null
+          ? { text: 'calc takes numbers with + - * / and brackets, such as "1250.50 + 300".', step: 'Working it out' }
+          : { text: `= ${String(v)}`, figures: [v], step: 'Working it out' };
+      }
+      try {
+        return await tools.call(c.name, c.args, { ...run });
+      } catch (e) {
+        return { text: `${c.name} could not be read just now: ${e instanceof Error ? e.message : String(e)}.` };
+      }
+    };
+
+    /* THE CALLS OF ONE STEP RUN TOGETHER, reads at once and writes one after another in the order asked, and are told in
+       that order, so a step that asks for cash and runway waits for the slower of the two and not for both. */
+    const runCalls = async (asked: readonly Asked[]): Promise<void> => {
+      const reads = asked.map((c) => (named.get(c.name)?.writes === true ? null : runOne(c)));
+      const outs: ChatRan[] = [];
+      for (const [i, c] of asked.entries()) outs.push(await (reads[i] ?? runOne(c)));
+      for (const [i, c] of asked.entries()) {
+        const out = outs[i]!;
+        const tool = named.get(c.name);
+        if (tool !== undefined) emit({ type: 'step', text: out.step ?? tool.about.split(/[.:,]/u)[0] ?? c.name });
+        /* OUTSIDE TEXT DROPS THE REST OF THE TURN TO ASKING, whatever the model reads next (the record's own rule). */
+        if (out.outside) {
+          run.outside ??= out.outside;
+          run.askOnly = true;
+        }
+        figures.push(...numbersIn(out.text), ...(out.figures ?? []));
+        done.push({ tool: c.name, args: c.args, text: out.text });
+        if (out.action !== undefined) {
+          const { op, ...shown } = out.action;
+          const action: ChatAction = { id: ulid(clock.now()), ...shown };
+          if (action.kind === 'ask')
+            sql.exec(
+              'INSERT INTO slash_act (id, thread, person, title, op, ts) VALUES (?, ?, ?, ?, ?, ?)',
+              action.id,
+              thread.id,
+              person,
+              action.title,
+              JSON.stringify(op ?? {}),
+              now(),
+            );
+          actions.push(action);
+          emit({ type: 'action', ...action });
+        }
+        if (out.navigate !== undefined) emit({ type: 'navigate', href: out.navigate.href, label: out.navigate.label });
+      }
+    };
+
     try {
+      /* THE READS THE MESSAGE PLAINLY WANTS, BEFORE THE FIRST MODEL CALL, so "how much cash do I have" is one call and not
+         two. Reads only, never a tool that writes, and they spend none of the turn's calls: they are the host's guess,
+         and the model may still call what it wants. */
+      const first = (tools.prefetch?.(message) ?? []).filter((c) => named.has(c.tool) && named.get(c.tool)?.writes !== true).slice(0, 2);
+      if (first.length > 0) await runCalls(first.map((c) => ({ name: c.tool, args: { ...c.args } })));
+
       for (let step = 0; step < STEPS_MOST && answer === null; step++) {
         const last = step === STEPS_MOST - 1 || calls >= CALLS_MOST;
         /* FITTED UNDER THE TEMPLATE'S CAP, the conversation's oldest turns first and then this turn's older results, so a
@@ -384,7 +524,7 @@ export const chats = (core: Core): Chat => {
         let kept = [...before];
         let short = done.length;
         const prompt = (): string =>
-          promptOf({ now: clock.now(), page: input.page, outside: run.outside, tools: list, before: kept, message, done, last, short });
+          promptOf({ now: clock.now(), page: input.page, outside: run.outside, lists, tools: list, before: kept, message, done, last, short });
         let text = prompt();
         const room = PROMPTS.chat.capIn - tokens(PROMPTS.chat.system) - 100;
         while (tokens(text) > room && kept.length > 0) {
@@ -398,7 +538,9 @@ export const chats = (core: Core): Chat => {
 
         const id = step === 0 ? holds[0]! : core.reserve('read', s.tier, model, STEPPED);
         if (step > 0) holds.push(id);
-        const ran = await core.run({ id: 'chat', slots: { '%TRANSCRIPT%': text }, inference, model: s.model ?? undefined });
+        /* THE LAST STEP CAN ONLY ANSWER: its schema has no calls, so a model that would have called again says what it has,
+           where before it called again, the calls were dropped and the person was told nothing was found. */
+        const ran = await core.run({ id: 'chat', slots: { '%TRANSCRIPT%': text }, inference, model: s.model ?? undefined, ...(last ? { schema: CHAT_ANSWER_SCHEMA } : {}) });
         reached ||= ran.served;
         core.account({
           id,
@@ -428,56 +570,12 @@ export const chats = (core: Core): Chat => {
           break;
         }
 
-        for (const call of wanted) {
-          if (calls >= CALLS_MOST) break;
-          calls++;
-          const name = typeof call['tool'] === 'string' ? call['tool'] : '';
-          const args = isRecord(call['args']) ? call['args'] : {};
-          const tool = named.get(name);
-          if (tool === undefined) {
-            done.push({ tool: name, args, text: `There is no tool called ${name}. The tools are ${list.map((t) => t.name).join(', ')}.` });
-            continue;
-          }
-          if (tool.name === CALC.name) {
-            const expr = typeof args['expr'] === 'string' ? args['expr'] : '';
-            const v = calc(expr);
-            emit({ type: 'step', text: 'Working it out' });
-            if (v !== null) figures.push(v);
-            done.push({ tool: name, args, text: v === null ? 'calc takes numbers with + - * / and brackets, such as "1250.50 + 300".' : `= ${String(v)}` });
-            continue;
-          }
-          let out: ChatRan;
-          try {
-            out = await tools.call(name, args, { ...run });
-          } catch (e) {
-            out = { text: `${name} could not be read just now: ${e instanceof Error ? e.message : String(e)}.` };
-          }
-          emit({ type: 'step', text: out.step ?? tool.about.split(/[.:,]/u)[0] ?? name });
-          /* OUTSIDE TEXT DROPS THE REST OF THE TURN TO ASKING, whatever the model reads next (the record's own rule). */
-          if (out.outside) {
-            run.outside ??= out.outside;
-            run.askOnly = true;
-          }
-          figures.push(...numbersIn(out.text), ...(out.figures ?? []));
-          done.push({ tool: name, args, text: out.text });
-          if (out.action !== undefined) {
-            const { op, ...shown } = out.action;
-            const action: ChatAction = { id: ulid(clock.now()), ...shown };
-            if (action.kind === 'ask')
-              sql.exec(
-                'INSERT INTO slash_act (id, thread, person, title, op, ts) VALUES (?, ?, ?, ?, ?, ?)',
-                action.id,
-                thread.id,
-                person,
-                action.title,
-                JSON.stringify(op ?? {}),
-                now(),
-              );
-            actions.push(action);
-            emit({ type: 'action', ...action });
-          }
-          if (out.navigate !== undefined) emit({ type: 'navigate', href: out.navigate.href, label: out.navigate.label });
-        }
+        const asked = wanted.slice(0, Math.max(0, CALLS_MOST - calls)).map((call) => ({
+          name: typeof call['tool'] === 'string' ? call['tool'] : '',
+          args: isRecord(call['args']) ? call['args'] : {},
+        }));
+        calls += asked.length;
+        await runCalls(asked);
       }
     } catch (e) {
       failed = `Slash stopped partway: ${e instanceof Error ? e.message : String(e)}.`;
@@ -501,7 +599,8 @@ export const chats = (core: Core): Chat => {
       text = actions.length > 0 ? 'Done.' : "I couldn't find that in the record.";
     }
 
-    if (text !== '') for (const piece of sentences(text)) emit({ type: 'delta', text: `${piece} ` });
+    /* EACH PIECE WITH THE SPACE IT WAS WRITTEN WITH, so the lines of a short list stay lines on the screen. */
+    if (text !== '') for (const piece of sentences(text)) emit({ type: 'delta', text: piece });
     if (failed !== null) emit({ type: 'error', text: failed });
     addTurn(thread.id, 'slash', text !== '' ? text : (failed ?? ''), actions);
     emit({ type: 'done', spent: { asks: reached ? 1 : 0, left: left() }, ...(cited.length === 0 ? {} : { figures: cited }) });

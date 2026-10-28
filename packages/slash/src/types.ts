@@ -506,6 +506,13 @@ export type ChatTools = {
   apply(op: Record<string, unknown>): Promise<Result<{ receipt: string; undo?: { batch: string } | undefined; href?: string | undefined }>>;
   /** An id a result printed, as the `register#seq` a link is drawn from and the row's own name, or `null`. */
   ref?(id: string): Promise<{ ref: string; label: string } | null>;
+  /** The lists the asker may read, named with their ids and counts in one line, which the model is shown before it calls anything. */
+  context?(): Promise<string>;
+  /**
+   * The reads a message plainly wants, run before the first model call so a plain question is answered in one: cash and
+   * spending ask for the figures, "what's late" for today. Reads only, and none for a message asking for something done.
+   */
+  prefetch?(message: string): readonly { tool: string; args: Record<string, unknown> }[];
 };
 
 /** A held action answered. */
