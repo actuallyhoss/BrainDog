@@ -1,6 +1,9 @@
 <!--
   The bell, on the desk's bar and the phone's head alike: a dot when something happened, never a count, and its menu is
   what happened, with Activity at its foot. What was asked is Needs you's, not the bell's.
+
+  SENT LEADS IT: what was handed to an agent and is still in flight (`send/SentTray.svelte`), fetched the first time the
+  bell opens so none of it is on a screen's first load, and read only while the menu is open.
 -->
 <script lang="ts">
   import { at } from '../at.ts';
@@ -8,6 +11,7 @@
   import Icon from '../ui/Icon.svelte';
   import Menu from '../ui/Menu.svelte';
   import { frame } from './frame.svelte.ts';
+  import type SentTrayView from '../send/SentTray.svelte';
 
   let { phone = false }: { phone?: boolean } = $props();
 
@@ -19,10 +23,16 @@
   } as const;
 
   const told = $derived(happened(frame.news));
+
+  let open = $state(false);
+  let SentTray = $state<typeof SentTrayView | null>(null);
+  $effect(() => {
+    if (open && SentTray === null) void import('../send/SentTray.svelte').then((m) => (SentTray = m.default));
+  });
 </script>
 
 <div class="bell" data-phone={phone ? '' : undefined}>
-  <Menu label={words.arrivals} align="end">
+  <Menu label={words.arrivals} align="end" bind:open>
     {#snippet trigger()}
       <span class="bell-face">
         <Icon name="bell" size={phone ? 'l' : 'm'} />
@@ -30,6 +40,7 @@
         <span class="sr-only">{told.length > 0 ? `${words.arrivals}. ${words.fresh}` : words.arrivals}</span>
       </span>
     {/snippet}
+    {#if open && SentTray}<SentTray />{/if}
     {#each told.slice(0, 6) as n, i (i)}
       <a class="bell-mi bell-news" role="menuitem" href={at(n.href)}><span class="mi-name">{n.text}</span></a>
     {:else}
