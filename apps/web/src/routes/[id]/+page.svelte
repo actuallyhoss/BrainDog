@@ -33,6 +33,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import NotFound from '$lib/ui/NotFound.svelte';
+  import PageHead from '$lib/ui/PageHead.svelte';
   import { nearest, shellPlaces } from '$lib/record/nearest.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
@@ -223,6 +224,7 @@
     </Empty>
   </div>
 {:else if done}
+  <PageHead title={shape === 'bare' || shape === 'spoken' ? (missing ?? raw) : copy.noPageCalled(raw)} headless />
   <div class="page">
     <!-- A NUMBER AND AN ID SAY NO MORE THAN WHAT WAS TYPED. The bodies used to teach the spelling of an id
          ("obligations#4", "SG31"), which is a developer's notation on a screen anybody reaches; what helps a person

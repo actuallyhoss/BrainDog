@@ -5,6 +5,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import NotFound from '$lib/ui/NotFound.svelte';
+  import PageHead from '$lib/ui/PageHead.svelte';
 
   /* WHICH FAILURE THIS IS decides the one line and the one button. A failed fetch has no status of its own, so the
      browser saying it is offline outranks it; a 429 may carry the seconds to wait as `retry_after`. */
@@ -17,6 +18,8 @@
   const stuck = $derived(said === words.broken);
 </script>
 
+<!-- THE PHONE'S BAR, with the mark, the bell and the face, over the page's own words; on a desk the crumb says it. -->
+<PageHead title={page.status === 404 && !offline ? words.missing : said.title} headless />
 <div class="page">
   <!--
     ONE SENTENCE IN THE HOUSE VOICE, AND IT WAS TWO. `page.error.message` is SvelteKit's string and

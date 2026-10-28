@@ -26,6 +26,7 @@
   import { copy } from '$lib/copy.ts';
   import { titleOf } from '$lib/title.ts';
   import Home from '$lib/home/Home.svelte';
+  import PageHead from '$lib/ui/PageHead.svelte';
 
   let { data } = $props();
 
@@ -37,6 +38,7 @@
 <svelte:head>{#if elsewhere && named !== null}<title>{titleOf(copy.noPageCalled(named))}</title>{/if}</svelte:head>
 
 {#if elsewhere && named !== null}
+  <PageHead title={copy.noPageCalled(named)} headless />
   <div class="nowhere">
     <!-- BY `import()`, as Work is: a mistyped address is rare, and Today's first load is not the place for it. -->
     {#await Promise.all([import('$lib/ui/NotFound.svelte'), import('$lib/record/nearest.ts')]) then [{ default: NotFound }, { nearest, shellPlaces }]}

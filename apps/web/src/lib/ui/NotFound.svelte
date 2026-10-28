@@ -4,7 +4,7 @@
 
   ONE SCREEN FOR BOTH DOORS A MISTYPED ADDRESS COMES THROUGH. A path that is one segment long reaches `routes/[id]`, the
   spoken-id resolver, before anything else can answer it, and every other unmatched path reaches `+error.svelte` at 404.
-  Both draw this, so the answer does not depend on how many slashes were typed, and the site says it in the same words.
+  Both draw this, so the answer does not depend on how many slashes were typed.
 
   NOT AN ALARM. `no-results`, not `error`: nothing failed, a string was typed and it names nothing, which is the same
   class of event as a search with no hits, and `error` would also settle the screen as refused.
@@ -28,15 +28,14 @@
 
   /* This screen's own words, in a `words` object in the module that draws them. */
   const words = {
-    title: "There's no page here",
-    body: 'The address may be mistyped, or the page has moved.',
+    title: copy.errorPage.missing,
     search: 'Search',
     signIn: 'Sign in',
   } as const;
 
   let {
     title = words.title,
-    body = words.body,
+    body,
     near = [],
   }: {
     /** The screen's heading, when the caller knows more than "nothing is here": a number that names no one list. */
