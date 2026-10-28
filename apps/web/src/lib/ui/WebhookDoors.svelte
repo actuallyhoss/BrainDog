@@ -165,7 +165,7 @@
 
 <!-- THE LINE FIRST, THEN ITS BUTTON: "New web address" in the heading's corner wrapped to a row of
      its own on a phone, above the sentence that says what it makes. -->
-<Tile class="section" data-surface="tile" title={copy.doorsTitle}>
+<Tile icon="link" class="section" data-surface="tile" title={copy.doorsTitle}>
   <div class="section-body">
     <p class="hint">{copy.doorsHow}</p>
     {#if owner}<div class="row-actions"><Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button></div>{/if}
