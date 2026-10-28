@@ -45,6 +45,7 @@
   import ProfileSheet from '$lib/agents/ProfileSheet.svelte';
   import ChatAnswer from '$lib/agents/ChatAnswer.svelte';
   import OnWord from '$lib/agents/OnWord.svelte';
+  import Apart from '$lib/agents/Apart.svelte';
   import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
   import { lineOf as appLineOf, madeByOther, partsOf } from '$lib/record/apps.ts';
@@ -776,6 +777,10 @@
   <!-- AGENTS MAY ANSWER WHEN YOU TELL THEM, the owner's one switch for answering on his word (`lib/agents/OnWord.svelte`):
        on until he turns it off, and off every agent asks. -->
   <OnWord prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+
+  <!-- AGENTS' SUGGESTIONS WAIT APART, the owner's one switch for Decide's shelf (`lib/agents/Apart.svelte`): on until he
+       turns it off, and off every suggestion waits in Needs you and is counted there. -->
+  <Apart prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
 
   <!-- CONNECT AN AGENT is the first tile's one primary; the sheet it opens is a chunk of its own, asked for on the first
        press, and the six-digit field rides in it under the setup line while no machine waits above. -->

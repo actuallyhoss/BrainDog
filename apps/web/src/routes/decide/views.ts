@@ -56,6 +56,10 @@ export const CALLS_READ = 50;
 /* THE SCREEN'S OWN WORDS, beside the only code that says them, until the Decide area has a copy file of its own. */
 export const WORDS = {
   later: 'Later',
+  /** The shelf of agents' suggestions beside Needs you: one press takes each, and none is counted as needing you. */
+  apart: 'Suggested by agents',
+  /** Its fold, with how many: "Suggested by agents · 9". */
+  apartSaid: (n: number) => `Suggested by agents · ${n.toLocaleString('en-GB')}`,
   /** The fold of what was put off, with how many and the soonest back (today F12): "Later · 22 · next back 1 Dec". */
   laterSaid: (n: number, back: string | null) => `Later · ${n.toLocaleString('en-GB')}${back ? ` · next back ${back}` : ''}`,
   calls: 'How the calls went',
@@ -247,6 +251,10 @@ export function decideHome(): DecideBody {
          the first the questions that move money and the second the rest, each question once, five showing in each. */
       { kind: 'queue', key: GROUP_KEY.money, heading: GROUP_WORDS.money, icon: 'money', source: 'governance.open', limit: QUEUE_MOST },
       { kind: 'queue', key: GROUP_KEY.quick, heading: GROUP_WORDS.quick, icon: 'decide', source: 'governance.open', limit: QUEUE_MOST },
+      /* AGENTS' SUGGESTIONS, OLDEST FIRST, on their own quieter shelf: an "Add this to Tasks?" one press takes and one Put
+         back undoes, never counted as needing you (`govern.ts` `apartOf`; a Settings switch puts them back). */
+      { kind: 'section', heading: WORDS.apart, icon: 'session', fold: true },
+      { kind: 'queue', source: 'governance.apart', limit: QUEUE_MOST },
       /* WHAT WAS PUT OFF, SOONEST BACK FIRST, folded: it is not waiting yet, and is one press away. */
       { kind: 'section', heading: WORDS.later, icon: 'clock', fold: true },
       { kind: 'queue', source: 'governance.later', limit: QUEUE_MOST },
@@ -489,8 +497,15 @@ export function decideDrawn(
     : arrived
       ? words.noQuestion
       : (calm ?? words.nothingWaiting);
+  /* AND THE SHELF OF AGENTS' SUGGESTIONS, BY HOW MANY, on its fold's own line. */
+  const apartAt = blocks.findIndex((b) => b.kind === 'queue' && b.source === 'governance.apart');
+  const apartHead =
+    apartAt > 0 && blocks[apartAt - 1]?.kind === 'section'
+      ? ((held) => ({ at: apartAt - 1, heading: ((n) => (n > 0 ? WORDS.apartSaid(n) : WORDS.apart))(Math.max(held.total, held.queue?.length ?? 0)) }))(blocks[apartAt]!)
+      : null;
   const later = shapedLater as { at: number; heading: string } | null;
-  const named = later ? shaped.map((b, n) => (n === later.at ? { ...b, heading: later.heading } : b)) : shaped;
+  const heads = [later, apartHead].filter((h): h is { at: number; heading: string } => h !== null);
+  const named = heads.length > 0 ? shaped.map((b, n) => ((h) => (h ? { ...b, heading: h.heading } : b))(heads.find((h) => h.at === n))) : shaped;
   const out = emptyHidden(named);
   return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn), groups, first };
 }
@@ -540,7 +555,7 @@ const answerWord = (v: unknown): string => (v === 'accept' ? copy.acceptIt : v =
  */
 export function decideBlockOf(b: Answered, now: number): LiveBlock {
   const refused = (Array.isArray(b.refusals) && b.refusals.length > 0) || b.drawn === false;
-  if (!refused && b.source === 'governance.later') return { ...blockOf({ ...b, source: 'governance.open' }, new Map(), now), source: 'governance.later' };
+  if (!refused && (b.source === 'governance.later' || b.source === 'governance.apart')) return { ...blockOf({ ...b, source: 'governance.open' }, new Map(), now), source: b.source };
   if (!refused && b.source === 'governance.decided') return decidedOf(b, now);
   return blockOf(b, new Map(), now);
 }

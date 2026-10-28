@@ -1858,7 +1858,7 @@ export function blockOf(
      block can say what it left out rather than drawing three of nine as though that were all of it. */
   /* WHAT WAS PUT OFF IS A QUEUE TOO: the same questions, each still open and waiting on its day, so it is read as the
      open one is and keeps its own source. */
-  if (b.source === 'governance.open' || b.source === 'governance.later') {
+  if (b.source === 'governance.open' || b.source === 'governance.later' || b.source === 'governance.apart') {
     const queue = queueOf(waiting);
     return queue ? { ...shell, queue, shown: queue.length, total: matched } : cannot;
   }
