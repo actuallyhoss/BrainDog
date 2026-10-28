@@ -179,6 +179,14 @@ test('AN OLDER COMMAND GETS ONE LINE AT THE END, and a build of the same day, or
   assert.ok(!shaped(draw(ctx({ session: run }), { build: '2026.10.01+1a2b3c4' })).has('Update'), 'behind with no oldest to be behind');
 });
 
+test('A COMMAND OLDER THAN THE HOST’S OWN BUILD IS BEHIND TOO, said once, though the door still works with it', () => {
+  const card = draw(ctx({ session: run }), { build: '2026.10.03+1a2b3c4', min_cli: '2026.10.01', serves: '2026.10.08+5d6e7f8' });
+  assert.equal(shaped(card).get('Update'), `This command is older than the record (built 6 days ago). ${OLDER}`);
+  assert.equal(card.split('Run braindog update').length - 1, 1, card);
+  assert.ok(!shaped(draw(ctx({ session: run }), { build: '2026.10.08+1a2b3c4', min_cli: '2026.10.01', serves: '2026.10.08+5d6e7f8' })).has('Update'), 'a build of the host’s own day was called behind');
+  assert.ok(!shaped(draw(ctx({ session: run }), { build: 'checkout', serves: '2026.10.08+5d6e7f8' })).has('Update'), 'a checkout was called behind');
+});
+
 /* ── names, controls, and the size ─────────────────────────────────────── */
 
 test('NAMES PRINT AS WRITTEN, accents and Arabic letters kept, in Waiting, Next and Learned', () => {

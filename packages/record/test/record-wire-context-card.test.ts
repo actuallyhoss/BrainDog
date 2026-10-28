@@ -78,7 +78,7 @@ test('CONTEXT CARRIES THE CARD, and the ahead header reaches its Next line as co
 });
 
 test('A COMMAND OLDER THAN THE DOOR is said on the card and in build, and doorHealth reads behind against the same min_cli', async () => {
-  const { sql, api, agent, attach, context } = await record({ app: '2026.10.09+abc1234', slash: false, min_cli: '2026.10.07' });
+  const { sql, api, clock, agent, attach, context } = await record({ app: '2026.10.09+abc1234', slash: false, min_cli: '2026.10.07' });
   const old = await agent('old', { cli: '2026.10.01+1a2b3c4' } as Record<string, string>);
   await attach(old);
   const here = await context(old);
@@ -87,10 +87,18 @@ test('A COMMAND OLDER THAN THE DOOR is said on the card and in build, and doorHe
 
   /* WHAT THE KEY LAST SAID, when this call says nothing: the token's own `last_build`. */
   const id = old.principal.kind === 'token' ? old.principal.id : assert.fail('not a key');
-  sql.exec('UPDATE token SET last_build = ? WHERE id = ?', '2026.10.08+5d6e7f8', id);
+  sql.exec('UPDATE token SET last_build = ? WHERE id = ?', '2026.10.09+5d6e7f8', id);
   const quiet = await context({ ...old, session: { ...old.session, cli: undefined } as CallContext['session'] });
-  assert.deepEqual(quiet.build, { cli: '2026.10.08+5d6e7f8', behind: false });
+  assert.deepEqual(quiet.build, { cli: '2026.10.09+5d6e7f8', behind: false });
   assert.ok(!(quiet.card ?? '').includes(OLDER));
+
+  /* OLDER THAN THE HOST'S OWN BUILD, though the door still works with it: behind, and said once. */
+  sql.exec('UPDATE token SET last_build = ? WHERE id = ?', '2026.10.08+5d6e7f8', id);
+  /* A minute on, since the same instant answers the card it already drew. */
+  clock.advance(60_000);
+  const lagging = await context({ ...old, session: { ...old.session, cli: undefined } as CallContext['session'] });
+  assert.deepEqual(lagging.build, { cli: '2026.10.08+5d6e7f8', behind: true });
+  assert.equal((lagging.card ?? '').split('Run braindog update').length - 1, 1, lagging.card);
 
   sql.exec('UPDATE token SET last_build = ? WHERE id = ?', '2026.10.01+1a2b3c4', id);
   const health = ok<DoorHealth>(await api.doorHealth({}, owner));

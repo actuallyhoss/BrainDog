@@ -9479,7 +9479,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * THE CONTEXT WITH ITS CARD (`card.ts`), so the start hook, `context` and `braindog context` print one text
    * made here by one set of rules, whatever build of the command sits on the machine. `build` says which command called
    * (its `x-braindog-cli` on this call, else what its key last said) and whether it is older than the oldest the door
-   * still works with (`Build.min_cli`), which is the card's last line when it is.
+   * still works with (`Build.min_cli`) or than the build this host serves (`Build.app`), which is the card's last line
+   * when it is.
    */
   const carded = (
     ctx: CallContext,
@@ -9500,6 +9501,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ...at,
       build: cli,
       min_cli: build?.min_cli ?? null,
+      serves: build?.app ?? null,
       decider: deciderOf(ctx),
       waiting: questionsFor(ctx),
       home: homeTitle(ctx),

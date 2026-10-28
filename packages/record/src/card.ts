@@ -46,7 +46,7 @@ const HANDOFFS_READ = 'braindog:handoffs';
 /** Said word for word whenever another run is working in the same repository (`docs/32-PARITY.md:142`). */
 export const TWO_SESSIONS = 'Two sessions in one working tree overwrite each other. Coordinate or stop.';
 
-/** Said when the command's build is older than the oldest the record's door still works with. */
+/** Said when the command's build is older than the oldest the record's door still works with, or than the host's own. */
 export const OLDER = 'Run braindog update and restart this session.';
 
 const DAY_S = 86_400;
@@ -72,6 +72,8 @@ export type CardAt = {
   ahead?: number | null | undefined;
   build?: string | null | undefined;
   min_cli?: string | null | undefined;
+  /** The build this host serves (`Build.app`): a command built on an earlier day is behind it too. */
+  serves?: string | null | undefined;
   /** Whom the questions wait on, by name, when the record said; "the owner" otherwise. */
   decider?: string | null | undefined;
   /** How many questions wait in all, when the record counted them: `context` sends only the newest. */
@@ -525,12 +527,16 @@ const dayOf = (build: string | null | undefined, bare: boolean): string | null =
 
 /**
  * The line that ends the card when the command that called was built on a day before the oldest the door still works
- * with, and how long ago it was built. A build that is not a build, a checkout's, says nothing: it is not called behind.
+ * with, or before the build this host serves, and how long ago it was built. A build that is not a build, a checkout's,
+ * says nothing: it is not called behind.
+ *
+ * THE HOST'S OWN BUILD TOO: held only to the oldest the door works with, a command five days behind the host was told
+ * nothing, while What shipped has arrived said it had not arrived.
  */
 function olderSlot(at: CardAt, now: number): Slot | null {
   const built = dayOf(at.build, false);
-  const min = dayOf(at.min_cli, true);
-  if (built === null || min === null || built >= min) return null;
+  const floors = [dayOf(at.min_cli, true), dayOf(at.serves, true)].filter((d): d is string => d !== null);
+  if (built === null || !floors.some((floor) => built < floor)) return null;
   const [y, m, d] = built.split('.').map(Number) as [number, number, number];
   const days = Math.floor((now - Date.UTC(y, m - 1, d)) / DAY_MS);
   const ago = Number.isFinite(days) && days >= 1 ? ` (built ${count(days, 'day')} ago)` : '';
