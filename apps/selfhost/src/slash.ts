@@ -35,6 +35,8 @@ import {
   slashModelOf,
   slashNamedEngine,
   slashOwnInference,
+  slashDeepFor,
+  slashDeepKeyOf,
   slashOwnKeyFor,
   slashOwnKeyOf,
   slashOwnModel,
@@ -512,8 +514,18 @@ export function slashDoor(
   const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
   /* THIS HOST'S ENDPOINT OPENS NO KEYCHAIN KEY, so the engine is handed on as built: there is no `grant.read` for an asker
      to sign unless the ask is on his own key, which `byok` above opens for them. */
+  /* DEEP, ON HIS ANTHROPIC KEY, opened for the asker as his own key is, and only where a key store can open one. */
+  const deep =
+    config === undefined || store === undefined
+      ? undefined
+      : async (ctx: CallContext) => slashDeepFor(slashDeepKeyOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(config, api, store, actor));
   /* AND A CONVERSATION'S TOOLS, built by the server over the record it holds (`@braindog/mcp/slash-tools`). */
-  return slashAskDoor(origins, () => slashEngineFor(config, api, store, deps), byok, { keychain, samples, ...(chat === undefined ? {} : { chat }) });
+  return slashAskDoor(origins, () => slashEngineFor(config, api, store, deps), byok, {
+    keychain,
+    samples,
+    ...(chat === undefined ? {} : { chat }),
+    ...(deep === undefined ? {} : { deep }),
+  });
 }
 
 /* ── erasing a person from Slash's ledger ─────────────────────────────────────────────────────────────────────────────── */

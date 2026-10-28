@@ -47,6 +47,9 @@ import {
   SlashAnsweredError,
   SlashKeyClosedError,
   answerOf,
+  slashDeepFor,
+  slashDeepKeyOf,
+  slashDeepTurn,
   slashGuardedEngine,
   slashOwnInference,
   slashOwnKeyFor,
@@ -935,8 +938,12 @@ function keyOnly(engine: Slash, sql: Sql): Slash {
   only.proposeSetup = (ask, ctx, inference) => (onOwnKey(sql) ? engine.proposeSetup(ask, ctx, inference) : refused());
   only.proposeMapping = (ask, ctx, inference) => (onOwnKey(sql) ? engine.proposeMapping(ask, ctx, inference) : refused());
   /* A CONVERSATION SAYS IT IN ITS OWN STREAM, and ends as every turn ends. */
-  only.chat = (input, ctx, tools, emit, inference) => {
-    if (onOwnKey(sql)) return engine.chat(input, ctx, tools, emit, inference);
+  /* DEEP NEEDS NO INCLUDED MODEL: it is his own Anthropic key, so a turn that may go deep goes there when quick has
+     nothing to answer with. */
+  only.chat = (input, ctx, tools, emit, inference, deep) => {
+    if (onOwnKey(sql)) return engine.chat(input, ctx, tools, emit, inference, deep);
+    if (slashDeepTurn(input, deep) !== null) return engine.chat({ ...input, mode: 'deep' }, ctx, tools, emit, inference, deep);
+    if (input.mode === 'deep' || input.rethink === true) return engine.chat(input, ctx, tools, emit, inference, deep);
     emit({ type: 'error', text: NO_MODEL_HERE });
     emit({ type: 'done', spent: { asks: 0, left: null } });
     return Promise.resolve();
@@ -1106,8 +1113,13 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, budget
   capped.proposeMapping = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeMapping(ask, ctx, inference));
   /* A TURN IS SEVERAL CALLS AT MOST `STEPS_MOST`, and is let in while two more fit, as a question's two passes are; the
      ceiling's sentence goes in the turn's own stream. */
-  capped.chat = (input, ctx, tools, emit, inference) => {
-    if (!spent(2)) return engine.chat(input, ctx, tools, emit, inference);
+  /* A TURN THAT GOES DEEP SPENDS NONE OF THE INCLUDED MODEL, so the ceiling does not hold it; `auto` past the ceiling
+     goes deep where it can. */
+  capped.chat = (input, ctx, tools, emit, inference, deep) => {
+    const going = slashDeepTurn(input, deep);
+    if (going === 'deep' || input.mode === 'deep' || input.rethink === true) return engine.chat(input, ctx, tools, emit, inference, deep);
+    if (!spent(2)) return engine.chat(input, ctx, tools, emit, inference, deep);
+    if (going === 'auto') return engine.chat({ ...input, mode: 'deep' }, ctx, tools, emit, inference, deep);
     const out = refused<never>();
     emit({ type: 'error', text: out.ok ? '' : 'refusal' in out ? out.refusal.fix : '' });
     emit({ type: 'done', spent: { asks: 0, left: 0 } });
@@ -1320,8 +1332,18 @@ export function workerSlashDoor(
   const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
   /* THE DAY'S CEILING, from the same ledger the month's count is read from (`slashDayStop`). */
   const day = async (): Promise<Refusal | null> => slashDayStop(deps.sql, Date.now());
+  /* DEEP, ON HIS ANTHROPIC KEY, opened for the asker as his own key is, and only where a key can be opened at all. */
+  const deep = isBound(env.KEK)
+    ? async (ctx: CallContext) => slashDeepFor(slashDeepKeyOf(deps.sql), api(), ctx, (_asker, actor) => wireOf(env, api, deps, actor))
+    : undefined;
   /* AND A CONVERSATION'S TOOLS, built by the object over the record it holds (`@braindog/mcp/slash-tools`). */
-  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { keychain, samples, day, ...(chat === undefined ? {} : { chat }) });
+  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, {
+    keychain,
+    samples,
+    day,
+    ...(chat === undefined ? {} : { chat }),
+    ...(deep === undefined ? {} : { deep }),
+  });
 }
 
 /* ── the daily look, and what it heard go wrong ───────────────────────────────────────────────────────────────────── */
