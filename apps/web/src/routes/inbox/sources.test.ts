@@ -78,8 +78,8 @@ test('the page draws that inbox as one tile, in place of the two tiles and the e
   assert.doesNotMatch(one, /<Tile\b/u, 'the one tile still draws the ways in or the rules beside it');
   assert.match(one, /title=\{quiet\.title\} body=\{quiet\.why\}/u);
   assert.match(one, /<Button weight="primary" href="\/settings\/ingest">\{quiet\.add\}<\/Button>/u, "the one thing to do is the primary (first F13)");
-  /* AND THE ONE STEP TO AN ADDRESS, where it is a command to copy. */
-  assert.match(one, /\{#if quiet\.command\}<CodeLine text=\{quiet\.command\}/u, 'the self-host command is not drawn to copy');
+  /* AND THE ONE STEP TO AN ADDRESS, where it is a command to copy, folded under one press. */
+  assert.match(one, /\{#if quiet\.command && quiet\.show\}[\s\S]*?<details\b[\s\S]*?<CodeLine text=\{quiet\.command\}/u, 'the self-host command is not drawn to copy');
   /* IT WAITS FOR THE TALLY, so the cleared inbox is never drawn first and swapped a moment later. */
   assert.match(markup, /\{:else if !refused && INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if !refused && never\}/u);
   assert.match(src, /const never = \$derived\(patterns\.length === 0 && nothingEver\(tally, ways, INBOX\.length\)\);/u);
@@ -98,7 +98,9 @@ test('X25: the empty Inbox says how to get the address, never "this BrainDog\'s 
   assert.equal(cmd, 'echo "https://studio.example/in/email/$(cat ${BRAINDOG_DATA:-/data}/the-studio/inbound.token)"');
   const self = quietOf('self-host', cmd);
   assert.equal(self.command, cmd);
-  assert.match(self.why, /where BrainDog runs/u);
+  assert.match(self.why, /address/u);
+  assert.equal(self.show, 'Print the address', 'the command is folded behind one press');
+  assert.equal(cloud.show, null, 'a hosted record is never shown the command');
   /* A HOST THAT DID NOT SAY WHICH IT IS IS TOLD THE CLOUD'S WAY, which needs no command. */
   assert.equal(quietOf(undefined, cmd).command, null);
 });

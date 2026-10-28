@@ -134,8 +134,9 @@ export function nothingEver(
   return ways === null || ways.every((w) => w.last === null);
 }
 
-/** The one tile's words: what the inbox is for, the one step to an address, and the press that adds a way in. */
-export type Quiet = { title: string; why: string; add: string; command: string | null };
+/** The one tile's words: what the inbox is for, the one step to an address, and the press that adds a way in. `show`
+ * opens the self-host's command, folded so the empty tile stays one line and one button. */
+export type Quiet = { title: string; why: string; add: string; command: string | null; show: string | null };
 
 /**
  * THE ONE STEP TO AN ADDRESS. It said "Forward mail to this BrainDog's address" and never said
@@ -146,6 +147,6 @@ export type Quiet = { title: string; why: string; add: string; command: string |
 export function quietOf(host: 'cloud' | 'self-host' | undefined, command: string | null): Quiet {
   const title = 'Nothing has come in yet';
   if (host === 'self-host' && command)
-    return { title, why: 'Run this where BrainDog runs to print your mail address.', add: 'Other ways in', command };
-  return { title, why: 'Make an address in What comes in, then forward mail to it.', add: 'Set up an address', command: null };
+    return { title, why: 'Forward mail to your BrainDog address.', add: 'Other ways in', command, show: 'Print the address' };
+  return { title, why: 'Make an address in What comes in, then forward mail to it.', add: 'Set up an address', command: null, show: null };
 }

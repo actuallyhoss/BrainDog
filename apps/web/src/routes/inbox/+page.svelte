@@ -758,7 +758,17 @@
          rules' figure and what waits would each say nothing, three times. -->
     <div class="clear">
       <Empty kind="no-data-yet" glyph="mail" title={quiet.title} body={quiet.why}>
-        {#snippet actions()}{#if quiet.command}<CodeLine text={quiet.command} />{/if}<Button weight="primary" href="/settings/ingest">{quiet.add}</Button>{/snippet}
+        {#snippet actions()}
+          <Button weight="primary" href="/settings/ingest">{quiet.add}</Button>
+          <!-- A SELF-HOST ONLY, FOLDED: the command that prints its address is a press away, so the tile is one line and
+               one button, and the command is never drawn on a hosted record. -->
+          {#if quiet.command && quiet.show}
+            <details class="quiet-how">
+              <summary class="tap">{quiet.show}</summary>
+              <CodeLine text={quiet.command} />
+            </details>
+          {/if}
+        {/snippet}
       </Empty>
     </div>
   {:else}
@@ -1134,6 +1144,27 @@
 {/snippet}
 
 <style>
+  /* THE SELF-HOST'S FOLD, under the one button: its summary a quiet line, and the command the tile's width when open. */
+  /* ITS OWN LINE UNDER THE BUTTON: the empty tile's actions take the tile's width here, so the fold wraps under them. */
+  .clear :global(.empty-actions) {
+    align-self: stretch;
+    justify-content: center;
+  }
+
+  .quiet-how {
+    flex-basis: 100%;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .quiet-how > summary {
+    cursor: pointer;
+  }
+
+  .quiet-how[open] > summary {
+    margin-block-end: var(--sp-2);
+  }
+
   .page {
     container-type: inline-size;
     display: flex;
