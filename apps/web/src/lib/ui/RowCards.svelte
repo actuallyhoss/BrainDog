@@ -73,6 +73,7 @@
     entries,
     href,
     picked,
+    menuHost,
     arrived,
     action,
     note,
@@ -84,6 +85,8 @@
     href?: (e: Entry) => string;
     /** Which rows are selected, by `seq`. Omitted where a surface has no bulk verbs. */
     picked?: ReadonlySet<number>;
+    /** A card's `data-menu-host`, so a right-click or a held thumb opens its "…" (or, by selector, another menu). */
+    menuHost?: ((seq: number) => string) | undefined;
     /** Which rows just arrived, by `seq`: each wears the neutral 1.5s wash, as the table's row does (VERIFY H24). */
     arrived?: ReadonlySet<number>;
     /** The trailing control on each card: the caller's, because the verbs are the caller's. */
@@ -340,7 +343,7 @@
       {@const holder = holderOf(e)}
       <!-- A CARD ADDED OR TAKEN AWAY ARRIVES AND LEAVES WITH THE LIST'S MOTION (motion F7.1), and the cards beside it
            close the gap: no card under it jumps. -->
-      <li class="card-line" data-row-seq={e.seq} data-picked={picked?.has(e.seq) ? '' : undefined} in:rowIn out:rowOut animate:flip={settle()}>
+      <li class="card-line" data-row-seq={e.seq} data-menu-host={menuHost?.(e.seq)} data-picked={picked?.has(e.seq) ? '' : undefined} in:rowIn out:rowOut animate:flip={settle()}>
         <a class="card" href={at(to(e))} data-arrived={arrived?.has(e.seq) ? '' : undefined}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
                what the row is before anything about it. ONE THING LEADS IT, the project's mark or, on a

@@ -57,6 +57,7 @@
     sort,
     focus = $bindable(),
     selected,
+    menuHost,
     chunk = TABLE_CHUNK,
     onactivate,
     onsort,
@@ -93,6 +94,8 @@
     sort?: { field: string; dir: 'asc' | 'desc' } | undefined;
     focus?: { row: number; col: number } | undefined;
     selected?: Set<string> | undefined;
+    /** A row's `data-menu-host`, so a right-click on it opens its "…" (or, by selector, another menu); absent, none. */
+    menuHost?: ((key: string) => string) | undefined;
     chunk?: number | undefined;
     onactivate?: ((row: TableRow) => void) | undefined;
     onsort?: ((field: string) => void) | undefined;
@@ -470,7 +473,7 @@
               >{/if}
 {/snippet}
 
-{#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {now} {rowActions} {act} />{/await}{:else if rowsAsCards()}
+{#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {menuHost} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {now} {rowActions} {act} />{/await}{:else if rowsAsCards()}
 <ul class="table-cards">
   {#each lines as line (line.kind === 'group' ? `\u0000${line.name}` : line.row.key)}
     {#if line.kind === 'group'}
@@ -578,6 +581,7 @@
               role="row"
               aria-rowindex={g * grouped.step + i + 2}
               aria-selected={selected ? selected.has(row.key) : undefined}
+              data-menu-host={menuHost?.(row.key)}
               data-intent={row.tone}
               data-focused={focus?.row === index ? '' : undefined}
               data-arrived={row.arrived ? '' : undefined}
@@ -609,6 +613,7 @@
             role="row"
             aria-rowindex={g * grouped.step + i + 2}
             aria-selected={selected ? selected.has(row.key) : undefined}
+            data-menu-host={menuHost?.(row.key)}
             data-intent={row.tone}
             data-focused={focus?.row === index ? '' : undefined}
             data-arrived={row.arrived ? '' : undefined}

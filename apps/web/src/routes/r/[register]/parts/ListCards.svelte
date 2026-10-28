@@ -19,13 +19,8 @@
   import RowCards from '$lib/ui/RowCards.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import type { Receipt } from './list.ts';
-  import { openSheet } from '$lib/send/open.ts';
-
-  /* A PRESS HELD THIS LONG ON A CARD SENDS IT (`$lib/send`): the send sheet rises from the bottom with the row attached. */
-  const HOLD_MS = 500;
-  /* A THUMB THAT MOVES THIS FAR IS SCROLLING, not holding. */
-  const SLOP = 10;
+  import { menuAt, type MenuAt } from '$lib/ui/context-menu.ts';
+  import { SELECTION_MENU, type Receipt } from './list.ts';
 
   let {
     register,
@@ -51,54 +46,13 @@
     /** There may be another page, so the list ends in a sentinel the page's observer watches. */
     more: boolean;
     receiptFor: (seq: number) => Receipt | undefined;
-    openCardMenu: (seq: number, el: HTMLElement) => void;
+    /** The row's menu, hung from its "…", or at the pointer when a right-click or a held thumb opened it. */
+    openCardMenu: (seq: number, el: HTMLElement, point?: MenuAt) => void;
   } = $props();
-
-  /* ── THE LONG PRESS ── a held thumb on a card, not on its "…" or its Undo. The click the lift would make is eaten, so the
-     card does not open under the sheet. */
-  let hold: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
-  let held = false;
-
-  function down(ev: PointerEvent) {
-    if (ev.pointerType === 'mouse') return;
-    const line = (ev.target as Element | null)?.closest<HTMLElement>('.card-line');
-    if (!line || (ev.target as Element).closest('button')) return;
-    const seq = Number(line.dataset.rowSeq);
-    const e = entries.find((x) => x.seq === seq);
-    if (!e) return;
-    held = false;
-    hold = {
-      x: ev.clientX,
-      y: ev.clientY,
-      timer: setTimeout(() => {
-        held = true;
-        hold = null;
-        navigator.vibrate?.(10);
-        void openSheet({ kind: register, attach: [{ ref: `${register}#${seq}`, label: display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow }] });
-      }, HOLD_MS),
-    };
-  }
-
-  function up() {
-    if (hold) clearTimeout(hold.timer);
-    hold = null;
-  }
-
-  function move(ev: PointerEvent) {
-    if (hold && Math.hypot(ev.clientX - hold.x, ev.clientY - hold.y) > SLOP) up();
-  }
-
-  function click(ev: MouseEvent) {
-    if (!held) return;
-    held = false;
-    ev.preventDefault();
-    ev.stopPropagation();
-  }
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="list-cards" onpointerdown={down} onpointerup={up} onpointercancel={up} onpointermove={move} onclickcapture={click} oncontextmenu={(ev) => (held || hold !== null) && ev.preventDefault()}>
-<RowCards {register} {entries} {now} {names} picked={selected} {arrived}>
+<div class="list-cards">
+<RowCards {register} {entries} {now} {names} picked={selected} {arrived} menuHost={(seq) => (selected.size > 1 && selected.has(seq) ? SELECTION_MENU : '')}>
   {#snippet action(e)}
     <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
          key: peek `p`, copy `y`, copy link `⇧Y`, archive `⌫`, select `x`. On the device
@@ -114,6 +68,8 @@
       type="button"
       class="card-more tap"
       aria-label={copy.moreOn(display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow)}
+      aria-haspopup="menu"
+      {@attach menuAt((p) => openCardMenu(e.seq, p.back ?? document.body, p))}
       onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
     >
       <!-- `m`, AND IT WAS `s`: a 12px box of a 24-unit path at `stroke-width: 1.6`, so each dot

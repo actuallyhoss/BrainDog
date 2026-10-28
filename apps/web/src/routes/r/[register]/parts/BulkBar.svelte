@@ -40,6 +40,7 @@
   import { movable, moveMany, movedSaid, moverAt, placesIn, putBackSaid, scopeFieldOf, words, type MovedMany, type MoveRow, type Place } from '$lib/record/scope-move.ts';
   import Button from '$lib/ui/Button.svelte';
   import Menu from '$lib/ui/Menu.svelte';
+  import { menuAt } from '$lib/ui/context-menu.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
@@ -86,6 +87,15 @@
     /** The ones picked as the send sheet attaches them. */
     send?: readonly Attached[] | undefined;
   } = $props();
+
+  /* THE SELECTION'S MENU: the bar's verbs, opened where a right-click or a held thumb lands on a picked row
+     (`SELECTION_MENU`), so the rows are acted on where they are. */
+  let menuRect = $state<{ x: number; y: number; height: number } | null>(null);
+  let menuOpen = $state(false);
+  const heard = menuAt((p) => {
+    menuRect = { x: p.x, y: p.y, height: p.height };
+    menuOpen = true;
+  });
 
   /* This part's own words: the short Clear at the bar's end, whose name says what it clears. */
   const barWords = { clear: 'Clear' } as const;
@@ -176,7 +186,7 @@
 
 <!-- It wraps rather than scrolls, so the verbs survive a narrow tile. On a phone it is placed on the window, above the
      tab bar, which `data-fixed` tells the shell's rail slide (`+layout.svelte`). -->
-<div class="picked-bar" data-fixed role="toolbar" aria-label="{count} {copy.selected}">
+<div class="picked-bar" data-fixed data-selection-menu role="toolbar" aria-label="{count} {copy.selected}" {@attach heard}>
   <span class="picked-n"><span class="num">{count}</span> {copy.selected}</span>
   {#if states.length}
     <Menu label={copy.setState(stateLabel)}>
@@ -215,6 +225,37 @@
     <Icon name="close" size="s" />{barWords.clear}<span class="picked-esc" aria-hidden="true"><Kbd keys="Esc" /></span>
   </button>
 </div>
+
+<Menu label="{count} {copy.selected}" bind:open={menuOpen} at={menuRect} onclose={() => (menuRect = null)}>
+  {#each states as state}
+    <button role="menuitem" type="button" onclick={() => setPickedState(state)}>
+      <Icon name="edit" size="s" /><span class="mi-name">{copy.setTo(saidInLine(decl?.state ?? '', state))}</span>
+    </button>
+  {/each}
+  {#if states.length}<hr />{/if}
+  <button role="menuitem" type="button" onclick={() => copyIds()}>
+    <Icon name="copy" size="s" /><span class="mi-name">{copy.copyIds}</span>
+  </button>
+  {#if canMove}
+    <button role="menuitem" type="button" onclick={openMove}>
+      <Icon name="arrow" size="s" /><span class="mi-name">{words.moveMany}</span>
+    </button>
+  {/if}
+  {#if canFold}
+    <button role="menuitem" type="button" disabled={folding} onclick={() => void fold()}>
+      <Icon name="link" size="s" /><span class="mi-name">{words.foldMany}</span>
+    </button>
+  {/if}
+  {#if archiveSelected}
+    <button role="menuitem" type="button" onclick={() => archiveSelected?.()}>
+      <Icon name="archive" size="s" /><span class="mi-name">{copy.archiveSelected}</span>
+    </button>
+  {/if}
+  <hr />
+  <button role="menuitem" type="button" onclick={() => onclear()}>
+    <Icon name="close" size="s" /><span class="mi-name">{copy.clear}</span>
+  </button>
+</Menu>
 
 {#snippet confirm()}
   <Button weight="primary" disabled={moving} onclick={() => void moveTo(null, true)}>{words.widenGo}</Button>

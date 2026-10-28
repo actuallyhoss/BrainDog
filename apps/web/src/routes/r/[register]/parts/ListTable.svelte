@@ -41,7 +41,8 @@
   import StateDot from '$lib/ui/StateDot.svelte';
   import { rowIn, rowOut, settle } from '$lib/ui/motion.ts';
   import { OWN_TYPES } from '$lib/ui/own.ts';
-  import { boxOf, deadlineOf, dotOf, dueOf, withoutGood, withoutZeros, type Receipt } from './list.ts';
+  import { menuAt, type MenuAt } from '$lib/ui/context-menu.ts';
+  import { SELECTION_MENU, boxOf, deadlineOf, dotOf, dueOf, withoutGood, withoutZeros, type Receipt } from './list.ts';
 
   let {
     register,
@@ -126,7 +127,8 @@
     cellKeys: (e: KeyboardEvent, enterCommits: boolean) => void;
     /** Absent for a caller whose level cannot change the list, and the row's Archive is then not drawn. */
     archive?: ((seq: number) => void) | undefined;
-    openCardMenu: (seq: number, el: HTMLElement) => void;
+    /** The row's menu, hung from its "…", or at the pointer when a right-click or a held thumb opened it. */
+    openCardMenu: (seq: number, el: HTMLElement, point?: MenuAt) => void;
   } = $props();
 
   /* THE PERSON'S OWN WORDS, AS WRITTEN (`data-own`, `lib/ui/own.ts`): a text field holds what somebody typed, which the
@@ -271,6 +273,7 @@
     href={at}
     {sort}
     selected={selectedKeys}
+    menuHost={(key) => (selectedKeys.size > 1 && selectedKeys.has(key) ? SELECTION_MENU : '')}
     bind:focus
     {onactivate}
     {onsort}
@@ -497,6 +500,8 @@
               class="verb icon tap"
               tabindex="-1"
               aria-label={copy.moreOn(name)}
+              aria-haspopup="menu"
+              {@attach menuAt((p) => openCardMenu(seq, p.back ?? document.body, p))}
               onclick={(e) => {
                 e.stopPropagation();
                 openCardMenu(seq, e.currentTarget);

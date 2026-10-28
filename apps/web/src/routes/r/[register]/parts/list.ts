@@ -959,3 +959,6 @@ export const headCount = (p: { matched: number; drawn: number }): number => Math
 /** THE FOOT WHILE THE REST IS ON ITS WAY, where the head now says the whole count: what is shown, and that more comes. */
 export const shownSaid = (shown: number, of: number): string =>
   `Showing ${shown.toLocaleString('en')} of ${of.toLocaleString('en')}. More as you scroll.`;
+
+/** A picked row's `data-menu-host` while more than one is picked: a right-click on it opens the selection's menu. */
+export const SELECTION_MENU = '[data-selection-menu]';

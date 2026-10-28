@@ -39,6 +39,7 @@
     sort,
     focus = $bindable(),
     selected,
+    menuHost,
     onactivate,
     onsort,
     onmore,
@@ -63,6 +64,8 @@
     sort?: { field: string; dir: 'asc' | 'desc' } | undefined;
     focus?: { row: number; col: number } | undefined;
     selected?: Set<string> | undefined;
+    /** A row's `data-menu-host`, so a right-click on it opens its "…" (or, by selector, another menu); absent, none. */
+    menuHost?: ((key: string) => string) | undefined;
     onactivate?: ((row: TableRow) => void) | undefined;
     onsort?: ((field: string) => void) | undefined;
     onmore?: (() => void) | undefined;
@@ -379,6 +382,7 @@
           role="row"
           aria-rowindex={n + 2}
           aria-selected={selected ? selected.has(row.key) : undefined}
+          data-menu-host={menuHost?.(row.key)}
           data-line={n}
           data-intent={row.tone}
           data-focused={focus?.row === index ? '' : undefined}

@@ -2467,6 +2467,8 @@
       }
       return;
     }
+    /* A ROW WITH ITS OWN "…" HAS HAD ITS MENU OPENED BY THE SHELL (`context-menu.ts`) when the focus is in it. */
+    if (e.defaultPrevented) return;
     if (e.shiftKey && e.key === 'F10') {
       e.preventDefault();
       openRowMenu();
@@ -2641,9 +2643,9 @@
   }
 
   /** The same menu, opened by touch from the card's own trailing control. */
-  function openCardMenu(seq: number, el: HTMLElement) {
+  function openCardMenu(seq: number, el: HTMLElement, point?: { x: number; y: number; height: number }) {
     const r = el.getBoundingClientRect();
-    menuAt = { x: r.x, y: r.y, height: r.height };
+    menuAt = point ? { x: point.x, y: point.y, height: point.height } : { x: r.x, y: r.y, height: r.height };
     menuSeq = seq;
   }
 
@@ -3265,6 +3267,7 @@
         {now}
         names={result.names ?? undefined}
         more={cursor !== null && loaded < DOM_CAP}
+        {openCardMenu}
       />
     {:else if rowsAsCards()}
       <ListCards

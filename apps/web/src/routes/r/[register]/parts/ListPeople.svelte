@@ -20,6 +20,7 @@
   import Face from '$lib/ui/Face.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import { foldPeople, folds, orgFieldOf, roleFieldOf, seenWords, type Member } from '../people.ts';
   import { daySaid, localDay } from '../[seq]/said.ts';
 
@@ -30,6 +31,7 @@
     now,
     names,
     more,
+    openCardMenu,
   }: {
     register: string;
     decl: RegisterDecl;
@@ -39,6 +41,8 @@
     names: Names | undefined;
     /** There may be another page, so the list ends in a sentinel the page's observer watches. */
     more: boolean;
+    /** A person's row menu, the list's own, at the pointer where a right-click or a held thumb opened it. */
+    openCardMenu?: ((seq: number, el: HTMLElement, point?: MenuAt) => void) | undefined;
   } = $props();
 
   const bands = $derived(foldPeople(entries, decl, localDay(now)));
@@ -77,7 +81,7 @@
 {#snippet person(m: Member, at_: number | null)}
   {@const name = nameOf(m.entry)}
   {@const detail = detailOf(m, at_)}
-  <a class="line line-tall" href={at(`/r/${register}/${m.entry.seq}`)}>
+  <a class="line line-tall" href={at(`/r/${register}/${m.entry.seq}`)} {@attach openCardMenu && ownMenu((p) => openCardMenu(m.entry.seq, document.body, p))}>
     <span class="line-mark"><Face {name} kind="person" you={m.self} size="m" /></span>
     <span class="line-main">
       <span class="line-title" dir="auto">{name}{#if m.self}<span class="you">{seenWords.you}</span>{/if}</span>

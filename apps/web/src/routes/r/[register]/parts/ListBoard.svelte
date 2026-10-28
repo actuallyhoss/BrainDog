@@ -28,7 +28,8 @@
   import Money from '$lib/ui/Money.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
   import { rowIn, rowOut } from '$lib/ui/motion.ts';
-  import { deadlineOf, dueOf, isDone, laneFieldOf, lanesOf, type Receipt } from './list.ts';
+  import { menuAt, type MenuAt } from '$lib/ui/context-menu.ts';
+  import { SELECTION_MENU, deadlineOf, dueOf, isDone, laneFieldOf, lanesOf, type Receipt } from './list.ts';
 
   let {
     register,
@@ -65,7 +66,8 @@
     /** There may be another page, so the cards end in a sentinel the page's observer watches. */
     more: boolean;
     receiptFor: (seq: number) => Receipt | undefined;
-    openCardMenu: (seq: number, el: HTMLElement) => void;
+    /** The row's menu, hung from its "…", or at the pointer when a right-click or a held thumb opened it. */
+    openCardMenu: (seq: number, el: HTMLElement, point?: MenuAt) => void;
     /** The field the lanes are, as Display chose it; absent is the list's state (`laneFieldOf`). */
     lane?: string | undefined;
     /** Absent for a caller whose level cannot change the list, and no card is draggable then. A card dropped in a
@@ -142,6 +144,7 @@
     class="bcard"
     data-mode={mode}
     data-row-seq={e.seq}
+    data-menu-host={selected.size > 1 && selected.has(e.seq) ? SELECTION_MENU : ''}
     data-picked={selected.has(e.seq) ? '' : undefined}
     data-cursor={cursor === e.seq ? '' : undefined}
     data-done={isDone(decl, e) ? '' : undefined}
@@ -181,7 +184,15 @@
       {#if selected.has(e.seq)}<span class="bcard-tick" role="img" aria-label={copy.selected}><Icon name="check" size="s" /></span>{/if}
     </a>
     <!-- OUTSIDE THE LINK, because a button inside a link is neither. The same menu the table's ⋯ opens. -->
-    <button type="button" class="bcard-more tap" aria-label={copy.moreOn(name)} title={copy.moreOn(name)} onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}>
+    <button
+      type="button"
+      class="bcard-more tap"
+      aria-label={copy.moreOn(name)}
+      title={copy.moreOn(name)}
+      aria-haspopup="menu"
+      {@attach menuAt((p) => openCardMenu(e.seq, p.back ?? document.body, p))}
+      onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
+    >
       <Icon name="more" size="m" />
     </button>
     {#if said}
