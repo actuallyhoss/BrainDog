@@ -66,7 +66,7 @@ export type SentOne = Omit<Told, 'job'> & {
   job: { id: string; status: string; cost_minor: number | null; cost_currency: string | null; ms: number | null } | null;
 };
 
-/** How recently a machine or a session must have been heard to be offered as live. */
+/** How recently a machine's runner must have claimed to be offered as live. */
 export const LIVE_MS = 2 * 60_000;
 
 /** The two kinds a machine runs a request as: reading and proposing, or changing files in one folder. */
@@ -187,10 +187,10 @@ export function methods(deps: RecordDeps) {
     return typeof v === 'string' && v.trim() !== '' ? (projectNamed(ctx, v.trim()) ?? null) : null;
   };
 
-  /** A project's title, for a label, or its spoken name when it has none. */
-  const projectTitle = (spoken: string): string => {
+  /** A project's title, for a label, or its spoken name when it has none or the caller is not shown it. */
+  const projectTitle = (ctx: CallContext, spoken: string): string => {
     const row = kernel.get(spoken);
-    return (row === null ? null : kernel.titleOfRow(row.id)) ?? spoken;
+    return (row === null || !sight.admits(ctx, row) ? null : kernel.titleOfRow(row.id)) ?? spoken;
   };
 
   /** The project a door is about: the one named, else the row's. */
@@ -205,10 +205,13 @@ export function methods(deps: RecordDeps) {
   const byJob = (token: string | null): boolean =>
     token !== null && (sql.one<{ label: string | null }>('SELECT label FROM token WHERE id = ?', token)?.label ?? '').startsWith('job:');
 
-  /** The sessions open now that were heard within `LIVE_MS`, as targets, those on `project` first. */
+  /**
+   * The sessions there now, as targets, those on `project` first. WHETHER ONE IS THERE IS THE ONE CLOCK'S
+   * (`presentRuns`, `packages/kernel/src/presence.ts`): its bridge pulsed lately, or it called lately where it has no
+   * pulse, so this list and the Agents page never say two numbers.
+   */
   const sessions = (ctx: CallContext, project: string | null): Target[] => {
     if (guard(ctx, 'read', 'session') !== null) return [];
-    const now = clock.now();
     const present = kernel.presentRuns();
     const shown = sight.admitted(ctx, 'session', present.map((r) => r.id));
     const of = (f: Record<string, unknown>, k: string): string | null => (typeof f[k] === 'string' && (f[k] as string).trim() !== '' ? (f[k] as string).trim() : null);
@@ -216,11 +219,10 @@ export function methods(deps: RecordDeps) {
     for (const r of present) {
       if (!shown.has(r.id)) continue;
       const f = r.fields as Record<string, unknown>;
-      const heard = Math.max(...[of(f, 'last_seen'), of(f, 'pulse_at')].map((v) => (v === null ? NaN : Date.parse(v))).filter(Number.isFinite), 0);
-      if (now - heard > LIVE_MS || of(f, 'parent') !== null || f.stopped === 'stop' || f.stopped === 'pause' || byJob(of(f, 'token_id'))) continue;
+      if (of(f, 'parent') !== null || f.stopped === 'stop' || f.stopped === 'pause' || byJob(of(f, 'token_id'))) continue;
       const run = kernel.nameOf(r.id);
       const where = of(f, 'project');
-      const label = [AGENT_SAID[of(f, 'agent') ?? ''] ?? 'An agent', machineCalled(of(f, 'host')), where === null ? of(f, 'repo') : projectTitle(where)].filter((x) => x !== null).join(' · ');
+      const label = [AGENT_SAID[of(f, 'agent') ?? ''] ?? 'An agent', machineCalled(of(f, 'host')), where === null ? of(f, 'repo') : projectTitle(ctx, where)].filter((x) => x !== null).join(' · ');
       out.push({
         id: `session:${run}`,
         kind: 'session',
@@ -262,10 +264,10 @@ export function methods(deps: RecordDeps) {
   };
 
   /** Whoever starts next on the project, as a target: never live, since it waits for a run to start. */
-  const nextTarget = (project: string | null): Target => ({
+  const nextTarget = (ctx: CallContext, project: string | null): Target => ({
     id: 'next',
     kind: 'next',
-    label: project === null ? 'Whoever starts next' : `Next Claude on ${projectTitle(project)}`,
+    label: project === null ? 'Whoever starts next' : `Next Claude on ${projectTitle(ctx, project)}`,
     detail: project === null ? 'Waits for the next Claude Code session to start, anywhere.' : 'Waits for the next Claude Code session on this project to start.',
     live: false,
     ...(project === null ? {} : { project }),
@@ -277,15 +279,15 @@ export function methods(deps: RecordDeps) {
   ];
 
   /** Who an instruction went to, as the strip says it. */
-  const routedOf = (i: Instr): { kind: TargetKind; label: string } => {
+  const routedOf = (ctx: CallContext, i: Instr): { kind: TargetKind; label: string } => {
     if (i.job !== null) return { kind: 'mac', label: `Claude on ${machineCalled(i.machine)}` };
     if (i.to === 'run' && i.to_run !== null) {
       const run = kernel.get(i.to_run, { includeDeleted: true });
-      const f = (run?.fields ?? {}) as Record<string, unknown>;
+      const f = (run !== null && sight.admits(ctx, run) ? run.fields : {}) as Record<string, unknown>;
       const agent = typeof f.agent === 'string' ? (AGENT_SAID[f.agent] ?? 'An agent') : 'A session';
       return { kind: 'session', label: `${agent} · ${machineCalled(typeof f.host === 'string' ? f.host : null)} (${i.to_run})` };
     }
-    return { kind: 'next', label: i.project === null ? 'Whoever starts next' : `Next Claude on ${projectTitle(i.project)}` };
+    return { kind: 'next', label: i.project === null ? 'Whoever starts next' : `Next Claude on ${projectTitle(ctx, i.project)}` };
   };
 
   /** The job behind an instruction as the strip reads it, and its last step as a line. */
@@ -318,14 +320,14 @@ export function methods(deps: RecordDeps) {
     let said = doing;
     if (said === null && i.state === 'working' && i.taken_by !== null && i.job === null) {
       const run = kernel.get(i.taken_by, { includeDeleted: true });
-      const d = (run?.fields as Record<string, unknown> | undefined)?.doing;
+      const d = run !== null && sight.admits(ctx, run) ? (run.fields as Record<string, unknown>).doing : undefined;
       said = typeof d === 'string' && d.trim() !== '' ? d.trim() : null;
     }
     const r = receiptsOf(sql, kernel, i, new Date(clock.now()).toISOString(), ctx, sight);
     const { batches, ...changed } = r ?? { batches: [] as Receipts['batches'] };
     return {
       ...toldOf(sql, i),
-      routed_to: routedOf(i),
+      routed_to: routedOf(ctx, i),
       seen: kernel.instructionSeen(i.id),
       receipts: batches.map((b) => ({
         batch: b.batch,
@@ -380,7 +382,7 @@ export function methods(deps: RecordDeps) {
       if (stray) return stray;
       const project = projectFor(ctx, a);
       const macs = admin(ctx, 'send a request to a machine') === null ? (await machines()).map((m) => m.target) : [];
-      return ok({ targets: [...SLASH, ...macs, ...sessions(ctx, project), nextTarget(project)], project });
+      return ok({ targets: [...SLASH, ...macs, ...sessions(ctx, project), nextTarget(ctx, project)], project });
     },
 
     /**
@@ -451,7 +453,7 @@ export function methods(deps: RecordDeps) {
           ...(repo === null ? {} : { repo }),
         });
         if (!made.ok) return tail(made as Result<never>);
-        return tail(ok({ id: made.value.id, routed_to: routedOf(made.value) }));
+        return tail(ok({ id: made.value.id, routed_to: routedOf(ctx, made.value) }));
       }
 
       if (kind === 'next') {
@@ -465,7 +467,7 @@ export function methods(deps: RecordDeps) {
           ...(profile === null ? {} : { seat: profile }),
         });
         if (!made.ok) return tail(made as Result<never>);
-        return tail(ok({ id: made.value.id, routed_to: routedOf(made.value) }));
+        return tail(ok({ id: made.value.id, routed_to: routedOf(ctx, made.value) }));
       }
 
       /* CLAUDE ON A MACHINE: STARTING A JOB IS THE OWNER'S, IN A BROWSER, as `createJob` is. */
@@ -514,7 +516,7 @@ export function methods(deps: RecordDeps) {
         kernel.jobs.cancel({ id: started.value.id });
         return tail(made as Result<never>);
       }
-      return tail(ok({ id: made.value.id, routed_to: routedOf(made.value), job: started.value.id }));
+      return tail(ok({ id: made.value.id, routed_to: routedOf(ctx, made.value), job: started.value.id }));
     },
 
     /** One send, by its spoken name (`IN12`): where it went, its state and reply, who saw it, what it is at, its receipts. */
@@ -636,11 +638,11 @@ export function methods(deps: RecordDeps) {
       const jobOpen = first.job !== null && ['queued', 'claimed'].includes(sql.one<{ status: string }>('SELECT status FROM job WHERE id = ?', first.job)?.status ?? '');
       if (first.job !== null && jobOpen) {
         const made = kernel.instruct(asPerson(ctx), { ...carried, ...where, kind: 'tell', to: 'agent', to_agent: 'claude', when: 'now', job: first.job, waits_ms: 86_400_000 });
-        return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(made.value), job: first.job }) : (made as Result<never>));
+        return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(ctx, made.value), job: first.job }) : (made as Result<never>));
       }
       if (first.job === null && runOpen) {
         const made = kernel.instruct(asPerson(ctx), { ...carried, ...(first.repo === null ? {} : { repo: first.repo }), kind: 'tell', to: 'run', to_run: first.taken_by!, when: 'now' });
-        return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(made.value) }) : (made as Result<never>));
+        return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(ctx, made.value) }) : (made as Result<never>));
       }
       if (first.job !== null) {
         /* THE SAME MACHINE, A FRESH JOB: the first one's ended, and its words are on the first send for the run to read. */
@@ -659,10 +661,10 @@ export function methods(deps: RecordDeps) {
           kernel.jobs.cancel({ id: started.value.id });
           return tail(made as Result<never>);
         }
-        return tail(ok({ id: made.value.id, routed_to: routedOf(made.value), job: started.value.id }));
+        return tail(ok({ id: made.value.id, routed_to: routedOf(ctx, made.value), job: started.value.id }));
       }
       const made = kernel.instruct(asPerson(ctx), { ...carried, ...where, kind: 'tell', to: 'agent', to_agent: first.to_agent ?? 'claude', when: 'next' });
-      return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(made.value) }) : (made as Result<never>));
+      return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(ctx, made.value) }) : (made as Result<never>));
     },
   };
 }
