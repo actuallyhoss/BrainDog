@@ -369,7 +369,10 @@ function partSaid(register: string, field: string, g: { key: string; label?: str
   /* A YES OR NO IS KEYED AS TEXT, `1` or `0`, which `display` read as yes either way: both parts of a split by "Counts as
      cash" said yes. The record's word for it, else the value it stands for. */
   if (fieldDecl(register, field)?.type === 'bool') return named ?? display(register, field, g.key === '1' || g.key === 'true') ?? g.key;
-  return display(register, field, g.key) ?? named ?? g.key;
+  /* A FIELD THIS BUILD DOES NOT KNOW (an add-on's list) HANDS THE KEY BACK AS IT CAME, so Where it sits read "gold" and
+     "fund" over the record's own "Gold" and "Fund": the record's label stands over a key said back unchanged. */
+  const shown = display(register, field, g.key);
+  return (shown === g.key ? named : null) ?? shown ?? named ?? g.key;
 }
 
 /**
