@@ -2844,11 +2844,22 @@ function applyPatches(deps: GovernDeps, asked: string, raw: unknown, actor: stri
         }
         version = met.version;
       }
+      /* AN ENTRY ALREADY AS ASKED IS LEFT AS IT IS, neither written nor counted as changed: what the pick says is already
+         true of it. Measured on a live record: two hundred entries were filed in their books by another answer, and "File
+         them" on the older question then wrote the same book onto each again, two hundred lines saying nothing. */
+      if (alreadySo(now.fields, r.patch)) continue;
       const made = applyUpdate(deps, list, { ...r, version }, actor, batch);
       if (!made.ok) return made as Result<Patched>;
       out.wrote.push(made.value.id);
     }
   return ok(out);
+}
+
+/** Whether every field a patch sets already holds that value, so writing it would change nothing. A delete never is. */
+function alreadySo(fields: string, patch: unknown): boolean {
+  if (!isPlain(patch) || Object.keys(patch).length === 0 || Object.hasOwn(patch, 'deleted_at')) return false;
+  const held = parse(fields) ?? {};
+  return Object.entries(patch).every(([f, v]) => canon(v ?? null) === canon(held[f] ?? null));
 }
 
 /** The line a pick that left some of its entries says, counted, so the owner knows what was not written and why. */
