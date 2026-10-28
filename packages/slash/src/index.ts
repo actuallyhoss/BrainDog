@@ -46,6 +46,7 @@ import { no, ok, type Result } from '@braindog/ports';
 
 import { answering } from './answer.ts';
 import { chats } from './chat.ts';
+import { DEEP_CAP, DEEP_GRANT, DEEP_HARDER, DEEP_MODEL, deepSetupOf, deepSpent } from './deep.ts';
 import { core as makeCore, openStore, TIERS } from './call.ts';
 import { patterns } from './jobs.ts';
 import { palette, setups } from './propose.ts';
@@ -68,6 +69,7 @@ import {
 
 export { eraseSlash } from './erase.ts';
 export { CALLS_MOST, STEPS_MOST, calc, checkFigures, numbersIn, openChat } from './chat.ts';
+export { DEEP_CALLS_MOST, DEEP_CAP, DEEP_CAP_CENTS_DEFAULT, DEEP_GRANT, DEEP_HARDER, DEEP_MODEL, DEEP_STEPS_MOST, DEEP_SYSTEM, deepMicros, deepToolOf, wantsDeep } from './deep.ts';
 export { health as engineHealth, said as engineSaid, ANSWER_STALE_DAYS, FAILS_DOWN, HEALTH_DAYS, LEDGER_ANSWERED, LEDGER_FAILED } from './health.ts';
 export type { EngineFacts, EngineHealth, EngineSaid } from './health.ts';
 export { STORE_VERSION } from './call.ts';
@@ -86,6 +88,7 @@ export type {
   ChatEvent,
   ChatFigure,
   ChatInput,
+  ChatMode,
   ChatRan,
   ChatRun,
   ChatThread,
@@ -93,6 +96,16 @@ export type {
   ChatTool,
   ChatTools,
   Citable,
+  Deep,
+  DeepBlock,
+  DeepCall,
+  DeepInference,
+  DeepMessage,
+  DeepReply,
+  DeepSetup,
+  DeepStream,
+  DeepTool,
+  DeepUsage,
   Inference,
   InferenceCall,
   InferenceReply,
@@ -282,6 +295,15 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
       asks: { used: key ? keyedAsks() : core.asksUsed(), cap: s.ask_cap, resets: core.resets(), capped: !key },
       /* AND THE RECORD'S OWN WORK BESIDE HIS, a count of its own (`spends = 'background'`), so Settings shows the two apart. */
       background: { used: core.backgroundUsed(), cap: BACKGROUND_ASKS_MONTH },
+      /* DEEP, ON HIS OWN ANTHROPIC KEY: set when he picked a key for it, or when his own key for Slash is Anthropic's. Its
+         spend is the month's, priced from what the provider counted (`deep.ts`), never a number of asks. */
+      deep: {
+        key: deepSetupOf(deps.sql).grant_id !== null || (key && own().provider === 'anthropic'),
+        model: DEEP_MODEL,
+        harder: DEEP_HARDER,
+        cap_cents: deepSetupOf(deps.sql).cap_cents,
+        spent_cents: Math.ceil(deepSpent(deps.sql, core.monthStart()) / 10_000),
+      },
     };
   };
 
@@ -298,9 +320,19 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
        his own key's form as he left it, and `status` is read by every signed-in person, so neither goes there: a
        colleague is not told which keychain grant the owner's key lives in. `updated_at` stays the last real save's. */
     if (Object.keys(patch).length === 0) {
-      const saved: Setup = { ...before, source: before.tier === 'b' ? 'key' : 'included', provider: stored.provider, base_url: stored.base_url };
+      const saved: Setup = { ...before, source: before.tier === 'b' ? 'key' : 'included', provider: stored.provider, base_url: stored.base_url, deep: deepSetupOf(deps.sql) };
       return ok(saved);
     }
+
+    /* DEEP'S KEY IS A GRANT IN THE KEYCHAIN, PICKED BY ITS ID AS HIS OWN KEY IS, and its cap a whole number of cents. The
+       host holds the grant to a live API token before this sees it (`slashGuardedEngine`). */
+    const deepBefore = deepSetupOf(deps.sql);
+    const deepGrant = patch.deep_grant_id === undefined ? deepBefore.grant_id : patch.deep_grant_id;
+    if (deepGrant !== null && !GRANT_ID.test(deepGrant))
+      return no('VALUE_MALFORMED', 'That is not a grant id. Put your Anthropic key in the keychain first, then pick it for Deep.', { at: 'deep_grant_id' });
+    const deepCap = patch.deep_cap_cents ?? deepBefore.cap_cents;
+    if (!Number.isInteger(deepCap) || deepCap < 0 || deepCap > 1_000_000)
+      return no('VALUE_MALFORMED', "Deep's monthly cap is a whole number of cents, and zero turns Deep off.", { at: 'deep_cap_cents' });
 
     if (patch.source !== undefined && !SOURCES.includes(patch.source))
       return no('ENUM_VALUE_UNKNOWN', 'Slash runs on the included model or on your own key.', { at: 'source', allowed: SOURCES });
@@ -375,6 +407,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
       updated_at: core.now(),
       provider: tier === 'b' ? (provider ?? 'openai') : provider,
       base_url: base,
+      deep: { grant_id: deepGrant, cap_cents: deepCap },
     };
     deps.sql.transactionSync(() => {
       deps.sql.exec(
@@ -387,6 +420,8 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
       );
       remember(OWN_PROVIDER, after.provider);
       remember(OWN_BASE_URL, after.base_url);
+      remember(DEEP_GRANT, after.deep.grant_id);
+      remember(DEEP_CAP, String(after.deep.cap_cents));
     });
     return ok(after);
   };

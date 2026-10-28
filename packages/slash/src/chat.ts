@@ -26,9 +26,46 @@
 import { codeOf, fixOf, no, ok, type Result, type Sql } from '@braindog/ports';
 
 import { ulid, type Core } from './call.ts';
+import {
+  ATTACH_MOST,
+  DEEP_CALLS_MOST,
+  DEEP_DDL,
+  DEEP_HARDER,
+  DEEP_MAX_TOKENS,
+  DEEP_MODEL,
+  DEEP_RESULT_CHARS,
+  DEEP_STEPS_MOST,
+  DEEP_SYSTEM,
+  DEEP_TURN_CHARS,
+  DEEP_TURNS_READ,
+  deepSetupOf,
+  deepSpend,
+  deepSpent,
+  deepToolOf,
+  wantsDeep,
+} from './deep.ts';
 import { CHAT_ANSWER_SCHEMA, PROMPTS } from './prompts.ts';
 import { firstBytes, isRecord, tokens } from './project.ts';
-import type { CallContext, ChatAction, ChatActed, ChatEvent, ChatFigure, ChatInput, ChatRan, ChatRun, ChatThread, ChatThreads, ChatTool, ChatTools, Inference } from './types.ts';
+import type {
+  CallContext,
+  ChatAction,
+  ChatActed,
+  ChatEvent,
+  ChatFigure,
+  ChatInput,
+  ChatMode,
+  ChatRan,
+  ChatRun,
+  ChatThread,
+  ChatThreads,
+  ChatTool,
+  ChatTools,
+  Deep,
+  DeepBlock,
+  DeepInference,
+  DeepMessage,
+  Inference,
+} from './types.ts';
 
 /** The most model calls one turn makes: read, read again, answer, and one to spare. */
 export const STEPS_MOST = 4;
@@ -84,6 +121,7 @@ const DDL: readonly string[] = [
 /** Make the conversation's tables where they are not yet. */
 export const openChat = (sql: Sql): void => {
   for (const statement of DDL) sql.exec(statement);
+  sql.exec(DEEP_DDL);
 };
 
 /** The tool the engine answers itself: arithmetic, so a total the answer says is one code worked out. */
@@ -446,6 +484,7 @@ const promptOf = (a: {
   done: readonly Done[];
   last: boolean;
   short: number;
+  sent?: readonly string[];
 }): string => {
   const lines: string[] = [`Today is ${dayOf(a.now)}. Tomorrow is ${dayOf(a.now + 86_400_000)}.`];
   if (a.page !== undefined) {
@@ -463,6 +502,7 @@ const promptOf = (a: {
     for (const t of a.before) lines.push(`${t.role === 'you' ? 'They said' : 'You said'}: ${cut(t.text, TURN_CHARS)}${t.actions ?? ''}`);
   }
   lines.push('', `Now they say: ${a.message}`);
+  if (a.sent !== undefined && a.sent.length > 0) lines.push(`They sent you these rows with it, read below: ${a.sent.join(', ')}.`);
   if (a.done.length > 0) {
     lines.push('', 'What your calls answered this turn:');
     a.done.forEach((d, i) => {
@@ -479,6 +519,58 @@ const promptOf = (a: {
   );
   return lines.join('\n');
 };
+
+/**
+ * The first user message of a deep turn: what `promptOf` says, less the tools (the provider is handed those) and with
+ * more of each result. The system text says none of this, so it stays one cached prefix with the tools.
+ */
+const deepPromptOf = (a: {
+  now: number;
+  page: ChatInput['page'];
+  outside: string | null;
+  lists: string;
+  before: readonly Turn[];
+  message: string;
+  done: readonly Done[];
+  sent: readonly string[];
+  rethink: boolean;
+}): string => {
+  const lines: string[] = [`Today is ${dayOf(a.now)}. Tomorrow is ${dayOf(a.now + 86_400_000)}.`];
+  if (a.page !== undefined) {
+    const where = [a.page.title, a.page.path].filter((s) => typeof s === 'string' && s.trim() !== '').join(', ');
+    lines.push(`They are looking at ${where}${a.page.row ? `, on ${a.page.row}` : ''}. "This" or "here" means that.`);
+  }
+  if (a.outside !== null) lines.push(`This turn read ${a.outside}, so anything you do now waits for their yes.`);
+  if (a.lists !== '') lines.push('', `Their lists, as name (id, rows): ${a.lists}.`);
+  if (a.before.length > 0) {
+    lines.push('', 'The conversation so far:');
+    for (const t of a.before) lines.push(`${t.role === 'you' ? 'They said' : 'You said'}: ${cut(t.text, DEEP_TURN_CHARS)}${t.actions ?? ''}`);
+  }
+  lines.push('', `Now they say: ${a.message}`);
+  if (a.rethink) lines.push('They asked you to think harder about this than the answer they had: look again, more carefully.');
+  if (a.sent.length > 0) lines.push(`They sent you these rows with it: ${a.sent.join(', ')}.`);
+  if (a.done.length > 0) {
+    lines.push('', 'Already read for this turn:');
+    a.done.forEach((d, i) => lines.push(`[${i + 1}] ${d.tool} ${JSON.stringify(d.args)}`, cut(d.text, DEEP_RESULT_CHARS), ''));
+  }
+  return lines.join('\n');
+};
+
+/** Dollars as a person reads a cap: `$10`, `$12.50`. */
+const dollars = (cents: number): string => `$${cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2)}`;
+
+/** What a deep call's throw says to the person, by the status the provider answered where it answered one. */
+const deepFailed = (e: unknown): string => {
+  const status = typeof e === 'object' && e !== null ? (e as { refused?: unknown }).refused : undefined;
+  if (status === 401 || status === 403) return 'Anthropic refused your key for Deep. Check the key in Keys, or pick another in Settings › Agents.';
+  if (status === 404) return 'Anthropic does not know the model Deep asked for on your key.';
+  if (status === 400) return 'Anthropic could not read what Deep sent. Try asking again.';
+  if (typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false) return e instanceof Error ? e.message : 'Your key did not open for Deep.';
+  return "Deep couldn't reach Anthropic just now. Try again in a moment.";
+};
+
+/** The sentence when Deep has no key here: the two ways it can answer. */
+const NO_DEEP_KEY = 'Deep answers on your own Anthropic key, and none is set. Add one in Settings › Agents, or send this to Claude on your Mac.';
 
 /* ── the answer as it streams ────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -571,7 +663,7 @@ const flowing = (evidence: readonly number[], tools: ChatTools, emit: (event: Ch
 /* ── the engine ──────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 export type Chat = {
-  chat(input: ChatInput, ctx: CallContext, tools: ChatTools, emit: (event: ChatEvent) => void, inference?: Inference): Promise<void>;
+  chat(input: ChatInput, ctx: CallContext, tools: ChatTools, emit: (event: ChatEvent) => void, inference?: Inference, deep?: Deep): Promise<void>;
   act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
   thread(id: string, ctx: CallContext): Result<ChatThread>;
   threads(ctx: CallContext): Result<ChatThreads>;
@@ -633,36 +725,93 @@ export const chats = (core: Core): Chat => {
     return s.tier === 'a' ? Math.max(0, s.ask_cap - core.asksUsed()) : null;
   };
 
-  const chat: Chat['chat'] = async (input, ctx, tools, emit, inference) => {
+  /** The thread's last question and the turns before it, for "Think harder", or `null` where it has none. */
+  const askedLast = (thread: string, most: number): { message: string; before: Turn[] } | null => {
+    const all = turnsOf(thread, TURNS_KEPT);
+    for (let i = all.length - 1; i >= 0; i--) if (all[i]!.role === 'you') return { message: all[i]!.text, before: all.slice(Math.max(0, i - most), i) };
+    return null;
+  };
+
+  /**
+   * Why Deep cannot answer now, or `null` where it can: no key set, a key the host could not open for this asker, the cap
+   * at zero, or the month's spend at the cap. Read on each turn, so a cap raised a second ago counts.
+   */
+  const deepNo = (deep: Deep | undefined): string | null => {
+    if (deep === undefined) return NO_DEEP_KEY;
+    if ('refused' in deep) return deep.refused;
+    const cap = deepSetupOf(sql).cap_cents;
+    if (cap <= 0) return 'Deep is off, since its monthly cap is zero. Raise it in Settings › Agents, or send this to Claude on your Mac.';
+    if (deepSpent(sql, core.monthStart()) >= cap * 10_000)
+      return `Deep has spent this month's cap of ${dollars(cap)} on your key. Raise it in Settings › Agents, or send this to Claude on your Mac.`;
+    return null;
+  };
+
+  const chat: Chat['chat'] = async (input, ctx, tools, emit, inference, deep) => {
     open();
     const person = who(ctx);
-    const message = firstBytes((typeof input.message === 'string' ? input.message : '').trim(), MESSAGE_BYTES);
+    const rethink = input.rethink === true;
+    const mode: ChatMode = rethink ? 'deep' : input.mode === 'deep' || input.mode === 'auto' ? input.mode : 'quick';
+    /* A PLAIN ANSWER WITH NO MODEL ASKED: one line, the hand-off where it is Deep that cannot answer, and the end. */
+    const plain = (text: string, mac: boolean): void => {
+      emit({ type: 'delta', text });
+      if (mac) emit({ type: 'route', to: 'mac' });
+      emit({ type: 'done', spent: { asks: 0, left: left() } });
+    };
+
+    /* "THINK HARDER" ASKS THE THREAD'S OWN LAST QUESTION AGAIN, in a thread of this person's and nobody else's. */
+    let message: string;
+    let again: { message: string; before: Turn[] } | null = null;
+    if (rethink) {
+      const owned = typeof input.thread === 'string' ? sql.one<{ person: string }>('SELECT person FROM slash_thread WHERE id = ?', input.thread) : undefined;
+      again = owned !== undefined && owned.person === person ? askedLast(input.thread!, DEEP_TURNS_READ) : null;
+      if (again === null) {
+        emit({ type: 'error', text: 'There is no question in this conversation to think harder about.' });
+        emit({ type: 'done', spent: { asks: 0, left: left() } });
+        return;
+      }
+      message = again.message;
+    } else message = firstBytes((typeof input.message === 'string' ? input.message : '').trim(), MESSAGE_BYTES);
     if (message === '') {
       emit({ type: 'error', text: 'Say something first.' });
       emit({ type: 'done', spent: { asks: 0, left: left() } });
       return;
     }
 
-    /* THE MONTH'S CHECK AND THE HOLD, WITH NO `await` BETWEEN THEM, for `read`'s reason (`propose.ts`). */
+    const why = deepNo(deep);
+    const brain: DeepInference | null = why === null && deep !== undefined && 'inference' in deep ? deep.inference : null;
+    if (mode === 'deep' && brain === null) {
+      plain(why ?? NO_DEEP_KEY, true);
+      return;
+    }
+
+    /* THE MONTH'S CHECK AND THE HOLD, WITH NO `await` BETWEEN THEM, for `read`'s reason (`propose.ts`). Deep spends none of
+       the included month: it is his key and his cap. `auto` goes deep at once for an ask that wants a plan or a why, and for
+       one quick could not take because its month is spent. */
     const s = core.settings();
-    if (s.tier === 'a' && core.asksUsed() >= s.ask_cap) {
+    let goDeep = mode === 'deep' || (mode === 'auto' && brain !== null && wantsDeep(message));
+    const quickOut = s.tier === 'a' && core.asksUsed() >= s.ask_cap;
+    const quickClosed = s.tier === 'b' && inference === undefined;
+    if (!goDeep && mode === 'auto' && brain !== null && (quickOut || quickClosed)) goDeep = true;
+    if (!goDeep && quickOut) {
       core.turnedAway('read', s.tier);
       emit({ type: 'error', text: `Slash is out of asks until ${core.resets().slice(0, 10)}. Add your own key in Settings, or wait.` });
+      if (mode === 'auto') emit({ type: 'route', to: 'mac' });
       emit({ type: 'done', spent: { asks: 0, left: 0 } });
       return;
     }
-    if (s.tier === 'b' && inference === undefined) {
+    if (!goDeep && quickClosed) {
       emit({ type: 'error', text: 'Your key is not open in this session. Open the keychain, or switch Slash to the included model.' });
       emit({ type: 'done', spent: { asks: 0, left: null } });
       return;
     }
     const model = s.model ?? PROMPTS.chat.model;
-    const holds: string[] = [core.reserve('read', s.tier, model, ASKED)];
+    const holds: string[] = goDeep ? [] : [core.reserve('read', s.tier, model, ASKED)];
 
-    const thread = threadFor(input.thread, person);
+    const thread = rethink ? { id: input.thread!, fresh: false } : threadFor(input.thread, person);
     emit({ type: 'thread', id: thread.id });
-    const before = thread.fresh ? [] : turnsOf(thread.id, TURNS_READ);
-    addTurn(thread.id, 'you', message);
+    const before = rethink ? again!.before.slice(-TURNS_READ) : thread.fresh ? [] : turnsOf(thread.id, TURNS_READ);
+    const beforeDeep = rethink ? again!.before : thread.fresh ? [] : turnsOf(thread.id, DEEP_TURNS_READ);
+    if (!rethink) addTurn(thread.id, 'you', message);
 
     const list = [...tools.list.filter((t) => t.name !== CALC.name), CALC];
     /* THE LISTS ARE READ WHILE THE PREFETCH RUNS, and awaited before the first model call reads them. */
@@ -681,14 +830,15 @@ export const chats = (core: Core): Chat => {
     /* WHAT A FIGURE MAY STAND IN BESIDE THE RESULTS: their words, the conversation, the lists' counts, today and tomorrow. */
     const figures: number[] = [
       ...numbersIn(message),
-      ...before.flatMap((t) => numbersIn(t.text)),
+      ...beforeDeep.flatMap((t) => numbersIn(t.text)),
       ...numbersIn(dayOf(clock.now())),
       ...numbersIn(dayOf(clock.now() + 86_400_000)),
     ];
     let reached = false;
     let calls = 0;
-    let answer: string | null = null;
-    let failed: string | null = null;
+    let answer = null as string | null;
+    let failed = null as string | null;
+    let mac = false as boolean;
 
     /** A tool call the engine runs, by the name the model gave it. */
     type Asked = { name: string; args: Record<string, unknown> };
@@ -709,8 +859,9 @@ export const chats = (core: Core): Chat => {
     };
 
     /* THE CALLS OF ONE STEP RUN TOGETHER, reads at once and writes one after another in the order asked, and are told in
-       that order, so a step that asks for cash and runway waits for the slower of the two and not for both. */
-    const runCalls = async (asked: readonly Asked[]): Promise<void> => {
+       that order, so a step that asks for cash and runway waits for the slower of the two and not for both. What each
+       answered comes back in the order asked, for a deep step to hand each result to the call that asked it. */
+    const runCalls = async (asked: readonly Asked[]): Promise<ChatRan[]> => {
       const reads = asked.map((c) => (named.get(c.name)?.writes === true ? null : runOne(c)));
       const outs: ChatRan[] = [];
       for (const [i, c] of asked.entries()) outs.push(await (reads[i] ?? runOne(c)));
@@ -743,9 +894,121 @@ export const chats = (core: Core): Chat => {
         }
         if (out.navigate !== undefined) emit({ type: 'navigate', href: out.navigate.href, label: out.navigate.label });
       }
+      return outs;
     };
 
     const flow = flowing(figures, tools, emit);
+
+    /* THE ROWS THEY SENT, read through the tools before any model is asked, as the asker, so a row they may not read is
+       refused in the tool's own words. Quick reads a few, to stay under its template's cap; deep reads them all. */
+    const sent = [...new Set((input.attach ?? []).filter((r): r is string => typeof r === 'string' && QUALIFIED.test(r)))].slice(0, goDeep || mode === 'auto' ? ATTACH_MOST : 3);
+
+    /**
+     * A deep turn, on the owner's key: the model is handed the tools themselves and the turn's reads so far, calls what it
+     * wants, and its answer streams through the same check every quick answer passes (`flow`). Each call is a row on the
+     * ledger under his key's tier and a line of Deep's spend, and the month's cap is read before each one.
+     */
+    const deepLoop = async (brainOf: DeepInference, deepModel: string): Promise<void> => {
+      emit({ type: 'brain', depth: 'deep', model: deepModel });
+      const offered = list.map(deepToolOf);
+      const messages: DeepMessage[] = [
+        {
+          role: 'user',
+          content: deepPromptOf({ now: clock.now(), page: input.page, outside: run.outside, lists, before: beforeDeep, message, done, sent, rethink }),
+        },
+      ];
+      const cap = deepSetupOf(sql).cap_cents * 10_000;
+      let used = 0;
+      /* WHAT HAS GONE OUT AS THE ANSWER, across steps, which `flow.feed` takes whole each time. */
+      let spoken = '';
+      for (let step = 0; step < DEEP_STEPS_MOST; step++) {
+        const last = step === DEEP_STEPS_MOST - 1 || used >= DEEP_CALLS_MOST;
+        if (deepSpent(sql, core.monthStart()) >= cap) {
+          failed = `Deep reached this month's cap on your key partway through, so it stopped there. Raise the cap in Settings › Agents.`;
+          mac = true;
+          return;
+        }
+        const id = core.reserve('read', 'b', deepModel, step === 0 ? ASKED : STEPPED);
+        holds.push(id);
+        /* THE WORDS OF A STEP ARE HELD until they are clearly an answer: the step ends without a call, or they run past a
+           sentence or two. Words the model wrote before calling a tool are its own note, said as a step and not the answer. */
+        let words = '';
+        let released = false;
+        const base = spoken === '' ? '' : `${spoken}\n\n`;
+        const started = clock.now();
+        let reply: Awaited<ReturnType<DeepInference['turn']>>;
+        try {
+          reply = await brainOf.turn(
+            { model: deepModel, system: DEEP_SYSTEM, tools: offered, messages, maxTokens: DEEP_MAX_TOKENS, effort: deepModel === DEEP_HARDER ? 'high' : 'medium', ...(last ? { toolChoice: 'none' as const } : {}) },
+            {
+              text: (piece) => {
+                words += piece;
+                if (!released && words.length >= 240) released = true;
+                if (released) flow.feed(`${base}${words}`, false);
+              },
+              tool: () => {
+                if (released || words.trim() === '') return;
+                emit({ type: 'step', text: cut(words.trim().split(/(?<=[.!?])\s/u)[0] ?? words.trim(), 120).replace(/ \(cut here\)$/u, '') });
+                words = '';
+              },
+            },
+          );
+        } catch (e) {
+          const answered = typeof e === 'object' && e !== null && (e as { answered?: unknown }).answered === true;
+          const usage = answered ? (e as { usage?: { in: number; out: number } }).usage : undefined;
+          if (answered)
+            core.account({ id, kind: 'read', tier: 'b', model: deepModel, usage: usage ?? { in: 0, out: 0 }, ms: clock.now() - started, status: 'error', code: 'UNREACHABLE', purpose: 'ask', spends: step === 0 ? 'person' : 'none', served: true });
+          failed = deepFailed(e);
+          return;
+        }
+        const u = reply.usage;
+        core.account({
+          id,
+          kind: 'read',
+          tier: 'b',
+          model: reply.model,
+          usage: { in: u.in + u.cacheRead + u.cacheWrite, out: u.out },
+          ms: clock.now() - started,
+          status: 'ok',
+          ...(step === 0 ? { question: message } : {}),
+          read: done.map((d) => ({ register: `@${d.tool}`, rows: 1, predicate: 'tool' })),
+          ...(step === 0 ? ASKED : STEPPED),
+          served: true,
+        });
+        deepSpend(sql, { id, ts: now(), model: reply.model, usage: u });
+
+        if (reply.stop === 'refusal') {
+          failed = 'Deep declined to answer that one.';
+          return;
+        }
+        const text = reply.content
+          .filter((b): b is DeepBlock & { text: string } => b.type === 'text' && typeof b['text'] === 'string')
+          .map((b) => b.text)
+          .join('');
+        const uses = reply.content.filter((b) => b.type === 'tool_use' && typeof b['id'] === 'string' && typeof b['name'] === 'string');
+        if (uses.length === 0 || last) {
+          /* THE ANSWER: whatever streamed of it, finished from the whole text, which is the same words. */
+          spoken = `${base}${released ? text : text.trim()}`;
+          answer = spoken.trim();
+          flow.feed(spoken, true);
+          return;
+        }
+        if (released) spoken = `${base}${text}`;
+        messages.push({ role: 'assistant', content: reply.content });
+        const room = Math.max(0, DEEP_CALLS_MOST - used);
+        const asked = uses.slice(0, room).map((b) => ({ name: String(b['name']), args: isRecord(b['input']) ? b['input'] : {} }));
+        used += asked.length;
+        const outs = await runCalls(asked);
+        const results: DeepBlock[] = uses.map((b, i) =>
+          i < outs.length
+            ? { type: 'tool_result', tool_use_id: String(b['id']), content: cut(outs[i]!.text, DEEP_RESULT_CHARS) }
+            : { type: 'tool_result', tool_use_id: String(b['id']), content: 'Not run: this turn has used its tool calls.', is_error: true },
+        );
+        if (step + 1 === DEEP_STEPS_MOST - 1 || used >= DEEP_CALLS_MOST)
+          results.push({ type: 'text', text: 'Answer them now from what you have. If it does not answer them, say what you found and what is missing.' });
+        messages.push({ role: 'user', content: results });
+      }
+    };
 
     try {
       /* THE READS THE MESSAGE PLAINLY WANTS, BEFORE THE FIRST MODEL CALL, so "how much cash do I have" is one call and not
@@ -753,83 +1016,109 @@ export const chats = (core: Core): Chat => {
          and the model may still call what it wants. */
       const first = (tools.prefetch?.(message) ?? []).filter((c) => named.has(c.tool) && named.get(c.tool)?.writes !== true).slice(0, 2);
       if (first.length > 0) await runCalls(first.map((c) => ({ name: c.tool, args: { ...c.args } })));
+      if (sent.length > 0 && named.has('open')) await runCalls(sent.map((ref) => ({ name: 'open', args: { id: ref } })));
       lists = await listing;
       figures.push(...numbersIn(lists));
 
-      for (let step = 0; step < STEPS_MOST && answer === null; step++) {
-        const last = step === STEPS_MOST - 1 || calls >= CALLS_MOST;
-        /* FITTED UNDER THE TEMPLATE'S CAP, the conversation's oldest turns first and then this turn's older results, so a
-           result the model is about to read is never the part that goes. */
-        let kept = [...before];
-        let short = done.length;
-        const prompt = (): string =>
-          promptOf({ now: clock.now(), page: input.page, outside: run.outside, lists, tools: list, before: kept, message, done, last, short });
-        let text = prompt();
-        const room = PROMPTS.chat.capIn - tokens(PROMPTS.chat.system) - 100;
-        while (tokens(text) > room && kept.length > 0) {
-          kept = kept.slice(1);
-          text = prompt();
-        }
-        while (tokens(text) > room && short > 1) {
-          short--;
-          text = prompt();
-        }
+      if (goDeep) {
+        if (mode === 'auto') emit({ type: 'step', text: 'Thinking harder…' });
+        await deepLoop(brain!, rethink ? DEEP_HARDER : DEEP_MODEL);
+      } else {
+        emit({ type: 'brain', depth: 'quick' });
+        /* `auto` HANDS A TURN QUICK CANNOT FINISH TO DEEP: one that would have to answer because its steps or calls ran out,
+           or whose model failed, before any word of it was shown. */
+        let handOff = false;
+        for (let step = 0; step < STEPS_MOST && answer === null; step++) {
+          const last = step === STEPS_MOST - 1 || calls >= CALLS_MOST;
+          if (last && mode === 'auto') {
+            if (brain !== null) {
+              handOff = true;
+              break;
+            }
+            mac = true;
+          }
+          /* FITTED UNDER THE TEMPLATE'S CAP, the conversation's oldest turns first and then this turn's older results, so a
+             result the model is about to read is never the part that goes. */
+          let kept = [...before];
+          let short = done.length;
+          const prompt = (): string =>
+            promptOf({ now: clock.now(), page: input.page, outside: run.outside, lists, tools: list, before: kept, message, done, last, short, sent });
+          let text = prompt();
+          const room = PROMPTS.chat.capIn - tokens(PROMPTS.chat.system) - 100;
+          while (tokens(text) > room && kept.length > 0) {
+            kept = kept.slice(1);
+            text = prompt();
+          }
+          while (tokens(text) > room && short > 1) {
+            short--;
+            text = prompt();
+          }
 
-        const id = step === 0 ? holds[0]! : core.reserve('read', s.tier, model, STEPPED);
-        if (step > 0) holds.push(id);
-        /* THE LAST STEP CAN ONLY ANSWER: its schema has no calls, so a model that would have called again says what it has,
-           where before it called again, the calls were dropped and the person was told nothing was found. */
-        /* THE ANSWER STREAMS AS IT IS WRITTEN, once the step says it calls nothing (the last step always answers), a
-           checked sentence at a time (`flow`). A step that calls is read whole, as before. */
-        const ran = await core.run({
-          id: 'chat',
-          slots: { '%TRANSCRIPT%': text },
-          inference,
-          model: s.model ?? undefined,
-          ...(last ? { schema: CHAT_ANSWER_SCHEMA } : {}),
-          onText: (sofar) => {
-            const seen = peekStep(sofar);
-            if (seen.say !== null && (last || seen.calls === 'none')) flow.feed(seen.say, false);
-          },
-        });
-        reached ||= ran.served;
-        core.account({
-          id,
-          kind: 'read',
-          tier: s.tier,
-          model: ran.model,
-          usage: ran.usage,
-          ms: ran.ms,
-          status: ran.out.ok ? 'ok' : 'error',
-          code: ran.out.ok ? undefined : codeOf(ran.out),
-          ...(step === 0 ? { question: message } : {}),
-          read: done.map((d) => ({ register: `@${d.tool}`, rows: 1, predicate: 'tool' })),
-          ...(step === 0 ? ASKED : STEPPED),
-          served: ran.served,
-          candidate: ran.candidate,
-          raw: ran.raw,
-        });
-        if (!ran.out.ok) {
-          failed = codeOf(ran.out) === 'UNREACHABLE' ? "Slash couldn't reach its model just now. Try again in a moment." : "Slash's model answered in a shape it could not read. Try asking again.";
-          break;
-        }
+          const id = step === 0 ? holds[0]! : core.reserve('read', s.tier, model, STEPPED);
+          if (step > 0) holds.push(id);
+          /* THE LAST STEP CAN ONLY ANSWER: its schema has no calls, so a model that would have called again says what it has,
+             where before it called again, the calls were dropped and the person was told nothing was found. */
+          /* THE ANSWER STREAMS AS IT IS WRITTEN, once the step says it calls nothing (the last step always answers), a
+             checked sentence at a time (`flow`). A step that calls is read whole, as before. */
+          const ran = await core.run({
+            id: 'chat',
+            slots: { '%TRANSCRIPT%': text },
+            inference,
+            model: s.model ?? undefined,
+            ...(last ? { schema: CHAT_ANSWER_SCHEMA } : {}),
+            onText: (sofar) => {
+              const seen = peekStep(sofar);
+              if (seen.say !== null && (last || seen.calls === 'none')) flow.feed(seen.say, false);
+            },
+          });
+          reached ||= ran.served;
+          core.account({
+            id,
+            kind: 'read',
+            tier: s.tier,
+            model: ran.model,
+            usage: ran.usage,
+            ms: ran.ms,
+            status: ran.out.ok ? 'ok' : 'error',
+            code: ran.out.ok ? undefined : codeOf(ran.out),
+            ...(step === 0 ? { question: message } : {}),
+            read: done.map((d) => ({ register: `@${d.tool}`, rows: 1, predicate: 'tool' })),
+            ...(step === 0 ? ASKED : STEPPED),
+            served: ran.served,
+            candidate: ran.candidate,
+            raw: ran.raw,
+          });
+          if (!ran.out.ok) {
+            if (mode === 'auto' && brain !== null && flow.shown() === '') {
+              handOff = true;
+              break;
+            }
+            failed = codeOf(ran.out) === 'UNREACHABLE' ? "Slash couldn't reach its model just now. Try again in a moment." : "Slash's model answered in a shape it could not read. Try asking again.";
+            if (mode === 'auto') mac = true;
+            break;
+          }
 
-        const spoken = typeof ran.out.value['say'] === 'string' ? ran.out.value['say'] : '';
-        const said = spoken.trim();
-        const wanted = (Array.isArray(ran.out.value['calls']) ? ran.out.value['calls'] : []).filter(isRecord).slice(0, 3);
-        if (wanted.length === 0 || last) {
-          answer = said;
-          /* AS IT WAS WRITTEN AND NOT TRIMMED, so it lines up with what streamed of it. */
-          flow.feed(spoken, true);
-          break;
-        }
+          const spoken = typeof ran.out.value['say'] === 'string' ? ran.out.value['say'] : '';
+          const said = spoken.trim();
+          const wanted = (Array.isArray(ran.out.value['calls']) ? ran.out.value['calls'] : []).filter(isRecord).slice(0, 3);
+          if (wanted.length === 0 || last) {
+            answer = said;
+            /* AS IT WAS WRITTEN AND NOT TRIMMED, so it lines up with what streamed of it. */
+            flow.feed(spoken, true);
+            break;
+          }
 
-        const asked = wanted.slice(0, Math.max(0, CALLS_MOST - calls)).map((call) => ({
-          name: typeof call['tool'] === 'string' ? call['tool'] : '',
-          args: isRecord(call['args']) ? call['args'] : {},
-        }));
-        calls += asked.length;
-        await runCalls(asked);
+          const asked = wanted.slice(0, Math.max(0, CALLS_MOST - calls)).map((call) => ({
+            name: typeof call['tool'] === 'string' ? call['tool'] : '',
+            args: isRecord(call['args']) ? call['args'] : {},
+          }));
+          calls += asked.length;
+          await runCalls(asked);
+        }
+        if (handOff) {
+          emit({ type: 'step', text: 'Thinking harder…' });
+          await deepLoop(brain!, DEEP_MODEL);
+        } else if (mode === 'auto' && wantsDeep(message)) mac = true;
       }
     } catch (e) {
       failed = `Slash stopped partway: ${e instanceof Error ? e.message : String(e)}.`;
@@ -858,6 +1147,8 @@ export const chats = (core: Core): Chat => {
 
     if (failed !== null) emit({ type: 'error', text: failed });
     addTurn(thread.id, 'slash', text !== '' ? text : (failed ?? ''), actions);
+    /* AND WHERE DEEP WAS WANTED AND COULD NOT ANSWER HERE, THE HAND-OFF, so the screen can offer Claude on their Mac. */
+    if (mac) emit({ type: 'route', to: 'mac' });
     const cited = flow.cited();
     emit({ type: 'done', spent: { asks: reached ? 1 : 0, left: left() }, ...(cited.length === 0 ? {} : { figures: cited }) });
   };

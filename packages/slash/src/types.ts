@@ -307,7 +307,14 @@ export type Provider = (typeof PROVIDERS)[number];
  * column is a step under `STORE_VERSION` and this is two values the row's own shape has no room for. `base_url` is `null`
  * where the owner left it to the provider's own address, and the host fills that in.
  */
-export type Setup = Settings & { source: Source; provider: Provider | null; base_url: string | null };
+export type Setup = Settings & { source: Source; provider: Provider | null; base_url: string | null; deep: DeepSetup };
+
+/**
+ * Deep as the owner set it up: the keychain grant holding his Anthropic key for it, and the most it may spend in a month,
+ * in cents. `grant_id` is `null` where he picked none, and then Deep answers on his own key where that key is Anthropic's.
+ * A cap of 0 turns Deep off.
+ */
+export type DeepSetup = { grant_id: string | null; cap_cents: number };
 
 /** What an owner may change, as the settings door hands it on. `tier` still works. */
 export type SetupPatch = Partial<{
@@ -318,6 +325,10 @@ export type SetupPatch = Partial<{
   model: string | null;
   grant_id: string | null;
   ask_cap: number;
+  /** The keychain grant Deep answers with, or `null` to use his own key where that key is Anthropic's. */
+  deep_grant_id: string | null;
+  /** The most Deep may spend in a month, in cents; 0 turns it off. */
+  deep_cap_cents: number;
 }>;
 
 /**
@@ -332,6 +343,11 @@ export type Status = {
   asks: { used: number; cap: number; resets: string; capped: boolean };
   /** The month's background asks and their allowance (`BACKGROUND_ASKS_MONTH`), never his. Absent from a host that does not count them. */
   background?: { used: number; cap: number };
+  /**
+   * Deep: whether an Anthropic key is set for it, the model it answers with and the one "Think harder" asks, and this
+   * month's spend against its cap, in cents, as the provider's own counts priced it.
+   */
+  deep?: { key: boolean; model: string; harder: string; cap_cents: number; spent_cents: number };
 };
 
 /**
@@ -438,7 +454,7 @@ export interface Slash {
    * through them, and answers. Every event goes to `emit` as it happens, and the last is always `done`. One ask a turn,
    * on the same month's count as a question, however many steps it took.
    */
-  chat(input: ChatInput, ctx: CallContext, tools: ChatTools, emit: (event: ChatEvent) => void, inference?: Inference): Promise<void>;
+  chat(input: ChatInput, ctx: CallContext, tools: ChatTools, emit: (event: ChatEvent) => void, inference?: Inference, deep?: Deep): Promise<void>;
   /** A held action answered: `accept` applies it through `tools.apply`, and either way it is settled and never asked again. */
   act(id: string, accept: boolean, ctx: CallContext, tools: Pick<ChatTools, 'apply'>): Promise<Result<ChatActed>>;
   /** One conversation, its turns oldest first, for the person who had it and nobody else. */
@@ -449,8 +465,26 @@ export interface Slash {
 
 /* ── a conversation ──────────────────────────────────────────────────────────────────────────────────────────────── */
 
-/** What a person sent: the words, the conversation it continues, and where they were when they sent it. */
-export type ChatInput = { thread?: string | undefined; message: string; page?: { path: string; title?: string | undefined; row?: string | undefined } | undefined };
+/**
+ * What a person sent: the words, the conversation it continues, and where they were when they sent it.
+ *
+ * `mode` IS HOW DEEP: `quick` the model this host answers with, `deep` the owner's own Anthropic key, `auto` quick first
+ * and deep when the ask wants a plan, a why or several changes, or quick runs out of steps. Absent is `quick`, as every
+ * turn was before there were two. `attach` names rows the person sent with the words (`tasks#12`), read before the first
+ * model call. `rethink` asks the thread's last question again at deep, on the model that thinks harder; `message` may
+ * then be empty, and the question is the thread's own.
+ */
+export type ChatInput = {
+  thread?: string | undefined;
+  message: string;
+  page?: { path: string; title?: string | undefined; row?: string | undefined } | undefined;
+  mode?: ChatMode | undefined;
+  attach?: readonly string[] | undefined;
+  rethink?: boolean | undefined;
+};
+
+/** How deep a turn goes: the included model, the owner's own Anthropic key, or the first and then the second. */
+export type ChatMode = 'quick' | 'deep' | 'auto';
 
 /**
  * One thing Slash did, or wants to do and waits for a yes on. `done` has happened, with `undo` its batch where the record
@@ -475,6 +509,10 @@ export type ChatEvent =
   | ({ type: 'action' } & Omit<ChatAction, 'state'>)
   | { type: 'navigate'; href: string; label: string }
   | { type: 'error'; text: string }
+  /* WHICH BRAIN ANSWERS THIS TURN, said once it is known and again if an `auto` turn goes deep. */
+  | { type: 'brain'; depth: 'quick' | 'deep'; model?: string | undefined }
+  /* DEEP WAS ASKED FOR AND CANNOT ANSWER HERE: the screen may hand the turn to Claude on the person's own Mac. */
+  | { type: 'route'; to: 'mac' }
   | { type: 'done'; spent: { asks: number; left: number | null }; figures?: ChatFigure[] | undefined };
 
 /** A row the answer links to, by the `register#seq` in its brace and the row's own name. */
@@ -523,8 +561,48 @@ export type ChatTools = {
   prefetch?(message: string): readonly { tool: string; args: Record<string, unknown> }[];
 };
 
+/* ── deep: the owner's own Anthropic key, with the model's own tool use ──────────────────────────────────────────── */
+
+/**
+ * The port Deep is asked through: one Messages turn with tools, streamed. NOT `Inference`, whose call shape has no tools
+ * by decision (the top of this file): every quick ask keeps that rule. Deep is the one place a model is handed the tools
+ * themselves, and only on the owner's own key, so it is its own port and a host builds it only over that key.
+ *
+ * `content` IS THE PROVIDER'S BLOCKS AS THEY CAME, thinking blocks included, because the next request must hand them back
+ * unchanged; the engine reads only `text` and `tool_use` out of them.
+ */
+export interface DeepInference {
+  turn(call: DeepCall, on: DeepStream): Promise<DeepReply>;
+}
+
+export type DeepTool = { name: string; description: string; input_schema: Record<string, unknown> };
+export type DeepBlock = Record<string, unknown> & { type: string };
+export type DeepMessage = { role: 'user' | 'assistant'; content: string | readonly DeepBlock[] };
+export type DeepCall = {
+  model: string;
+  /** Stable for every turn, so it and the tools are read from the provider's cache after the first. */
+  system: string;
+  tools: readonly DeepTool[];
+  messages: readonly DeepMessage[];
+  maxTokens: number;
+  effort: 'low' | 'medium' | 'high';
+  /** `none` on a turn's last step, which may only answer. The tools stay listed, so the cached prefix is the same. */
+  toolChoice?: 'auto' | 'none' | undefined;
+};
+/** What the provider counted: fresh input, output, and input read from and written to its cache. */
+export type DeepUsage = { in: number; out: number; cacheRead: number; cacheWrite: number };
+export type DeepReply = { content: DeepBlock[]; stop: string; usage: DeepUsage; model: string };
+/** The reply as it streams: the answer's words as they land, and the name of each tool the model starts to call. */
+export type DeepStream = { text(piece: string): void; tool?(name: string): void };
+
+/**
+ * What a host hands a turn for Deep: the port over the owner's key, or the sentence for why it cannot open here (the
+ * keychain closed in this session, the key gone). Absent where no Anthropic key is set for Deep at all.
+ */
+export type Deep = { inference: DeepInference } | { refused: string };
+
 /** A held action answered. */
-export type ChatActed = { ok: true; receipt?: string | undefined; undo?: { batch: string } | undefined };
+export type ChatActed ={ ok: true; receipt?: string | undefined; undo?: { batch: string } | undefined };
 
 /** A person's conversations, newest first. */
 export type ChatThreads = { threads: { id: string; title: string; at: string }[] };
