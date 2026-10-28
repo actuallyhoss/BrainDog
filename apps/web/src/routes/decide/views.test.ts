@@ -134,7 +134,7 @@ test('the record draws the page: the first question whole, the rest after it onc
   /* THE LINE WENT TO THE HEAD, and says how many wait and what the first suggests. */
   assert.equal(note?.drawn, false);
   assert.equal(shaped.open, 3);
-  assert.equal(shaped.sentence.text, '3 need you, all quick ones.');
+  assert.equal(shaped.sentence.text, '3 need you · 3 quick');
   assert.equal(shaped.sentence.needs, '3 need you');
   /* EACH QUESTION ONCE, IN ITS GROUP: none of these moves money, so Money draws nothing and Quick holds all three. */
   const moneyIds = (money?.queue ?? []).map((q) => q.id);
@@ -182,11 +182,11 @@ test('the head says how many questions and, when alike ones fold, how many cards
   const ran = (id: string): QueueQuestion => ({ ...question(id), kind: 'rowset', body_kind: 'rowset', options: [], run: { id: 'S904', name: 'Tidy projects' } }) as QueueQuestion;
   const qs = [ran('r1'), ran('r2'), ran('r3'), ran('r4'), question('q1')];
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK);
-  assert.equal(shaped.sentence.text, '5 need you, as 2 cards, all quick ones.');
+  assert.equal(shaped.sentence.text, '5 need you · 2 cards · 5 quick');
   /* THE SWITCH COUNTS QUESTIONS, as the sentence does, and the cards are said in the sentence. */
   assert.equal(shaped.groups.quick, 5);
   /* A QUEUE THAT DREW SOME OF THEM says no cards, since a fold of some is not one of all. */
-  assert.equal(decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 9, true), queueBlock(qs, 9)], CLOCK).sentence.text, '9 need you, all quick ones.');
+  assert.equal(decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 9, true), queueBlock(qs, 9)], CLOCK).sentence.text, '9 need you · 9 quick');
 });
 
 /* "35 need you: 2 about money, ... and 33 quick ones" sat over
@@ -198,42 +198,40 @@ test('the sentence, the switch and each column\'s head say one count of what wai
   const qs = [paying('m1'), paying('m2'), ...Array.from({ length: 14 }, (_, n) => tidy(`t${n}`)), ...['a', 'b', 'c', 'd'].map((id) => question(id))];
   const waits = { questions: 35, late: 0, hard: 0, inbox: null };
   const shaped = decideDrawn([noteBlock(), queueBlock(qs, 35), queueBlock(qs, 35)], CLOCK, () => '', waits);
-  assert.match(shaped.sentence.text, /^35 need you: 2 about money, .* and 33 quick ones\.$/u);
+  assert.equal(shaped.sentence.text, '35 need you · 2 money · 33 quick');
   assert.deepEqual(shaped.groups, { money: 2, quick: 33 });
   const head = (b: LiveBlock | undefined): unknown => (b as { counted?: unknown } | undefined)?.counted;
   assert.equal(head(shaped.blocks[1]), 2);
   assert.equal(head(shaped.blocks[2]), 33);
 });
 
-/* "EGP 930,191 in all" over cards that said "Moves EGP 74,092.16 and $9,074.01"
-   and "Records EGP 2,155,589". The sum is what the cards say, every value of each, in their currencies. */
-test('the sentence\'s sum is the sum of what the money cards say, in their currencies (audit Z4)', () => {
+/* ONE SHORT LINE: how many, how many are money and how many are quick. What the money comes to is on the cards. */
+test('the line counts the money cards and adds up none of what they say, which each card says in its own currencies', () => {
   const tidy = { ...question('m1'), money: [{ amount: 5000000, currency: 'EGP' }, { amount: 907401, currency: 'USD' }, { amount: 2409216, currency: 'EGP' }] } as QueueQuestion;
   const parts = { ...question('m2'), money: [{ amount: 100000000, currency: 'EGP' }, { amount: 115558900, currency: 'EGP' }] } as QueueQuestion;
   const shaped = decideDrawn([noteBlock(), queueBlock([tidy, parts, question('q1')], 3), queueBlock([tidy, parts, question('q1')], 3)], CLOCK);
-  assert.match(shaped.sentence.text, /^3 need you: 2 about money, EGP\s2,229,681 and \$9,074\s?USD in all, and 1 quick one\.$/u);
+  assert.equal(shaped.sentence.text, '3 need you · 2 money · 1 quick');
 });
 
-/* A GOAL AND A CHARGE TO CHECK NAME AN AMOUNT AND MOVE NONE: the total is only what accepting would move. */
-test('the sentence\'s sum leaves out a goal and a charge to check, which name an amount and move none', () => {
+/* A GOAL AND A CHARGE TO CHECK NAME AN AMOUNT, and the line names none. */
+test('the line names no amount, a goal\'s and a charge\'s included', () => {
   const tidy = { ...question('m1'), money: [{ amount: 7409216, currency: 'EGP' }, { amount: 907401, currency: 'USD' }] } as QueueQuestion;
   const goal = { ...question('m2'), question: 'Track the shop\'s monthly revenue, aiming for USD 1,500.00 by Sep 2027?' };
   const charge = { ...question('m3'), question: 'A charge of EGP 1,750.00 at a shop came twice. Was the second one yours?' };
   const qs = [tidy, goal, charge, question('q1')];
   const shaped = decideDrawn([noteBlock(), queueBlock(qs, 4), queueBlock(qs, 4)], CLOCK);
-  assert.match(shaped.sentence.text, /^4 need you: 3 about money, EGP\s74,092 and \$9,074\s?USD from 1 of them, and 1 quick one\.$/u);
+  assert.equal(shaped.sentence.text, '4 need you · 3 money · 1 quick');
   assert.doesNotMatch(shaped.sentence.text, /1,500|1,750/u);
-  /* WHERE EVERY ONE MOVES MONEY, THE SUM IS SAID "IN ALL", AS BEFORE. */
   const alone = decideDrawn([noteBlock(), queueBlock([tidy, question('q1')], 2), queueBlock([tidy, question('q1')], 2)], CLOCK);
-  assert.match(alone.sentence.text, /^2 need you: 1 about money, EGP\s74,092 and \$9,074\s?USD in all, and 1 quick one\.$/u);
+  assert.equal(alone.sentence.text, '2 need you · 1 money · 1 quick');
 });
 
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);
 
-test('the head says how many need you, then the two groups in digits (today F12): about money and what they come to, then the quick ones', () => {
+test('the head says how many need you, then the two groups in digits (today F12): money, then quick', () => {
   const qs = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id, n) => question(id, 'call', n === 0));
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK, () => 'Claude');
-  assert.equal(shaped.sentence.text, '5 need you, all quick ones.');
+  assert.equal(shaped.sentence.text, '5 need you · 5 quick');
   assert.equal(shaped.sentence.needs, '5 need you');
   const bills = [
     { ...question('m1'), question: 'Invoice 2026-041: brand system was due 38 days ago, GBP 4,800.00. Chase it?' },
@@ -241,7 +239,7 @@ test('the head says how many need you, then the two groups in digits (today F12)
     { ...question('m3'), question: 'Ledger Post, sending plan was due 4 days ago, GBP 39.00. Did it go through?' },
   ];
   const mixed = decideDrawn([noteBlock(), queueBlock([...bills, ...qs], 8, true), queueBlock([...bills, ...qs], 8)], CLOCK);
-  assert.match(mixed.sentence.text, /^8 need you: 3 about money, [^.]*7,239[^.]* in all, and 5 quick ones\.$/u);
+  assert.equal(mixed.sentence.text, '8 need you · 3 money · 5 quick');
   assert.equal(mixed.sentence.needs, '8 need you');
   /* NONE MOVES MONEY, so Quick holds every one, once, and Money draws nothing. */
   assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q1', 'q2', 'q3', 'q4', 'q5']);
@@ -250,7 +248,7 @@ test('the head says how many need you, then the two groups in digits (today F12)
   assert.equal(shaped.open, 5);
 
   const one = decideDrawn([noteBlock(), queueBlock([question('q1', 'undo')], 1, true), queueBlock([question('q1', 'undo')], 1)], CLOCK);
-  assert.equal(one.sentence.text, '1 needs you, a quick one.');
+  assert.equal(one.sentence.text, '1 needs you · 1 quick');
   /* A GROUP THAT HOLDS NOTHING IS NOT DRAWN, the question is drawn once, and the indexes stay. */
   assert.equal(one.blocks.length, 3);
   assert.equal(one.blocks[1]?.drawn, false);
@@ -264,7 +262,7 @@ test('the head counts every open question by the record’s count, not the few d
   const lead = withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 3, hardToUndo: 4 });
   const rest = withCounts(queueBlock(qs, 12), { stale: 3, hardToUndo: 4 });
   const shaped = decideDrawn([noteBlock(), lead, rest], CLOCK, undefined, null, LATE);
-  assert.equal(shaped.sentence.text, '12 need you, all quick ones.');
+  assert.equal(shaped.sentence.text, '12 need you · 12 quick');
   assert.equal(shaped.open, 12);
 });
 
@@ -273,7 +271,7 @@ test('with boot\'s waits the head says the record\'s one count, and the calm lin
   /* THE BADGE'S NUMBER (`waits`), not the three the queue drew, and its late and hard counts. */
   const waits = { questions: 25, late: 10, hard: 2, inbox: 32 };
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 3, true), queueBlock(qs, 3)], CLOCK, () => '', waits, LATE);
-  assert.equal(shaped.sentence.text, '25 need you, all quick ones.');
+  assert.equal(shaped.sentence.text, '25 need you · 25 quick');
   assert.equal(shaped.open, 25);
   /* NO QUESTION BUT 32 ARRIVALS: "Nothing waits on you" would be false. */
   const inbox = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0)], CLOCK, undefined, { questions: 0, late: 0, hard: 0, inbox: 32 }, LATE);
