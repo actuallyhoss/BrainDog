@@ -71,9 +71,9 @@ async function record() {
   return { api, at: (ms: number) => (now = ms) };
 }
 
-/** Slash's open who-is-who questions, as the kernel lists them. */
+/** Slash's open who-is-who questions, as the kernel lists them, wherever on Decide they wait (the agents' shelf too). */
 function whoOpen(api: Awaited<ReturnType<typeof record>>['api']) {
-  const open = api.kernel.openSuggestions();
+  const open = api.kernel.openSuggestions({ apart: 'with' });
   assert.ok(open.ok);
   return open.value.filter((s) => s.opened_by === SLASH && typeof s.cause === 'string' && s.cause.startsWith(WHO_CAUSE));
 }

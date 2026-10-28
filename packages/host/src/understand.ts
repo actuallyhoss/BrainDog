@@ -440,7 +440,9 @@ const todayOf = (kernel: Pick<NotesKernel, 'identity'>, nowMs: number): string =
  */
 export function whoRoom(kernel: Pick<NotesKernel, 'openSuggestions' | 'identity'>, nowMs: number = Date.now()): number {
   if (typeof kernel.openSuggestions !== 'function') return WHO_WAITING_MOST;
-  const open = kernel.openSuggestions();
+  /* WHEREVER ON DECIDE THEY WAIT: a who-is-who question is an agent's suggestion and waits on the agents' shelf, which the
+     open list leaves out unless asked, so a room counted without it never filled. */
+  const open = kernel.openSuggestions({ apart: 'with' });
   if (!open.ok) return 0;
   const today = todayOf(kernel, nowMs);
   let waiting = 0;

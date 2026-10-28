@@ -495,7 +495,7 @@ test('THE MODEL-JOBS PASS READS THE NOTES ONCE ITS NIGHT HAS COME, on a host tha
   };
   await serveModelJobs(r.api, deps);
   assert.equal(asked.length, 1);
-  const open = r.api.kernel.governance('suggestion', {});
+  const open = r.api.kernel.governance('suggestion', { apart: 'with' });
   assert.ok(open.ok);
   /* THE ONE QUESTION ABOUT AHMED, AND THE OFFER THE SAME NOTE MAKES WITH NO MODEL: Jo Okonkwo, held, named in full. */
   /* THE LINK FOR JO ONLY ARRANGES A ROW THE OWNER HOLDS, so it settles itself (the Handled list) and Decide holds the one about Ahmed. */
@@ -571,7 +571,7 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
   assert.notEqual(r.api.kernel.get(quill.value.id)?.version, quill.value.version);
 
   /* YES WRITES IT: Quill now answers to the address the note gave. */
-  const open = r.api.kernel.governance('suggestion', {});
+  const open = r.api.kernel.governance('suggestion', { apart: 'with' });
   assert.ok(open.ok);
   const mine = open.value.find((s) => 'offer' in (s.body as object));
   assert.ok(mine, 'the offer to Quill is on Decide');
@@ -685,7 +685,7 @@ test("A RUN'S HANDOFF IS READ FOR NAMES: one is a question linked to the run's p
 test('THE OFFERS NEED NO MODEL: a host with none still offers what the notes spell out, and leases nothing', async () => {
   const r = await record();
   await serveModelJobs(r.api, { inference: undefined, meter: meter(), now: () => T0, store: openSqlite(), log: () => {} });
-  const open = r.api.kernel.governance('suggestion', {});
+  const open = r.api.kernel.governance('suggestion', { apart: 'with' });
   assert.ok(open.ok);
   /* SETTLED AS IT IS FILED, since it only arranges the owner's own row (the Handled list): nothing waits on Decide, and Jo is linked. */
   assert.equal(open.value.length, 0, 'the link for Jo waits on Decide');
