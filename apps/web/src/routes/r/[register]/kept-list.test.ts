@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { countsOf, keptOf, listsOf, namesOf, searchFieldsOf, searchKept, servedWhole, spotOf, walkWhole } from './kept-list.ts';
+import { countsOf, keepShown, keptOf, listsOf, namesOf, searchFieldsOf, searchKept, servedWhole, shownFor, spotOf, walkWhole } from './kept-list.ts';
 import { compile } from '@braindog/where';
 import { terms } from '../../../lib/record/find.ts';
 import type { RegisterDecl } from '../../../lib/record/schema.ts';
@@ -156,4 +156,16 @@ test('WALKED WHOLE: the pages after the first, each when idle, kept only when th
   assert.equal(await walkWhole(page([4, 3], 'c1'), async () => null, opts), null, 'a page refused');
   assert.equal(await walkWhole(page([4, 3], 'c1', 40), async () => page([2, 1], null, 40), opts), null, 'more than it keeps');
   assert.equal(await walkWhole(page([4, 3], 'c1'), async () => page([2, 1], null), { ...opts, gone: () => true }), null, 'the screen went');
+});
+
+test('BACK TO A LIST IS DRAWN FROM WHAT THIS TAB LAST DREW, for the same record and the same question alone', () => {
+  const base = 'https://one.example/api';
+  const said = JSON.stringify(['tasks', [], '', null, null, false]);
+  assert.equal(shownFor(base, said), null, 'nothing kept yet');
+  keepShown(base, said, { rows: 3 });
+  assert.deepEqual(shownFor(base, said), { rows: 3 });
+  assert.equal(shownFor('https://two.example/api', said), null, 'another record is not this one');
+  assert.equal(shownFor(base, JSON.stringify(['tasks', [], 'q', null, null, false])), null, 'another question is not this one');
+  keepShown(base, JSON.stringify(['notes', [], '', null, null, false]), { rows: 1 });
+  assert.equal(shownFor(base, said), null, 'only the newest is held');
 });

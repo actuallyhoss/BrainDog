@@ -34,7 +34,7 @@
   import { live } from '$lib/data/live.svelte.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
-  import { countsOf, keptOf, listsOf, namesOf, searchKept, servedWhole, spotOf, walkWhole, type KeptList, type Paged } from './kept-list.ts';
+  import { countsOf, keepShown, keptOf, listsOf, namesOf, searchKept, servedWhole, shownFor, spotOf, walkWhole, type KeptList, type Paged } from './kept-list.ts';
   import { painted } from '$lib/data/timing.ts';
   import { LIST_ROWS_MOST, type Near } from '$lib/data/local.ts';
   import { searchable } from '$lib/record/find.ts';
@@ -54,7 +54,7 @@
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
@@ -666,12 +666,41 @@
    * AND AN ANSWER FOR A QUESTION THAT HAS MOVED ON IS DROPPED, whole, which is why the state is
    * written at the end rather than as each part arrives.
    */
+  /** A list's answer as this tab last drew it (`keepShown`). */
+  type Shown = { decl: RegisterDecl; entries: Entry[]; names: Names; matched: number; counted: Map<string, Map<string, number>>; uncounted: Refusal | null };
+
   async function ask(said: string, register: string, typed: Filter[], text: string, order: typeof sort, joined: Join, wantsTwice = false): Promise<void> {
     busy = true;
     const mark = localTicket();
     /* The record has answered this asking: a copy landing later than the wait is not drawn over it. */
     let done = false;
-    await read(async () => {
+    /* THE BRACKET, held open by hand as `read` holds it, so that a return drawn from what this tab kept can close it. */
+    const at = opened();
+    let released = false;
+    const release = (ok: boolean): void => {
+      if (released) return ok ? undefined : closed(false, opened());
+      released = true;
+      closed(ok, at);
+    };
+    /* WHAT THIS TAB LAST DREW FOR THIS QUESTION is drawn at once on a return, held to read like the copy's, and the
+       screen is the screen from that frame (`keepShown`); the record's read lands over it. Not for the people held twice,
+       whose answer is asked again each time. */
+    const remembered = pages.length === 0 && !wantsTwice ? shownFor<Shown>(apiBase(), said) : null;
+    if (remembered !== null) {
+      declared = { register, decl: remembered.decl };
+      pages = [remembered.entries];
+      named = remembered.names;
+      cursor = null;
+      matched = remembered.matched;
+      counted = remembered.counted;
+      uncounted = remembered.uncounted;
+      fromCopy = true;
+      painted('list', 'memory');
+      /* AND IT IS NOT BUSY: what it drew is the whole screen, and the read behind it only brings it up to date. */
+      busy = false;
+      release(true);
+    }
+    const work = async (): Promise<boolean> => {
       /* NOTHING DRAWN YET: THE LOCAL COPY'S FIRST PAGE AT ONCE, marked `fromCopy` and with no cursor to page from, and
          the record is asked behind it as ever (`lib/data/local.ts`). One later than the wait is drawn when it lands, if
          the record has still not answered: the same rows in the same place the record's answer would put them. */
@@ -694,7 +723,7 @@
       /* A SEARCH OR A FILTER OVER A LIST THIS DEVICE KEEPS WHOLE is answered from it at once, marked as this device's, and
          the record's own answer replaces it when it lands (`searchKept`). Chips the browser asks as the record would (no
          ref, no relative day); the people held twice are the record's to answer. */
-      if (near === null && (text !== '' || typed.length > 0) && !wantsTwice) {
+      if (near === null && remembered === null && (text !== '' || typed.length > 0) && !wantsTwice) {
         const whole = await nearLocal<KeptList>(LIST_WHOLE, wholeKey(register, order), apiBase());
         const where = typed.length === 0 ? null : ((treeOf(register, typed, '', new Map(), joined) as Predicate | undefined) ?? null);
         const found = whole === null ? null : searchKept(whole.value, text, where);
@@ -779,8 +808,15 @@
       keepList(said, register, s.value, answer.value, { filters: chips, q: text, sort: order, twice: rows !== null, join: joined }, bar ? facets : null, mark);
       /* AND THE REST OF THE LIST, WHEN IDLE: the whole of it kept beside this page (`keepWhole`). */
       keepWhole(register, s.value, order, chips.length === 0 && text === '' ? answer.value : null, mark);
+      if (!wantsTwice) keepShown(apiBase(), said, { decl: s.value, entries: answer.value.entries, names: answer.value.names, matched: answer.value.matched, counted: facets.counts, uncounted: facets.withheld } satisfies Shown);
       return true;
-    });
+    };
+    let ok = false;
+    try {
+      ok = await work();
+    } finally {
+      release(ok);
+    }
     done = true;
     if (asked === said) busy = false;
   }

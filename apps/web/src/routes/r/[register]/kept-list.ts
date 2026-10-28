@@ -210,3 +210,18 @@ export async function walkWhole(
   if (entries.length !== matched || entries.length > opts.most || new Set(entries.map((e) => e.seq)).size !== entries.length) return null;
   return { entries, matched, names, cursor: null };
 }
+
+/**
+ * THE LAST LIVE ANSWER THIS TAB DREW FOR A LIST, by the record and the question it answered: Back to a list is drawn
+ * from it at once, as Back to Needs you and to a page are, and the record's read lands over it. Held only while the tab
+ * is open, and only the newest, so a list left by another one is asked as ever.
+ */
+let shown: { base: string; said: string; value: unknown } | null = null;
+
+/** Keep the newest live answer drawn for `said` on `base`. */
+export function keepShown(base: string, said: string, value: unknown): void {
+  shown = { base, said, value };
+}
+
+/** The answer kept for `said` on `base`, or `null`. */
+export const shownFor = <T>(base: string, said: string): T | null => (shown !== null && shown.base === base && shown.said === said ? (shown.value as T) : null);
