@@ -74,7 +74,20 @@ function steps(lines) {
     else if (blocks.length > 0 && /^ {8}/.test(line)) blocks.at(-1).push(line);
     else break;
   }
-  return blocks.map((block) => ({ name: key(block, 8, 'name'), if: key(block, 8, 'if'), uses: key(block, 8, 'uses'), run: key(block, 8, 'run'), body: block.join('\n') }));
+  return blocks.map((block) => ({ name: key(block, 8, 'name'), if: key(block, 8, 'if'), uses: key(block, 8, 'uses'), run: runOf(block), body: block.join('\n') }));
+}
+
+/** A step's command: the inline `run:`, or a `run: |` block read as the shell reads it, comment lines (a shellcheck mark) left out. */
+function runOf(block) {
+  const run = key(block, 8, 'run');
+  if (run !== '|') return run;
+  const from = block.findIndex((line) => /^ {8}run: \|\s*$/.test(line));
+  const body = [];
+  for (const line of block.slice(from + 1)) {
+    if (!/^ {10}/.test(line) && line.trim() !== '') break;
+    body.push(line.slice(10));
+  }
+  return body.filter((line) => line.trim() !== '' && !/^\s*#/.test(line)).join('\n');
 }
 
 /** The index of the first step whose body matches, asserted present. */
