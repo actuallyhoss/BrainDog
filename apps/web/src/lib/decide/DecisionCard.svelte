@@ -901,7 +901,7 @@
         <!-- WHAT THE FILLED ANSWER DOES, one line under the row, where its answers each carry one: "File them" says
              what filing does before the press, as its rectangle did. -->
         <!-- THE CARE A HARD ANSWER ASKS FOR, A LINE UNDER THE ROW: on the button it wrapped to two lines at 390. -->
-        {#if inline && hardLine}<p class="dc-hard" id="{uid}-hard" dir="auto"><span class="dc-hard-word">{hardLine}.</span>{#if hardReason} {hardReason}{/if}</p>{/if}
+        {#if inline && hardLine}<p class="dc-hard" id="{uid}-hard" dir="auto"><span class="dc-hard-word">{hardLine}.</span>{#if hardReason}{' '}{hardReason}{/if}</p>{/if}
         {#if inline && !compact && primaryDoes}<p class="dc-does" dir="auto">{primaryDoes}</p>{/if}
       {/if}
       {#if phase === 'asking' && chosen}
