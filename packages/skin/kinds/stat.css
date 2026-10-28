@@ -241,7 +241,10 @@
     gap: 2px;
   }
 
+  /* THE LINE IS THE WALK'S FIRST ROW AND ITS TWO DAYS THE SECOND. Its own `grid-area: trend` named an area this grid does
+     not have, which put the line in an implicit column and piled "Today" and the last day above its start. */
   .cell-trend-ahead > .cell-trend {
+    grid-area: auto;
     inline-size: 100%;
   }
 
