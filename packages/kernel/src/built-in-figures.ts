@@ -1377,7 +1377,7 @@ function dayIn(ms: number, tz: string | undefined): string {
  * its row id or its name, as Today's cards read it. On a read of a past day nothing after it counts. NOTHING, NEVER
  * NOUGHT, for a project with neither, or a name no project has.
  */
-export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 'viewer'>, decl: MetricDecl): Result<Reading> {
+export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 'viewer' | 'walks'>, decl: MetricDecl): Result<Reading> {
   const about = (decl as WorkedDecl).about;
   const said = typeof about === 'string' && about !== PARAM ? about.trim() : '';
   const none = (why: string): Result<Reading> => judged(decl, null, why);
@@ -1405,38 +1405,69 @@ export function readWorked(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' |
   const before = until === null ? '' : ' AND at <= ?';
   const upTo = until === null ? [] : [until];
   const stamps: { at: string; agent: string | null }[] = [];
+  /*
+   * EACH LIST IS WALKED ONCE FOR A READ, NOT ONCE A PROJECT (`ctx.walks`, the read's own memo): a row of project cards
+   * asked this figure a project at a time, and each asked walked every run's row and every task's again, which on a
+   * record of a thousand runs was most of Today's time. The newest stamp of each project is grouped in one walk, and a
+   * read that keeps no memo groups it for the one project as well.
+   */
+  const memo = <T>(key: unknown[], make: () => T): T => {
+    const k = JSON.stringify(['worked', ...key, ctx.viewer ?? null, until]);
+    if (ctx.walks?.has(k)) return ctx.walks.get(k) as T;
+    const made = make();
+    ctx.walks?.set(k, made);
+    return made;
+  };
 
   /* THE TASKS: each list that hands work out and points at the projects, its newest write on a row of this one. */
-  const works = sql
-    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body) AND json_extract(body, '$.hand') IS NOT NULL")
-    .map((r) => JSON.parse(r.body) as { id?: unknown; fields?: unknown });
+  const works = memo(['works'], () =>
+    sql
+      .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body) AND json_extract(body, '$.hand') IS NOT NULL")
+      .map((r) => JSON.parse(r.body) as { id?: unknown; fields?: unknown }),
+  );
   for (const work of works) {
     if (typeof work.id !== 'string' || !Array.isArray(work.fields)) continue;
     for (const f of work.fields as { id?: unknown; type?: unknown; to?: unknown }[]) {
       if (f.type !== 'ref' || f.to !== list || typeof f.id !== 'string') continue;
-      const got = sql.one<{ at: string | null }>(
-        `SELECT max(at) AS at FROM (SELECT updated_at AS at, id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, ?) = ?${viewer}) WHERE at IS NOT NULL${before}`,
-        work.id,
-        pathOf(f.id),
-        project.id,
-        ...seen,
-        ...upTo,
-      )?.at;
+      const [register, field] = [work.id, f.id];
+      const newest = memo(['tasks', register, field], () => {
+        const by = new Map<string, string>();
+        for (const r of sql.all<{ v: unknown; at: string | null }>(
+          `SELECT v, max(at) AS at FROM (SELECT json_extract(fields, ?) AS v, updated_at AS at, id FROM entry WHERE register = ? AND deleted_at IS NULL${viewer})
+            WHERE at IS NOT NULL AND v IS NOT NULL${before} GROUP BY v`,
+          pathOf(field),
+          register,
+          ...seen,
+          ...upTo,
+        ))
+          if (typeof r.v === 'string' && typeof r.at === 'string') by.set(r.v, r.at);
+        return by;
+      });
+      const got = newest.get(project.id);
       if (typeof got === 'string') stamps.push({ at: got, agent: null });
     }
   }
 
   /* THE RUNS: the newest heard from in this project, by any of the three ways a run names it. */
   const names = [`${list}#${project.seq}`, project.id, ...(typeof project.title === 'string' && project.title.trim() !== '' ? [project.title.trim()] : [])].map((n) => n.toLowerCase());
-  const run = sql.one<{ at: string | null; agent: string | null }>(
-    `SELECT at, agent FROM (SELECT coalesce(json_extract(fields, '$.last_seen'), updated_at) AS at, json_extract(fields, '$.agent') AS agent, id
-       FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, '$.project'))) IN (SELECT value FROM json_each(?))${viewer})
-     WHERE at IS NOT NULL${before} ORDER BY at DESC LIMIT 1`,
-    SESSION,
-    JSON.stringify(names),
-    ...seen,
-    ...upTo,
-  );
+  const runs = memo(['runs'], () => {
+    const by = new Map<string, { at: string; agent: string | null }>();
+    /* THE AGENT IS THE NEWEST ROW'S: beside a lone `max`, SQLite reads a bare column from the row the max came from. */
+    for (const r of sql.all<{ p: unknown; at: string | null; agent: string | null }>(
+      `SELECT p, max(at) AS at, agent FROM (SELECT lower(trim(json_extract(fields, '$.project'))) AS p, coalesce(json_extract(fields, '$.last_seen'), updated_at) AS at,
+         json_extract(fields, '$.agent') AS agent, id FROM entry WHERE register = ? AND deleted_at IS NULL${viewer})
+       WHERE at IS NOT NULL AND p IS NOT NULL${before} GROUP BY p`,
+      SESSION,
+      ...seen,
+      ...upTo,
+    ))
+      if (typeof r.p === 'string' && typeof r.at === 'string') by.set(r.p, { at: r.at, agent: r.agent });
+    return by;
+  });
+  const run = names
+    .map((n) => runs.get(n))
+    .filter((r): r is { at: string; agent: string | null } => r !== undefined)
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0];
   if (typeof run?.at === 'string') stamps.push({ at: run.at, agent: typeof run.agent === 'string' && run.agent.trim() !== '' ? run.agent.trim() : 'other' });
 
   const newest = stamps.filter((s) => Number.isFinite(Date.parse(s.at))).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
