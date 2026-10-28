@@ -101,7 +101,7 @@ test('THE SAME PERSON IN ANOTHER OF THEIR RECORDS KEEPS THEIR LOOK, and that rec
 });
 
 test('SOMEBODY ELSE SIGNING IN STARTS FROM THE HOUSE LOOK and their own record, not the last person\'s', async () => {
-  page(cookie({ scheme: 'dark', density: 'compact', contrast: true, who: 'ann', unsent: { 'look.scheme': 'dark' }, sidebar: false }));
+  page(cookie({ scheme: 'dark', density: 'compact', contrast: true, who: 'ann', unsent: { 'look.scheme': 'dark' }, nav: ['/'] }));
   const record = keeping();
   try {
     follow(at('acme', 'bob', { 'look.size': 'md' }), record.send);
@@ -111,7 +111,7 @@ test('SOMEBODY ELSE SIGNING IN STARTS FROM THE HOUSE LOOK and their own record, 
     assert.equal(now.contrast, undefined);
     assert.equal(now.text, 'md', "Bob's own record was not adopted");
     assert.equal(now.who, 'bob');
-    assert.equal(now.sidebar, false, 'a per-device setting went with the look');
+    assert.deepEqual(now.nav, ['/'], 'a per-device setting went with the look');
     await pref.settled();
     assert.deepEqual(record.sent, [], "what Ann's device owed her record was sent to Bob's");
   } finally {
