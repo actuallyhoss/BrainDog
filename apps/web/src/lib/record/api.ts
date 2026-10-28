@@ -134,7 +134,10 @@ export const columnHeading = (register: string, c: { field: string; label?: stri
   if (typeof c.label === 'string') return c.label;
   const list = REGISTERS[register];
   const one = list && list.title === c.field ? list.one : undefined;
-  return typeof one === 'string' && one ? one.charAt(0).toUpperCase() + one.slice(1) : c.field;
+  if (typeof one === 'string' && one) return one.charAt(0).toUpperCase() + one.slice(1);
+  /* AND A FIELD THE LIST DECLARES IS SAID BY ITS LABEL, never its id: a bill's card headed its figure "amount". */
+  const f = list?.fields.find((d) => d.id === c.field);
+  return f ? labelOf(f) : c.field;
 };
 
 /** A label is the field id with `_` as a space, until a pack needs a different word (50 §10). */
@@ -761,6 +764,12 @@ export function toRows(
         }
         const parts = decl(register, c.field)?.type === 'ref' ? parted(c.field) : [];
         if (parts.length > 0) return splitSaid(parts);
+        /* A CARD'S DEADLINE PAST ITS DAY SAYS HOW LATE, as the list does: "38 days late · 27 Jul", never a red dot alone. */
+        const v = e.fields[c.field];
+        if (c.as === 'when' && decl(register, c.field)?.deadline && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v) && toneOf(register, e, now) === 'bad') {
+          const days = Math.floor(now / 86_400_000) - Math.floor(Date.parse(`${v}T00:00:00Z`) / 86_400_000);
+          if (days > 0) return `${days === 1 ? '1 day' : `${days} days`} late · ${cell(c.field) ?? v}`;
+        }
         return cell(c.field) ?? (c.or === undefined ? null : cell(c.or));
       }),
     };

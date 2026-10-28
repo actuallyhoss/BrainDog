@@ -1171,6 +1171,8 @@
   {@const seen = foldable ? foldSeen.get(key) : undefined}
   {@const folds = seen !== undefined && foldOf(block.kind, seen.lines, mode)}
   {@const shut = folds && !foldOpen.has(key)}
+  <!-- A PAGE ABOUT ONE ROW THAT LEADS WITH THAT ROW'S OWN CARD names it once, in its title: the card said it twice. -->
+  {@const self = block.kind === 'cards' && page.param !== undefined && block.register === page.param.register && block.entries?.length === 1 && block.entries[0]?.seq === page.param.seq}
   {#if between}{@render between(slot.i)}{/if}
   <!-- `drawn: false` means the record evaluated `when:` and said no. A page that shows a warning that does not apply
        teaches people to ignore warnings (06 §1). -->
@@ -1197,6 +1199,7 @@
       data-drop={over && over.at === at && dragging !== at ? over.edge : undefined}
       data-stacked={stacked ? '' : undefined}
       data-lead={leadTile && lifted?.at === at ? '' : undefined}
+      data-self={self ? '' : undefined}
       draggable={arranging}
       ondragstart={() => (dragging = at)}
       ondragend={() => ((dragging = null), (over = null))}
@@ -1566,6 +1569,10 @@
   :global(.block-slot[data-full] + .block-slot:not([data-full]):has(+ .block-slot > [data-seen-none]):has(+ .block-slot + .block-slot[data-full])),
   :global(.block-slot[data-full] + .block-slot:has(> [data-seen-none]) + .block-slot:not([data-full]):has(+ .block-slot[data-full])) {
     grid-column: 1 / -1;
+  }
+
+  .block-slot[data-self] :global(.cards-title) {
+    display: none;
   }
 
   .block-slot {
