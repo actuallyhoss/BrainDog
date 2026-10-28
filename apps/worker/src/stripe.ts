@@ -214,6 +214,18 @@ export function subscriptionSeen(sub: StripeObject, plans: readonly string[]): S
   };
 }
 
+/**
+ * A price on a subscription as one more item: `true` when it is there already or was put there now, `false` when Stripe
+ * could not be asked or would not. Extra usage's metered price, which carries no quantity.
+ */
+export async function priceOnSubscription(stripe: Stripe, subscription: string, price: string): Promise<boolean> {
+  if (!/^sub_[A-Za-z0-9]{1,250}$/u.test(subscription)) return false;
+  const got = await stripe.read(`/v1/subscriptions/${subscription}`);
+  if (!got.ok) return false;
+  if (listOf(objectAt(got.body, 'items') ?? {}).some((item) => idAt(item, 'price') === price)) return true;
+  return (await stripe.create('/v1/subscription_items', { subscription, price })).ok;
+}
+
 /** The most customers one address is looked through for this person's, a ceiling on one read. */
 const CUSTOMERS_READ = 10;
 

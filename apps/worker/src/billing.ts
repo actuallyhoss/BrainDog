@@ -57,9 +57,9 @@ import {
   customerFor,
   endSubscription,
   idAt,
-  listOf,
   metadataOf,
   objectAt,
+  priceOnSubscription,
   sessionOfPayment,
   startCheckout,
   startPortal,
@@ -367,13 +367,7 @@ async function extraPriceRefused(stripe: Stripe, price: string): Promise<Result<
  * not be asked. Put on once and left there, so what was reported while it stood is still charged after a cap is taken
  * off; a month with no usage reported charges nothing for it.
  */
-async function meteredOn(stripe: Stripe, subscription: string, price: string): Promise<boolean> {
-  if (!/^sub_[A-Za-z0-9]{1,250}$/u.test(subscription)) return false;
-  const got = await stripe.read(`/v1/subscriptions/${subscription}`);
-  if (!got.ok) return false;
-  if (listOf(objectAt(got.body, 'items') ?? {}).some((item) => idAt(item, 'price') === price)) return true;
-  return (await stripe.create('/v1/subscription_items', { subscription, price })).ok;
-}
+const meteredOn = (stripe: Stripe, subscription: string, price: string): Promise<boolean> => priceOnSubscription(stripe, subscription, price);
 
 /** What one night's report of extra usage came to: months owed a report, reported, and failed. */
 export type ExtraReport = { due: number; reported: number; failed: number };
