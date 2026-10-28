@@ -9,7 +9,7 @@
   number it leads with and its line, and the last real work on it. Then the parked as a strip of chips that say only
   what is due, and the finished as a count.
 
-  ON A PHONE the same sentence leads, the four tiles go two by two, and a row is its name and chip, its next step in two
+  ON A PHONE the same sentence leads, the four tiles go two by two, each its figure and first line, and a row is its name and chip, its next step in two
   lines, and one small line of its number and its last work.
 
   While the reads are out the board draws the projects from the block's own rows, so the page never opens blank.
@@ -96,12 +96,12 @@
       {@render week('Late', 'clock', 'late', b.week.late)}
       {@render week('Due in 7 days', 'calendar', 'plain', b.week.due)}
       {@render week('Numbers gone quiet', 'activity', 'warn', b.week.quiet)}
-      {@render week('Renewals, 60 days', 'globe', 'plain', b.week.renewals)}
+      {@render week('Renewals', 'globe', 'plain', b.week.renewals)}
     </div>
 
     {#if b.groups.length > 0}
       <section class="b-list" aria-label="Projects in play">
-        <div class="r-head" aria-hidden="true"><span>Project</span><span>Next step</span><span>Needs</span><span>Its number</span><span>Last real work</span></div>
+        <div class="r-head" aria-hidden="true"><span>Project</span><span>Next step</span><span>Needs</span><span>Number</span><span>Last work</span></div>
         {#each b.groups as g (g.id)}
           <h3 class="g-head">{g.name} <span>{g.said}</span></h3>
           <ul class="rows">
@@ -162,7 +162,7 @@
           <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a href={at(l.href)} dir="auto"><span class="strong">{l.project}</span> · {l.text}</a></li>
         {/each}
       </ul>
-      {#if t.more > 0}<p class="small">and {t.more} more</p>{/if}
+      {#if t.more > 0}<p class="small wk-more">and {t.more} more</p>{/if}
     {/if}
   </section>
 {/snippet}
@@ -464,10 +464,29 @@
     font-weight: 600;
   }
 
-  /* On a phone a tile shows two of its lines. */
+  /* ON A PHONE A TILE IS ITS FIGURE AND ITS FIRST LINE, the day over the words in two lines at most; the figure says how
+     many, so "and N more" is left to the desk. */
   @media (width < 640px) {
-    .wk-lines li:nth-child(n + 3) {
+    .wk-lines li:nth-child(n + 2),
+    .wk-more {
       display: none;
+    }
+
+    .wk-lines li {
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .wk-lines b {
+      inline-size: auto;
+    }
+
+    .wk-lines a {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
     }
   }
 

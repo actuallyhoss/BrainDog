@@ -119,7 +119,7 @@ test('last real work is a tagged run or a task change, never an edit of the proj
   const lantern = b.groups.find((g) => g.id === 'moving')!.rows.find((r) => r.name === 'Lantern')!;
   assert.equal(lantern.work.said, 'Tasks changed 2 days ago');
   const tide = b.groups.find((g) => g.id === 'quiet')!.rows[0]!;
-  assert.deepEqual(tide.work, { agent: null, said: 'No session tagged', sub: null, none: true });
+  assert.deepEqual(tide.work, { agent: null, said: 'No sessions', sub: null, none: true });
 });
 
 test('a run is placed by its tag, else loosely by its repository, remote or folder', () => {
@@ -155,13 +155,13 @@ test('earning a month adds linked repeating money, else a monthly key number, in
     ],
   );
   assert.equal(b.earning.also, '1 project with no money linked');
-  assert.match(b.groups[0]!.said, /about \$13,565 a month/u);
+  assert.equal(b.groups[0]!.said, '3');
 });
 
-test('no money linked to an earning project says how to link it', () => {
+test('no money linked to an earning project says so in a line', () => {
   const b = boardOf(base());
   assert.equal(b.earning.total, null);
-  assert.match(b.earning.empty ?? '', /No money is linked/u);
+  assert.equal(b.earning.empty, 'No money linked yet.');
 });
 
 test('the parked ask nothing unless something of theirs is due, and the finished are a count', () => {

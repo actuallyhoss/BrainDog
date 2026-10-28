@@ -367,7 +367,7 @@ function workOf(f: Facts, now: number): WorkCell {
     return { agent: run.agent, said: ago(run.at, now), sub, none: false };
   }
   if (move) return { agent: null, said: `Tasks changed ${ago(move, now)}`, sub: null, none: false };
-  return { agent: null, said: 'No session tagged', sub: null, none: true };
+  return { agent: null, said: 'No sessions', sub: null, none: true };
 }
 
 /** Whether a project building is moving or due: late, due within the week, a run or a task change this week, or asked. */
@@ -422,7 +422,7 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
       year: null,
       currency: null,
       lines: [],
-      empty: earning.length === 0 ? 'No project is earning yet.' : 'No money is linked to the earning projects yet. A key number of monthly money, or a repeating payment set to the project, fills this.',
+      empty: earning.length === 0 ? 'No project is earning yet.' : 'No money linked yet.',
       also: null,
     };
   /* ONE CURRENCY ADDED UP, the home one where any line is in it: two currencies are never summed. */
@@ -520,9 +520,9 @@ export function boardOf(input: BoardInput): Board {
     .sort((a, b) => Number(chipOf(b, input.today) !== null) - Number(chipOf(a, input.today) !== null) || a.p.name.localeCompare(b.p.name));
   const earning = earningOf(input, fs);
   const groups: BoardGroup[] = [
-    { id: 'earning' as const, name: 'Earning', said: `${earningFs.length}${earning.total ? ` · about ${earning.total} a month` : ''}`, rows: earningFs.map(rowOf) },
-    { id: 'moving' as const, name: 'Building, moving or due', said: `${movingFs.length} of ${building.length}`, rows: movingFs.map(rowOf) },
-    { id: 'quiet' as const, name: 'Building, quiet', said: `${quietFs.length} · no session, change or date in ${WEEK_DAYS} days`, rows: quietFs.map(rowOf) },
+    { id: 'earning' as const, name: 'Earning', said: `${earningFs.length}`, rows: earningFs.map(rowOf) },
+    { id: 'moving' as const, name: 'Building', said: `${movingFs.length}`, rows: movingFs.map(rowOf) },
+    { id: 'quiet' as const, name: 'Quiet', said: `${quietFs.length} · nothing in ${WEEK_DAYS} days`, rows: quietFs.map(rowOf) },
   ].filter((g) => g.rows.length > 0);
 
   /* ── this week ── */
