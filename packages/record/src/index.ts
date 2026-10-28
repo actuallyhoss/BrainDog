@@ -837,8 +837,12 @@ RETURNING n, until`;
 
 /** How long a fact a read is written from is held while the record's version stands (`heldFor`): 30 s, plan §4.1. */
 const HELD_MS = 30_000;
-/** How old a Today drawn before may be and still be answered first, marked `behind`, while it is drawn again (`today`). */
-const TODAY_BEHIND_MS = 1_800_000;
+/**
+ * How old a Today drawn before may be and still be answered first, marked `behind`, while it is drawn again (`today`):
+ * six hours, inside the same day, as the app's own copy of Today is drawn first on an open whatever its age. Half an
+ * hour left the first open of a morning, the open that is slowest, drawn the slow way.
+ */
+const TODAY_BEHIND_MS = 21_600_000;
 /** The most Todays held at once, one for each body and reader; past it the oldest goes. */
 const TODAY_KEPT_MOST = 8;
 /** How long a fact about the questions is held while only the runs have moved (`quietFor`). */
