@@ -83,11 +83,6 @@ export const shell = {
   arrangeCancel: 'Cancel',
   moveUp: 'Move up',
   moveDown: 'Move down',
-  /* HIDING A PAGE AND BRINGING IT BACK, which Settings, Navigation does since the rail became one flat list with no
-     menu of its own on each row. */
-  hiddenCount: (n: number) => (n === 1 ? '1 page hidden' : `${n} pages hidden`),
-  showHidden: 'Show',
-
   /* Putting a saved view onto a page. `21 §3.4`'s sentence, with the two halves the view already
      answered stated rather than asked.
 
@@ -98,7 +93,6 @@ export const shell = {
 
   /** The predicate of an unfiltered list, said as a person would say it. */
   everything: 'everything in it',
-  switchRecord: 'Switch record',
   recordSettings: 'Record settings',
   recordNotOpened: 'That did not open. Check your connection, then try again.',
   /* A PRESS ON A SCREEN STILL OPENING FROM THE SAVED COPY (fluid F5): a control that cannot wait says so, and an answer that
@@ -115,11 +109,6 @@ export const shell = {
   nothingToUndo: 'Nothing to undo.',
   copied: (what: string) => `Copied ${what}.`,
   copyRefused: 'The browser would not give this page the clipboard.',
-  /* THE TWO HALVES OF ONE CONTROL, AT THE HEAD OF THE RAIL. Each names what it will do rather than
-     the gesture that got you here: "Toggle the sidebar" is what the key sheet calls the chord, and
-     a reader looking at a column of glyphs does not know a toggle happened. */
-  showSidebar: 'Show the sidebar',
-  collapseSidebar: 'Collapse the sidebar',
 
   /* decide and the gate */
   openQuestions: 'Open questions',

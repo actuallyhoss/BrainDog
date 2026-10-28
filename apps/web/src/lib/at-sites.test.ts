@@ -54,7 +54,6 @@ const RENDERED_IN = new Map([
 /** The files that read the bare origin on purpose, and what for. Anything else reading it is a record call gone to the root. */
 const BARE_ORIGIN = new Map([
   ['lib/clipboard.ts', 'a copied link is absolute, and `at()` adds the record'],
-  ['lib/ui/Sidebar.svelte', '`/auth/switch` is the person\'s, not a record\'s'],
   ['lib/ui/WebhookDoors.svelte', 'a door is `/in/…` at the root, which a stranger posts to'],
   ['lib/ui/NewAction.svelte', 'the same door mint as `WebhookDoors.svelte`, shown once while the sheet is still open'],
   ['lib/page/panels/Reporting.svelte', 'the curl line is a bearer at `/api`, which names its record by the key'],

@@ -30,7 +30,7 @@ test('the palette searches, lists and adds on the record or not at all, never on
 });
 
 test('the switcher, Add a field and Runs on say nothing of a write that did not happen', () => {
-  assert.doesNotMatch(code('../ui/Sidebar.svelte'), /notWritten|otherRecord/u);
+  assert.doesNotMatch(code('../shell/RecordMenu.svelte'), /notWritten|otherRecord/u);
   const field = code('../ui/AddField.svelte');
   assert.doesNotMatch(field, /notWritten|fieldWords\.sample/u);
   assert.match(field, /\{:else if live\}/u, 'the Add a field button is drawn where nothing can be added');

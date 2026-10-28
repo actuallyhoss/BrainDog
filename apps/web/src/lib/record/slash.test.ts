@@ -121,8 +121,8 @@ test('a new record with nothing noticed and nothing suggested gets one friendly 
   assert.match(screen, /nothingYet\(reading\)/u);
   assert.match(screen, /words\.emptyTitle/u);
 
-  /* THE RAIL HAS NO SLASH ROW: the page folded into the palette, the one ask (batch 5d). */
-  const rail = readFileSync(new URL('../ui/Sidebar.svelte', import.meta.url), 'utf8');
+  /* THE SIDEBAR HAS NO SLASH ROW: the page folded into the palette, the one ask (batch 5d). */
+  const rail = readFileSync(new URL('../shell/SideBar.svelte', import.meta.url), 'utf8');
   assert.doesNotMatch(rail, /href: '\/slash'/u);
 });
 

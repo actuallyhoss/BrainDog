@@ -271,7 +271,6 @@
   });
   /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE SIDEBAR TOO: one nav, not two. */
   const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
-  const hiddenCount = $derived(railNav.filter((e) => navPrefs.hidden.includes(e.href)).length);
   /* THE SIDEBAR'S LISTS IN THE RAIL'S ORDER, from the same preference (`orderLists`), the kernel's own marked, each with
      what its declaration says of where it belongs: as the sidebar learnt it, else as this device last kept it, so every
      list is drawn in its home at once, from the shell's own index, and never pops in after a read. */

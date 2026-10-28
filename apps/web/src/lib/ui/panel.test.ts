@@ -268,7 +268,7 @@ test('a lift called twice lifts once, so a close and a destroy cannot take down 
  * may say "240ms" to explain what a token is.
  */
 test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
-  const files = ['Panel.svelte', 'Sheet.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', 'Sidebar.svelte', 'TopBar.svelte'];
+  const files = ['Panel.svelte', 'Sheet.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', '../shell/SideBar.svelte', 'TopBar.svelte'];
   for (const file of files) {
     const text = readFileSync(new URL(file, import.meta.url), 'utf8');
     const style = file.endsWith('.css') ? text : (text.match(/<style>([\s\S]*)<\/style>/u)?.[1] ?? '');
@@ -283,7 +283,7 @@ test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
  * is the opaque tile with a 1px edge. `lib/no-glass.test.ts` holds the whole app to it; this names the overlays.
  */
 test('no overlay or chrome blurs what is behind it', () => {
-  const files = ['Panel.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', 'Sidebar.svelte', '../../routes/+layout.svelte'];
+  const files = ['Panel.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', '../shell/SideBar.svelte', '../../routes/+layout.svelte'];
   for (const file of files) {
     const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
     assert.doesNotMatch(code, /backdrop-filter|--glass/u, `${file} still blurs or names the glass`);
