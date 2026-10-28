@@ -736,15 +736,16 @@ export function answerRowOf<W extends { key: string; label: string }>(ways: read
 }
 
 /**
- * WHY AN ANSWER CAN'T BE UNDONE EASILY, said concretely beside the warning: money on entries already here, something
- * turned off, entries removed, or an answer its asker marked hard. Read off what the card holds, never a guess.
+ * WHY AN ANSWER CAN'T BE UNDONE EASILY, in a few words beside the warning: money on entries already here, something
+ * turned off, entries removed. Read off what the card holds, never a guess; an answer its asker marked hard says nothing more.
  */
 export function hardWhy(card: Pick<Card, 'moves' | 'filed' | 'ways'>, kinds: readonly string[] = []): string {
-  if (card.moves.length > 0 || kinds.some((k) => /(?:^|:)money(?::|$)/u.test(k))) return 'It changes amounts on entries already here, and Undo can’t put each one back in one press.';
-  if (card.filed === 'pack' || card.filed === 'settings') return 'It turns something off, and turning it back on is done by hand.';
-  if (kinds.some((k) => k.endsWith(':delete'))) return 'It removes entries, and bringing them back is done one at a time.';
-  if (card.ways.some((w) => w.hard)) return 'Whoever asked marked this answer as one that can’t be taken back in one press.';
-  return 'Undo can’t take it back in one press; each change would be put back by hand.';
+  if (card.moves.length > 0 || kinds.some((k) => /(?:^|:)money(?::|$)/u.test(k))) return 'It changes amounts already here.';
+  if (card.filed === 'pack' || card.filed === 'settings') return 'It turns something off.';
+  if (kinds.some((k) => k.endsWith(':delete'))) return 'It removes entries.';
+  /* THE ASKER MARKED IT HARD AND SAID NO MORE, so the warning stands alone rather than repeating itself. */
+  if (card.ways.some((w) => w.hard)) return '';
+  return 'Each change goes back by hand.';
 }
 
 /** THE LADDER'S LINE ("… ask until 10 of them have been kept as they were"), drawn behind an info mark and not as why. */
