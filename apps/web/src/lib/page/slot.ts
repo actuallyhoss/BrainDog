@@ -165,16 +165,25 @@ export function slotQuestion(v: unknown): SlotQuestion | null {
 export const SLOT_READ = 20;
 
 /**
- * The open questions, ranked as Needs you ranks them, on a page that has no queue of its own to read them from: one
- * `governance.open` queue drawn by `previewPage`, which writes nothing. A read that fails is no suggestion.
+ * The open questions, ranked as Needs you ranks them and then agents' suggestions from their shelf, on a page that has
+ * no queue of its own to read them from: a `governance.open` queue and a `governance.apart` one drawn by `previewPage`,
+ * which writes nothing. A drawing BrainDog made unasked waits on the shelf, and the slot is where it is offered. A read
+ * that fails is no suggestion.
  */
 export async function readSlot(base: string, io?: Fetch): Promise<SlotQuestion[]> {
-  const body = { page: 'slot', title: 'Suggestion', blocks: [{ kind: 'queue', source: 'governance.open', limit: SLOT_READ }] };
+  const body = {
+    page: 'slot',
+    title: 'Suggestion',
+    blocks: [
+      { kind: 'queue', source: 'governance.open', limit: SLOT_READ },
+      { kind: 'queue', source: 'governance.apart', limit: SLOT_READ },
+    ],
+  };
   try {
     const out = await createClient({ base, ...(io ? { fetch: io } : {}) }).call<{ blocks?: unknown }>('previewPage', { body });
     if (!out.ok) return [];
-    const [block] = Array.isArray(out.value.blocks) ? out.value.blocks : [];
-    const queue = isBag(block) && Array.isArray(block.queue) ? block.queue : [];
+    const blocks: unknown[] = Array.isArray(out.value.blocks) ? out.value.blocks : [];
+    const queue = blocks.flatMap((block) => (isBag(block) && Array.isArray(block.queue) ? (block.queue as unknown[]) : []));
     return queue.map(slotQuestion).filter((q): q is SlotQuestion => q !== null);
   } catch {
     return [];

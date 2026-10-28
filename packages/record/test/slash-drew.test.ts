@@ -101,9 +101,22 @@ test('ONE DRAWING A DAY, ABOUT ITS PROJECT, IN THE SLOT WITH KEEP IT, AND KEEP W
   );
   /* THE SLOT READS IT AS A QUESTION ABOUT MARSH, with Keep it the one suggested answer. */
   const read = value<{ blocks: { queue?: { id: string; about?: string; cause?: string; options: { key: string; label: string; recommended: boolean }[] }[] }[] }>(
-    await api.previewPage({ body: { page: 'slot', title: 'Suggestion', blocks: [{ kind: 'queue', source: 'governance.open', limit: 20 }] } } as never, owner),
+    await api.previewPage(
+      {
+        body: {
+          page: 'slot',
+          title: 'Suggestion',
+          blocks: [
+            { kind: 'queue', source: 'governance.open', limit: 20 },
+            { kind: 'queue', source: 'governance.apart', limit: 20 },
+          ],
+        },
+      } as never,
+      owner,
+    ),
   );
-  const q = read.blocks[0]!.queue!.find((x) => x.id === first[0]!.id)!;
+  /* AS THE SLOT READS IT (`readSlot`): Needs you and then agents' shelf, where a drawing BrainDog made unasked waits. */
+  const q = read.blocks.flatMap((b) => b.queue ?? []).find((x) => x.id === first[0]!.id)!;
   assert.equal(q.about, 'projects#1');
   assert.equal(q.cause, 'drew:plan:projects#1:path');
   assert.deepEqual(
