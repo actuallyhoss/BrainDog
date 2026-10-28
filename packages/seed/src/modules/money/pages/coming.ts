@@ -53,18 +53,18 @@ export const MONEY_COMING_PAGE: SeedPage = {
       kind: 'note',
       lead: true,
       span: 12,
-      body: 'What comes in and goes out next, this week, next week and later, each in its own currency. In the next 30 days {{arriving-30d}} comes in and {{leaving-30d}} goes out.',
+      body: 'Next 30 days: {{arriving-30d}} in, {{leaving-30d}} out.',
     },
     {
       /* WHAT REPEATS AT ITS MONTHLY SHARE, in, out and what is left, beside the line's next thirty days. */
       kind: 'stat',
-      heading: 'What repeats, a month',
+      heading: 'Every month',
       icon: 'calendar',
       span: 12,
       cells: [
-        { metric: 'every-month-in', label: 'Repeats in, a month' },
-        { metric: 'every-month-out', label: 'Repeats out, a month' },
-        { metric: 'every-month-net', label: 'Left over, a month' },
+        { metric: 'every-month-in', label: 'In' },
+        { metric: 'every-month-out', label: 'Out' },
+        { metric: 'every-month-net', label: 'Left over' },
       ],
       when: { metric: 'cash-accounts', gt: 0 },
     },
@@ -72,7 +72,7 @@ export const MONEY_COMING_PAGE: SeedPage = {
       /* THE BILLS AND INVOICES STILL OPEN IN THE NEXT SIXTY DAYS, A LATE ONE FIRST AND IN THE LATE RED: a `todo`, so a
          tick marks one paid where it is read. */
       kind: 'todo',
-      heading: 'Bills and invoices to settle',
+      heading: 'Bills and invoices',
       icon: 'receipt',
       span: 12,
       source: 'register.obligations',
@@ -80,14 +80,14 @@ export const MONEY_COMING_PAGE: SeedPage = {
       columns: [{ field: 'what' }, { field: 'amount' }, { field: 'due' }, { field: 'party' }],
       order: [{ field: 'due', dir: 'asc' }],
       limit: 12,
-      empty: 'No bill or invoice falls due in the next 60 days.',
+      empty: 'Nothing due in 60 days.',
     },
     /* THE WEEKS, MONDAY TO SUNDAY, EACH THE WHOLE ROW. This week holds what is already late, first and in the late red,
        since the record reads what is overdue before the rest, and a list with something late in it is drawn above the
        figures: two weeks side by side would be parted by it and leave half a row empty. */
     week('This week', 'day before bow+7d', 'Nothing falls due this week.'),
     week('Next week', 'day after bow+6d, day before bow+14d', 'Nothing falls due next week.'),
-    week('Later, to 60 days', 'day after bow+13d', 'Nothing else falls due in the next 60 days.'),
+    week('Later', 'day after bow+13d', 'Nothing else due in 60 days.'),
     {
       /* WHAT IS PAUSED, FOLDED: a paused line is walked by nothing, so it is nowhere above, and still a line to start again. */
       kind: 'section',
@@ -110,7 +110,7 @@ export const MONEY_COMING_PAGE: SeedPage = {
       ],
       order: [{ field: 'what', dir: 'asc' }],
       limit: 20,
-      empty: 'Nothing that repeats is paused.',
+      empty: 'Nothing paused.',
     },
   ],
 };

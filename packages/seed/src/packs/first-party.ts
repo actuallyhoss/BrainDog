@@ -809,12 +809,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   People's step is a major one. Core is 1.0.0, and a record that never held it takes it in the same pass.
  * - core 1.1.0: `page.scripts` heads the column of where each script stands "Status". Words on a column, no id added or
  *   taken away, so a minor step.
+ * - money-core 3.29.1: fewer words on every Money page. Notes that said what a figure is go, leads are one line with a
+ *   figure in it, and an empty list says one line. Words inside declarations already there, nothing added or taken
+ *   away, so a patch step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.1.0',
   portfolio: '1.30.0',
   people: '4.0.0',
-  'money-core': '3.29.0',
+  'money-core': '3.29.1',
   estate: '2.5.0',
   work: '1.19.0',
 };

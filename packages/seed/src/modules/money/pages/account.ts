@@ -75,8 +75,8 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
               icon: 'wallet',
               span: 12,
               cells: [
-                { metric: NOW, label: 'The bank says', note: 'Its newest balance, and every line after it' },
-                { metric: LINES, label: 'The lines add up to', note: 'The balance typed for it, and every line since' },
+                { metric: NOW, label: 'The bank says' },
+                { metric: LINES, label: 'The lines add up to' },
               ],
             },
           ]
@@ -95,7 +95,7 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
                 {
                   metric: GAP,
                   label: 'Counted by the bank, with no line here',
-                  note: 'Lines the bank sent that never reached the Ledger. Find them below, or add them.',
+                  note: 'Missing from the Ledger',
                 },
               ],
               when: { metric: GAP, not: 0 },
@@ -127,7 +127,7 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
               back: 6,
               net: true,
               when: { metric: OUT_BY_MONTH, empty: false },
-              empty: 'Nothing moved through {{name}} in these months.',
+              empty: 'Nothing moved.',
             },
           ]
         : []),
@@ -150,7 +150,7 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
         ],
         order: [{ field: 'on', dir: 'desc' }],
         limit: 50,
-        empty: 'Nothing has moved through {{name}} yet.',
+        empty: 'Nothing has moved yet.',
       },
     ],
   };

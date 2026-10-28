@@ -123,7 +123,7 @@ test('MONEY\'S HERO SAYS IT, and the one line drawn says where the money is kept
   /* AND THE PART THAT IS LATE AFTER IT, since money-core 3.18.0, a sentence the app leaves out while none is. */
   assert.equal(
     leads[0]!.body,
-    'Kept in {{cash-by-account.groups}} account(s), and on what is due it lasts the year. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.',
+    'Lasts the year on what is due. {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.',
   );
   assert.equal(leads[0]!.values?.['lasts-no-income'], undefined, 'the line says it again');
   /* THE HERO SAYS IT SINCE money-core 3.29.0, as the cell after the day it runs out on what is due, with the day it ends

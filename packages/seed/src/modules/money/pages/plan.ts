@@ -86,7 +86,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'plan-parts:{{name}}', lt: 1 },
-      body: 'No part of {{name}} is on Instalments yet. Add its parts there with {{name}} as the plan, and this page counts them.',
+      body: 'No instalments for {{name}} yet.',
     },
     /* HOW MANY ARE PAID AND WHEN IT ENDS. The amounts are the summary's, under it, and said once. */
     lead(HAS_OPEN, '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, the last due on {{plan-last-due:{{name}}}}.'),
@@ -104,7 +104,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       cells: [
         { metric: 'plan-paid:{{name}}', label: 'Paid in' },
         { metric: 'plan-left:{{name}}', label: 'Left' },
-        { metric: 'plan-late:{{name}}', label: 'Late', note: 'Past its day' },
+        { metric: 'plan-late:{{name}}', label: 'Late' },
       ],
     },
     {
@@ -124,7 +124,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
         { metric: 'plan-after-next-by-plan:{{name}}', label: 'Left after' },
       ],
       when: HAS_PARTS,
-      empty: 'No part of {{name}} is on Instalments yet.',
+      empty: 'No parts of {{name}} yet.',
     },
     {
       /* WHAT WAS PAID IN ALL BY EACH QUARTER, the quarters before the chart's first in it too: a running line over what
@@ -136,7 +136,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       series: [{ metric: 'plan-paid-by-quarter:{{name}}', label: 'Paid in all', running: true }],
       back: 24,
       when: { metric: 'plan-parts-paid:{{name}}', gt: 0 },
-      empty: 'Nothing is paid on {{name}} yet.',
+      empty: 'Nothing paid on {{name}} yet.',
     },
     {
       /* THE NEXT SIX PARTS, A LIST TO TICK: a tick marks a part paid where it is read, with its Undo, as a bill is on
@@ -151,7 +151,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       columns: [{ field: 'what' }, { field: 'note' }, { field: 'due' }, { field: 'amount' }],
       order: [{ field: 'due', dir: 'asc' }],
       limit: 6,
-      empty: 'Nothing is left to pay on {{name}}.',
+      empty: 'Nothing left to pay on {{name}}.',
     },
     {
       /* THE PARTS PAID, THE LATEST FIRST, with the day each was paid and the payment that paid it. */
@@ -164,7 +164,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       columns: [DUE, WHAT, AMOUNT, { field: 'settled', label: 'Paid on', width: '13ch' }, { field: 'paid_by', label: 'Paid by', width: 'minmax(10ch,18ch)' }],
       order: [{ field: 'due', dir: 'desc' }],
       limit: 120,
-      empty: 'No part of {{name}} is paid yet.',
+      empty: 'Nothing paid on {{name}} yet.',
     },
     {
       /* EVERY PART STILL TO COME, FOLDED, as Property folds them: the six above are the ones a person acts on. */
@@ -184,7 +184,7 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       columns: [DUE, WHAT, AMOUNT, LEFT_AFTER],
       order: [{ field: 'due', dir: 'asc' }],
       limit: 120,
-      empty: 'Nothing is left to pay on {{name}}.',
+      empty: 'Nothing left to pay on {{name}}.',
     },
     {
       /* A CANCELLED PART IS COUNTED NOWHERE and still listed, under its own heading, so nobody wonders where it went. */

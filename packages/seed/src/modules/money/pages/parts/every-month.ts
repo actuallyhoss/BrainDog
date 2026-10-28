@@ -24,7 +24,7 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
     cells: [
       { metric: 'every-month-in', label: 'Repeats, coming in' },
       { metric: 'every-month-out', label: 'Repeats, going out' },
-      { metric: 'leaving-30d', label: 'Going out, 30 days', note: 'Bills, what repeats and parts of plans' },
+      { metric: 'leaving-30d', label: 'Going out, 30 days' },
     ],
     when: { metric: 'every-month-out', gt: 0 },
   },
@@ -42,6 +42,6 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
     source: 'metric.every-month-by-category',
     unset: 'No category',
     when: { metric: 'every-month-out', gt: 0 },
-    empty: 'Nothing that repeats has a category yet.',
+    empty: 'No categories yet.',
   },
 ];

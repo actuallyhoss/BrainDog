@@ -35,7 +35,7 @@ export const HEADS_UP: Record<string, unknown>[] = [
     kind: 'note',
     tone: 'warn',
     span: 12,
-    body: 'The oldest balance in Cash now was last confirmed on {{cash-as-of}}. [Update balances](/r/balances?new=1)',
+    body: 'Oldest balance from {{cash-as-of}}. [Update](/r/balances?new=1)',
     when: { metric: 'balances-stale', gt: 0 },
   },
   ...AGES,
@@ -82,7 +82,7 @@ export const HEADS_UP: Record<string, unknown>[] = [
     kind: 'note',
     tone: 'warn',
     span: 12,
-    body: 'Categories holding money going the other way from how they are marked: {{categories-against-direction}}. Make it either way: in Categories, set Which way to Either way.',
+    body: 'Categories holding money the other way: {{categories-against-direction}}. [Open categories](/r/categories)',
     when: { metric: 'categories-against-direction', gt: 0 },
   },
 ];

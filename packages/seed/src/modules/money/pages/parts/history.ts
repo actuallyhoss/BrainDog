@@ -38,7 +38,7 @@ export const HISTORY: Record<string, unknown>[] = [
     ahead: 3,
     net: true,
     when: { metric: 'out-by-month', gt: 0 },
-    empty: 'Nothing moved or due in these months.',
+    empty: 'Nothing moved or due.',
   },
   /* WHAT MOVED IS NOT HERE, SINCE THE LEDGER TILE (`parts/ledger.ts`): its twelve lines were folded shut under
      this heading, where the owner went looking for them. The six newest stand open on the page now, and a page that

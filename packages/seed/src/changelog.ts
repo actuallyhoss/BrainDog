@@ -193,6 +193,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.29.1',
+      notes: 'Money says less and shows more: each page opens on one line with a number in it, figures lose the notes that explained them, and an empty list says one short line.',
+    },
+    {
       version: '3.29.0',
       notes: "A page for each job: Accounts, Ledger, Budgets, Coming up, Forecast, Reports and Payees. Budgets are offered from last month, never set for you.",
     },

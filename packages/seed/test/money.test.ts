@@ -772,7 +772,6 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.ok(dry <= days, 'money with nothing coming in lasts longer than money with what comes in');
   const on = reading(k, 'runs-out-on');
   assert.equal(on, Math.floor(NOW / 86_400_000) + days, 'the day is not the count of days from today');
-  assert.equal(runs.values?.['runs-out-on'], new Date((on as number) * 86_400_000).toISOString().slice(0, 10), 'the sentence does not say the day the walk with what comes in goes under');
   assert.equal(runs.values?.['lasts-no-income.on'], new Date(NOW + dry * 86_400_000).toISOString().slice(0, 10), 'the sentence does not say the day the days end on');
   assert.equal(typeof runs.values?.['lasts-no-income.because'], 'string', 'the sentence does not say what falls due that day');
   assert.equal((METRICS['runs-out-on'] as { format?: string }).format, 'day');
@@ -901,7 +900,7 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
     /* A PLAN'S PAGE READS TEN SINCE ITS LEAD BECAME ONE SENTENCE (plan-lead-sentence-70), where four figures had a label each. */
     /* AN ACCOUNT'S AND A BILL'S PAGE READ TWO AND THREE (money-core 3.19.0): one card, and a heading or two under it. */
     /* A SECTION'S PAGE THAT IS STILL ITS LINE ALONE READS ONE (money-core 3.29.0), and is held to more once it has blocks. */
-    const least = slug === 'money-rules' ? 8 : slug === 'money-account' ? 2 : slug === 'money-bill' ? 2 : lineAlone ? 1 : 10;
+    const least = slug === 'money-rules' || slug === 'money-ledger' ? 8 : slug === 'money-account' ? 2 : slug === 'money-bill' ? 2 : lineAlone ? 1 : 10;
     assert.ok(read.length >= least, `${slug}: the sweep read almost nothing, so it proves nothing`);
     for (const t of read) assert.doesNotMatch(t, /\bowe[ds]?\b|\byou owe\b|\bowing\b/iu, `${slug} says "${t}"`);
   }
@@ -932,8 +931,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the redesign (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
   /* EACH CURRENCY APART, AND THE ACCOUNTS THE ACCOUNTS TILE LISTS, SINCE money-core 3.27.0: the sample keeps one
      currency, so nothing is said converted, and every account it counts as cash holds money. */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on', 'cash-by-account.groups']);
-  assert.equal(lead.values?.['cash-by-account.groups'], reading(k, 'cash-accounts'));
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on']);
   /* HOW MUCH, AND HOW FAR IT MOVED, ARE THE HERO'S SINCE money-core 3.29.0, drawn under the line in the figure's own size. */
   const hero = blocks.find((b) => b.kind === 'stat' && b.lead === true)!;
   assert.deepEqual(Object.keys(hero.values ?? {}).filter((v) => v.startsWith('cash-now.')).sort(), ['cash-now.apart', 'cash-now.moved']);
@@ -942,9 +940,9 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
   /* IN WORDS: "6% down on a month ago", where it said "−6%". */
   assert.equal(hero.values?.['cash-now.moved'], `${-moved}% down`);
-  /* THE LINE IS WHERE THE MONEY IS KEPT, a sentence, and then the part that is late, a sentence of its own. */
-  const [money, late] = lead.body?.split(/(?<=\.)\s+/u) ?? [];
-  assert.equal(money, 'Kept in {{cash-by-account.groups}} account(s).');
+  /* THE LINE IS ONLY WHAT NEEDS DOING SINCE money-core 3.29.1: the part that is late, then the card to pay. */
+  const [late, card] = lead.body?.split(/(?<=\.)\s+/u) ?? [];
+  assert.equal(card, '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.');
   /* AND THE PART THAT IS LATE, A SENTENCE OF ITS OWN SINCE money-core 3.18.0, which the sample has none of: its figures
      hold no value here, so the app leaves the sentence out whole (`leadOf`). */
   assert.match(late ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u);
@@ -985,7 +983,7 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, Coming up is the next few things, and wha
   const old = ACCOUNTS.filter((a) => a.liquid === true && String(a.as_of) < day(-7)).length;
   assert.ok(old > 0, 'the sample keeps no old balance, so this proves nothing');
   assert.equal(reading(k, 'balances-stale'), old);
-  const stale = (out.value as { blocks: readonly { body?: string; drawn?: boolean }[] }).blocks.find((b) => String(b.body).startsWith('The oldest balance'));
+  const stale = (out.value as { blocks: readonly { body?: string; drawn?: boolean }[] }).blocks.find((b) => String(b.body).startsWith('Oldest balance'));
   assert.ok(stale && stale.drawn !== false, 'an old balance is not said on the page that reads it');
   assert.notEqual(drawn('Heads up'), false, 'the line about an old balance is drawn with no tile round it');
 

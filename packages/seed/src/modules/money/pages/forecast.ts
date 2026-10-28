@@ -44,9 +44,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       kind: 'note',
       lead: true,
       span: 12,
-      body:
-        'Cash ahead, with every pay, bill and part of a plan on its day and everyday spending at its three-month average. ' +
-        'If all money in stopped, it lasts to {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due.',
+      body: 'With nothing coming in, cash lasts to {{lasts-no-income.on}}.',
     },
     CASH_AHEAD,
     {
@@ -65,7 +63,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       ahead: 3,
       net: true,
       when: { metric: 'cash-accounts', gt: 0 },
-      empty: 'Nothing is dated in the months ahead yet.',
+      empty: 'Nothing dated ahead yet.',
     },
     {
       /* THE PARTS OF PLANS STILL TO PAY IN THE YEAR AHEAD, each on its day in its own currency: the drops the chart
@@ -84,7 +82,7 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       order: [{ field: 'due', dir: 'asc' }],
       limit: 12,
       when: { metric: 'installments-left', gt: 0 },
-      empty: 'No part of a plan falls due in the year ahead.',
+      empty: 'No instalments due this year.',
     },
     {
       /* WHAT REPEATS, EACH LINE ONCE WITH HOW OFTEN AND WHEN IT NEXT LANDS: the dots on the chart that come round. A

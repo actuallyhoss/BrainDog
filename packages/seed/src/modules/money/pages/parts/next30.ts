@@ -69,7 +69,7 @@ export const NEXT_30: Record<string, unknown>[] = [
     back: 0,
     ahead: 1,
     when: { metric: 'cash-accounts', gt: 0 },
-    empty: 'Nothing falls due in the next 30 days.',
+    empty: 'Nothing due in 30 days.',
   },
 ];
 
@@ -103,6 +103,6 @@ export const COMING_UP: Record<string, unknown>[] = [
     columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
     limit: COMING_UP_LINES,
     when: { metric: 'cash-accounts', gt: 0 },
-    empty: 'Nothing falls due in the next two months.',
+    empty: 'Nothing due in two months.',
   },
 ];

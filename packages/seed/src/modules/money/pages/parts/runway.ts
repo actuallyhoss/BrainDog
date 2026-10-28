@@ -17,10 +17,8 @@ export const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due 
  */
 export const LASTS_SAID = {
   metric: 'lasts-no-income',
-  label: 'With no money coming in',
-  note:
-    'If all money in stopped, {{every-month-in.names}} too, it lasts to {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due. ' +
-    'With what comes in it still runs out on {{runs-out-on}}.',
+  label: 'If nothing comes in',
+  note: 'Until {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due',
 };
 
 /**

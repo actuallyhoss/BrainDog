@@ -179,7 +179,7 @@ test('HOME IS CALLED TODAY, in the voice and as the page title', () => {
 /* WHERE IT IS KEPT, SINCE money-core 3.29.0: how much there is is the hero's under the line, and every line ends on the
    part that is late, a sentence the app leaves out while none is. */
 /* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0, left out whole with no card that says it. */
-const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
+const LATE = '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
 test('MONEY WITH TWO BOOKS OPENS ON WHERE ITS MONEY IS KEPT, and with one book on how long it lasts', async () => {
   const k = await founder();
   type Lead = Drawn & { lead?: boolean; body?: string; values?: Record<string, unknown> };
@@ -192,11 +192,11 @@ test('MONEY WITH TWO BOOKS OPENS ON WHERE ITS MONEY IS KEPT, and with one book o
   account('Everyday', own, 'GBP');
   /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE LASTS THE YEAR, and since money-core 3.17.0 the line says so
      (`HEADLINE_LASTS`): one lead still, the line of what there is stepping aside for it. */
-  assert.deepEqual(leads().map((b) => b.body), [`Kept in {{cash-by-account.groups}} account(s), and on what is due it lasts the year.${LATE}`]);
+  assert.deepEqual(leads().map((b) => b.body), [`Lasts the year on what is due. ${LATE}`]);
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
-  assert.deepEqual(two.map((b) => b.body), [`Kept in {{cash-by-account.groups}} account(s) in {{books-held}} books.${LATE}`], 'one lead');
+  assert.deepEqual(two.map((b) => b.body), [`{{cash-by-account.groups}} account(s) in {{books-held}} books. ${LATE}`], 'one lead');
   /* NO CARD SAYS WHAT IS TO PAY ON IT: the sum reads nought and its day reads nothing, so the card's sentence goes whole. */
   assert.deepEqual(two[0]!.values, {
     'books-held': 2,

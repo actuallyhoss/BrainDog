@@ -8,11 +8,9 @@ const ONE_BOOK = { metric: 'books-held', lt: 2 };
  */
 const ACCOUNTS_SAID = '{{cash-by-account.groups}} account(s)';
 /**
- * WHERE THE MONEY IS KEPT, AND NOT HOW MUCH, SINCE money-core 3.29.0. How much is the hero's (`hero.ts`): Cash now in the
- * figure's own size, each currency in its own amount under it and its change on a month ago, which this line said
- * until the hero stood under it. A line saying the same money over a tile saying it bigger was one fact twice.
+ * NO LINE OF WHERE THE MONEY IS KEPT, SINCE money-core 3.29.1: "Kept in 2 accounts" said a count the Accounts tile draws
+ * a row for, in the page's biggest type. The line is only what needs doing: the part that is late and the card to pay.
  */
-const WHAT_THERE_IS = `Kept in ${ACCOUNTS_SAID}.`;
 
 /**
  * AND A PART THAT IS LATE, SINCE money-core 3.18.0 ("Money's first line says how much he
@@ -20,13 +18,13 @@ const WHAT_THERE_IS = `Kept in ${ACCOUNTS_SAID}.`;
  * sentence of its own after the money. Its figures are `installments-late`'s first row, so on a record with nothing
  * late the sentence has no figure that reads and goes whole (`leadOf`), and the line is what it was.
  */
-const LATE_PART = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
+const LATE_PART = '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}.';
 
 /**
  * AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.20.0 (B8 of 24 October): a card is not cash, so it is on no tile, and the
  * page is at its ceiling of blocks, so the sentence is the line's. No card that says it, and the sentence goes whole.
  */
-const CARD_OWES = ' On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
+const CARD_OWES = ' {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
 
 export const HEADLINE: Record<string, unknown>[] = [
   {
@@ -38,7 +36,7 @@ export const HEADLINE: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: ONE_BOOK,
-    body: `${WHAT_THERE_IS}${LATE_PART}${CARD_OWES}`,
+    body: `${LATE_PART}${CARD_OWES}`,
   },
   {
     /* WITH TWO BOOKS OR MORE THE LINE SAYS HOW MANY, SINCE money-core 3.17.0, so a person reads that the hero's Cash
@@ -48,7 +46,7 @@ export const HEADLINE: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { metric: 'books-held', gte: 2 },
-    body: `Kept in ${ACCOUNTS_SAID} in {{books-held}} books.${LATE_PART}${CARD_OWES}`,
+    body: `${ACCOUNTS_SAID} in {{books-held}} books. ${LATE_PART}${CARD_OWES}`,
   },
 ];
 
@@ -61,7 +59,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
   {
     ...HEADLINE[0],
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
-    body: `${WHAT_THERE_IS}${LATE_PART}${CARD_OWES}`,
+    body: `${LATE_PART}${CARD_OWES}`,
   },
   {
     /* THAT IT LASTS THE YEAR IS THE LINE'S, BECAUSE NO TILE SAYS IT. The tile of when it runs out is drawn only while
@@ -74,7 +72,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
-    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year.${LATE_PART}${CARD_OWES}`,
+    body: `Lasts the year on what is due. ${LATE_PART}${CARD_OWES}`,
   },
   HEADLINE[1]!,
 ];

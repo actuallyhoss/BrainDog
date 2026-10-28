@@ -95,12 +95,13 @@ const bill = (k: Kernel, amount: number, due: number): void =>
 /* AND EACH ENDS ON THE PART THAT IS LATE, since money-core 3.18.0: a sentence of its own,
    which the app leaves out whole while no part is late (`leadOf`). With two books the line says the money there is. */
 /* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0, left out whole with no card that says it. */
-const LATE = ' {{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. On the card: {{card-to-pay}} to pay, as of {{card-to-pay-on}}.';
-/* THE LINE SAYS WHERE THE MONEY IS KEPT, since money-core 3.29.0: how much there is, and in which currencies, is the hero's. */
+const LATE = '{{installments-late.first}} is {{bad:late}}: {{installments-late.first_amount}}, due {{ago:installments-late.first_due}}. {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
+/* NO WORD OF WHERE THE MONEY IS KEPT SINCE money-core 3.29.1: the Accounts tile draws a row for each, so the line is only
+   what needs doing, and on one book with nothing late and no card it says nothing. */
 const ACCOUNTS = '{{cash-by-account.groups}} account(s)';
-const WHAT_THERE_IS = `Kept in ${ACCOUNTS}.${LATE}`;
-const LASTS = `Kept in ${ACCOUNTS}, and on what is due it lasts the year.${LATE}`;
-const BOOKS = `Kept in ${ACCOUNTS} in {{books-held}} books.${LATE}`;
+const WHAT_THERE_IS = LATE;
+const LASTS = `Lasts the year on what is due. ${LATE}`;
+const BOOKS = `${ACCOUNTS} in {{books-held}} books. ${LATE}`;
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
@@ -130,8 +131,8 @@ test('WITH ONE BOOK AND A WALK THAT NEVER GOES UNDER, the line says the cash and
   assert.equal(figure(k, 'runway-days'), null, 'a walk that stays above zero has no day count');
   assert.deepEqual(bodies(k), [LASTS], 'the cash is said once, and that it lasts the year');
   const line = leads(k)[0]!;
-  /* ONE ACCOUNT HOLDING MONEY, AND ONE CURRENCY, SO THE CASH IS SAID AS IT IS: no sum at a rate beside it. */
-  assert.equal(line.values?.['cash-by-account.groups'], 1);
+  /* NO COUNT OF ACCOUNTS: the Accounts tile draws one row for each. */
+  assert.equal(line.values?.['cash-by-account.groups'], undefined);
   assert.equal(line.values?.['cash-now.apart'], undefined, 'how much there is is the hero\'s');
   assert.equal(line.values?.['runway-days'], undefined, 'the line carries no day count: that is the tile\'s');
 

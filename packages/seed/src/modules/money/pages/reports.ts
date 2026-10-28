@@ -54,7 +54,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'out-by-month', gt: 0 },
-      body: 'This month so far {{received-month}} came in and {{spent-by-category-month}} went out, so {{left-month}} is left over.',
+      body: 'This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left.',
     },
     {
       /* NOTHING MOVED YET: what the page will hold, in place of noughts. */
@@ -62,7 +62,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'out-by-month', lt: 1 },
-      body: 'Nothing has moved yet. Once the Ledger holds a month, this page reads it month by month.',
+      body: 'Nothing has moved yet.',
     },
     {
       /* TWELVE MONTHS, EACH WAY, AND WHAT WAS LEFT. No months ahead: Forecast is where the months ahead are read. */
@@ -77,7 +77,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       back: 12,
       net: true,
       when: { metric: 'out-by-month', gt: 0 },
-      empty: 'Nothing moved in these months.',
+      empty: 'Nothing moved.',
     },
     {
       /* HOW THE QUARTER WENT: what was kept of what came in, and the last thirty days in and out; how long the cash lasts
@@ -88,11 +88,11 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       icon: 'heart-pulse',
       span: 12,
       cells: [
-        { metric: 'kept-share-90d', label: 'Kept of money in', note: 'The last 90 days, after everything that went out' },
-        { metric: 'spent-30d', label: 'Spent, 30 days', note: 'Moves between your own accounts left out' },
-        { metric: 'received-30d', label: 'Came in, 30 days', note: 'Pay and everything else paid in' },
-        { metric: 'lasts-no-income', label: 'Lasts with no income', note: 'Cash now, spent at the pace it goes out' },
-        { metric: 'cash-foreign-share', label: 'In other currencies', note: 'Of cash now, at the rates you hold' },
+        { metric: 'kept-share-90d', label: 'Kept, 90 days' },
+        { metric: 'spent-30d', label: 'Spent, 30 days' },
+        { metric: 'received-30d', label: 'Came in, 30 days' },
+        { metric: 'lasts-no-income', label: 'Lasts with no income' },
+        { metric: 'cash-foreign-share', label: 'In other currencies' },
       ],
       when: { metric: 'out-by-month', gt: 0 },
     },
@@ -109,7 +109,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       columns: [{ field: 'category' }, { field: 'amount' }],
       unset: 'No category yet',
       when: { metric: 'out-by-month', gt: 0 },
-      empty: 'Nothing went out in these months.',
+      empty: 'Nothing went out.',
     },
     {
       /* WHO WAS PAID MOST, IN THE MONTHS PICKED. Each bar opens that payee's entries. */
@@ -123,7 +123,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       unset: 'No name yet',
       limit: 10,
       when: { metric: 'out-by-month', gt: 0 },
-      empty: 'Nobody was paid in these months.',
+      empty: 'Nobody was paid.',
     },
     {
       /* WHERE THE MONEY CAME FROM, IN THE MONTHS PICKED, by who paid it in. */
@@ -137,7 +137,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       unset: 'No name yet',
       limit: 8,
       when: { metric: 'in-by-month', gt: 0 },
-      empty: 'Nothing came in in these months.',
+      empty: 'Nothing came in.',
     },
     {
       /* THIS MONTH SO FAR AGAINST LAST MONTH TO THE SAME DAY, ONE BAR A CATEGORY: what moved, read from one figure that
@@ -157,7 +157,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       source: 'metric.spent-vs-last-month',
       unset: 'No category',
       when: { metric: 'spent-by-category-month', gt: 0 },
-      empty: 'Nothing spent this month or last has a category yet.',
+      empty: 'No categories yet.',
     },
     /* WHERE IT WENT, FOLDED AT THE END since money-core 3.29.0 gave Money's home a board of tiles: this month by category,
        and who was paid in what nobody has filed, the bar that says where filing starts. */

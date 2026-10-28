@@ -68,7 +68,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift'],
       late: 'days-late-in',
       under: 30,
-      empty: 'Nothing in {{name}} is dated ahead yet.',
+      empty: 'Nothing dated ahead yet.',
     },
     {
       /* THIS BOOK'S MONTH IN ONE ROW: what came in, what went out and what is left, each read once a
@@ -110,7 +110,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
          3.16.0, the day `account-ages` says for the card's account, where it was the typed "As of" a bank
          message never writes (`parts/ages.ts`). */
       stale: CONFIRMED_STALE,
-      empty: 'No account is in {{name}} yet. Add one here and it is filed in this book.',
+      empty: 'No accounts yet.',
     },
     {
       kind: 'capture',
@@ -141,7 +141,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       columns: [{ field: 'what' }, { field: 'due' }],
       back: 0,
       ahead: 1,
-      empty: 'Nothing in {{name}} falls due in the next 30 days.',
+      empty: 'Nothing due in 30 days.',
     },
     {
       kind: 'bridge',
@@ -152,7 +152,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       opening: { metric: 'book-cash:{{name}}' },
       from: BOOK_LEGS,
       horizon: 30,
-      empty: 'Nothing in {{name}} is dated in the next 30 days.',
+      empty: 'Nothing in the next 30 days.',
     },
     {
       kind: 'split',
@@ -179,7 +179,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       columns: MOVED_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: 12,
-      empty: 'Nothing has moved in {{name}} yet.',
+      empty: 'Nothing has moved yet.',
     },
   ],
 });
@@ -225,7 +225,7 @@ function owedRow(declared: (figure: string) => boolean): Record<string, unknown>
  */
 function lastsNote(declared: (figure: string) => boolean): Record<string, unknown>[] {
   if (!declared('book-lasts-until')) return [];
-  return [{ kind: 'note', span: 12, when: { metric: 'book-lasts-until:{{name}}', beyond: true }, body: 'Its money lasts the year on what is due.' }];
+  return [{ kind: 'note', span: 12, when: { metric: 'book-lasts-until:{{name}}', beyond: true }, body: 'Lasts the year on what is due.' }];
 }
 
 /** The figure the two lines below are drawn on, and the list they send a person to. */
@@ -282,7 +282,7 @@ function monthsChart(declared: (figure: string) => boolean): Record<string, unkn
       back: 12,
       net: true,
       when: { metric: `${BY_MONTH.net}:{{name}}`, empty: false },
-      empty: 'Nothing moved in {{name}} in these months.',
+      empty: 'Nothing moved in {{name}}.',
     },
   ];
 }

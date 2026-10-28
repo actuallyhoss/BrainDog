@@ -197,15 +197,15 @@ test('RULES THAT FILED BEFORE AND NOTHING LATELY SAY SO IN WORDS, never "0 rules
   clock.advance(40 * 86_400_000);
   assert.equal(figure(k, 'filed-by-rule-30d').value, 0);
   const lead = leadOf(pageOf(k).blocks);
-  assert.match(lead.body!, /^No rule has filed anything in the last 30 days\./u);
-  assert.deepEqual([lead.values?.['rules-filing'], lead.values?.['rule-filed']], [1, 3]);
+  assert.match(lead.body!, /^Nothing filed in 30 days\./u);
+  assert.deepEqual([lead.values?.['rule-filed']], [3]);
 });
 
 test('WITH NO RULE, THE LEAD READS THE NOUGHT SENTENCE and nothing else counts', async () => {
   const { k } = await fresh();
   assert.equal(figure(k, 'rule-filed').value, 0);
   const { blocks } = pageOf(k);
-  assert.equal(leadOf(blocks).body, 'No rule has filed anything yet. Set a category on an entry and the record offers one.');
+  assert.equal(leadOf(blocks).body, 'No rule has filed anything yet.');
   assert.equal(drawn(blocks).find((b) => b.heading === 'Entries each rule filed'), undefined);
   assert.equal(drawn(blocks).find((b) => b.heading === 'Filed lately'), undefined);
   assert.ok(drawn(blocks).length <= 7, 'six tiles or fewer beside the line');

@@ -48,26 +48,25 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{cash-by-account.groups}} account(s) hold cash: {{cash-now.apart}}. Each balance stays in its own currency, dated by the bank’s newest word on it.',
+        body: '{{cash-now.apart}} in {{cash-by-account.groups}} account(s).',
       },
       {
-        /* WHETHER THE BALANCES CAN BE TRUSTED, IN FOUR NUMBERS: what they hold, what the card asks, the oldest balance
-           among them and how many are older than a week. */
+        /* WHETHER THE BALANCES CAN BE TRUSTED, IN THREE NUMBERS: what the card asks, the oldest balance among them and
+           how many are older than a week. What they hold is the line above, so it is not said twice. */
         kind: 'stat',
         heading: 'All accounts',
         icon: 'landmark',
         span: 12,
         cells: [
-          { metric: 'cash-now', label: 'Cash now', note: 'Every account that counts as cash' },
           { metric: 'card-to-pay', label: 'To pay on the card' },
-          { metric: 'cash-as-of', label: 'Oldest balance', note: 'The day the bank or a check last said it' },
-          { metric: 'balances-stale', label: 'Older than a week', note: 'Accounts whose balance nobody confirmed in seven days' },
+          { metric: 'cash-as-of', label: 'Oldest balance' },
+          { metric: 'balances-stale', label: 'Older than a week' },
         ],
       },
       {
         /* WHAT EACH HOLDS NOW, by the bank's newest word and every line after it, each in its own currency. */
         kind: 'bar',
-        heading: 'What each holds',
+        heading: 'Balance',
         icon: 'wallet',
         span: twoWays ? 6 : 12,
         source: 'metric.cash-by-account',
@@ -80,7 +79,7 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
               /* AND WHAT ITS LINES ADD UP TO, from the balance typed for it: where a bar here is not the bar beside it, the
                  bank counted money the Ledger has no line for, and the account's own page says how much. */
               kind: 'bar',
-              heading: 'What its lines add up to',
+              heading: 'Ledger total',
               icon: 'receipt',
               span: 6,
               source: `metric.${BY_LINES}`,
@@ -101,7 +100,7 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
         columns: ACCOUNT_CARD,
         order: [{ field: 'seq', dir: 'asc' }],
         stale: CONFIRMED_STALE,
-        empty: 'No account yet. Add the first below, with what it holds today.',
+        empty: 'No account yet.',
       },
       {
         kind: 'capture',

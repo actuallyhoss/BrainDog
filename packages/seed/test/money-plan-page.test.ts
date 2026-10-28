@@ -386,7 +386,7 @@ test('a plan with no parts says so in a sentence, and draws no figure about noth
   const lead = shown.filter((b) => b.lead === true);
   assert.equal(lead.length, 1, 'one block leads');
   assert.equal(lead[0]!.kind, 'note');
-  assert.match(lead[0]!.body!, /^No part of Desk is on Instalments yet\./);
+  assert.match(lead[0]!.body!, /^No instalments for Desk yet\./);
   /* NO TILE OF FIGURES AND NO TRACK: a count of nought of nought and a day that is not there are a dash on a screen. */
   assert.deepEqual(shown.filter((b) => b.kind === 'stat' || b.kind === 'progress'), []);
   const table = tableOf(blocks);
@@ -451,7 +451,7 @@ test('the lead is one of three sentences, by whether the plan has a part and whe
 
   /* AND NO PART AT ALL IS NEITHER: one sentence that says so, never "nothing is left" about a plan nobody has filled. */
   const shed = leadOf(pageOf(k, 'Shed'));
-  assert.match(shed.body!, /^No part of Shed is on Instalments yet\./);
+  assert.match(shed.body!, /^No instalments for Shed yet\./);
 });
 
 test('the two counts the lead waits on tell a plan all paid from a plan with a part open and from one with none', async () => {

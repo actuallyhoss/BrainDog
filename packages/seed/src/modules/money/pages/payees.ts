@@ -37,14 +37,14 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'payees-paid-90d', gt: 0 },
-      body: 'You paid {{payees-paid-90d}} payees in the last 90 days, {{spent-30d}} in the last 30. Pick one to see only theirs.',
+      body: '{{payees-paid-90d}} payee(s) paid in 90 days.',
     },
     {
       kind: 'note',
       lead: true,
       span: 12,
       when: { metric: 'payees-paid-90d', lt: 1 },
-      body: 'No payee has been paid in the last 90 days. A payee is the name on an entry, and the bank lines that name one fill this page.',
+      body: 'No payees paid in 90 days.',
     },
     {
       /* HOW MUCH EACH WAS PAID, THE MOST FIRST, added up where it is drawn, so two currencies are two amounts. */
@@ -57,7 +57,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       columns: [{ field: 'payee' }, { field: 'amount' }],
       unset: 'No name yet',
       limit: 15,
-      empty: 'Nobody was paid in the last 90 days.',
+      empty: 'Nobody paid in 90 days.',
     },
     {
       /* HOW OFTEN EACH WAS PAID: a count, which has no currency, so a figure grouped by payee. */
@@ -70,12 +70,12 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       /* THE TEN PAID MOST OFTEN, as Paid most is cut: uncut, a record with thirty payees drew thirty bars of ones and twos. */
       limit: 10,
       when: { metric: 'payees-paid-90d', gt: 0 },
-      empty: 'Nobody was paid in the last 90 days.',
+      empty: 'Nobody paid in 90 days.',
     },
     {
       /* UNDER WHICH CATEGORIES, IN THE SAME DAYS: with one payee picked, the category its money went under. */
       kind: 'split',
-      heading: 'Under which category',
+      heading: 'By category, 90 days',
       donut: true,
       icon: 'chart-pie',
       span: 12,
@@ -83,7 +83,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       where: `${LEDGER_90D}, direction is out`,
       columns: [{ field: 'category' }, { field: 'amount' }],
       unset: 'No category yet',
-      empty: 'Nothing went out in the last 90 days.',
+      empty: 'Nothing out in 90 days.',
     },
     {
       /* THE NEWEST ENTRIES, the day each was last paid among them, as the Ledger's own tile says them. */
@@ -113,7 +113,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       ],
       order: [{ field: 'match', dir: 'asc' }],
       limit: 60,
-      empty: 'No payee has a usual category yet. Set a category on an entry and the record offers one.',
+      empty: 'No usual categories yet.',
     },
     {
       /* WHO PAID IN, folded at the end. */
@@ -134,7 +134,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       columns: [{ field: 'payee' }, { field: 'amount' }],
       unset: 'No name yet',
       limit: 10,
-      empty: 'Nothing came in in the last 90 days.',
+      empty: 'Nothing in for 90 days.',
     },
   ],
 };

@@ -43,7 +43,7 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'budgets-set', gt: 0 },
-      body: '{{budgets-set}} categories have a budget, {{budgets-total}} a month in all.',
+      body: '{{budgets-total}} a month across {{budgets-set}} categories.',
     },
     {
       /* WITH NONE SET: what the page offers instead, and that nothing is set by itself. */
@@ -51,7 +51,7 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'budgets-set', lt: 1 },
-      body: 'No category has a budget yet. Each one below is offered from what it spent last month, and nothing is set until you say so.',
+      body: 'No budgets yet.',
     },
     {
       /* THE MONTH IN TWO FIGURES: spent so far, and last month whole beside it. What is budgeted is the line's, and what
@@ -61,8 +61,8 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       icon: 'calendar',
       span: 12,
       cells: [
-        { metric: 'spent-by-category-month', label: 'Spent so far', note: 'Since the first, on every category' },
-        { metric: 'spent-last-month', label: 'Last month', note: 'The whole month, on every category' },
+        { metric: 'spent-by-category-month', label: 'Spent so far' },
+        { metric: 'spent-last-month', label: 'Last month' },
       ],
       when: { metric: 'spent-by-category-month', gt: 0 },
     },
@@ -73,7 +73,7 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       tone: 'warn',
       span: 12,
       when: { metric: 'unfiled-month', gt: 0 },
-      body: `{{unfiled-spent-month}} spent this month has no category, over {{unfiled-month}} entries. No budget counts it until it is filed. [File them](${FILE_THEM})`,
+      body: `{{unfiled-spent-month}} this month has no category. [File them](${FILE_THEM})`,
     },
     {
       /* EACH BUDGET, AGAINST THIS MONTH. Columns: the name, the most a month, the share it warns at and whether what is
@@ -89,7 +89,7 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       spent: 'spent-by-category-month',
       order: [{ field: 'seq', dir: 'asc' }],
       limit: 30,
-      empty: 'No category has a budget yet.',
+      empty: 'No budgets yet.',
     },
     {
       /* THE ONE OFFER, WHERE IT CAN BE ANSWERED: the question `offer_budgets` files once a month, "Use these" or "Not
@@ -112,7 +112,7 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       source: 'metric.spent-by-category-last-month',
       unset: 'No category',
       when: { metric: 'spent-last-month', gt: 0 },
-      empty: 'Nothing was spent last month.',
+      empty: 'Nothing spent last month.',
     },
     {
       /* THE CATEGORIES WITH NO BUDGET, each a press from its page, where a most a month is typed by hand. THE NAME
@@ -127,7 +127,7 @@ export const MONEY_BUDGETS_PAGE: SeedPage = {
       order: [{ field: 'name', dir: 'asc' }],
       limit: 30,
       when: { metric: 'budgets-unset', gt: 0 },
-      empty: 'Every category money goes out on has a budget.',
+      empty: 'Every category has a budget.',
     },
   ],
 };

@@ -33,6 +33,6 @@ export const SPENDING: Record<string, unknown>[] = [
     source: 'metric.spent-by-category-month',
     unset: 'Not filed yet',
     when: { metric: 'spent-by-category-month', gt: 0 },
-    empty: 'Nothing spent this month has a category yet.',
+    empty: 'Nothing spent this month.',
   },
 ];

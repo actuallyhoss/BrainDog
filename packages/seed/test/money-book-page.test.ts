@@ -67,7 +67,7 @@ const OWED_CELLS = [
   ['book-lasts-until', 'Money lasts until'],
 ] as const;
 /** The line under What is due on a book whose money never goes under in the year its walk looks. */
-const LASTS = 'Its money lasts the year on what is due.';
+const LASTS = 'Lasts the year on what is due.';
 const LASTS_WHEN = { metric: 'book-lasts-until:{{name}}', beyond: true };
 
 /** One book's cleared entries of the last thirteen months, and no transfer: `in-by-month`'s clauses, narrowed to a book. */

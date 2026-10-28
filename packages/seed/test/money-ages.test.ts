@@ -104,7 +104,7 @@ test('AN ACCOUNT TYPED THIRTY DAYS AGO IS NAMED, AND LEAVES THE LINE THE DAY A B
   /* MONEY SAYS IT IN HEADS UP, AND THE BOOK'S ACCOUNTS CARDS NAME THE ACCOUNT WITH ITS DAY: Last confirmed is off Money
      since money-where-it-went-100, and each account's last confirmed day is on its book's page. */
   const before = blocksOf(k, 'money');
-  assert.notEqual(before.find((b) => String(b.body).startsWith('The oldest balance'))?.drawn, false, 'the old balance is not said');
+  assert.notEqual(before.find((b) => String(b.body).startsWith('Oldest balance'))?.drawn, false, 'the old balance is not said');
   const tile = blocksOf(k, bookSlug(k)).find((b) => b.heading === 'Accounts');
   assert.ok(tile && tile.drawn !== false, "the book's Accounts cards are not drawn");
   assert.deepEqual(tile.rows?.map((r) => [r.fields.name, r.fields.as_of]), [['HSBC (EGP)', day(-30)]]);
@@ -119,7 +119,7 @@ test('AN ACCOUNT TYPED THIRTY DAYS AGO IS NAMED, AND LEAVES THE LINE THE DAY A B
   assert.equal(read(k, 'statement-oldest-days'), 0);
   /* THE OLD BALANCE'S LINE GOES WITH IT, and with it its Update balances: the box that took today's balance is off Money,
     and that line opens the same form. */
-  assert.equal(blocksOf(k, 'money').find((b) => String(b.body).startsWith('The oldest balance'))?.drawn, false, 'the old balance is said with nothing old');
+  assert.equal(blocksOf(k, 'money').find((b) => String(b.body).startsWith('Oldest balance'))?.drawn, false, 'the old balance is said with nothing old');
   assert.equal(card(), day(0), "the book's card keeps the typed day");
 });
 

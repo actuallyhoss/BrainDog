@@ -36,7 +36,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'rule-filed', lt: 1 },
-      body: 'No rule has filed anything yet. Set a category on an entry and the record offers one.',
+      body: 'No rule has filed anything yet.',
     },
     {
       /* WHAT THE RULES DID THIS MONTH, as one line: how many rules, and how many entries between them. */
@@ -44,7 +44,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'filed-by-rule-30d', gte: 1 },
-      body: '{{rules-filing-30d}} rule(s) filed {{filed-by-rule-30d}} of your entries in the last 30 days.',
+      body: '{{rules-filing-30d}} rule(s) filed {{filed-by-rule-30d}} entries in 30 days.',
     },
     {
       /* RULES THAT FILED BEFORE AND NOTHING LATELY: said in words, and never "0 rules filed 0". */
@@ -52,7 +52,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { all: [HAS_FILED, { metric: 'filed-by-rule-30d', lt: 1 }] },
-      body: 'No rule has filed anything in the last 30 days. {{rules-filing}} rule(s) filed {{rule-filed}} of your entries before that.',
+      body: 'Nothing filed in 30 days. {{rule-filed}} before that.',
     },
     {
       /* FILE OLD ENTRIES, SINCE money-core 3.20.0 (B24 of 24 October): a rule files what is written after it, and the
@@ -61,7 +61,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
       kind: 'note',
       span: 12,
       when: { metric: 'txn-uncategorised', gt: 0 },
-      body: 'Entries with no category in the last 91 days: {{txn-uncategorised}}. [File old entries](/automations/txn-categorise?again=1)',
+      body: '{{txn-uncategorised}} entries with no category. [File them](/automations/txn-categorise?again=1)',
     },
     {
       /* EVERY RULE, ON OR OFF, in the person's own order and then by its text. A rule opens from its line, where it
@@ -82,7 +82,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
         { field: 'match', dir: 'asc' },
       ],
       limit: 120,
-      empty: 'No filing rule yet. Set a category on an entry and the record offers one.',
+      empty: 'No filing rules yet.',
     },
     {
       /* HOW MANY ENTRIES EACH RULE FILED, ALL TIME, the most first, each by the rule's own text. */

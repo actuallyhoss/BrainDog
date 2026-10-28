@@ -197,14 +197,14 @@ async function spending() {
 test('BUDGETS SETS EACH BUDGET AGAINST THIS MONTH, and names the money no category holds with the way to file it', async () => {
   const m = await spending();
   const lead = m.page('money-budgets').find((b) => b.lead && b.drawn !== false)!;
-  assert.equal(lead.body, '{{budgets-set}} categories have a budget, {{budgets-total}} a month in all.');
+  assert.equal(lead.body, '{{budgets-total}} a month across {{budgets-set}} categories.');
   assert.deepEqual(lead.values?.['budgets-total'], egp(5_000));
 
   const each = m.block('money-budgets', 'Each budget');
   assert.deepEqual(each.rows!.map((r) => [r.fields.name, r.fields.budget_alert]), [['Groceries', 80]]);
 
   const unfiled = m.page('money-budgets').find((b) => b.kind === 'note' && !b.lead && b.drawn !== false)!;
-  assert.deepEqual([unfiled.values?.['unfiled-spent-month'], unfiled.values?.['unfiled-month']], [egp(7_850), 2]);
+  assert.deepEqual([unfiled.values?.['unfiled-spent-month']], [egp(7_850)]);
   assert.match(String(unfiled.body), /\[File them\]\(\/r\/transactions\?f=category:empty/u);
 
   /* EVERY FIGURE THE THREE PAGES DECLARE READS, AND SAYS WHAT IT SHOULD. */

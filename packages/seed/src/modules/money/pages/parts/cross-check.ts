@@ -27,7 +27,7 @@ export const CROSS_CHECK: Record<string, unknown>[] = [
       {
         metric: 'cash-cross-check',
         label: 'Cash now, less its entries added up',
-        note: 'These two should be the same. Until they are, read the money on this page as unchecked.',
+        note: 'Should be nought',
       },
     ],
     when: { metric: 'cash-cross-check', not: 0 },

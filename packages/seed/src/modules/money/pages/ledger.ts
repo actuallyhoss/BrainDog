@@ -84,30 +84,24 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
   filters: [{ field: 'account', control: 'chips' }, { field: 'category', control: 'chips' }, MONTH_FILTER, SHOW_FILTER],
   blocks: [
     {
-      /* THE FIRST SENTENCE SAYS WHAT IS LEFT TO FILE, while anything is, and otherwise what the page is. */
+      /* THE FIRST SENTENCE SAYS WHAT IS LEFT TO FILE, while anything is, and otherwise nothing: the page is its lines. */
       kind: 'note',
       lead: true,
       span: 12,
-      says: [
-        {
-          when: { metric: 'txn-uncategorised', gt: 0 },
-          body: '{{txn-uncategorised}} lines from the last three months have no category yet. They are first below: open one to say what it was for.',
-        },
-        { body: 'Every line, a day at a time, with what it was for and the account it moved through.' },
-      ],
+      when: { metric: 'txn-uncategorised', gt: 0 },
+      body: '{{txn-uncategorised}} line(s) to file.',
     },
     {
-      /* THE MONTH IN FOUR NUMBERS, the Ledger's own: what went out and came in over thirty days, moves between your own
-         accounts left out, how many lines wait for a category, and how many a rule filed for you. */
+      /* THE MONTH IN THREE NUMBERS, the Ledger's own: what went out and came in over thirty days, moves between your own
+         accounts left out, and how many a rule filed for you. How many wait for a category is the line above. */
       kind: 'stat',
-      heading: 'Thirty days',
+      heading: 'Last 30 days',
       icon: 'coins',
       span: 12,
       cells: [
-        { metric: 'spent-30d', label: 'Out', note: 'Moves between your own accounts left out' },
+        { metric: 'spent-30d', label: 'Out' },
         { metric: 'received-30d', label: 'In' },
-        { metric: 'txn-uncategorised', label: 'Not filed yet', note: 'Lines from the last three months with no category' },
-        { metric: 'filed-for-you-30d', label: 'Filed for you', note: 'By your filing rules and the bank add-ons' },
+        { metric: 'filed-for-you-30d', label: 'Filed for you' },
       ],
     },
     {
@@ -135,7 +129,7 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       columns: LEDGER_LINE_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: LEDGER_PAGE_LINES,
-      empty: 'No line matches these choices.',
+      empty: 'No lines match.',
     },
   ],
 };

@@ -84,7 +84,7 @@ test('MONEY DECLARES THE FIGURE AND HEADS UP NAMES IT, a count with nought for i
   const line = HEADS_UP.find((b) => (b.when as { metric?: string } | undefined)?.metric === FIGURE);
   assert.ok(line, 'Heads up draws no line on the figure');
   assert.match(String(line.body), new RegExp(`\\{\\{${FIGURE}\\}\\}`));
-  assert.match(String(line.body), /Make it either way/);
+  assert.match(String(line.body), /Open categories/);
   assert.doesNotMatch(String(line.body), /—|\brow\b/);
 });
 

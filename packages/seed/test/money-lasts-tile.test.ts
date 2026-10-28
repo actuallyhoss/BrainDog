@@ -108,7 +108,6 @@ test('CASH ABOVE NOUGHT THAT RUNS OUT ON WHAT IS DUE READS THE DAY, calm: the da
   const values = h.values ?? {};
   assert.equal(values['lasts-no-income.on'], day(68));
   assert.equal(values['lasts-no-income.because'], 'Rent');
-  assert.equal(values['runs-out-on'], day(68));
   assert.equal(values['every-month-in.names'], undefined, 'nothing comes in, so no repeating money in is named');
 });
 
