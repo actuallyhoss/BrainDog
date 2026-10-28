@@ -76,13 +76,11 @@
     lanes: 'Lanes by',
     keep: 'Keep as my default',
     forget: 'Forget',
-    willOpen: (name: string) => `${name} will open this way for you, on this device.`,
-    opens: (name: string) => `${name} opens this way for you, on this device.`,
+    isKept: 'Your default on this device',
   } as const;
 </script>
 
 <Sheet bind:open title={copy.display}>
-  <p class="display-note">{copy.displayNote}</p>
   <div class="filter-groups">
     <!--
       SORT LIVED ON THE COLUMN HEADERS AND THE COLUMNS ARE GONE BELOW 640px.
@@ -200,11 +198,10 @@
          and the press becomes Forget. -->
     <div class="keep">
       {#if isDefault}
-        <p class="keep-line"><Icon name="check" size="s" />{words.opens(decl.name)}</p>
+        <p class="keep-line"><Icon name="check" size="s" />{words.isKept}</p>
         <Button weight="bare" onclick={() => forget()}>{words.forget}</Button>
       {:else}
-        <Button weight="quiet" onclick={() => keep()}><Icon name="star" size="s" />{words.keep}</Button>
-        <p class="keep-line">{words.willOpen(decl.name)}</p>
+        <Button weight="quiet" onclick={() => keep()}>{words.keep}</Button>
         {#if kept}<Button weight="bare" onclick={() => forget()}>{words.forget}</Button>{/if}
       {/if}
     </div>
@@ -221,12 +218,6 @@
 </Sheet>
 
 <style>
-  .display-note {
-    margin-block-end: var(--sp-4);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
   .filter-groups {
     display: flex;
     flex-direction: column;
@@ -279,6 +270,14 @@
     .filter-value {
       min-block-size: var(--tap);
     }
+  }
+
+  /* THE RADIO TAKES THE CHECKBOX'S BOX, so the sort and the columns share one edge for their marks and their words. */
+  .filter-value input[type='radio'] {
+    flex: none;
+    inline-size: 17px;
+    block-size: 17px;
+    margin: 0;
   }
 
   .filter-value:hover {

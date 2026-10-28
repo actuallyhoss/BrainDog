@@ -191,7 +191,14 @@
 {/snippet}
 
 {#if shown}
-  <Tile class="list-figures" data-figured={fig ? '' : undefined} title={fig ? (fig.field.type === 'money' ? words.money : labelOf(fig.field)) : words.byState} count={fig ? undefined : entries.length}>
+  <!-- A TILE OF SIDES NAMES EACH SIDE ("Money out", "Money in"), so a "Money" heading over them says nothing new. -->
+  <Tile
+    class="list-figures"
+    data-figured={fig ? '' : undefined}
+    aria-label={fig && sided ? words.money : undefined}
+    title={fig && sided ? undefined : fig ? (fig.field.type === 'money' ? words.money : labelOf(fig.field)) : words.byState}
+    count={fig ? undefined : entries.length}
+  >
     <!-- THE PHONE'S FORM: a cell a side, its figure at 20, one stacked bar, and what is late under it. -->
     {#if fig}
       <div class="compact" style:--sides={sides.length}>

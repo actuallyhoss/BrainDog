@@ -284,7 +284,9 @@
     const held = state ? String(e.fields[state] ?? '') : '';
     const first = state ? decl?.fields.find((f) => f.id === state)?.values?.[0] : undefined;
     const also = tone && state && !done && held !== '' && held !== first ? saidOf(e, state) || null : null;
-    const date = done ? (decl?.finished ? daySaid(e.fields[decl.finished]) : null) : daySaid(due);
+    /* A WORD THAT ALREADY SAYS WHEN ("Due tomorrow", "4 days late") takes the date's place, so the line has room for
+       the project rather than the same day said twice. */
+    const date = done ? (decl?.finished ? daySaid(e.fields[decl.finished]) : null) : tone && typeof due === 'string' ? null : daySaid(due);
     const text = detailFields.find((f) => saidOf(e, f) !== '');
     const place: Scope | null | undefined = scoped === undefined ? undefined : scopeOf(register, e.fields, names);
     const chip = place !== undefined && (decl?.mobile.includes(scoped ?? '') === true || text === undefined);
