@@ -35,6 +35,7 @@ import { dayIn } from './finished.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { RATE_STALE_DAYS, ratesFrom, type Rate } from './fx.ts';
 import { intervalMs } from './pull.ts';
+import { ratesFeed, ratesFeedSaid } from './rates-feed.ts';
 import { ratesRole, type RoleList } from './roles.ts';
 import { SIGNS_ACTIONS } from './signs-actions.ts';
 import { SIGNS_FLOW } from './signs-flow.ts';
@@ -642,7 +643,7 @@ function readRatesCurrent(sql: Sql, nowMs: number, tz: string): SignReading {
   const said = `The newest exchange rate is ${days === 0 ? 'from today' : `${count(days, 'day')} old`}.`;
   if (days <= RATES_STALE_DAYS) return reading('green', days, said, facts);
   facts.push(`An amount converted on a rate more than ${count(RATES_STALE_DAYS, 'day')} old is marked stale.`);
-  return reading('red', days, `${said} A feed of rates once a day would keep them current.`, facts);
+  return reading('red', days, `${said} ${ratesFeedSaid(ratesFeed(sql), (at) => dateSaid(at, tz, nowMs))}`, facts);
 }
 
 /* ── the closed list ───────────────────────────────────────────────────── */

@@ -36,6 +36,7 @@ import { isCurrencyCode } from './coerce.ts';
 import { dayIn } from './finished.ts';
 import { FORMAT_VERSION, KERNEL_MIGRATION } from './migrate.ts';
 import { newestRate, PAIR_RATE_DAYS } from './pairs.ts';
+import { ratesFeed, ratesFeedSaid } from './rates-feed.ts';
 import type { SignReader, SignReading, SignState } from './signs.ts';
 
 const HOUR = 3_600_000;
@@ -284,7 +285,7 @@ function readRateAge(sql: Sql, nowMs: number, tz: string): SignReading {
   const said = `The newest rate is from ${daySaid(newest.as_of, today)}, ${newest.days === 0 ? 'today' : `${count(newest.days, 'day')} old`}.`;
   if (newest.days <= RATE_DAYS_MOST) return reading('green', newest.days, said, facts);
   facts.push('Until a newer rate arrives, both sides of such a move stay counted as money out and money in.');
-  return reading('red', newest.days, `${said} A move between two currencies is matched by itself only on a rate at most ${count(RATE_DAYS_MOST, 'day')} old.`, facts);
+  return reading('red', newest.days, `${said} A move between two currencies is matched by itself only on a rate at most ${count(RATE_DAYS_MOST, 'day')} old. ${ratesFeedSaid(ratesFeed(sql), (at) => daySaid(dayIn(Date.parse(at), tz), today))}`, facts);
 }
 
 /* ── the list ──────────────────────────────────────────────────────────── */
