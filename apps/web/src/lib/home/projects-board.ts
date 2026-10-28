@@ -18,7 +18,7 @@
  */
 
 import { nextSplit } from '../page/next-split.ts';
-import { counted, names } from './counted.ts';
+import { counted, names } from './phrase.ts';
 
 const DAY = 86_400_000;
 /** How many days ahead "due" reaches, and how many back a run or a task change still makes a project moving. */

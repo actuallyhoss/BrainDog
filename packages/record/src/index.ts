@@ -706,24 +706,22 @@ export type Restored = { bookmark: string; at: string; kept: string | null; ende
  */
 export type Ended = { [table: string]: Record<string, string | number | null>[] };
 
-/** Each ended table, the rows of it the record has ended, and the columns that say so. A row the copy lacks is left out. */
-const ENDED: readonly { table: string; read: string; columns: readonly string[]; write: string }[] = [
+/** Each ended table, the rows of it the record has ended, and the columns that say so (its `read` names them after `id`, in
+    the order its `write` sets them). A row the copy lacks is left out. */
+const ENDED: readonly { table: string; read: string; write: string }[] = [
   {
     table: 'token',
     read: 'SELECT id, revoked_at FROM token WHERE revoked_at IS NOT NULL',
-    columns: ['revoked_at'],
     write: 'UPDATE token SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL',
   },
   {
     table: 'device_grant',
     read: "SELECT id, status, expires, last_used FROM device_grant WHERE status IN ('expired', 'denied', 'revoked')",
-    columns: ['status', 'expires', 'last_used'],
     write: "UPDATE device_grant SET status = ?, expires = ?, last_used = ? WHERE id = ? AND status IN ('pending', 'approved', 'active')",
   },
   {
     table: 'invitation',
     read: 'SELECT id, accepted_at, accepted_by, revoked_at FROM invitation WHERE accepted_at IS NOT NULL OR revoked_at IS NOT NULL',
-    columns: ['accepted_at', 'accepted_by', 'revoked_at'],
     write: 'UPDATE invitation SET accepted_at = ?, accepted_by = ?, revoked_at = ? WHERE id = ? AND accepted_at IS NULL AND revoked_at IS NULL',
   },
 ];
@@ -751,7 +749,10 @@ function endAgain(sql: Sql, ended: unknown): void {
       ? rows.filter((r): r is Record<string, string | number | null> => r !== null && typeof r === 'object' && Object.values(r as object).every(scalar))
       : [];
   };
-  for (const e of ENDED) for (const row of rowsOf(e.table)) if (typeof row.id === 'string') sql.exec(e.write, ...e.columns.map((c) => row[c] ?? null), row.id);
+  for (const e of ENDED) {
+    const columns = /^SELECT id, (.+?) FROM /u.exec(e.read)![1]!.split(', ');
+    for (const row of rowsOf(e.table)) if (typeof row.id === 'string') sql.exec(e.write, ...columns.map((c) => row[c] ?? null), row.id);
+  }
   for (const row of rowsOf('closed')) {
     if (typeof row.id !== 'string' || typeof row.target !== 'string') continue;
     if (!sql.one("SELECT 1 AS n FROM event WHERE target = ? AND kind = 'share.open'", row.target)) continue;
