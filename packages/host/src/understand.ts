@@ -31,6 +31,7 @@
  */
 
 import {
+  codeName,
   dayIn,
   isOrganisationAddress,
   keyOf,
@@ -726,6 +727,8 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
 
   const runList = all.find((l) => l.kind === 'run');
   const runs: Found[] = [];
+  /* THE BRANCHES THE RUNS READ HERE WORKED ON, so a note naming one never offers it as a project. */
+  const branches = new Set<string>();
   if (runList) {
     /* THE PROJECTS BY THEIR ROLE, whether or not they keep notes, and by the handle a run names its project with. */
     const scoped = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
@@ -733,6 +736,7 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
     const projects = scoped ? titlesOf(kernel, scoped.id, scoped.title, { prefix: scoped.seq_prefix, ids }) : new Map<string, string>();
     const known = new Set([...projects.values()].flatMap((name) => nameKey(name).split(' ')));
     for (const row of changedRows(kernel, runList.register, markOf(store, 'runs.since'))) {
+      if (typeof row.fields.branch === 'string' && row.fields.branch.trim() !== '') branches.add(row.fields.branch.trim().toLowerCase());
       if (runs.length >= RUNS_PER_PASS) break;
       const text = noteText(row, runList);
       if (text.length < 12 || !namesSomeone(text, known)) continue;
@@ -819,6 +823,10 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
     if (markOf(store, asked) !== null) continue;
     const note = handed.get(m.note)!;
     const run = note.found.kind === 'run';
+    /* A PROJECT IS NEVER READ OFF A RUN, AND NEVER A WORD OF CODE. What a run says it worked on is its branch, a page
+       or a feature ("Make glaze-fix green, then Rates"), and a run is placed in its project by its folder, asked once a
+       folder; a branch or an identifier named in a note is no project either (`codeName`). */
+    if (list.kind === 'project' && (run || codeName(m.name, branches))) continue;
     const group = byList.get(list.register) ?? { list, rows: [], names: [], from: new Map<string, Source>(), notes: new Set<string>() };
     if (group.names.some((n) => nameKey(n) === k)) continue;
     const row: Record<string, unknown> = { [list.name]: m.name };

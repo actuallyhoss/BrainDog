@@ -260,6 +260,34 @@ export function genericPlace(name: string, cwd?: string): boolean {
   return /\/(?:\.claude\/worktrees|\.worktrees|worktrees)\//u.test(path) || /^\/(?:private\/)?(?:tmp|var\/folders)\//u.test(path);
 }
 
+/** The words a branch is commonly started with, before a `/`, `-` or `_`: `feature/login`, `fix-rates`, `claude/x`. */
+const BRANCH_LEAD = /^(?:feature|feat|fix|bugfix|hotfix|chore|release|wip|refactor|test|tests|docs|spike|exp|experiment|claude|codex|copilot|cursor|dependabot|renovate)[-/_]/iu;
+
+/**
+ * Whether a name is a branch's, never a project's: one any run said it worked on (`branches`, the runs' `branch`
+ * facts), a name holding a `/` as a branch does, or one started the way a branch is (`feature-`, `fix/`, `claude/`).
+ *
+ * "Add 2 names to Projects? Rates and glaze-fix, named in a run" offered a branch as a project. A project is what a person
+ * names, so a name only a branch or a worktree has is never offered as one.
+ */
+export function branchName(name: string, branches: ReadonlySet<string> = new Set()): boolean {
+  const said = name.trim();
+  if (said === '') return false;
+  if (branches.has(said.toLowerCase())) return true;
+  if (/[\\/]/u.test(said)) return true;
+  return BRANCH_LEAD.test(said) || genericPlace(said);
+}
+
+/**
+ * Whether a name read from what an agent wrote is a word of code rather than a project's name: a branch's
+ * (`branchName`), or one written the way an identifier is, in lower case joined by `-`, `_` or `.` (`glaze-fix`,
+ * `kiln_rates`). A project named in prose is said as a person says it ("Kiln", "Lantern.io", "Oxbow app").
+ */
+export function codeName(name: string, branches: ReadonlySet<string> = new Set()): boolean {
+  const said = name.trim();
+  return branchName(said, branches) || /^[a-z0-9]+(?:[-_.][a-z0-9]+)+$/u.test(said);
+}
+
 /** On how many days runs worked there: a project is a habit across days, and three runs in one afternoon a visit. */
 export const SUGGEST_DAYS = 2;
 
@@ -299,7 +327,7 @@ export function suggestProjects(runs: readonly SeenRun[], projects: readonly Can
     if (placed.project || placed.ambiguous.length) continue;
     const spelled = remote ? lastSpelled(remote) : (newest.find((r) => r.repo?.trim())?.repo?.trim() ?? key);
     const at = newest.find((r) => r.cwd?.trim());
-    if (genericPlace(spelled, at?.cwd?.trim() || undefined)) continue;
+    if (genericPlace(spelled, at?.cwd?.trim() || undefined) || branchName(spelled)) continue;
     out.push({ key, name: spelled, remote, folder: at?.cwd ? checkout(at.cwd, at.repo?.trim() || spelled) : null, runs: seen.length });
   }
   return out.sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name));

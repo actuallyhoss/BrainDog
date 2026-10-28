@@ -544,7 +544,7 @@ export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceR
 export { shapeGrant };
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
-export { placeOnce, projectSuggestions, suggestProjects, remoteKey, SUGGEST_AFTER, type ProjectSuggestion, type SeenRun, type Candidate } from './scope.ts';
+export { branchName, codeName, placeOnce, projectSuggestions, suggestProjects, remoteKey, SUGGEST_AFTER, type ProjectSuggestion, type SeenRun, type Candidate } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { splitOf, splitOfFields, rowsBySplit, type SplitField } from './row-parts.ts';
