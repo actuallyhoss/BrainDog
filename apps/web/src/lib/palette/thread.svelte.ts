@@ -161,6 +161,10 @@ export async function ask(message: string, page: PageContext, base = apiBase()):
   const turn = live();
   if (turn) {
     turn.streaming = false;
+    /* THE UNDO'S SECONDS START WHEN THE ANSWER IS THERE TO READ. An action lands before the model's last step, which took
+       seconds on the included model, so a window started on landing had closed by the time the receipt's sentence came. */
+    const from = Date.now();
+    for (const a of turn.actions) if (a.state === 'done' && a.until !== undefined) a.until = from + UNDO_MS;
     if (!end.ok) {
       turn.error = end.text;
       turn.spent = end.spent;
