@@ -2386,7 +2386,7 @@
   }
 
   /**
-   * ⇧⌘J: SEND WHAT IS PICKED, ELSE THE ROW OPEN BESIDE THE LIST, ELSE THE ROW THE CURSOR IS ON (`$lib/send`). The sheet
+   * `s`: SEND WHAT IS PICKED, ELSE THE ROW OPEN BESIDE THE LIST, ELSE THE ROW THE CURSOR IS ON (`$lib/send`). The sheet
    * hangs from the open row's own send button, or from the row in the list.
    */
   function sendRows(): boolean {
@@ -2405,10 +2405,6 @@
 
   function onkeydown(e: KeyboardEvent) {
     if (composed) return;
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'j' && !(covered() && !(host.opened !== null && overlays.depth === 1))) {
-      if (sendRows()) e.preventDefault();
-      return;
-    }
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
        buttons left the page behind it holding its own keyboard.
@@ -2508,6 +2504,8 @@
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
       focus = { ...focus, col: Math.max(focus.col - 1, 0) };
+    } else if (e.key === 's') {
+      if (sendRows()) e.preventDefault();
     } else if (e.key === 'p') {
       e.preventDefault();
       const seq = result.entries[focus.row]?.seq;

@@ -1066,7 +1066,7 @@
    *
    * `silenced` first: `y` is a bare letter, and `Character keys: off` silences the namespace.
    */
-  /* SEND TO… (`$lib/send`): the head's split button, which ⇧⌘J opens the sheet of. */
+  /* SEND TO… (`$lib/send`): the head's split button, which `s` opens the sheet of. */
   let sender = $state<ReturnType<typeof SendButton> | null>(null);
 
   function onkeydown(e: KeyboardEvent) {
@@ -1074,14 +1074,14 @@
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
        buttons left the page behind it holding its own keyboard. */
     if (covered()) return;
-    /* ⇧⌘J: THIS ROW, SENT. A chord, so it is read before the bare keys stand down for a modifier. */
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'j' && sender) {
+    if (typing() || silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!row) return;
+    /* `s`: THIS ROW, SENT, as `s` sends what is picked in its list. */
+    if (e.key === 's' && sender) {
       e.preventDefault();
       sender.openHere();
       return;
     }
-    if (typing() || silenced(e) || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (!row) return;
     if (e.key === 'y' || e.key === 'Y') {
       e.preventDefault();
       void (e.key === 'y' ? clipboard.putSpoken(id, row.seq) : clipboard.putLink(id, row.seq));
@@ -1333,7 +1333,7 @@
       {#if changes && archived}
         <Button weight="primary" disabled={saving} data-head-primary onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {/if}
-      <!-- SEND TO…: Slash or an agent, the last one in one press and the rest from its arrow (⇧⌘J). -->
+      <!-- SEND TO…: Slash or an agent, the last one in one press and the rest from its arrow (s). -->
       {#if live && !archived && row.seq !== null}
         <SendButton
           bind:this={sender}

@@ -1,5 +1,5 @@
 /**
- * Opening the send sheet from anywhere: a row's button, its ⇧⌘J, a long press on a phone, a selection, a Decide card,
+ * Opening the send sheet from anywhere: a row's button, its `s`, a long press on a phone, a selection, a Decide card,
  * Slash's own footer.
  *
  * THE SHEET IS ITS OWN CHUNK, fetched on the first press, and mounted on the page's body rather than in the layout, so

@@ -4,7 +4,7 @@
   quiet rectangle every secondary button is, 1px apart, the outer corners rounded and the inner ones square.
 
   WHAT COMES BACK IS DRAWN BY THE HOST, on the row's strip (`SendStrip`), so the button says only where it sent.
-  `openHere` is the sheet from the keyboard (⇧⌘J), hung from this button.
+  `openHere` is the sheet from the keyboard (`s`), hung from this button.
 -->
 <script lang="ts">
   import Icon from '../ui/Icon.svelte';
