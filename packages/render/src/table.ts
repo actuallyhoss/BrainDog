@@ -92,6 +92,34 @@ export type TableRow = {
  * in a screen reader's list. It was a bare string inside `Table.svelte`, which meant `toHTML` had
  * no way to say the same thing even once it grew a region to say it about.
  */
+/**
+ * WHETHER TWO ANSWERS DRAW THE SAME ROWS: the same keys in the same order, each row saying the same in every cell.
+ *
+ * A TABLE KEEPS THE ROWS IT DREW WHEN A NEW ANSWER SAYS NOTHING NEW (`Table.svelte`). Its rows are keyed and move with
+ * `animate:flip`, and a keyed list that is handed another array measures every row before and after, which is two
+ * layouts of the whole table: a list drawn from what the tab kept, then handed the same rows again as the record caught
+ * up, spent 36 of its 69 ms on Back laying out 54 unchanged rows. Shallow on each row and on its cells, which are text.
+ */
+export function sameRows(a: readonly TableRow[], b: readonly TableRow[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i] as Record<string, unknown>;
+    const y = b[i] as Record<string, unknown>;
+    if (x === y) continue;
+    const keys = Object.keys(x);
+    if (keys.length !== Object.keys(y).length) return false;
+    for (const k of keys) {
+      if (k === 'cells') {
+        const cx = x.cells as readonly unknown[];
+        const cy = y.cells as readonly unknown[] | undefined;
+        if (!Array.isArray(cy) || cx.length !== cy.length || cx.some((c, n) => c !== cy[n])) return false;
+      } else if (x[k] !== y[k]) return false;
+    }
+  }
+  return true;
+}
+
 export const TABLE_ROWS_LABEL = 'Rows';
 
 /**

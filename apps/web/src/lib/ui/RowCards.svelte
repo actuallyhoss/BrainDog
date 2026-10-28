@@ -61,6 +61,7 @@
   import { amountField, wayOf } from '$lib/record/money-way.ts';
   import type { Names } from '$lib/record/remote.ts';
   import { flip } from 'svelte/animate';
+  import { sameEntries } from '$lib/record/same-entries.ts';
   import Face from './Face.svelte';
   import Money from './Money.svelte';
   import ScopeChip from './ScopeChip.svelte';
@@ -101,6 +102,13 @@
     /** The record's own names and marks for the refs on these rows. Absent on the sample, which names them from its own rows. */
     names?: Names | undefined;
   } = $props();
+
+  /* THE ROWS AS LAST DRAWN, kept while a new answer draws the same (`sameEntries`): the keyed list moves nothing then. */
+  let drawnEntries: readonly Entry[] = [];
+  const steady = $derived.by(() => {
+    if (!sameEntries(entries, drawnEntries)) drawnEntries = entries;
+    return drawnEntries;
+  });
 
   /**
    * THE LIST AS THE RECORD DECLARES IT, when this build does not ship it. A use case's own list (Assignments, Datapoints)
@@ -324,7 +332,7 @@
 
 {#if decl}
   <ul class="cards" data-faced={faced ? '' : undefined}>
-    {#each entries as e (e.seq)}
+    {#each steady as e (e.seq)}
       {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now, names)}
       {@const line = lineOf(e)}
       {@const holder = holderOf(e)}

@@ -32,7 +32,7 @@
   import { markGlyphOf } from '../../src/cards.ts';
   import { glyphPath } from '../../src/inline.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
-  import { glyphColumn, intrinsicRows, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
+  import { glyphColumn, intrinsicRows, sameRows, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
   import { MISSING } from '../../src/format.ts';
   import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
@@ -174,7 +174,13 @@
   /* EACH GROUP UNDER ITS HEADING, where the host put `group` on its rows (`tableLines`, which the static mirror draws
      from too). A heading is a row of the grid, so the chunks are cut from the lines and `aria-rowindex` counts it. NO
      ROW IN A GROUP, and the lines are the rows in their own order: every table that carries none is drawn as it was. */
-  const lines = $derived(tableLines(rows, rowGroup));
+  /* THE ROWS AS LAST DRAWN, kept while a new answer draws the same (`sameRows`): the keyed body moves nothing then. */
+  let drawnRows: readonly TableRow[] = [];
+  const steady = $derived.by(() => {
+    if (!sameRows(rows, drawnRows)) drawnRows = rows;
+    return drawnRows;
+  });
+  const lines = $derived(tableLines(steady, rowGroup));
   const grouped = $derived(chunkRows(lines, chunk));
   /* THE CARET WALKS THE ROWS AS DRAWN, `at`, which is the rows' own index wherever no row is grouped, so a host that
      binds `focus` to its own rows (the register grid, which groups nothing) reads the same row it always did. Each

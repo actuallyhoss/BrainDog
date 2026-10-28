@@ -667,7 +667,7 @@
    * written at the end rather than as each part arrives.
    */
   /** A list's answer as this tab last drew it (`keepShown`). */
-  type Shown = { decl: RegisterDecl; entries: Entry[]; names: Names; matched: number; counted: Map<string, Map<string, number>>; uncounted: Refusal | null };
+  type Shown = { decl: RegisterDecl; booted: Boot; entries: Entry[]; names: Names; matched: number; counted: Map<string, Map<string, number>>; uncounted: Refusal | null };
 
   async function ask(said: string, register: string, typed: Filter[], text: string, order: typeof sort, joined: Join, wantsTwice = false): Promise<void> {
     busy = true;
@@ -687,6 +687,9 @@
        whose answer is asked again each time. */
     const remembered = pages.length === 0 && !wantsTwice ? shownFor<Shown>(apiBase(), said) : null;
     if (remembered !== null) {
+      /* AND THE BOOT IT WAS DRAWN WITH, whose count says whether the list is long enough to pick from: drawn without it,
+         the table came up with no select column and took one a frame later, laying every row out twice. */
+      booted ??= remembered.booted;
       declared = { register, decl: remembered.decl };
       pages = [remembered.entries];
       named = remembered.names;
@@ -808,7 +811,7 @@
       keepList(said, register, s.value, answer.value, { filters: chips, q: text, sort: order, twice: rows !== null, join: joined }, bar ? facets : null, mark);
       /* AND THE REST OF THE LIST, WHEN IDLE: the whole of it kept beside this page (`keepWhole`). */
       keepWhole(register, s.value, order, chips.length === 0 && text === '' ? answer.value : null, mark);
-      if (!wantsTwice) keepShown(apiBase(), said, { decl: s.value, entries: answer.value.entries, names: answer.value.names, matched: answer.value.matched, counted: facets.counts, uncounted: facets.withheld } satisfies Shown);
+      if (!wantsTwice) keepShown(apiBase(), said, { decl: s.value, booted: b.value, entries: answer.value.entries, names: answer.value.names, matched: answer.value.matched, counted: facets.counts, uncounted: facets.withheld } satisfies Shown);
       return true;
     };
     let ok = false;
