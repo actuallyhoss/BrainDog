@@ -217,6 +217,7 @@ const linked = async (said: string, tools: ChatTools): Promise<{ text: string; f
     .replace(/\{\{(?!ref:[a-z][a-z0-9_]*#[1-9][0-9]*\}\})[^}]*\}\}/gu, '')
     /* AND THE PUNCTUATION A NAME OR A BRACE LEFT BEHIND WHEN IT MOVED OR WENT: "two of them:, " and ", and, ". */
     .replace(/([:,;])\s*,/gu, '$1')
+    .replace(/^([ \t]*-)[ \t]*[:,][ \t]*/gmu, '$1 ')
     .replace(/\band,\s/gu, 'and ')
     .replace(/\(\s*\)/gu, '')
     .replace(/[ \t]{2,}/gu, ' ')
