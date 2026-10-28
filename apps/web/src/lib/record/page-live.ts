@@ -2179,6 +2179,9 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
     if (typeof v === 'string') return v;
     if (typeof v === 'number') {
       if (dayFigure) return format('day', v);
+      /* A MONEY FIGURE THE RECORD ANSWERED WITH NO CURRENCY (a sum of nothing) is said in the home one, never a bare "0". */
+      const shape = Object.hasOwn(METRICS, figure) ? METRICS[figure]?.format : undefined;
+      if (shape === 'money' || shape?.startsWith('money.')) return format(shape, v);
       return Number.isInteger(v) ? integer(v) : String(v);
     }
     if (typeof v === 'boolean') return v ? 'yes' : 'no';

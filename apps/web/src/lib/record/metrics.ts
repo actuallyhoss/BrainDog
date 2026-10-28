@@ -25,6 +25,7 @@ import { UNNAMED, day as longDay, integer, money, shortDay } from 'braindog-rend
 import { copy } from '../copy.ts';
 import { REGISTERS } from './held.ts';
 import { BARE, amountOf, currencyOf, mixedFix } from './money.ts';
+import { homeCurrency } from './api.ts';
 import { joinsWithOr, registerHref, schemaOf } from './where.ts';
 import type { Entry } from './schema.ts';
 
@@ -394,7 +395,9 @@ export function format(shape: string | undefined, n: number | string | null, now
   if (shape.startsWith('money.')) return money(Math.round(n), shape.slice('money.'.length));
   /* A BARE `money` IS THE HOME CURRENCY'S (money-core 3.0.0). With none chosen it names no currency, so it is written
      as the number it is rather than in a currency guessed for it. */
-  const home = shape === 'money' ? fxSource().home : null;
+  /* AND THE SHELL'S HOME CURRENCY WHERE NO RATES WERE HANDED IN, the one the record chose or its money is all in
+     (`homeCurrency`): a sum of nothing in an add-on's money figure drew a bare "0" beside "EGP 4,200,000". */
+  const home = shape === 'money' ? (fxSource().home ?? homeCurrency()) : null;
   if (home !== null) return money(Math.round(n), home);
   switch (shape) {
     case 'int':
