@@ -222,7 +222,8 @@ if (!QUICK) {
         notRun.push([`selfhost.yml ${name}: ${step.name}`, 'iptables, groupadd and sg are Linux; the run below goes with outbound calls open']);
         continue;
       }
-      let script = step.run;
+      /* A step's comment lines (a shellcheck mark, say) are the shell's to drop, and the `sg` match reads the command alone. */
+      let script = step.run.replace(/^[ \t]*#.*\n/gm, '');
       const wrapped = /^sg braindog-offline -c '([\s\S]*)'$/.exec(script.trim());
       if (wrapped) script = wrapped[1];
       script = script.replace(/ --after-install "\$RUNNER_TEMP\/offline\.sh"/g, '');
