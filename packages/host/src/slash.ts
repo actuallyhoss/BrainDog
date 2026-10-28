@@ -978,6 +978,251 @@ export function anthropicModel(options: EndpointModelOptions): SlashUnderstandin
   };
 }
 
+/* ── Deep: the Messages API with the model's own tool use, streamed ─────────────────── */
+
+/**
+ * The package's `DeepInference` (`packages/slash/src/types.ts`), WRITTEN OUT for the reason `SlashInference` is: this
+ * package may not import that one. A turn with tools, its blocks handed back as they came so the next request can carry
+ * them unchanged, thinking blocks included.
+ */
+export type SlashDeepBlock = Record<string, unknown> & { type: string };
+export type SlashDeepCall = {
+  model: string;
+  system: string;
+  tools: readonly { name: string; description: string; input_schema: Record<string, unknown> }[];
+  messages: readonly { role: 'user' | 'assistant'; content: string | readonly SlashDeepBlock[] }[];
+  maxTokens: number;
+  effort: 'low' | 'medium' | 'high';
+  toolChoice?: 'auto' | 'none' | undefined;
+};
+export type SlashDeepUsage = { in: number; out: number; cacheRead: number; cacheWrite: number };
+export type SlashDeepReply = { content: SlashDeepBlock[]; stop: string; usage: SlashDeepUsage; model: string };
+export type SlashDeepStream = { text(piece: string): void; tool?(name: string): void };
+export interface SlashDeepInference {
+  turn(call: SlashDeepCall, on: SlashDeepStream): Promise<SlashDeepReply>;
+}
+
+/** The most a deep turn may take to answer, thinking included: longer than a quick ask's, since it reads and plans. */
+export const SLASH_DEEP_TIMEOUT_MS = 180_000;
+/** The most text one deep answer may stream, its tool inputs and thinking included, before it is cut off. */
+const DEEP_ANSWER_CHARS = 400_000;
+
+/**
+ * One Messages request for Deep: the system text and the tools marked for the provider's cache (the tools render before
+ * the system text, so one mark on the system text caches both), the effort asked for, and the stream.
+ *
+ * NO `temperature` AND NO `thinking`: the models Deep asks take only their defaults for the first, and think on their own
+ * for the second. `tool_choice: none` on a last step keeps the tools listed, so the cached prefix is the same.
+ */
+const deepBody = (call: SlashDeepCall): Record<string, unknown> => ({
+  model: call.model,
+  max_tokens: call.maxTokens,
+  stream: true,
+  system: [{ type: 'text', text: call.system, cache_control: { type: 'ephemeral' } }],
+  tools: call.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
+  ...(call.toolChoice === 'none' ? { tool_choice: { type: 'none' } } : {}),
+  output_config: { effort: call.effort },
+  messages: call.messages.map((m) => ({ role: m.role, content: m.content })),
+});
+
+/** The four counts a Messages reply carries, read where they stand; a count it left out is left as it was. */
+const deepUsageOf = (raw: unknown, was: SlashDeepUsage): SlashDeepUsage => {
+  if (raw === null || typeof raw !== 'object') return was;
+  const u = raw as Record<string, unknown>;
+  const at = (key: string, before: number): number => (typeof u[key] === 'number' ? counted(u[key]) : before);
+  return {
+    in: at('input_tokens', was.in),
+    out: at('output_tokens', was.out),
+    cacheRead: at('cache_read_input_tokens', was.cacheRead),
+    cacheWrite: at('cache_creation_input_tokens', was.cacheWrite),
+  };
+};
+
+/**
+ * Deep's port over Anthropic's Messages API, with the owner's key in `x-api-key`, read as it streams.
+ *
+ * EVERY KEY RULE IS `opened`'s: the key asked for on this call and put in one header, a status that is not `ok` thrown
+ * before any body is read (`SlashRefusedError` for one no retry mends, which carries the status the engine names), and
+ * everything after a 200 marked answered, with the counts so far, since a model ran and may have billed.
+ *
+ * THE STREAM IS READ BLOCK BY BLOCK, BY ITS INDEX: text handed on as it lands, a tool's input gathered from its pieces and
+ * parsed when the block ends, and a thinking block kept whole with its signature, because the next request hands it back.
+ * READ FROM ANTHROPIC'S PUBLISHED REFERENCE, NOT MEASURED: no request is sent to Anthropic from this repository.
+ */
+export function anthropicDeep(options: EndpointModelOptions): SlashDeepInference {
+  const url = endpointUrl(options.url);
+  const sending = { ...options, auth: 'anthropic' as const, timeoutMs: options.timeoutMs ?? SLASH_DEEP_TIMEOUT_MS };
+  return {
+    turn: async (call, on) => {
+      const model = call.model;
+      const { res, signal, timedOut } = await opened(url, sending, deepBody(call), model);
+      let usage: SlashDeepUsage = { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 };
+      const answeredWith = (why: string): SlashAnsweredError =>
+        new SlashAnsweredError(why, { in: usage.in + usage.cacheRead + usage.cacheWrite, out: usage.out }, model);
+      const blocks: SlashDeepBlock[] = [];
+      const partial = new Map<number, string>();
+      let stop = '';
+      let served = model;
+      let size = 0;
+
+      /* A PROXY OR AN OLD GATEWAY THAT IGNORED `stream` and answered one JSON body is read as the whole message. */
+      if (!(res.headers.get('content-type') ?? '').includes('event-stream') || res.body === null) {
+        let whole: string;
+        try {
+          whole = await res.text();
+        } catch {
+          throw signal.aborted ? timedOut() : answeredWith('The model broke off its answer.');
+        }
+        let message: { content?: unknown; stop_reason?: unknown; usage?: unknown; model?: unknown } | null;
+        try {
+          message = JSON.parse(whole) as typeof message;
+        } catch {
+          throw answeredWith('The model answered with a body that is not JSON.');
+        }
+        usage = deepUsageOf(message?.usage, usage);
+        const content = Array.isArray(message?.content) ? (message.content.filter((b) => b !== null && typeof b === 'object') as SlashDeepBlock[]) : [];
+        for (const b of content) if (b.type === 'text' && typeof b['text'] === 'string') on.text(b['text']);
+        return { content, stop: typeof message?.stop_reason === 'string' ? message.stop_reason : '', usage, model: typeof message?.model === 'string' ? message.model : model };
+      }
+
+      const take = (data: string): void => {
+        let event: Record<string, unknown>;
+        try {
+          event = JSON.parse(data) as Record<string, unknown>;
+        } catch {
+          return;
+        }
+        const index = typeof event['index'] === 'number' ? event['index'] : -1;
+        switch (event['type']) {
+          case 'message_start': {
+            const message = event['message'] as { usage?: unknown; model?: unknown } | undefined;
+            usage = deepUsageOf(message?.usage, usage);
+            if (typeof message?.model === 'string') served = message.model;
+            return;
+          }
+          case 'content_block_start': {
+            const block = event['content_block'];
+            if (index < 0 || block === null || typeof block !== 'object') return;
+            blocks[index] = { ...(block as SlashDeepBlock) };
+            if ((block as SlashDeepBlock).type === 'tool_use') {
+              partial.set(index, '');
+              const name = (block as { name?: unknown }).name;
+              if (typeof name === 'string') on.tool?.(name);
+            }
+            return;
+          }
+          case 'content_block_delta': {
+            const block = blocks[index];
+            const delta = event['delta'] as Record<string, unknown> | undefined;
+            if (block === undefined || delta === undefined) return;
+            if (delta['type'] === 'text_delta' && typeof delta['text'] === 'string') {
+              block['text'] = `${typeof block['text'] === 'string' ? block['text'] : ''}${delta['text']}`;
+              size += delta['text'].length;
+              on.text(delta['text']);
+            } else if (delta['type'] === 'input_json_delta' && typeof delta['partial_json'] === 'string') {
+              partial.set(index, `${partial.get(index) ?? ''}${delta['partial_json']}`);
+              size += delta['partial_json'].length;
+            } else if (delta['type'] === 'thinking_delta' && typeof delta['thinking'] === 'string') {
+              block['thinking'] = `${typeof block['thinking'] === 'string' ? block['thinking'] : ''}${delta['thinking']}`;
+            } else if (delta['type'] === 'signature_delta' && typeof delta['signature'] === 'string') {
+              block['signature'] = `${typeof block['signature'] === 'string' ? block['signature'] : ''}${delta['signature']}`;
+            }
+            return;
+          }
+          case 'content_block_stop': {
+            const block = blocks[index];
+            if (block === undefined || block.type !== 'tool_use') return;
+            const json = partial.get(index) ?? '';
+            let input: unknown = {};
+            try {
+              input = json.trim() === '' ? {} : (JSON.parse(json) as unknown);
+            } catch {
+              input = {};
+            }
+            block['input'] = input !== null && typeof input === 'object' && !Array.isArray(input) ? input : {};
+            return;
+          }
+          case 'message_delta': {
+            const delta = event['delta'] as { stop_reason?: unknown } | undefined;
+            if (typeof delta?.stop_reason === 'string') stop = delta.stop_reason;
+            usage = deepUsageOf(event['usage'], usage);
+            return;
+          }
+          case 'error': {
+            const said = (event['error'] as { message?: unknown } | undefined)?.message;
+            throw answeredWith(`The model stopped: ${typeof said === 'string' ? said.slice(0, 200) : 'an error'}.`);
+          }
+          default:
+            return;
+        }
+      };
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let held = '';
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          held += decoder.decode(value, { stream: true });
+          const lines = held.split('\n');
+          held = lines.pop() ?? '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data:')) take(trimmed.slice(5).trim());
+          }
+          if (size > DEEP_ANSWER_CHARS) {
+            await reader.cancel().catch(() => undefined);
+            throw answeredWith('The model answered more than Slash reads.');
+          }
+        }
+      } catch (e) {
+        if (e instanceof SlashAnsweredError) throw e;
+        throw signal.aborted ? timedOut() : answeredWith('The model broke off its answer.');
+      }
+      held += decoder.decode();
+      if (held.trim().startsWith('data:')) take(held.trim().slice(5).trim());
+      return { content: blocks.filter((b): b is SlashDeepBlock => b !== undefined), stop, usage, model: served };
+    },
+  };
+}
+
+/** The `slash_meta` key Deep's own key is kept under (`DEEP_GRANT` in `packages/slash/src/deep.ts`, written out here). */
+const DEEP_GRANT_KEY = 'deep.grant_id';
+
+/**
+ * The key Deep answers with, or `null` where none is set: the grant he picked for Deep, or else his own key for Slash
+ * where that key is Anthropic's, at the address he gave it. Read on each turn, as his own key is.
+ */
+export const slashDeepKeyOf = (sql: Sql): SlashOwnKey | null => {
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_meta'") === undefined) return null;
+  const picked = sql.one<{ value: string }>('SELECT value FROM slash_meta WHERE key = ?', DEEP_GRANT_KEY)?.value;
+  if (picked !== undefined && picked !== '') return { provider: 'anthropic', base_url: null, model: '', grant_id: picked };
+  const own = slashOwnKeyOf(sql);
+  return own !== null && own.provider === 'anthropic' ? own : null;
+};
+
+/**
+ * Deep for this asker: the keychain's own gate on their session first, as `slashOwnKeyFor` runs it, and then the port over
+ * the key, each `grant.read` signed by them. `undefined` where no key is set for Deep; `{ refused }` with the sentence
+ * where the gate or the key will not open, which the turn says and then offers the Mac.
+ */
+export async function slashDeepFor<A extends SlashKeychainApi>(
+  key: SlashOwnKey | null,
+  api: A,
+  ctx: CallContext,
+  wire: (api: A, actor: string) => SlashHostDeps,
+  hostUrl?: string,
+): Promise<{ inference: SlashDeepInference } | { refused: string } | undefined> {
+  if (key === null) return undefined;
+  const gate = await api.listGrants(ctx);
+  if (!gate.ok) return { refused: 'Your key is not open in this session, so Deep cannot answer. Open the keychain and ask again, or send this to Claude on your Mac.' };
+  const options = ownOptionsOf({ ...key, provider: 'anthropic' }, wire(api, actorOf(ctx)), hostUrl);
+  if (options === undefined)
+    return { refused: 'The Anthropic key Deep was set to answer with is no longer a key in the keychain. Pick it again in Settings › Agents.' };
+  return { inference: anthropicDeep({ ...options, keyName: 'your Anthropic key for Deep' }) };
+}
+
 /* ── the model a host hands the record: the host's own endpoint ───────────── */
 
 /**
@@ -1357,7 +1602,11 @@ const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? 
  * Slash; it may not redirect his key.
  */
 export const slashKeySave = (patch: Readonly<Record<string, unknown>>): boolean =>
-  patch['source'] === 'key' || patch['tier'] === 'b' || (patch['grant_id'] !== undefined && patch['grant_id'] !== null) || (typeof patch['base_url'] === 'string' && patch['base_url'].trim() !== '');
+  patch['source'] === 'key' ||
+  patch['tier'] === 'b' ||
+  (patch['grant_id'] !== undefined && patch['grant_id'] !== null) ||
+  (patch['deep_grant_id'] !== undefined && patch['deep_grant_id'] !== null) ||
+  (typeof patch['base_url'] === 'string' && patch['base_url'].trim() !== '');
 
 /** One arrival as `@braindog/slash`'s `proposePattern` reads it, the package's `RawPayload`, declared here for the reason `SlashInference` is. */
 export type SlashSample = {
@@ -1457,7 +1706,19 @@ type Guarded = {
   answer?(ask: SlashAsk, inference?: SlashInference): Promise<Result<{ text: string }>>;
   proposeSetup?(ask: unknown, ctx: CallContext, inference?: SlashInference): Promise<Result<unknown>>;
   proposeMapping?(ask: unknown, ctx: CallContext, inference?: SlashInference): Promise<Result<unknown>>;
-  chat?(input: unknown, ctx: CallContext, tools: unknown, emit: (event: Record<string, unknown>) => void, inference?: SlashInference): Promise<void>;
+  chat?(input: unknown, ctx: CallContext, tools: unknown, emit: (event: Record<string, unknown>) => void, inference?: SlashInference, deep?: unknown): Promise<void>;
+};
+
+/**
+ * Whether a turn asks for Deep and has it to hand: `deep` or "Think harder", or `auto`, with a port and not a refusal. Such
+ * a turn spends none of this host's count, so a cap on the host's model does not stop it; `auto` past that cap goes deep.
+ */
+export const slashDeepTurn = (input: unknown, deep: unknown): 'deep' | 'auto' | null => {
+  const ready = typeof deep === 'object' && deep !== null && 'inference' in deep;
+  if (!ready || input === null || typeof input !== 'object') return null;
+  const asked = input as { mode?: unknown; rethink?: unknown };
+  if (asked.rethink === true || asked.mode === 'deep') return 'deep';
+  return asked.mode === 'auto' ? 'auto' : null;
 };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1560,9 +1821,12 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
      why in its own stream, and ends as every turn does. */
   if (typeof engine.chat === 'function') {
     const chat = engine.chat.bind(engine);
-    guarded.chat = (input, ctx, tools, emit, inference) => {
+    guarded.chat = (input, ctx, tools, emit, inference, deep) => {
+      const going = slashDeepTurn(input, deep);
+      if (going === 'deep') return chat(input, ctx, tools, emit, inference, deep);
       const stop = spent();
-      if (stop === null) return chat(input, ctx, tools, emit, inference);
+      if (stop === null) return chat(input, ctx, tools, emit, inference, deep);
+      if (going === 'auto') return chat({ ...(input as object), mode: 'deep' }, ctx, tools, emit, inference, deep);
       emit({ type: 'error', text: stop.fix });
       emit({ type: 'done', spent: { asks: 0, left: 0 } });
       return Promise.resolve();
@@ -1584,6 +1848,23 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
        picked it is Settings' to show on that form, not a reason to refuse him the form. */
     if (Object.keys(patch).length === 0) return engine.configure(patch, ctx);
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner') return engine.configure(patch, ctx);
+    /* DEEP'S KEY IS HELD TO THE SAME RULE: a live API token this record's keychain holds. */
+    const deepGrant = patch['deep_grant_id'];
+    if (typeof deepGrant === 'string') {
+      const held = deps.grants().find((g) => g.id === deepGrant && g.revoked_at === null);
+      if (held === undefined || held.kind !== SLASH_GRANT_KIND)
+        return {
+          ok: false,
+          refusal: {
+            code: 'VALUE_MALFORMED',
+            fix:
+              held === undefined
+                ? 'That grant holds no key in this record. Put your Anthropic key in the keychain first, then pick it for Deep.'
+                : 'That grant is not an API token, so Deep cannot answer with it. Pick the key Anthropic gave you.',
+            at: 'deep_grant_id',
+          },
+        };
+    }
     const before = tierOf();
     const asked = patch['source'] === 'key' ? 'b' : patch['source'] === 'included' ? 'a' : patch['tier'];
     const tier = asked ?? before?.tier;

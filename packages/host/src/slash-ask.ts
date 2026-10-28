@@ -112,14 +112,28 @@ export type SlashAskEngine<C> = {
   proposeSetup?(ask: unknown, ctx: C, inference?: unknown): Promise<Result<unknown>>;
   proposeMapping?(ask: unknown, ctx: C, inference?: unknown): Promise<Result<unknown>>;
   /** A conversation's turn, its held actions and the conversation read back (`packages/slash/src/chat.ts`). */
-  chat?(input: SlashChatInput, ctx: C, tools: unknown, emit: (event: Record<string, unknown>) => void, inference?: unknown): Promise<void>;
+  chat?(input: SlashChatInput, ctx: C, tools: unknown, emit: (event: Record<string, unknown>) => void, inference?: unknown, deep?: unknown): Promise<void>;
   act?(id: string, accept: boolean, ctx: C, tools: unknown): Promise<Result<unknown>>;
   thread?(id: string, ctx: C): Result<unknown>;
   threads?(ctx: C): Result<unknown>;
 };
 
-/** What a person sends in a conversation, as the door has checked it. */
-export type SlashChatInput = { thread?: string; message: string; page?: { path: string; title?: string; row?: string } };
+/**
+ * What a person sends in a conversation, as the door has checked it: the words, the thread and the page, how deep to go
+ * (`quick`, `deep` or `auto`), the rows they sent with it, and `rethink` for "Think harder" on the thread's last answer.
+ */
+export type SlashChatInput = {
+  thread?: string;
+  message: string;
+  page?: { path: string; title?: string; row?: string };
+  mode?: 'quick' | 'deep' | 'auto';
+  attach?: string[];
+  rethink?: boolean;
+};
+
+/** The most rows one message may send Slash, and the shape each is named in: `tasks#12`. */
+const ATTACH_MOST = 8;
+const ROW_REF = /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u;
 
 /**
  * The tools a conversation reads and writes through, built by the host for one asker (`@braindog/mcp/slash-tools`). The
@@ -165,10 +179,16 @@ export type SlashAskDoor<C> = {
   day?: (() => Promise<Refusal | null>) | undefined;
   /** The tools of a conversation, for this asker (`SlashChatTools`). Absent, the conversation's doors answer `NOT_IN_THIS_BUILD`. */
   chat?: ((ctx: C) => SlashChatTools) | undefined;
+  /**
+   * Deep for this asker (`slashDeepFor` in `slash.ts`): the port over the owner's Anthropic key, `{ refused }` with the
+   * sentence where it will not open, or `undefined` where no key is set. Asked only for a turn that may go deep, so a quick
+   * turn never runs the keychain's gate. Absent, Deep is never offered and a deep turn is handed to the Mac.
+   */
+  deep?: ((ctx: C) => Promise<unknown>) | undefined;
 };
 
 /** What a host hands `slashAskDoor` beside the builder: the keychain's gate, the inbox's reader and the day's ceiling (`SlashAskDoor`). */
-export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'keychain' | 'samples' | 'health' | 'day' | 'chat'>;
+export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'keychain' | 'samples' | 'health' | 'day' | 'chat' | 'deep'>;
 
 /**
  * A door over a builder that is asked once, which is what each host's `slash.ts` hands this file.
@@ -210,6 +230,7 @@ export function slashAskDoor<C>(
     ...(reads.health === undefined ? {} : { health: reads.health }),
     ...(reads.day === undefined ? {} : { day: reads.day }),
     ...(reads.chat === undefined ? {} : { chat: reads.chat }),
+    ...(reads.deep === undefined ? {} : { deep: reads.deep }),
   };
 }
 
@@ -238,7 +259,7 @@ export function servesSlash(pathname: string): SlashRoute | null {
  * The keys a settings patch may carry, which are the keys `configure` reads (`packages/slash/src/index.ts`): the source and
  * where his own key is asked, and `tier`, kept readable for one release.
  */
-const SETTINGS = ['source', 'provider', 'base_url', 'model', 'grant_id', 'ask_cap', 'tier'] as const;
+const SETTINGS = ['source', 'provider', 'base_url', 'model', 'grant_id', 'ask_cap', 'tier', 'deep_grant_id', 'deep_cap_cents'] as const;
 
 /** The asks one `GET /api/slash/asks` lists when it names no `limit`, and the most it lists when it names more. */
 const ASKS_LISTED = 20;
@@ -662,12 +683,24 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
     return flat(() => act(id, accept, ctx, tools));
   }
 
-  const message = body['message'];
-  if (typeof message !== 'string' || message.trim() === '')
+  const rethink = body['rethink'];
+  if (rethink !== undefined && rethink !== null && typeof rethink !== 'boolean')
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: 'rethink is true to ask the last question again, thinking harder.', at: 'rethink' });
+  const again = rethink === true;
+  const message = body['message'] ?? (again ? '' : undefined);
+  if (typeof message !== 'string' || (message.trim() === '' && !again))
     return refusal(422, { code: 'VALUE_MALFORMED', fix: 'message is what you want to say to Slash, in words.', at: 'message' });
   const thread = body['thread'];
   if (thread !== undefined && thread !== null && typeof thread !== 'string')
     return refusal(422, { code: 'VALUE_MALFORMED', fix: 'thread is the id the conversation started with, as text.', at: 'thread' });
+  if (again && (typeof thread !== 'string' || thread === ''))
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: 'Think harder asks a conversation again, so name its thread.', at: 'thread' });
+  const mode = body['mode'];
+  if (mode !== undefined && mode !== null && mode !== 'quick' && mode !== 'deep' && mode !== 'auto')
+    return refusal(422, { code: 'ENUM_VALUE_UNKNOWN', fix: 'mode is quick, deep or auto.', at: 'mode', allowed: ['quick', 'deep', 'auto'] });
+  const attach = body['attach'];
+  if (attach !== undefined && attach !== null && (!Array.isArray(attach) || attach.length > ATTACH_MOST || !attach.every((r) => typeof r === 'string' && ROW_REF.test(r))))
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: `attach is up to ${ATTACH_MOST} rows by their ids, such as "tasks#12".`, at: 'attach' });
   const page = body['page'];
   const at = typeof page === 'object' && page !== null && !Array.isArray(page) ? (page as Record<string, unknown>) : null;
   if (page !== undefined && page !== null && (at === null || typeof at['path'] !== 'string'))
@@ -676,6 +709,9 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
   const input: SlashChatInput = {
     message,
     ...(typeof thread === 'string' && thread !== '' ? { thread } : {}),
+    ...(mode === 'quick' || mode === 'deep' || mode === 'auto' ? { mode } : {}),
+    ...(Array.isArray(attach) && attach.length > 0 ? { attach: [...new Set(attach as string[])] } : {}),
+    ...(again ? { rethink: true } : {}),
     ...(at === null
       ? {}
       : {
@@ -691,10 +727,22 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
   if (engine instanceof Response) return engine;
   const chat = engine.chat?.bind(engine);
   if (chat === undefined) return refusal(501, NO_CHAT);
-  const day = await door.day?.();
+  /* THE DAY'S CEILING IS THE HOST'S MODEL'S, so a turn that only goes deep, on his own key, is not held to it. */
+  const day = again || mode === 'deep' ? null : await door.day?.();
   if (day) return slashReply({ ok: false, refusal: day });
-  const own = await opened(door, ctx);
+  /* HIS OWN KEY FOR QUICK, refused as the door's answer; and DEEP, only for a turn that may go deep, whose refusal is the
+     turn's own to say, since the turn can still offer the Mac. */
+  const deepAsked = again || mode === 'deep' || mode === 'auto';
+  const own = again || mode === 'deep' ? undefined : await opened(door, ctx);
   if (own instanceof Response) return own;
+  let deep: unknown;
+  if (deepAsked && door.deep !== undefined) {
+    try {
+      deep = await door.deep(ctx);
+    } catch (e) {
+      deep = { refused: `Your Anthropic key could not be opened for Deep: ${e instanceof Error ? e.message : String(e)}.` };
+    }
+  }
 
   const lines = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -711,7 +759,7 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
         }
       };
       /* NOT AWAITED, so the response goes out with its first line and the turn writes into it as it runs. */
-      void chat(input, ctx, tools, send, own)
+      void chat(input, ctx, tools, send, own, deep)
         .catch((e: unknown) => send({ type: 'error', text: `Slash stopped: ${e instanceof Error ? e.message : String(e)}.` }))
         .finally(() => {
           if (!ended) send({ type: 'done', spent: { asks: 0, left: null } });
@@ -781,7 +829,7 @@ function unsettled(patch: Record<string, unknown>, byok: boolean): Response | nu
       at: stray,
       allowed: [...SETTINGS],
     });
-  for (const key of ['source', 'provider', 'base_url', 'tier', 'model', 'grant_id'] as const) {
+  for (const key of ['source', 'provider', 'base_url', 'tier', 'model', 'grant_id', 'deep_grant_id'] as const) {
     const value = patch[key];
     if (value !== undefined && value !== null && typeof value !== 'string')
       return refusal(422, { code: 'VALUE_MALFORMED', fix: `${key} is text or null, and this one is ${shown(value)}.`, at: key });
@@ -792,7 +840,13 @@ function unsettled(patch: Record<string, unknown>, byok: boolean): Response | nu
       fix: `ask_cap is a number of asks, and this one is ${shown(patch['ask_cap'])}.`,
       at: 'ask_cap',
     });
-  if ((patch['source'] === 'key' || patch['tier'] === 'b') && !byok)
+  if (patch['deep_cap_cents'] !== undefined && typeof patch['deep_cap_cents'] !== 'number')
+    return refusal(422, {
+      code: 'VALUE_MALFORMED',
+      fix: `deep_cap_cents is a number of cents, and this one is ${shown(patch['deep_cap_cents'])}.`,
+      at: 'deep_cap_cents',
+    });
+  if ((patch['source'] === 'key' || patch['tier'] === 'b' || (typeof patch['deep_grant_id'] === 'string' && patch['deep_grant_id'] !== '')) && !byok)
     return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: 'Slash cannot use a key of your own on this host yet.', at: patch['source'] === 'key' ? 'source' : 'tier' });
   return null;
 }
