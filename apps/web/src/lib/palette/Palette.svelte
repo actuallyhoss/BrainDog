@@ -94,7 +94,10 @@
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
   import { asksFirst, capLine, inOrder, offersSlash, slashWords } from './slash.ts';
   import SlashThread from './SlashThread.svelte';
-  import { ask as askThread, clear as clearThread, convo, open as threadOn } from './thread.svelte.ts';
+  import { ask as askThread, clear as clearThread, convo, open as threadOn, rethink, rethinkable } from './thread.svelte.ts';
+  import AttachPicker from '../send/AttachPicker.svelte';
+  import { sendWords, targets as readTargets, type Attached, type Target } from '../send/send.ts';
+  import Menu from '../ui/Menu.svelte';
   import { pageOf, threadWords, type PageContext } from './slash-chat.ts';
   import type { About, SlashStatus } from '@braindog/client';
 
@@ -217,6 +220,82 @@
      no record at all: every ask from `/app/<slug>/…` went to the root and never reached the record it was typed on. */
   const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: apiBase() }));
 
+  /**
+   * WHO ASK TALKS TO (`$lib/send`): Slash, Quick or Deep, or a machine or a session running now, picked in the footer.
+   * What is typed to a machine or a session is sent to it as an instruction with the page's row attached, and its answer
+   * comes back on that row's strip and under Sent in the bell. The targets are read once Ask first opens; a host without
+   * the door offers Slash alone.
+   */
+  let askTo = $state<{ to: 'slash'; mode: 'quick' | 'deep' } | { to: 'target'; t: Target }>({ to: 'slash', mode: 'quick' });
+  let sendTargets = $state<Target[] | null>(null);
+  let targetsAsked = false;
+  /** THE ROWS ATTACHED WITH @, sent with every ask until they are taken off or the conversation starts again. */
+  let attached = $state<Attached[]>([]);
+  let attaching = $state(false);
+  const switchable = $derived(sendTargets?.filter((t) => t.kind === 'mac' || t.kind === 'session') ?? []);
+  const firstMac = $derived(sendTargets?.find((t) => t.kind === 'mac') ?? null);
+  const askLabel = $derived(askTo.to === 'slash' ? `${sendWords.slash} · ${askTo.mode === 'deep' ? sendWords.deep : sendWords.quick}` : askTo.t.label);
+  /** What every ask is about: the row behind the palette, then what was attached with @. */
+  const attachNow = (): string[] => [...new Set([...(behind.row ? [behind.row] : []), ...attached.map((a) => a.ref)])];
+  const lastTurn = $derived(convo.turns.at(-1));
+  const routedMac = $derived(lastTurn?.role === 'slash' && !lastTurn.streaming && lastTurn.route === 'mac' && firstMac !== null);
+  const harder = $derived(askTo.to === 'slash' && rethinkable());
+
+  $effect(() => {
+    if (!inAsk || targetsAsked) return;
+    targetsAsked = true;
+    void readTargets(apiBase()).then((got) => (sendTargets = got));
+  });
+
+  function asked(question: string) {
+    if (askTo.to === 'target') return void toTarget(askTo.t, question);
+    void askThread(question, behind, apiBase(), { mode: askTo.mode, attach: attachNow() });
+  }
+
+  /** A message to a machine or a session: sent, and said in the thread as one line with the way to its row. */
+  async function toTarget(t: Target, said: string) {
+    if (convo.busy) return;
+    const { deliver } = await import('../send/convos.svelte.ts');
+    const rows = attachNow();
+    convo.turns.push({ role: 'you', text: said });
+    const out = await deliver({ kind: behind.row?.split('#')[0] ?? 'page', target: t.id, label: t.label, targetKind: t.kind, mode: 'auto', note: said, fallback: said, attach: rows, mayChange: false });
+    const row = rows.find((r) => /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(r));
+    convo.turns.push({
+      role: 'slash',
+      steps: [],
+      text: out.ok ? sendWords.sentInPalette(out.label) : '',
+      figures: {},
+      actions: [],
+      go: out.ok && row ? [{ href: `/r/${row.replace('#', '/')}`, label: sendWords.open }] : [],
+      error: out.ok ? null : out.text,
+      spent: false,
+      streaming: false,
+    });
+  }
+
+  /** Slash could not answer Deep here and named a machine: the same question, sent to it. */
+  function toMac() {
+    const t = firstMac;
+    const question = [...convo.turns].reverse().find((x) => x.role === 'you')?.text;
+    if (!t || !question) return;
+    askTo = { to: 'target', t };
+    void toTarget(t, question);
+  }
+
+  /** @ IN THE FIELD, typed as a word of its own, opens the row search to attach one; the @ itself is not kept. */
+  function onaskinput() {
+    if (/(^|\s)@$/u.test(q)) {
+      q = q.slice(0, -1);
+      attaching = true;
+    }
+  }
+
+  function attachOne(a: Attached) {
+    if (!attached.some((x) => x.ref === a.ref)) attached = [...attached, a];
+    attaching = false;
+    input?.focus();
+  }
+
   /** A question from Find: a new conversation, asked at once, with the field cleared for the next one. */
   function askSlash(question: string) {
     backTo = q;
@@ -224,7 +303,7 @@
     opener.mode = 'ask';
     clearThread();
     q = '';
-    void askThread(question, behind, apiBase());
+    asked(question);
     queueMicrotask(() => input?.focus());
   }
 
@@ -233,7 +312,7 @@
     const said = q.trim();
     if (said === '' || convo.busy) return;
     q = '';
-    void askThread(said, behind, apiBase());
+    asked(said);
   }
 
   /** Back to Find, with what its field said before the question. */
@@ -257,6 +336,8 @@
 
   function fresh() {
     clearThread();
+    attached = [];
+    attaching = false;
     q = '';
     input?.focus();
   }
@@ -1491,6 +1572,7 @@
         bind:this={input}
         bind:value={q}
         {onkeydown}
+        oninput={onaskinput}
         class="p-input"
         type="text"
         aria-label={threadWords.placeholder}
@@ -1565,7 +1647,7 @@
     reader who heard both would hear every heading twice.
   -->
   {#if inAsk}
-    <SlashThread bind:this={threadView} here={behind} base={apiBase()} onask={(question) => void askThread(question, behind, apiBase())} onleave={() => (open = false)} />
+    <SlashThread bind:this={threadView} here={behind} base={apiBase()} onask={(question) => asked(question)} onleave={() => (open = false)} />
   {:else}
   <div class="p-body">
     <!-- LOOKING, AT ONCE: the same frame as the keystroke, where the first answer will land, and gone when it does. -->
@@ -1603,9 +1685,27 @@
       <span class="p-cap">{slashWords.capLine(slashStatus.asks.used, slashStatus.asks.cap, slashStatus.asks.resets)}</span>
       <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{slashWords.capDismiss}</button>
     </footer>
-  {:else if inAsk && (waitingCard || asksLeft !== null)}
-    <!-- QUIET: what Enter does while a card waits, and the asks left this month once there is a number to say. -->
+  {:else if inAsk}
+    <!-- WHO IT GOES TO, WHAT IS ATTACHED, AND ONCE AN ANSWER IS WHOLE, THINK HARDER; then, quiet, what Enter does while a
+         card waits and the asks left this month once there is a number to say. -->
     <footer class="p-foot p-ask-foot" id="palette-ask-foot">
+      {#if attaching}
+        <div class="p-attach"><AttachPicker onpick={attachOne} onclose={() => ((attaching = false), input?.focus())} taken={attachNow()} /></div>
+      {/if}
+      <Menu label={sendWords.sheet}>
+        {#snippet trigger()}<span class="p-to">{#if askTo.to === 'target' && askTo.t.live}<span class="p-live" aria-hidden="true"></span>{/if}{askLabel}<Icon name="chevronDown" size="s" /></span>{/snippet}
+        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}>{sendWords.slash} · {sendWords.quick}</button>
+        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'deep'} onclick={() => (askTo = { to: 'slash', mode: 'deep' })}>{sendWords.slash} · {sendWords.deep}</button>
+        {#each switchable as t (t.id)}
+          <button type="button" role="menuitemradio" aria-checked={askTo.to === 'target' && askTo.t.id === t.id} onclick={() => (askTo = { to: 'target', t })}><span class="mi-name">{t.label}</span></button>
+        {/each}
+      </Menu>
+      {#each attached as a (a.ref)}
+        <span class="p-attached"><span class="p-attached-name" dir="auto">{a.label}</span><button type="button" class="p-attached-x tap" aria-label={sendWords.remove(a.label)} onclick={() => (attached = attached.filter((x) => x.ref !== a.ref))}><Icon name="close" size="s" /></button></span>
+      {/each}
+      <button type="button" class="p-at tap" aria-label={sendWords.attach} title={sendWords.attach} aria-expanded={attaching} onclick={() => (attaching = !attaching)}>@</button>
+      {#if harder}<button type="button" class="p-harder tap" onclick={() => void rethink(apiBase())}>{sendWords.thinkHarder}</button>{/if}
+      {#if routedMac && firstMac}<button type="button" class="p-harder tap" onclick={toMac}>{sendWords.toMac(firstMac.label)}</button>{/if}
       {#if waitingCard}<span class="p-keys-hint">{threadWords.enterDoes}</span>{/if}
       {#if asksLeft !== null}<span class="p-left">{threadWords.left(asksLeft)}</span>{/if}
     </footer>
@@ -2027,6 +2127,90 @@
 
   .p-left {
     margin-inline-start: auto;
+  }
+
+  /* THE FOOTER'S CONTROLS (`$lib/send`): who Ask talks to as a quiet menu, the rows attached as small rectangles, and @. */
+  .p-attach {
+    flex: 1 1 100%;
+  }
+
+  .p-to {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: var(--btn-h-sm);
+    padding-inline: var(--sp-2);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+  }
+
+  .p-live {
+    inline-size: 7px;
+    block-size: 7px;
+    background: var(--live);
+    border-radius: var(--r-round);
+  }
+
+  .p-attached {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--btn-h-sm);
+    padding-inline-start: var(--sp-2);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+  }
+
+  .p-attached-name {
+    overflow: hidden;
+    max-inline-size: 160px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .p-attached-x,
+  .p-at,
+  .p-harder {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: var(--btn-h-sm);
+    min-block-size: var(--btn-h-sm);
+    padding-inline: var(--sp-1);
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+  }
+
+  .p-harder {
+    padding-inline: var(--sp-2);
+    background: var(--tile-2);
+    color: var(--ink);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .p-attached-x:hover,
+    .p-at:hover,
+    .p-harder:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .p-to,
+    .p-attached,
+    .p-attached-x,
+    .p-at,
+    .p-harder {
+      min-block-size: var(--tap);
+    }
   }
 
   /* WHAT ENTER AND ESC DO is said where there are keys to press, and not under a thumb. */
