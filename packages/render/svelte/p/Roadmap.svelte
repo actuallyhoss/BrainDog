@@ -56,7 +56,7 @@
   } = $props();
 
   const said = (r: Row, i: number): string => text(inline(r.cells[i] ?? '', opts));
-  const rows = $derived(block.rows.map((r) => roadmapRow(said(r, 0), said(r, 1), said(r, 2), r.tone)));
+  const rows = $derived(block.rows.map((r) => roadmapRow(said(r, 0), said(r, 1), said(r, 2), r.tone, opts.now)));
   const plan = $derived(roadmapPlan(rows, roadmapToday(opts.now)));
   const lines = $derived(plan.empty ? [] : roadmapLines(plan));
   const keys = $derived(roadmapLegend(lines));

@@ -404,8 +404,9 @@ const effortDays = (m: RegExpExecArray): number => {
   return n / (unit === 'h' ? 24 : unit === 'm' ? 1_440 : DAY_SECONDS);
 };
 
-/** A day as `day()` in `format.ts` writes it: `10 Oct 2026`, and `15 Mar 950` for a year it does not pad. */
-const WRITTEN = /^(\d{1,2}) ([A-Z][a-z]{2}) (\d{3,4})$/u;
+/** A day as `day()` in `format.ts` writes it: `10 Oct 2026`, and `15 Mar 950` for a year it does not pad; `dateSaid()`
+    leaves the reader's own year off, `10 Oct`. */
+const WRITTEN = /^(\d{1,2}) ([A-Z][a-z]{2})(?: (\d{3,4}))?$/u;
 
 /**
  * The due day as `YYYY-MM-DD`, from either spelling of it, or the text unchanged when it is neither.
@@ -420,11 +421,12 @@ const WRITTEN = /^(\d{1,2}) ([A-Z][a-z]{2}) (\d{3,4})$/u;
  * NOTHING IS GUESSED ON THE WAY. The month is one of the twelve `day()` writes, spelt as it writes them, and the
  * day it names must exist: `30 Feb 2026` comes back as it was, is not a day, and is skipped like `2026-02-30`.
  */
-const dayRead = (text: string): string => {
+const dayRead = (text: string, now: number = Date.now()): string => {
   const m = WRITTEN.exec(text);
   const month = m ? MONTHS.indexOf(m[2]!) + 1 : 0;
   if (!m || month === 0) return text;
-  const iso = `${m[3]!.padStart(4, '0')}-${String(month).padStart(2, '0')}-${m[1]!.padStart(2, '0')}`;
+  /* NO YEAR IS THE READER'S YEAR (`dateSaid`), so a page projected through it draws its bars again. */
+  const iso = `${(m[3] ?? String(new Date(now).getFullYear())).padStart(4, '0')}-${String(month).padStart(2, '0')}-${m[1]!.padStart(2, '0')}`;
   return isDay(iso) ? iso : text;
 };
 
@@ -442,8 +444,8 @@ const dayRead = (text: string): string => {
  * the plan as a row it will skip by index: a word becomes a start that is not a day, and a negative
  * effort a start after the end, which is the backwards window the plan already refuses to draw.
  */
-export function roadmapRow(title: string, by: string, effort: string, tone?: Tone): RoadmapRow {
-  const end = dayRead(by.trim());
+export function roadmapRow(title: string, by: string, effort: string, tone?: Tone, now?: number): RoadmapRow {
+  const end = dayRead(by.trim(), now);
   const said = effort.trim();
   const toned = tone ? { tone } : {};
   if (!isDay(end)) return { start: '', end, title, ...toned };

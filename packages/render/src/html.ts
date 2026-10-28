@@ -1859,7 +1859,7 @@ function forecast(b: Block, o: RenderOptions): string {
  */
 function roadmap(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
-  const rows = b.rows.map((r) => roadmapRow(said(r, 0), said(r, 1), said(r, 2), r.tone));
+  const rows = b.rows.map((r) => roadmapRow(said(r, 0), said(r, 1), said(r, 2), r.tone, o.now));
   const plan = roadmapPlan(rows, roadmapToday(o.now));
   const skipped = plan.skipped.length
     ? `<p class="roadmap-skipped">${escape(roadmapSkipped(plan.skipped.map((i) => rows[i]!.title || MISSING)))}</p>`
