@@ -33,6 +33,7 @@ import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
+import { slashTools } from '@braindog/mcp/slash-tools';
 import { INVITE_GONE, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
@@ -2204,6 +2205,9 @@ export class Record$ extends DurableObject<Env> {
         () => api,
         { sql: guardedSql(this.ctx.storage), clock: { now: () => Date.now() }, plan: () => this.#planOf(api), onFail: (fail) => this.#modelFailed(api, fail) },
         new Set([`https://${this.env.PUBLIC_HOST ?? ''}`]),
+        /* A CONVERSATION'S TOOLS, over this record as the asker, the ladder's reading of a write asked of the record's own
+           SQLite, which is this object's storage. */
+        (asker) => slashTools(api, asker, { sql: guardedSql(this.ctx.storage), person: asker.principal.kind === 'person' ? asker.principal.id : null }),
       );
       /* `GET /api/slash/health` READS THE SAME LEDGER THE RECORD'S `engineHealth` DOES, so Settings and a read token are
          told one thing. Handed per request, since `#open` sets it and the door is built before it may be read. */

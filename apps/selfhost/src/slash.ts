@@ -487,6 +487,7 @@ export function slashDoor(
   store: KeyStore | undefined,
   deps: SlashEngineDeps,
   origins: ReadonlySet<string>,
+  chat?: SlashAskDoor<CallContext>['chat'],
 ): SlashAskDoor<CallContext> {
   /* HIS OWN KEY IS OFFERED ONLY WHERE A KEY CAN BE OPENED, which on this host is a key store: without one `keyOpener`
      answers `null` for every grant, and a `byok` handed in here is what lets the settings door store his key, so
@@ -511,7 +512,8 @@ export function slashDoor(
   const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
   /* THIS HOST'S ENDPOINT OPENS NO KEYCHAIN KEY, so the engine is handed on as built: there is no `grant.read` for an asker
      to sign unless the ask is on his own key, which `byok` above opens for them. */
-  return slashAskDoor(origins, () => slashEngineFor(config, api, store, deps), byok, { keychain, samples });
+  /* AND A CONVERSATION'S TOOLS, built by the server over the record it holds (`@braindog/mcp/slash-tools`). */
+  return slashAskDoor(origins, () => slashEngineFor(config, api, store, deps), byok, { keychain, samples, ...(chat === undefined ? {} : { chat }) });
 }
 
 /* ── erasing a person from Slash's ledger ─────────────────────────────────────────────────────────────────────────────── */

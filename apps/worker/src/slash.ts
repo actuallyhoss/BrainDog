@@ -923,6 +923,13 @@ function keyOnly(engine: Slash, sql: Sql): Slash {
   only.answer = (ask, inference) => (onOwnKey(sql) ? engine.answer(ask, inference) : refused());
   only.proposeSetup = (ask, ctx, inference) => (onOwnKey(sql) ? engine.proposeSetup(ask, ctx, inference) : refused());
   only.proposeMapping = (ask, ctx, inference) => (onOwnKey(sql) ? engine.proposeMapping(ask, ctx, inference) : refused());
+  /* A CONVERSATION SAYS IT IN ITS OWN STREAM, and ends as every turn ends. */
+  only.chat = (input, ctx, tools, emit, inference) => {
+    if (onOwnKey(sql)) return engine.chat(input, ctx, tools, emit, inference);
+    emit({ type: 'error', text: NO_MODEL_HERE });
+    emit({ type: 'done', spent: { asks: 0, left: null } });
+    return Promise.resolve();
+  };
   return only;
 }
 
@@ -1086,6 +1093,15 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, budget
   capped.digestProse = (digest) => (backgroundSpent() ? Promise.resolve(ok({ text: '' })) : engine.digestProse(digest));
   capped.proposeSetup = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeSetup(ask, ctx, inference));
   capped.proposeMapping = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeMapping(ask, ctx, inference));
+  /* A TURN IS SEVERAL CALLS AT MOST `STEPS_MOST`, and is let in while two more fit, as a question's two passes are; the
+     ceiling's sentence goes in the turn's own stream. */
+  capped.chat = (input, ctx, tools, emit, inference) => {
+    if (!spent(2)) return engine.chat(input, ctx, tools, emit, inference);
+    const out = refused<never>();
+    emit({ type: 'error', text: out.ok ? '' : 'refusal' in out ? out.refusal.fix : '' });
+    emit({ type: 'done', spent: { asks: 0, left: 0 } });
+    return Promise.resolve();
+  };
   /* THE RUN'S OWN SENTENCE, NAMING THE RULE AND THE STEP, as the package's own cap refusal does. Any code but
      `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops here and the ladder does not ask again. */
   capped.answer = (ask, inference) => {
@@ -1273,6 +1289,7 @@ export function workerSlashDoor(
   api: () => RecordApi,
   deps: SlashEngineDeps,
   origins: ReadonlySet<string>,
+  chat?: SlashAskDoor<CallContext>['chat'],
 ): SlashAskDoor<CallContext> {
   /* HIS OWN KEY IS OFFERED ONLY WHERE A KEY CAN BE OPENED. A `byok` handed in here is what lets the settings door store
      it: offering it on a Worker with no `KEK` would save a choice every later ask refuses. `api` is not called until an
@@ -1292,7 +1309,8 @@ export function workerSlashDoor(
   const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
   /* THE DAY'S CEILING, from the same ledger the month's count is read from (`slashDayStop`). */
   const day = async (): Promise<Refusal | null> => slashDayStop(deps.sql, Date.now());
-  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { keychain, samples, day });
+  /* AND A CONVERSATION'S TOOLS, built by the object over the record it holds (`@braindog/mcp/slash-tools`). */
+  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { keychain, samples, day, ...(chat === undefined ? {} : { chat }) });
 }
 
 /* ── the daily look, and what it heard go wrong ───────────────────────────────────────────────────────────────────── */

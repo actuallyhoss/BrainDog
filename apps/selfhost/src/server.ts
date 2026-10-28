@@ -46,6 +46,7 @@ import {
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
+import { slashTools } from '@braindog/mcp/slash-tools';
 import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
 import { cutOffReadable, mayPropose } from '@braindog/kernel';
@@ -2071,7 +2072,14 @@ export async function start(options: {
     /* THE RECORD READS THE GRANT BEFORE IT READS A ROW (`shapeExport`), so the door hands the bearer on unread. */
     shape: { copy: (bearer) => shapeMethods({ kernel: api.kernel, clock, validFrom }).shapeExport(bearer) },
     keys: keysDoor(api, options.keys, origins),
-    slash: { ...slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins), health: engineHealth },
+    /* A CONVERSATION'S TOOLS READ THE RECORD'S OWN SQLITE for the ladder's reading of a write, which here is `sql`, apart
+       from Slash's own store. */
+    slash: {
+      ...slashDoor(slashConfig, () => api, options.keys, { sql: slashSql, clock }, origins, (asker) =>
+        slashTools(api, asker, { sql, person: asker.principal.kind === 'person' ? asker.principal.id : null }),
+      ),
+      health: engineHealth,
+    },
     /* ONE BUDGET PER PROCESS, built here so it outlives a request and is shared by every ingest. */
     arrivals: arrivalDoor(api, ingestBudget(clock.now), inboundMail, keyOpener(api, options.keys), blobsFolder(options.file)),
     /* A LINK TO ONE PAGE, built here once so its read budget outlives a request, as the arrivals' does. */
@@ -2309,6 +2317,13 @@ async function write(res: ServerResponse, out: Response, cookie?: string): Promi
   });
   if (cookies.length > 0) res.setHeader('set-cookie', cookies);
   res.writeHead(out.status);
+  /* A STREAM OF LINES IS WRITTEN AS IT COMES (Slash's conversation), so its first step reaches the screen before its answer. */
+  if (out.body !== null && (out.headers.get('content-type') ?? '').includes('ndjson')) {
+    const reader = out.body.getReader();
+    for (let part = await reader.read(); !part.done; part = await reader.read()) res.write(part.value);
+    res.end();
+    return;
+  }
   res.end(Buffer.from(await out.arrayBuffer()));
 }
 
