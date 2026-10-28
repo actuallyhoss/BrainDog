@@ -151,6 +151,19 @@ export function safeHref(href: string): string | null {
   return null;
 }
 
+/**
+ * `{{money:<path>}}` OVER A FIGURE THE HOST ALREADY WROTE: a money figure or a row's money field is answered as the
+ * amount written (`EGP 12,400.00`, `£1,200.00`, one amount a currency joined by ` · `, a day after it when it is old),
+ * never as minor units and a code. So the written amount is drawn as it came. A bare number is no amount (money is never
+ * a number alone), and stays the author's text, marked. Two currencies are never added here: the host writes them apart.
+ */
+function writtenAmount(form: string, said: string): string | null {
+  if (form !== 'money') return null;
+  const t = said.trim();
+  if (!/\d/u.test(t) || /^[-−+]?[\d,.\s]+$/u.test(t)) return null;
+  return t;
+}
+
 function braced(body: string, opts: InlineOptions): Inline {
   const colon = body.indexOf(':');
   if (colon > 0) {
@@ -176,7 +189,7 @@ function braced(body: string, opts: InlineOptions): Inline {
       if (arg === UNNAMED) return { type: 'path', path: raw, resolved: null, named: false };
       if (arg === null || arg === undefined)
         return { type: 'path', path: raw, resolved: null };
-      const text = formatTyped(form as TypedForm, arg, opts.now, opts.zone);
+      const text = formatTyped(form as TypedForm, arg, opts.now, opts.zone) ?? (isPath ? writtenAmount(form, arg) : null);
       if (text === null) return { type: 'unresolved', text: raw };
       const link = form === 'date' ? ('day' as const) : form === 'ref' ? ('row' as const) : undefined;
       return { type: 'typed', form: form as TypedForm, arg, text, ...(link ? { link } : {}) };

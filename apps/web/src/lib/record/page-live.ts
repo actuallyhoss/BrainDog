@@ -353,6 +353,11 @@ export type LiveBlock = BlockResult & {
    */
   unnamed?: string[] | undefined;
   /**
+   * THE DAY EACH FILLED `{{path}}` WAS STATED ON, where the record knows one (`values_as_of`): a rolled figure's oldest
+   * balance, or a row's own `as_of`. A sentence says the age beside the figure once it is old (`agedText`).
+   */
+  valuesAsOf?: Record<string, string> | undefined;
+  /**
    * A RUN'S FACE ON A CARD whose `who` column the block answered as a run (`types`), aligned with the rows, or `null`
    * where the row names no run the page could read. Handed to the renderer as its `runs`, as a block of runs is.
    */
@@ -1270,6 +1275,28 @@ const unnamedOf = (b: Answered): string[] | undefined => {
   return Array.isArray(u) && u.length > 0 && u.every((p) => typeof p === 'string') ? [...(u as string[])] : undefined;
 };
 
+/** The day each filled path was stated on (`values_as_of`), narrowed to ISO days, or `undefined`. */
+const asOfOf = (b: Answered): Record<string, string> | undefined => {
+  const a = (b as { values_as_of?: unknown }).values_as_of;
+  if (!isObject(a)) return undefined;
+  const out = Object.fromEntries(Object.entries(a).filter((e): e is [string, string] => typeof e[1] === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(e[1])));
+  return Object.keys(out).length > 0 ? out : undefined;
+};
+
+/** How many days old a stated figure must be before a sentence says its age: a week, as a rate is stale after one. */
+export const FIGURE_AGED_DAYS = 7;
+
+/**
+ * A figure as a sentence says it, with its age once it is old: `EGP 12,400.00 (as of 3 Sep)`. A figure stated within
+ * `FIGURE_AGED_DAYS` of today is said bare, so a sentence is not cluttered with a day nobody needs.
+ */
+export function agedText(text: string, asOf: string | undefined, today: string): string {
+  if (asOf === undefined) return text;
+  const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${asOf}T00:00:00Z`)) / 86_400_000);
+  if (!Number.isFinite(days) || days < FIGURE_AGED_DAYS) return text;
+  return `${text} (as of ${format('day', Date.parse(`${asOf}T00:00:00Z`) / 86_400_000)})`;
+}
+
 /** The primitives a source no arm knows is drawn in, and the types whose cells stand at a column's end. */
 const SOURCE_DRAWN: ReadonlySet<string> = new Set(['table', 'list', 'rows']);
 const END_TYPES: ReadonlySet<string> = new Set(['money', 'int', 'count', 'decimal']);
@@ -1537,6 +1564,7 @@ export function blockOf(
     ...(values ? { values } : {}),
     /* NARROWED, so the resolver is only ever handed words. */
     ...(unnamedOf(b) ? { unnamed: unnamedOf(b) } : {}),
+    ...(asOfOf(b) ? { valuesAsOf: asOfOf(b) } : {}),
     ...(keyOf(keyed) === null ? {} : { key: keyOf(keyed)! }),
   };
   const cannot: LiveBlock = { ...shell, cannot: liveWords.cannot };

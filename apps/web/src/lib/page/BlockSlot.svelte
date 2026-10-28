@@ -22,7 +22,7 @@
   import { apiBase, at as inApp } from '../at.ts';
   import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
-  import { EMPTY_KEEP, KPIS_KIND, inline, moneyWhole, readFigure, text } from 'braindog-render';
+  import { EMPTY_KEEP, KINDS, KPIS_KIND, inline, moneyWhole, readFigure, text } from 'braindog-render';
   import { approxOf } from '$lib/money/rates.ts';
   import { held as heldRates } from '$lib/money/rates.svelte.ts';
   import { recordToday } from '$lib/record/zone.ts';
@@ -45,7 +45,7 @@
   import { dayHref } from '$lib/record/day-href.ts';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { fileAt, namedResolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
+  import { agedText, fileAt, namedResolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
   import { glyphSet, glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
   import { agentKindOf, liveOf } from '../ui/face.ts';
   import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
@@ -262,7 +262,11 @@
        words in prose, and no figure in a chip, a tile or a bar. */
     resolve: (path: string) => {
       const v = namedResolverOf(block.values, block.unnamed)(path);
-      return typeof v === 'string' || v === null || v === undefined ? said(v ?? null) : v;
+      if (!(typeof v === 'string' || v === null || v === undefined)) return v;
+      const text = said(v ?? null);
+      /* IN PROSE, A FIGURE STATED A WHILE AGO SAYS ITS AGE beside it, as a tile does (`agedText`). A chip's or a tile's
+         figure stays the figure alone: the tile says its own age. */
+      return text === null ? null : (KINDS as Record<string, { prose?: boolean } | undefined>)[block.kind]?.prose === true ? agedText(text, block.valuesAsOf?.[path], recordToday()) : text;
     },
     now,
     /* THE RECORD'S HOME CURRENCY, so every amount the drawers write is the one writer's (`money.ts`): `null` on a
