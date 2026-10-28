@@ -49,7 +49,7 @@
   import { actor, listName } from '$lib/record/names.ts';
   import { installWords, openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -313,8 +313,9 @@
     return () => cancelAnimationFrame(frame);
   });
 
-  /* THIS BROWSER'S CLOCK. It was the seed's 3 September 2026 whenever the editor was drawn over the sample. */
-  const now = Date.now();
+  /* THE RECORD'S CLOCK (`recordNow`), as the hub and the Agents page read it: on this browser's clock a run the Agents
+     page said ran "just now" read "8w ago" here, on a record whose clock is not the browser's. */
+  const now = recordNow();
   const faults = $derived(flow.faults);
   const drawn = $derived(JSON.stringify(flow.body));
   /**
@@ -869,6 +870,8 @@
           <Empty kind="no-data-yet" compact title={words.noRuns} />
         {:else}
           <div class="column">
+            <!-- A CHART ONLY OF THREE RUNS OR MORE: one or two are read off their rows, and a bar of one said nothing. -->
+            {#if runs.length >= 3}
             <Tile icon="refresh" title={canvasWords.lastRuns} meta={canvasWords.lastRunsMeta(runs.length)}>
               {#snippet actions()}
                 {#if durations.length > 1}
@@ -878,6 +881,7 @@
               <Stacked parts={runParts(runs)} subject={canvasWords.runsSubject} />
               <p class="reading">{lastRunReading(runs, places, now)}</p>
             </Tile>
+            {/if}
 
             <ol class="runs ledger ledger-lead">
               {#each runs as r (r.id)}

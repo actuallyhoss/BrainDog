@@ -470,7 +470,7 @@ export const words = {
   noSuchWhy: 'It may have been from another record, or the link may be wrong.',
   cancel: 'Stop this run',
   cancelling: 'Stopping this run',
-  empty: 'Nothing yet. The first lines appear here when a machine takes the run.',
+  empty: 'Nothing yet.',
   thinking: 'Thinking',
   result: 'Result',
   failed: 'Failed',

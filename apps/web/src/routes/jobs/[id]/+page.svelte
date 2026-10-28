@@ -29,6 +29,7 @@
   import { page as route } from '$app/state';
   import { TONES, since } from 'braindog-render';
   import { apiBase } from '$lib/at.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { copy } from '$lib/copy.ts';
   import { titleOf } from '$lib/title.ts';
   import {
@@ -83,8 +84,10 @@
   const live = $derived(status !== null && isLive(status));
   const said = $derived(status === null ? null : statusOf(status, lost, cancel));
 
-  /* THIS BROWSER'S CLOCK, moved on with each poll. Every date here is the record's, read against now. */
-  let now = $state(Date.now());
+  /* THE RECORD'S CLOCK (`recordNow`), moved on with each poll: every date here is the record's, so it is read against the
+     record's now. Against this browser's clock a run asked for at 15:00 read "Started 8w ago" on a record whose clock is
+     not the browser's. */
+  let now = $state(recordNow());
 
   /* ONE POLL PER RUN ON SCREEN. A new id or a new record starts over from line 0, and leaving stops the timer and drops
      whatever answer was still out, so a run's lines never land under another's header. */
@@ -109,7 +112,7 @@
     async function tick(): Promise<void> {
       const got = await readEvents(at, job, seq);
       if (gone) return;
-      now = Date.now();
+      now = recordNow();
       if (!got.ok) {
         /* THE FIRST ANSWER SETTLES THE SCREEN; a later one that fails is a blip in a live run, and the next ask
            goes out as it would have. */
