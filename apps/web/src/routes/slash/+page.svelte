@@ -35,7 +35,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
-  import { onMount, type Component } from 'svelte';
+  import { type Component } from 'svelte';
   import { page } from '$app/state';
   import { createClient, type EngineHealth, type SlashStatus } from '@braindog/client';
   import { engineLine } from '$lib/ui/engine-line.ts';
@@ -56,6 +56,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
   import SlashMark from './SlashMark.svelte';
+  import SlashThreads from './SlashThreads.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -340,7 +341,12 @@
    */
   let PageJobs = $state<Component | null>(null);
 
-  onMount(() => {
+  /* THE CONVERSATIONS ARE THE PAGE (`SlashThreads.svelte`); THE HISTORY IS `?history`, and only it reads all of this. */
+  const history = $derived(page.url.searchParams.has('history'));
+  let started = false;
+  $effect(() => {
+    if (!history || started) return;
+    started = true;
     door = createClient({ base: apiBase() });
     client = door as unknown as SlashClient;
     void read(load);
@@ -365,6 +371,9 @@
 
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
+{#if !history}
+<SlashThreads />
+{:else}
 <PageHead icon="star" title={words.title} sentence={sentence?.text} needs={sentence?.needs} />
 <div class="page">
   {#if phase === 'refused'}
@@ -702,6 +711,7 @@
     {/if}
   {/if}
 </div>
+{/if}
 
 <style>
   /* ONE COLUMN, NARROWER THAN A LIST SCREEN'S: what is here is sentences and questions, and a line that runs the width of

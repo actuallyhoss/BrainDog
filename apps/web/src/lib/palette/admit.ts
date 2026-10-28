@@ -277,8 +277,9 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox', aliases: ['mail', 'messages', 'email', 'incoming'] },
   { id: 'c-keychain', title: copy.keychain, href: '/keychain', group: copy.destinations, icon: 'vault', aliases: ['vault', 'keys', 'secrets', 'passwords', 'tokens'] },
   { id: 'c-packs', title: copy.packs, href: '/settings/addons', group: copy.destinations, icon: 'packs', aliases: ['packs', 'extensions', 'plugins', 'install', 'store'] },
-  /* SLASH'S HISTORY, what it noticed, suggested and was asked: the old page, folded into the palette (batch 5d). The bare
-     `/slash` opens the palette itself (`routes/slash/+page.ts`), so this row goes to the history. */
+  /* SLASH'S CONVERSATIONS, the bare `/slash`: each one press from going on with it in Ask. */
+  { id: 'c-slash-threads', title: 'Slash conversations', href: '/slash', group: copy.destinations, icon: 'slash', aliases: ['threads', 'chats'] },
+  /* SLASH'S HISTORY, what it noticed, suggested and was asked: the old page, kept at `?history`. */
   { id: 'c-slash', title: 'Slash history', href: '/slash?history', group: copy.destinations, icon: 'slash', aliases: ['suggestions', 'noticed', 'asked'] },
   /* AUTOMATIONS, the canvas an owner and an agent both edit. Reachable only by its address
      until it was here and in the rail. */
