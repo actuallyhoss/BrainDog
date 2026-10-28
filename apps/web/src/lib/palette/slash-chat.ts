@@ -40,7 +40,12 @@ export type ChatEvent =
   /* SLASH COULD NOT TAKE IT THIS WAY (Deep with no key of one's own) and names who can: `mac`, Claude on a machine. */
   | { type: 'route'; to: string }
   | { type: 'error'; text: string }
+  /* Which brain answers: the included model, or Deep on the owner's Anthropic key, with the model it asks. */
+  | { type: 'brain'; depth: 'quick' | 'deep'; model?: string }
   | { type: 'done'; spent: Spent; figures?: Record<string, unknown> };
+
+/** How deep a message goes: the included model, Deep on the owner's key, or the first and then the second. */
+export type ChatMode = 'quick' | 'deep' | 'auto';
 
 export type Turn = { role: 'you' | 'slash'; text: string; actions: ChatAction[] };
 export type Thread = { id: string; turns: Turn[] };
@@ -105,6 +110,8 @@ export function eventOf(line: string): ChatEvent | null {
       const figures = figuresOf(v.figures);
       return { type: 'delta', text: v.text, ...(figures ? { figures } : {}) };
     }
+    case 'brain':
+      return v.depth === 'quick' || v.depth === 'deep' ? { type: 'brain', depth: v.depth, ...(str(v.model) ? { model: v.model as string } : {}) } : null;
     case 'route':
       return str(v.to) ? { type: 'route', to: v.to as string } : null;
     case 'navigate':
