@@ -903,6 +903,11 @@
         </form>
       {/if}
       {#if fix || bulkFix}<p class="qa-fix" role="status">{fix || bulkFix}</p>{/if}
+      <!-- ASK SLASH AND HAND IT OFF, under the answers on Decide itself: Slash explains and compares them, the answer drawn
+           under the card, and the send sheet hands the question on (`$lib/send`). Fetched with the first whole card. -->
+      {#if drawn && !compact && phase !== 'asking'}
+        {#await import('$lib/send/DecideAsk.svelte') then { default: DecideAsk }}<DecideAsk id={question.id} title={card.question} />{/await}
+      {/if}
     </div>
     {#if side}
       <!-- THE CARD'S SIDE, only where there is something to put in it: on a wide tile a 280px column
