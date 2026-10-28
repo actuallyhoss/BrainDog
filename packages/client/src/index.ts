@@ -1300,8 +1300,18 @@ export type EngineReadings = {
  * `Standing` in `packages/record/src/ladder.ts`.
  */
 export type TrustStanding = {
-  agents: { agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: { kind: string; rung: 'ask' | 'tell' | 'quiet'; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
+  agents: {
+    agent: string;
+    connected: string | null;
+    asking: { from: string; at: string } | null;
+    kinds: { kind: string; rung: 'ask' | 'tell' | 'quiet'; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[];
+    /** The share of its questions the owner took as filed over `days`, overall and by kind of change; absent with none answered. */
+    kept?: KeptShare & { days: number; kinds: (KeptShare & { kind: string })[] };
+  }[];
 };
+
+/** Of an agent's answered questions, how many the owner accepted unchanged, and the share, `null` with none answered. */
+export type KeptShare = { accepted: number; answered: number; share: number | null };
 
 /**
  * `slashReads`'s answer: whether Slash reads in the background. On unless the owner turned it off. See

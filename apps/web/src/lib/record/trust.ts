@@ -116,6 +116,23 @@ const isStanding = (v: unknown): v is TrustStanding => {
   return Array.isArray(agents) && agents.every((a) => typeof a?.agent === 'string' && Array.isArray(a.kinds) && a.kinds.every(isKind));
 };
 
+const count = (n: unknown): boolean => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+
+/** Whether an agent's `kept` is the shape the record answers: counts that are whole numbers, and each kind in words. */
+const keptOf = (v: unknown): v is NonNullable<Agent['kept']> => {
+  const k = v as Agent['kept'] | null | undefined;
+  return (
+    typeof k === 'object' &&
+    k !== null &&
+    count(k.accepted) &&
+    count(k.answered) &&
+    k.accepted <= k.answered &&
+    count(k.days) &&
+    Array.isArray(k.kinds) &&
+    k.kinds.every((x) => typeof x?.kind === 'string' && count(x.accepted) && count(x.answered) && x.accepted <= x.answered)
+  );
+};
+
 /** The client's `trust`, and nothing else of it, so a test hands in one function. */
 export type TrustClient = { trust: () => Promise<unknown> };
 
@@ -139,6 +156,8 @@ export async function readTrust(client: TrustClient): Promise<TrustStanding | nu
       connected: typeof a.connected === 'string' ? a.connected : null,
       asking: a.asking && typeof a.asking.from === 'string' ? { from: a.asking.from, at: String(a.asking.at ?? '') } : null,
       kinds: a.kinds.map((k) => ({ kind: k.kind, rung: k.rung, since: k.since, lifted: k.lifted === true, dropped: k.dropped && typeof k.dropped.at === 'string' ? { at: k.dropped.at, why: typeof k.dropped.why === 'string' ? k.dropped.why : null } : null })),
+      /* THE ACCEPTED-UNCHANGED SHARE, carried only where the record said one: a host a release behind says none. */
+      ...(keptOf(a.kept) ? { kept: a.kept } : {}),
     })),
   };
 }

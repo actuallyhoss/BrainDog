@@ -107,13 +107,28 @@ const UNDO_WINDOW_MS = 5_000;
 
 /** Where one agent stands on one kind, as a person reads it: the kind in words, never its key. */
 export type StandingKind = { kind: string; rung: Rung; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null };
+/**
+ * THE ONE NUMBER THE AGENT SIDE IS JUDGED BY ("the share of suggestions accepted unchanged, by kind of change"), over the
+ * last `KEPT_SHARE_DAYS`: of the questions it filed that the owner answered, how many he took as filed. A no, a part
+ * taken, or a yes undone after is answered and not unchanged. `share` is `accepted` over `answered`, `null` with none
+ * answered. By kind too, each kind in words, dearest of a question's kinds first.
+ */
+export type KeptShare = { accepted: number; answered: number; share: number | null };
+export type AgentKept = KeptShare & { days: number; kinds: (KeptShare & { kind: string })[] };
 /** Where every agent stands: each by its name, never a grant's id. */
 /**
  * `agent` is said once in an answer: a second grant under a name already said carries a number after it, in the order
  * the two were connected. `connected` is when the grant was made, and `null` for Slash, which no grant connects.
  * `asking` is what outside text the agent read, said in words, and when, while that keeps every change of its asking.
  */
-export type Standing = { agents: { agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: StandingKind[] }[] };
+export type Standing = {
+  agents: { agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: StandingKind[]; kept?: AgentKept }[];
+};
+
+/** How far back the accepted-unchanged share reads. */
+export const KEPT_SHARE_DAYS = 90;
+/** The most questions one reading of the share reads, newest first. */
+const KEPT_SHARE_READ = 5000;
 
 /**
  * One import made into the record: the run it wrote as, said as a person reads a run (`S12`), when it first
@@ -131,7 +146,55 @@ const lower = (a: Rung, b: Rung): Rung => (ORDER.indexOf(a) <= ORDER.indexOf(b) 
 type Listed = { id: string; agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: (StandingKind & { key: string; held: Rung })[] };
 
 /** One agent as a person reads it, with the grant and the keys set aside. */
-const plain = (a: Listed): Standing['agents'][number] => ({ agent: a.agent, connected: a.connected, asking: a.asking, kinds: a.kinds.map(({ key: _key, held: _held, ...k }) => k) });
+const plain = (a: Listed, kept?: AgentKept): Standing['agents'][number] => ({
+  agent: a.agent,
+  connected: a.connected,
+  asking: a.asking,
+  kinds: a.kinds.map(({ key: _key, held: _held, ...k }) => k),
+  ...(kept === undefined ? {} : { kept }),
+});
+
+/** A share out of its two counts. */
+const shareOf = (accepted: number, answered: number): KeptShare => ({ accepted, answered, share: answered === 0 ? null : accepted / answered });
+
+/**
+ * One kind of change as the rest of a sentence, from the key a question was stamped with: a list's kinds as
+ * `kindWords` says them, and the four a proposal has that a write does not in words of their own.
+ */
+export function stampWords(key: string, listName: (id: string) => string): string {
+  if (key === 'call') return 'choose between options';
+  if (key === 'addons') return 'change add-ons and settings';
+  if (key === 'automation') return 'set up what runs on its own';
+  if (key.startsWith('shape:')) return `change the fields of ${listName(key.slice('shape:'.length)).toLowerCase()}`;
+  const cut = key.indexOf(':');
+  if (cut <= 0) return key.replace(/[_-]+/gu, ' ');
+  return kindWords({ key, list: key.slice(0, cut), verb: key.slice(cut + 1), floor: null }, listName);
+}
+
+/** The words a question is closed with as a no, beside a decision whose answer is `reject`. */
+const SAID_NO: ReadonlySet<string> = new Set(['wont-fix', 'incorrect']);
+
+/** One question as the share reads it: who filed it, its stamp, and how it was answered. */
+type Answered = { by: string; kind: string; status: string; resolved_as: string | null; answer: string | null; in_part: number; undone: number };
+
+/** A question's lines in the log, by its target, and the `decide` line before one of its `resolve` lines. */
+const ON_Q = "'suggestion:' || s.id";
+const DECIDED_Q = `FROM event r JOIN event d ON d.rowid = r.rowid - 1
+  WHERE r.target = ${ON_Q} AND r.kind = 'resolve' AND d.kind = 'decide' AND d.target LIKE 'decision:%' AND json_valid(d.to_v)`;
+
+/**
+ * Whether the owner took a question as filed (`true`), answered it some other way (`false`), or has not answered it
+ * (`null`), read as the engine's readings read Slash's (`engine-readings.ts`, `endingOf`): an undo and a part taken
+ * are answers that changed it, `addressed` is a yes unless its decision said `reject`, and a withdrawn, moot or lapsed
+ * question was never answered.
+ */
+function takenAsFiled(q: Answered): boolean | null {
+  if (Number(q.undone) === 1 || q.resolved_as === 'undone') return false;
+  if (Number(q.in_part) === 1) return false;
+  if (q.status !== 'resolved') return null;
+  if (q.resolved_as === 'addressed') return q.answer !== 'reject';
+  return q.resolved_as !== null && SAID_NO.has(q.resolved_as) ? false : null;
+}
 
 /** What the ladder needs of the record. */
 export type LadderDeps = { sql: Sql; kernel: Kernel; now: () => number };
@@ -633,9 +696,64 @@ export function ladder(deps: LadderDeps) {
    * `why` IS WHAT `drop` WAS TOLD, and for an undo, which tells it nothing, the undo found in `undone` at that moment.
    * A drop from before the reason was kept answers `null`.
    */
-  const standing = (validFrom?: string): Standing => ({
-    agents: listed(validFrom).map(plain),
-  });
+  const standing = (validFrom?: string): Standing => {
+    const shares = keptShares();
+    return { agents: listed(validFrom).map((a) => plain(a, shares.get(a.id))) };
+  };
+
+  /**
+   * The accepted-unchanged share of every agent that filed a question the owner answered in the last
+   * `KEPT_SHARE_DAYS`, by its grant (or Slash), read from what each question was stamped with when it was filed
+   * (`suggestion.kind`) and how it was answered. A question filed before the stamp, or by a person or a rule, counts
+   * for nobody. READ-ONLY and bounded, newest first.
+   */
+  const keptShares = (): Map<string, AgentKept> => {
+    const since = iso(deps.now() - KEPT_SHARE_DAYS * 86_400_000);
+    const rows = sql.all<Answered>(
+      `SELECT s.opened_by AS by, s.kind AS kind, s.status AS status, s.resolved_as AS resolved_as,
+         (SELECT json_extract(d.to_v, '$.answer') ${DECIDED_Q} ORDER BY r.rowid DESC LIMIT 1) AS answer,
+         (EXISTS (SELECT 1 ${DECIDED_Q} AND json_type(d.to_v, '$.rows') IS NOT NULL)
+           OR EXISTS (SELECT 1 FROM event n WHERE n.target = ${ON_Q} AND n.kind = 'note' AND n.to_v LIKE 'taken:%')) AS in_part,
+         EXISTS (SELECT 1 FROM event u WHERE u.target = ${ON_Q} AND u.actor <> 'system'
+           AND ((u.kind = 'suggest' AND u.to_v IN ('reopened', '"reopened"')) OR (u.kind = 'resolve' AND u.to_v IN ('undone', '"undone"')))) AS undone
+       FROM suggestion s
+       WHERE s.kind IS NOT NULL AND s.opened_at >= ? AND s.opened_by NOT LIKE 'p\\_%' ESCAPE '\\'
+       ORDER BY s.opened_at DESC, s.rowid DESC LIMIT ?`,
+      since,
+      KEPT_SHARE_READ,
+    );
+    const listName = (id: string): string => kernel.register(id)?.name ?? id;
+    const agentOf = new Map<string, string | null>();
+    const tally = new Map<string, { accepted: number; answered: number; kinds: Map<string, { accepted: number; answered: number }> }>();
+    for (const q of rows) {
+      const took = takenAsFiled(q);
+      if (took === null) continue;
+      if (!agentOf.has(q.by)) agentOf.set(q.by, agentOfActor(q.by));
+      const agent = agentOf.get(q.by);
+      if (agent === null || agent === undefined) continue;
+      const key = keysOfStamp(q.kind)[0];
+      if (key === undefined) continue;
+      let t = tally.get(agent);
+      if (!t) tally.set(agent, (t = { accepted: 0, answered: 0, kinds: new Map() }));
+      const words = stampWords(key, listName);
+      let k = t.kinds.get(words);
+      if (!k) t.kinds.set(words, (k = { accepted: 0, answered: 0 }));
+      t.answered += 1;
+      k.answered += 1;
+      if (took) {
+        t.accepted += 1;
+        k.accepted += 1;
+      }
+    }
+    const out = new Map<string, AgentKept>();
+    for (const [agent, t] of tally)
+      out.set(agent, {
+        ...shareOf(t.accepted, t.answered),
+        days: KEPT_SHARE_DAYS,
+        kinds: [...t.kinds].map(([kind, k]) => ({ kind, ...shareOf(k.accepted, k.answered) })).sort((a, b) => b.answered - a.answered || (a.kind < b.kind ? -1 : 1)),
+      });
+    return out;
+  };
 
   /** `standing` with what a person never reads kept beside it: each agent's grant (or Slash) and each kind's key. */
   const listed = (validFrom?: string): Listed[] => {
