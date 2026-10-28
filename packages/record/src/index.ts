@@ -7338,6 +7338,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const openHeld = new Map<string, Held<ReturnType<Kernel['openSuggestions']>>>();
   const openNow = (): ReturnType<Kernel['openSuggestions']> => quietFor(openHeld, '', () => kernel.openSuggestions());
+  /** And every question still open, agents' shelf with Needs you, for a reader that is not a count of what waits on him. */
+  const everyHeld = new Map<string, Held<ReturnType<Kernel['openSuggestions']>>>();
+  const everyOpenNow = (): ReturnType<Kernel['openSuggestions']> => quietFor(everyHeld, '', () => kernel.openSuggestions({ apart: 'with' }));
   const waitHeld = new Map<string, Held<ReturnType<Kernel['governance']>>>();
   /** What the queue holds back and what it weighs (`costRows`), held as the questions are. */
   const costHeld = new Map<string, Held<ReturnType<typeof costRows>>>();
@@ -10100,7 +10103,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -13140,6 +13143,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(args?.limit === undefined ? {} : { limit: Number(args.limit) }),
         ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}),
         ...(args?.review === 'only' ? { review: 'only' as const } : {}),
+        /* EVERY QUESTION STILL OPEN, agents' shelf with Needs you: a caller looking one up finds it wherever it waits. */
+        apart: 'with' as const,
         ...after,
       });
       if (!rows.ok) return rows;
@@ -13158,7 +13163,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND THE PAGE IS FILLED FROM WHAT IS LEFT. Trimmed to the limit and then filtered, a token
          scoped to one register was handed an empty page whenever the newest fifty were about
          another, with its own questions still open behind them. */
-      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}), ...(args?.review === 'only' ? { review: 'only' as const } : {}), every: true, ...after });
+      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}), ...(args?.review === 'only' ? { review: 'only' as const } : {}), apart: 'with' as const, every: true, ...after });
       if (!every.ok) return every;
       /* AND ONLY THE PAGE IS NAMED (W1-D): each row handed out is named and given its card's facts (`out`), and this
          named every open question on the record to hand back the first page of them. */

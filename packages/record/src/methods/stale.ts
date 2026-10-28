@@ -175,8 +175,9 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
   }
 
   /* THE QUESTIONS THAT WAITED, each held to what the caller is shown (`sightOf`) and called by the name they are handed.
-     One put off to a day still ahead is not open, so it is not here (`openSuggestions`). */
-  const open = deps.openSuggestions?.() ?? kernel.openSuggestions();
+     One put off to a day still ahead is not open, so it is not here (`openSuggestions`). One on agents' shelf is still
+     open, and still the agent's to take back, so it is. */
+  const open = deps.everyOpen?.() ?? kernel.openSuggestions({ apart: 'with' });
   const shown = (open.ok ? open.value : []).flatMap((q) => {
     const id = String(q.id ?? '');
     const at = Date.parse(String(q.opened_at ?? ''));

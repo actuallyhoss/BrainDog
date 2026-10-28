@@ -443,7 +443,7 @@ export function methods(deps: RecordDeps) {
       /* THE NEWEST QUESTION EACH RUN ASKED THAT STILL WAITS, by the run that signed it (`opened_by`, its spoken name), said
          only to a caller who reads the record whole, as the questions themselves are. */
       const asked = new Map<string, string>();
-      const open = whole(ctx) ? kernel.openSuggestions() : null;
+      const open = whole(ctx) ? (deps.everyOpen?.() ?? kernel.openSuggestions({ apart: 'with' })) : null;
       if (open?.ok)
         for (const s of [...open.value].sort((a, b) => String(a.opened_at ?? '').localeCompare(String(b.opened_at ?? '')))) {
           const by = typeof s.opened_by === 'string' ? s.opened_by : '';

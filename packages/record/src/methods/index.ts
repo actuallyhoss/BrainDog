@@ -204,6 +204,8 @@ export type RecordDeps = {
   withheld?: ((ctx: CallContext, slug: string) => boolean) | undefined;
   /** The open questions held for the record's version (`openNow` in `index.ts`), so a briefing weighs the queue once. */
   openSuggestions?: (() => ReturnType<Kernel['openSuggestions']>) | undefined;
+  /** Every question still open, agents' shelf with Needs you (`everyOpenNow` in `index.ts`), held as those are. */
+  everyOpen?: (() => ReturnType<Kernel['openSuggestions']>) | undefined;
   /**
    * What one of those open questions is called to this caller, `sightOf`'s answer read off the row already in hand (`holds`
    * and `nameOf` in `index.ts`), so a queue is not read again a question at a time. Absent, `sightOf` reads it.

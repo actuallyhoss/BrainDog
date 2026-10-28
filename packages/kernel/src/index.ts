@@ -11335,8 +11335,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** How many rows a governance register holds, all of them. */
     governanceCount: (register: GovernRegister) => countGovernance(sql, register),
 
-    /** Every open suggestion, uncapped, for a count or a list the record filters to its caller before it trims. */
-    openSuggestions: () => listGovernance({ sql, nowMs: clock.now() }, 'suggestion', { status: 'open', every: true }),
+    /**
+     * Every open suggestion, uncapped, for a count or a list the record filters to its caller before it trims. Agents'
+     * suggestions on their shelf are left out, as they are out of Needs you; `apart: 'with'` reads them too, for a
+     * reader that means every question still open (who asked what, what an agent may take back).
+     */
+    openSuggestions: (opts: { apart?: 'with' } = {}) => listGovernance({ sql, nowMs: clock.now() }, 'suggestion', { status: 'open', every: true, ...opts }),
 
     /** One governance row, or `null` — a missing one is a value, not a refusal. */
     governanceRow: (register: GovernRegister, id: string) => getGovernance(sql, register, id),
