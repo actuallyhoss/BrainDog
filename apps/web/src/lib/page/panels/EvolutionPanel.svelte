@@ -98,8 +98,9 @@
     end: 0,
   });
 
-  const learningHref = (seq: number | null): string | null => (seq === null || lists === null ? null : at(`/r/${lists.learnings}/${seq}`));
-  const skillHref = (seq: number | null): string | null => (seq === null || !lists?.skills ? null : at(`/r/${lists.skills}/${seq}`));
+  /* THE ROW'S PATH IN THE APP, which the link renders through `at()`. */
+  const learningPath = (seq: number | null): string | null => (seq === null || lists === null ? null : `/r/${lists.learnings}/${seq}`);
+  const skillPath = (seq: number | null): string | null => (seq === null || !lists?.skills ? null : `/r/${lists.skills}/${seq}`);
 </script>
 
 {#if !read || refused}
@@ -122,7 +123,7 @@
                   {#if e.mark}<span class="evo-mark" data-faded={e.faded ? '' : undefined}>{e.mark}</span>{/if}
                 </p>
                 <p class="evo-title" dir="auto">
-                  {#if learningHref(e.seq)}<a href={learningHref(e.seq)}>{e.lesson}</a>{:else}{e.lesson}{/if}
+                  {#if learningPath(e.seq)}<a href={at(learningPath(e.seq) ?? '')}>{e.lesson}</a>{:else}{e.lesson}{/if}
                 </p>
                 {#if e.because}
                   <p class="evo-because" dir="auto"><span class="evo-label">{words.because}:</span> {e.because}</p>
@@ -136,14 +137,14 @@
               {:else if e.kind === 'faded'}
                 <p class="evo-what"><span class="evo-mark" data-faded="">{words.faded}</span></p>
                 <p class="evo-title evo-title-faded" dir="auto">
-                  {#if learningHref(e.seq)}<a href={learningHref(e.seq)}>{e.lesson}</a>{:else}{e.lesson}{/if}
+                  {#if learningPath(e.seq)}<a href={at(learningPath(e.seq) ?? '')}>{e.lesson}</a>{:else}{e.lesson}{/if}
                 </p>
                 <p class="evo-because">{words.fadedLine}</p>
               {:else}
                 {@const plan = diffPlan(diffRows(e.before, e.after))}
                 <p class="evo-what"><span class="evo-tag">{words.changed}</span><span class="evo-sub">{words.version(e.from, e.to)}</span></p>
                 <p class="evo-title" dir="auto">
-                  {#if skillHref(e.seq)}<a href={skillHref(e.seq)}>{e.skill}</a>{:else}{e.skill}{/if}
+                  {#if skillPath(e.seq)}<a href={at(skillPath(e.seq) ?? '')}>{e.skill}</a>{:else}{e.skill}{/if}
                 </p>
                 <details class="evo-diff">
                   <summary>{words.showText} <span class="evo-sub">{plan.summary}</span></summary>
