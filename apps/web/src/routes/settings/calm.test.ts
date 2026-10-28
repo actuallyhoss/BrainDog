@@ -24,13 +24,13 @@ test('Navigation says where its choices are kept once, and no footer under it sa
 
 test('the two sentences about where a look is kept agree with the code, which keeps it in the record', () => {
   /* THE CODE: every look setting is sent to the record under a `look.*` key, and `whereKept` answers `record` once the
-     record has it. So "on every device you open it on" is the true one, and no line may say "this device" under it. */
+     record has it. So "on all your devices" is the true one, and no line may say "this device" under it. */
   const pref = strip(readFileSync(new URL('../../lib/pref.ts', import.meta.url), 'utf8'));
   for (const key of ['scheme', 'text', 'density', 'contrast', 'theme']) assert.match(pref, new RegExp(`${key}: 'look\\.`, 'u'), `${key} is not a key the record keeps`);
   assert.match(pref, /!follows\(\) \? 'device' : Object\.keys\(unsent\(\)\)\.length > 0 \? 'pending' : 'record'/u);
   const look = area('Appearance');
   assert.match(look, /kept === 'record' \? words\.hint\(props\.shell\.index\.name\) : kept === 'pending' \? words\.hintPending : words\.hintDevice/u);
-  assert.match(look, /on every device you open it on\./u);
+  assert.match(look, /on all your devices\./u);
   /* NO FOOTER UNDER APPEARANCE SAYS OTHERWISE. Keyboard's switch is a cookie and is sent nowhere, so it keeps the line. */
   assert.doesNotMatch(/const KEEPS = new Set\(\[([^\]]*)\]\)/u.exec(page)?.[1] ?? "'appearance'", /appearance/u);
   assert.match(area('Keyboard'), /pref\.write\(\{ chars \}\)/u);

@@ -61,8 +61,8 @@
   const words = {
     looks: 'How it looks',
     /* PER RECORD, by the record's name: the look is kept in each record a person opens, not once for the whole account. */
-    hint: (record: string) => (record ? `Yours in ${record}, on every device you open it on.` : 'Yours in this record, on every device you open it on.'),
-    hintPending: 'On this device for now. It reaches this record the next time it can.',
+    hint: (record: string) => (record ? `Kept in ${record}, on all your devices.` : 'Kept in this record, on all your devices.'),
+    hintPending: 'On this device until the record hears of it.',
     hintDevice: 'Kept on this device.',
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
     /* THE REAL COUNT, the one the badge says, so the preview never contradicts the bar beside it. */
