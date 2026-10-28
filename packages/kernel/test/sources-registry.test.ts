@@ -25,6 +25,9 @@
  *
  * `scripts` TAKEN AGAIN: it answers each field's type, as every other computed source does, so a script's last run is
  * drawn as how long ago. Nothing else moved.
+ *
+ * `governance.apart` ADDED with agents' shelf beside Needs you: the seeded record's one question is a call between
+ * options, which stays in Needs you, so the shelf answers none. Nothing else moved.
  */
 
 import { test } from 'node:test';
@@ -111,6 +114,7 @@ const BLOCKS: Record<string, PageBlock> = {
   [ACTIONS_BLOCKING]: { kind: 'table', source: ACTIONS_BLOCKING, about: 'things#1' },
   'governance.open': { kind: 'queue', source: 'governance.open' },
   'governance.later': { kind: 'queue', source: 'governance.later' },
+  'governance.apart': { kind: 'queue', source: 'governance.apart' },
   'governance.decided': { kind: 'table', source: 'governance.decided' },
   runs_on: { kind: 'table', source: 'runs_on', about: 'things#1' },
   deadlines: { kind: 'table', source: 'deadlines', horizon: 30 },
@@ -209,7 +213,7 @@ test('THE REGISTRY IS REACHED WITH NO FLAG: a source registered is read, and a w
 });
 
 /** The names that belong to no list, written out as the set they were in `pages.ts`. */
-const WHOLE = ['actions', ACTIONS_BLOCKING, 'activity', 'exceptions', 'governance.decided', 'governance.later', 'governance.open', 'kpis', 'scripts', 'signs', 'usage.actions', 'usage.days', 'usage.projects'];
+const WHOLE = ['actions', ACTIONS_BLOCKING, 'activity', 'exceptions', 'governance.apart', 'governance.decided', 'governance.later', 'governance.open', 'kpis', 'scripts', 'signs', 'usage.actions', 'usage.days', 'usage.projects'];
 
 test('A SOURCE THAT BELONGS TO NO LIST SAYS SO, and a block over it is named as a read of the whole record', () => {
   assert.deepEqual(NAMES.filter((name) => sourceModule(name)?.whole === true), [...WHOLE].sort());
@@ -239,6 +243,7 @@ function snapshot(): Record<string, string> {
     "actions.blocking": "{\"kind\":\"table\",\"source\":\"actions.blocking\",\"about\":\"things#1\",\"rows\":[],\"matched\":0,\"refusals\":[],\"types\":{\"name\":\"text\",\"why\":\"enum\",\"since\":\"instant\",\"status\":\"int\",\"said\":\"text\"},\"key\":\"k124xath\"}",
     "governance.open": "{\"kind\":\"queue\",\"source\":\"governance.open\",\"rows\":[],\"matched\":1,\"refusals\":[],\"queue\":[{\"id\":\"SG1\",\"who\":\"slash\",\"at\":\"2026-09-15T12:00:00.000Z\",\"kind\":\"options\",\"question\":\"Fire on Friday?\",\"why\":\"\",\"cost\":\"call\",\"options\":[{\"key\":\"yes\",\"label\":\"Yes\",\"because\":\"The bowls are dry.\",\"recommended\":false},{\"key\":\"no\",\"label\":\"No\",\"because\":\"The kiln is booked.\",\"recommended\":false}],\"about\":\"things#1\",\"waits\":\"new\",\"kinds\":[\"call\"],\"list\":\"things\"}],\"waiting\":{\"stale\":0,\"hardToUndo\":0},\"key\":\"k0poi5qa\"}",
     "governance.later": "{\"kind\":\"queue\",\"source\":\"governance.later\",\"rows\":[],\"matched\":0,\"refusals\":[],\"queue\":[],\"key\":\"k0k0lp8a\"}",
+    "governance.apart": "{\"kind\":\"queue\",\"source\":\"governance.apart\",\"rows\":[],\"matched\":0,\"refusals\":[],\"queue\":[],\"key\":\"k1qvt4ei\"}",
     "governance.decided": "{\"kind\":\"table\",\"source\":\"governance.decided\",\"rows\":[],\"matched\":0,\"refusals\":[],\"key\":\"k1h7gcp3\"}",
     "runs_on": "{\"kind\":\"table\",\"source\":\"runs_on\",\"about\":\"things#1\",\"rows\":[{\"id\":\"<id 1>\",\"register\":\"credentials\",\"seq\":1,\"fields\":{\"kind\":\"key\",\"name\":\"Kiln deploy key\",\"scope\":\"project\",\"state\":null,\"detail\":null,\"used_by\":null,\"used_agent\":null,\"used_at\":null,\"used_runs\":0,\"used_agents\":null,\"spoken\":\"credentials#1\",\"quiet\":null,\"runs\":null,\"requests\":null,\"bytes\":null,\"failures\":null,\"held\":null},\"state\":null,\"version\":1,\"created_at\":\"2026-09-15T12:00:00.000Z\",\"updated_at\":\"2026-09-15T12:00:00.000Z\",\"deleted_at\":null},{\"id\":\"action:balance\",\"register\":\"actions\",\"seq\":null,\"fields\":{\"kind\":\"action\",\"name\":\"balance\",\"scope\":\"global\",\"state\":\"pending\",\"detail\":\"2026-09-15T12:00:00.000Z\",\"used_by\":null,\"used_agent\":null,\"used_at\":null,\"used_runs\":0,\"used_agents\":null,\"spoken\":\"balance\",\"quiet\":\"global\",\"runs\":0,\"requests\":0,\"bytes\":0,\"failures\":0,\"held\":0},\"state\":\"pending\",\"version\":1,\"created_at\":\"\",\"updated_at\":\"\",\"deleted_at\":null}],\"matched\":2,\"refusals\":[],\"inherited\":1,\"types\":{\"kind\":\"enum\",\"name\":\"text\",\"scope\":\"enum\",\"state\":\"text\",\"detail\":\"text\",\"used_by\":\"run\",\"used_agent\":\"text\",\"used_at\":\"instant\",\"used_runs\":\"int\",\"used_agents\":\"text\",\"spoken\":\"text\",\"quiet\":\"text\",\"runs\":\"int\",\"requests\":\"int\",\"bytes\":\"int\",\"failures\":\"int\",\"held\":\"int\"},\"scopes\":[\"Kiln\",null],\"scope_marks\":[{\"mark\":null,\"hue\":null},null],\"key\":\"k0vc91av\"}",
     "deadlines": "{\"kind\":\"table\",\"source\":\"deadlines\",\"horizon\":30,\"rows\":[{\"id\":\"<id 1>:due\",\"register\":\"deadlines\",\"seq\":null,\"fields\":{\"list\":\"tasks\",\"row\":\"tasks#2\",\"title\":\"Order clay\",\"day\":\"2026-09-10\",\"amount\":null,\"direction\":null},\"state\":null,\"version\":1,\"created_at\":\"2026-09-15T12:00:00.000Z\",\"updated_at\":\"2026-09-15T12:00:00.000Z\",\"deleted_at\":null},{\"id\":\"<id 2>:due\",\"register\":\"deadlines\",\"seq\":null,\"fields\":{\"list\":\"tasks\",\"row\":\"tasks#1\",\"title\":\"Fire the bowls\",\"day\":\"2026-09-18\",\"amount\":null,\"direction\":null},\"state\":null,\"version\":1,\"created_at\":\"2026-09-15T12:00:00.000Z\",\"updated_at\":\"2026-09-15T12:00:00.000Z\",\"deleted_at\":null},{\"id\":\"<id 3>:due\",\"register\":\"deadlines\",\"seq\":null,\"fields\":{\"list\":\"bills\",\"row\":\"bills#2\",\"title\":\"Glaze\",\"day\":\"2026-09-20\",\"amount\":{\"amount\":350000,\"currency\":\"EGP\"},\"direction\":null},\"state\":null,\"version\":1,\"created_at\":\"2026-09-15T12:00:00.000Z\",\"updated_at\":\"2026-09-15T12:00:00.000Z\",\"deleted_at\":null},{\"id\":\"<id 4>:due\",\"register\":\"deadlines\",\"seq\":null,\"fields\":{\"list\":\"bills\",\"row\":\"bills#1\",\"title\":\"Rent\",\"day\":\"2026-09-25\",\"amount\":{\"amount\":2000000,\"currency\":\"EGP\"},\"direction\":null},\"state\":null,\"version\":1,\"created_at\":\"2026-09-15T12:00:00.000Z\",\"updated_at\":\"2026-09-15T12:00:00.000Z\",\"deleted_at\":null}],\"matched\":4,\"refusals\":[],\"key\":\"k00erjwi\"}",
