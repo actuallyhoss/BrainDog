@@ -680,7 +680,8 @@
     },
     "one-clock.ALLOWED": {
       "lines": [
-        { "count": 5, "on": "2026-10-09", "why": "Files that still work out a run's state from last_seen and the clock, each still to move onto presence.ts." }
+        { "count": 5, "on": "2026-10-09", "why": "Files that still work out a run's state from last_seen and the clock, each still to move onto presence.ts." },
+        { "count": 4, "on": "2026-10-28", "why": "The sweep in schedule.ts now counts a run's pulse through presence.ts, so it is off the list." }
       ]
     },
     "audit-append-only.ALLOWED": {
