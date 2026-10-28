@@ -94,9 +94,10 @@ test('THE FOUR STATE SITES AND THE VIEW TITLE SAY A VALUE THROUGH `saidInLine`, 
   /* THE TEST ABOVE ONLY REFUSES ONE WRONG SPELLING. With the bulk menu's item put back as a bare `{state}`, or the row
      menu asking `saidInLine('', state)`, which finds no field and so no label, the four tests this file first held still passed; both
      were measured by mutation. So the sites are counted: the row's move and its toast, the bulk move and its toast,
-     the two menus, and the saved view's title. */
+     the two menus, and the saved view's title. AND THE SELECTION'S MENU where it is right-clicked, which sets the state
+     of every picked row as the bar's own menu does. */
   const count = (s: string) => PAGE.split(s).length - 1;
-  assert.equal(count("saidInLine(decl?.state ?? '', state)"), 4, 'a state menu or a move sentence no longer reads the state field');
+  assert.equal(count("saidInLine(decl?.state ?? '', state)"), 5, 'a state menu or a move sentence no longer reads the state field');
   /* The saved view's title, and the rectangle each filter that is on is drawn as (money F7). */
   assert.equal(count('saidInLine(f.field, v)'), 2, "a saved view's title or a filter's rectangle no longer reads the filtered field's labels");
 });
