@@ -62,6 +62,7 @@
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
   import type { Row } from 'braindog-render';
+  import { refOfHref } from '$lib/send/send.ts';
   import AddStep from './AddStep.svelte';
   import Hole from './Hole.svelte';
   import { foldOf } from './home.ts';
@@ -729,6 +730,22 @@
      other, so by place they would read as arrived on every unfold. */
   const several = $derived(drawing.filter((item) => item.kind === 'segment' && item.segment.type === 'block').length > 1);
   const runAt = (run: number): boolean | number => (several ? (grouped ? true : run) : false);
+
+  /**
+   * A TABLE ROW'S MENU WHERE IT IS RIGHT-CLICKED OR HELD: the page's row menu for the record row it opens, which the
+   * row's own address names (a row read across lists opens the row it stands for). `false` for a row that opens none.
+   */
+  const tableMenu =
+    (rows: readonly { key: string; href?: string | null | undefined }[]) =>
+    (key: string, point: { x: number; y: number; height: number }): boolean => {
+      const href = rows.find((r) => r.key === key)?.href;
+      const ref = href ? refOfHref(href) : null;
+      if (!ref || !verbs) return false;
+      const at = ref.indexOf('#');
+      /* The menu reads the row by its list and number; what it writes reads the version the page holds. */
+      const row: Row = { cells: [], ref: { register: ref.slice(0, at), seq: Number(ref.slice(at + 1)), version: 0 } };
+      return verbs.onmenu(row, document.body, point);
+    };
 </script>
 
 {#if block.heading}
@@ -832,7 +849,7 @@
 {:else if block.kind === 'table' && !block.answer}
   <!-- THE ROWS THAT ARRIVED SINCE IT WAS LAST DRAWN ARE MARKED, as a list's are, where the page can write. -->
   {@const all = writes ? writes.arrivedTable(i, block.rows, block) : block.rows}
-  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} />
+  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} />
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->

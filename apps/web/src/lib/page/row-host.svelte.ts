@@ -81,7 +81,8 @@ export class RowHost {
   /** Whether the panel holds words typed and not saved, which the cursor moving must not throw away. */
   dirty = $state(false);
   /** The row whose menu is open, which of the menu's steps it shows, and where the row was when it opened. */
-  menu = $state<{ row: RowAt; mode: MenuMode; at: { x: number; y: number; height: number } } | null>(null);
+  /** `far` is the title of a row this page drew from another list, which it holds no copy of: its menu is the short one. */
+  menu = $state<{ row: RowAt; mode: MenuMode; at: { x: number; y: number; height: number }; far?: string | undefined } | null>(null);
   menuOpen = $state(false);
   /** Rows touched from this page, by key. */
   touched = $state.raw(new Map<string, Touch>());
@@ -431,13 +432,27 @@ export class RowHost {
   }
 
   /** Opens the row's menu at the element it was asked from: the row under the cursor, or the control pressed. */
-  openMenu(row: RowAt | null, from: HTMLElement | null, mode: MenuMode = 'row', point?: { x: number; y: number; height: number }) {
-    if (!row || !from || !this.entry(row) || !this.shapeOf(row.register)) return false;
+  openMenu(row: RowAt | null, from: HTMLElement | null, mode: MenuMode = 'row', point?: { x: number; y: number; height: number }, said?: string) {
+    if (!row || !from || !this.shapeOf(row.register)) return false;
+    const far = this.entry(row) ? undefined : mode === 'row' ? (this.farTitle(row) ?? (said || null)) : null;
+    if (far === null) return false;
     const r = from.getBoundingClientRect();
     /* AT THE POINTER where a right-click or a held thumb opened it, and at the row's "…" otherwise. */
-    this.menu = { row, mode, at: point ? { x: point.x, y: point.y, height: point.height } : { x: r.left, y: r.top, height: r.height } };
+    this.menu = { row, mode, at: point ? { x: point.x, y: point.y, height: point.height } : { x: r.left, y: r.top, height: r.height }, far };
     this.menuOpen = true;
     return true;
+  }
+
+  /** The title of a row the page drew from another list (what falls due across lists), as read; null where none is. */
+  farTitle(row: RowAt): string | null {
+    const key = keyOf(row);
+    for (const b of this.#deps.blocks())
+      for (const e of b.entries) {
+        if (e.fields.row !== key) continue;
+        const t = e.fields.title;
+        return typeof t === 'string' && t !== '' ? t : key;
+      }
+    return null;
   }
 
   /** From one step of the menu to the next: the first closes on the press, and the next opens once it has. */

@@ -43,10 +43,27 @@
   import { roadmapToday } from '../src/roadmap.ts';
   import { barFigures } from '../src/format.ts';
   import Text from './Text.svelte';
+  import { pointed, type Point } from './menu-at.ts';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
+  let {
+    block,
+    opts = {},
+    onmenu,
+  }: {
+    block: Block;
+    opts?: RenderOptions;
+    /** A thing's menu where it is right-clicked or held, on a thing the record names (`ref`); the host says `false` when it has none. */
+    onmenu?: ((row: Row, anchor: HTMLElement, point?: Point) => unknown) | undefined;
+  } = $props();
 
   const said = (r: Row, i: number): string => text(inline(r.cells[i] ?? '', opts));
+  /* THE RECORD ROW A THING STANDS FOR: its own, or the one its title links to (a calendar reads across lists). */
+  const LINKED = /\]\(\/r\/([a-z][a-z0-9_]*)\/([1-9][0-9]*)\)/u;
+  const refOf = (r: Row): Row | null => {
+    if (r.ref) return r;
+    const m = LINKED.exec(r.cells[0] ?? '');
+    return m ? { ...r, ref: { register: m[1]!, seq: Number(m[2]), version: 0 } } : null;
+  };
   /* `day` is not yet a key of RenderOptions (`src/html.ts`), so it is read as one more the host may give. */
   const asked = getContext<(() => string | null) | undefined>(CALENDAR_DAY);
   const mark = $derived((opts as RenderOptions & { day?: string | null }).day ?? asked?.() ?? null);
@@ -81,7 +98,8 @@
 
 {#snippet item(r: Row)}
   {@const title = takeWorking(r.cells[0] || MISSING)}
-  <li class="calendar-item" data-intent={r.tone}
+  {@const named = refOf(r)}
+  <li class="calendar-item" data-intent={r.tone} data-menu-host={onmenu && named ? 'self' : undefined} {@attach onmenu && named && pointed((p) => onmenu(named, document.body, p))}
     ><span class="calendar-title"
       >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text
         nodes={inline(title.text ?? '', opts)}

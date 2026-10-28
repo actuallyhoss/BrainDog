@@ -26,6 +26,7 @@
   import { ROW_ACTIONS_HEAD, type OnAct } from '../../src/actions.ts';
   import { revealTop, windowOf, ROW_PX, ROWS_OVERSCAN } from '../../src/rows-window.ts';
   import Actions from '../Actions.svelte';
+  import { pointed, type Point } from '../menu-at.ts';
 
   /** `Table`'s own shape for a scope cell, written out here for the reason it is written out there. */
   type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
@@ -40,6 +41,7 @@
     focus = $bindable(),
     selected,
     menuHost,
+    onmenu,
     onactivate,
     onsort,
     onmore,
@@ -66,6 +68,8 @@
     selected?: Set<string> | undefined;
     /** A row's `data-menu-host`, so a right-click on it opens its "…" (or, by selector, another menu); absent, none. */
     menuHost?: ((key: string) => string) | undefined;
+    /** A row's menu where it is right-clicked or held (`Table`'s). */
+    onmenu?: ((key: string, point: Point) => unknown) | undefined;
     onactivate?: ((row: TableRow) => void) | undefined;
     onsort?: ((field: string) => void) | undefined;
     onmore?: (() => void) | undefined;
@@ -382,7 +386,8 @@
           role="row"
           aria-rowindex={n + 2}
           aria-selected={selected ? selected.has(row.key) : undefined}
-          data-menu-host={menuHost?.(row.key)}
+          data-menu-host={onmenu ? 'self' : menuHost?.(row.key)}
+          {@attach onmenu && pointed((p) => onmenu(row.key, p))}
           data-line={n}
           data-intent={row.tone}
           data-focused={focus?.row === index ? '' : undefined}

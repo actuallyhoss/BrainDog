@@ -9,10 +9,13 @@
 -->
 <script lang="ts">
   import { at as inApp } from '$lib/at.ts';
+  import { putLink } from '$lib/clipboard.ts';
+  import { copy } from '$lib/copy.ts';
   import { REGISTERS, refOptions } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import RowMenu from '$lib/ui/RowMenu.svelte';
+  import SendItem from '$lib/send/SendItem.svelte';
   import { dayIn, projectOf } from '$lib/work/board.ts';
   import type { RowHost } from './row-host.svelte.ts';
   import { daysFor, finished, keyOf, movesFor, titleOf, words, type RowAt } from './row-verbs.ts';
@@ -55,7 +58,7 @@
 <RowMenu
   bind:open={host.menuOpen}
   at={m?.at ?? null}
-  label={entry && shape ? words.menu(titleOf(entry, shape)) : words.more}
+  label={entry && shape ? words.menu(titleOf(entry, shape)) : m?.far ? words.menu(m.far) : words.more}
   onclose={closed}
   hand={m?.mode === 'row' && entry && mayWrite && REGISTERS[m.row.register]
     ? { register: m.row.register, row: entry, decl: REGISTERS[m.row.register]!, onhanded: () => void reread() }
@@ -64,6 +67,7 @@
   {#if m && entry && shape}
     {@const r = m.row}
     {#if m.mode === 'row'}
+      <SendItem kind={r.register} attach={[{ ref: `${r.register}#${r.seq}`, label: titleOf(entry, shape) }]} />
       <a class="mi" role="menuitem" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="external" size="s" /><span class="mi-name">{words.open}</span></a>
       {#if mayWrite}
         {#if shape.state && shape.tickTo}
@@ -107,6 +111,12 @@
         <button class="mi" role="menuitem" type="button" onclick={() => host.setProject(r, null, words.noProject)}><span class="mi-name">{words.unfile}</span></button>
       {/if}
     {/if}
+  {:else if m?.far}
+    <!-- A ROW THIS PAGE READ FROM ANOTHER LIST, with none of its own fields here: sending it, its page and its link. -->
+    {@const r = m.row}
+    <SendItem kind={r.register} attach={[{ ref: `${r.register}#${r.seq}`, label: m.far }]} />
+    <a class="mi" role="menuitem" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="external" size="s" /><span class="mi-name">{words.open}</span></a>
+    <button class="mi" role="menuitem" type="button" onclick={() => void putLink(r.register, r.seq)}><Icon name="link" size="s" /><span class="mi-name">{copy.copyLink}</span></button>
   {/if}
 </RowMenu>
 

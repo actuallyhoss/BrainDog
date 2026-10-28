@@ -162,6 +162,11 @@
      reach the same columns: it used to write its own and spelled the same track list differently,
      so the two renderers differed on every table in the product. */
   const comparison = $derived(comparisonPlan(block.rows));
+  /* A TABLE ROW'S MENU IS ITS RECORD ROW'S: the plan keys a row by its place under the header row. */
+  const tableMenu = (key: string, point: { x: number; y: number; height: number }): unknown => {
+    const row = block.rows[Number(key) + 1];
+    return row?.ref && onmenu ? onmenu(row, document.body, point) : false;
+  };
 </script>
 
 {#if !spec}
@@ -192,7 +197,7 @@
            `aria-rowcount` now; this was the one caller of six that added the header itself, and
            the other five did not, so five surfaces announced one row too few and this one was
            right by hand. -->
-      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} home={opts.home} now={opts.now} {rowActions} act={act ? tableAct : undefined} onmore={onmore ? () => onmore(block) : undefined} />
+      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} home={opts.home} now={opts.now} {rowActions} act={act ? tableAct : undefined} onmore={onmore ? () => onmore(block) : undefined} onmenu={onmenu ? tableMenu : undefined} />
     {/if}
   {:else if block.kind === 'inputs'}
     <!-- BY KIND, because the callback belongs to one kind on a primitive two others share: handed to `Rows`, a `spec`
@@ -206,7 +211,7 @@
          PRIMITIVES, for `inputs`' reason: each sits on a primitive other kinds share, and asking here keeps a
          primitive's component from learning a kind it has no callback for. A drawer that does not know one of these
          kinds falls back to its primitive, which is why each is on one. -->
-    <Calendar {block} {opts} />
+    <Calendar {block} {opts} {onmenu} />
   {:else if block.kind === 'lanes'}
     <Lanes {block} {opts} />
   {:else if block.kind === 'link'}

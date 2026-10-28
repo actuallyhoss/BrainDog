@@ -1137,7 +1137,9 @@
             const r = host.rowOf(row);
             if (!r) return false;
             rowKey = `${ids}b-${i + 1}|${r.register}#${r.seq}`;
-            return host.openMenu(r, anchor, 'row', point);
+            /* WHAT THE ROW IS CALLED AS DRAWN, for a row this page holds no copy of: its first words, a link taken to its words. */
+            const said = (row.cells.find((c) => c) ?? '').replace(/\[([^\]]*)\]\([^)]*\)/gu, '$1').trim();
+            return host.openMenu(r, anchor, 'row', point, said);
           },
         }
       : null;

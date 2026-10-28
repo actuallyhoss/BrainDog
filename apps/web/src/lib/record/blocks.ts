@@ -1523,7 +1523,12 @@ function withRefs(segments: ReturnType<typeof parse>, register: string, entries:
   if (!only || only.rows.length !== leading + entries.length + trailing) return segments;
   only.rows.slice(leading, leading + entries.length).forEach((row, i) => {
     const entry = entries[i];
-    if (entry && entry.seq > 0) row.ref = { register, seq: entry.seq, version: entry.version };
+    if (entry && entry.seq !== null && entry.seq > 0) row.ref = { register, seq: entry.seq, version: entry.version };
+    else if (entry) {
+      /* A ROW READ ACROSS LISTS (what falls due in every list) names the row it stands for in its `row` field. */
+      const far = typeof entry.fields.row === 'string' ? /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u.exec(entry.fields.row) : null;
+      if (far) row.ref = { register: far[1]!, seq: Number(far[2]), version: entry.version };
+    }
   });
   return segments;
 }
