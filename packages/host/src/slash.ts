@@ -473,6 +473,27 @@ const usageIn = (text: string): { in: number; out: number } | undefined => {
  * timeout, is a `SlashAnsweredError`, carrying `model`, the name the body was sent with.
  */
 const post = async (url: URL, options: EndpointModelOptions, body: unknown, model?: string, most = ANSWER_BYTES): Promise<string> => {
+  const { res, signal, timedOut } = await opened(url, options, body, model);
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    throw signal.aborted ? timedOut() : new SlashAnsweredError('The Slash endpoint broke off its answer.', undefined, model);
+  }
+  if (text.length > most) throw new SlashAnsweredError('The Slash endpoint answered more than Slash reads.', usageIn(text), model);
+  return text;
+};
+
+/**
+ * The request `post` sends, up to an `ok` status: the key, the clock and every status rule are `post`'s, and the body is
+ * left for the caller to read, whole (`post`) or as it streams (`streamed`).
+ */
+const opened = async (
+  url: URL,
+  options: EndpointModelOptions,
+  body: unknown,
+  model?: string,
+): Promise<{ res: Response; signal: AbortSignal; timedOut: () => SlashAnsweredError }> => {
   const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
   const key = options.key ? await options.key() : null;
   /* THE KEY IN THE ONE HEADER ITS PROVIDER READS, and in no other place. */
@@ -509,14 +530,98 @@ const post = async (url: URL, options: EndpointModelOptions, body: unknown, mode
     if (retried(res.status)) throw new Error(`The Slash endpoint answered ${res.status}.`);
     throw new SlashRefusedError(res.status, key ? (options.keyName ?? 'the key it was sent') : null);
   }
-  let text: string;
-  try {
-    text = await res.text();
-  } catch {
-    throw signal.aborted ? timedOut() : new SlashAnsweredError('The Slash endpoint broke off its answer.', undefined, model);
+  return { res, signal, timedOut };
+};
+
+/**
+ * A chat-completions answer read as it streams (`stream: true`): each piece of the message handed to `onText` as it
+ * lands, and at the end the whole text and the endpoint's counts.
+ *
+ * THE COUNTS ARE THE STREAM'S LAST: `stream_options.include_usage` asks for a last chunk carrying them, which OpenAI and
+ * most local servers send. An endpoint that sends none is counted the way the package estimates a prompt, over the
+ * messages sent and the text that came back, so a streamed answer is never billed as nothing.
+ *
+ * AN ENDPOINT THAT IGNORED `stream` and answered one JSON body is read as `complete` reads it, and handed on in one piece.
+ * Everything after the status is a `SlashAnsweredError`, as `post`'s is: a body that broke off, ran past what Slash reads,
+ * or ran out the clock.
+ */
+const streamed = async (
+  url: URL,
+  options: EndpointModelOptions,
+  body: Record<string, unknown>,
+  model: string,
+  onText: (text: string) => void,
+  estimateIn: number,
+): Promise<{ text: string; usage: { in: number; out: number } }> => {
+  const { res, signal, timedOut } = await opened(url, options, { ...body, stream: true, stream_options: { include_usage: true } }, model);
+  const estimated = (text: string): { in: number; out: number } => ({ in: estimateIn, out: Math.ceil(new TextEncoder().encode(text).length / 4) });
+  if (!(res.headers.get('content-type') ?? '').includes('event-stream') || res.body === null) {
+    let whole: string;
+    try {
+      whole = await res.text();
+    } catch {
+      throw signal.aborted ? timedOut() : new SlashAnsweredError('The Slash endpoint broke off its answer.', undefined, model);
+    }
+    if (whole.length > ANSWER_BYTES) throw new SlashAnsweredError('The Slash endpoint answered more than Slash reads.', usageIn(whole), model);
+    let parsed: { choices?: { message?: { content?: unknown } }[]; usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } };
+    try {
+      parsed = JSON.parse(whole) as typeof parsed;
+    } catch {
+      throw new SlashAnsweredError('The Slash endpoint answered with a body that is not JSON.', undefined, model);
+    }
+    const content = parsed?.choices?.[0]?.message?.content;
+    const text = typeof content === 'string' ? content : whole;
+    if (text !== '') onText(text);
+    return { text, usage: usageIn(whole) ?? estimated(text) };
   }
-  if (text.length > most) throw new SlashAnsweredError('The Slash endpoint answered more than Slash reads.', usageIn(text), model);
-  return text;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let held = '';
+  let text = '';
+  let usage: { in: number; out: number } | undefined;
+  let ended = false;
+  const take = (line: string): void => {
+    const data = line.startsWith('data:') ? line.slice(5).trim() : '';
+    if (data === '' || ended) return;
+    if (data === '[DONE]') {
+      ended = true;
+      return;
+    }
+    let chunk: { choices?: { delta?: { content?: unknown } }[]; usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } | null } | null;
+    try {
+      chunk = JSON.parse(data) as typeof chunk;
+    } catch {
+      return;
+    }
+    const tin = chunk?.usage?.prompt_tokens;
+    const tout = chunk?.usage?.completion_tokens;
+    if (typeof tin === 'number' && typeof tout === 'number') usage = { in: counted(tin), out: counted(tout) };
+    const piece = chunk?.choices?.[0]?.delta?.content;
+    if (typeof piece === 'string' && piece !== '') {
+      text += piece;
+      onText(piece);
+    }
+  };
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      held += decoder.decode(value, { stream: true });
+      const lines = held.split('\n');
+      held = lines.pop() ?? '';
+      for (const line of lines) take(line.trim());
+      if (text.length > ANSWER_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new SlashAnsweredError('The Slash endpoint answered more than Slash reads.', usage ?? estimated(text), model);
+      }
+    }
+  } catch (e) {
+    if (e instanceof SlashAnsweredError) throw e;
+    throw signal.aborted ? timedOut() : new SlashAnsweredError('The Slash endpoint broke off its answer.', usage ?? estimated(text), model);
+  }
+  held += decoder.decode();
+  if (held.trim() !== '') take(held.trim());
+  return { text, usage: usage ?? estimated(text) };
 };
 
 /** A `SlashModel` over a chat-completions endpoint. Every failure is a throw, which the record reads as "the rules speak". */
@@ -594,6 +699,8 @@ export interface SlashInference {
   complete(call: SlashInferenceCall): Promise<SlashInferenceReply>;
   /** OPTIONAL, as the package's is: a host with no embedding model leaves it out and `embedTexts` refuses in words. */
   embed?(texts: readonly string[]): Promise<SlashEmbedding>;
+  /** OPTIONAL, as the package's is: `complete` with the text handed on as it arrives, and the same reply at the end. */
+  stream?(call: SlashInferenceCall, onText: (text: string) => void): Promise<SlashInferenceReply>;
 }
 
 /**
@@ -662,22 +769,26 @@ const counted = (value: unknown): number =>
 export function endpointInference(options: EndpointModelOptions): SlashInference {
   const url = endpointUrl(options.url);
   const embed = embeddingsOver(url, options);
+  const bodyOf = (call: SlashInferenceCall, model: string): Record<string, unknown> => ({
+    model,
+    temperature: 0,
+    max_tokens: call.maxTokens,
+    response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: call.jsonSchema, strict: true } },
+    messages: call.messages.map((m) => ({ role: m.role, content: m.content })),
+  });
   return {
     ...(embed ? { embed } : {}),
+    /* THE SAME CALL WITH `stream: true`, its text handed on as it lands; a fence the model wrapped it in is read off the
+       whole text at the end, as `complete` reads it. */
+    stream: async (call: SlashInferenceCall, onText: (text: string) => void): Promise<SlashInferenceReply> => {
+      const model = modelSent(call.model, options.model);
+      const estimateIn = call.messages.reduce((n, m) => n + Math.ceil(new TextEncoder().encode(m.content).length / 4), 0);
+      const got = await streamed(url, options, bodyOf(call, model), model, onText, estimateIn);
+      return { text: FENCE.exec(got.text)?.[1] ?? got.text, usage: got.usage, model };
+    },
     complete: async (call: SlashInferenceCall): Promise<SlashInferenceReply> => {
       const model = modelSent(call.model, options.model);
-      const text = await post(
-        url,
-        options,
-        {
-          model,
-          temperature: 0,
-          max_tokens: call.maxTokens,
-          response_format: { type: 'json_schema', json_schema: { name: 'answer', schema: call.jsonSchema, strict: true } },
-          messages: call.messages.map((m) => ({ role: m.role, content: m.content })),
-        },
-        model,
-      );
+      const text = await post(url, options, bodyOf(call, model), model);
       let parsed: {
         choices?: { message?: { content?: unknown } }[];
         usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };

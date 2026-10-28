@@ -40,6 +40,13 @@ export interface Inference {
    * was never there. Throws as `complete` does, on the same host marks `answer.ts` reads off a throw.
    */
   embed?(texts: readonly string[]): Promise<Embedding>;
+  /**
+   * `complete`, with the reply's text handed to `onText` piece by piece as the provider sends it, and the same reply at
+   * the end: the whole text, and the usage the stream's last chunk reported, or the adapter's estimate where it reported
+   * none. OPTIONAL, as `embed` is: an adapter without it is asked through `complete`, and the answer arrives whole.
+   * Throws as `complete` does; a throw after any text arrived is marked `answered`, since a model ran.
+   */
+  stream?(call: InferenceCall, onText: (text: string) => void): Promise<InferenceReply>;
 }
 
 /** One call's embeddings: the model that answered, the width of each vector, and the vectors themselves, in order. */
@@ -463,7 +470,8 @@ export type ChatAction = {
 export type ChatEvent =
   | { type: 'thread'; id: string }
   | { type: 'step'; text: string }
-  | { type: 'delta'; text: string }
+  /* `figures` NAMES THE ROWS THIS PIECE LINKS, so a link streamed before `done` is drawn by its name at once. */
+  | { type: 'delta'; text: string; figures?: ChatFigure[] | undefined }
   | ({ type: 'action' } & Omit<ChatAction, 'state'>)
   | { type: 'navigate'; href: string; label: string }
   | { type: 'error'; text: string }

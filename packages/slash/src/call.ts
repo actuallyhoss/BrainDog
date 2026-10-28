@@ -111,6 +111,11 @@ export type RunArgs = {
    * not an earlier one's. Absent, a candidate's wire is asked as it came.
    */
   watch?: ((inference: Inference) => Inference) | undefined;
+  /**
+   * Handed the reply's text so far each time more of it arrives, where the adapter can stream (`Inference.stream`); the
+   * reply is still parsed, checked and returned whole. Absent, or an adapter without `stream`, and nothing is called.
+   */
+  onText?: ((sofar: string) => void) | undefined;
 };
 
 /** What every hold and every settled row says about itself: what the ask was for and whose allowance it spends. */
@@ -665,37 +670,56 @@ export const core = (
     const estimate = tokens(system) + tokens(content);
 
     /** One model asked once: what came back, read against the schema, and the throw, where there was one, for the walk. */
-    const ask = async (model: string, inference: Inference, t0: number): Promise<{ ran: Ran; thrown?: unknown }> => {
+    const ask = async (model: string, inference: Inference, t0: number): Promise<{ ran: Ran; thrown?: unknown; streamed?: boolean }> => {
       let reply;
+      const call = {
+        model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content },
+        ],
+        maxTokens: template.maxTokens,
+        jsonSchema: schema,
+      } as const;
+      /* STREAMED WHERE THE CALLER WANTS THE TEXT AS IT COMES AND THE ADAPTER CAN SEND IT; the reply at the end is the same
+         whole reply `complete` answers, so what follows reads it exactly as before. */
+      const onText = args.onText;
+      let sofar = '';
       try {
-        reply = await inference.complete({
-          model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content },
-          ],
-          maxTokens: template.maxTokens,
-          jsonSchema: schema,
-        });
+        reply =
+          onText !== undefined && inference.stream !== undefined
+            ? await inference.stream(call, (piece) => {
+                if (typeof piece !== 'string' || piece === '') return;
+                sofar += piece;
+                onText(sofar);
+              })
+            : await inference.complete(call);
       } catch (e) {
         /* A PROVIDER THAT DID NOT ANSWER IS NOT A REFUSAL ABOUT THE ASK, and saying `PROPOSAL_SCHEMA`
            here would send a person looking at their question for a fault that is in the network. The
            estimate is billed as `tokens_in` so a month of outages is visible in the meter. `answer`
            settles that row under `-`, so there it keeps `tokens_in` and no neurons (`asksUsed`), unless the
            host marked the throw `reached`, and then `answer` settles it as `read` does, under the model's name. */
+        /* A STREAM THAT BROKE OFF AFTER ITS FIRST WORDS CAME FROM A MODEL THAT RAN, whatever the throw says: it is served,
+           and its output is what arrived, estimated as the prompt is, where the throw carries no count of its own. */
+        const streamed = sofar !== '';
+        const told = streamed ? (e as { usage?: { in?: unknown; out?: unknown } } | null)?.usage : undefined;
         const ran: Ran = {
           model,
           ms: clock.now() - t0,
-          usage: { in: estimate, out: 0 },
+          usage:
+            told !== undefined && typeof told.in === 'number' && typeof told.out === 'number' && told.in > 0
+              ? { in: Math.ceil(told.in), out: Math.max(Math.ceil(told.out), tokens(sofar)) }
+              : { in: estimate, out: streamed ? tokens(sofar) : 0 },
           /* THE HOST'S `answered` MARK, read structurally as `answer.ts` reads it (`heardIn`): the endpoint answered and
              the reply was too large, unreadable or cut off, or the clock ran out on a model that may have run to the end. */
-          served: typeof e === 'object' && e !== null && (e as { answered?: unknown }).answered === true,
+          served: streamed || (typeof e === 'object' && e !== null && (e as { answered?: unknown }).answered === true),
           out: no(
             'UNREACHABLE',
             `The model did not answer${e instanceof Error && e.message !== '' ? `: ${e.message}` : ''}. Nothing was filed; ask again.`,
           ),
         };
-        return { ran, thrown: e };
+        return { ran, thrown: e, streamed };
       }
 
       const usage = reply.usage;
@@ -749,10 +773,11 @@ export const core = (
           continue;
         }
       }
-      const { ran, thrown } = await ask(candidate.model, candidate.inference === undefined ? (args.inference ?? fallback) : (args.watch?.(candidate.inference) ?? candidate.inference), start);
+      const { ran, thrown, streamed } = await ask(candidate.model, candidate.inference === undefined ? (args.inference ?? fallback) : (args.watch?.(candidate.inference) ?? candidate.inference), start);
       const raw = thrown === undefined ? undefined : thrownRaw(thrown);
       const tried: Ran = candidate.id === undefined ? ran : { ...ran, candidate: candidate.id, ...(raw === undefined ? {} : { raw }) };
-      if (final || !passedOver(ran, thrown)) return tried;
+      /* A CANDIDATE WHOSE WORDS HAVE STARTED ENDS THE WALK: the caller may have shown them, and a second model's would follow. */
+      if (final || streamed === true || !passedOver(ran, thrown)) return tried;
       /* THE ATTEMPT PASSED OVER IS ITS OWN ROW, under its own model and a fresh id, so the ledger holds one row an attempt
          and the caller's row is the attempt that ended the walk. It spends nothing (`unspent`), and its neurons are its
          model's, as a caller's `UNREACHABLE` row's are. A throw the host marked as nothing sent is under `-`. */
