@@ -38,7 +38,7 @@ test('the press is offered only when there is something new, room for it, and a 
 
 test('the frame says who drafts, plainly, and no line uses a dash as punctuation', () => {
   assert.equal(draftedBy(READING), words.byRules);
-  assert.match(draftedBy({ ...READING, model: 'endpoint' }), /\(endpoint\)/u);
+  assert.match(draftedBy({ ...READING, model: 'endpoint' }), /^Drafted by endpoint, /u);
   for (const w of Object.values(words)) {
     const line = typeof w === 'function' ? (w as (x: never) => string)(2 as never) : w;
     assert.ok(!line.includes('—') && !line.includes(' - '), line);
