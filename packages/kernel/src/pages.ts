@@ -1611,7 +1611,13 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
   const atRow = about !== undefined && host.resolved === undefined ? rowPageAt(deps, slug, about) : null;
   const written = atRow === null && host.resolved === undefined ? resolvePages({ ...deps, pages: () => deps.pages().filter((d) => !d.for) }) : null;
   const mine = written?.find((p) => p.slug === slug && !p.refusal);
-  const every = atRow !== null ? [atRow] : mine !== undefined ? written! : (host.resolved?.() ?? resolvePages(deps));
+  /* AND A PAGE OF A ROW THAT STAYS, A PROJECT'S, IS FOUND AMONG THE PAGES THAT CLAIM BEFORE THE RUNS' (`claimRank`): their
+     addresses never turn on a run, so filling a page for each run to find a project's was the most of its time. A slug
+     none of them holds is looked for among them all. */
+  const steady =
+    atRow === null && mine === undefined && host.resolved === undefined ? resolvePages({ ...deps, pages: () => deps.pages().filter((d) => claimRank(d) < 2) }) : null;
+  const held = steady?.some((p) => p.slug === slug) === true ? steady : null;
+  const every = atRow !== null ? [atRow] : mine !== undefined ? written! : (held ?? host.resolved?.() ?? resolvePages(deps));
   const found = atRow ?? mine ?? every.find((p) => p.slug === slug);
   /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per row is
      named after the row's title, so listing those slugs listed every row title of every templated list, and this
