@@ -442,7 +442,7 @@ test('THE SUGGESTED ANSWER IS THE RED PRIMARY, IN ITS OWN WORDS, and the others 
 const src = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('THE FOUR DRAWS AND THE PALETTE DRAW THIS CARD', () => {
-  for (const path of ['../palette/Palette.svelte'])
+  for (const path of ['../palette/SlashThread.svelte'])
     assert.match(src(path), /import DecisionCard from '\$lib\/decide\/DecisionCard\.svelte'/u, `${path} draws a card of its own`);
   /* A PAGE'S QUEUE LOADS THE CARD beside its data, rather than ahead of the first paint. */
   for (const path of ['../page/QueueAnswer.svelte']) {

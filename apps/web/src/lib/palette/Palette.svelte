@@ -1,13 +1,16 @@
 <!--
   The palette: the ask field, opened, reaching OBJECTS and not only the screens they live on.
 
-  A CENTRED MODAL FROM 640PX, AND THE WHOLE SCREEN BELOW IT (frame F6, 2.A.15). It grew out of the top bar's field
-  and dropped over the nav with no scrim, so Agents was cut to "A" and the page stayed at full strength behind it. Now
-  the bar's field is only the trigger: the palette is 640 wide (the screen less 16 a side), 96 from the top, at most
-  560 tall, a tile with one strong hairline and radius 16, over the scrim, and solid: no glass, no shadow. It fades in
-  from .98 of its size over `--d-panel` and fades out over `--d-panel-out`; focus goes to the field and back to the
-  trigger. On a phone it is the screen, the field a 44px well in a 56px bar with Cancel at its end. Each result is a
-  glyph in a 28px well, a title and one line saying where it sits (`Result.svelte`).
+  OUT OF THE FIELD IT WAS OPENED FROM, AT EVERY WIDTH (`placeOn`). Pressing `/` or the bar's "Ask or change anything"
+  widens that field in place, and the answer drops down attached under it at the same width, never a centred box: from
+  900px over the bar's field, from 640px across the head bar's row, and on a phone a sheet from the top edge, the full
+  width. Only with no field on screen at all is it the centred box. It is a tile with one strong hairline over the scrim,
+  solid: no glass, no shadow. It widens over `--d-panel` and fades out over `--d-panel-out`; under reduced motion it only
+  fades. Focus goes to the field and back to the trigger. Each result is a glyph in a 28px well, a title and one line
+  saying where it sits (`Result.svelte`).
+
+  TWO MODES IN ONE FIELD. Find (`/`, ⌘K) is everything below; Ask (⌘J, or a question typed into Find) is the
+  conversation with Slash (`SlashThread.svelte`), the field its follow-up field.
 
   WITH NOTHING TYPED IT IS TWO SHORT GROUPS, "Go to" (the five places and Settings) and "Recent" (the last five rows
   changed): it opened on a wall of fifteen figures. A group shows six rows and then "Show all 13". A figure is drawn
@@ -89,11 +92,11 @@
   import { palette as opener } from './open.svelte.ts';
   import { untrack } from 'svelte';
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
-  import { asksFirst, capLine, drawProposal, drawReading, inOrder, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
-  import Cited from '../ui/Cited.svelte';
-  import SlashOut from '$lib/ui/SlashOut.svelte';
-  import DecisionCard from '$lib/decide/DecisionCard.svelte';
-  import type { About, Reading, SlashStatus } from '@braindog/client';
+  import { asksFirst, capLine, inOrder, offersSlash, slashWords } from './slash.ts';
+  import SlashThread from './SlashThread.svelte';
+  import { ask as askThread, clear as clearThread, convo, open as threadOn } from './thread.svelte.ts';
+  import { pageOf, threadWords, type PageContext } from './slash-chat.ts';
+  import type { About, SlashStatus } from '@braindog/client';
 
   let {
     open = $bindable(false),
@@ -148,6 +151,8 @@
     folded?: number | undefined;
     /** The group a "Show all" row opens. */
     more?: string | undefined;
+    /** Set on the row that goes back to the conversation with Slash where it was left. */
+    resume?: true | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -191,76 +196,94 @@
   const slashHere = $derived(isLive && shell.slash === true);
 
   /**
-   * SLASH'S MODE: the question asked, for the text that was in the box when it was asked, and what came back.
+   * ASK: THE CONVERSATION WITH SLASH, in the same surface under the same field (`thread.svelte.ts`, `SlashThread.svelte`).
    *
-   * KEYED ON THE TEXT, SO NOTHING ACCUMULATES (`50 §5.5` step 5). Typing anything else puts the palette back to its list at
-   * once, with no effect to clear it, and `latest` drops an answer to a question the box has moved on from, so a slow read
-   * cannot land over the next one. `Esc` in the mode goes back to the list and keeps the text; a second `Esc` closes.
+   * THE FIELD IS THE FOLLOW-UP FIELD THERE, and keeps the caret: Enter sends what is typed, and with nothing typed Enter
+   * does what the waiting card asks and Esc leaves it. A question reached from Find (its row, or Today's three) starts a
+   * new conversation and Esc goes back to Find with the words as they were; ⌘J opens straight into the conversation where
+   * it was left, and Esc there closes. ⌘K moves back to Find. The thread outlives the palette, so it can be reopened.
    */
-  /** Pass 2 under the rows: `null` while it is being written, then the proposal or the refusal, never both. */
-  type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null; spent?: boolean } | null };
-  let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null; reading?: Reading | null; busy?: boolean } | null>(null);
-  const slashShown = $derived(slash !== null && slash.q === q ? slash : null);
+  const inAsk = $derived(opener.mode === 'ask');
+  /* WHAT FIND'S FIELD SAID WHEN A QUESTION LEFT IT FOR ASK, or `null` when Ask was opened straight. */
+  let backTo = $state<string | null>(null);
+  /* THE MODE THE PALETTE LAST DREW, so a move made from outside it (⌘K, ⌘J) is told from one made here. */
+  let modeWas: 'find' | 'ask' = 'find';
+  let threadView = $state<ReturnType<typeof SlashThread> | null>(null);
+  /** The page behind the palette, read each time it opens: what an ask is sent with and what the starters fit. */
+  let behind = $state<PageContext>({ path: '/' });
   const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
   /* THE RECORD ON SCREEN, AT ITS OWN BASE. `page.url.origin` asked `/api/slash/*` at the bare host, which on the Cloud is
      no record at all: every ask from `/app/<slug>/…` went to the root and never reached the record it was typed on. */
   const client = () => import('@braindog/client').then(({ createClient }) => createClient({ base: apiBase() }));
-  const slashAsk = latest((question: string) =>
-    client()
-      .then((c) =>
-        c.slashRead(question, {
-          busy: () => {
-            if (slash?.question === question && slash.drawn === null) slash.busy = true;
-          },
-        }),
-      )
-      .catch(unreached),
-  );
-  /* PASS 2 THROUGH ITS OWN `latest`, so a proposal written for an older question is dropped exactly as pass 1's rows are.
-     THE REQUEST ITSELF IS NEVER ABORTED, which is `46 §5.5` step 11: Escape during pass 2 goes back to the list, and the
-     proposal the engine was already writing is still filed in Needs you. `latest` only decides whether the answer is drawn. */
-  const slashPropose = latest((a: { question: string; askId: string }) =>
-    client()
-      .then((c) => c.slashAnswer(a.question, a.askId))
-      .catch(unreached),
-  );
 
+  /** A question from Find: a new conversation, asked at once, with the field cleared for the next one. */
   function askSlash(question: string) {
-    const asked = q;
-    slash = { q: asked, question, drawn: null, fix: null, second: null };
-    cursor = 0;
-    slashAsk.ask(question, (out) => {
-      if (slash?.q !== asked) return;
-      if (!out.ok) {
-        slash = { q: asked, question, drawn: null, fix: 'refusal' in out ? out.refusal.fix : copy.slashNothing, second: null };
-        return;
-      }
-      /* THE ASK ID GOES BACK WITH PASS 2, so the engine re-runs the predicate it already drafted instead of asking the model
-         for a second one, which would be a second draft and a second ask for the same question. */
-      const more = secondPass(out.value);
-      slash = { q: asked, question, drawn: drawReading(out.value), fix: null, second: more ? { drawn: null, refused: null } : null, reading: out.value };
-      if (!more) return;
-      slashPropose.ask({ question, askId: out.value.ask_id }, (said) => {
-        if (slash?.q !== asked || slash.second === null) return;
-        slash.second = said.ok
-          ? { drawn: drawProposal(said.value, question), refused: null }
-          : { drawn: null, refused: pass2Refused('refusal' in said ? said.refusal : { code: 'VALUE_MALFORMED', fix: copy.slashNothing }) };
-      });
-    });
+    backTo = q;
+    modeWas = 'ask';
+    opener.mode = 'ask';
+    clearThread();
+    q = '';
+    void askThread(question, behind, apiBase());
+    queueMicrotask(() => input?.focus());
   }
 
-  /**
-   * SLASH'S FILED PROPOSAL, DRAWN WHERE IT WAS ASKED, as the one decision card: when it arrives the
-   * keyboard is on it (`cursor` is -1, above the rows), Enter accepts it, a six-second Undo follows on its line, and the
-   * line reads "Slash suggested · Mara accepted". `↓` goes down to the rows as ever, and `↑` from the first row comes
-   * back to it. A proposal that moves money is not accepted by a key: Enter opens it on Decide, where Accept names the
-   * amount.
-   */
-  const filed = $derived(slashShown?.second?.drawn?.card ?? null);
-  let filedCard = $state<ReturnType<typeof DecisionCard> | null>(null);
-  const armed = $derived(filed !== null && cursor === -1);
+  /** The follow-up field, sent. */
+  function send() {
+    const said = q.trim();
+    if (said === '' || convo.busy) return;
+    q = '';
+    void askThread(said, behind, apiBase());
+  }
+
+  /** Back to Find, with what its field said before the question. */
+  function toFind() {
+    modeWas = 'find';
+    opener.mode = 'find';
+    q = backTo ?? '';
+    backTo = null;
+    cursor = 0;
+    input?.focus();
+  }
+
+  /** The conversation where it was left, from Find's "Continue" row. */
+  function toAsk() {
+    backTo = q;
+    modeWas = 'ask';
+    opener.mode = 'ask';
+    q = '';
+    input?.focus();
+  }
+
+  function fresh() {
+    clearThread();
+    q = '';
+    input?.focus();
+  }
+
+  /* A MOVE MADE FROM OUTSIDE (⌘K to Find, ⌘J to Ask) while the palette is open: the field starts empty in the new mode. */
   $effect(() => {
-    if (filed) untrack(() => (cursor = -1));
+    const mode = opener.mode;
+    if (!open) return;
+    untrack(() => {
+      if (mode === modeWas) return;
+      modeWas = mode;
+      backTo = null;
+      q = '';
+      cursor = 0;
+      queueMicrotask(() => input?.focus());
+    });
+  });
+
+  /* A THREAD NAMED FROM OUTSIDE (the Slash page's list), read back to go on with it. */
+  $effect(() => {
+    const id = opener.thread;
+    if (!open || id === null) return;
+    untrack(() => {
+      opener.thread = null;
+      void threadOn(id, apiBase()).then((ok) => {
+        if (!ok) toasts.push(threadWords.gone, { intent: 'warn' });
+      });
+    });
   });
 
   /**
@@ -275,6 +298,15 @@
      cheap way to be wrong; storage that throws is treated the same as storage that is empty. */
   let capDismissed = $state<string | null>(null);
   const capShown = $derived(slashHere && slashStatus !== null && capLine(slashStatus, capDismissed));
+  /* THE ASKS LEFT, said quietly under the conversation: what the last answer said, else this month's count where it is
+     capped. A key of one's own is not counted, so nothing is said there. */
+  const asksLeft = $derived.by((): number | null => {
+    if (convo.left !== null) return convo.left;
+    const a = slashStatus?.asks;
+    return a && a.capped !== false && a.cap > 0 ? Math.max(0, a.cap - a.used) : null;
+  });
+  /* WHETHER A CARD IN THE THREAD WAITS ON ENTER, read off the thread as it changes. */
+  const waitingCard = $derived(inAsk && threadView !== null && threadView.waiting());
   function warm() {
     try {
       capDismissed = localStorage.getItem(CAP_LINE_KEY);
@@ -676,17 +708,6 @@
     const { prefix, text } = parsed;
     total = 0;
     drawn = 0;
-    /* IN SLASH'S MODE THE LIST IS WHAT SLASH FOUND, AND NOTHING ELSE. They are rows like any other here, so the arrow keys,
-       `↵` and the pointer walk them with no second mechanism, and each one is an address on the record. */
-    if (slashShown)
-      return (slashShown.drawn?.rows ?? []).map((r) => ({
-        id: `s-${r.id}`,
-        title: r.title,
-        detail: listNamed.get(r.register)?.name ?? listName(r.register),
-        href: r.href,
-        group: copy.slashFound,
-        icon: listNamed.get(r.register)?.icon ?? 'rows',
-      }));
     const needle = text.toLowerCase();
     /* WHAT THE NAME IS, FIRST INTO THE LIST so the cap below never cuts it, and its place on screen is its group's rank. */
     const about = aboutShown;
@@ -728,6 +749,10 @@
        the place that answers each; then the places opened last on this device. "Go to" repeats the bar, so it is drawn
        only on a device that has opened nothing yet. Commands, pages, lists, figures and questions wait for a word. */
     const blank = prefix === null && text.trim() === '';
+    /* THE CONVERSATION GOES ON FROM HERE: its first question, one press back into it. */
+    const opening = convo.turns.find((t) => t.role === 'you')?.text;
+    if (blank && opening !== undefined)
+      out.push({ id: 'resume', title: threadWords.resume(opening), href: null, group: ASK_TODAY, icon: 'ask', resume: true });
     if (blank)
       for (const [i, asked] of questionsOf(slashHere).entries())
         out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: ASK_TODAY, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
@@ -1168,26 +1193,17 @@
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
-      /* OUT OF ITS BAR: from 900px, where the bar's ask field is drawn, the palette opens over it, its top and end
-         edge on the field's, and grows down from there; anywhere else it is the centred box. */
-      const field = document.querySelector<HTMLElement>('[data-palette-from="bar"]');
-      const r = field && field.getClientRects().length > 0 && innerWidth >= 900 ? field.getBoundingClientRect() : null;
-      if (r) {
-        const rtl = getComputedStyle(field!).direction === 'rtl';
-        el.dataset.from = 'bar';
-        const end = Math.round(rtl ? r.left : innerWidth - r.right);
-        el.setAttribute('style', `--from-top: ${Math.round(r.top)}px; --from-end: ${end}px; --from-w: ${Math.round(r.width)}px`);
-      } else {
-        delete el.dataset.from;
-        el.removeAttribute('style');
-      }
+      placeOn(el);
       el.showModal();
       overlays.open();
       /* WHAT TODAY'S ASK BAR HANDED OVER, taken once and cleared, so the next open starts empty as it always has. */
       q = untrack(() => opener.seed);
       untrack(() => (opener.seed = ''));
       cursor = 0;
-      slash = null;
+      modeWas = opener.mode;
+      backTo = null;
+      if (opener.mode === 'ask') q = '';
+      behind = pageOf(page.url.pathname, document.title);
       held = [];
       given = [];
       look = lookNow();
@@ -1200,6 +1216,49 @@
       overlays.close();
     }
   });
+
+  /**
+   * OUT OF THE FIELD IT WAS OPENED FROM, AT EVERY WIDTH (`data-palette-from`): the first one drawn on screen.
+   *
+   * From 900px it is the bar's "Ask or change anything": the palette opens over it, its top on the field's and its edge
+   * on the field's nearer edge, and widens from the field's own width as the answer drops down under it. From 640px the
+   * head bar's search button: the palette takes the bar's row, the width of the screen less its gutters, and drops down
+   * from there. Under 640px it is a sheet from the top edge, the full width. Only with no field on screen at all (the
+   * menu shape's corner button) is it the centred box.
+   */
+  function placeOn(d: HTMLDialogElement) {
+    let field: HTMLElement | null = null;
+    for (const f of document.querySelectorAll<HTMLElement>('[data-palette-from]')) {
+      const r = f.getBoundingClientRect();
+      if (f.getClientRects().length > 0 && r.width > 0 && r.bottom > 0 && r.top < innerHeight) {
+        field = f;
+        break;
+      }
+    }
+    delete d.dataset.side;
+    if (innerWidth < 640) {
+      d.dataset.from = 'phone';
+      d.removeAttribute('style');
+      return;
+    }
+    if (!field) {
+      delete d.dataset.from;
+      d.removeAttribute('style');
+      return;
+    }
+    const r = field.getBoundingClientRect();
+    const rtl = getComputedStyle(field).direction === 'rtl';
+    const bar = field.dataset.paletteFrom === 'bar' && innerWidth >= 900;
+    d.dataset.from = bar ? 'bar' : 'head';
+    /* A FIELD ON THE START HALF OF THE WINDOW (the sidebar's) is kept to by its start edge, so the palette grows into the
+       window and never off it; the bar's, on the end half, by its end edge. */
+    const startward = (rtl ? innerWidth - r.right : r.left) + r.width / 2 < innerWidth / 2;
+    if (bar && startward) d.dataset.side = 'start';
+    const start = Math.round(rtl ? innerWidth - r.right : r.left);
+    const end = Math.round(rtl ? r.left : innerWidth - r.right);
+    const top = bar ? r.top : Math.max(8, r.top - 6);
+    d.setAttribute('style', `--from-top: ${Math.round(top)}px; --from-start: ${start}px; --from-end: ${end}px; --from-w: ${Math.round(r.width)}px; --from-h: ${Math.round(r.height)}px`);
+  }
 
   /**
    * A NEW QUESTION STARTS AT THE TOP OF ITS OWN ANSWER.
@@ -1225,6 +1284,7 @@
     }
     /* SLASH'S ROW ANSWERS IN THE PANEL, so it is the one row that leaves it open. */
     if (row.ask !== undefined) return askSlash(row.ask);
+    if (row.resume) return toAsk();
     /* A RENAME WITH NO NEW NAME YET WRITES THE SENTENCE INTO THE BOX, and the palette stays open for its last word. */
     if (row.change?.kind === 'fill') {
       q = row.change.text;
@@ -1333,12 +1393,21 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    /* IN ASK, ENTER SENDS WHAT IS TYPED, and with nothing typed does what the waiting card asks. Nothing else is taken. */
+    if (inAsk) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        if (q.trim() !== '') send();
+        else threadView?.enter();
+      }
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       cursor = Math.min(cursor + 1, flat.length - 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      cursor = Math.max(cursor - 1, filed ? -1 : 0);
+      cursor = Math.max(cursor - 1, 0);
     } else if (e.key === 'Backspace' && held.length > 0 && input?.selectionStart === 0 && input.selectionEnd === 0) {
       /* BACKSPACE AT THE START OF THE FIELD GIVES THE LAST CHIP BACK AS WORDS, which then stay words. */
       e.preventDefault();
@@ -1348,16 +1417,6 @@
       q = untoken(q, last);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      /* ON SLASH'S FILED PROPOSAL, Enter accepts it; where a key may not (money moves), it opens on Decide instead. */
-      if (armed) {
-        if (filedCard?.accept()) return;
-        const decide = slashShown?.second?.drawn?.decide;
-        if (decide && !filedCard?.answered()) {
-          open = false;
-          void goto(at(decide));
-        }
-        return;
-      }
       run(flat[cursor]);
     } else if (e.key === 'Tab' && !e.shiftKey) {
       /**
@@ -1386,6 +1445,19 @@
   }
 
   /**
+   * ESC, ONE LAYER A PRESS. In Ask: the waiting card first, then the words typed, then back to Find when a question
+   * came from there, and only then closed. In Find it closes, as it always has.
+   */
+  function oncancel(e: Event) {
+    e.preventDefault();
+    if (!inAsk) return void (open = false);
+    if (q === '' && threadView?.escape()) return;
+    if (q !== '') return void (q = '');
+    if (backTo !== null) return toFind();
+    open = false;
+  }
+
+  /**
    * Click outside to close.
    *
    * A modal `<dialog>` does not do this on its own, and the absence reads as the app being stuck:
@@ -1408,27 +1480,47 @@
   }
 </script>
 
-<dialog bind:this={el} class="palette" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), slashShown ? (slash = null) : (open = false))} onclose={() => (open = false)}>
+<dialog bind:this={el} class="palette" data-mode={inAsk ? 'ask' : undefined} onclick={onbackdrop} {oncancel} onclose={() => (open = false)}>
   <div class="p-head">
     <span class="p-field">
-    <Icon name="search" size="m" />
-    <input
-      bind:this={input}
-      bind:value={q}
-      {onkeydown}
-      {oninput}
-      class="p-input"
-      type="text"
-      role="combobox"
-      aria-expanded="true"
-      aria-controls="palette-list"
-      aria-activedescendant={activeId}
-      aria-label={copy.paletteLabel}
-      placeholder={copy.palettePlaceholder}
-      spellcheck="false"
-      autocomplete="off"
-    />
+    {#if inAsk}<span class="p-ask-mark" aria-hidden="true"><Icon name="slash" size="m" /></span>{:else}<Icon name="search" size="m" />{/if}
+    {#if inAsk}
+      <!-- THE FOLLOW-UP FIELD: a plain field, since in Ask there is no list for it to point into. -->
+      <input
+        bind:this={input}
+        bind:value={q}
+        {onkeydown}
+        class="p-input"
+        type="text"
+        aria-label={threadWords.placeholder}
+        aria-describedby="palette-ask-foot"
+        placeholder={convo.turns.length > 0 ? threadWords.followUp : threadWords.placeholder}
+        autocomplete="off"
+      />
+    {:else}
+      <input
+        bind:this={input}
+        bind:value={q}
+        {onkeydown}
+        {oninput}
+        class="p-input"
+        type="text"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls="palette-list"
+        aria-activedescendant={activeId}
+        aria-label={copy.paletteLabel}
+        placeholder={copy.palettePlaceholder}
+        spellcheck="false"
+        autocomplete="off"
+      />
+    {/if}
     </span>
+    {#if inAsk}
+      <!-- FIND, ONE PRESS BACK (or ⌘K), and NEW once there is a conversation to start again from. -->
+      {#if convo.turns.length > 0}<button type="button" class="p-mode tap" aria-label={threadWords.freshLabel} onclick={fresh}><Icon name="plus" size="s" /><span>{threadWords.fresh}</span></button>{/if}
+      <button type="button" class="p-mode tap" aria-label={threadWords.findLabel} onclick={toFind}><Icon name="search" size="s" /><span>{threadWords.find}</span></button>
+    {/if}
     <!--
       A WAY OUT A THUMB CAN REACH.
 
@@ -1471,17 +1563,13 @@
     prints. The printed heading is `aria-hidden`, because the group's own name already says it and a
     reader who heard both would hear every heading twice.
   -->
+  {#if inAsk}
+    <SlashThread bind:this={threadView} here={behind} base={apiBase()} onask={(question) => void askThread(question, behind, apiBase())} onleave={() => (open = false)} />
+  {:else}
   <div class="p-body">
-    <!-- WHAT SLASH LOOKED FOR, BEFORE WHAT IT FOUND (`50 §5.5` step 5), so the rows are read against the question the record
-         was actually asked. A draft that did not fit is a keyword search, and the line says that instead. -->
-    {#if slashShown?.drawn}
-      <p class="p-slash-where">
-        {#if slashShown.drawn.where !== null}<span class="p-slash-label">{copy.slashWhere}</span> {slashShown.drawn.where}{:else if slashShown.drawn.q !== null}{copy.slashSearched(slashShown.drawn.q)}{/if}
-      </p>
-    {/if}
     <!-- LOOKING, AT ONCE: the same frame as the keystroke, where the first answer will land, and gone when it does. -->
-    {#if pending && !slashShown}<p class="p-looking" role="status">{copy.looking}</p>{/if}
-    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending || (slashShown !== null && slashShown.drawn === null && slashShown.fix === null)}>
+    {#if pending}<p class="p-looking" role="status">{copy.looking}</p>{/if}
+    <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending}>
       {#if askRow && askLeads}{@render result(askRow)}{/if}
       {#each groups as [group, items]}
         <div role="group" aria-label={group}>
@@ -1494,65 +1582,7 @@
       {#if overflow}{@render result(overflow)}{/if}
       {#if askRow && !askLeads}{@render result(askRow)}{/if}
     </div>
-    {#if slashShown}
-      <!-- OUTSIDE THE LISTBOX, like the sentence below: the state of the ask and the fold are prose about the list. -->
-      {#if slashShown.fix !== null}
-        <p class="p-none">{slashShown.fix}</p>
-      {:else if slashShown.drawn === null}
-        <p class="p-none" role="status">{slashShown.busy ? copy.slashBusy : copy.slashAsking}</p>
-      {:else}
-        <!-- NO ROW IS NOT NOTHING WHEN A FIGURE WAS READ: pass 2 is asked on that figure (`secondPass`), and a line saying
-             nothing answers would sit above the answer it gives. -->
-        {#if slashShown.drawn.rows.length === 0 && slashShown.second === null}<p class="p-none">{copy.slashNothing}</p>{/if}
-        <!-- PIN THE ANSWER, loaded only once there is an answer to pin (`PinTo.svelte`). -->
-        {#if slashShown.reading}{#await import('./PinTo.svelte') then { default: PinTo }}<PinTo reading={slashShown.reading} asked={slashShown.q} proposal={slashShown.second?.drawn?.text ? slashShown.second.drawn : null} />{/await}{/if}
-        <!-- PASS 2, UNDER THE ROWS AND NEVER INSTEAD OF THEM (`23 §7`): the rows were drawn by code before any of this was
-             written, which is the only reason the budget sentence below can be true. -->
-        {#if slashShown.second}
-          <section class="p-slash-second" aria-label={slashWords.proposed}>
-            {#if slashShown.second.refused}
-              <p class="p-slash-said">{slashShown.second.refused.fix}</p>
-              {#if slashShown.second.refused.without}<p class="p-slash-said">{slashShown.second.refused.without}</p>{/if}
-              {#if slashShown.second.refused.spent}<SlashOut />{/if}
-            {:else if slashShown.second.drawn}
-              <!-- SLASH'S SENTENCE WITH ITS BRACES DRAWN, never printed (`Cited`): a row is a link to the row, a figure is
-                   the figure. Following a link leaves the palette, as following any of its rows does; the listener is on
-                   the paragraph because the links are `Cited`'s, and a link's click and its Enter both arrive here. -->
-              {#if slashShown.second.drawn.text}
-                <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-                <p
-                  class="p-slash-text"
-                  onclick={(e) => {
-                    if (e.target instanceof Element && e.target.closest('a')) open = false;
-                  }}
-                >
-                  <Cited text={slashShown.second.drawn.text} figures={slashShown.second.drawn.figures} />
-                </p>
-              {/if}
-              {#if slashShown.second.drawn.card}
-                <!-- THE ONE DECISION CARD, where it was asked. Outside the listbox, as everything about the ask is. -->
-                <div class="p-slash-card" data-armed={armed ? '' : undefined}>
-                  <DecisionCard bind:this={filedCard} question={slashShown.second.drawn.card} whole={false} />
-                </div>
-              {/if}
-              {#if slashShown.second.drawn.decide}
-                <a class="p-slash-decide tap" href={at(slashShown.second.drawn.decide)} onclick={() => (open = false)}>{slashWords.decide}</a>
-              {/if}
-              <!-- `23 §8`: EVERY ANSWER Slash GIVES CARRIES THE MODEL IN ITS FOOTER, ALWAYS. `drawProposal` never leaves it empty. -->
-              <p class="p-slash-model">{slashShown.second.drawn.footer}</p>
-            {:else}
-              <p class="p-slash-said" role="status">{slashWords.proposing}</p>
-            {/if}
-          </section>
-        {/if}
-        <details class="p-slash-fold">
-          <summary class="p-slash-summary tap">{copy.slashFold}</summary>
-          <ul>
-            {#each slashShown.drawn.fold as line}<li>{line}</li>{/each}
-          </ul>
-        </details>
-      {/if}
-    {:else if flat.length === 0 && !pending}
+    {#if flat.length === 0 && !pending}
       <!-- A query matching nothing falls through to a fallback row when a model is configured.
            Without one the row, the status call and every "Ask BrainDog" button do not exist: ABSENT,
            not disabled (23 §8). This record has no model, so this is what you get.
@@ -1561,6 +1591,7 @@
       <p class="p-none">{hits?.fix ?? `${copy.noMatches} “${q}”`}</p>
     {/if}
   </div>
+  {/if}
 
   <!-- A FOOTER ONLY WHEN THERE IS SOMETHING TO SAY IN IT. It held the query grammar in the identifier face,
        `> commands · # rows · @ people · / pages`, on every open, which read as a tool for the people who built it.
@@ -1570,6 +1601,12 @@
     <footer class="p-foot">
       <span class="p-cap">{slashWords.capLine(slashStatus.asks.used, slashStatus.asks.cap, slashStatus.asks.resets)}</span>
       <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{slashWords.capDismiss}</button>
+    </footer>
+  {:else if inAsk}
+    <!-- QUIET: what Enter does while a card waits, and the asks left this month once there is a number to say. -->
+    <footer class="p-foot p-ask-foot" id="palette-ask-foot">
+      {#if waitingCard}<span>{threadWords.enterDoes}</span>{/if}
+      {#if asksLeft !== null}<span class="p-left">{threadWords.left(asksLeft)}</span>{/if}
     </footer>
   {/if}
 </dialog>
@@ -1652,6 +1689,7 @@
     transition:
       opacity var(--d-panel) var(--ease-out),
       scale var(--d-panel) var(--ease-out),
+      translate var(--d-panel) var(--ease-out),
       display var(--d-panel) allow-discrete,
       overlay var(--d-panel) allow-discrete;
   }
@@ -1660,15 +1698,50 @@
     display: flex;
   }
 
-  /* OPENED FROM THE BAR'S FIELD: over it, its end edge on the field's, at least 520 wide, growing down. */
+  /* OPENED FROM THE BAR'S FIELD: over it, its end edge on the field's (its start edge, for a field on the start half),
+     at least 560 wide, WIDENING FROM THE FIELD'S OWN WIDTH AND DROPPING DOWN from its height, over `--d-panel`. */
   .palette:global([data-from='bar']) {
     inset-block-start: var(--from-top);
     inset-inline: auto var(--from-end);
-    inline-size: min(560px, max(var(--from-w), 520px), calc(100vw - 2 * var(--sp-4)));
-    max-block-size: min(560px, calc(100dvh - var(--from-top) - var(--sp-6)));
+    inline-size: min(640px, max(var(--from-w), 560px), calc(100vw - 2 * var(--sp-4)));
+    max-block-size: min(640px, calc(100dvh - var(--from-top) - var(--sp-6)));
     margin: 0;
     border-radius: var(--r-pop);
     transform-origin: top;
+    transition:
+      opacity var(--d-panel) var(--ease-out),
+      inline-size var(--d-panel) var(--ease-out),
+      max-block-size var(--d-panel) var(--ease-out),
+      display var(--d-panel) allow-discrete,
+      overlay var(--d-panel) allow-discrete;
+  }
+
+  .palette:global([data-from='bar'][data-side='start']) {
+    inset-inline: var(--from-start) auto;
+  }
+
+  @starting-style {
+    .palette:global([data-from='bar'][open]) {
+      opacity: 0.4;
+      scale: 1;
+      inline-size: var(--from-w);
+      max-block-size: var(--from-h);
+    }
+  }
+
+  /* OPENED FROM A HEAD BAR'S SEARCH BUTTON (640 to 900): the bar's row, the screen less its gutters, dropping down. */
+  .palette:global([data-from='head']) {
+    inset-block-start: var(--from-top);
+    inset-inline: var(--sp-4);
+    inline-size: auto;
+    max-block-size: min(640px, calc(100dvh - var(--from-top) - var(--sp-6)));
+    margin: 0;
+    border-radius: var(--r-pop);
+    transform-origin: top right;
+  }
+
+  .palette:global([data-from='head']):dir(rtl) {
+    transform-origin: top left;
   }
 
   .palette:not([open]) {
@@ -1712,11 +1785,26 @@
     .palette,
     .palette:not([open]) {
       scale: none;
+      translate: none;
+    }
+
+    /* NOTHING WIDENS OR DROPS under reduced motion: the palette is at its size from the first frame and only fades. */
+    .palette:global([data-from='bar']) {
+      transition:
+        opacity var(--d-panel) var(--ease-out),
+        display var(--d-panel) allow-discrete,
+        overlay var(--d-panel) allow-discrete;
     }
 
     @starting-style {
       .palette[open] {
         scale: none;
+        translate: none;
+      }
+
+      .palette:global([data-from='bar'][open]) {
+        inline-size: min(640px, max(var(--from-w), 560px), calc(100vw - 2 * var(--sp-4)));
+        max-block-size: min(640px, calc(100dvh - var(--from-top) - var(--sp-6)));
       }
     }
   }
@@ -1895,95 +1983,51 @@
     color: var(--ink-3);
   }
 
-  /* SLASH ANSWERS IN THE SAME SURFACE. What it looked for sits where a group heading sits, in the meta step,
-     and the rows it found are grouped under their own heading like any others. EVERY LINE SLASH'S ANSWER DRAWS BREAKS
-     WHERE IT MUST (`overflow-wrap: anywhere`): a predicate over a long value, a row's title or a model's name can be one
-     unbroken word, and at 390px one of those would push the panel sideways. */
-  .p-slash-where {
-    margin: 0;
-    padding: var(--sp-3) var(--sp-4) 0;
+  /* ASK'S MARK IN THE FIELD, where Find has its magnifier: Slash's own glyph, so the mode is seen before anything is read. */
+  .p-ask-mark {
+    display: inline-grid;
+    flex: none;
     color: var(--ink-2);
-    font-size: var(--fs-meta);
-    overflow-wrap: anywhere;
   }
 
-  .p-slash-label {
+  /* NEW AND FIND, quiet words at the field's end. */
+  .p-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    flex: none;
+    min-block-size: 32px;
+    padding: 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: none;
     color: var(--ink-3);
-    font-weight: 500;
-  }
-
-  /* THE FOLD IS FOLDED, AND IT IS THERE ON EVERY ASK. `23 §6`: its last line is the Keychain, refused, drawn every time. */
-  .p-slash-fold {
-    padding: var(--sp-2) var(--sp-4) var(--sp-3);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  /* A 44px TARGET ON A COARSE POINTER through `.tap`, whose hit box grows past the line it sits on. */
-  .p-slash-summary {
+    font: inherit;
+    font-size: var(--fs-ctl);
     cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
-  /* WORDS IN THE UI FACE, not the identifier face: a fold line is a sentence about a list, and nobody wrote it as code. */
-  .p-slash-fold ul {
-    margin: var(--sp-2) 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: var(--fs-meta);
-    overflow-wrap: anywhere;
+  @media (hover: hover) and (pointer: fine) {
+    .p-mode:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
   }
 
-  /* PASS 2, under the rows, set off by the one hairline, in the body step. */
-  .p-slash-second {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    padding: var(--sp-3) var(--sp-4) 0;
-    border-block-start: 1px solid var(--rule);
+  /* IN ASK THE THREAD IS THE BODY: it fills what the palette has and scrolls inside it. */
+  .palette[data-mode='ask'] {
+    min-block-size: min(280px, 60dvh);
   }
 
-  .p-slash-text,
-  .p-slash-said {
-    margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-    overflow-wrap: anywhere;
+  .p-ask-foot:empty {
+    display: none;
   }
 
-  /* THE FILED PROPOSAL'S CARD, its own container, ringed while the keyboard is on it, as a row is tinted. */
-  .p-slash-card {
-    container-type: inline-size;
-    padding: var(--sp-3);
-    border-radius: var(--r-pop);
-  }
-
-  .p-slash-card[data-armed] {
-    background: var(--hover);
-  }
-
-  .p-slash-card > :global(.queue-card) {
-    padding-block: 0;
-    border-block-start: 0;
-  }
-
-  /* A LINK IS INK WITH ITS UNDERLINE, never the brand's red, and a 44px target through `.tap`. */
-  .p-slash-decide {
-    align-self: flex-start;
-    color: var(--red);
-    text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
-  }
-
-  /* RECEDED AND SMALL (`23 §8`), and still there on every proposal. */
-  .p-slash-model {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    overflow-wrap: anywhere;
+  .p-left {
+    margin-inline-start: auto;
   }
 
   .p-cap {
@@ -2014,8 +2058,9 @@
   }
 
   /**
-   * ON A PHONE THE PALETTE IS THE SCREEN: a 56px bar holding the field as a 44px well, radius 12, and "Cancel"
-   * as a word at its end; the results fill what is left. No scrim to see and no hairline round it.
+   * ON A PHONE THE PALETTE IS A SHEET FROM THE TOP EDGE, the full width: a 56px bar holding the field as a 44px well,
+   * radius 12, and "Cancel" as a word at its end; the results drop down under it, as tall as they are and at most the
+   * screen, and the scrim shows below. It comes down from the edge rather than growing from the middle.
    *
    * EACH INSET IS PAID HERE, ONCE. The top one is under the bar, because the palette sits in the top
    * layer and nothing of the shell's padding reaches it; the bottom one and the keyboard (`--kb`,
@@ -2024,13 +2069,31 @@
    */
   @media (width < 640px) {
     .palette {
-      inset-block: 0;
+      inset-block: 0 auto;
       inline-size: 100%;
-      block-size: 100dvh;
+      block-size: auto;
       max-block-size: 100dvh;
       padding-block-start: env(safe-area-inset-top, 0px);
       border: 0;
-      border-radius: 0;
+      border-block-end: 1px solid var(--rule-strong);
+      border-radius: 0 0 var(--r-tile) var(--r-tile);
+      translate: 0;
+    }
+
+    @starting-style {
+      .palette[open] {
+        scale: 1;
+        translate: 0 -12px;
+      }
+    }
+
+    .palette:not([open]) {
+      translate: 0 -12px;
+      transition:
+        opacity var(--d-panel-out) var(--ease-in),
+        translate var(--d-panel-out) var(--ease-in),
+        display var(--d-panel-out) allow-discrete,
+        overlay var(--d-panel-out) allow-discrete;
     }
 
     .p-head {

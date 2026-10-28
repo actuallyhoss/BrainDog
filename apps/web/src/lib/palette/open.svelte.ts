@@ -11,11 +11,27 @@
  * in a place nothing can typecheck; a rune in a module is the same state the shell already had, with
  * one more reader.
  */
-export const palette = $state({ open: false, seed: '' });
+export const palette = $state({ open: false, seed: '', mode: 'find' as 'find' | 'ask', thread: null as string | null });
 
 /** Open it. The one verb a page needs, so no page has to know how the shell holds it. */
 export function openPalette(): void {
+  palette.mode = 'find';
   palette.open = true;
+}
+
+/**
+ * Open it straight into Ask (⌘J): the conversation with Slash, where it was left. Pressed with the palette already open,
+ * it moves the palette to Ask.
+ */
+export function openAsk(): void {
+  palette.mode = 'ask';
+  palette.open = true;
+}
+
+/** Open Ask on one thread, read back from the record, to continue it (the Slash page's list). */
+export function openThread(id: string): void {
+  palette.thread = id;
+  openAsk();
 }
 
 /**
@@ -24,5 +40,6 @@ export function openPalette(): void {
  */
 export function openPaletteWith(seed: string): void {
   palette.seed = seed;
+  palette.mode = 'find';
   palette.open = true;
 }
