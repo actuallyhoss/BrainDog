@@ -182,6 +182,8 @@ import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { COST_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
+import { HeldReadings, traceOf, tracing } from './held-readings.ts';
+import { localDays, readableZone } from './measures.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, claimRank, fill, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
@@ -1767,9 +1769,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
   /* EVERY STATEMENT THAT IS NOT A SELECT DROPS WHAT ONE TRANSACTION HOLDS (`moment`), so a read kept for one snapshot is
      never answered across a write made inside it. */
+  /* A ROLLBACK DROPS EVERY READING HELD ACROSS READS (`readingHeld`), since one read inside the write it took back read
+     rows that never were. Set once the readings are. */
+  let dropHeld = (): void => undefined;
   const sql: Sql = {
     exec: (text, ...params) => {
       moment?.drop();
+      if (/^\s*ROLLBACK\b/iu.test(text)) dropHeld();
       raw.exec(text, ...params);
     },
     all: (text, ...params) => {
@@ -1780,7 +1786,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (!reads(text)) moment?.drop();
       return raw.one(text, ...params);
     },
-    transactionSync: (fn) => raw.transactionSync(fn),
+    transactionSync: (fn) => {
+      try {
+        return raw.transactionSync(fn);
+      } catch (e) {
+        dropHeld();
+        throw e;
+      }
+    },
   };
   /* THE INSTANT `backdate` HOLDS, while a history is being written, and `null` the rest of the time. */
   let held: number | null = null;
@@ -4339,6 +4352,83 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /** `MAX(event.rowid)`, which is the record's version: what changed since is a range scan. */
   const version = (): number =>
     Number(sql.one<{ v: number | null }>('SELECT MAX(rowid) AS v FROM event')?.v ?? 0);
+
+  /**
+   * EACH LIST'S OWN VERSION, for a reading held while the lists it read stand (`held-readings.ts`): the newest line of
+   * the log about one of its rows, walked once per line as it is written, and what its rows add up to (`listsStamp`).
+   * Beside them, what moves every list: the newest line about no row (a pack's settings, the record's zone), the
+   * declarations, the add-ons on, the rows kept private and the declaration revision.
+   *
+   * A LINE THAT IS ONLY A CHANNEL HAVING RUN (`pull` on a declaration) or a question moves no list: what a run wrote has
+   * lines of its own, and the questions are read past every list. A log that went back (a write rolled back and another
+   * in its place) moves everything, as does the first look.
+   */
+  type ListsSeen = { head: string; whole: string; top: number; id: string; base: number; other: number; tops: Map<string, number> };
+  let listsSeen: ListsSeen | null = null;
+  const listsNow = (): ListsSeen => {
+    const h = sql.one<{ r: number | null; id: string | null; e: number | null; d: number | null; p: string | null; v: number | null; n: number | null }>(
+      `SELECT (SELECT rowid FROM event ORDER BY rowid DESC LIMIT 1) AS r, (SELECT id FROM event ORDER BY rowid DESC LIMIT 1) AS id,
+              (SELECT max(rowid) FROM entry) AS e, (SELECT max(rowid) FROM declaration) AS d,
+              (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p,
+              (SELECT max(rowid) FROM entry_private) AS v, (SELECT count(*) FROM entry_private) AS n`,
+    );
+    const top = Number(h?.r ?? 0);
+    const id = h?.id ?? '';
+    const whole = JSON.stringify([h?.d ?? null, h?.p ?? null, h?.v ?? null, h?.n ?? null, revision]);
+    const head = JSON.stringify([top, id, h?.e ?? null, whole]);
+    const was = listsSeen;
+    if (was !== null && was.head === head) return was;
+    if (was !== null && was.top === top && was.id === id) return (listsSeen = { ...was, head, whole });
+    /* A LOG WHOSE NEWEST LINE WAS WRITTEN AGAIN (a run's steps folded into one line) is walked from the line before it. A
+       log that went back, or one never looked at, moves everything. */
+    const kept = was === null || was.top === 0 || top < was.top ? null : sql.one<{ id: string }>('SELECT id FROM event WHERE rowid = ?', was.top)?.id === was.id ? was.top : sql.one<{ r: number | null }>('SELECT max(rowid) AS r FROM event WHERE rowid < ?', was.top)?.r ?? null;
+    if (was === null || kept === null) return (listsSeen = { head, whole, top, id, base: top, other: top, tops: new Map() });
+    const tops = new Map(was.tops);
+    let other = was.other;
+    for (const line of sql.all<{ r: number; k: string; tk: string | null; g: string | null }>(
+      `SELECT e.rowid AS r, e.kind AS k, e.target_kind AS tk, n.register AS g
+         FROM event e LEFT JOIN entry n ON e.target_kind = 'entry' AND n.id = substr(e.target, 7)
+        WHERE e.rowid > ? ORDER BY e.rowid`,
+      kept,
+    )) {
+      if (line.g !== null) tops.set(line.g, line.r);
+      else if (!(line.k === 'pull' && line.tk === 'declaration') && line.tk !== 'suggestion') other = line.r;
+    }
+    return (listsSeen = { head, whole, top, id, base: was.base, other, tops });
+  };
+  /**
+   * HOW MUCH A LIST'S ROWS WEIGH, so a row put right in place, with no line and its version and time unmoved (a repair),
+   * still moves its list: the bytes of every row's fields, which SQLite reads off the row's head without its text.
+   * `octet_length` is SQLite 3.43's; an older one counts the characters instead, which reads the text.
+   */
+  let weight: string | null = null;
+  const weighed = (): string => {
+    if (weight !== null) return weight;
+    try {
+      sql.one("SELECT octet_length('') AS w");
+      weight = 'total(octet_length(fields))';
+    } catch {
+      weight = 'total(length(fields))';
+    }
+    return weight;
+  };
+  /**
+   * The version of the lists named, as a held reading is stamped. `once` is one read's own: within it nothing is
+   * written, so the log and each list are asked once for all its figures.
+   */
+  type Stamps = { seen?: ListsSeen; rows: Map<string, string> };
+  const listsStamp = (lists: readonly string[], once: Stamps = { rows: new Map() }): string => {
+    const seen = (once.seen ??= listsNow());
+    const each = lists.map((list) => {
+      let rows = once.rows.get(list);
+      if (rows === undefined) {
+        rows = JSON.stringify(Object.values(sql.one<Record<string, unknown>>(`SELECT max(rowid) AS r, count(*) AS n, count(deleted_at) AS d, total(version) AS v, max(updated_at) AS u, ${weighed()} AS w FROM entry WHERE register = ?`, list) ?? {}));
+        once.rows.set(list, rows);
+      }
+      return [list, seen.tops.get(list) ?? 0, rows];
+    });
+    return JSON.stringify([seen.base, seen.other, seen.whole, each]);
+  };
 
   /**
    * A register's rows as a run in one project sees them: the project's own, and the global rows it
@@ -7071,6 +7161,54 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     } };
   };
 
+  /**
+   * A FIGURE'S READING HELD ACROSS READS WHILE THE LISTS IT READ STAND (`held-readings.ts`), the day where the record is
+   * holds, and for at most an hour: an agent's step on its run moves the runs list and no figure over the ledger.
+   * Read through `tracing`, with the context's own reads noted too (a ref by name, the rates, the signs). A figure
+   * that read the runs, the log or rows of no list is not held and is read each time, as before: a run's heartbeat
+   * moves its row with no line.
+   *
+   * NEVER A READ AS OF ANOTHER DAY, A KEPT POINT'S, OR ONE HELD TO THE LISTS A MEMBER READS (`reads`): those are read
+   * as they come. `how` keeps a read in its home currency apart from one in each currency (`readApart`). Handed out
+   * and kept as copies, so a caller that reshapes one reshapes no other.
+   */
+  const readingsHeld = new HeldReadings<Result<Reading>>();
+  dropHeld = () => {
+    readingsHeld.clear();
+    listsSeen = null;
+  };
+  const daysIn = new Map<string, (ms: number) => string>();
+  const readingHeld = (decl: MetricDecl, ctx: EvalContext, how: string, read: (sql: Sql, ctx: EvalContext) => Result<Reading>, once: Stamps = { rows: new Map() }): Result<Reading> => {
+    if (depth > 0 || ctx.asOfMs !== undefined || ctx.point === true || ctx.reads !== undefined) return read(sql, ctx);
+    const now = ctx.nowMs;
+    const tz = readableZone(ctx.tz);
+    let days = daysIn.get(tz);
+    if (days === undefined) daysIn.set(tz, (days = localDays(tz)));
+    const day = days(now);
+    const key = JSON.stringify([how, ctx.viewer ?? null, tz, decl]);
+    const stampOf = (lists: readonly string[]): string => listsStamp(lists, once);
+    const held = readingsHeld.get(key, day, now, stampOf);
+    if (held !== undefined) return structuredClone(held);
+    const trace = traceOf();
+    const known = (word: string): boolean => registers.has(word);
+    const noted = (list: string | null | undefined): void => {
+      if (typeof list === 'string') trace.lists.add(list);
+      else trace.whole = true;
+    };
+    const { refByTitle, refById, refBySpoken, fx, signs } = ctx;
+    const seen: EvalContext = {
+      ...ctx,
+      ...(refByTitle ? { refByTitle: (register: string, title: string) => (noted(register), refByTitle(register, title)) } : {}),
+      ...(refById ? { refById: (id: string) => ((r) => (noted(r), r))(refById(id)) } : {}),
+      ...(refBySpoken ? { refBySpoken: (said: string) => ((r) => (r === null ? r : (noted(r.register), r)))(refBySpoken(said)) } : {}),
+      ...(fx ? { fx: () => ((role) => (role ? noted(role.register) : undefined, fx()))(ratesRole(registers.values())) } : {}),
+      ...(signs ? { signs: () => ((trace.whole = true), signs()) } : {}),
+    };
+    const got = read(tracing(sql, known, trace), seen);
+    readingsHeld.set(key, day, now, trace, structuredClone(got), stampOf, (list) => list === SESSION);
+    return got;
+  };
+
   const evalContext = (staged: readonly Declaration[] = [], viewer?: string): EvalContext => withViewer(viewer, {
     nowMs: clock.now(),
     /* THE RECORD'S ZONE, SO A LIVE READ NAMES THE DAY THE NIGHT POINT WILL BE STORED UNDER. Without it
@@ -7613,6 +7751,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const walked = new Map<string, ReturnType<NonNullable<PageDeps['runway']>>>();
     const walks = new Map<string, unknown>();
     const readings = new Map<string, ReturnType<typeof evaluateMetric>>();
+    /* AND THE LISTS' VERSIONS ASKED ONCE FOR THE READ (`listsStamp`), which writes nothing. */
+    const once: Stamps = { rows: new Map() };
     /* AND THE READ'S CLOCK, ZONE AND RATES BUILT ONCE (each figure read built them again: the record's row and the home
        currency, a query apiece). */
     const here = { ...evalContext([], viewer), walks };
@@ -7635,13 +7775,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const key = JSON.stringify(decl);
       let got = readings.get(key);
       if (got === undefined) {
-        got = evaluateMetric(sql, decl, here);
+        got = readingHeld(decl, here, 'read', (s, c) => evaluateMetric(s, decl, c), once);
         readings.set(key, got);
       }
       return structuredClone(got);
     },
     /* WITH NO CURRENCY TO ADD UP IN, so each currency is its own amount: the reader's own rows, as `read` reads them. */
-    readApart: (decl) => evaluateMetric(sql, decl, { ...here, fx: () => ({ home: null, rates: [] }) }),
+    readApart: (decl) => readingHeld(decl, { ...here, fx: () => ({ home: null, rates: [] }) }, 'apart', (s, c) => evaluateMetric(s, decl, c), once),
     list: (q) => {
       /* AND THE ORDER GOES THROUGH. It was dropped here, silently, which is the one place a
          forwarded query can be wrong without anybody seeing it: the block asked, `list` could
@@ -9917,15 +10057,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        record, so a figure filled with a hidden client's title counted that client's jobs for a member who could not
        list them, and the record's door made up for it with a second `list` and a refusal of its own
        (`test/metric-reads.test.ts`). Handed `reads`, a ref into a list she cannot read names no row, as it does there. */
-    metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean; viewer?: string | undefined } = {}): Result<Reading> =>
-      evaluateMetric(
-        sql,
-        liveTarget(sql, decl, evalContext([], o.viewer)),
-        /* AND A HOP IN IT HELD TO WHAT SHE READS (`readerSchemaOf`), as `list` holds one. */
-        o.reads === undefined
-          ? evalContext([], o.viewer)
-          : withViewer(o.viewer, { ...evalContext(), reads: o.reads, schemaOf: readerSchemaOf(o.reads) }),
-      ),
+    metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean; viewer?: string | undefined } = {}): Result<Reading> => {
+      const live = liveTarget(sql, decl, evalContext([], o.viewer));
+      /* AND A HOP IN IT HELD TO WHAT SHE READS (`readerSchemaOf`), as `list` holds one. */
+      /* A READER WHO READS EVERY LIST IS READ AS THE RECORD READS, which is the same reading and one that can be held. */
+      const reads = o.reads === undefined || [...registers.keys()].every((list) => o.reads!(list)) ? undefined : o.reads;
+      const ctx = reads === undefined ? evalContext([], o.viewer) : withViewer(o.viewer, { ...evalContext(), reads, schemaOf: readerSchemaOf(reads) });
+      /* HELD ACROSS READS WHILE ITS LISTS STAND (`readingHeld`), as a page's figure is. */
+      return readingHeld(live, ctx, 'read', (s, c) => evaluateMetric(s, live, c));
+    },
 
     /* ── pages ──────────────────────────────────────────────────── */
 
@@ -10088,6 +10228,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...(fx ? { fx: () => (rates ??= fx()) } : {}),
       };
       const readings = new Map<string, Result<Reading>>();
+      const once: Stamps = { rows: new Map() };
       const metrics = new Map<string, MetricDecl | null>();
       const signs = base.signs;
       const activity = base.activity;
@@ -10103,12 +10244,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           const key = JSON.stringify(decl);
           let got = readings.get(key);
           if (got === undefined) {
-            got = evaluateMetric(sql, decl, ctx);
+            got = readingHeld(decl, ctx, 'read', (s, c) => evaluateMetric(s, decl, c), once);
             readings.set(key, got);
           }
           return structuredClone(got);
         },
-        readApart: (decl) => evaluateMetric(sql, decl, { ...ctx, fx: () => ({ home: null, rates: [] }) }),
+        readApart: (decl) => readingHeld(decl, { ...ctx, fx: () => ({ home: null, rates: [] }) }, 'apart', (s, c) => evaluateMetric(s, decl, c), once),
         /* THE RECORD'S OWN SIGNS ARE READ OVER THE BUILT-IN ONES THE FIGURES READ, never a second read of them. */
         ...(signs ? { signs: () => structuredClone((every ??= everySign(structuredClone(ctx.signs!() as VitalSign[])))) } : {}),
         /* AND THE LOG A FEED IS DRAWN FROM, by how many lines it asks: every feed asks the same, and every look its seen. */
