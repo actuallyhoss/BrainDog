@@ -1799,9 +1799,7 @@ export function draw(
          */
         title: block.where || !block.empty ? `Nothing in ${held.name} yet.` : block.empty,
         ...(block.where || !block.empty ? {} : { authored: true as const }),
-        /* BE SPECIFIC ABOUT WHAT WILL BE HERE (19 §6). The register declares the sentence; every
-           register does, and one screen was reading it. */
-        body: 'Your agent fills this as it works.',
+        /* ONE LINE AND ONE BUTTON: the title says the list is empty, and a second line under it said who fills it. */
         /* AND ONE THING TO DO, when the surface knows where. A shared page does not: it is read-only
            and there is no list to open, so it gets the sentence and no button rather than a button
            that goes nowhere.

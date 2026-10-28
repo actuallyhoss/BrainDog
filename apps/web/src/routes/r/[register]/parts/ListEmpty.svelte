@@ -63,11 +63,7 @@
       ? 'Nothing outstanding.'
       : `Nothing in ${decl.name} yet.`}
   query={kind === 'no-results' ? [q, saidPlainly(register, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
-  body={kind === 'no-data-yet'
-    ? 'Your agent fills this as it works.'
-    : kind === 'no-results' && q
-      ? copy.searchesOnly(searched)
-      : undefined}
+  body={kind === 'no-results' && q ? copy.searchesOnly(searched) : undefined}
 >
   {#snippet actions()}
     <!-- NO "Add the first row" AND NO EXAMPLE ROW. The capture line sits directly above and the New button beside the
