@@ -9,11 +9,16 @@
  * AND THE QUESTIONS AN ANSWER COVERED: one a newer question said it answers too is closed as moot when that
  * one is answered, and is told here under its own words, with the answer that settled it and that decision's Undo.
  *
+ * AND THE QUESTIONS THAT TOOK THEMSELVES BACK: one that could no longer apply (its rows changed, or what it asked about
+ * is gone, `sweepStale`) or that was already so (`recheck`) is closed by the record, and told here once, under its own
+ * words, with the line that says why. Nothing was written, so it has no Undo (`withdrawn`), and its handle is the
+ * question's own.
+ *
  * IT WRITES NOTHING. Undoing a line is the record's own `undo` on its decision.
  */
 
 import type { Result } from '@braindog/ports';
-import { COVERED, HANDLED_REASONS, HANDLED_RULE } from '@braindog/kernel';
+import { CHANGED_NOTE, COVERED, GONE_NOTE, HANDLED_REASONS, HANDLED_RULE, MOOT_GONE, MOOT_HELD } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -24,8 +29,14 @@ export const HANDLED_MOST = 20;
 /** How many of today's decisions are read to find them. */
 const SCANNED = 200;
 
-/** One thing BrainDog did: the decision to undo, one plain line, the reason, and when. */
-export type HandledRow = { decision: string; line: string; why: string; at: string };
+/**
+ * One thing BrainDog did: the decision to undo, one plain line, the reason, and when. A question that took itself back
+ * carries `withdrawn` and its own handle in `decision`, and has nothing to undo.
+ */
+export type HandledRow = { decision: string; line: string; why: string; at: string; withdrawn?: true };
+
+/** The lines the record closes a question with by itself, as `handled` tells them. */
+const SELF_CLOSED = [CHANGED_NOTE, GONE_NOTE, MOOT_HELD, MOOT_GONE];
 
 /** What `handled` answers: today's lines, newest first, and how many more were held back past them. */
 export type Handled = { rows: HandledRow[]; more: number };
@@ -65,7 +76,31 @@ export function methods(deps: RecordDeps) {
         today,
         SCANNED,
       );
+      /* THE ONES THAT TOOK THEMSELVES BACK TODAY, by the record and in no decision's batch. */
+      const closed = sql.all<{ id: string; question: string | null; note: string; ts: string; body: string | null }>(
+        `SELECT s.id AS id, r.note AS note, r.ts AS ts, s.body AS body,
+           (SELECT coalesce(q.to_v, q.note) FROM event q WHERE q.kind = 'suggest' AND q.target = r.target AND q.field IS NULL ORDER BY q.rowid LIMIT 1) AS question
+         FROM event r JOIN suggestion s ON 'suggestion:' || s.id = r.target
+         WHERE r.kind = 'resolve' AND r.actor = 'system' AND r.batch IS NULL AND r.to_v IN ('withdrawn', 'moot') AND r.ts >= ?
+           AND r.note IN (SELECT value FROM json_each(?))
+         ORDER BY r.ts DESC, r.rowid DESC LIMIT ?`,
+        today,
+        JSON.stringify(SELF_CLOSED),
+        SCANNED,
+      );
       const rows: HandledRow[] = [];
+      for (const c of closed) {
+        if (c.question === null) continue;
+        let list: unknown;
+        try {
+          list = (JSON.parse(c.body ?? '{}') as { register?: unknown }).register;
+        } catch {
+          list = undefined;
+        }
+        if (typeof list === 'string' && (readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0)) continue;
+        const line = lineOf(c.question);
+        if (line !== '') rows.push({ decision: c.id, line, why: lineOf(c.note), at: c.ts, withdrawn: true });
+      }
       for (const c of covered) {
         if (c.undone !== null || c.question === null) continue;
         let list: unknown;

@@ -107,7 +107,7 @@
               <span class="h-what" dir="auto" data-own>{row.line}</span>
               {#if back}<span class="h-why">{words.putBack}</span>{:else if row.why}<span class="h-why" dir="auto" data-own>{row.why}</span>{/if}
             </span>
-            {#if !back && (row.told === undefined || (row.told?.changes ?? 0) > 0)}
+            {#if !back && !row.withdrawn && (row.told === undefined || (row.told?.changes ?? 0) > 0)}
               <button type="button" class="h-undo tap" disabled={busy !== null} aria-busy={busy === row.decision} data-handled-undo onclick={() => void undo(row.decision)}
                 >{HANDLED_WORDS.undo}</button
               >

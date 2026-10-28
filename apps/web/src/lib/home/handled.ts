@@ -38,7 +38,8 @@ export const HANDLED_WORDS = {
  * One thing BrainDog did: the decision that puts it back, one line, the reason under it, and when. A line about what an
  * agent finished of what he told it carries the run's receipts instead (`told`), which its Undo puts back.
  */
-export type HandledLine = { decision: string; line: string; why: string; at: string | null; told?: Receipts | null };
+/* A QUESTION THAT TOOK ITSELF BACK (`withdrawn`, the record's `sweepStale` and `recheck`) wrote nothing, so it has no Undo. */
+export type HandledLine = { decision: string; line: string; why: string; at: string | null; told?: Receipts | null; withdrawn?: true };
 
 /** What the record answers: today's lines newest first and how many it held back past its own limit. */
 export type Handled = { rows: HandledLine[]; more: number };
@@ -60,12 +61,12 @@ const plain = (v: unknown): string => (typeof v === 'string' ? v.replaceAll(/\s*
 
 function rowOf(v: unknown): HandledLine | null {
   if (typeof v !== 'object' || v === null) return null;
-  const r = v as { decision?: unknown; line?: unknown; why?: unknown; at?: unknown };
+  const r = v as { decision?: unknown; line?: unknown; why?: unknown; at?: unknown; withdrawn?: unknown };
   const decision = plain(r.decision);
   const line = plain(r.line);
   if (decision === '' || line === '' || ULID.test(line)) return null;
   const at = plain(r.at);
-  return { decision, line, why: plain(r.why), at: at === '' ? null : at };
+  return { decision, line, why: plain(r.why), at: at === '' ? null : at, ...(r.withdrawn === true ? { withdrawn: true as const } : {}) };
 }
 
 /** The record's answer as what the screen holds, or `null` for a refusal or an answer of another shape. */
