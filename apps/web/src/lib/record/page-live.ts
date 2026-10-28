@@ -1294,7 +1294,9 @@ export function agedText(text: string, asOf: string | undefined, today: string):
   if (asOf === undefined) return text;
   const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${asOf}T00:00:00Z`)) / 86_400_000);
   if (!Number.isFinite(days) || days < FIGURE_AGED_DAYS) return text;
-  return `${text} (as of ${format('day', Date.parse(`${asOf}T00:00:00Z`) / 86_400_000)})`;
+  const day = format('day', Date.parse(`${asOf}T00:00:00Z`) / 86_400_000);
+  /* A FIGURE THAT IS ITS OWN DAY ("the oldest balance is from 25 Aug") already says its age: "(as of 25 Aug)" after it said it twice. */
+  return text.includes(day) ? text : `${text} (as of ${day})`;
 }
 
 /** The primitives a source no arm knows is drawn in, and the types whose cells stand at a column's end. */
