@@ -122,11 +122,6 @@
 {/if}
 
 <style>
-  /* THE HELD CARD IS THE SHEET'S, not the browser's link preview. */
-  .list-cards :global(.card) {
-    -webkit-touch-callout: none;
-  }
-
   /* AN ARCHIVED CARD DIMS WHILE ITS RECEIPT SHOWS, as the grid's row does: its words go to the quiet ink and "Archived"
      and "Put back" under it stay at full ink. It leaves with the list's motion when the way back runs out. The quiet ink
      and not an opacity, for the grid's reason: at 0.45 its words read under 3 to 1. */
