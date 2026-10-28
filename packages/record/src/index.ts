@@ -12060,8 +12060,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * `{ body }`: Today's body drawn as `previewPage` draws it, with every tile's part beside it in the same answer
      * (`today.ts`): what BrainDog did itself, what is shared out, and the project cards' late work, runs and key numbers.
      * READ+, and it changes nothing. Each part is its own method's answer to this caller; one refused is `null`.
+     * To the owner, a read may be answered Today as it was last drawn, marked `behind` (`todayKept`); `fresh` is never.
      */
-    async today(args: { body?: unknown } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
+    async today(args: { body?: unknown; fresh?: boolean } | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;

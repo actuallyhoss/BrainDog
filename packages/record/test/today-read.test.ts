@@ -69,8 +69,13 @@ test('EACH PROJECT IS COUNTED ITS LATE WORK, one more for a task past its day th
   const decls = [...api.kernel.registers()].map(([, d]) => d as never);
   assert.ok(lateListsOf(decls, 'things').some((l) => l.id === 'tasks'), 'the work list is read for late work');
   value(await api.create({ register: 'tasks', fields: { what: 'Glaze the second batch', thing: 'things#1', by: '2026-08-20' } }, owner));
-  const after = value<TodayAnswer>(await api.today({ body: BODY }, owner)).cards!.lates;
-  assert.equal(after['1'] ?? 0, (before['1'] ?? 0) + 1);
+  /* A FIRST READ AFTER THE WRITE IS TODAY AS IT WAS LAST DRAWN, said `behind`; asked `fresh`, it is drawn now. */
+  const first = value<TodayAnswer>(await api.today({ body: BODY }, owner));
+  assert.equal(first.behind, true);
+  assert.deepEqual(first.cards!.lates, before);
+  const after = value<TodayAnswer>(await api.today({ body: BODY, fresh: true }, owner));
+  assert.equal(after.behind, undefined);
+  assert.equal(after.cards!.lates['1'] ?? 0, (before['1'] ?? 0) + 1);
   sql.close();
 });
 
