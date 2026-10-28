@@ -41,14 +41,14 @@
 
   const words = {
     title: 'Count cash',
-    sentence: 'Count the notes and coins in the box. If it is out, you say how the difference is recorded.',
+    sentence: 'The box against what is expected.',
     account: 'Account',
     notes: 'Notes and coins',
     totalOnly: 'Total counted',
-    totalHelp: 'This currency has no set of notes here, so type what the box holds.',
+    totalHelp: 'Type what the box holds.',
     total: 'Amount counted',
     expected: 'Expected',
-    typedBalance: 'Expected is the balance typed on the account; the record has no later figure for it.',
+    typedBalance: 'From the balance typed on the account.',
     out: 'Out by',
     agrees: 'Agrees',
     more: 'more than expected',
@@ -60,20 +60,18 @@
     how: 'Record the difference',
     asLines: 'As lines',
     asDiscrepancy: 'As Discrepancy',
-    linesHelp: 'Say what part of it was what. Whatever is left is filed as Discrepancy.',
-    discrepancyHelp: 'The whole difference is filed as one Discrepancy entry in the Ledger.',
+    linesHelp: 'What is left is filed as Discrepancy.',
+    discrepancyHelp: 'One Discrepancy entry in the Ledger.',
     what: 'What it was',
     amount: 'Amount',
     category: 'Category',
     addLine: 'Add a line',
     left: 'Left as Discrepancy',
-    noCash: 'No cash account to count',
-    noCashBody: 'Add an account of type Cash and it will be here to count.',
-    notSetUp: 'Counting cash is not set up',
-    notSetUpBody: 'Add Count cash from the add-ons, then open the counter from Count the cash on Money.',
+    noCash: 'No Cash account to count yet',
+    notSetUp: 'Add Count cash to count the box',
     addOn: 'See add-ons',
     saved: 'Count saved',
-    savedBody: 'The difference is being filed in the Ledger.',
+    savedBody: 'Filing the difference in the Ledger.',
     again: 'Count again',
     toMoney: 'Back to Money',
     reduce: (face: string) => `Take one ${face} away`,
@@ -184,13 +182,13 @@
 <PageHead icon="money" title={words.title} sentence={words.sentence} kicker="Money" back={at('/p/money', page.url.pathname)} />
 <div class="cc-page">
   {#if !ready}
-    <Empty kind="no-data-yet" glyph="money" title={words.notSetUp} body={words.notSetUpBody}>
+    <Empty kind="no-data-yet" glyph="money" title={words.notSetUp}>
       {#snippet actions()}<Button href={at('/addons', page.url.pathname)}>{words.addOn}</Button>{/snippet}
     </Empty>
   {:else if counter.state === 'waiting' || counter.state === 'refused' || counter.state === 'offline'}
     <ReadState state={counter.state} refusal={counter.refusal} onretry={counter.reread} />
   {:else if !account}
-    <Empty kind="no-data-yet" glyph="money" title={words.noCash} body={words.noCashBody} />
+    <Empty kind="no-data-yet" glyph="money" title={words.noCash} />
   {:else if step === 'done'}
     <div class="cc-done" role="status">
       <h2>{words.saved}</h2>

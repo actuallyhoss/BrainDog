@@ -27,8 +27,7 @@ export const said = {
   runsSaid: (n: number) => (n === 1 ? '1 run' : `${n.toLocaleString('en-GB')} runs`),
   asksOf: (max: number) => `of ${max.toLocaleString('en-GB')} asks`,
   firedWeek: (n: number) => `Automations fired ${n === 1 ? 'once' : `${n.toLocaleString('en-GB')} times`} in the last 7 days.`,
-  noActionRun: 'No scheduled action has run this month',
-  firedBody: "A scheduled action's runs are counted here, day by day. An automation that files or marks something is not counted.",
+  noActionRun: 'No scheduled runs this month',
 } as const;
 
 /** Where a meter reads as near its limit: the Directory's `NOTICE_AT`, as `actions.ts` holds it. */

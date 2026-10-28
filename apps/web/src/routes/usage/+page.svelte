@@ -142,14 +142,13 @@
    */
   /* The empty month's words. */
   const usageWords = {
-    emptyBody: 'When an agent or an automation runs, what it used is counted here, day by day.',
-    seeAgents: 'See your agents',
-    seeAutomations: 'See your automations',
+    seeAgents: 'Agents',
+    seeAutomations: 'Automations',
   } as const;
 
   const said = {
     counted: 'Deliveries and arrivals',
-    countedWhy: 'Counted here and never held by the monthly limit, because neither is work this record chose to run: one is a notice it owed somebody, the other is something sent to it.',
+    countedWhy: 'Not held by the monthly limit.',
     sent: 'Sent',
     arrived: 'Arrived',
     sentCount: (n: string) => `${n} sent`,
@@ -355,11 +354,10 @@
           kind="no-data-yet"
           glyph="chart-bar"
           title={view.current ? ((view.fired ?? 0) > 0 ? reading.noActionRun : words.noUsage) : words.noUsageIn(monthWords(view.month))}
-          body={(view.fired ?? 0) > 0 ? reading.firedBody : usageWords.emptyBody}
         >
           {#snippet actions()}
-            {#if (view.fired ?? 0) > 0}<Button weight="primary" href="/automations">{usageWords.seeAutomations}</Button>
-            {:else}<Button weight="primary" href="/agents">{usageWords.seeAgents}</Button>{/if}
+            {#if (view.fired ?? 0) > 0}<Button weight="quiet" href="/automations">{usageWords.seeAutomations}</Button>
+            {:else}<Button weight="quiet" href="/agents">{usageWords.seeAgents}</Button>{/if}
           {/snippet}
         </Empty>
       {:else if sliced.length === 0}
