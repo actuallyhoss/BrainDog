@@ -401,7 +401,7 @@ test('September is Sep down the whole screen, and the dot between two parts of a
   const markup = page.slice(page.indexOf('{#snippet entry('), page.indexOf('<PageHead'));
   assert.doesNotMatch(markup, />\s+·/u, 'an element opens on white space and a dot');
   assert.match(markup, /<span class="note" title=\{note\} data-own>\{' · '\}\{note\}<\/span>/u);
-  assert.match(markup, /<span class="where-chip">\{'· '\}\{thing\.list\}<\/span>/u, 'where it happened is said after a dot of its own');
+  assert.match(markup, /<span class="where-chip">\{' · '\}\{thing\.list\}<\/span>/u, 'where it happened is said after a dot of its own');
 });
 
 /* WHO A RUN IS (history-run-by-web-68): a line a run signed carries run_by, and the screen says the app it ran in. */

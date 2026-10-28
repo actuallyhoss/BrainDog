@@ -728,10 +728,10 @@
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.you && myName ? myName : by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : by.name)}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}</span
+            >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : by.name)}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}<!--
+              WHERE IT HAPPENED, in the same run of quiet words, so it wraps with them on a phone: the list a row is in.
+            -->{#if thing?.list}<span class="where-chip">{' · '}{thing.list}</span>{/if}</span
           >
-          <!-- WHERE IT HAPPENED, at the line's end in the same quiet words: the list a row is in, as the rail names it. -->
-          {#if thing?.list}<span class="where-chip">{'· '}{thing.list}</span>{/if}
         </span>
       </span>
       <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
@@ -1219,14 +1219,7 @@
   /* WHERE IT HAPPENED, right after who and what in the line's own quiet words: the list a row is in. A pill on every
      line of a long feed was chrome repeated thirty times. */
   .where-chip {
-    flex: none;
-    max-inline-size: 12em;
-    overflow: hidden;
     color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 20px;
-    text-overflow: ellipsis;
-    white-space: pre;
   }
 
   /* A TIME IN A FEED IS GEIST AT 13 WITH TABULAR FIGURES, in the quiet ink: the figures line up down the tile without a
