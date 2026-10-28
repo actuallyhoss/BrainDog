@@ -53,7 +53,6 @@ export const palette = {
   slashBusy: 'BrainDog is busy. Trying again.',
   slashWhere: 'Slash looked for',
   slashSearched: (q: string) => `Slash searched the record for “${q}”`,
-  slashFound: 'What Slash found',
   slashNothing: 'Nothing in the record answers that.',
   slashFold: 'What Slash read',
   slashFoldLine: (register: string, rows: number, predicate: string) => `${register}: ${rows === 1 ? '1 item' : `${rows.toLocaleString('en')} items`}, ${predicate}`,
