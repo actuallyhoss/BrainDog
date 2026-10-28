@@ -110,8 +110,9 @@ test('PORTFOLIO PROVIDES NUMBERS AND KEY NUMBERS, needs no other list, and found
   /* 3.1.0 SINCE 24 October (things, not rows): its project page is drawn for every project; Numbers is handed as 3.0.0 did.
      3.2.0 since its project page draws Portfolio 1.23.0's stages, and 3.3.0 since it declares the project's shape as
      blocks, and 3.4.0 since Last worked reads the runs too and the Dashboard says how old its numbers are, and 3.6.0
-     beside Portfolio 1.27.0's Add a project box, and 3.7.0 since its project page draws the page of 27 October. */
-  assert.equal(doc.version, '3.7.0');
+     beside Portfolio 1.27.0's Add a project box, and 3.7.0 since its project page draws the page of 27 October, and
+     3.7.1 since its card's summary is one short line. */
+  assert.equal(doc.version, '3.7.1');
   assert.equal(doc.hands['register.datapoints'], 'portfolio');
   assert.ok(!doc.declarations.some((d) => d.register === 'datapoints'), 'founder declares Numbers no more');
   assert.ok(!(doc.seeds ?? []).some((s) => s.register === 'datapoints'), 'and seeds no list it does not own');

@@ -234,6 +234,22 @@ const LAID: Record<string, Laid> = {
     declares: '192a7f45d2533b26',
     history: ['3.7.0 lays what 3.6.0 laid, word for word: its own project page changed, and nothing it lays on another pack -> 192a7f45d2533b26'],
   },
+  /* 3.7.1, THE CARD'S SUMMARY IN ONE SHORT LINE: it lays what 3.7.0 laid, word for word. */
+  'founder@3.7.1': {
+    lays: [
+      'adds page.relation after People: Numbers, 30 days',
+      'adds page.relation after People: Latest numbers',
+      'adds page.relation after People: Send numbers here',
+      'adds page.portfolio after In play: ',
+      'adds page.estate after Next ninety days: Server and provider numbers',
+      'adds page.relation after Notes: Where it was seen',
+      'adds page.someone after Notes: Where it was seen',
+      'hands register.organisations to people',
+      'hands register.datapoints to portfolio',
+    ],
+    declares: '192a7f45d2533b26',
+    history: ["3.7.1 lays what 3.7.0 laid, word for word: only the card's summary changed -> 192a7f45d2533b26"],
+  },
   /* PERSONAL LAYS FOR THE FIRST TIME AT 2.4.0 (budgets-set-73, integrate 73): the count of budgets set goes to Money,
      which declares it since money-core 3.17.0. 2.3.1, released, laid nothing and has no entry. */
   'personal@2.4.0': {
@@ -252,6 +268,12 @@ const LAID: Record<string, Laid> = {
     lays: ['hands metric.budgets-set to money-core'],
     declares: '5719e519311f68f0',
     history: ['2.6.0 lays what 2.5.0 laid, word for word; it adds `needs` and nothing it lays moved -> 5719e519311f68f0'],
+  },
+  /* 2.6.1, THE CARD'S SUMMARY IN ONE SHORT LINE: it lays what 2.6.0 laid, word for word. */
+  'personal@2.6.1': {
+    lays: ['hands metric.budgets-set to money-core'],
+    declares: '5719e519311f68f0',
+    history: ["2.6.1 lays what 2.6.0 laid, word for word: only the card's summary changed -> 5719e519311f68f0"],
   },
 };
 

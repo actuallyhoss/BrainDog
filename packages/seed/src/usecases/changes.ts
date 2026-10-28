@@ -18,18 +18,24 @@ export type UseCaseChange = { version: string; notes: string };
 const NAMED = (list: string): string =>
   `Each setting now names the list it is for, such as the ${list} list, and your own lists come first.`;
 
+/** The note for the patch that says each starter in one short line on its card. Nothing in a record changes. */
+const SUMMARY = 'Its card says what it is for in one short line. Nothing in your record changes.';
+
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.6.1', notes: SUMMARY },
     { version: '2.6.0', notes: 'A new Personal record starts with Money and the Projects it points at. People comes when you name someone, and anything else when you add it. A record you already have keeps everything it holds, and nothing on its pages changes.' },
     { version: '2.5.0', notes: 'A new Home has something to press. Until an account counts as cash, Bring your money in links to adding one, forwarding a bank message and add-ons for your bank. Until you keep a savings goal or have a project on the go, a line names the first one. Each goes once you have it.' },
     { version: '2.4.0', notes: 'The count of the budgets you have set is kept by Money now, so Home and Money read the same one. Nothing you see on Home changes.' },
     { version: '2.3.1', notes: NAMED('Ledger') },
   ],
   student: [
+    { version: '1.6.1', notes: SUMMARY },
     { version: '1.6.0', notes: 'Studies is part of Student now: a piece of work can carry a mark as a number, and a reading list of books and papers sits beside your courses.' },
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.7.1', notes: SUMMARY },
     { version: '3.7.0', notes: "A project page leads with what is true of the project, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane: what it brings in, its dated path, or what it costs to keep. Its numbers have lines and say their age, and its dates, what it runs on and renews, its agents and what happened sit under them. Projects opens on what needs you and one sorted list." },
     { version: '3.6.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
     {
@@ -73,6 +79,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.29.1', notes: SUMMARY },
     { version: '2.29.0', notes: 'Team task list is part of Team board now: a cycle can carry a write-up of how it went.' },
     { version: '2.28.0', notes: "A product's page leads with what is true of it, not its next step, and draws that step once as a list with its dates. Beside it is a tile by lane, and its numbers, dates, what it runs on, its agents and what happened sit under it. Projects opens on what needs you and one sorted list." },
     { version: '2.27.0', notes: 'A record with no project in play opens Projects on a box to add one, under one line.' },
@@ -108,10 +115,12 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   guide: [
+    { version: '1.7.1', notes: SUMMARY },
     { version: '1.7.0', notes: 'Starting a project is part of the New project guide now: a step can say why it is worth doing.' },
     { version: '1.6.1', notes: NAMED('Steps') },
   ],
   shop: [
+    { version: '1.4.1', notes: SUMMARY },
     { version: '1.4.0', notes: 'The Orders page opens on a box to add an order, so a new shop has something to press on its first tab.' },
     { version: '1.3.0', notes: 'Orders sits second in the menu, after Work and before Projects, Money and People.' },
     {
@@ -125,6 +134,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.0.0', notes: 'The first version: Orders and Products, and an Orders page that says the month\'s orders, what ships this week and who still owes you.' },
   ],
   business: [
+    { version: '1.7.2', notes: SUMMARY },
     { version: '1.7.1', notes: 'Home is called Today on the page too, as it already was in the menu. It says what stopped reporting: Gone quiet lists what this record was taking and no longer is, with the day each was last seen.' },
     {
       version: '1.7.0',

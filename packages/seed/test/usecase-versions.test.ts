@@ -1140,6 +1140,35 @@ const DECLARED: Record<string, Version> = {
       "Cut beside the frozen 2.5.0 for `needs` (usecase-needs-102): a fresh record installs Money, the Projects it points at and what the words point at, `page.home-personal` already leads from Money's figures and this pack's own lists, and a block or a role laid on a list the record does not hold (`extends.register.people.role.family` among them) is cut at install; nothing declared, taken away or reworded -> 32aff23db88fea96",
     ],
   },
+  /* 2.6.1: THE CARD'S SUMMARY IS ONE SHORT LINE. 2.6.0 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'personal@2.6.1': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson hands.metric.budgets-set.money-core
+      metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active metric.logged-by-goal
+      metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held metric.saved-toward-goals
+      metric.savings-active metric.savings-held metric.steps-done metric.steps-left page.goals page.home-personal
+      page.my-project register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_accounts setting.label_books
+      setting.label_categories setting.label_goal_log setting.label_goals setting.label_installments
+      setting.label_obligations setting.label_people setting.label_people__role__accountant
+      setting.label_people__role__client setting.label_people__role__collaborator setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_recurring setting.label_savings_goals
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts
+      setting.one_books setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by setting.one_recurring
+      setting.one_savings_goals setting.one_things setting.one_transactions setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty setting.voice_right_now
+      setting.voice_since_away
+    `,
+    declares: '32aff23db88fea96',
+    history: ["The card's summary is one short line, a word outside the pack; `page.home-personal` and every other declaration are 2.6.0's word for word -> 32aff23db88fea96"],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -1609,6 +1638,29 @@ const DECLARED: Record<string, Version> = {
       "The project page of 27 October: `page.project` draws the project's parts in three blocks, lane by lane; the plan and Key numbers move under More about, What changed, the Numbers lines and Where it was seen go, and Send numbers here is folded last. No id added or taken away -> eb077e6d7cda38bd",
     ],
   },
+  /* 3.7.1: THE CARD'S SUMMARY IS ONE SHORT LINE. 3.7.0 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'founder@3.7.1': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
+      extends.register.datapoints.organisation extends.register.datapoints.about_service
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
+      metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
+      metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'eb077e6d7cda38bd',
+    history: ["The card's summary is one short line, a word outside the pack; `page.home-founder` and every other declaration are 3.7.0's word for word -> eb077e6d7cda38bd"],
+  },
   'founder@3.6.0': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
@@ -2062,6 +2114,15 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 1.7.1: `page.home-business` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under What you have and not drawn while nothing is quiet; a block added, no id added or taken away -> b4eb9cf32455cdd4",
     ],
   },
+  /* 1.7.2: THE CARD'S SUMMARY IS ONE SHORT LINE. 1.7.1 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'business@1.7.2': {
+    holds: `
+      page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
+      setting.voice_nothing_due
+    `,
+    declares: 'b4eb9cf32455cdd4',
+    history: ["The card's summary is one short line, a word outside the pack; `page.home-business` and every other declaration are 1.7.1's word for word -> b4eb9cf32455cdd4"],
+  },
   /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. Unreleased, so the
       Orders section, an order's total and the month's count fold into it rather than a 1.0.1. */
   'shop@1.0.0': {
@@ -2128,12 +2189,31 @@ const DECLARED: Record<string, Version> = {
       '`page.orders` opens on a capture box for `register.orders` under its line, "Add an order", where a new shop drew nothing to press -> db1dc8be3e901825',
     ],
   },
+  /* 1.4.1: THE CARD'S SUMMARY IS ONE SHORT LINE. 1.4.0 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'shop@1.4.1': {
+    holds: `
+      metric.orders-30d metric.orders-due-7d metric.orders-late metric.orders-owed metric.orders-owed-named metric.orders-owed-other
+      page.orders register.orders register.products setting.label_orders
+      setting.label_people setting.label_products setting.one_orders setting.one_people setting.one_products
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: 'db1dc8be3e901825',
+    history: ["The card's summary is one short line, a word outside the pack; `page.orders` and every other declaration are 1.4.0's word for word -> db1dc8be3e901825"],
+  },
   'guide@1.7.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway metric.guide-resources metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices metric.milestone-resources metric.milestone-steps page.guide page.home-guide page.milestone register.choices register.milestones register.resources register.steps rule.guide_milestone_open rule.guide_milestone_passed setting.label_choices setting.label_milestones setting.label_resources setting.label_steps setting.one_choices setting.one_milestones setting.one_resources setting.one_steps setting.shared_version setting.speaks setting.start_next_milestone setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
     `,
     declares: '8719fe1699ace09b',
     history: ["Starting a project is part of the New project guide now: `register.steps` gains a why, the reason for a step; nothing taken away -> 8719fe1699ace09b"],
+  },
+  /* 1.7.1: THE CARD'S SUMMARY IS ONE SHORT LINE. 1.7.0 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'guide@1.7.1': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway metric.guide-resources metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices metric.milestone-resources metric.milestone-steps page.guide page.home-guide page.milestone register.choices register.milestones register.resources register.steps rule.guide_milestone_open rule.guide_milestone_passed setting.label_choices setting.label_milestones setting.label_resources setting.label_steps setting.one_choices setting.one_milestones setting.one_resources setting.one_steps setting.shared_version setting.speaks setting.start_next_milestone setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '8719fe1699ace09b',
+    history: ["The card's summary is one short line, a word outside the pack; `page.home-guide` and every other declaration are 1.7.0's word for word -> 8719fe1699ace09b"],
   },
   'student@1.6.0': {
     holds: `
@@ -2142,12 +2222,28 @@ const DECLARED: Record<string, Version> = {
     declares: '7ad0fb8e9bdb5e06',
     history: ["Studies is part of Student now: `register.assignments` gains a mark, and `register.course_reads` is a reading list beside the courses; nothing taken away -> 7ad0fb8e9bdb5e06"],
   },
+  /* 1.6.1: THE CARD'S SUMMARY IS ONE SHORT LINE. 1.6.0 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'student@1.6.1': {
+    holds: `
+      metric.courses-held metric.homework-due-7d metric.homework-later metric.homework-open metric.study-done-12w metric.study-held page.home-student page.studies register.assignments register.course_reads register.courses register.study_sessions setting.label_assignments setting.label_course_reads setting.label_courses setting.label_study_sessions setting.one_assignments setting.one_course_reads setting.one_courses setting.one_study_sessions setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '7ad0fb8e9bdb5e06',
+    history: ["The card's summary is one short line, a word outside the pack; `page.home-student` and every other declaration are 1.6.0's word for word -> 7ad0fb8e9bdb5e06"],
+  },
   'team@2.29.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project register.cycle_days register.cycle_plan register.cycles rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day script.plan_follows_ticket setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
     `,
     declares: '8d09acce2d6bc162',
     history: ["Team task list is part of Team board now: `register.cycles` gains a retro, a document for how the cycle went; nothing taken away -> 8d09acce2d6bc162"],
+  },
+  /* 2.29.1: THE CARD'S SUMMARY IS ONE SHORT LINE. 2.29.0 IS IN THE CATALOGUE, so a version of its own; nothing it declares moved. */
+  'team@2.29.1': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project register.cycle_days register.cycle_plan register.cycles rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day script.plan_follows_ticket setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '8d09acce2d6bc162',
+    history: ["The card's summary is one short line, a word outside the pack; `page.home-team` and every other declaration are 2.29.0's word for word -> 8d09acce2d6bc162"],
   },
 };
 
