@@ -60,6 +60,6 @@ test('A BANK LINE READS AS A NAME: its own date stamp and a till number run onto
   assert.equal(timelineTitle('WREN ABERNATHY HOLLOWAY'), 'Wren Abernathy Holloway');
   /* A PERSON'S OWN WORDS ARE KEPT: small letters, a short word, and a stamp that is the whole line. */
   assert.equal(timelineTitle('Rent2'), 'Rent2');
-  assert.equal(timelineTitle('HMRC VAT Q3'), 'Hmrc VAT Q3');
+  assert.equal(timelineTitle('HMRC VAT Q3'), 'HMRC VAT Q3');
   assert.equal(timelineTitle('22OCT26'), '22OCT26');
 });
