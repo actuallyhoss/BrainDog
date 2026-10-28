@@ -13,7 +13,7 @@ import { test } from 'node:test';
 
 import { codeOf, refused } from '@braindog/ports';
 
-import { ASK_CAP_DEFAULT, BACKGROUND_ASKS_MONTH, createSlash } from '../src/index.ts';
+import { ASK_CAP_DEFAULT, BACKGROUND_ASKS_MONTH, DEEP_CAP_CENTS_DEFAULT, DEEP_HARDER, DEEP_MODEL, createSlash } from '../src/index.ts';
 import { canned, fakeRecord, fixedClock, MEMBER, NOW, OWNER, openSqlite } from './double.ts';
 
 const build = () => {
@@ -52,6 +52,7 @@ test('status is the included source on tier a, the routing table model, and a ca
     model: 'glm-5.3-flash',
     asks: { used: 0, cap: 80, resets: '2026-12-01T00:00:00.000Z', capped: true },
     background: { used: 0, cap: 600 },
+    deep: { key: false, model: DEEP_MODEL, harder: DEEP_HARDER, cap_cents: DEEP_CAP_CENTS_DEFAULT, spent_cents: 0 },
   });
 });
 
@@ -72,6 +73,7 @@ test('on his own key status says so, lists his asks uncapped, and a save of noth
     model: 'claude-x',
     asks: { used: 1, cap: 80, resets: '2026-12-01T00:00:00.000Z', capped: false },
     background: { used: 0, cap: 600 },
+    deep: { key: true, model: DEEP_MODEL, harder: DEEP_HARDER, cap_cents: DEEP_CAP_CENTS_DEFAULT, spent_cents: 0 },
   });
   const read = slash.configure({}, OWNER);
   assert.ok(read.ok);
