@@ -145,7 +145,7 @@ export const heatLines = (plan: HeatPlan): { day: string; count: string }[] =>
   plan.cells.flatMap((c) => (c.count === null ? [] : [{ day: day(c.day), count: c.count }]));
 
 /** The renderer's own words, as `roadmap.ts` keeps its own: it imports nothing from the app. */
-export const HEAT_NONE = 'Nothing here falls in the last twelve weeks.';
+export const HEAT_NONE = 'Nothing in the last 12 weeks.';
 export const HEAT_DAY = 'Day';
 export const HEAT_VALUE = 'Value';
 /** What a day's wash is on a block with `of:`, as the grid's name and the table's heading say it. */

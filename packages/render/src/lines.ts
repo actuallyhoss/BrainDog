@@ -282,7 +282,7 @@ export function linesAge(plan: Pick<LinesPlan, 'last'>, now?: number): string {
 
 /** The renderer's own words, as `series.ts` keeps its own: it imports nothing from the app. */
 export const LINES_LAST = 'Last reading';
-export const LINES_NONE = 'Nothing to draw yet: no point here has a value.';
+export const LINES_NONE = 'No values to draw yet.';
 export const LINES_NOTHING = 'no values';
 /** NOT "The numbers", which is what a page of tiles is headed: a chart's fold holds the points it was drawn from. */
 export const LINES_NUMBERS = 'Points on this chart';

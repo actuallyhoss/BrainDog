@@ -377,7 +377,7 @@ export const DAY_SECONDS = 86_400;
 export const ROADMAP_WHAT = 'What';
 export const ROADMAP_FROM = 'From';
 export const ROADMAP_DUE = 'Due';
-export const ROADMAP_NONE = 'Nothing here has a date that can be drawn.';
+export const ROADMAP_NONE = 'No dates to draw.';
 /* "THE DATE OR THE EFFORT", because a row is skipped for either. This said only the date, and `Glaze | 2026-09-20 |
    2 days` was told its good day did not read while the cell at fault was the effort. */
 export const roadmapSkipped = (titles: readonly string[]): string => `Not drawn, because the date or the effort does not read: ${titles.join(', ')}.`;

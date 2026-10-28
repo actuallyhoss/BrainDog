@@ -78,7 +78,7 @@ test('nothing in view is the sentence, and a clock that is not a day draws nothi
   assert.deepEqual([old.empty, old.outside], [true, 1]);
   assert.equal(heatPlan([], TODAY).empty, true);
   assert.equal(heatPlan([{ day: TODAY, value: '1' }], '').empty, true);
-  assert.equal(HEAT_NONE, 'Nothing here falls in the last twelve weeks.');
+  assert.equal(HEAT_NONE, 'Nothing in the last 12 weeks.');
 });
 
 /* ── the fence ────────────────────────────────────────────────────────────── */
@@ -99,7 +99,7 @@ test('the fence is `day | value` on the grid, and toHTML draws the weeks, the wa
   assert.match(html, /<p class="heat-skipped">Not drawn, because the day or the value does not read: soon\.<\/p>/u);
 
   const none = toHTML(parse('```heat\n2025-01-06 | 3\n```'), { now: NOW });
-  assert.match(none, /<p class="heat-empty">Nothing here falls in the last twelve weeks\.<\/p>/u);
+  assert.match(none, /<p class="heat-empty">Nothing in the last 12 weeks\.<\/p>/u);
   assert.match(none, /<p class="heat-outside">1 day falls outside the twelve weeks to today and is not drawn\.<\/p>/u);
   assert.doesNotMatch(none, /heat-grid/u);
 });

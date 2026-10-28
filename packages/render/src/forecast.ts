@@ -1450,7 +1450,7 @@ export const FORECAST_PAINT = {
 } as const satisfies Record<string, Readonly<Record<string, string>>>;
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */
-export const FORECAST_NONE = 'There is no balance to walk from, so there is no forecast yet.';
+export const FORECAST_NONE = 'No balance to forecast from yet.';
 export const FORECAST_NUMBERS = 'Every movement';
 export const FORECAST_WHEN = 'When';
 export const FORECAST_WHAT = 'What';

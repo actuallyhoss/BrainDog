@@ -311,7 +311,7 @@ function seriesScale(hi: number, lo: number, y: (v: number) => number, template:
 }
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */
-export const SERIES_NONE = 'Nothing to draw yet: every bucket here is empty or zero.';
+export const SERIES_NONE = 'Nothing to draw yet.';
 export const SERIES_NET = 'Net';
 /** The key of the red cap on a month whose net is below zero, so the red always has its word. */
 export const SERIES_UNDER = 'More out than in';
