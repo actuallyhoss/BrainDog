@@ -63,6 +63,9 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { machineOf, outcomeOf, runTail, toolsOf, toolsSaid, words as runWords } from '../charts.ts';
   import { costWords } from './cost.ts';
+  import SendButton from '$lib/send/SendButton.svelte';
+  import SendStrip from '$lib/send/SendStrip.svelte';
+  import { refs as sendRefs } from '$lib/send/send.ts';
 
   const id = $derived(String(route.params.id ?? ''));
   const base = $derived(apiBase(route.url));
@@ -209,7 +212,11 @@
         ></span>{/if}{#if red}<span class="state-word" data-needs>{said.word}</span>{:else}<span class="state-word">{said.word}</span>{/if}{runTail(status, lost, row)}</span
     >{/if}{/snippet}
 
-<PageHead {title} kicker={words.heading} back="/jobs" sentence={status !== null && said !== null ? sentence : undefined} />
+<!-- A FAILED RUN, SENT: to Slash to say why, or to an agent to try again (`$lib/send`). Only a failure; a run that is
+     going or went well has nothing to hand on. -->
+{#snippet sendRun()}<SendButton kind="run" attach={[{ ref: sendRefs.run(id), label: title }]} fallback={`Why did “${title}” fail, and what would fix it?`} />{/snippet}
+
+<PageHead {title} kicker={words.heading} back="/jobs" sentence={status !== null && said !== null ? sentence : undefined} actions={outcome === 'failed' ? sendRun : undefined} />
 
 <div class="page">
   {#if route.data.refused}
@@ -226,6 +233,7 @@
   {:else if status === null || said === null}
     <Waiting rows={4} />
   {:else}
+    <SendStrip ref={sendRefs.run(id)} kind="run" label={title} />
     {#if row || tally.calls > 0}
       <Tile icon="session" title={runWords.runTitle}>
         {#if row}

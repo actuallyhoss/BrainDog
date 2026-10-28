@@ -45,6 +45,7 @@
     lastCopy,
     leadFault,
     nearest,
+    plainSign,
     type CopyState,
     type Engine,
     type Fault,
@@ -74,6 +75,9 @@
   import Export from './areas/Export.svelte';
   import Delete from './areas/Delete.svelte';
   import Words from './areas/Words.svelte';
+  import SendButton from '$lib/send/SendButton.svelte';
+  import SendStrip from '$lib/send/SendStrip.svelte';
+  import { refs as sendRefs } from '$lib/send/send.ts';
   import { homeCurrency } from '$lib/record/api.ts';
 
   /**
@@ -341,6 +345,9 @@
    * the record hands it (the owner of a self-hosted record).
    */
   const fault = $derived(SAID_ON.has(area) ? leadFault(faults) : null);
+  /* THE RED SIGN THE SENTENCE NAMES, when no open fault comes first: what "Send to…" under it hands on (`$lib/send`). */
+  const redSign = $derived(health !== null && !fault ? (signs?.find((x) => x.state === 'red') ?? null) : null);
+  const redSaid = $derived(redSign ? plainSign(redSign.said ?? redSign.sign).replace(/[.!?]$/u, '') : '');
   let retrying = $state<string | null>(null);
   let retryFix = $state('');
   let details = $state(false);
@@ -418,6 +425,16 @@
   {/if}
 {/snippet}
 
+<!-- A RED SIGN, SENT: to Slash to say why, or to an agent to cure it, with what came back under it. -->
+{#snippet signTools()}
+  {#if redSign}
+    <div class="sign-send">
+      <SendButton kind="sign" size="sm" attach={[{ ref: sendRefs.sign(redSign.sign), label: redSaid }]} fallback={`Why is “${redSaid}” red, and what would cure it?`} />
+      <SendStrip ref={sendRefs.sign(redSign.sign)} kind="sign" label={redSaid} />
+    </div>
+  {/if}
+{/snippet}
+
 <svelte:head><title>{titleOf(label, copy.settings)}</title></svelte:head>
 
 {#if param === 'look'}
@@ -453,7 +470,7 @@
 {/snippet}
 {#if known}
   <!-- EACH AREA UNDER ITS OWN GLYPH (agents F28): the sun for Appearance, the bell for Notifications. -->
-  <PageHead icon={known.icon} kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : undefined} />
+  <PageHead icon={known.icon} kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : redSign ? signTools : undefined} />
 {:else}
   <!-- THE INDEX OPENS ON A LEAD TILE, as a declared page does: its name and Arrange ride over the top of the tile and the
        line under them is the headline. Arrange waits for the pointer or the keyboard to reach the tile. `display:
@@ -463,7 +480,7 @@
       icon="settings"
       title={copy.settings}
       sentence={health ? healthLine : words.lead(shell.refused ? '' : shell.index.name)}
-      below={fault ? faultTools : undefined}
+      below={fault ? faultTools : redSign ? signTools : undefined}
       actions={indexTools}
     />
   </div>
@@ -572,6 +589,13 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
+  }
+
+  .sign-send {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-3);
   }
 
   /* Always in the document, so the record's refusal is announced when it arrives. Empty, it takes no room. */

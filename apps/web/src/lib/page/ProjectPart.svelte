@@ -150,15 +150,22 @@
             </ul>
           </div>
         {/if}
-        {#if facts.red || facts.soft}
+        {#if facts.red || facts.soft || hold.seq > 0}
           <div class="h-acts">
             {#if facts.red}<Button weight="primary" href={facts.red.href}>{facts.red.said}</Button>{/if}
             {#if facts.soft}<Button href={facts.soft.href}>{facts.soft.said}</Button>{/if}
+            <!-- SEND TO…: the project to Slash or an agent, fetched with the hero and not before. -->
+            {#if hold.register !== '' && hold.seq > 0}
+              {@const ref = `${hold.register}#${hold.seq}`}
+              {#await import('../send/SendButton.svelte') then { default: SendButton }}<SendButton kind={hold.register} attach={[{ ref, label: name }]} project={ref} />{/await}
+            {/if}
           </div>
         {/if}
       </section>
     {/if}
     {#if read && hold.register !== '' && hold.seq > 0}
+      <!-- WHAT WAS SENT FROM THE PROJECT, and what came back, under its hero. -->
+      {#await import('../send/SendStrip.svelte') then { default: SendStrip }}<SendStrip ref="{hold.register}#{hold.seq}" kind={hold.register} label={hold.name} />{/await}
       <!-- THE PROJECT'S VISUALS, its audits, plans and designs, under the hero: nothing when it holds none. -->
       <VisualStrip on="{hold.register}#{hold.seq}" tile />
     {/if}
