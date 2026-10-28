@@ -91,6 +91,8 @@ test('the body is the line, Money and Quick side by side, then what was put off 
       ['queue', 'governance.open', false, false],
       ['queue', 'governance.open', false, false],
       ['section', '', false, true],
+      ['queue', 'governance.apart', false, false],
+      ['section', '', false, true],
       ['queue', 'governance.later', false, false],
       ['section', '', false, true],
       ['table', 'governance.decided', false, false],
@@ -128,7 +130,7 @@ test('the record draws the page: the first question whole, the rest after it onc
   for (const b of blocks.filter((x) => x.source === 'governance.open')) assert.deepEqual(waitingOf(b), { stale: 0, hardToUndo: 0 });
 
   const shaped = decideDrawn(blocks, got.now, (q) => (q.who === 'slash' ? 'Slash' : ''));
-  const [note, money, quick, , later, , decided] = shaped.blocks;
+  const [note, money, quick, , , , later, , decided] = shaped.blocks;
   /* THE LINE WENT TO THE HEAD, and says how many wait and what the first suggests. */
   assert.equal(note?.drawn, false);
   assert.equal(shaped.open, 3);
