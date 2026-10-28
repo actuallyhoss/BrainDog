@@ -1245,7 +1245,7 @@ export type SlashChatAction = {
 export type SlashChatEvent =
   | { type: 'thread'; id: string }
   | { type: 'step'; text: string }
-  | { type: 'delta'; text: string }
+  | { type: 'delta'; text: string; figures?: { ref: string; label: string }[] }
   | ({ type: 'action' } & Omit<SlashChatAction, 'state'>)
   | { type: 'navigate'; href: string; label: string }
   | { type: 'error'; text: string }

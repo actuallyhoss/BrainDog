@@ -34,7 +34,7 @@ export type Spent = { asks: number; left: number | null };
 export type ChatEvent =
   | { type: 'thread'; id: string }
   | { type: 'step'; text: string }
-  | { type: 'delta'; text: string }
+  | { type: 'delta'; text: string; figures?: Record<string, unknown> }
   | ({ type: 'action' } & ChatAction)
   | { type: 'navigate'; href: string; label: string }
   | { type: 'error'; text: string }
@@ -95,9 +95,14 @@ export function eventOf(line: string): ChatEvent | null {
     case 'thread':
       return str(v.id) ? { type: 'thread', id: v.id as string } : null;
     case 'step':
-    case 'delta':
     case 'error':
       return typeof v.text === 'string' ? { type: v.type, text: v.text } : null;
+    case 'delta': {
+      if (typeof v.text !== 'string') return null;
+      /* THE ROWS THIS PIECE LINKS, so a link that streams in is drawn by its name before `done` comes. */
+      const figures = figuresOf(v.figures);
+      return { type: 'delta', text: v.text, ...(figures ? { figures } : {}) };
+    }
     case 'navigate':
       return str(v.href) ? { type: 'navigate', href: v.href as string, label: str(v.label) ?? (v.href as string) } : null;
     case 'action': {

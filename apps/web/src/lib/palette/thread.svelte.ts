@@ -131,6 +131,7 @@ export async function ask(message: string, page: PageContext, base = apiBase()):
           turn.steps.push(e.text);
           break;
         case 'delta':
+          if (e.figures) turn.figures = { ...turn.figures, ...e.figures };
           turn.text += e.text;
           break;
         case 'action': {
@@ -146,7 +147,7 @@ export async function ask(message: string, page: PageContext, base = apiBase()):
           break;
         case 'done':
           convo.left = e.spent.left;
-          if (e.figures) turn.figures = e.figures;
+          if (e.figures) turn.figures = { ...turn.figures, ...e.figures };
           break;
       }
     },
