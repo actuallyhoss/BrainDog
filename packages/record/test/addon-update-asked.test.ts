@@ -1,6 +1,7 @@
 /**
  * BrainDog's own add-on from the catalogue, on the record's tick: an update that would take something away is asked once
- * on Decide, in Needs you and never on the agents' shelf, a yes installs it, and a no is kept for that version.
+ * on Decide, in Needs you and never on the agents' shelf, and a yes installs it; an update that goes in by itself reads
+ * "What shipped has arrived" again at once, so the sign does not say it is missing until the next night.
  */
 
 import { test } from 'node:test';
@@ -9,6 +10,7 @@ import assert from 'node:assert/strict';
 import { apartIds } from '@braindog/kernel';
 
 import { createRecordApi, type CallContext, type CatalogueOffer } from '../src/index.ts';
+import { ARRIVED_BEHIND, ARRIVED_HOLDER } from '../src/signs.ts';
 import { openSqlite } from '../../kernel/test/sqlite.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
@@ -77,5 +79,19 @@ test('A NO IS KEPT FOR THAT VERSION: neither the night nor Slash asks about it a
   }
   assert.equal(sql.all("SELECT 1 FROM suggestion WHERE body_kind = 'pack' AND status = 'open'").length, 0);
   assert.equal(version(sql), '1.0.0');
+  sql.close();
+});
+
+test('AN ADD-ON UPDATE THAT GOES IN BY ITSELF READS WHAT SHIPPED HAS ARRIVED AGAIN AT ONCE', async () => {
+  const now = { at: Date.UTC(2026, 9, 28, 3) };
+  const { api, sql } = await record(doc('1.1.0', [BOOKS, SHELF, LOANS]), now);
+  /* BEHIND FOR THREE NIGHTS, AND THE NIGHT'S SIGNS FILED RED before the tick. */
+  api.kernel.setPref(ARRIVED_HOLDER, ARRIVED_BEHIND, { bookshelf: { to: '1.1.0', since: '2026-10-25' } });
+  await api.lintTick();
+  const arrived = () => value<{ signs: { sign: string; state: string; said?: string }[] }>(api.kernel.signs()).signs.find((s) => s.sign === 'arrived');
+  assert.equal(arrived()?.state, 'red', JSON.stringify(arrived()));
+  await api.slashTick();
+  assert.equal(version(sql), '1.1.0');
+  assert.notEqual(arrived()?.state, 'red', JSON.stringify(arrived()));
   sql.close();
 });

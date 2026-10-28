@@ -18,7 +18,7 @@
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { keptRound, lintRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, unworded } from './page-lint.ts';
-import { SIGNS_KEPT, fileRecordSigns, keptNow, keptSigns, type KeptSign } from './signs.ts';
+import { SIGNS_KEPT, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
 import { appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
 import {
@@ -4582,6 +4582,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       asked: steps.filter((st) => st.did === 'asked').map((st) => name(st.pack)),
     };
     kernel.setPref(FIRST_PARTY_HOLDER, FIRST_PARTY_LAST, { versions: shipped, day: today, steps: said, passes: passKept(passesOf(last), pass) });
+    /* AND WHAT SHIPPED HAS ARRIVED IS READ AGAIN once an update went in or was asked about. Filed once a night, the sign
+       said an add-on updated that afternoon had not arrived until the next night, on Health and every agent's card. */
+    if (steps.some((st) => st.did === 'updated' || st.did === 'asked'))
+      try {
+        const filed = kernel.signRead('arrived', await readArrivedSign(kernel, { sql, build, offers: deps.catalogueOffers }, clock.now()));
+        if (filed.ok) keepSigns();
+      } catch {
+        /* The night's filing reads it again. */
+      }
     if (steps.some((st) => st.did === 'updated' || st.did === 'asked') && scheduler) await kernel.tail(scheduler);
     return said;
   };
