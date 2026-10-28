@@ -728,7 +728,11 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
   const headers = new Headers();
   for (const [k, v] of KEYCHAIN_HEADERS) headers.append(k, v);
   headers.set('content-type', 'application/x-ndjson; charset=utf-8');
-  headers.set('cache-control', 'no-store');
+  /* EACH LINE REACHES THE SCREEN AS IT IS WRITTEN: `no-transform` keeps a proxy, Cloudflare's edge among them, from
+     compressing the stream, which holds lines back until a block fills; `x-accel-buffering: no` tells nginx in front of a
+     self-host not to buffer it. */
+  headers.set('cache-control', 'no-store, no-transform');
+  headers.set('x-accel-buffering', 'no');
   return new Response(stream, { status: 200, headers });
 }
 
