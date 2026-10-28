@@ -277,6 +277,8 @@
      with nothing it can draw truthfully draws nothing, and one that already shows a colour, a figure or a picture keeps
      that. */
   const asQueued = $derived(question ? queueOf(question) : null);
+  /* THE ANSWERS THAT LEAVE THE RECORD AS IT IS (`option-visual.ts`), said as such beside the ones that change it. */
+  const LEAVES_AS_IS: ReadonlySet<string> = new Set(['reject', 'apart', 'later', 'no', 'keep']);
   const drawingFor = (key: string) => {
     if (!asQueued || visuals.has(key)) return null;
     const raw = Array.isArray(offered) ? (offered as unknown[]).find((o) => (o as { id?: unknown } | null)?.id === key) : undefined;
@@ -1183,7 +1185,8 @@
                     <!-- AN OPTION WITH NOTHING BUT ITS NAME IS ITS BUTTON, and no card: "It went through" was a heading over
                          a button saying "It went through". One with a reason or a picture keeps its name as the card's
                          heading, and its button says what a press does, so the same words are never read twice. -->
-                    {@const bare = because.trim() === '' && !shows && drawn === null && confirming !== option.key}
+                    {@const still = drawn === null && !shows && because.trim() === '' && LEAVES_AS_IS.has(option.key) && question.options.some((o) => drawingFor(o.key) !== null)}
+                    {@const bare = because.trim() === '' && !shows && drawn === null && !still && confirming !== option.key}
                     <li class="dc-option" data-bare={bare ? '' : undefined} data-suggested={marked ? '' : undefined} data-checked={on ? '' : undefined}>
                       <!-- WHAT THE OPTION IS LEADS IT, inside its own card and nowhere else: a swatch writes its colour into
                            `--swatch` on its chip alone, hidden from a screen reader because the name says it. -->
@@ -1204,6 +1207,11 @@
                         <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
                       {/if}
                       <OptionVisual visual={drawn} />
+                      <!-- AN ANSWER THAT LEAVES THINGS AS THEY ARE SAYS SO beside answers that draw a change, so the row
+                           compares what each does rather than leaving one card blank. -->
+                      {#if still}
+                        <span class="dc-choice-does card-body">{gate.nothingChanges}</span>
+                      {/if}
                       {#if samples.has(option.key)}
                         {@const sample = samples.get(option.key)!}
                         <ul class="dc-sample" aria-label={gate.sample}>
@@ -2095,6 +2103,11 @@
 
   .dc-option[data-checked] {
     border-color: var(--ink);
+  }
+
+  /* THE SUGGESTED ONE WEARS THE ACCENT'S EDGE, as well as its word, so the row is read from it. */
+  .dc-option[data-suggested]:not([data-bare], [data-checked]) {
+    border-color: var(--red-fill);
   }
 
   /* AN OPTION THAT IS ONLY ITS NAME IS ONLY ITS BUTTON: no card round it, the button the cell's width and a thumb's

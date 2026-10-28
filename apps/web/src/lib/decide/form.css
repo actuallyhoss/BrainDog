@@ -532,6 +532,28 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   overflow-wrap: anywhere;
 }
 
+/* SIDE BY SIDE (`data-across`): two or three answers that each draw what they change stand in a row, as tall as the
+   tallest, so they are compared at a glance; the suggested one wears the accent's edge. Stacked under 600px. */
+.dc-choices[data-across] {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  align-items: stretch;
+}
+
+.dc-choices[data-across] > li,
+.dc-choices[data-across] > li > .dc-choice {
+  block-size: 100%;
+}
+
+.dc-choices[data-across] > .queue-option[data-recommended] > .dc-choice {
+  border-color: var(--red-fill);
+}
+
+@media (width < 600px) {
+  .dc-choices[data-across] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* WHAT A LONG LIST SAYS OF MANY ROWS AT ONCE, over the list ("12 have nothing kept for ... yet."). */
 .dc-fold {
   margin: 0 0 var(--sp-2);

@@ -219,6 +219,9 @@
   );
   const foldLines = $derived([...[...folded].map(([b, c]) => foldedLine(b, c)), ...(same !== null ? [`Each takes ${same}.`] : [])]);
   const listed = $derived(card.decline === null && card.merge === null && !compact && (!inline || !drawn));
+  /* TWO OR THREE ANSWERS WITH SOMETHING TO DRAW STAND SIDE BY SIDE, each with what it changes (`form.css`), so they are
+     compared at a glance; stacked on a phone. */
+  const across = $derived(card.ways.length >= 2 && card.ways.length <= 3 && card.ways.some((w) => Boolean(w.shows) || visualOfWay(w) !== null));
   /* THE ANSWER CHOSEN: the reader's, or the one the form starts on (the suggestion, where a key may give it). */
   let picked = $state<string | null>(null);
   const selected = $derived(picked ?? startsOn(card));
@@ -824,7 +827,7 @@
         <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested
              one saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
         {#each foldLines as line (line)}<p class="dc-fold" dir="auto">{line}</p>{/each}
-        <ul class="queue-options dc-choices" data-long={card.ways.length > 6 ? '' : undefined} role={drawn ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
+        <ul class="queue-options dc-choices" data-long={card.ways.length > 6 ? '' : undefined} data-across={across ? '' : undefined} role={drawn ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
           {#each card.ways as way, i (way.key)}
             {@const marked = way.recommended}
             {@const on = phase === 'asking' ? chosen?.key === way.key : selected === way.key}
