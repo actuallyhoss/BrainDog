@@ -47,7 +47,7 @@ export const home = {
     build: {
       title: 'Build with AI',
       say: "Claude, Cursor and Codex start every session from your brief and leave a note when they're done.",
-      lines: ['braindog · context', 'Tidepool, building. Next: ship webhook retries.', "Cursor, yesterday: onboarding copy waits on Dana's icons."],
+      lines: ['braindog · context', 'Tidepool, building. Next: ship webhook retries.', "Cursor: onboarding copy waits on Dana's icons."],
       link: 'Connect your tools',
       href: '/agents',
     },
@@ -57,7 +57,7 @@ export const home = {
     team: {
       title: 'Run client work with your agents',
       say: "Give each client a project. Your agents see what's next, and every change has a name on it.",
-      line: 'Claude moved Onboarding copy to review · 10:05',
+      line: 'Claude moved Onboarding copy to review',
       link: 'How agents work with you',
       href: '/agents',
     },
