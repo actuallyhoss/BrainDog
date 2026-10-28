@@ -66,3 +66,8 @@ test('A DRAFT WAITS BESIDE THE KEPT VERSION and never moves where it stands; a k
   assert.deepEqual(visualState([v1, d2, drop, line('u', JSON.stringify({ back: 'v1', draft: 'd2' }), 4)]), { standing: 'v1', draft: 'd2' });
   assert.deepEqual(visualSaid(body('a', true)), { title: 'T', page: 'a'.repeat(64), bytes: 1, pictures: [], draft: true });
 });
+
+test('A VISUAL WITH A SHADOW ROOT IN ITS MARKUP IS REFUSED, and the words alone are not', () => {
+  assert.ok('fault' in visualPage('<div><template shadowrootmode="open"><p>x</p></template></div>', new Set()));
+  assert.ok(!('fault' in visualPage('<div><p>a shadow root is a word here</p></div>', new Set())));
+});

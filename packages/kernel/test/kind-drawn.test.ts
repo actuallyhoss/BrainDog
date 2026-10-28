@@ -114,3 +114,8 @@ test('the rules are the renderer\'s: an SVG namespace and inline pictures pass, 
   assert.ok(drawnCodeFault('<img src="//example.com/x.png">'));
   assert.ok(drawnCodeFault('<!doctype html><p>x</p>'));
 });
+
+test('A SHADOW ROOT WRITTEN IN A COMPONENT IS REFUSED AT INSTALL, where the frame watch cannot see into it', () => {
+  assert.match(drawnCodeFault('<div><template shadowrootmode="closed"><script>void 0</script></template></div>') ?? '', /shadow root/u);
+  assert.equal(drawnCodeFault('<div class="shadow">root</div>'), null);
+});
