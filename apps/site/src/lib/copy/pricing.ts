@@ -33,8 +33,8 @@ export const pricing = {
    * `lib/pricing/cards.ts` puts each figure into these sentences.
    *
    * HONEST AT LAUNCH (§47). The paid buttons follow `LAUNCH.billing`: with billing off the paid cards say "Coming soon"
-   * in the button's place and link nothing. Extra use is sold by no checkout (`mayRun` in `directory.ts` holds a
-   * record at its allowance), so its section always says it is coming soon. No sentence says a card is charged.
+   * in the button's place and link nothing. Extra use follows `LAUNCH.extra`, the one flag that says production sells
+   * it: until it is on, its section says it is coming soon. No sentence says a card is charged.
    *
    * TWO METERS ARE NAMED FOR WHAT THE CODE COUNTS, not the prototype's words: `bytes` is data fetched from other
    * services in the month (`dir_usage_day` in `directory.ts`), so it reads "Data fetched", never "Storage", and
@@ -116,7 +116,7 @@ export const pricing = {
     extra: {
       title: 'Extra use, if you want it',
       say: 'Off by default. Turn it on with a monthly cap, and BrainDog never goes past it.',
-      // No checkout sells extra use, so this is said whatever `LAUNCH.billing` is (`promises.test.mjs` allows it here).
+      // Said until `LAUNCH.extra` is on, the day production sells extra usage (`promises.test.mjs` allows it here).
       soon: 'Coming soon.',
       on: 'On Cloud and Cloud Plus',
       price: 'Price',

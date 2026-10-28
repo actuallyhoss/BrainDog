@@ -71,10 +71,10 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
   { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },
-  { id: 'extra-use-soon', said: 'Coming soon.', where: 'pricing.extra.soon', state: 'not-yet', flag: 'billing', soon: true },
+  { id: 'extra-use-soon', said: 'Coming soon.', where: 'pricing.extra.soon', state: 'not-yet', flag: 'extra', soon: true },
   { id: 'waits-next-month', said: 'Nothing stops at the limit. It waits for next month.', where: 'pricing.holds.say', state: 'true' },
   { id: 'brief-spends-no-ask', said: 'Your brief, filing and your rules never spend one.', where: 'pricing.faq.questions.0.a', state: 'true' },
-  { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'flag', flag: 'billing' },
+  { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'flag', flag: 'extra' },
 
   /* The pages for each kind of person (`copy/for.ts`). */
   { id: 'bills-file-themselves', said: 'Once it knows their shape, each lands in the right list with its amount and due day.', where: 'person.who.personal.rows.0.said', state: 'true' },

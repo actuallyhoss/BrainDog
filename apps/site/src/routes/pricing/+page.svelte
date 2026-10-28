@@ -92,7 +92,8 @@
 
   <div class="sec" id="extra">
     <h2>{p.extra.title}</h2>
-    <p class="say">{#if LAUNCH.billing}{p.extra.say} {/if}{p.extra.soon}</p>
+    <!-- EXTRA USE IS SOLD THE DAY `LAUNCH.extra` IS ON, with billing: until then the section says it is coming soon. -->
+    <p class="say">{#if LAUNCH.billing}{p.extra.say}{/if}{#if !(LAUNCH.billing && LAUNCH.extra)}{LAUNCH.billing ? ' ' : ''}{p.extra.soon}{/if}</p>
     <div class="tablebox">
       <table class="ptable">
         <thead>

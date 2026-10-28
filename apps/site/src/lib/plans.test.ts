@@ -191,8 +191,8 @@ test('with billing off, no pack is shown and no sentence names one', () => {
 });
 
 test('nothing promises what the checkout does not sell: extra use is coming soon and sold by nothing, and no $12 headline', () => {
-  /* EXTRA USE IS NOT BUILT (`mayRun` in `directory.ts` holds a record at its allowance), so its section says it is
-     coming soon whatever billing is, its prices are the table's, and no sentence sells it or a pack. */
+  /* EXTRA USE IS SOLD ONLY ONCE `LAUNCH.extra` IS ON, so until then its section says it is coming soon whatever billing
+     is, its prices are the table's, and no sentence sells it or a pack. */
   const p = site.pricing;
   assert.equal(p.extra.soon, 'Coming soon.', 'the extra-use section does not say it is coming soon');
   const cost = TABLE.hosted.extra!;
