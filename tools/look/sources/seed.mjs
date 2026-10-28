@@ -9,7 +9,8 @@
 import { forward, forwards, recordsAnswer, startRecord } from '../../gates/record.mjs';
 
 export async function open() {
-  const record = await startRecord(0);
+  /* WITH ONE AUTOMATION RUN AND ONE JOB (`runs`), so the screens of a run have one to draw. */
+  const record = await startRecord(0, { runs: true });
   return {
     name: 'seed',
     record: 'the seed',

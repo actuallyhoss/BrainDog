@@ -101,6 +101,24 @@ export const VARIANTS = [
 /** The view every gate record saves, which `routes.mjs` opens as `/v/obligations.open`. */
 export const VIEW = { register: 'obligations', id: 'open', name: 'Still open', filter: { field: 'state', in: ['open', 'part'] }, order: [{ field: 'due', dir: 'asc' }] };
 
+/** The look's two runs: a button-started automation that has run once, and a job waiting for a machine. */
+async function plantRuns(kernel) {
+  const installed = await kernel.install([
+    { id: 'rule.weekly-review', kind: 'rule', body: { rule: 'weekly-review', on: { manual: true }, steps: [{ notify: { say: 'The week is reviewed.' } }] } },
+    {
+      id: 'job.stale-tasks',
+      kind: 'job',
+      body: { job: 'stale-tasks', title: 'Stale tasks', prompt: 'Read my open tasks and say which have not moved in a month.', tools: ['mcp__braindog__search'], turns: 6, permission: 'dontAsk' },
+    },
+  ]);
+  if (!installed.ok) throw new Error(`the look's record could not take its runs: ${installed.refusal?.fix ?? 'no reason given'}`);
+  const ran = kernel.automationRun('rule.weekly-review', 'p_seed');
+  if (!ran.ok) throw new Error(`the look's automation could not run: ${ran.refusal?.fix ?? 'no reason given'}`);
+  await kernel.drain();
+  const job = kernel.jobs.create({ kind: 'job.stale-tasks', args: {} });
+  if (!job.ok) throw new Error(`the look's job could not be started: ${job.refusal?.fix ?? 'no reason given'}`);
+}
+
 /** The twelve renewals `busy` decides, one a licence year, each answered the way the year before was. */
 async function decideRenewals(kernel) {
   for (let i = 0; i < 12; i++) {
@@ -260,7 +278,7 @@ async function startCloudRecord() {
  * call and not from a second one in the gate: `test/handles.test.mjs` holds every gate to closing what it opened in the
  * `finally` of the `try` it opened it in, and four records under one handle are one close.
  */
-export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false } = {}) {
+export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
   /* THE CLOUD IS ANOTHER HOST, NOT THIS ONE WITH SOMETHING ADDED, so none of what follows is asked of it. */
   if (variant === 'cloud') return startCloudRecord();
@@ -324,6 +342,10 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
       },
     ]);
     if (!queued.ok) throw new Error(`the gate's record could not take its queue page: ${queued.refusal?.fix ?? 'no reason given'}`);
+    /* ONE RUN OF AN AUTOMATION AND ONE JOB, ASKED FOR BY THE LOOK ALONE (`tools/look/sources/seed.mjs`), so an
+       automation's Runs and `/jobs/[id]` have something to draw. The seed holds neither: its rules run inside the change
+       that starts them and keep no run, and it approves no kind of job. No gate's record holds them. */
+    if (runs) await plantRuns(running.api.kernel);
     if (variant === 'busy') await decideRenewals(running.api.kernel);
     if (variant === 'connected') await connect(running.server.address().port, key);
   } catch (e) {
