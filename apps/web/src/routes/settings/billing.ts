@@ -110,7 +110,15 @@ export type SoldPlan = { id: string; name: string; price: string };
 export type SoldPack = { id: string; credits: number; price: string };
 
 /** The whole answer: each owned record, whether this host takes payment at all, and the plans and packs it sells. */
-export type BillingAnswer = { records: BilledRecord[]; open: boolean; plans: SoldPlan[]; packs: SoldPack[]; teamsHeld: boolean };
+export type BillingAnswer = {
+  records: BilledRecord[];
+  open: boolean;
+  plans: SoldPlan[];
+  packs: SoldPack[];
+  teamsHeld: boolean;
+  /** Whether this host sells extra usage past the allowance. Absent from a host older than it, which sells none. */
+  extra?: boolean;
+};
 
 /** The one fetch these calls need, so a test hands in its own and nothing here reaches for the page's. */
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -165,6 +173,7 @@ export function billingOf(v: unknown): BillingAnswer | null {
     records: v.records.map(billedOf).filter((r): r is BilledRecord => r !== null),
     open: v.open === true,
     teamsHeld: v.teams_held === true,
+    extra: v.extra === true,
     plans: Array.isArray(v.plans) ? v.plans.map(soldOf).filter((p): p is SoldPlan => p !== null) : [],
     packs: Array.isArray(v.packs) ? v.packs.map(packOf).filter((p): p is SoldPack => p !== null) : [],
   };
@@ -226,6 +235,36 @@ export async function paymentPage(
   plan?: string,
 ): Promise<Said<string>> {
   return pageOf(await door(io, `/account/billing/${kind}`, { record, ...(plan ? { plan } : {}) }));
+}
+
+/** The most a monthly cap on extra usage may be, in cents: the Worker's `EXTRA_CAP_MOST`, the one table's. */
+export const EXTRA_CAP_MOST = 100_000;
+
+/**
+ * Whether this record may turn extra usage on: the host sells it, and the record is paid for on Cloud or Cloud Plus and
+ * not lapsed. A gift is never charged, and Free has none.
+ */
+export const extraOffered = (r: BilledRecord | null, answer: BillingAnswer | null): boolean =>
+  r !== null && answer !== null && answer.extra === true && !r.gift && (r.state === 'active' || r.state === 'past_due') && (r.plan === 'cloud' || r.plan === 'plus');
+
+/**
+ * A cap typed in whole currency units ("20", "12.50") as cents, or `null` when it is not one: a sum from a cent to
+ * `EXTRA_CAP_MOST`, at most two places. Turning extra usage off is its own press, never a typed 0.
+ */
+export function capCents(typed: string): number | null {
+  const t = typed.trim().replace(/^\$/u, '');
+  if (!/^\d{1,4}(?:\.\d{1,2})?$/u.test(t)) return null;
+  const [whole = '0', part = ''] = t.split('.');
+  const cents = Number(whole) * 100 + Number(part.padEnd(2, '0'));
+  return cents >= 1 && cents <= EXTRA_CAP_MOST ? cents : null;
+}
+
+/**
+ * Set the monthly cap on a record's extra usage, in cents, or turn it off with 0. Answers the Worker's own refusal when
+ * it will not: the host does not sell it, the plan has none, or Stripe could not be reached.
+ */
+export async function setExtraCap(record: string, cents: number, io: Fetch = (u, i) => globalThis.fetch(u, i)): Promise<Said<unknown>> {
+  return door(io, '/account/billing/extra', { record, cap_cents: cents });
 }
 
 /**

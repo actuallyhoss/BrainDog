@@ -10,8 +10,11 @@
   Slash's asks as a ring where the answer carries an allowance of them. A chart with nothing behind it is no tile at
   all: with no allowance, the Slash line sits under the month's allowance instead.
 
-  THE LISTS SIT ON THE GROUND UNDER THEM: the projects, each with its actions under
-  it and the global ones under Everywhere, then the deliveries and arrivals, then Slash's own section, `SlashUsage`.
+  THE LISTS SIT ON THE GROUND UNDER THEM: a row a project and a row an action, busiest first, or one project's actions
+  under it when the page is its slice; then the deliveries and arrivals, then Slash's own section, `SlashUsage`.
+
+  THE PLAN'S LIMITS IN ONE SENTENCE under the rings, and extra usage under it: the month's running amount against the
+  cap, and on a paid record of a host that sells it, the cap itself to set (`ExtraCap`).
 
   THE LEDGER FIRST. `GET /account/usage` is the Directory's count, and there is ONE allowance, the Directory's, read
   from its answer. A host without the route (404), or no host, falls back to the record's own run events, which say
@@ -50,7 +53,8 @@
   import { homeCurrency } from '$lib/record/api.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { asksOf, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
-  import { hostedHere } from '../settings/billing.ts';
+  import { extraOffered, hostedHere, readBilling, type BillingAnswer } from '../settings/billing.ts';
+  import ExtraCap from './ExtraCap.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
 
   /* THE MONTH AND THE PROJECT ARE THE ADDRESS'S, so the switcher is two links, Back returns to the month before, and
@@ -107,6 +111,29 @@
     }
   });
   const heat = $derived(view ? heatOf(view, today) : null);
+
+  /* WHETHER EACH RECORD MAY SET A CAP ON EXTRA USAGE: Billing's answer, asked only of the owner's ledger on the Cloud. A
+     host that does not answer it offers no cap, and the month above is drawn whatever it says. */
+  const billed = read(
+    () => (view && view.from === 'ledger' && view.owner && hosted && view.current ? `${apiBase(page.url)} billing` : null),
+    async (): Promise<Result<BillingAnswer | null>> => {
+      const out = await readBilling();
+      return { ok: true, value: out.ok ? out.value : null };
+    },
+  );
+  const capOffered = (record: string): boolean => {
+    const answer = billed.value ?? null;
+    return extraOffered(answer?.records.find((b) => b.record === record) ?? null, answer);
+  };
+
+  /* A ROW AN ACTION, BUSIEST FIRST, each with the project it runs in, so the month's heaviest work reads from the top. */
+  const actionRows = $derived(
+    groups
+      .flatMap((g) => g.actions.map((a) => ({ ...a, project: groupName(g) })))
+      .sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name)),
+  );
+  /* A ROW A PROJECT, BUSIEST FIRST, linking to its slice. Everywhere has no slice and no link. */
+  const projectRows = $derived([...groups].sort((a, b) => b.totals.runs - a.totals.runs || groupName(a).localeCompare(groupName(b))));
   const parts = $derived(view ? projectParts(view.groups) : null);
 
   /**
@@ -277,7 +304,12 @@
             {/if}
             <!-- THE SLASH LINE HERE when there is no allowance of asks to draw a ring against, which is every host today. -->
             {#if r.slash && !asksOf(r)}<p class="slash-line">{r.slash}</p>{/if}
+            <!-- THE PLAN'S LIMITS IN ONE SENTENCE, then extra usage: its running amount, and the cap where one may be set. -->
+            {#if r.planLine}<p class="aside-line">{r.planLine}</p>{/if}
             {#if r.extra}<p class="aside-line">{r.extra}</p>{/if}
+            {#if r.extraUse && capOffered(r.record)}
+              <ExtraCap record={r.record} on={r.extraUse.on} cap={r.extraUse.cap} onset={usage.reread} />
+            {/if}
           </Tile>
         {/each}
 
@@ -330,9 +362,42 @@
             {:else}<Button weight="primary" href="/agents">{usageWords.seeAgents}</Button>{/if}
           {/snippet}
         </Empty>
+      {:else if sliced.length === 0}
+        <!-- A ROW A PROJECT, then A ROW AN ACTION, each with its counts beside it; a project's row opens its slice. -->
+        <Tile class="section" data-surface="tile" title={words.byProject} count={projectRows.length || undefined}>
+          <div class="section-body">
+            <ul class="ledger use-list">
+              {#each projectRows as g (g.key)}
+                <li>
+                  <div class="line use-row" data-faint={g.faint ? '' : undefined}>
+                    {#if g.scope !== ''}
+                      <a class="line-title tap" href={at(`/usage?month=${view.month}&project=${encodeURIComponent(g.scope)}`)}>{groupName(g)}</a>
+                    {:else}
+                      <span class="line-title">{groupName(g)}</span>
+                    {/if}
+                    <span class="line-when use-counts">{countsOf(g.totals)}</span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        </Tile>
+        <Tile class="section" data-surface="tile" title={words.byAction} count={actionRows.length || undefined}>
+          <div class="section-body">
+            <ul class="ledger use-list">
+              {#each actionRows as a, i (`${a.project} ${a.name} ${i}`)}
+                <li>
+                  <div class="line use-row" data-faint={a.faint ? '' : undefined}>
+                    <span class="line-title">{a.name}<span class="use-in"> · {a.project}</span></span>
+                    <span class="line-when use-counts">{countsOf(a)}</span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        </Tile>
       {:else}
-        <!-- BY PROJECT, EACH PROJECT'S ACTIONS UNDER IT and the global ones last under Everywhere; a project's "Runs on"
-             opens its slice, and the link beside the heading shows every project again. -->
+        <!-- ONE PROJECT'S SLICE, ITS ACTIONS UNDER IT; the link beside the heading shows every project again. -->
         <Tile class="section" data-surface="tile" title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={(sliced.length > 0 ? 0 : groups.length) || undefined}>
           {#snippet actions()}
             {#if sliced.length > 0}<a class="use-all tap" href={at(`/usage?month=${view.month}`)}>{words.allProjects}</a>{/if}
@@ -595,6 +660,11 @@
 
   .use-row[data-faint] .line-title {
     color: var(--ink-2);
+  }
+
+  /* THE PROJECT AN ACTION RUNS IN, quieter than its name. */
+  .use-in {
+    color: var(--ink-3);
   }
 
   .use-why {

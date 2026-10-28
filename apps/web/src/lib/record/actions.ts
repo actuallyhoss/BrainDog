@@ -83,9 +83,9 @@ export type Resumed = { ingest: string; kind: Channel };
  * nothing and `/usage` said the record could not be reached. `usage-contract.test.ts` now builds the answer with the
  * Directory's own code and runs this reader over it, so the day the two part again a test goes red, not his screen.
  *
- * TWO KEYS ARE WIDER THAN THE DIRECTORY'S, and the contract test names both. `slash` is optional, for a host a release
- * behind that answers without it, and its `cap` and the record's `extra` are never sent today: the allowance of asks is
- * the record's own `ask_cap`, which the Directory never reads. When a host carries them they are said; until then nothing is.
+ * TWO KEYS ARE WIDER THAN THE DIRECTORY'S, and the contract test names one. `slash` is optional, for a host a release
+ * behind that answers without it, and its `cap` is never sent today: the allowance of asks is the record's own
+ * `ask_cap`, which the Directory never reads. `extra` is optional for the same host a release behind.
  */
 type LedgerTotals = Totals & { ms: number; held: number };
 export type AccountUsage = {
@@ -112,8 +112,12 @@ export type AccountUsage = {
      * above. `cap` is the month's allowance of asks, which no host sends yet.
      */
     slash?: { asks: number; neurons: number; days: { day: string; asks: number; neurons: number }[]; cap?: number | null };
-    /** Extra usage past the allowance, when the owner turned it on: units this month, and the cost and cap in minor units. */
-    extra?: { on: boolean; units: number; cost: number; cap: number; currency: string };
+    /**
+     * The month's extra usage past the allowance (the Directory's `ExtraUsage`), `null` on a plan that sells none. `on`
+     * is whether a cap stands now; `cents` is what the month came to, in cents of the plans' currency, never past the
+     * highest cap that stood in it.
+     */
+    extra?: { on: boolean; cap_cents: number; cents: number; reported_cents: number; month: string; month_cap_cents: number } | null;
   }[];
 };
 
@@ -272,8 +276,11 @@ export const words = {
         (neurons > 0 ? `, and the model did ${neurons.toLocaleString('en-GB')} ${neurons === 1 ? 'unit' : 'units'} of work answering.` : '.'),
   thisMonth: 'this month',
   inMonth: (month: string) => `in ${month}`,
-  extraLine: (units: number, cost: string, cap: string) =>
-    `Extra usage is on: ${units.toLocaleString('en-GB')} ${units === 1 ? 'unit' : 'units'} this month, ${cost} of the ${cap} cap.`,
+  /* EXTRA USAGE, THE RUNNING AMOUNT AND THE CAP: what the month has come to, which is what is charged. */
+  extraLine: (cost: string, cap: string) => `Extra usage is on: ${cost} so far this month, of the ${cap} cap you set.`,
+  extraOff: (cost: string, when: string) => `Extra usage came to ${cost} ${when}.`,
+  meterExtra: (cap: string) => `Past the allowance. Extra usage carries on up to the ${cap} cap.`,
+  waitingCap: (resets: string, cap: string) => `Actions on this record are waiting until ${resets}, because its extra usage reached the ${cap} cap.`,
   /* A member's page. The ledger is the owner's, and an empty one read as nothing having run. */
   notOwner: "Limits and plans are the owner's to see. These are this record's own runs.",
   notOwnerNone: "Usage is counted on the owner's account, so only the owner of this record sees it here.",
@@ -427,6 +434,8 @@ export type Meter = { key: MeterKey; line: string; said: string; share: number; 
  */
 export type Allowed = {
   name: string;
+  /** The record's id, which a control that changes its extra usage names. */
+  record: string;
   plan: string | null;
   planLine: string | null;
   used: number;
@@ -437,6 +446,11 @@ export type Allowed = {
   binding: string | null;
   slash: string | null;
   extra: string | null;
+  /**
+   * The month's extra usage as figures, `null` on a plan that sells none or a host that does not say: whether it is on,
+   * the cap and what the month has come to, in cents of the plans' currency. `extra` stays the sentence.
+   */
+  extraUse: { on: boolean; cap: number; cents: number } | null;
   /**
    * Slash's asks over the month as the ledger counted them, the numbers behind `slash`: the asks, the neurons the model
    * spent on them, and the month's allowance of asks when the answer carries one (`null` when it does not, which is
@@ -674,6 +688,12 @@ const NEAR = 0.8;
 const money = (minor: number, currency: string, home: string | null): string =>
   writeAmount({ minor: Math.round(minor), currency }, home, 'read')?.text ?? `${currency} ${minor}`;
 
+/** The currency every plan figure is in: the one table's `CURRENCY` (`packages/record/src/plans.ts`), which this web does not import. */
+const PLAN_CURRENCY = 'USD';
+
+/** Cents of the plans' currency as a person reads them, by the one writer. */
+export const centsSaid = (cents: number, home: string | null = null): string => money(cents, PLAN_CURRENCY, home);
+
 /** One record of the ledger, against its allowance: its four meters, the one nearest its limit, and its plan. */
 function allowedOf(r: AccountUsage['records'][number], current: boolean, month: string, home: string | null): Allowed {
   const allowance = r.month.allowance;
@@ -682,12 +702,25 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean, month: 
   const keys: MeterKey[] = ['runs', 'requests', 'bytes', 'ms'];
   const shares = allowance ? keys.map((k) => ({ k, share: allowance[k] > 0 ? used[k] / allowance[k] : 0 })) : [];
   const top = [...shares].sort((a, b) => b.share - a.share)[0];
-  const waiting = current && allowance !== null && (used.held > 0 || shares.some((s) => s.share >= 1));
+  /* EXTRA USAGE ON THIS MONTH: past the allowance the record runs on, and waits only at the cap. */
+  const x = r.extra ?? null;
+  const extraOn = current && x !== null && x.on && x.cap_cents > 0;
+  const capSaid = extraOn ? money(x.cap_cents, PLAN_CURRENCY, home) : '';
+  const atCap = extraOn && x.cents >= x.cap_cents;
+  const waiting = current && allowance !== null && (extraOn ? atCap : used.held > 0 || shares.some((s) => s.share >= 1));
   const meters: Meter[] = allowance
     ? shares.map(({ k, share }) => ({
         key: k,
         line: words.meterLine(words.meterName[k], amountOf(k, used[k]), amountOf(k, allowance[k])),
-        said: !current ? words.meterPast(shareWords(share)) : share >= 1 ? words.meterFull(resets) : share >= NEAR ? words.meterNear(shareWords(share), resets) : words.meterFree(shareWords(share), resets),
+        said: !current
+          ? words.meterPast(shareWords(share))
+          : share >= 1 && extraOn && !atCap
+            ? words.meterExtra(capSaid)
+            : share >= 1
+              ? words.meterFull(resets)
+              : share >= NEAR
+                ? words.meterNear(shareWords(share), resets)
+                : words.meterFree(shareWords(share), resets),
         share: Math.min(1, share),
         binding: top !== undefined && top.k === k && top.share > 0,
       }))
@@ -695,9 +728,18 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean, month: 
   const planName = Object.hasOwn(words.planName, r.plan) ? (words.planName[r.plan] ?? null) : null;
   const asks = r.slash ? { asks: r.slash.asks, neurons: r.slash.neurons, cap: typeof r.slash.cap === 'number' ? r.slash.cap : null } : null;
   const slash = asks ? words.slashLine(asks.asks, asks.neurons, asks.cap, current ? words.thisMonth : words.inMonth(monthWords(month))) : null;
-  const extra = r.extra?.on ? words.extraLine(r.extra.units, money(r.extra.cost, r.extra.currency, home), money(r.extra.cap, r.extra.currency, home)) : null;
+  /* ONLY THIS MONTH'S FIGURE IS THE DIRECTORY'S: a month gone says nothing of extra usage rather than this month's amount. */
+  const extra =
+    !current || x === null
+      ? null
+      : extraOn
+        ? words.extraLine(money(x.cents, PLAN_CURRENCY, home), capSaid)
+        : x.cents > 0
+          ? words.extraOff(money(x.cents, PLAN_CURRENCY, home), words.thisMonth)
+          : null;
   return {
     name: r.slug ?? r.record,
+    record: r.record,
     plan: planName,
     planLine:
       planName && allowance
@@ -711,6 +753,7 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean, month: 
     binding: top !== undefined && top.share > 0 ? words.meterNoun[top.k] : null,
     slash,
     extra,
+    extraUse: current && x !== null ? { on: x.on && x.cap_cents > 0, cap: x.cap_cents, cents: x.cents } : null,
     asks,
   };
 }

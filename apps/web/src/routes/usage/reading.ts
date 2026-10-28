@@ -58,10 +58,15 @@ export function sentenceOf(view: UsageView): Sentence | null {
     const name = words.meterName[top.key];
     const share = shareSaid(top.share);
     if (!view.current) return { text: `In ${month} the busiest meter was ${lower(name)}, at ${lower(share)} of the allowance.` };
+    const extraOn = r.extraUse?.on === true;
     if (r.waiting) {
       const needs = `actions wait until ${r.resets}`;
+      if (extraOn) return { text: `Extra usage has reached its cap for the month; ${needs}.`, needs };
       return { text: `${name} is at ${lower(share)} of the month's allowance; ${needs}.`, needs };
     }
+    /* WITH EXTRA USAGE ON THE ALLOWANCE IS NOT WHERE ACTIONS WAIT: past it they run on under the cap. */
+    if (extraOn && top.share >= 1) return { text: `${name} is past the month's allowance, and extra usage carries on under its cap.` };
+    if (extraOn && top.share >= NEAR) return { text: `${name} is at ${lower(share)} of the month's allowance; past it, extra usage carries on under its cap.` };
     if (top.share >= NEAR) return { text: `${name} is at ${lower(share)} of the month's allowance; at the limit, actions wait until ${r.resets}.` };
     return { text: `Everything ran, and the busiest meter is at ${lower(share)}.` };
   }
@@ -88,7 +93,7 @@ export function sentenceOf(view: UsageView): Sentence | null {
  * drawn and the rings are not.
  */
 export function offCloud(view: UsageView): UsageView {
-  return { ...view, records: view.records.map((r) => ({ ...r, plan: null, planLine: null, allowance: null, waiting: false, meters: [], binding: null })) };
+  return { ...view, records: view.records.map((r) => ({ ...r, plan: null, planLine: null, allowance: null, waiting: false, meters: [], binding: null, extra: null, extraUse: null })) };
 }
 
 /** A group's name as the page says it: the actions in no project are "Not in a project". */

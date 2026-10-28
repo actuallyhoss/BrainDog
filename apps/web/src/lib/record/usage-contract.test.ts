@@ -97,7 +97,6 @@ function watched<T>(answer: T): { answer: T; missing: Set<string> } {
  * the reader asks for and does not find is the two shapes parting.
  */
 const NOT_SENT = new Map([
-  ['records[].extra', 'extra usage past the allowance, which no host answers yet; absent, nothing is said'],
   ['records[].slash.cap', "an allowance of Slash's asks, the record's own `ask_cap`, which the Directory never reads; absent, the line says none"],
 ]);
 
@@ -146,6 +145,6 @@ test('THE ALLOWED ABSENCES ARE STILL ABSENT: the day the Directory sends one, it
   const { wire, sql } = await answered();
   sql.close();
   const r = (wire as AccountUsage).records[0] as Record<string, unknown> & { slash: Record<string, unknown> };
-  assert.ok(!('extra' in r), 'the Directory answers extra usage now: read it, and take it out of NOT_SENT');
+  assert.ok('extra' in r, 'the Directory answers extra usage, and the reader draws it');
   assert.ok(!('cap' in r.slash), "the Directory answers an allowance of Slash's asks now: take it out of NOT_SENT");
 });
