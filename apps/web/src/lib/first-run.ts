@@ -166,9 +166,9 @@ export const firstRun = {
    * the one screen somebody can reach with the record already behind it. Answering again installs; it deletes nothing
    * and changes no entry, so saying so is what lets somebody who came here on purpose carry on.
    */
-  againMade: 'This BrainDog is already made.',
-  againMore: 'Answering again adds to it and takes nothing away.',
-  againBack: 'Open this BrainDog',
+  againMade: 'This BrainDog is set up.',
+  againMore: 'Answering again only adds to it.',
+  againBack: 'Open it',
 } as const;
 
 /**

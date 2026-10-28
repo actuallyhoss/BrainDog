@@ -572,7 +572,7 @@ export const account = {
   serverKeyWay: 'Sign in with the server key',
   serverKeyLabel: 'Server key',
   /* Where the credential goes, said to the person handing it over: one request, and nowhere after. */
-  serverKeyHint: 'The key you started your server with. It is sent once and never kept in this browser.',
+  serverKeyHint: 'The key your server started with. Never kept here.',
   /* Two full literals for the toggle's two states, which is `copy.ts`'s own rule about a toggle. */
   showToken: 'Show',
   hideToken: 'Hide',
