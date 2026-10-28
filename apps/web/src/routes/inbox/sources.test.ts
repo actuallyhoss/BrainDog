@@ -98,7 +98,7 @@ test('X25: the empty Inbox says how to get the address, never "this BrainDog\'s 
   assert.equal(cmd, 'echo "https://studio.example/in/email/$(cat ${BRAINDOG_DATA:-/data}/the-studio/inbound.token)"');
   const self = quietOf('self-host', cmd);
   assert.equal(self.command, cmd);
-  assert.match(self.why, /machine BrainDog runs on/u);
+  assert.match(self.why, /where BrainDog runs/u);
   /* A HOST THAT DID NOT SAY WHICH IT IS IS TOLD THE CLOUD'S WAY, which needs no command. */
   assert.equal(quietOf(undefined, cmd).command, null);
 });

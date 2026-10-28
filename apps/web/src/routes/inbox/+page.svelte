@@ -758,7 +758,7 @@
          rules' figure and what waits would each say nothing, three times. -->
     <div class="clear">
       <Empty kind="no-data-yet" glyph="mail" title={quiet.title} body={quiet.why}>
-        {#snippet actions()}{#if quiet.command}<CodeLine text={quiet.command} />{/if}<Button weight="primary" href="/settings/ingest">{quiet.add}</Button>{/snippet}
+        {#snippet actions()}{#if quiet.command}<div class="quiet-code"><CodeLine text={quiet.command} /></div>{/if}<Button weight="primary" href="/settings/ingest">{quiet.add}</Button>{/snippet}
       </Empty>
     </div>
   {:else}
@@ -1134,6 +1134,12 @@
 {/snippet}
 
 <style>
+  /* A COMMAND READS FROM ITS START: the empty state centres its words, never the code under them. */
+  .quiet-code {
+    inline-size: 100%;
+    text-align: start;
+  }
+
   .page {
     container-type: inline-size;
     display: flex;
