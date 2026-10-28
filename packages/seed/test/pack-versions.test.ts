@@ -2644,7 +2644,7 @@ const DECLARED: Record<string, Version> = {
       metric.tasks-week-yours metric.tasks-with-agents page.roadmap page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: '675583e78e5a5ff8',
+    declares: '4909bff066e3b705',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
       "Inside the unreleased 1.19.0: on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
@@ -2662,6 +2662,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 1.19.0: `page.roadmap`, titled Timeline, is a page of Work, a line and the dated tasks on one time axis that the Roadmap add-on drew, which hands the page over; a page added, nothing taken away -> 17616de9fbc2bbce",
       "Inside the unreleased 1.19.0: `page.roadmap` drops its line that said what the page is for, so the Timeline is its heading and its tasks; no id added or taken away -> e88ef938c85d76df",
       "Inside the unreleased 1.19.0: `page.work`'s head counts `metric.open-tasks`, kept for later left out, so it says the number the rail says beside it; no id added or taken away -> 675583e78e5a5ff8",
+      "Inside the unreleased 1.19.0: `page.roadmap` opens on a line of what is past its date and what falls due in 7 days, `metric.tasks-overdue` and `metric.tasks-due-7d`, where it had no line; no id added or taken away -> 4909bff066e3b705",
     ],
   },
 };

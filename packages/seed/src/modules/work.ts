@@ -1231,6 +1231,14 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     pack: 'work',
     blocks: [
       {
+        /* THE PAGE'S LINE IS WHAT IS LATE AND WHAT IS NEAR on the axis under it, not what the page is for. A clause whose
+           figure is nought is left out (`leadOf`), so a quiet axis says only what there is. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        body: '{{tasks-overdue}} past their date, {{tasks-due-7d}} due in 7 days',
+      },
+      {
         kind: 'roadmap',
         heading: 'In play',
         span: 12,
