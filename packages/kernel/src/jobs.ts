@@ -187,6 +187,14 @@ const ARG_ID = /^[a-z][a-z0-9_]{0,31}$/u;
 const SLOT = '%([a-z][a-z0-9_]{0,31})%';
 /** A repository's name as a machine maps it: letters, digits, `.`, `_` and `-`, which every folder name can carry. */
 const REPO = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/u;
+/**
+ * A kind whose folder each run names: `repo` said as one of its own arguments' slots, `%repo%`. The run fills it with a
+ * folder's name as the machine maps it, or `-` for none (an empty folder of its own); the machine still turns the name
+ * into a folder only from its own map, so the record never sends a path.
+ */
+export const JOB_REPO_SLOT = /^%([a-z][a-z0-9_]{0,31})%$/u;
+/** The value of a repo slot that names no folder: the run works in an empty one of its own. */
+export const JOB_NO_REPO = '-';
 /** One of the record's own tools. */
 const MCP_TOOL = /^mcp__braindog__[a-z][a-z0-9_]{0,39}$/u;
 /** One named command: `Bash(git log:*)`. */
@@ -302,9 +310,12 @@ export function jobBody(decl: { id: string; body: Record<string, unknown> }): Re
   const unsaid = ids.find((a) => !slots.includes(a));
   if (unsaid !== undefined) return bad(`${id} takes ${unsaid}, and its prompt never says %${unsaid}%, so the value would go nowhere.`, 'args');
 
-  if (body.repo !== undefined && (typeof body.repo !== 'string' || !REPO.test(body.repo)))
+  const repoSlot = typeof body.repo === 'string' ? JOB_REPO_SLOT.exec(body.repo)?.[1] : undefined;
+  if (repoSlot !== undefined && !ids.includes(repoSlot))
+    return bad(`${id}'s repo says %${repoSlot}%, and the kind takes no argument called ${repoSlot}.`, 'repo', ids);
+  if (body.repo !== undefined && repoSlot === undefined && (typeof body.repo !== 'string' || !REPO.test(body.repo)))
     return bad(
-      `${id}'s repo is the name a machine gives one of its folders, letters, digits, ., _ and -, at most 64. Leave it out to run in an empty folder.`,
+      `${id}'s repo is the name a machine gives one of its folders, letters, digits, ., _ and -, at most 64, or one of its arguments as %repo%. Leave it out to run in an empty folder.`,
       'repo',
     );
 
@@ -368,7 +379,20 @@ export type CreateJobArgs = { kind?: unknown; args?: unknown; about?: unknown; m
  * Where a runner claiming is: the machine, as runs name it (`os.hostname()`), and the Claude Code profiles it can start
  * a run under, by name. A runner that says neither takes only a job that names neither.
  */
-export type RunnerPlace = { host?: unknown; seats?: unknown };
+export type RunnerPlace = { host?: unknown; seats?: unknown; repos?: unknown };
+
+/**
+ * A runner as it last claimed: its name, the machine it said it is on, the profiles it can run Claude Code under and
+ * the folders it maps, by name and never by path, and when (`heard`). What the app offers to send a request to.
+ */
+export type RunnerHeard = { id: string; name: string; host: string | null; seats: string[]; repos: string[]; heard: string };
+
+/** The pseudo-person the runners' last claims are kept under in `pref`, one key per runner: never a person's id. */
+const HEARD_HOLDER = 'runner:heard';
+/** The most folder names one claim may say it maps. */
+const REPOS_MOST = 64;
+/** How long the same place a runner said is not written again. */
+const HEARD_AGAIN_MS = 30_000;
 
 /** One job as the list shows it. `lost` is worked out, never stored: a claim whose lease has run out. */
 export type JobRow = {
@@ -612,13 +636,64 @@ function placeFor(args: CreateJobArgs): Result<{ machine: string | null; seat: s
 }
 
 /** A claim's place as the runner said it: its machine, or `null`, and the profiles it can run, each a name. */
-function placeOf(place: RunnerPlace | undefined): { host: string | null; seats: string[] } {
+function placeOf(place: RunnerPlace | undefined): { host: string | null; seats: string[]; repos: string[] } {
   const hostSaid = place?.host;
   const host = typeof hostSaid === 'string' && MACHINE_NAME.test(hostSaid.trim()) ? hostSaid.trim() : null;
   const seatsSaid = place?.seats;
   const said: unknown[] = Array.isArray(seatsSaid) ? seatsSaid : [];
   const seats = [...new Set(said.filter((v): v is string => typeof v === 'string' && SEAT_NAME.test(v.trim())).map((v) => v.trim()))].slice(0, SEATS_MOST);
-  return { host, seats };
+  const reposSaid: unknown[] = Array.isArray(place?.repos) ? place.repos : [];
+  const repos = [...new Set(reposSaid.filter((v): v is string => typeof v === 'string' && REPO.test(v.trim())).map((v) => v.trim()))].slice(0, REPOS_MOST);
+  return { host, seats, repos };
+}
+
+/** Keeps where a runner said it is as it claims, one row of `pref` per runner, so the app can offer it. */
+function keepHeard(deps: TokenDeps, runner: JobRunner, where: { host: string | null; seats: string[]; repos: string[] }): void {
+  const value = JSON.stringify({ name: runner.name, host: where.host, seats: where.seats, repos: where.repos });
+  /* A HELD CLAIM ASKS EVERY FEW SECONDS: the same words heard within half a minute are not written again. */
+  const was = deps.sql.one<{ value: string; updated_at: string }>('SELECT value, updated_at FROM pref WHERE person_id = ? AND key = ?', HEARD_HOLDER, runner.id);
+  if (was !== undefined && was.value === value && was.updated_at >= instant(deps.nowMs - HEARD_AGAIN_MS)) return;
+  deps.sql.exec(
+    'INSERT INTO pref (person_id, key, value, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (person_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+    HEARD_HOLDER,
+    runner.id,
+    value,
+    instant(deps.nowMs),
+  );
+}
+
+/**
+ * The runners that claimed within `withinMs`, newest first, each as it last said where it is (`RunnerHeard`). Only a
+ * runner whose grant is still active is named: one revoked in Settings is gone from the list at once.
+ */
+export async function runnersHeard(deps: TokenDeps, withinMs: number): Promise<RunnerHeard[]> {
+  const since = instant(deps.nowMs - withinMs);
+  const rows = deps.sql.all<{ key: string; value: string; updated_at: string }>(
+    'SELECT key, value, updated_at FROM pref WHERE person_id = ? AND updated_at >= ? ORDER BY updated_at DESC LIMIT ?',
+    HEARD_HOLDER,
+    since,
+    RUNNERS_WALK,
+  );
+  if (rows.length === 0) return [];
+  const active = new Set<string>();
+  for (const g of deps.sql.all<{ id: string }>("SELECT id FROM device_grant WHERE reach = 'runner' AND status = 'active' LIMIT ?", RUNNERS_WALK))
+    active.add(await runnerIdOf(deps, g.id));
+  const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  return rows.flatMap((r) => {
+    if (!active.has(r.key)) return [];
+    const v = parsed(r.value);
+    if (!isObject(v)) return [];
+    return [
+      {
+        id: r.key,
+        name: typeof v.name === 'string' ? v.name : 'A runner',
+        host: typeof v.host === 'string' ? v.host : null,
+        seats: strings(v.seats),
+        repos: strings(v.repos),
+        heard: r.updated_at,
+      },
+    ];
+  });
 }
 
 /** The arguments one start fills in, checked against its kind. */
@@ -659,6 +734,13 @@ export function createJob(deps: TokenDeps, args: CreateJobArgs, known: (spoken: 
     return no('DECLARATION_UNKNOWN', `${kind.slice(0, ECHO_CHARS_MOST)} is not a kind of job this record has approved. A kind is approved once, in Decide.`, { at: 'kind' });
   const filled = argsFor(kind, body, args.args);
   if (!filled.ok) return filled as Result<never>;
+  /* A FOLDER EACH RUN NAMES is a name a machine maps, or `-` for none: never a path, whatever the argument allows. */
+  const slot = typeof body.repo === 'string' ? JOB_REPO_SLOT.exec(body.repo)?.[1] : undefined;
+  if (slot !== undefined) {
+    const named = filled.value[slot] ?? '';
+    if (named !== JOB_NO_REPO && !REPO.test(named))
+      return no('VALUE_MALFORMED', `${slot} is a folder's name as the machine maps it, like braindog, or - for none.`, { at: `args.${slot}` });
+  }
   const place = placeFor(args);
   if (!place.ok) return place as Result<never>;
 
@@ -745,6 +827,15 @@ function placesOf(deps: TokenDeps, ids: readonly string[]): Map<string, Place> {
   );
 }
 
+/** The folder a job works in, by name: its kind's, or the one its run named when the kind takes it as an argument. */
+function repoOf(repo: string | undefined, args: Record<string, string>): string | null {
+  if (repo === undefined) return null;
+  const slot = JOB_REPO_SLOT.exec(repo)?.[1];
+  if (slot === undefined) return repo;
+  const named = args[slot] ?? '';
+  return named === '' || named === JOB_NO_REPO ? null : named;
+}
+
 /** A stored row as the list shows it. */
 function shown(deps: TokenDeps, row: Stored, kinds: Map<string, JobBody | null>, names: Map<string, string>, place: Place = NOWHERE): JobRow {
   if (!kinds.has(row.kind)) kinds.set(row.kind, kindOf(deps, row.kind));
@@ -754,7 +845,7 @@ function shown(deps: TokenDeps, row: Stored, kinds: Map<string, JobBody | null>,
     id: row.id,
     kind: row.kind,
     title: kind?.title ?? null,
-    repo: kind?.repo ?? null,
+    repo: repoOf(kind?.repo, argsOf(row.args)),
     args: argsOf(row.args),
     about: row.about,
     status: row.status,
@@ -959,7 +1050,10 @@ export async function claimJob(deps: TokenDeps, runner: JobRunner, transaction: 
   const person = await approverOf(deps, runner.id);
   if (person === null) return no('FORBIDDEN', 'This machine is no longer enrolled on this record. Enrol it again.', { at: 'principal' });
   const where = placeOf(place);
-  const taken = transaction(() => take(deps, runner, where));
+  const taken = transaction(() => {
+    keepHeard(deps, runner, where);
+    return take(deps, runner, where);
+  });
   if (taken === null) return ok({ job: null, idle_ms: JOB_IDLE_MS });
 
   const minted = await createToken(deps, person, { scope: 'propose', label: bearerLabel(taken.id), days: 1 });

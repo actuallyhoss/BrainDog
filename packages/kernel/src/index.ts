@@ -317,6 +317,8 @@ import {
   INSTRUCTION_KERNEL_WRITTEN,
   changedSince as instructionsChangedSince,
   expireInstructions,
+  settleEndedJobs,
+  settleJobInstructions,
   instruct as instructRun,
   instructionFor as instructionsFor,
   instructionOf,
@@ -502,8 +504,11 @@ export {
   SAID_MOST,
   SEAT_NAME,
   SEEN_HOW,
+  ATTACH_MOST,
+  ATTACH_REF_MOST,
   WAIT_MS as INSTRUCTION_WAIT_MS,
   instructionOf,
+  jobOfRun,
   instructionsTakenBy,
   openInstructions,
   type Delta,
@@ -748,7 +753,7 @@ export type { Accepted as InviteAccepted, InvitationRow, InviteArgs, Invited } f
 export type { ChildArgs, ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
 /* THE JOB QUEUE'S NAMES (`jobs.ts`, `kernel.jobs`). Its `Claimed` stays unexported here, because the scheduler's `Claimed`
    already has the name; a caller reads it as `ReturnType` of `kernel.jobs.claim`. */
-export { JOB_AGENTS, JOB_EVENT_KINDS, JOB_LEASE_MS, JOB_MCP_PATH, JOB_MCP_PREFIX, JOB_PERMISSIONS, JOB_STATUSES, commandOf, fillPrompt, jobBody } from './jobs.ts';
+export { JOB_AGENTS, JOB_EVENT_KINDS, JOB_LEASE_MS, JOB_MCP_PATH, JOB_MCP_PREFIX, JOB_NO_REPO, JOB_PERMISSIONS, JOB_REPO_SLOT, JOB_STATUSES, commandOf, fillPrompt, jobBody } from './jobs.ts';
 export type {
   CancelRead,
   Cancelled,
@@ -763,6 +768,7 @@ export type {
   JobsPage,
   PostJobEventArgs,
   Posted,
+  RunnerHeard,
   RunnerPlace,
 } from './jobs.ts';
 export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Remembered, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
@@ -9141,6 +9147,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AN INSTRUCTION NO RUN TOOK IN ITS TIME expires in the same hour, and one sent to a run that ended before it saw it
        goes to the next run of that kind there (`instruction.ts`). */
     transaction(() => expireInstructions(instructionDeps()));
+    /* AND ONE A JOB CARRIED, whose job the queue ended by itself, is answered for it (`settleEndedJobs`). */
+    transaction(() => settleEndedJobs(instructionDeps()));
     const sessions = transaction(() =>
       sweepSessions(
         sql,
@@ -12986,6 +12994,18 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     instructionSeen: (id: string) => instructionSeenBy(sql, id),
     /** One instruction by `IN4` or its row id, or null. */
     instruction: (id: string): Instr | null => instructionOf(sql, id),
+    /**
+     * A job ended: each instruction it carried that is still open is answered for it from how it ended
+     * (`settleJobInstructions`). Answers how many moved; never fails the caller.
+     */
+    settleJob: (job: string): number => {
+      if (schemaRefusal(state)) return 0;
+      try {
+        return transaction(() => settleJobInstructions(instructionDeps(), job));
+      } catch {
+        return 0;
+      }
+    },
     /**
      * A question answered on his order: the answer spent on the instruction, by the run, and the decision said as
      * his order's, by him. The record answered the question as him first; this keeps the two lines, in one go.

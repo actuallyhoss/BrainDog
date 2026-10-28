@@ -41,6 +41,8 @@ import {
   type Posted,
   type RunnerGrant,
   type RunnerPlace,
+  type RunnerHeard,
+  runnersHeard,
 } from '../jobs.ts';
 
 export function extension(parts: KernelParts) {
@@ -89,6 +91,9 @@ export function extension(parts: KernelParts) {
 
       /** A runner's bearer, checked against this record's device grants. INTERNAL: the host asks before it builds a context. */
       runner: (bearer: string, validFrom?: string): Promise<Result<RunnerGrant>> => runnerGrant(deps(validFrom), bearer),
+
+      /** The runners that claimed within `withinMs`, each with where it last said it is. Reads only. */
+      heard: (withinMs: number): Promise<RunnerHeard[]> => runnersHeard(deps(), withinMs),
 
       /** Let go what waited past its day and what a silent machine held. The hourly sweep's part; answers the rows moved. */
       sweep: (): number => transaction(() => sweepJobs(deps())),
