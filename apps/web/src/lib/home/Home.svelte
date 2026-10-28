@@ -1343,7 +1343,8 @@
       display: none;
     }
 
-    /* AT WORK, ONE LINE A RUN: who and what it is doing, cut at the line's end; the rest is on Agents. */
+    /* AT WORK, TWO SHORT LINES A RUN: who and when, then what it is doing cut at the line's end; the rest is on Agents.
+       On one line the name and the time left the work four letters. */
     .body[data-board] :global([data-working] .run :is(.r-doing, .r-holds)) {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1351,8 +1352,10 @@
     }
 
     .body[data-board] :global([data-working] .run) {
-      grid-template-columns: auto auto minmax(0, 1fr) auto auto;
-      grid-template-areas: 'face who doing time do';
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        'face who time do'
+        'face doing doing do';
     }
 
     .body[data-board] :global([data-working] .run :is(.r-holds, .r-project)) {

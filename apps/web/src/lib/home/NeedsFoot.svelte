@@ -54,11 +54,11 @@
 
   const words = {
     late: (n: number, said: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'payment is' : 'payments are'} late, ${said} in all`,
-    handled: (n: number) => `BrainDog handled ${n.toLocaleString('en-GB')} itself today.`,
+    handled: (n: number) => `BrainDog handled ${n.toLocaleString('en-GB')} today`,
     review: 'Review',
     answer: 'Answer',
     finished: (who: readonly string[]) =>
-      who.length === 1 ? `${who[0]!} finished what you told it.` : `Agents finished ${who.length.toLocaleString('en-GB')} of your instructions today.`,
+      who.length === 1 ? `${who[0]!} finished what you asked` : `Agents finished ${who.length.toLocaleString('en-GB')} asks today`,
   } as const;
 
   const sharedSaid = $derived(shared === undefined ? null : sharedLine(shared));

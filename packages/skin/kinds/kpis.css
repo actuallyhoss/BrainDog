@@ -683,9 +683,34 @@
       padding-inline-end: var(--sp-5);
     }
 
+    /* THE LINE GOES UNDER THE WORDS in a column, so a quarter of the strip gives its words the whole width: beside them it
+       broke "Specimen downloads" and its unit onto lines of their own. */
+    .kpis[data-form='today'] .kpi-row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    /* AND UNDER THE FIGURE, before why it is here and its fix: the words' block lends its lines to the column. */
+    .kpis[data-form='today'] .kpi-row-text {
+      display: contents;
+    }
+
+    .kpis[data-form='today'] .kpi-row-text > * {
+      order: 2;
+    }
+
+    .kpis[data-form='today'] .kpi-row-text > :is(.kpi-who, .kpi-figure) {
+      order: 0;
+    }
+
+    .kpis[data-form='today'] .kpi-menu {
+      order: 3;
+    }
+
     .kpis[data-form='today'] .kpi-row-chart {
-      inline-size: clamp(56px, 7cqi, 96px);
-      margin-block-start: var(--sp-4);
+      order: 1;
+      inline-size: min(100%, 160px);
+      margin-block: var(--sp-2) var(--sp-1);
     }
   }
 
