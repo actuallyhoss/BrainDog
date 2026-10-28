@@ -114,7 +114,16 @@ export type TodayAnswer = {
 };
 
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);
-const asking = <A>(ask: Ask, args: A, ctx: unknown): Promise<Result<unknown> | null> => ask(args as never, ctx as never).catch(() => null);
+/**
+ * EACH PART ASKED ON A TURN OF ITS OWN (`turn`), so a call that came in while Today was being drawn, an agent's write or
+ * read, is answered between its parts rather than after all of them: the record has one thread, and Today is the
+ * longest thing it is asked.
+ */
+export const turn = (): Promise<void> => new Promise((done) => setTimeout(done, 0));
+const asking = async <A>(ask: Ask, args: A, ctx: unknown): Promise<Result<unknown> | null> => {
+  await turn();
+  return ask(args as never, ctx as never).catch(() => null);
+};
 
 /**
  * Every part of Today, asked of the record one after another in this one call. `body` is what `previewPage` takes, and a

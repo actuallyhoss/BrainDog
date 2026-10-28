@@ -22,7 +22,7 @@ import type { Result } from '@braindog/ports';
 import { handOf } from '@braindog/declare/hand';
 import { KPIS_KIND } from 'braindog-render';
 
-import { runsListOf } from './today.ts';
+import { runsListOf, turn } from './today.ts';
 
 /** One method of the record, as the shape asks it: with the caller's own context, answered as it would be alone. */
 type Ask = (args: never, ctx: never) => Promise<Result<unknown>>;
@@ -112,7 +112,12 @@ export function linkedListOf(decls: readonly Decl[], projects: string, ids: read
 export const SHAPE_LINKED = { services: ['renews', 'provider'], readings: ['at', 'value', 'name'], recurring: ['every', 'next_due', 'direction'] } as const;
 
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);
-const asking = <A>(ask: Ask, args: A, ctx: unknown): Promise<Result<unknown> | null> => ask(args as never, ctx as never).catch(() => null);
+/* EACH PART ASKED ON A TURN OF ITS OWN (`turn`, `today.ts`), so a call waiting on the record's one thread is answered
+   between the parts of a project's shape rather than after all of them. */
+const asking = async <A>(ask: Ask, args: A, ctx: unknown): Promise<Result<unknown> | null> => {
+  await turn();
+  return ask(args as never, ctx as never).catch(() => null);
+};
 
 /** The work list of a projects list: one that hands its rows to someone and points at it with a state, as `figures.ts` `viaOf`. */
 export function workListOf(decls: readonly Decl[], projects: string): { list: string; field: string } | null {
