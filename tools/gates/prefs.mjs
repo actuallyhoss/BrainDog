@@ -42,15 +42,12 @@
  * the sample, and the check was red on this file's case for it until the
  * case went too.
  *
- * `Pref` holds fourteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `shape`,
- * `chars`, `suggestPages`, `seen`, `columns`, `nav`, `defined`, `railShut`. Nine are covered
- * here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `shape`, `suggestPages`, `nav` and
- * `railShut`, which is everything a page LOAD can settle. `suggestPages` joined the type after this
- * file had spent a paragraph excusing itself from covering a field the type did not have; it is
- * covered now, on the load, because turning it off empties a list. `railShut` arrived later still
- * and was measured by nothing and excused by nothing, which is the hole the derived check exists to
- * close: it is settled by a load exactly the way `sidebar` is, folding a section of the rail. The
- * other five each need something a fixture cannot do by loading a URL:
+ * `suggestPages` joined the type after this file had spent a paragraph excusing itself from covering
+ * a field the type did not have; it is covered now, on the load, because turning it off empties a
+ * list. `railShut` arrived later still and was measured by nothing and excused by nothing, which is
+ * the hole the derived check exists to close. `sidebar` and `railShut` then left the type with the
+ * side rail they narrowed and folded, and their cases left with them. Five fields each need something
+ * a fixture cannot do by loading a URL:
  *
  *   - `theme`   an accent is chosen by pressing a swatch, and the difference is a palette rather
  *               than one token. **A duplicate swatch that repainted nothing lived here for months**
@@ -215,49 +212,30 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       probe: () => getComputedStyle(document.body).color,
     },
     {
-      name: 'sidebar',
-      what: 'whether the rail is drawn',
-      route: '/',
-      /* `undefined` is open, which is what a first visit should be. So the two values are "unset"
-         and `false` rather than `true` and `false`. */
-      values: [{ shape: 'rail' }, { shape: 'rail', sidebar: false }],
-      /* THE RENDERED WIDTH, not the link count. Folding hides the rail with CSS, so its anchors are
-         still in the DOM and still queryable. A probe that counts them reports "no change" about a
-         control that works, which is the same lie in the other direction. */
-      probe: () => String(Math.round(document.querySelector('.rail-slot, nav.rail')?.getBoundingClientRect().width ?? -1)),
-    },
-    {
       /**
-       * `shape`: which of the three shapes `19 §3` offers is drawn, and it is drawn by the SHELL.
+       * `shape`: which of the shapes `19 §3` offers is drawn, and it is drawn by the SHELL.
        *
-       * THE ONE PREFERENCE WHERE A LAZY PROBE WOULD GO GREEN ON A BROKEN BUILD, and it would do it
-       * the opposite way round from `sidebar` two cases up. `sidebar` leaves its anchors in the DOM,
-       * so counting them lies about a control that works; this one REPLACES one nav with another, so
-       * a probe that counted nav links would report a difference between a top bar and a menu no
-       * matter which of the two was drawn, and would keep reporting it if the shell drew the rail
-       * every time and the strip on top of it.
+       * THE ONE PREFERENCE WHERE A LAZY PROBE WOULD GO GREEN ON A BROKEN BUILD: it REPLACES one nav with another, so a
+       * probe that counted nav links would report a difference between a top bar and a menu no matter which of the two
+       * was drawn.
        *
-       * SO IT IS WHICH OF THE THREE IS PRESENT, all three counted on every load. `1 0 0` is the rail,
-       * `0 1 0` the top bar, `0 0 1` the menu button, and a build that ignored the preference comes
-       * back `1 0 0` three times, which is exactly what this gate is for.
+       * SO IT IS WHICH OF THE TWO IS PRESENT, both counted on every load. `1 0` is the top bar, `0 1` the menu button,
+       * and a build that ignored the preference comes back the same twice, which is exactly what this gate is for. THE
+       * SIDE RAIL IS NO LONGER A SHAPE: a cookie an older build left holding `rail` reads as no choice and draws the top
+       * bar (`nav-prefs.svelte.ts`, held by its test), so it is not a value here, where it would be the first one twice.
        */
       name: 'shape',
       what: 'which navigation the shell draws (19 §3)',
       route: '/',
       /* 1440 BY 900, WHICH IS THIS GATE'S VIEWPORT AND IS WHY THIS CASE CAN BE MEASURED AT ALL. The
-         tab bar stays below 900px whatever the shape says, so the same three values there are one
-         answer three times, correctly. */
-      /* `undefined` IS THE TOP BAR, the default again (the owner's choice 1, 20 October: the bar of 19 October), so the first value
+         tab bar stays below 900px whatever the shape says, so the same values there are one
+         answer twice, correctly. */
+      /* `undefined` IS THE TOP BAR, the default (the owner's choice 1, 20 October: the bar of 19 October), so the first value
          is "unset" rather than `'bar'`. A device's own `'bar'` is not a value here: older builds wrote it into the cookie
-         on every boot, so `deviceChose` (nav-prefs.svelte.ts) reads it as nobody's choice, which draws the bar twice, and
-         this case is red on any two values that agree. The rail and the menu are a device's own choices. */
-      values: [{}, { shape: 'rail' }, { shape: 'menu' }],
-      probe: () =>
-        [
-          document.querySelectorAll('nav.rail').length,
-          document.querySelectorAll('nav.topbar').length,
-          document.querySelectorAll('button.menu-open').length,
-        ].join(' '),
+         on every boot, so `deviceChose` (nav-prefs.svelte.ts) reads it as nobody's choice, which draws the bar twice. The
+         menu is a device's own choice. */
+      values: [{}, { shape: 'menu' }],
+      probe: () => [document.querySelectorAll('nav.topbar').length, document.querySelectorAll('button.menu-open').length].join(' '),
     },
     {
       /**
@@ -306,45 +284,21 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     },
     {
       name: 'nav',
-      what: 'the order of the rail (19 §3: position lives in a per-user store and wins)',
-      route: '/',
+      what: 'the order of the pages in the nav (19 §3: position lives in a per-user store and wins)',
+      /* THE NAV'S PAGES AS SETTINGS > NAVIGATION LISTS THEM, in the person's order (`Pages.svelte`, `arrange` over
+         `navPrefs.order`). The side rail drew this order until it stopped being a shape; the sidebar draws the places
+         and the projects list's own rows, so the pages within a section are drawn in order where they are arranged. */
+      route: '/settings/navigation',
       /* THE ONE THAT WAS WRITTEN, SURVIVED A RELOAD, AND MOVED NOTHING. The rail rendered the raw
          list while the arrangement lived in a value read only by the two move functions. */
       /* WITHIN ONE SECTION, because that is the only move the product offers: `29 §4` places a page
          "at the end of its section, never inserted mid-list", and the menu is up / down / to top /
          hide. Three pages from three different sections would reorder three buckets of one, which
          changes nothing and would fail this gate for being a bad test rather than a bad build. */
-      values: [{ shape: 'rail' }, { shape: 'rail', nav: ['/p/portage', '/p/kiln', '/p/marlow-co'] }],
-      probe: () => [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => a.getAttribute('href')).join(' '),
-    },
-    {
-      /**
-       * `railShut`: thirty-four items of navigation, and the heading somebody folded away.
-       *
-       * THE OTHER ONE NOTHING MEASURED, and the one of the two where a lazy probe would lie. Folding
-       * writes `data-shut` and `inert` on the group and leaves every anchor in the DOM, so a probe
-       * that counted rail links would report "no change" about a control that works. `sidebar` names
-       * the same trap two cases up and answers it with the rendered width.
-       *
-       * SO THE HEADINGS AND NOT THE LINKS. The fold is a button carrying the section's own name, and
-       * `aria-expanded` is what it writes, so this comes back as the name of every section that is
-       * folded and as the empty string when none is.
-       */
-      name: 'railShut',
-      what: 'which rail sections are folded (19 §3)',
-      route: '/',
-      /* `Projects` BECAUSE `/` IS NOT IN IT. A section holding the screen you are looking at is never
-         shut, deliberately, so a case that folded the section containing its own route would measure
-         that exception rather than the preference.
-
-         AND BECAUSE IT HOLDS MORE THAN ONE PAGE. This folded `Money`, which declares one page, and the
-         rail now draws a section of one as a plain row with no fold to press, so the cookie carried
-         the name and the page had nothing to shut. `Projects` is three things on the shipped seed. */
-      values: [{ shape: 'rail' }, { shape: 'rail', railShut: ['Projects'] }],
-      probe: () =>
-        [...document.querySelectorAll('nav.rail .fold[aria-expanded="false"]')]
-          .map((b) => (b.textContent ?? '').replace(/\s+/g, ' ').trim())
-          .join(' '),
+      /* TWO OF MONEY'S PAGES, PUT IN THE OPPOSITE ORDER: the projects' own pages are the sidebar's rows of the projects
+         list now, and not pages in the nav, so the section that moves is one the nav lists. */
+      values: [{}, { nav: ['/p/money-reports', '/p/money-forecast'] }],
+      probe: () => [...document.querySelectorAll('#main .page-row a.page-link')].map((a) => a.getAttribute('href')).join(' '),
     },
 
     /*
@@ -357,25 +311,19 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
      */
     {
       /**
-       * `nav.shape`: the record's word draws the shell, AND IT STANDS OVER THE COOKIE. The third value carries a top bar in
-       * the cookie and a menu in the record, so a build that still read the cookie as the truth comes back with the top
-       * bar twice and goes red.
+       * `nav.shape`: the record's word draws the shell, AND IT STANDS OVER THE COOKIE. Both loads carry a menu in the
+       * cookie: the first keeps nothing on the record, so the cookie's menu is drawn; the second keeps the top bar on the
+       * record, so a build that still read the cookie as the truth comes back with the menu twice and goes red.
        *
-       * `side` IN THE MIDDLE, the record's word for the rail somebody chose. With the top bar the default again (the owner's
-       * choice 1, 20 October), a record that keeps nothing draws the bar, and a `bar` here would be one answer twice. The record's
-       * legacy `rail` reads as no choice, which `nav-prefs.svelte.test.ts` holds.
+       * THE RECORD'S `side` AND `rail` ARE AN OLDER BUILD'S WORDS for the side rail, which is no longer a shape: both read
+       * as no choice and draw the top bar, which `nav-prefs.svelte.test.ts` holds.
        */
       name: 'nav.shape',
       record: true,
       what: "which navigation the shell draws when the record keeps the shape, over the cookie's copy (contracts §7.3)",
       route: '/',
-      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'side' } }, { shape: 'rail', '@record': { 'nav.shape': 'menu' } }],
-      probe: () =>
-        [
-          document.querySelectorAll('nav.rail').length,
-          document.querySelectorAll('nav.topbar').length,
-          document.querySelectorAll('button.menu-open').length,
-        ].join(' '),
+      values: [{ shape: 'menu', '@record': {} }, { shape: 'menu', '@record': { 'nav.shape': 'bar' } }],
+      probe: () => [document.querySelectorAll('nav.topbar').length, document.querySelectorAll('button.menu-open').length].join(' '),
     },
     {
       /** `pen.suggest`: the switch as the record keeps it, and the pen or the empty state it draws, over the cookie's copy. */
@@ -428,17 +376,17 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     },
     {
       /**
-       * `nav.labels`: a page renamed in Settings > Navigation, drawn under its new name in the rail (`navPrefs.relabel`).
-       * The rail's words are the measurement, in the rail's order, so a build that kept the label and drew the page's own
-       * title comes back with the same words twice and goes red.
+       * `nav.labels`: a page renamed in Settings > Navigation, drawn under its new name in the nav's list there
+       * (`navPrefs.labelOf`). The names are the measurement, in the nav's order, so a build that kept the label and drew
+       * the page's own title comes back with the same words twice and goes red.
        */
       name: 'nav.labels',
       record: true,
-      what: 'the names the rail draws its pages under (Settings > Navigation)',
-      route: '/',
-      values: [{ shape: 'rail', '@record': {} }, { shape: 'rail', '@record': { 'nav.labels': { '/p/kiln': 'The kiln room' } } }],
+      what: 'the names the nav draws its pages under (Settings > Navigation)',
+      route: '/settings/navigation',
+      values: [{ '@record': {} }, { '@record': { 'nav.labels': { '/p/money-ledger': 'The day book' } } }],
       probe: () =>
-        [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => (a.textContent ?? '').replace(/\s+/g, ' ').trim()).join(' | '),
+        [...document.querySelectorAll('#main .page-row a.page-link')].map((a) => (a.textContent ?? '').replace(/\s+/g, ' ').trim()).join(' | '),
     },
 
     {
@@ -616,6 +564,15 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       route: '/settings/agents',
       values: [{ '@record': {} }, { '@record': { 'agents.answer_in_chat': true } }],
       probe: () => document.querySelector('#main button[role="switch"][aria-label="Answer from inside chat apps"]')?.getAttribute('aria-checked') ?? 'none',
+    },
+    {
+      /** `decide.agents_apart`: the Agents' suggestions wait apart switch as the record keeps it, on until it is off (Settings > Agents). */
+      name: 'decide.agents_apart',
+      record: true,
+      what: "the Agents' suggestions wait apart switch, as the record keeps it",
+      route: '/settings/agents',
+      values: [{ '@record': {} }, { '@record': { 'decide.agents_apart': false } }],
+      probe: () => document.querySelector('#main [data-part="apart"] button[role="switch"]')?.getAttribute('aria-checked') ?? 'none',
     },
   ];
 

@@ -78,7 +78,6 @@
   import { isHere, orderLists, placeOf, type FlatItem } from '../nav.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
   import type { PenItem } from '../design/pen.ts';
-  import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import Count from './Count.svelte';
   import Icon, { type IconName } from './Icon.svelte';
@@ -133,7 +132,7 @@
     inbox?: number | undefined;
     /** The agents at work now, as `boot` sends them. Kept for the caller: the top bar and Agents say who is working. */
     working?: readonly Working[] | undefined;
-    /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
+    /** The narrow rail: glyphs, with the names on hover and on focus. */
     icons?: boolean | undefined;
     ontoggle?: (() => void) | undefined;
   } = $props();
@@ -309,15 +308,14 @@
   const moreShut = $derived(!icons && !moreAsked && !inMore);
 
   /**
-   * A SECTION'S THINGS FOLD ON THEIR OWN, AND STAY FOLDED (`railShut`, per device): a person who does not run projects
-   * folds Projects once. A section holding the screen you are on is never shut, so the rail never loses "here".
+   * A SECTION'S THINGS FOLD ON THEIR OWN, for as long as the rail is drawn: the shell draws this rail no more, so the
+   * cookie keeps no folds for it. A section holding the screen you are on is never shut, so the rail never loses "here".
    */
-  let shut = $state(new Set(pref.read().railShut ?? []));
+  let shut = $state(new Set<string>());
   function fold(section: string) {
     const next = new Set(shut);
     if (!next.delete(section)) next.add(section);
     shut = next;
-    pref.write({ railShut: [...next] });
   }
   const isShut = (section: string, list: readonly NavEntry[]) => !icons && shut.has(section) && !list.some((e) => under(e.href));
 

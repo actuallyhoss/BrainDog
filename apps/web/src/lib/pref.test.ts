@@ -69,9 +69,9 @@ test('THE SHAPE IS A CHOICE OR NOTHING: written as nothing it leaves the key, an
   /* `undefined` IS THE RAIL, so the default is the key's absence, and `nav-prefs.svelte.ts` writes `undefined` when nobody
      chose. Writing the shape drawn instead is how every top-bar build left `bar` behind in this cookie. */
   jar();
-  pref.write({ shape: 'menu', sidebar: false });
+  pref.write({ shape: 'menu', contrast: true });
   pref.write({ shape: undefined });
-  assert.deepEqual(pref.read(), { sidebar: false }, 'the default was kept as if somebody chose it, or took the width with it');
+  assert.deepEqual(pref.read(), { contrast: true }, 'the default was kept as if somebody chose it, or took the contrast with it');
 
   /* `side` IS THE RECORD'S WORD FOR A CHOSEN RAIL, never the cookie's, so a cookie holding it holds no shape. */
   jar(`bd_pref=${encodeURIComponent('{"shape":"side","scheme":"dark"}')}`);
@@ -122,7 +122,6 @@ test('AND NEITHER IS ONE THAT PARSES AND HOLDS THE WRONG TYPE, which used to be 
   for (const [key, bad] of [
     ['nav', '"/x"'],
     ['defined', '"row"'],
-    ['railShut', '3'],
     ['columns', '["what"]'],
     ['scheme', '"chartreuse"'],
     ['chars', '"yes"'],

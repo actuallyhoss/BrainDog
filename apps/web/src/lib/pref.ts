@@ -52,21 +52,6 @@ export type Pref = {
    */
   contrast?: boolean | undefined;
   /**
-   * `false` collapses the rail to its glyphs. `undefined` is open, which is what a first visit
-   * should be.
-   *
-   * IT USED TO TAKE THE WHOLE RAIL AWAY, and that is not what anybody means by collapsed. `⌘\`
-   * removed every row of navigation and left one button in an empty gutter: a sweep of `/keychain` in
-   * that state returned six visible controls and all six were *Reveal once*. The record switcher,
-   * the spine and the lists were then reachable only from a chord or the palette, and this
-   * preference persists, so a chord pressed by accident survived the reload.
-   *
-   * SO IT IS ONE RAIL AT TWO WIDTHS NOW. Collapsed keeps every row, every glyph, the spine and the
-   * switcher, and hands the names back on hover and on focus. Nothing becomes unreachable, which is
-   * what makes this a width rather than a disappearance.
-   */
-  sidebar?: boolean | undefined;
-  /**
    * WHERE THE NAVIGATION LIVES: the rail, a top bar, or nothing but a button.
    *
    * `undefined` IS THE RAIL, the floating glass card, which `19 §3` makes the default in bold and
@@ -177,18 +162,6 @@ export type Pref = {
    * store that is left. One key, named here rather than added quietly.
    */
   defined?: string[] | undefined;
-  /**
-   * Which rail sections this person has folded away.
-   *
-   * THIRTY-FOUR ITEMS OF NAVIGATION ON EVERY SCREEN, in a nested scroller that cut one of them in
-   * half at the default window size. The rail was already the reader's to reorder and to hide from
-   * one row at a time, and nobody hides twenty rows one at a time.
-   *
-   * SECTION NAMES AND NOT IDS, because a section IS its heading: `arrange()` groups by the `section`
-   * string a page declares, and there is no other handle on one. A section that is renamed comes
-   * back open, which is the right answer: it is not the section that was put away.
-   */
-  railShut?: string[] | undefined;
 };
 
 /** Look changes owed to the record, by the record's key, each with the word that was sent for it. */
@@ -248,7 +221,6 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   density: (v) => v === 'compact' || v === 'comfortable' || v === 'roomy',
   theme: (v) => typeof v === 'string',
   contrast: (v) => typeof v === 'boolean',
-  sidebar: (v) => typeof v === 'boolean',
   shape: (v) => v === 'rail' || v === 'bar' || v === 'menu',
   chars: (v) => typeof v === 'boolean',
   suggestPages: (v) => typeof v === 'boolean',
@@ -257,7 +229,6 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   seen: (v) => typeof v === 'string',
   nav: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   defined: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
-  railShut: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   who: (v) => typeof v === 'string',
   unsent: (v) =>
     typeof v === 'object' &&
