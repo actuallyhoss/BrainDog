@@ -119,7 +119,7 @@ const isRow = (x: unknown): x is Row => isObject(x) && typeof x.id === 'string' 
 
 /** A row's own name, as far as its fields say one. */
 const titleOf = (fields: Record<string, unknown>): string => {
-  for (const key of ['name', 'title', 'summary', 'subject', 'label', 'description']) {
+  for (const key of ['name', 'title', 'what', 'summary', 'subject', 'label', 'description']) {
     const v = text(fields[key]);
     if (v !== '') return clip(v, 80);
   }
@@ -392,7 +392,13 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
         const kinds = kindsOfWrite({ list: row.register, op: 'update', patch, shape, madeBy: madeByIn(deps.sql, row.id), person: deps.person, was: row.fields });
         const floor = kinds.find((k) => k.floor !== null)?.floor ?? null;
         const named = titleOf(row.fields) || spokenOfRow(row);
-        const fields = Object.keys(patch).join(', ');
+        /* EACH FIELD BY THE LABEL ITS LIST GIVES IT, "Due" and not `by`, where the declaration has one. */
+        const fields = Object.keys(patch)
+          .map((id) => {
+            const named = (shape.fields.find((f) => f.id === id) as { label?: unknown } | undefined)?.label;
+            return typeof named === 'string' && named.trim() !== '' ? named.trim().toLowerCase() : id;
+          })
+          .join(', ');
         const title = `Change ${fields} on “${named}”`;
         const op = { do: 'change', list: row.register, seq: row.seq, patch, version: row.version, note: noteOf(run.said) };
         return { ...(await decided(title, op, waitsFor(run, floor))), step: `Changing “${clip(named, 40)}”` };
