@@ -841,6 +841,8 @@ const HELD_MS = 30_000;
 const TODAY_BEHIND_MS = 1_800_000;
 /** The most Todays held at once, one for each body and reader; past it the oldest goes. */
 const TODAY_KEPT_MOST = 8;
+/** How long a fact about the questions is held while only the runs have moved (`quietFor`). */
+const QUIET_HELD_MS = 300_000;
 /** The most field names one `list` may ask for (`fields`). */
 const LIST_FIELDS_MOST = 64;
 
@@ -7244,6 +7246,59 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * THE VERSION LESS THE RUNS' OWN ROWS (`quietStamp`): the newest line of the log that is not about a row of the runs
+   * list, with the newest declaration, the newest question, how many are open and which add-ons are on. Every agent's
+   * start and handoff writes its run's row, so on a record agents work in the version moved between any two starts and
+   * the questions were read again for every card, though no question had moved.
+   *
+   * WALKED ONCE PER LINE: what was seen is kept, the top of the log and its id, and only the lines written since are
+   * looked at. A top line that is not the one seen there (a write rolled back, and another written in its place) is
+   * counted as a move.
+   */
+  let quietSeen: { top: number; id: string; quiet: number } | null = null;
+  const quietStamp = (): string => {
+    const head = sql.one<{ r: number; id: string }>('SELECT rowid AS r, id FROM event ORDER BY rowid DESC LIMIT 1');
+    const top = Number(head?.r ?? 0);
+    const id = head?.id ?? '';
+    if (quietSeen === null) quietSeen = { top, id, quiet: top };
+    else if (top !== quietSeen.top || id !== quietSeen.id) {
+      const was = quietSeen;
+      const still = was.top !== 0 && top > was.top && sql.one<{ id: string }>('SELECT id FROM event WHERE rowid = ?', was.top)?.id === was.id;
+      const moved = still
+        ? sql.one<{ m: number | null }>(
+            `SELECT max(e.rowid) AS m FROM event e WHERE e.rowid > ?
+               AND NOT (e.target LIKE 'entry:%' AND EXISTS (SELECT 1 FROM entry n WHERE n.id = substr(e.target, 7) AND n.register = ?))`,
+            was.top,
+            SESSION,
+          )?.m
+        : top;
+      quietSeen = { top, id, quiet: moved === null || moved === undefined ? was.quiet : Number(moved) };
+    }
+    const at = sql.one<Record<string, unknown>>(
+      `SELECT (SELECT max(rowid) FROM declaration) AS d, (SELECT max(rowid) FROM suggestion) AS s, (SELECT count(*) FROM suggestion WHERE status = 'open') AS o,
+              (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p`,
+    );
+    return JSON.stringify([quietSeen.quiet, at?.d ?? null, at?.s ?? null, at?.o ?? null, at?.p ?? null]);
+  };
+
+  /**
+   * A FACT ABOUT THE QUESTIONS, HELD WHILE NOTHING BUT THE RUNS HAS MOVED (`quietStamp`), for up to `QUIET_HELD_MS`: the
+   * open questions and what each weighs move with a question or a row, never with a run's heartbeat, and the clock moves
+   * them only at a day's edge (a question put off to a day). Every other fact is held by `heldFor`.
+   */
+  const quietFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32): T => {
+    const version = quietStamp();
+    const now = clock.now();
+    const was = store.get(key);
+    if (was !== undefined && was.version === version && was.at <= now && now - was.at < QUIET_HELD_MS && new Date(was.at).toISOString().slice(0, 10) === new Date(now).toISOString().slice(0, 10)) return was.value;
+    const value = make();
+    store.delete(key);
+    store.set(key, { version, at: now, value });
+    if (store.size > most) store.delete(store.keys().next().value as string);
+    return value;
+  };
+
+  /**
    * EVERY INSTALLED PAGE, AS `kernel.pages()` ANSWERS, held (`heldFor`): it resolves every page and the figures each
    * reads, 135 ms a call on a record his size, and `context` asked it only for the Home page's title. Shared, so it is
    * read and never changed: the readers below filter and map it into answers of their own.
@@ -7272,12 +7327,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     });
 
   /**
-   * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held (`heldFor`): `boot` read every one three times, for the rail's
+   * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held while only the runs move (`quietFor`): `boot` read every one three times, for the rail's
    * count, `waits` and the queue, and `context` twice more, each weighing every question's cost again. Read, never
    * changed: each reader filters and maps them into its own answer. `waitHeld` is the same queue in the order it waits.
    */
   const openHeld = new Map<string, Held<ReturnType<Kernel['openSuggestions']>>>();
-  const openNow = (): ReturnType<Kernel['openSuggestions']> => heldFor(openHeld, '', () => kernel.openSuggestions());
+  const openNow = (): ReturnType<Kernel['openSuggestions']> => quietFor(openHeld, '', () => kernel.openSuggestions());
   const waitHeld = new Map<string, Held<ReturnType<Kernel['governance']>>>();
   /** What the queue holds back and what it weighs (`costRows`), held as the questions are. */
   const costHeld = new Map<string, Held<ReturnType<typeof costRows>>>();
@@ -7507,7 +7562,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const placedWaiting = (ctx: CallContext): ({ id: string; question: string; waits?: string } & Placed)[] => {
     /* UNWEIGHED (`weigh: false`): a place reads no cost, and weighing every open question was most of this read. */
-    const rows = heldFor(waitHeld, '', () => kernel.governance('suggestion', { status: 'open', every: true, order: 'wait', weigh: false }));
+    const rows = quietFor(waitHeld, '', () => kernel.governance('suggestion', { status: 'open', every: true, order: 'wait', weigh: false }));
     if (!rows.ok) return [];
     const at = placesOnce();
     return rows.value
