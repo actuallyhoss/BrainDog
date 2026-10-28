@@ -396,7 +396,8 @@ test('a label that is not text is left off rather than drawn, and the page still
   if (out.from !== 'live') return;
   const [stat, table] = out.page.blocks;
 
-  assert.equal(table!.columns[0]?.label, 'revenue');
+  /* THE FIELD SAID AS THE LIST LABELS IT, never its id (`columnHeading`), as a column declared without a label is. */
+  assert.equal(table!.columns[0]?.label, 'Earned in a year');
   assert.equal(stat!.cells?.[0]?.label, metric);
   assert.doesNotThrow(() => toSegments(table!));
   assert.doesNotThrow(() => toSegments(stat!));
