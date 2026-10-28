@@ -410,6 +410,66 @@ function updatesAsked(sql: Sql, installed: ReadonlySet<string>): { id: string; o
   return out;
 }
 
+/** How far back a computer's command is judged: a key that called in this week. */
+export const COMMAND_WINDOW_DAYS = 7;
+
+/** One computer's command as its key last said it: its build, that build's day, and the kind of machine, when known. */
+type CommandHeard = { build: string; day: string; machine: string | null };
+
+/**
+ * The kind of machine a run's host name says, never the name itself, which often carries its owner's: `MacBook`,
+ * `Windows PC`. `null` for a name that says no kind. (`deviceOf` in the agent door reads the same names.)
+ */
+function machineOf(host: unknown): string | null {
+  if (typeof host !== 'string' || host === '') return null;
+  const h = host.toLowerCase();
+  if (h.includes('macbook')) return 'MacBook';
+  if (h.includes('imac')) return 'iMac';
+  if (/mac-?mini/u.test(h)) return 'Mac mini';
+  if (/mac-?studio/u.test(h)) return 'Mac Studio';
+  if (/^laptop-/u.test(h)) return 'Windows laptop';
+  if (/^(desktop|win)-/u.test(h)) return 'Windows PC';
+  return null;
+}
+
+/**
+ * THE COMMAND ON EACH COMPUTER, read from the keys and not the door's marks. Every request the command sends says its
+ * build (`x-braindog-cli`), which its key keeps (`last_build`); a door mark's build is the host's own on a `hello` and the
+ * command's only on its hook's mark, so "the newest mark" was this host's build after one session and the command's after
+ * the next. A key that called this week, with a build of a day (never a checkout's), and the machine its newest run named.
+ */
+function commandsHeard(sql: Sql, nowMs: number): CommandHeard[] {
+  if (!hasTable(sql, 'token')) return [];
+  const since = new Date(nowMs - COMMAND_WINDOW_DAYS * DAY).toISOString();
+  const keys = sql.all<{ id: string; build: string }>(
+    'SELECT id, last_build AS build FROM token WHERE revoked_at IS NULL AND last_build IS NOT NULL AND last_used_at >= ? ORDER BY last_used_at DESC',
+    since,
+  );
+  return keys.flatMap((k) => {
+    const day = buildDayOf(k.build);
+    if (day === null) return [];
+    const host = hasTable(sql, 'entry')
+      ? sql.one<{ host: string | null }>(
+          "SELECT json_extract(fields, '$.host') AS host FROM entry WHERE register = 'session' AND deleted_at IS NULL AND json_extract(fields, '$.token_id') = ? ORDER BY created_at DESC LIMIT 1",
+          k.id,
+        )?.host
+      : null;
+    return [{ build: k.build, day, machine: machineOf(host) }];
+  });
+}
+
+/**
+ * The computers a line names, `the MacBook`, `one computer`, `the MacBook and 1 more computer`, and whether that is
+ * one computer. Two keys on one MacBook (one for each agent) are one MacBook.
+ */
+function machinesSaid(behind: readonly CommandHeard[]): { where: string; one: boolean } {
+  const named = [...new Set(behind.flatMap((m) => (m.machine === null ? [] : [m.machine])))];
+  const unnamed = behind.filter((m) => m.machine === null).length;
+  if (named.length === 0) return unnamed === 1 ? { where: 'one computer', one: true } : { where: `${unnamed} computers`, one: false };
+  const head = joined(named.map((n) => `the ${n}`));
+  return unnamed === 0 ? { where: head, one: named.length === 1 } : { where: `${head} and ${count(unnamed, 'more computer')}`, one: false };
+}
+
 /** `one`, `one and two`, `one, two and three`. */
 const joined = (parts: readonly string[]): string => (parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
 
@@ -431,7 +491,7 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
      names it, and never by its id said as words ("Bank hsbc eg" beside "HSBC Egypt alerts"). */
   const titled = new Map(addOns.flatMap((p) => (typeof p.title === 'string' && p.title.trim() !== '' ? [[p.id, addOnName(p.id, p.title)] as const] : [])));
   /* Each red thing: its line, and what it is called in the sentence that counts them. */
-  const red = new Map<string, { line: string; who: string }>();
+  const red = new Map<string, { line: string; who: string; how?: string }>();
   const notes: string[] = [];
   const fine: string[] = [];
 
@@ -475,9 +535,24 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
     }
   }
 
-  /* THE COMMAND: the build of the newest session it opened against the build this host serves, both by the day they were made. */
+  /* THE COMMAND ON EACH COMPUTER IT RAN ON THIS WEEK, by the build its key last said, against the build this host serves. */
   const appDay = buildDayOf(deps.build?.app);
-  const newest = appDay !== null && hasTable(deps.sql, 'door_mark') ? deps.sql.one<{ build: string }>('SELECT build FROM door_mark WHERE build IS NOT NULL ORDER BY at DESC LIMIT 1') : undefined;
+  const machines = appDay === null ? [] : commandsHeard(deps.sql, nowMs);
+  if (appDay !== null && machines.length > 0) {
+    const behind = machines.filter((m) => m.build !== deps.build!.app && nightsBetween(m.day, appDay) > ARRIVED_NIGHTS);
+    if (behind.length > 0) {
+      const oldest = behind.reduce((a, b) => (a.day <= b.day ? a : b));
+      const { where, one } = machinesSaid(behind);
+      const same = behind.every((m) => m.day === oldest.day);
+      red.set(' command', {
+        line: `The BrainDog command on ${where} runs ${same ? 'the build' : 'a build as old as that'} of ${daySaid(oldest.day)}, and this host serves the build of ${daySaid(appDay)}. Running braindog update on ${one ? where : 'each'} turns it on.`,
+        who: 'the BrainDog command',
+        how: `Running braindog update on ${one ? where : 'each computer'} turns the command on.`,
+      });
+    } else fine.push(machines.every((m) => m.build === deps.build!.app) ? "the command runs this host's build" : `the command is within ${ARRIVED_NIGHTS} days of this host's build`);
+  }
+  /* A HOST WITH NO KEY THAT SAID ITS BUILD: the newest mark that named one, as before. */
+  const newest = appDay !== null && machines.length === 0 && hasTable(deps.sql, 'door_mark') ? deps.sql.one<{ build: string }>('SELECT build FROM door_mark WHERE build IS NOT NULL ORDER BY at DESC LIMIT 1') : undefined;
   const cliDay = newest === undefined ? null : buildDayOf(newest.build);
   if (appDay !== null && newest !== undefined && (newest.build === deps.build!.app || cliDay !== null)) {
     if (newest.build === deps.build!.app) fine.push("the command runs this host's build");
@@ -485,6 +560,7 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
       red.set(' command', {
         line: `The BrainDog command last heard from runs the build of ${daySaid(cliDay!)}, and this host serves the build of ${daySaid(appDay)}. Running braindog update on that computer turns it on.`,
         who: 'the BrainDog command',
+        how: 'Running braindog update on that computer turns the command on.',
       });
     else fine.push(`the command is within ${ARRIVED_NIGHTS} days of this host's build`);
   }
@@ -498,7 +574,12 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
 
   const lines = [...red.values()].map((r) => r.line);
   if (lines.length > 0) {
-    const said = lines.length === 1 ? lines[0]! : `${count(lines.length, 'thing that shipped has', 'things that shipped have')} not arrived: ${joined([...red.values()].map((r) => r.who))}.`;
+    /* THE ONE COMMAND TO RUN rides in the sentence too, so a line that counts several things still says it. */
+    const how = red.get(' command')?.how;
+    const said =
+      lines.length === 1
+        ? lines[0]!
+        : `${count(lines.length, 'thing that shipped has', 'things that shipped have')} not arrived: ${joined([...red.values()].map((r) => r.who))}.${how === undefined ? '' : ` ${how}`}`;
     return reading('red', lines.length, said, [...lines, ...notes]);
   }
   if (fine.length === 0)
