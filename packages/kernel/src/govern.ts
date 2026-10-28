@@ -409,6 +409,8 @@ export function apartOf(
   if (PERSON_ID.test(q.opened_by)) return false;
   const body = isMap(q.body) ? q.body : typeof q.body === 'string' ? parse(q.body) : null;
   if (body === null) return false;
+  /* A DOUBTFUL ARRIVAL WAITS IN TO REVIEW, which is its own place and not this shelf. */
+  if (body.review === true || body.review === 1) return false;
   if (q.body_kind === 'options' && typeof body.understand_key === 'string' && PLACE_KEY.test(body.understand_key)) return true;
   /* BRAINDOG ARRANGING ITS OWN PAGES is a suggestion; an add-on installed, turned on or off, or set up is the floor. */
   if (q.body_kind === 'arrange') {
