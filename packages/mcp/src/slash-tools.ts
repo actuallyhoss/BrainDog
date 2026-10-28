@@ -63,7 +63,8 @@ export type SlashToolDeps = {
 
 const TOOLS: readonly SlashTool[] = [
   { name: 'search', args: 'q', about: 'Find anything by its words, in every list' },
-  { name: 'lists', args: 'list?', about: 'The lists this record keeps with their counts, and its figures (cash, runway, totals). With list: its fields' },
+  { name: 'lists', args: 'list?', about: 'The lists this record keeps, with their counts. With list: its fields, by the ids add and change take' },
+  { name: 'figures', args: 'words', about: 'The figures the record works out (cash, runway, totals, forecast) whose names match, each with its value now' },
   { name: 'list', args: 'list, where?, limit?', about: 'Rows of one list, newest first. where: {"field":"state","is":"open"}' },
   { name: 'open', args: 'id', about: 'One row whole with what it links to, by its id or its name; or one figure by its id, such as cash or runway' },
   { name: 'today', args: '', about: 'What matters now: what is late, what is due, what stopped and what waits on them' },
@@ -72,7 +73,7 @@ const TOOLS: readonly SlashTool[] = [
   { name: 'people', args: 'name?', about: 'The people they know' },
   { name: 'projects', args: '', about: 'Their projects' },
   { name: 'pages', args: '', about: 'The pages of this BrainDog' },
-  { name: 'add', args: 'list, fields', about: 'Add a row to a list, its fields by field id', writes: true },
+  { name: 'add', args: 'list, fields', about: 'Add a row to a list, its fields by field id: {"what":"Call the bank","by":"2026-11-02"}', writes: true },
   { name: 'change', args: 'id, fields', about: "Change some fields of one row, by the row's id", writes: true },
   { name: 'person', args: 'name, email?, note?', about: 'Add a person they know', writes: true },
   { name: 'draft', args: 'what, page?', about: 'Draft a new page, a change to a page, or an automation, from what they described, for them to look at in Decide', writes: true },
@@ -328,6 +329,31 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
           ...(row === null ? {} : { outside: outsideOf([row.register]) }),
           step: `Opening ${row === null ? clip(id, 40) : titleOf(row.fields) || id}`,
         };
+      }
+      case 'figures': {
+        if (!surface.figures) return { text: 'This record does not list its figures here. lists() names the lists instead.' };
+        const all = await surface.figures(ctx);
+        if (!all.ok) return { text: fixOf(all) };
+        const words = text(args['words'] ?? args['q']).toLowerCase().split(/[^a-z0-9]+/u).filter((w) => w.length > 1);
+        const scored = all.value
+          .filter((f) => f.param !== true)
+          .map((f) => {
+            const said = `${f.id} ${f.name ?? ''}`.toLowerCase();
+            return { f, score: words.length === 0 ? 1 : words.filter((w) => said.includes(w)).length };
+          })
+          .filter((x) => x.score > 0)
+          .sort((a, z) => z.score - a.score)
+          .slice(0, 12);
+        if (scored.length === 0) return { text: `No figure is named like ${words.join(' ') || 'that'}. Try other words, or search.` };
+        /* THE BEST FEW ARE READ NOW, so a question about cash is answered in one call and not two. */
+        const lines: string[] = [];
+        for (const [i, { f }] of scored.entries()) {
+          if (i < 4) {
+            const read = await agent.answer('get', { spoken: f.id }, ctx);
+            lines.push(read.result.ok ? read.text.split('\n')[0] ?? `${f.name ?? f.id} (${f.id})` : `${f.name ?? f.id} (${f.id})`);
+          } else lines.push(`${f.name ?? f.id} (${f.id}): open it to read`);
+        }
+        return { text: lines.join('\n'), step: 'Working out the figures' };
       }
       case 'today': {
         const out = await agent.read('braindog:briefing', ctx);
