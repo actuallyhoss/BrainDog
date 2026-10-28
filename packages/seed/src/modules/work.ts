@@ -1229,7 +1229,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     requires: ['register.tasks'],
     pack: 'work',
     blocks: [
-      { kind: 'note', lead: true, span: 12, body: 'Your dated tasks on one time axis. Drag one to move its day.' },
       {
         kind: 'roadmap',
         heading: 'In play',
