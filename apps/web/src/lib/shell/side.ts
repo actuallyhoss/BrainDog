@@ -6,7 +6,6 @@
  * `side.test.ts` holds the order, the folds, the facts and the width without a component.
  */
 
-import { counted, names } from '../home/phrase.ts';
 
 /** One project as the sidebar draws it. */
 export type SideProject = {
@@ -82,7 +81,6 @@ export function splitOf<P extends Pick<SideProject, 'lane'>>(list: readonly P[],
 }
 
 const digits = (n: number): string => n.toLocaleString('en-GB');
-const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
 
 /**
  * THE ONE FACT A PROJECT SAYS ON THE PHONE'S PROJECTS TAB (frame C's line, brought to B): what is late first, then who
@@ -103,24 +101,6 @@ export function factOf(p: Pick<SideProject, 'late' | 'working' | 'moved'>): { te
 export function phoneLine(p: Pick<SideProject, 'lane' | 'next'>, label: (lane: string) => string): string | null {
   const parts = [p.lane === '' ? '' : label(p.lane).trim(), (p.next ?? '').trim()].filter((x) => x !== '');
   return parts.length > 0 ? parts.join(' · ') : null;
-}
-
-/**
- * THE SENTENCE OVER THE PHONE'S LIST, THE SAME FACT THE PROJECTS PAGE OPENS ON (`projects-board.ts`): what is late, by
- * name ("Bindery and Lantern are late."), else that nothing is, then how many are in play and how many of them earn.
- * `label` gives a lane its word, and the earning lane is the one whose word is Earning.
- */
-export function playSaid(play: readonly Pick<SideProject, 'lane' | 'late' | 'name'>[], label: (lane: string) => string): string {
-  if (play.length === 0) return 'Nothing is in play.';
-  const late = play.filter((p) => p.late > 0);
-  const lead =
-    late.length === 0
-      ? 'Nothing is late.'
-      : late.length > 3
-        ? `${cap(counted(late.length))} projects are late, ${names(late.map((p) => p.name))} among them.`
-        : `${names(late.map((p) => p.name))} ${late.length === 1 ? 'is' : 'are'} late.`;
-  const earning = play.filter((p) => p.lane !== '' && label(p.lane).trim().toLowerCase() === 'earning').length;
-  return `${lead} ${digits(play.length)} in play${earning > 0 ? `, ${digits(earning)} earning` : ''}.`;
 }
 
 /** The pins kept on this device, as the addresses of the projects pinned. */

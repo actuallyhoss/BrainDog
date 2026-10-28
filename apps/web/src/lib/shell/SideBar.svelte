@@ -1,7 +1,7 @@
 <!--
   The sidebar: every place, on the nav's own surface beside the work, the window's full height. One sidebar, on the left.
 
-  A 56px head on the bar's line: the record's mark and its name ("Acme ▾", the switcher) and the button that hides it.
+  A 56px head on the bar's line: BrainDog's mark and name (`Brand.svelte`) and the button that hides it.
   Then the places, Today, Needs you and the record's own (Work, Money, Agents, People), each with its count, the red one
   only for what needs you and a live dot for an agent at work. Then the projects: the heading is the portfolio page,
   "+" adds one, the ones in play by this week (pins, late, an agent at work, money in), Parked and Finished folded, and
@@ -32,7 +32,7 @@
   import { knowProjects } from '../page/known-project.ts';
   import { keepOrder } from './project-order.ts';
   import { frame } from './frame.svelte.ts';
-  import RecordMenu from './RecordMenu.svelte';
+  import Brand from './Brand.svelte';
   import {
     COUNTS_KEY,
     PINS_KEY,
@@ -44,7 +44,6 @@
     holdsProjects,
     phoneLine,
     pinsKept,
-    playSaid,
     shownName,
     splitOf,
     widthOf,
@@ -377,7 +376,6 @@
     onwidth?.(widthOf(width + (rtl && Math.abs(step) === 16 ? -step : step)), true);
   }
 
-  const sentence = $derived(read && split ? playSaid(split.play, read.label) : undefined);
   const showProjects = $derived(model.projects !== null && (read === null ? !answered : holdsProjects(read)));
 </script>
 
@@ -545,7 +543,6 @@
   <!-- THE PAGE'S NAME FOR A SCREEN READER: the bar says it for the eye. -->
   <h1 class="sr-only" tabindex="-1">{words.menu}</h1>
   <div class="s-phone">
-    <div class="s-tile s-who"><RecordMenu phone /></div>
     <nav class="s-tile" aria-label={words.nav}>
       <ul class="s-list">
         {#each model.places as p (p.key)}{@render place(p)}{/each}
@@ -553,7 +550,6 @@
     </nav>
     {#if showProjects && model.projects}
       <div class="s-tile">
-        {#if sentence}<p class="s-said">{sentence}</p>{/if}
         {@render projectsPart()}
       </div>
     {/if}
@@ -566,7 +562,7 @@
   <!-- THE NARROW RAIL: the places as their glyphs, each named on hover and to a screen reader, never nothing. -->
   <nav class="s-rail" aria-label={words.nav}>
     <div class="s-rhead">
-      <RecordMenu bare />
+      <Brand bare />
     </div>
     <ul class="s-list s-rlist">
       {#each model.places as p (p.key)}
@@ -601,9 +597,9 @@
   </nav>
 {:else}
   <aside class="s-side" aria-label={words.side}>
-    <!-- THE HEAD, ON THE BAR'S LINE: the record's mark and name, and the button that hides the column. -->
+    <!-- THE HEAD, ON THE BAR'S LINE: the product's mark and name, and the button that hides the column. -->
     <div class="s-shead">
-      <RecordMenu />
+      <Brand />
       <button type="button" class="s-hide tap" aria-pressed={shown} aria-keyshortcuts="[" aria-label={shown ? words.hide : words.show} title={`${shown ? words.hide : words.show} ([)`} onclick={() => ontoggle?.()}>
         <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
       </button>
@@ -1106,16 +1102,6 @@
     padding: var(--sp-2);
     background: var(--tile);
     border-radius: var(--r-tile);
-  }
-
-  .s-who {
-    display: flex;
-  }
-
-  .s-said {
-    margin: var(--sp-2) var(--sp-2) 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
   }
 
   .s-phone .s-head {

@@ -93,7 +93,6 @@ export const shell = {
 
   /** The predicate of an unfiltered list, said as a person would say it. */
   everything: 'everything in it',
-  recordSettings: 'Record settings',
   recordNotOpened: 'That did not open. Check your connection, then try again.',
   /* A PRESS ON A SCREEN STILL OPENING FROM THE SAVED COPY (fluid F5): a control that cannot wait says so, and an answer that
      was kept for the record says when it was not there to give. */

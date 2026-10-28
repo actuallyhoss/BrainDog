@@ -18,7 +18,6 @@ import {
   litOf,
   phoneLine,
   pinsKept,
-  playSaid,
   shownName,
   sideKept,
   sideModel,
@@ -220,17 +219,6 @@ test('one fact a project: late first, then an agent, then money, nothing for a q
   assert.equal(factOf({ late: 0, working: true, moved: false })?.tone, 'live');
   assert.equal(factOf({ late: 0, working: false, moved: true })?.tone, 'quiet');
   assert.equal(factOf({ late: 0, working: false, moved: false }), null);
-});
-
-test('the sentence over the phone list opens on what is late by name, then what is in play and earning', () => {
-  const label = (l: string) => ({ earning: 'Earning', building: 'Building' })[l] ?? l;
-  const play = [p('A', { late: 1 }), p('B'), p('C', { lane: 'building', late: 2 })];
-  assert.equal(playSaid(play, label), 'A and C are late. 3 in play, 2 earning.');
-  assert.equal(playSaid([p('A', { late: 1 })], label), 'A is late. 1 in play, 1 earning.');
-  assert.equal(playSaid([p('A')], label), 'Nothing is late. 1 in play, 1 earning.');
-  assert.equal(playSaid([p('A', { lane: 'building' })], label), 'Nothing is late. 1 in play.');
-  assert.equal(playSaid([], label), 'Nothing is in play.');
-  assert.doesNotMatch(playSaid(play, label), /—/u);
 });
 
 test('what the device keeps is read safely', () => {

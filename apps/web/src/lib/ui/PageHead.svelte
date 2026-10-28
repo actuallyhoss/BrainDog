@@ -20,7 +20,7 @@
   to animate its own font size, which laid the head out on every frame.
 
   BELOW 900px THE HEAD IS A PHONE'S, THREE ROWS. The bar is always a row of its own, 56 under the notch, and stays, ONE
-  SHAPE ON EVERY PAGE: the record's mark (or a back chevron where the page has a parent), where you are in words (the
+  SHAPE ON EVERY PAGE: BrainDog's mark (or a back chevron where the page has a parent), where you are in words (the
   shell's lit row, `frame.here`), then Ask, the bell and the face, each 44 square. Under it the kicker when there is one,
   then the name at 22/28, two lines at most, with its count inline and the page's actions at the end; then the
   sentence. The bar says the title on one line once the name has gone under it, fading in over where you are.
@@ -56,7 +56,7 @@
   import { openPalette } from '../palette/open.svelte.ts';
   import Bell from '../shell/Bell.svelte';
   import { frame } from '../shell/frame.svelte.ts';
-  import RecordMark from '../shell/RecordMark.svelte';
+  import Brand from '../shell/Brand.svelte';
   import YouMenu from '../shell/YouMenu.svelte';
   import { partsOf, stopped } from '../shell/headline.ts';
   import { settled } from './screen.svelte.ts';
@@ -191,7 +191,7 @@
      browser may break at), and one longer than the row still breaks inside itself rather than running off the screen. */
   const named = $derived(title.split(/\s+/u).filter((w) => w !== ''));
 
-  /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT; without one it carries the record's mark. */
+  /* WHETHER THE PHONE'S BAR HAS A WAY BACK IN IT; without one it carries BrainDog's mark. */
   const wayBack = $derived(Boolean(kicker && back));
 
   /* THE PAGE'S NAME, FOR THE BAR'S CRUMB: said while this head is drawn, and taken back when it goes. */
@@ -230,7 +230,7 @@
       <span class="back-mark"><Icon name="chevron" size="l" /></span>
     </a>
   {:else}
-    <span class="bar-mark"><RecordMark size={24} /></span>
+    <span class="bar-mark"><Brand bare size={22} /></span>
   {/if}
   <div class="bar-lead">
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
