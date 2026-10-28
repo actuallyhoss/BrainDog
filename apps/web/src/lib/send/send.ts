@@ -145,6 +145,8 @@ const KINDS: ReadonlySet<string> = new Set(['slash', 'mac', 'session', 'next']);
 const STATES: ReadonlySet<string> = new Set(Object.keys(stateWords));
 const json = { 'content-type': 'application/json' } as const;
 const gone = (status: number) => status === 404 || status === 405 || status === 501;
+/** A record method's answer is `{ ok, value }`; a door that answers flat is taken as it stands. */
+const flat = (body: unknown): unknown => (isObj(body) && body.ok === true && isObj(body.value) ? body.value : body);
 
 /** A refusal's one sentence, out of whatever JSON body a door answered with. */
 function fixIn(body: unknown): string | null {
@@ -199,7 +201,7 @@ export async function targets(base: string, signal?: AbortSignal): Promise<Targe
   try {
     const res = await fetch(`${base}${urls.targets}`, signal ? { signal } : {});
     if (!res.ok) return null;
-    const body: unknown = await res.json();
+    const body: unknown = flat(await res.json());
     if (!isObj(body) || !Array.isArray(body.targets)) return null;
     return body.targets.flatMap((t) => targetOf(t) ?? []);
   } catch {
@@ -216,7 +218,7 @@ export async function send(base: string, body: SendBody): Promise<Routed> {
     return { ok: false, missing: false, text: sendWords.unreached };
   }
   if (gone(res.status)) return { ok: false, missing: true, text: sendWords.missing };
-  const out: unknown = await res.json().catch(() => null);
+  const out: unknown = flat(await res.json().catch(() => null));
   if (!res.ok || !isObj(out)) return { ok: false, missing: false, text: fixIn(out) ?? sendWords.unreached };
   if (out.route === 'slash') return { ok: true, slash: true };
   const id = str(out.id);
@@ -231,7 +233,7 @@ export async function one(base: string, id: string, signal?: AbortSignal): Promi
   try {
     const res = await fetch(`${base}${urls.one(id)}`, signal ? { signal } : {});
     if (!res.ok) return null;
-    return sentOf(await res.json());
+    return sentOf(flat(await res.json()));
   } catch {
     return null;
   }
@@ -242,7 +244,7 @@ export async function open(base: string, signal?: AbortSignal): Promise<Sent[] |
   try {
     const res = await fetch(`${base}${urls.open}`, signal ? { signal } : {});
     if (!res.ok) return null;
-    const body: unknown = await res.json();
+    const body: unknown = flat(await res.json());
     if (!isObj(body) || !Array.isArray(body.sent)) return null;
     return body.sent.flatMap((s) => sentOf(s) ?? []).sort((a, b) => b.at - a.at);
   } catch {
