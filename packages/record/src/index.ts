@@ -9350,8 +9350,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * one use case home or the page called home that the caller may open, and `null` when there is none or several, since
    * which of several is read there is the arrangement's to say.
    */
+  /*
+   * THE PAGES THAT COULD BE HOME, KEPT WHILE THE DECLARATIONS STAND: a declared page, never a row's. Every attach writes
+   * the run's row, so the record's version had moved and every page of every run was resolved again, for one title.
+   */
+  let homesKept: { at: string; pages: ReturnType<typeof pagesNow> } | null = null;
+  const homeish = (slug: string): boolean => slug === 'home' || /^home-[a-z0-9][a-z0-9-]*$/u.test(slug);
+  const homePages = (): ReturnType<typeof pagesNow> => {
+    const at = JSON.stringify(
+      sql.one<Record<string, unknown>>(
+        `SELECT (SELECT max(rowid) FROM declaration) AS d, (SELECT count(*) FROM declaration WHERE superseded_at IS NULL AND retired = 0) AS n,
+                (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p`,
+      ) ?? null,
+    );
+    if (homesKept?.at === at) return homesKept.pages;
+    const pages = pagesNow().filter((p) => p.about === null && homeish(p.slug));
+    homesKept = { at, pages };
+    return pages;
+  };
   const homeTitle = (ctx: CallContext): string | null => {
-    const seen = pagesNow().filter((p) => seesPage(ctx, p));
+    const seen = homePages().filter((p) => seesPage(ctx, p));
     const homes = seen.filter((p) => /^home-[a-z0-9][a-z0-9-]*$/u.test(p.slug));
     const one = homes.length === 1 ? homes[0] : homes.length === 0 ? seen.find((p) => p.slug === 'home') : undefined;
     return one?.title ?? null;
