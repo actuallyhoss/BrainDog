@@ -49,7 +49,7 @@ test('THREE WORDS ARE A QUESTION: "what needs me today" puts the ask row first, 
   const row = { id: 'slash', title: copy.askSlash(asked) };
   const flat = inOrder([{ id: 'h-1', title: 'Every day' }, { id: 'h-2', title: 'Go Bus' }], undefined, { row, first: asksFirst(asked) });
   assert.equal(flat[0], row);
-  assert.equal(flat[0]!.title, 'Ask BrainDog: what needs me today');
+  assert.equal(flat[0]!.title, 'Ask Slash: what needs me today');
   /* A NAME BEING LOOKED FOR keeps the ask as the fallback under everything. */
   assert.deepEqual(inOrder([{ id: 'a', title: 'a' }], { id: 'all', title: 'all' }, { row, first: false }).map((r) => r.id), ['a', 'all', 'slash']);
   /* WITHOUT A MODEL THERE IS STILL NO ROW, first or last. */
@@ -57,7 +57,7 @@ test('THREE WORDS ARE A QUESTION: "what needs me today" puts the ask row first, 
 });
 
 test("THE ROW'S WORDS SAY SLASH AND THE QUESTION, and no row this palette draws without a model says Slash", () => {
-  assert.equal(copy.askSlash('late invoices'), 'Ask BrainDog: late invoices');
+  assert.equal(copy.askSlash('late invoices'), 'Ask Slash: late invoices');
   /* THE ROWS THAT EXIST WITHOUT A MODEL are built from these keys, and none of them may name Slash. */
   for (const key of ['paletteLabel', 'palettePlaceholder', 'noMatches', 'commands', 'destinations', 'records', 'pages', 'openById'] as const)
     assert.doesNotMatch(String(copy[key]), /Slash/u, key);

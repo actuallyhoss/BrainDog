@@ -47,7 +47,7 @@ export const palette = {
   /* SLASH'S ROW AND WHAT IT DRAWS (`50 §5.5` step 5). Every one of these is on screen only when `/api/version` says a model
      is behind Slash on this host, because the row is the only way into the mode and without a model the row does not exist.
      The fold's last line is `23 §6`'s, with a colon for the dash. */
-  askSlash: (text: string) => `Ask BrainDog: ${text}`,
+  askSlash: (text: string) => `Ask Slash: ${text}`,
   slashAsking: 'Slash is reading the record.',
   /* WHILE A BUSY RECORD IS ASKED AGAIN (the client's 503 retry): calm, and never the crash sentence to quote. */
   slashBusy: 'BrainDog is busy. Trying again.',
