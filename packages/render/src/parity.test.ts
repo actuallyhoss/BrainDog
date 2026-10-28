@@ -883,8 +883,11 @@ test('A TASK\'S TITLE OPENS IT AND ITS MORE CONTROL IS QUIET only where the host
   assert.equal((opened.match(/class="item-open" tabindex="0"/gu) ?? []).length, 1);
   assert.ok(more[0]!.includes('aria-label="More for Check the export"'), more[0]);
   assert.doesNotMatch(menued, /item-open/u);
-  /* The rest of the row is the mirror's, the control taken off. */
-  assert.equal(menued.replace(/<button [^>]*class="item-more tap"[^>]*>.*?<\/button>/gu, ''), bare);
+  /* The row is the host of its menu, so a right-click on it opens the same one, and only with a menu to open. */
+  assert.equal((menued.match(/<li class="item" data-menu-host data-row=/gu) ?? []).length, 3, 'a right-click on a task opens its menu');
+  assert.doesNotMatch(bare, /data-menu-host/u);
+  /* The rest of the row is the mirror's, the control and its host mark taken off. */
+  assert.equal(menued.replace(/<button [^>]*class="item-more tap"[^>]*>.*?<\/button>/gu, '').replaceAll(' data-menu-host', ''), bare);
 });
 
 test('THE LEAD QUESTION IS DRAWN WHOLE in both renderers, and only the first: its recommendation, why and what it changes', () => {
