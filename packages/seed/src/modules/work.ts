@@ -863,10 +863,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
        Projects goes without, so the page's keys keep one order whether the strip is there or not. */
     /* NO SEARCH BOX (proj F10): "Search this page" floated between the name and the line
        with no field round it, and the frame's own search is one press away on every screen. */
-    /* THE HEAD COUNTS WHAT THE CHIPS COUNT, SINCE the screens scope of 24 October: every task not finished, the
-       folded Later among them, so Open equals the project chips added up. It read Open 39 beside one project's chip of 46. */
+    /* THE HEAD COUNTS WHAT THE RAIL COUNTS, SINCE 28 October: Open, kept for later left out, so Work's name says the
+       same number beside it on the page and in the rail ("Work 16" stood by "Work 15"). What is kept for later is
+       counted once, in Not this week. From 24 October it counted every task not finished, to equal the chips. */
     header: {
-      count: { metric: 'tasks-in-play' },
+      count: { metric: 'open-tasks' },
       action: { verb: 'row.create', label: 'Add' },
     },
     /* WHOSE WORK, SINCE work 1.19.0: Yours, Agents or All, as the old Work screen's toolbar picked, narrowing every
