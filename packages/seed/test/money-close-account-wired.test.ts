@@ -113,7 +113,7 @@ async function money() {
     }
   };
   const queued = (): Queued[] => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run' ORDER BY rowid").map((r) => JSON.parse(r.payload) as Queued);
-  const asked = (status = 'open') => value<Question[]>(k.governance('suggestion', { status })).filter((q) => q.cause?.startsWith('money.close-account.'));
+  const asked = (status = 'open') => value<Question[]>(k.governance('suggestion', { status, apart: 'with' })).filter((q) => q.cause?.startsWith('money.close-account.'));
   /** What was asked, in its words: the `suggest` event's `to_v`, the only copy. */
   const said = (id: string) => sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${id}`)!.to_v.replace(/^"|"$/gu, '');
   const moves = () => value<{ rows: Entry[] }>(k.list({ register: 'transactions', where: { field: 'transfer', is: true } as never })).rows;

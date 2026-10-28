@@ -99,7 +99,7 @@ async function money() {
     await turn();
   };
   const rowsOf = (register: string) => value<{ rows: Entry[] }>(k.list({ register, limit: 500 })).rows.sort((a, b) => a.seq! - b.seq!);
-  const asked = (status: string) => value<Question[]>(k.governance('suggestion', { status })).filter((q) => (q.cause ?? '').startsWith('plans.twins:'));
+  const asked = (status: string) => value<Question[]>(k.governance('suggestion', { status, apart: 'with' })).filter((q) => (q.cause ?? '').startsWith('plans.twins:'));
   const said = (id: string) => sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${id}`)!.to_v.replace(/^"|"$/gu, '');
   const part = (plan: string, n: number) =>
     value<Entry>(k.create('installments', { what: `${plan}, part ${n}`, plan, number: n, direction: 'out', amount: gbp(10_000), due: `2027-0${n}-01`, state: 'open' }, OWNER));

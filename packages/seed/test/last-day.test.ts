@@ -97,7 +97,7 @@ async function moneyCore() {
     }
   };
   const runs = () => sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM event WHERE kind = 'pull' AND target = 'declaration:script.last_day' AND to_v IS NOT NULL")!.n;
-  const asked = (status: string) => value<Question[]>(k.governance('suggestion', { status })).filter((q) => q.cause === 'money.last-day');
+  const asked = (status: string) => value<Question[]>(k.governance('suggestion', { status, apart: 'with' })).filter((q) => q.cause === 'money.last-day');
   /** What was asked, in its words: the `suggest` event's `to_v`, the only copy (`govern.ts` `propose`). */
   const said = (id: string) => sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${id}`)!.to_v;
   return { k, sql, night, runs, asked, said };

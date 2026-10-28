@@ -337,7 +337,7 @@ test('ON A RECORD LIKE HIS, the script files one question a project, writes no k
     propose: async (p: { question: string; body_kind: 'rowset'; body: Fields; cause: string }) => k.propose(p, ACTOR),
     log: (line: string) => void logs.push(line),
   };
-  const openOf = () => value<{ id: string; body_kind: string; cause?: string | null }[]>(k.openSuggestions());
+  const openOf = () => value<{ id: string; body_kind: string; cause?: string | null }[]>(k.openSuggestions({ apart: 'with' }));
 
   assert.deepEqual(await mod.default(ctx), { asked: 6, waiting: 0, answered: 0, refused: 0 });
   assert.ok(reads < 200, `${reads} reads`);

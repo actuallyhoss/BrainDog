@@ -61,7 +61,7 @@ async function projects() {
       log: (line: string) => void logs.push(line),
     });
   const queued = (): string[] => sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run' ORDER BY rowid").map((r) => (JSON.parse(r.payload) as { script: string }).script);
-  const open = () => value<{ id: string; body_kind: string; cause?: string | null }[]>(k.openSuggestions()).filter((q) => String(q.cause ?? '').startsWith('kpi-kind:'));
+  const open = () => value<{ id: string; body_kind: string; cause?: string | null }[]>(k.openSuggestions({ apart: 'with' })).filter((q) => String(q.cause ?? '').startsWith('kpi-kind:'));
   return { k, run, queued, open, logs };
 }
 

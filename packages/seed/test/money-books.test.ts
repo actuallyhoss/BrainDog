@@ -110,7 +110,7 @@ async function money(docs: unknown[] = ['portfolio', 'people', 'money-core'].map
   };
   const queued = (): number =>
     sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'script.run'").filter((r) => (JSON.parse(r.payload) as { script: string }).script === 'book_from_account').length;
-  const asked = (status: string) => value<Question[]>(k.governance('suggestion', { status })).filter((q) => (q.cause ?? '').startsWith(CAUSE));
+  const asked = (status: string) => value<Question[]>(k.governance('suggestion', { status, apart: 'with' })).filter((q) => (q.cause ?? '').startsWith(CAUSE));
   const said = (id: string) => sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${id}`)!.to_v;
   const bookOf = (id: string) => k.get(id)!.fields.book ?? null;
   return { k, sql, made, run, turn, night, queued, asked, said, bookOf, log };

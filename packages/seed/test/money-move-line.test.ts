@@ -114,7 +114,7 @@ async function money(cycle = true) {
       });
     }
   };
-  const open = (): Question[] => value<Question[]>(k.governance('suggestion', { status: 'open' }));
+  const open = (): Question[] => value<Question[]>(k.governance('suggestion', { status: 'open', apart: 'with' }));
   return { k, sql, made, paid, turn, open, log, cycled };
 }
 
