@@ -156,6 +156,7 @@ const SLASH = {
   model: 'string',
   asks: keys({ used: 'number', cap: 'number', resets: 'instant', capped: optional('boolean') }),
   background: optional(keys({ used: 'number', cap: 'number' })),
+  deep: optional(keys({ key: 'boolean', model: 'string', harder: 'string', cap_cents: 'number', spent_cents: 'number' })),
 } satisfies Record<keyof Required<SlashStatus>, Shape>;
 
 /**

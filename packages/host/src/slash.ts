@@ -1823,7 +1823,9 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
     const chat = engine.chat.bind(engine);
     guarded.chat = (input, ctx, tools, emit, inference, deep) => {
       const going = slashDeepTurn(input, deep);
-      if (going === 'deep') return chat(input, ctx, tools, emit, inference, deep);
+      const asked = input !== null && typeof input === 'object' ? (input as { mode?: unknown; rethink?: unknown }) : {};
+      /* A TURN THAT ASKED FOR DEEP IS NEVER THIS HOST'S ASK: it answers on his key, or says why not and offers the Mac. */
+      if (going === 'deep' || asked.mode === 'deep' || asked.rethink === true) return chat(input, ctx, tools, emit, inference, deep);
       const stop = spent();
       if (stop === null) return chat(input, ctx, tools, emit, inference, deep);
       if (going === 'auto') return chat({ ...(input as object), mode: 'deep' }, ctx, tools, emit, inference, deep);
