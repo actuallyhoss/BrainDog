@@ -83,11 +83,10 @@ export const historyWords = {
   evenWeek: 'Changes are spread evenly across the day.',
   /* THE SWITCH THAT SHOWS THE RECORD'S OWN BOOKKEEPING beside the changes, and the line saying what it is hiding. */
   everything: 'Everything',
-  hidden: (n: number): string =>
-    `${n === 1 ? 'One entry is' : `${count(n)} entries are`} BrainDog's own bookkeeping: agent runs starting and stopping, their working folders, and when a tool was last seen.`,
+  hidden: (n: number): string => `${count(n)} bookkeeping ${n === 1 ? 'entry' : 'entries'} hidden.`,
   showThem: (n: number): string => (n === 1 ? 'Show it' : 'Show them'),
   /* THE FOOT SAYS WHERE THEY ARE rather than being a second press beside Show more. */
-  hiddenWhere: 'Everything, above, shows them.',
+  hiddenWhere: 'Everything shows them.',
   onlyBooks: 'Nothing changed, apart from BrainDog keeping its own books.',
   /* THE ONE PRESS AT THE STREAM'S FOOT, for more of what was read and then for older lines. */
   showMore: 'Show more',

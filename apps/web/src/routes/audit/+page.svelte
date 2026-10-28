@@ -730,8 +730,8 @@
           <span class="detail-text"
             >{settled ?? (ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : by.name)}{#if said.done}{' · '}{said.done}{/if}{#if note}<span class="note" title={note} data-own>{' · '}{note}</span>{/if}</span
           >
-          <!-- WHERE IT HAPPENED AS A CHIP at the line's end: the list a row is in, as the rail names it. -->
-          {#if thing?.list}<span class="where-chip">{thing.list}</span>{/if}
+          <!-- WHERE IT HAPPENED, at the line's end in the same quiet words: the list a row is in, as the rail names it. -->
+          {#if thing?.list}<span class="where-chip">{'· '}{thing.list}</span>{/if}
         </span>
       </span>
       <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
@@ -1216,20 +1216,17 @@
     white-space: nowrap;
   }
 
-  /* WHERE IT HAPPENED, AS A QUIET CHIP right after who and what, as Recent runs and Up
-     next say a project: the list a row is in, never a lone chip at the far edge. */
+  /* WHERE IT HAPPENED, right after who and what in the line's own quiet words: the list a row is in. A pill on every
+     line of a long feed was chrome repeated thirty times. */
   .where-chip {
     flex: none;
     max-inline-size: 12em;
     overflow: hidden;
-    padding: 0 var(--sp-2);
-    border-radius: var(--r-round);
-    background: var(--tile-2);
-    color: var(--ink-2);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 20px;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: pre;
   }
 
   /* A TIME IN A FEED IS GEIST AT 13 WITH TABULAR FIGURES, in the quiet ink: the figures line up down the tile without a

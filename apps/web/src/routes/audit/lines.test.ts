@@ -332,8 +332,8 @@ test('every read of the log carries the switch, and turning it on or off reads t
 
 test('the words about what is hidden name the person’s own things, in plain words', () => {
   assert.equal(historyWords.everything, 'Everything');
-  assert.match(historyWords.hidden(14), /^14 entries are BrainDog's own bookkeeping: /u);
-  assert.match(historyWords.hidden(1), /^One entry is /u);
+  assert.equal(historyWords.hidden(14), '14 bookkeeping entries hidden.');
+  assert.equal(historyWords.hidden(1), '1 bookkeeping entry hidden.');
   assert.equal(historyWords.showMore, 'Show more');
   for (const line of [historyWords.hidden(1), historyWords.hidden(14), historyWords.onlyBooks, historyWords.showMore, historyWords.showThem(2), historyWords.hiddenWhere]) {
     assert.doesNotMatch(line, /\u2014|—/u, `an em dash in "${line}"`);
@@ -401,7 +401,7 @@ test('September is Sep down the whole screen, and the dot between two parts of a
   const markup = page.slice(page.indexOf('{#snippet entry('), page.indexOf('<PageHead'));
   assert.doesNotMatch(markup, />\s+·/u, 'an element opens on white space and a dot');
   assert.match(markup, /<span class="note" title=\{note\} data-own>\{' · '\}\{note\}<\/span>/u);
-  assert.match(markup, /<span class="where-chip">\{thing\.list\}<\/span>/u, 'where it happened is a chip of its own');
+  assert.match(markup, /<span class="where-chip">\{'· '\}\{thing\.list\}<\/span>/u, 'where it happened is said after a dot of its own');
 });
 
 /* WHO A RUN IS (history-run-by-web-68): a line a run signed carries run_by, and the screen says the app it ran in. */
