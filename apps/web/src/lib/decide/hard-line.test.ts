@@ -37,7 +37,8 @@ test('a hard answer says its care as a line under the row, and its button says i
   const source = readFileSync(new URL('./DecisionCard.svelte', import.meta.url), 'utf8');
   const row = source.slice(source.indexOf('{#snippet inlineButtons('), source.indexOf('{/snippet}', source.indexOf('{#snippet inlineButtons(')));
   assert.doesNotMatch(row, /\{wayTail\(card, way, primary\)\}/u, 'the care is still said inside the button');
-  /* AND SAYS WHY, in words of what the answer does: never the bare warning. */
-  assert.match(source, /<p class="dc-hard" id="\{uid\}-hard" dir="auto"><span class="dc-hard-word">\{hardLine\}\.<\/span> \{hardReason\}<\/p>/u);
+  /* AND SAYS WHY, in words of what the answer does, where there is a why: an answer its asker marked hard and said no
+     more of stands as the warning alone, rather than the warning said twice. */
+  assert.match(source, /<p class="dc-hard" id="\{uid\}-hard" dir="auto"><span class="dc-hard-word">\{hardLine\}\.<\/span>\{#if hardReason\} \{hardReason\}\{\/if\}<\/p>/u);
   assert.ok(card.hardWhy(card.cardOf(ask({ cost: 'undo', money: [{ amount: 1298, currency: 'GBP' }] }), { now })).startsWith('It changes amounts'));
 });
