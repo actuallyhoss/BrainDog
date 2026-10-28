@@ -123,6 +123,7 @@ import {
   slugify,
   SLASH,
   BACKFILL_ACTOR,
+  DRAFT_FIELD,
   CEILING,
   isOrganisationAddress,
   keyOf,
@@ -3831,9 +3832,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       filled[f.id] = first;
     }
     const drafts: SlashDraft[] = [];
+    /* A LIST THAT HOLDS DRAFTS GETS ONE, QUIETLY, instead of a question: the repository becomes a draft project the person
+       keeps with one press or turns away, as the first run out of a new repository makes one (`formFirstProject`). A name
+       the list has ever held, a draft turned away included, is not formed again. */
+    const drafting = decl.fields.some((f) => f.id === DRAFT_FIELD && f.retired !== true);
+    const folders = decl.scopes?.folders;
+    const formed: string[] = [];
     for (const s of kernel.projectSuggestions()) {
       const name = s.name.trim();
       if (name === '' || looksLikeCredential(name)) continue;
+      if (drafting) {
+        const held = sql.one<{ n: number }>(
+          `SELECT 1 AS n FROM entry WHERE register = ? AND lower(trim(json_extract(fields, '$."' || ? || '"'))) = lower(?) LIMIT 1`,
+          list,
+          decl.title,
+          name,
+        );
+        if (held) continue;
+        const fields: Record<string, JsonValue> = { ...filled, [decl.title]: name, [repos]: [name], [DRAFT_FIELD]: true };
+        if (folders !== undefined && s.folder !== null && decl.fields.some((f) => f.id === folders && f.retired !== true)) fields[folders] = [s.folder];
+        const made = kernel.create(list, fields as Patch, { actor: BACKFILL_ACTOR, cascade: false, note: 'formed from agent sessions' } as never);
+        if (made.ok) formed.push(`${name} became a draft project.`);
+        continue;
+      }
       const body = { register: list, project_key: s.key, rows: [{ ...filled, [decl.title]: name, [repos]: [name] }] };
       drafts.push({
         key: stableKey(body),
@@ -3843,10 +3864,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         by: 'rules',
       });
     }
-    if (drafts.length === 0) return { filed: [], dropped: [] };
+    if (drafts.length === 0) return { filed: [], dropped: formed };
     const { filed, skipped } = await slashFiling(drafts, slashReading());
     /* A NO HOLDS QUIETLY: a repository asked about before is not a line in the day's log. */
-    return { filed, dropped: skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`) };
+    return { filed, dropped: [...formed, ...skipped.filter((k) => k.why !== 'Slash has asked this before.').map((k) => `${k.question} was not filed: ${k.why}`)] };
   };
 
   /**
