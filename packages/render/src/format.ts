@@ -867,8 +867,14 @@ const SHORT_NAMES = new Set([
   'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun', 'ltd', 'co', 'inc', 'plc', 'llc',
   'tax', 'fee', 'pay', 'end', 'new', 'set', 'day', 'net', 'gas', 'car', 'bus', 'cab', 'bar', 'box', 'top', 'one', 'two', 'all', 'out', 'off', 'our', 'per',
 ]);
-/** Longer initialisms a bank line holds, kept in capitals. */
-const LONG_INITIALS = new Set(['HMRC', 'HSBC', 'AMEX', 'IBAN', 'SWIFT', 'DVLA']);
+/** Longer initialisms a bank line holds that could be said as a word, kept in capitals: the terms of a transfer. */
+const LONG_INITIALS = new Set(['IBAN', 'SWIFT', 'DVLA']);
+/**
+ * A WORD NOBODY COULD SAY IS INITIALS: four capitals or more with no vowel in them ("HMRC") are read letter by letter,
+ * so they keep their capitals. A rule and not a list of names, because whose initials a bank line carries is the
+ * record's and the add-on's, never the renderer's.
+ */
+const unsayable = (bare: string): boolean => bare.length > 3 && !/[AEIOUY]/u.test(bare) && /^\p{Lu}+$/u.test(bare);
 
 /**
  * BANK TEXT AS A PERSON WRITES IT: "KILN STOREFRONT PAYOUT" is "Kiln Storefront Payout", and "TALLYARD" is
@@ -895,7 +901,7 @@ export function readable(text: string): string {
       .map((word) => {
         const bare = word.replace(/['’]/gu, '');
         const low = word.toLowerCase();
-        if (LONG_INITIALS.has(bare)) return word;
+        if (LONG_INITIALS.has(bare) || unsayable(bare)) return word;
         if (!lead && parts.length === 1 && SMALL_WORDS.has(low)) return low;
         if (bare.length <= 3 && !joined && !SHORT_NAMES.has(low)) return word;
         return word.charAt(0) + word.slice(1).toLowerCase();
