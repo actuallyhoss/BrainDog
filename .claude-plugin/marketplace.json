@@ -1,0 +1,14 @@
+{
+  "name": "braindog",
+  "owner": { "name": "BrainDog", "url": "https://brain.dog" },
+  "description": "BrainDog for Claude Code: the record's MCP server, the session hooks and the BrainDog skill.",
+  "plugins": [
+    {
+      "name": "braindog",
+      "source": "./plugins/claude-code",
+      "description": "Connects Claude Code to your BrainDog record: the MCP server with sign-in, the session start and end hooks, and the BrainDog skill.",
+      "homepage": "https://brain.dog/docs/agents/connect",
+      "license": "Apache-2.0"
+    }
+  ]
+}

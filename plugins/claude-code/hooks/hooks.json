@@ -1,0 +1,28 @@
+{
+  "description": "The session's start and end, told to BrainDog by its command line. Each does nothing where the command line is not installed.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v braindog >/dev/null 2>&1 && braindog hook start || true",
+            "timeout": 10,
+            "statusMessage": "Connecting to BrainDog..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v braindog >/dev/null 2>&1 && braindog hook end || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
