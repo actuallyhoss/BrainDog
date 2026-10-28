@@ -1107,7 +1107,6 @@ export const words = {
   } as Record<'inline' | 'run', string>,
   filed: 'Sent to Needs you. It runs once you accept it there.',
   openDecide: 'Open it in Needs you',
-  nothingChanged: 'Nothing has changed since it was opened.',
   faults: 'Before it can be sent',
   insideItself: 'A branch cannot go inside itself.',
   /* THE CEILING IS THE GRAMMAR'S, said as a word: the copy said "three" while the number was kept beside it by hand. */

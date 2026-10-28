@@ -773,7 +773,6 @@
               <span class="trigger-main">
                 <span class="trigger-kicker">{words.trigger}</span>
                 <span class="trigger-said">{sayStart(flow.draft, listSaid)}</span>
-                <span class="trigger-path">{flow.path === 'inline' ? words.inline : words.asRun}</span>
               </span>
             </button>
             {#each general as f, i (f.say)}<p class="fault" id={`flow-fault-${i}`}><span class="fault-glyph" aria-hidden="true"><Icon name="alert" /></span>{f.say}</p>{/each}
@@ -798,8 +797,6 @@
               <p class="said" data-tone="bad" id="flow-held">{words.faults}: {faults.length === 1 ? faults[0]!.say : copy.flowFaultsOnCards(faults.length)}</p>
             {:else if served}
               <p class="said" data-tone="bad" id="flow-held">{words.faults}: {served.say}</p>
-            {:else if !flow.dirty && !filed}
-              <p class="said">{words.nothingChanged}</p>
             {/if}
             <!-- A NEW AUTOMATION THAT STARTS ON A PRESS SAYS WHERE THE PRESS WILL BE. Its trigger reads "When you press
                  Run now" and there was no Run now anywhere, because a run needs something saved to run. -->
@@ -808,7 +805,7 @@
             {/if}
             <div class="foot-actions">
               <!-- NOT DRAWN UNTIL THERE IS A STEP TO TAKE BACK: greyed, the two read as presses
-                   under "Nothing has changed since it was opened". Each comes once the canvas holds a change for it. -->
+                   with nothing to take back. Each comes once the canvas holds a change for it. -->
               {#if flow.canUndo || flow.canRedo}
                 <Button disabled={!flow.canUndo} kbd={canvasWords.undoKey} onclick={undo}>{copy.undo}</Button>
                 <Button disabled={!flow.canRedo} kbd={canvasWords.redoKey} onclick={redo}>{copy.redo}</Button>
@@ -1131,12 +1128,6 @@
     font-weight: 600;
     line-height: 20px;
     overflow-wrap: anywhere;
-  }
-
-  .trigger-path {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
   }
 
   /* THE AUTOMATION AS ONE SENTENCE, over the tabs, at the reading size and the measure a sentence keeps. */
