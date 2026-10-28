@@ -182,7 +182,7 @@ import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { COST_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
-import { HeldReadings, traceOf, tracing } from './held-readings.ts';
+import { HELD_SHORT_MS, HeldReadings, notice, traceOf, within, type ReadTrace } from './held-readings.ts';
 import { localDays, readableZone } from './measures.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { ROWS_SAID_MOVES, ROWS_SAID_NAMES, claimRank, fill, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageSees, type LastChange, type PageResult, type QueueCandidate, type QueueOption, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
@@ -1772,18 +1772,29 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /* A ROLLBACK DROPS EVERY READING HELD ACROSS READS (`readingHeld`), since one read inside the write it took back read
      rows that never were. Set once the readings are. */
   let dropHeld = (): void => undefined;
+  /* AND EVERY READ IS NOTED BY THE READINGS BEING READ NOW (`holdAcross`), which hold by the lists they read; a write
+     made while one is read holds none of them. `muted` while their versions are themselves asked. */
+  const traces: ReadTrace[] = [];
+  let muted = 0;
+  let knownList = (_word: string): boolean => false;
+  const noted = (text: string, params: readonly Param[]): void => {
+    if (muted === 0) for (const t of traces) notice(t, text, params, knownList);
+  };
   const sql: Sql = {
     exec: (text, ...params) => {
       moment?.drop();
       if (/^\s*ROLLBACK\b/iu.test(text)) dropHeld();
+      for (const t of traces) t.whole = true;
       raw.exec(text, ...params);
     },
     all: (text, ...params) => {
       if (!reads(text)) moment?.drop();
+      if (traces.length > 0) noted(text, params);
       return raw.all(text, ...params);
     },
     one: (text, ...params) => {
       if (!reads(text)) moment?.drop();
+      if (traces.length > 0) noted(text, params);
       return raw.one(text, ...params);
     },
     transactionSync: (fn) => {
@@ -7173,40 +7184,81 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * and kept as copies, so a caller that reshapes one reshapes no other.
    */
   const readingsHeld = new HeldReadings<Result<Reading>>();
+  const walksHeld = new HeldReadings<Runway | null>();
+  const signsHeld = new HeldReadings<SignReading>();
   dropHeld = () => {
     readingsHeld.clear();
+    walksHeld.clear();
+    signsHeld.clear();
     listsSeen = null;
   };
+  knownList = (word) => registers.has(word);
   const daysIn = new Map<string, (ms: number) => string>();
-  const readingHeld = (decl: MetricDecl, ctx: EvalContext, how: string, read: (sql: Sql, ctx: EvalContext) => Result<Reading>, once: Stamps = { rows: new Map() }): Result<Reading> => {
-    if (depth > 0 || ctx.asOfMs !== undefined || ctx.point === true || ctx.reads !== undefined) return read(sql, ctx);
-    const now = ctx.nowMs;
-    const tz = readableZone(ctx.tz);
+  /** The day where the record is, in `tz`, at `now`. */
+  const dayAt = (tz: string, now: number): string => {
     let days = daysIn.get(tz);
     if (days === undefined) daysIn.set(tz, (days = localDays(tz)));
-    const day = days(now);
-    const key = JSON.stringify([how, ctx.viewer ?? null, tz, decl]);
-    const stampOf = (lists: readonly string[]): string => listsStamp(lists, once);
-    const held = readingsHeld.get(key, day, now, stampOf);
-    if (held !== undefined) return structuredClone(held);
+    return days(now);
+  };
+  /**
+   * `make` held in `store` under `key` while the lists it read stand and the day holds (`held-readings.ts`), for at most
+   * `most`. What it read is noted by the reads of the kernel's own `Sql`, and a reading inside another is read by the
+   * outer one too, held or not, so the outer is held by its lists as well. Never inside a write, whose rows may yet be
+   * taken back. A copy is handed out and a copy kept.
+   */
+  const holdAcross = <T>(store: HeldReadings<T>, key: string, tz: string, now: number, once: Stamps, make: () => T, most?: number): T => {
+    if (depth > 0) return make();
+    const day = dayAt(tz, now);
+    const stampOf = (lists: readonly string[]): string => {
+      muted++;
+      try {
+        return listsStamp(lists, once);
+      } finally {
+        muted--;
+      }
+    };
+    const held = store.get(key, day, now, stampOf);
+    if (held !== undefined) {
+      for (const t of traces) within(t, held);
+      return structuredClone(held.value);
+    }
     const trace = traceOf();
-    const known = (word: string): boolean => registers.has(word);
-    const noted = (list: string | null | undefined): void => {
-      if (typeof list === 'string') trace.lists.add(list);
-      else trace.whole = true;
-    };
-    const { refByTitle, refById, refBySpoken, fx, signs } = ctx;
-    const seen: EvalContext = {
-      ...ctx,
-      ...(refByTitle ? { refByTitle: (register: string, title: string) => (noted(register), refByTitle(register, title)) } : {}),
-      ...(refById ? { refById: (id: string) => ((r) => (noted(r), r))(refById(id)) } : {}),
-      ...(refBySpoken ? { refBySpoken: (said: string) => ((r) => (r === null ? r : (noted(r.register), r)))(refBySpoken(said)) } : {}),
-      ...(fx ? { fx: () => ((role) => (role ? noted(role.register) : undefined, fx()))(ratesRole(registers.values())) } : {}),
-      ...(signs ? { signs: () => ((trace.whole = true), signs()) } : {}),
-    };
-    const got = read(tracing(sql, known, trace), seen);
-    readingsHeld.set(key, day, now, trace, structuredClone(got), stampOf, (list) => list === SESSION);
-    return got;
+    traces.push(trace);
+    let value: T;
+    try {
+      value = make();
+    } finally {
+      traces.pop();
+    }
+    for (const t of traces) within(t, trace);
+    store.set(key, day, now, trace, structuredClone(value), stampOf, (list) => list === SESSION, most);
+    return value;
+  };
+  /**
+   * A FIGURE'S READING HELD ACROSS READS WHILE THE LISTS IT READ STAND (`holdAcross`), the day where the record is
+   * holds, and for at most an hour: an agent's step on its run moves the runs list and no figure over the ledger. A
+   * figure that read the runs, the log or rows of no list is not held and is read each time, as before: a run's
+   * heartbeat moves its row with no line.
+   *
+   * NEVER A READ AS OF ANOTHER DAY, A KEPT POINT'S, OR ONE HELD TO THE LISTS A MEMBER READS (`reads`): those are read
+   * as they come. `how` keeps a read in its home currency apart from one in each currency (`readApart`).
+   */
+  /**
+   * THE VITAL SIGNS AS A FIGURE READS THEM (`signs-red`, `unread-now`), each sign held over the lists it read for at most
+   * `HELD_SHORT_MS`, since a sign may say how long ago something was. One that read the log, the questions or its own
+   * kept readings is read each time.
+   */
+  const signsHeldNow = (): VitalSign[] => {
+    const now = clock.now();
+    const tz = recordTz();
+    const zone = readableZone(tz);
+    const once: Stamps = { rows: new Map() };
+    return readSigns(sql, now, tz, (sign, read) => holdAcross(signsHeld, JSON.stringify([sign, zone]), zone, now, once, read, HELD_SHORT_MS));
+  };
+  const readingHeld = (decl: MetricDecl, ctx: EvalContext, how: string, read: (sql: Sql, ctx: EvalContext) => Result<Reading>, once: Stamps = { rows: new Map() }): Result<Reading> => {
+    if (ctx.asOfMs !== undefined || ctx.point === true || ctx.reads !== undefined) return read(sql, ctx);
+    const tz = readableZone(ctx.tz);
+    return holdAcross(readingsHeld, JSON.stringify([how, ctx.viewer ?? null, tz, decl]), tz, ctx.nowMs, once, () => read(sql, ctx));
   };
 
   const evalContext = (staged: readonly Declaration[] = [], viewer?: string): EvalContext => withViewer(viewer, {
@@ -7294,7 +7346,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        sign walked twice. Handed out as copies, so a reader that changed one changes nothing the next is handed. */
     signs: ((): (() => ReturnType<typeof readSigns>) => {
       let read: ReturnType<typeof readSigns> | undefined;
-      return () => structuredClone((read ??= readSigns(sql, clock.now(), recordTz())));
+      return () => structuredClone((read ??= signsHeldNow()));
     })(),
     /* THE HOST'S BUILD, for the door's `behind`: handed in by `openRecord`'s caller, null when it said none. */
     build: opts.build ?? null,
@@ -7826,15 +7878,19 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     runway: (opening, legs, horizon, only, into) => {
       const key = JSON.stringify([opening, legs, horizon, only, into]);
       if (walked.has(key)) return structuredClone(walked.get(key)!);
-      const out = runway(
-        { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
-        opening,
-        legs,
-        horizon,
-        only,
-        into,
-      );
-      const answer = out.ok ? out.value : null;
+      /* AND HELD ACROSS READS WHILE THE LISTS IT WALKED STAND (`holdAcross`), the day holding. */
+      const zone = readableZone(recordTz());
+      const answer = holdAcross(walksHeld, key, zone, clock.now(), once, () => {
+        const out = runway(
+          { sql, schemaOf: (r) => hopSchemaOf(r) ?? null, titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
+          opening,
+          legs,
+          horizon,
+          only,
+          into,
+        );
+        return out.ok ? out.value : null;
+      });
       walked.set(key, answer);
       return structuredClone(answer);
     },
@@ -10224,7 +10280,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const fx = base.ctx.fx;
       const ctx: EvalContext = {
         ...base.ctx,
-        signs: () => (built ??= readSigns(sql, clock.now(), recordTz())),
+        signs: () => (built ??= signsHeldNow()),
         ...(fx ? { fx: () => (rates ??= fx()) } : {}),
       };
       const readings = new Map<string, Result<Reading>>();

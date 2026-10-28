@@ -720,15 +720,18 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
   return reading(row.state, row.value === null ? null : Number(row.value), row.said, kept.facts, kept.counts);
 }
 
-/** Every sign now, with its last fourteen days, oldest first; a day with no reading is `none`. */
-export function readSigns(sql: Sql, nowMs: number, tz: string): VitalSign[] {
+/**
+ * Every sign now, with its last fourteen days, oldest first; a day with no reading is `none`. `each` reads one sign as
+ * the caller holds it (the kernel's figures hold a sign over the lists it read, `holdAcross`); absent, each is read now.
+ */
+export function readSigns(sql: Sql, nowMs: number, tz: string, each?: (sign: string, read: () => SignReading) => SignReading): VitalSign[] {
   const today = dayIn(nowMs, safeZone(tz));
   const first = dayBefore(today, 14);
   const kept = new Map<string, SignState>();
   for (const r of sql.all<{ sign: string; day: string; state: SignState }>('SELECT sign, day, state FROM sign_reading WHERE day >= ? AND day < ?', first, today))
     kept.set(`${r.sign} ${r.day}`, r.state);
   return VITAL_SIGNS.map((s) => {
-    const now = readNow(sql, s, nowMs, safeZone(tz));
+    const now = each === undefined ? readNow(sql, s, nowMs, safeZone(tz)) : each(s.sign, () => readNow(sql, s, nowMs, safeZone(tz)));
     const days = Array.from({ length: 14 }, (_, i) => dayBefore(today, 14 - i)).map((day) => ({ day, state: kept.get(`${s.sign} ${day}`) ?? ('none' as const) }));
     const sign: VitalSign = { sign: s.sign, name: s.name, state: now.state, value: now.value, said: now.said, facts: now.facts ?? [], days };
     if (now.counts !== undefined) sign.counts = { ...now.counts };
