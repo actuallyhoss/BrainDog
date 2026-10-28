@@ -305,11 +305,34 @@ function pairs(text: string): Map<number, number> {
  * `held` is true for the words of a `{{bad:…}}` and everything inside them. A `bad` in there is the author's
  * text, so the reader goes one level down and no further, whatever it is handed.
  */
+/**
+ * A ROW'S HANDLE WRITTEN BARE IN PROSE, `tasks#404`, as an agent writes it into a note: never inside an address, a
+ * file's path (`file:parts#2/photo`) or a longer word. It is drawn as `{{ref:tasks#404}}` is, the row's number linked
+ * where the host can link it, so a project's note never prints a register's key where a name goes.
+ */
+const BARE_HANDLE = /(?<![\w:/#.@-])[a-z][a-z0-9_]*#\d+(?![\w/#-])/gu;
+
+/** Plain text, with each bare handle in it drawn as a `ref`. */
+function plainRun(text: string, opts: InlineOptions): Inline[] {
+  if (!text.includes('#')) return [{ type: 'text', text }];
+  const out: Inline[] = [];
+  let at = 0;
+  for (const m of text.matchAll(BARE_HANDLE)) {
+    const shown = formatTyped('ref', m[0], opts.now, opts.zone);
+    if (shown === null) continue;
+    if (m.index > at) out.push({ type: 'text', text: text.slice(at, m.index) });
+    out.push({ type: 'typed', form: 'ref', arg: m[0], text: shown, link: 'row' });
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) out.push({ type: 'text', text: text.slice(at) });
+  return out;
+}
+
 function tokens(text: string, opts: InlineOptions, held = false): Inline[] {
   const out: Inline[] = [];
   let buf = '';
   const push = () => {
-    if (buf) out.push({ type: 'text', text: buf });
+    if (buf) out.push(...plainRun(buf, opts));
     buf = '';
   };
 
