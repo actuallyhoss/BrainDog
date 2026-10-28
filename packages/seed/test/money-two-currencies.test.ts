@@ -1,6 +1,6 @@
 /**
  * Every Money figure, on a record that holds pounds and dollars, answers one amount, a converted amount, or one amount a
- * currency, and never the bare sum of two currencies' minor units (REC-B01 build 4).
+ * currency, and never the bare sum of two currencies' minor units.
  *
  * WHY A GUARD AND NOT A HOPE. His record holds Egyptian pounds and dollars (one rate, typed on 28 September), and an
  * amount is integer minor units with a currency beside it. A figure that adds 50,000 cents to 100,000 pence answers

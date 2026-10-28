@@ -1,5 +1,5 @@
 /**
- * A small list is one read, and `title` is answered with the list's own title field (AGT-B11 jobs 3 and 4).
+ * A small list is one read, and `title` is answered with the list's own title field.
  *
  * `list` answered twenty rows when the call named no limit, so a portfolio of 27 projects took two reads. With no limit
  * named and at most sixty rows, the answer holds them all; past sixty it is a page of twenty and a cursor, as before.

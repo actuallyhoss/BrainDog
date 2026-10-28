@@ -1,5 +1,5 @@
 /**
- * The record's own log as three figures (PGS-C24 job 4, AGT-C17 job c): who worked, what changed and the busy hours.
+ * The record's own log as three figures (AGT-C17 job c): who worked, what changed and the busy hours.
  *
  * WHAT WAS MEASURED BEFORE THIS. A figure read a list, a kept line or one of the record's own counts, and never the log.
  * So the three side tiles of Activity were worked out inside one hand-built screen, from whatever page of the log the

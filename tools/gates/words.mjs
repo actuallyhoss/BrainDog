@@ -20,7 +20,7 @@
  * same lexer, so copy kept in a component rather than in `lib/copy` is still judged. And the `label` of each key the
  * keyboard sheet lists (`lib/a11y/bindings.ts`), whose other values are ids.
  *
- * AND WHAT A DECLARED PAGE PRINTS (EXP-B07 job 2): the `title`, `heading`, `label`, `body` and `empty` of every page the
+ * AND WHAT A DECLARED PAGE PRINTS: the `title`, `heading`, `label`, `body` and `empty` of every page the
  * seed declares (`packages/seed/src`) and every add-on in `packs/` (its `*.pack.json`), read by the same lexer. Only
  * those five keys are read there, since a declaration's other strings are its ids and sources; and inside them a
  * figure's `{{path}}` and a link's address are code.

@@ -67,7 +67,7 @@ export type Part =
   | { part: 'stops'; lines: string[] };
 
 /**
- * One part of an arrangement an accept may take or leave (REC-A06 step 7), by the id the record filed on it and the
+ * One part of an arrangement an accept may take or leave, by the id the record filed on it and the
  * kernel's `partsOf` gives: `name` is the record's own label for it ("Add Stripe"), `requires` the parts it cannot be
  * taken without, worked out as the kernel works them out so a tick here is never refused there, and `keys` the labels
  * of the keys it needs that the record does not hold for a scheduled run.
@@ -106,7 +106,7 @@ export type KeysContext = { readonly client: Pick<ReturnType<typeof createClient
 export const KEYS_CONTEXT = Symbol('arranged-keys');
 
 /**
- * What the question's own page hands `Arranged.svelte` by context so each part gets a tick (REC-A07 step 2): the parts
+ * What the question's own page hands `Arranged.svelte` by context so each part gets a tick: the parts
  * unticked by hand, and a press on one. Left out, as on the queue, the parts are not drawn and Accept takes the whole.
  */
 export type TicksContext = { readonly unticked: ReadonlySet<string>; tick: (id: string, on: boolean) => void };
@@ -568,7 +568,7 @@ const waiting = (n: Need): boolean => n.held === 'none' || (n.held === 'person' 
  * the record says needs a key the record cannot open for a scheduled run (`needs[].parts`) carries that key's label.
  */
 function takesOf(body: Row, needs: readonly Need[]): Take[] {
-  /* ONLY ON A BODY THE RECORD FILED ITS PARTS ON (REC-A06 step 7). One filed before parts existed is taken whole, as it
+  /* ONLY ON A BODY THE RECORD FILED ITS PARTS ON. One filed before parts existed is taken whole, as it
      was asked, and draws no ticks. */
   if (!Array.isArray(body.parts) || body.parts.length === 0) return [];
   const labels = new Map(body.parts.filter(isRow).map((p) => [text(p.id), text(p.label)] as const));

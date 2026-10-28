@@ -9,7 +9,7 @@
  * `inbox` reach. An agent asking without it is answered with the record's own sentence, word for word, and the address is
  * not listed to a caller it would refuse.
  *
- * THREE READS AT ONE ADDRESS (AGT-B13 job 4): `braindog:inbox` is the digest, one line of counts and each state's lines,
+ * THREE READS AT ONE ADDRESS: `braindog:inbox` is the digest, one line of counts and each state's lines,
  * held to the answer's limit; `braindog:inbox/<state>` is that state's hundred; an arrival's id in place of the state is
  * that arrival whole. Each is said as lines, a body cut to 180 characters and marked where it was.
  */
@@ -124,7 +124,7 @@ test('A SURFACE WITH NO INBOX DOES NOT LIST IT, says so when asked, and the tool
   assert.equal(TOOLS.some((t) => t.name.includes('inbox')), false, 'the inbox became a tool');
 });
 
-/* ── braindog:inbox/patterns, what each pattern did (REC-A03 step 5) ─────────────────────────────────────────────── */
+/* ── braindog:inbox/patterns, what each pattern did ─────────────────────────────────────────────── */
 
 /**
  * BEFORE: the address fell through to `inbox({ state: 'patterns' })` and was answered "state is one of ...", so an agent
@@ -203,7 +203,7 @@ test('braindog:inbox/patterns ANSWERS A RECORD WITH NO PATTERN: no doors, and a 
   sql.close();
 });
 
-/* ── The digest, one state's hundred, and one arrival whole (AGT-B13 job 4) ─────────────────────────────────────── */
+/* ── The digest, one state's hundred, and one arrival whole ─────────────────────────────────────── */
 
 /** A record holding `n` arrivals in each state named, every body `body` long. Every value is invented. */
 async function filled(per: Partial<Record<string, number>>, body = (n: number) => `Body ${String(n)}`) {

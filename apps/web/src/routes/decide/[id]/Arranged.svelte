@@ -24,7 +24,7 @@
   /* THE QUESTION'S OWN PAGE HANDS A CLIENT DOWN (`+page.svelte`); the queue does not, and there a key is only said. */
   const keys = getContext<KeysContext | undefined>(KEYS_CONTEXT);
 
-  /* A TICK PER PART, ON THE QUESTION'S OWN PAGE ONLY (REC-A07 step 2), and only where there is something to pick: more
+  /* A TICK PER PART, ON THE QUESTION'S OWN PAGE ONLY, and only where there is something to pick: more
      than one part, or one that waits on a key. A part that is off says why under its name, and a part off for a key or
      for a part it needs cannot be ticked until that is held or ticked. */
   const ticks = getContext<TicksContext | undefined>(TICKS_CONTEXT);

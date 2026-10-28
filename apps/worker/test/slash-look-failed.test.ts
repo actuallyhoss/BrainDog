@@ -1,5 +1,5 @@
 /**
- * A look that fails on the Worker is seen (ENG-B09 job 7): counted where the engine's readings count a failed background
+ * A look that fails on the Worker is seen: counted where the engine's readings count a failed background
  * ask, with the provider's words in Health, and nothing thrown out of the alarm. And the operator's second provider is
  * watched as the first is, so a 401 from it ends the walk and is asked once.
  *

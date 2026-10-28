@@ -52,7 +52,7 @@ const CASE_KEYS = new Set(['gate', 'rule', 'expect', 'findings', 'total', 'skip'
  * the whole of what the gate reports; `skip` asks for exit 3 over a root that holds nothing. `why`
  * is the reason the tree is shaped the way it is, which is where the comments of the old list went.
  *
- * THREE MORE, FOR THE GATES A FOLDER OF FILES CANNOT HOLD A FAULT FOR (PRF-B02 jobs 4 and 6). `seed` runs the gate
+ * THREE MORE, FOR THE GATES A FOLDER OF FILES CANNOT HOLD A FAULT FOR. `seed` runs the gate
  * over the repository's own build with `BRAINDOG_GATE_SEED` set to it, the way the browser negatives below run, and
  * not at all when that build is older than the source. `serve` names a folder of the tree served on a loopback port
  * and handed to the gate as `DEPLOY_HOST`, a planted host. `env` is the variables the run is given besides.
@@ -404,7 +404,7 @@ function seededBrowser({ gate, file, seed, names, blind, red }) {
 let ran = 0;
 
 /**
- * THE BROWSER GATES THAT NAME THEIR OWN RULES, walked one browser launch per gate (PRF-B02 jobs 2 and 3, landed from
+ * THE BROWSER GATES THAT NAME THEIR OWN RULES, walked one browser launch per gate (landed from
  * batch 44's two builders as one walk).
  *
  * Each exports `RULES`, a list of `{ id, seed, expect }`, and plants every seed named in `BRAINDOG_GATE_SEED`, joined
@@ -468,7 +468,7 @@ async function walkRules(gate) {
 }
 
 /**
- * THE GATES THAT DO NOT LIVE HERE AS `<gate>.mjs`, run the way `run.mjs` runs them (PRF-B02 jobs 4 and 5).
+ * THE GATES THAT DO NOT LIVE HERE AS `<gate>.mjs`, run the way `run.mjs` runs them.
  * `typecheck` is `pnpm -r run typecheck` in the tree, which is a workspace of its own, and `theme` is the skin's
  * script with `--check` and the tree's token file. `test/cases-planted-faults.test.mjs` holds these to `run.mjs`'s own two lines.
  */
@@ -696,7 +696,7 @@ async function gateParts() {
 }
 
 function budgetsAreRead(parts) {
-  /* THE PARTS TOO: a gate split by rule keeps its parts one level down (PRF-B04 job 8), and a part that reads a budget
+  /* THE PARTS TOO: a gate split by rule keeps its parts one level down, and a part that reads a budget
      reads it for the gate. */
   const NOT_READERS = new Set(['lib.mjs', 'self-test.mjs']);
   const look = join(here, '..', 'look');
@@ -763,7 +763,7 @@ function noSilentPass(parts) {
      `packages/skin/scripts/theme.mjs --check`, so a rule that read only this directory would leave
      the single gate outside it uncovered, which is the shape of hole this file exists to close. */
   const FILES = [
-    /* A GATE'S PARTS WITH IT, one level down (PRF-B04 job 8), held to the same rule as the gate they came out of. */
+    /* A GATE'S PARTS WITH IT, one level down, held to the same rule as the gate they came out of. */
     ...parts.filter(({ name }) => !RUNNERS.has(name)),
     { name: 'packages/skin/scripts/theme.mjs', at: join(here, '..', '..', 'packages', 'skin', 'scripts', 'theme.mjs') },
   ];

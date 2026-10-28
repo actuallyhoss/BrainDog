@@ -1,5 +1,5 @@
 /**
- * Testing one step alone (SHL-D14 jobs 3 and 4): the ask a card's "Test this step" sends, the tokens an earlier test's
+ * Testing one step alone: the ask a card's "Test this step" sends, the tokens an earlier test's
  * answers give a later step, and the one-step try's answer read through `source.ts`. Invented names inline.
  */
 

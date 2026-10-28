@@ -11,7 +11,7 @@
  * `~/.claude.json` for the default `~/.claude`, `<profile>/.claude.json` for any other. The caller runs `claude` with
  * that profile's `CLAUDE_CONFIG_DIR`, so the program writes the file read here.
  *
- * A COPY BEFORE THE FIRST CHANGE (AGT-A07 build 3). The file a run's first write changes is copied beside itself
+ * A COPY BEFORE THE FIRST CHANGE. The file a run's first write changes is copied beside itself
  * first, by install's `keepCopy`: `<file>.pre-braindog` the first time, then `<file>.bak`, `<file>.bak1` and on, so an
  * earlier copy is never written over. A copy that cannot be made keeps the entry out.
  */

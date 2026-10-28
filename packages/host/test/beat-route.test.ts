@@ -1,5 +1,5 @@
 /**
- * `beat`, a session saying it is still working (AGT-C03 job 3): routed as a DATA call beside `end`, handed to the record
+ * `beat`, a session saying it is still working: routed as a DATA call beside `end`, handed to the record
  * method of the same name with the body as sent, and answered `NOT_IN_THIS_BUILD` by a record built before it had one,
  * never a 500. That answer is what the hook's beat falls back on, so a self-host not yet updated loses nothing.
  *

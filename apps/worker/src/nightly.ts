@@ -164,7 +164,7 @@ export type Walk = {
   /** The night's tally, records by pack id, written as the Kennel's `counts.json` (`writeCounts`); answers the listings named. */
   counts?: ((held: ReadonlyMap<string, number>) => Promise<number>) | undefined;
   /**
-   * The Kennel's four vital signs (`kennelVitals` in `kennel.ts`, SHL-B01 job 5), read once after the counts are
+   * The Kennel's four vital signs (`kennelVitals` in `kennel.ts`), read once after the counts are
    * written so the counts sign reads tonight's file. ABSENT, NO SIGN IS READ AND THE NOTE SAYS NOTHING ABOUT THE KENNEL,
    * for the reason `expire` is optional.
    */

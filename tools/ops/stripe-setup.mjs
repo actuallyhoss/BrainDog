@@ -1,5 +1,5 @@
 /**
- * The plans and the credit packs, made in Stripe from the one table (LCH-A10 job 5, ;
+ * The plans and the credit packs, made in Stripe from the one table (;
  * "include the credits/usages offered on the plans").
  *
  *   pbpaste | node tools/ops/stripe-setup.mjs [--live-ok]
@@ -31,7 +31,7 @@ import { HOSTED_PLANS, PACK_SETTINGS } from '../../apps/worker/src/billing.ts';
 import { stripeOf, textAt, objectAt } from '../../apps/worker/src/stripe.ts';
 
 /** The sentence a live key is refused with, word for word. */
-export const LIVE_REFUSED = "Live mode is the owner's word (LCH-A14). Nothing was made.";
+export const LIVE_REFUSED = "Live mode is the owner's word. Nothing was made.";
 
 /** The sentence a key of no known kind is refused with. It never quotes what was given. */
 export const NOT_A_KEY = 'That is not a Stripe secret or restricted key (sk_test_, rk_test_, sk_live_ or rk_live_). Nothing was made.';

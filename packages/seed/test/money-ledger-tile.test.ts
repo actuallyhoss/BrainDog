@@ -1,5 +1,5 @@
 /**
- * Money's ledger tile (REC-B15 job 4): a ledger to add to, edit and delete from, and no tabs. What moved was
+ * Money's ledger tile: a ledger to add to, edit and delete from, and no tabs. What moved was
  * twelve lines folded shut inside History, and a person went looking for their transactions.
  *
  * WHAT IS HELD HERE: the tile is on Money's page under the accounts and above the fold, it draws the six newest
@@ -9,7 +9,7 @@
  * the page yet, for the two reasons `parts/ledger.ts` gives; the last test fails the day either reason is gone, so the
  * box is not forgotten.
  *
- * WHO WAS PAID, ON THE TILE (REC-B16 step 5). The record keeps a payee by the name a person reads beside the bank's own
+ * WHO WAS PAID, ON THE TILE. The record keeps a payee by the name a person reads beside the bank's own
  * line, and the tile says the payee, and the description where an entry holds none. The three tests at the foot hold
  * the two lines, what did not move with them (the day, the signed amount, the order), and why the column names a
  * second field: a payee column alone is an empty cell on every entry a person typed.

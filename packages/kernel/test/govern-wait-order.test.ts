@@ -1,5 +1,5 @@
 /**
- * `listGovernance` with `order: 'wait'` reads the open questions in the order Decide shows them (AGT-C08 step 4).
+ * `listGovernance` with `order: 'wait'` reads the open questions in the order Decide shows them.
  *
  * NEWEST FIRST HANDED AN AGENT THE WRONG QUESTION. One opened a minute ago that only rewords a note sat on top, while
  * one opened yesterday that moves money waited under it, so the agent picked up the plain one and the person, on Decide,

@@ -1,5 +1,5 @@
 /**
- * The walk passes over a model that keeps failing (ENG-A06 jobs 2 and 7): "Rules are the fallback, not the engine."
+ * The walk passes over a model that keeps failing: "Rules are the fallback, not the engine."
  *
  * A CANDIDATE THAT FAILED THREE TIMES IN TEN MINUTES IS SKIPPED FOR TEN MINUTES, and one its provider does not serve for a
  * day, read from its own last rows in the ledger and from nothing held in memory: every case builds the engine afresh, as

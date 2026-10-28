@@ -1,5 +1,5 @@
 /**
- * A shape nobody has a pattern for is owed a draft until it is answered (ENG-B07 job 1, "owed, not once").
+ * A shape nobody has a pattern for is owed a draft until it is answered ("owed, not once").
  *
  * BEFORE: a shape earned one draft at exactly its third arrival. If that draft's call failed, or the arrival that
  * would have been the third came while an older one was being filed, nothing ever asked again, and the arrivals sat

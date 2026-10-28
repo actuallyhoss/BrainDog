@@ -1,5 +1,5 @@
 /**
- * His "transcripts never read" (AGT-B10 job 4). Every hook event names the session's transcript in `transcript_path`,
+ * His "transcripts never read". Every hook event names the session's transcript in `transcript_path`,
  * and nothing BrainDog runs opens it: `tools/gates/no-transcript.mjs` is red on a line that does, and the hooks still
  * do their work when the path names a folder, which any read would throw on.
  */

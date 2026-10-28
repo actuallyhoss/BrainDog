@@ -1,5 +1,5 @@
 /**
- * A money field's two currency keys at install (REC-B04 job 1): `currency_from`, a link of the same list and a money
+ * A money field's two currency keys at install: `currency_from`, a link of the same list and a money
  * field of the list it points at, and `currency_fixed`, a code that never changes once a row holds it.
  *
  * BEFORE: neither key existed, so a Ledger amount could not say its code is its account's, and the only lock a field

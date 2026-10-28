@@ -345,7 +345,7 @@
   const kind = $derived(triggerKind(flow.draft.trigger));
   const register = $derived('written' in flow.draft.trigger ? flow.draft.trigger.written.register : null);
   const ruleNameOf = $derived(nameFor(ruleNames));
-  /* WHICH RULE GETS THERE FIRST on the dry run drawn now, by name (SHL-D07 job 6). The rule being drawn is never its own rival. */
+  /* WHICH RULE GETS THERE FIRST on the dry run drawn now, by name. The rule being drawn is never its own rival. */
   const contestNow = $derived.by(() => {
     const c = triedNow?.ok ? contestOf(triedNow.value) : null;
     return c ? contestLines(c, ruleNameOf) : [];

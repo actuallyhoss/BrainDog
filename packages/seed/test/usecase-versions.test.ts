@@ -1104,12 +1104,12 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '32aff23db88fea96',
     history: [
-      "`page.home-personal` gains the first acts (USE-A08): Bring your money in while no account counts as cash, a line naming a savings goal while none is kept and one naming a project in the Building lane while none is live, each on its own count; `metric.savings-held` is added for the second, nothing goes, and 2.4.0, live at 1b55e940, stays as it was -> 32aff23db88fea96",
+      "`page.home-personal` gains the first acts: Bring your money in while no account counts as cash, a line naming a savings goal while none is kept and one naming a project in the Building lane while none is live, each on its own count; `metric.savings-held` is added for the second, nothing goes, and 2.4.0, live at 1b55e940, stays as it was -> 32aff23db88fea96",
     ],
   },
   /* CUT BESIDE 2.5.0, WHICH THE CATALOGUE PUBLISHES AND FREEZES (0d9bc36e): the file it shares gains `needs`, Money and
      the Projects it points at, so a fresh record installs those two and what the words point at. No declaration moved,
-     so the fingerprint is 2.5.0's and a record on 2.5.0 updates without losing a list (usecase-needs-102, USE-B08 job 5). */
+     so the fingerprint is 2.5.0's and a record on 2.5.0 updates without losing a list (usecase-needs-102). */
   'personal@2.6.0': {
     holds: `
       extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
@@ -1137,7 +1137,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '32aff23db88fea96',
     history: [
-      "Cut beside the frozen 2.5.0 for `needs` (usecase-needs-102, USE-B08 job 5): a fresh record installs Money, the Projects it points at and what the words point at, `page.home-personal` already leads from Money's figures and this pack's own lists, and a block or a role laid on a list the record does not hold (`extends.register.people.role.family` among them) is cut at install; nothing declared, taken away or reworded -> 32aff23db88fea96",
+      "Cut beside the frozen 2.5.0 for `needs` (usecase-needs-102): a fresh record installs Money, the Projects it points at and what the words point at, `page.home-personal` already leads from Money's figures and this pack's own lists, and a block or a role laid on a list the record does not hold (`extends.register.people.role.family` among them) is cut at install; nothing declared, taken away or reworded -> 32aff23db88fea96",
     ],
   },
   'founder@1.15.0': {
@@ -1547,7 +1547,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 2.6.0: `metric.datapoints-7d`, `metric.datapoints-30d`, `metric.datapoints-reported` and `metric.project-numbers-7d` end today (`at before tomorrow`), so a reading dated after today is not a number reported -> 9c75914a4b35aa6a",
       "Folded into the unreleased 2.6.0: `metric.datapoints-held` and the dashboard's Latest numbers end today (`at before tomorrow`) -> b7181eced6b7c8f8",
       "Folded into the unreleased 2.6.0: `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), so a project with none of its own draws neither card where each listed everybody's -> 63df5982b0d1f484",
-      "Folded into the unreleased 2.6.0, one fingerprint for two changes, no id added or taken away: `page.project`'s At a glance cell over `project-owed` is labelled Still to come in, where it said Owed to you (owed-words-74); and `page.home-founder`'s line of what there is ends \"it lasts the year\" when the walk reached its last day above zero, a second lead note drawn on `all:` of one book and `runway-days` carrying `beyond`, the line with the days stepping aside on `beyond: false` (founder-lasts-74, REC-B07) -> dee2ed32ad8a72ee",
+      "Folded into the unreleased 2.6.0, one fingerprint for two changes, no id added or taken away: `page.project`'s At a glance cell over `project-owed` is labelled Still to come in, where it said Owed to you (owed-words-74); and `page.home-founder`'s line of what there is ends \"it lasts the year\" when the walk reached its last day above zero, a second lead note drawn on `all:` of one book and `runway-days` carrying `beyond`, the line with the days stepping aside on `beyond: false` (founder-lasts-74) -> dee2ed32ad8a72ee",
       "Inside the unreleased 2.6.0 (project-runs-tile-87, AGT-C12 job d and AGT-D12 job 2; integrate 87; commit 63423720 holds 2.5.0): `page.project`'s Agents reads a run of its own that wrote something (`parent is empty, wrote is not 0`), titled by the agent with `doing_said` under it; Keys, Tools and servers and Skills sit under a boxed section Runs on, a third of the tile each where each was a half, with And from everywhere under them (`kind is not action, scope is global`, five); Money by month is the tile's width where it was a half, so no row is left with a hole over the new heading; no id added or taken away -> 86861bc4c9e643e6",
       "Inside the unreleased 2.6.0 (founder-home-quiet-88, ENG-B13 'Seen'; batch 88; commit 63423720 holds 2.5.0, and the task asked for 2.7.0, which this file's own rule refuses for a version never released): `page.home-founder` draws Gone quiet, a table over the source `exceptions` with What, Last seen and Before, six lines at most, straight under what the money is and not drawn while nothing is quiet; it was a seventh tile, so Working now is folded shut under a section Agents at work, held to `runs-working` as its table is; two blocks added, no id added or taken away -> 48875c311c09ba01",
       "Inside the unreleased 2.6.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.5.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 6bb5b7dec0fe3e2b",
@@ -1557,7 +1557,7 @@ const DECLARED: Record<string, Version> = {
   },
   /* CUT BESIDE 2.6.0, WHICH THE CATALOGUE PUBLISHES AND FREEZES (0d9bc36e): the file it shares gains `needs`, Projects
      and Money, so a fresh record installs those two and what the words point at. No declaration moved, so the fingerprint
-     is 2.6.0's and a record on 2.6.0 updates without losing a list (usecase-needs-102, USE-B08 job 5). */
+     is 2.6.0's and a record on 2.6.0 updates without losing a list (usecase-needs-102). */
   'founder@2.7.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
@@ -1578,7 +1578,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '8a82770e8f8c8827',
     history: [
-      "Cut beside the frozen 2.6.0 for `needs` (usecase-needs-102, USE-B08 job 5): a fresh record installs Projects and Money and what the words point at, Services for domains or renewals; `page.home-founder` already leads from Money and `register.datapoints`, and Lapsing and `metric.lapsing-30d` over a list the record does not hold are cut at install; nothing declared, taken away or reworded -> 8a82770e8f8c8827",
+      "Cut beside the frozen 2.6.0 for `needs` (usecase-needs-102): a fresh record installs Projects and Money and what the words point at, Services for domains or renewals; `page.home-founder` already leads from Money and `register.datapoints`, and Lapsing and `metric.lapsing-30d` over a list the record does not hold are cut at install; nothing declared, taken away or reworded -> 8a82770e8f8c8827",
     ],
   },
   /* NUMBERS HANDED TO PORTFOLIO (the KPI plan of 21 October, K1-A): 2.7.0 IS PUBLISHED AND FROZEN, and a list this pack

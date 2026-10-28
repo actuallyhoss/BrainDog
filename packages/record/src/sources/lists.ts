@@ -1,5 +1,5 @@
 /**
- * `lists`: one row a list the reader may read, with how many live rows it holds and when it last changed (PGS-A11 job 3).
+ * `lists`: one row a list the reader may read, with how many live rows it holds and when it last changed.
  * "Ledger 217, Agent runs 752, Numbers 2,527", read off the record's own counts, so a page or an agent can say what the
  * record holds without a figure declared for each list.
  *

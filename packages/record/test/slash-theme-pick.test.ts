@@ -1,5 +1,5 @@
 /**
- * A THEME IS PICKED, NEVER DESIGNED (ENG-B20 job 2, `src/slash.ts` `lookDraft`, `lookLanding`).
+ * A THEME IS PICKED, NEVER DESIGNED (`src/slash.ts` `lookDraft`, `lookLanding`).
  *
  * What was true before: `BUILDS` left a theme out, so the looks an add-on carried were never offered, and a model's look
  * was a settings body `prepare` filed as it was, picking anything. These pin the pick: only a look `looksOf` answers for

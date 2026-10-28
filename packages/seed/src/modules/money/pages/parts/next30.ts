@@ -1,6 +1,6 @@
 /**
  * Coming and going: the next thirty days, as a calendar. The walk of them as arithmetic stays here, but Money places
- * only the heading and the calendar since REC-B23 (money-every-month-92, `money.ts` filters the bridge off): it said
+ * only the heading and the calendar now (money-every-month-92, `money.ts` filters the bridge off): it said
  * again what Cash ahead says.
  */
 

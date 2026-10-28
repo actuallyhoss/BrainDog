@@ -1,5 +1,5 @@
 /**
- * Where the money went, this month against last (REC-B19 job 2), read through the kernel on a record that installed
+ * Where the money went, this month against last, read through the kernel on a record that installed
  * Money the way a person does and then kept two months of spending in four categories.
  *
  * The clock is 18 September 2026. Last month is the whole of August; last month to date is August to the 18th, the same

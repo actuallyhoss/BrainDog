@@ -409,7 +409,7 @@ test('and a record that wired the grammar reads the date, so only the genuinely 
 });
 
 test('an arrival with nothing but absent fields names them in one clause, and the pattern by its name', async () => {
-  /* THE CLAUSE FOR AN ABSENT FIELD KEEPS ITS WORDS, and since REC-A03 says the pattern by its name and the fields as a
+  /* THE CLAUSE FOR AN ABSENT FIELD KEEPS ITS WORDS, and now says the pattern by its name and the fields as a
      sentence lists them, where it said `invoices could not read ref, when out of this one.` */
   const raw = await polled({ day: wiredDay }, JSON.stringify({ data: {} }));
   assert.equal(raw?.reason, 'Billing updates could not read ref and when out of this one.');

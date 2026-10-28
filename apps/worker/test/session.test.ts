@@ -60,7 +60,7 @@ test('A COOKIE THAT NAMES NO SESSION IS A 401 THAT CLEARS IT, even for a read', 
   assert.deepEqual(await doorOf(at('/api/boot', { headers: cookie }), dead.d), {
     door: 'refused',
     status: 401,
-    /* THE ONE 401 BODY (LCH-C08 job 2): the Directory's sentence goes to the log, never to the caller. */
+    /* THE ONE 401 BODY: the Directory's sentence goes to the log, never to the caller. */
     refusal: { code: 'UNAUTHORIZED', fix: 'unauthorized' },
     cookie: CLEAR,
   });

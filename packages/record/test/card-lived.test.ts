@@ -1,5 +1,5 @@
 /**
- * The card on a record lived in (AGT-B07 job 10): the proof area's default profile (`fixtures/shapes/default.json`,
+ * The card on a record lived in: the proof area's default profile (`fixtures/shapes/default.json`,
  * five weeks, 750 runs and 25 open questions, an import with residue), built by `tools/gates/lived.mjs` through the
  * product's own verbs and opened at the instant it ended.
  *

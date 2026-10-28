@@ -147,7 +147,7 @@ test("ON A FOUNDER'S RECORD, THE WEEK HOLDS WHAT IS DUE INSIDE IT AND LAPSING HO
   assert.deepEqual(lapsing.rows?.map((r) => r.fields.name), ['northwind.example', 'northwind.io', 'northwind.dev'], 'the three lapsing domains, soonest renewal first, and not the live one');
 });
 
-/* ── a founder's first day holds what the words point at (USE-B08 job 5, founder 2.7.0) ───────────────────── */
+/* ── a founder's first day holds what the words point at (founder 2.7.0) ───────────────────── */
 
 /**
  * THE MODULES A SENTENCE POINTS AT, as the first run hears them (`modulesOf` in `apps/web/src/lib/start/propose.ts`,

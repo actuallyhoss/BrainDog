@@ -1,5 +1,5 @@
 /**
- * The sealed census (LCH-C08 job 5): no route that is safe by method answers a sealed value, to the owner or to a
+ * The sealed census: no route that is safe by method answers a sealed value, to the owner or to a
  * member, on a record whose keychain holds one.
  *
  * WHAT IS PLANTED is what the record keeps and never hands back: a keychain key's wrapped bytes and nonce, and a key's

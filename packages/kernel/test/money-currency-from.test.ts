@@ -1,5 +1,5 @@
 /**
- * A row's currency comes from its account, and stays (REC-B04 job 2).
+ * A row's currency comes from its account, and stays.
  *
  * BEFORE: a money value had to carry its own code, so `{ amount: 97999 }` from an agent filing against an account kept
  * in EGP was refused, and the only lock a field could declare was on the whole field. Now a field declaring

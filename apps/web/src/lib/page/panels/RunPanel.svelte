@@ -10,7 +10,7 @@
   since, then Put back sends the plan that was read, by its hash, so a write that slipped in between is never undone
   blind. The record's sentence is the receipt; the page is read again and the plan with it.
 
-  THE RUN AS A CONVERSATION, TOP TO BOTTOM (AGT-C12 build 5, `run-talk.ts`): who it was and where it worked; its
+  THE RUN AS A CONVERSATION, TOP TO BOTTOM (`run-talk.ts`): who it was and where it worked; its
   stretches; what it said it is doing; what it changed, with Undo; what it asked; its dead ends; the step it left and
   what became of it; its helpers; the run whose step it took. A part with nothing true to say is not drawn, heading and
   all, so a run that only started says who and when.

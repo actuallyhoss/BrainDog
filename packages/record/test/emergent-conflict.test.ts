@@ -1,6 +1,6 @@
 /**
  * One list, one offer, one place: the pen and Slash's growing list never offer the same list a page at once, and an
- * answer given in one holds in the other (USE-B03 job 7).
+ * answer given in one holds in the other.
  *
  * WHAT WAS SEEN BEFORE: on a record twenty days old whose Tasks grew on three days, `boot`'s pen held `page:tasks` and a
  * plain press of Slash filed "Give Tasks a page of its own?" on Decide beside it, so the same question stood in two

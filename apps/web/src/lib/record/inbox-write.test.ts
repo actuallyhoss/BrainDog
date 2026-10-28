@@ -77,7 +77,7 @@ test('a repeat filed as a second one sends the arrival alone, and answers where 
   const refused = host(() => json(422, { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix, at: 'raw' } }));
   assert.deepEqual(await fileAsSecond(BASE, 'raw_9', refused.io), { from: 'refused', fix });
 
-  /* A RULE'S SKIP IS NOT A REPEAT (audit-35): the record refuses it by its mark, and the screen says the
+  /* A RULE'S SKIP IS NOT A REPEAT: the record refuses it by its mark, and the screen says the
      record's sentence, never that it was filed. */
   const rule = 'This message was set aside by a rule, not as a repeat.';
   const ruled = host(() => json(422, { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: rule, at: 'raw' } }));

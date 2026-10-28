@@ -2,7 +2,7 @@
 
 export const EVERY_MONTH: Record<string, unknown>[] = [
   {
-    /* WHAT COMES IN AND GOES OUT EVERY MONTH, AT ITS MONTHLY SHARE (REC-B23 job 5): a pay day, a retainer, the rent and
+    /* WHAT COMES IN AND GOES OUT EVERY MONTH, AT ITS MONTHLY SHARE: a pay day, a retainer, the rent and
        the subscriptions, each counted once a month whatever its own rhythm, read from the repeating list
        (`every-month-in` and `every-month-out` in `figures/flow.ts`). The two figures the chart above reads for the
        months ahead, said once as numbers, so a person sees what a month costs before anything is late.

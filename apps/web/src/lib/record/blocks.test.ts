@@ -53,7 +53,7 @@ const figure = (row: Row | undefined): number => signedOf(row?.cells[1] ?? '');
 
 /**
  * THE BRIDGE MONEY DREW UNTIL money-core 3.17.0, MADE FOR THE TEST: Coming and going opens on the calendar since
- * REC-B23, and a book's page, which still draws one, has no book in the sample. Its legs are the ones Cash ahead walks
+ * and a book's page, which still draws one, has no book in the sample. Its legs are the ones Cash ahead walks
  * on the Forecast page, read off that page's own declaration, over the thirty days `leaving-30d` and `arriving-30d` walk.
  */
 const moneyBridge = () => {

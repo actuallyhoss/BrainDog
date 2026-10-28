@@ -1,5 +1,5 @@
 /**
- * A field a list declares `once` is the add-on's to plant and never to patch (SHL-A09 job 4).
+ * A field a list declares `once` is the add-on's to plant and never to patch.
  *
  * THE CASE IS A CATEGORY'S NAME. An add-on plants "Groceries", the person calls theirs "Food", and the add-on's next
  * version carries "Groceries & household" for the same row. Its update goes over the row and the name stays "Food",

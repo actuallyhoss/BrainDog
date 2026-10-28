@@ -607,7 +607,7 @@ export type FeedBy = (typeof FEED_BY)[number];
  * it said none and its app names none), the app it ran in as the run holds it (`claude-code`), and the run it helps.
  *
  * SO NO LINE IS A BARE HANDLE. A run signs the log with its handle, and a host that was handed `S42` alone could only
- * say "An agent", so every run on Activity sat in one lane (H.296). `agent` is always said, and a host names the run
+ * say "An agent", so every run on Activity sat in one lane. `agent` is always said, and a host names the run
  * by it and by `client`, and a helper by its `parent`.
  */
 export type RunBy = { run: string; agent: string; client: string | null; parent: string | null };
@@ -719,7 +719,7 @@ export type QueueQuestion = {
    */
   body_kind?: string;
   does?: string;
-  /** The body of a `pack`, `settings` or `arrange` proposal, so a card says the arrangement in its own summary (web `card.ts` `arrangementOf`, REC-A07 step 3) without opening its page. */
+  /** The body of a `pack`, `settings` or `arrange` proposal, so a card says the arrangement in its own summary (web `card.ts` `arrangementOf`) without opening its page. */
   arranged?: Record<string, unknown>;
   /** How long it can wait (`weigh.ts` `WAIT_SQL`): `soon`, `old` or `new`, read in the queue's own query. */
   waits?: Wait;
@@ -879,7 +879,7 @@ export type PageResult = { page: string; title: string; blocks: BlockResult[]; r
  * ceiling is `FORBIDDEN`, inside it with a level that does not reach `read` is `LEVEL_REQUIRED`.
  *
  * A LIST OF CODES RATHER THAN "ANY REFUSAL AT ALL". A block refused for a misspelt key is a block somebody has to be
- * able to see in order to fix (H.366).
+ * able to see in order to fix.
  */
 export const WITHHELD_CODES: readonly string[] = ['FORBIDDEN', 'LEVEL_REQUIRED'];
 

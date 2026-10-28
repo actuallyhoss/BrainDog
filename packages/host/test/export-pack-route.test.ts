@@ -1,5 +1,5 @@
 /**
- * `exportPack`, an add-on made from what a person made (SHL-B09 job 3): one READ+ row that writes nothing, taking the
+ * `exportPack`, an add-on made from what a person made: one READ+ row that writes nothing, taking the
  * ticks and the example rows as JSON and the title, id and version as text, in the shape `router-groups` reads.
  *
  * THE GROUP IS WHAT `router-groups` COUNTS (`docs/30-BLUEPRINT.md` §5): READ+, since the method's first statement is

@@ -1,5 +1,5 @@
 /**
- * The predictions graded, beside the brake, in `engineReadings` (ENG-B17 job 2), so the Slash page can say "Of 4
+ * The predictions graded, beside the brake, in `engineReadings`, so the Slash page can say "Of 4
  * suggestions graded, 3 did what they said."
  *
  * Read from the kernel's own `prediction` table on a fresh record, with rows planted as `scorePrediction` settles them:

@@ -1,5 +1,5 @@
 /**
- * An arrangement accepted in part (REC-A06 step 7).
+ * An arrangement accepted in part.
  *
  * THE PARTS TAKEN ARE APPLIED AS ONE, AND THE REST STAYS THE SAME QUESTION. An accept may name the install, settings,
  * entries and declarations it takes; what it leaves waits on the owner under the same id and cause, with its history.

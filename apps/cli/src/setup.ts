@@ -252,7 +252,7 @@ export async function registerServer(dir: string, o: { home: string; env: Env; c
   if (now === 'same') return { did: 'same' };
   if (o.dryRun) return { did: 'would', replaces: now === 'other' };
   /*
-   * A COPY BEFORE `claude` CHANGES THE FILE (AGT-A07 build 3), since it writes the file itself and install's writer
+   * A COPY BEFORE `claude` CHANGES THE FILE, since it writes the file itself and install's writer
    * never sees it. Once per file a run, so a profile reached twice is copied once, before its first change.
    */
   let kept: string | null = null;

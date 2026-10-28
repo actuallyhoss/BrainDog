@@ -1,5 +1,5 @@
 /**
- * An entry's own documents, read on the entry's own screen (PGS-B03 b): `get` with `values: true` answers, for each
+ * An entry's own documents, read on the entry's own screen: `get` with `values: true` answers, for each
  * document field, what its `{{path}}`s read with the entry as `here`, and `unnamed` for a path that names nothing.
  *
  * WHAT WAS MEASURED BEFORE IT: on the owner's record a project's note said `{{blockers.count}}`, and the project's own

@@ -1,5 +1,5 @@
 /**
- * What Claude Code says it is connected to (AGT-D10 job 6): every server and connector `claude mcp list` prints, as a
+ * What Claude Code says it is connected to: every server and connector `claude mcp list` prints, as a
  * name and the address it printed, so the scan can record as integrations the ones no config file holds (a connector
  * added in the claude.ai app, a server a plugin registered).
  *

@@ -1012,7 +1012,7 @@ export async function hookEnd(io: Io): Promise<void> {
 
 /**
  * The programs this project's own Claude Code settings allow by name, sent once as `toolsSeen`'s command lines
- * (AGT-D10 job 5, its settings half; `commands-used.ts`). By name only: nothing else of an entry leaves the machine.
+ * (its settings half; `commands-used.ts`). By name only: nothing else of an entry leaves the machine.
  *
  * NO TRANSCRIPT. The scope also counts the shell calls in the session's log; his "transcripts never read" wins, so
  * only the folder's `.claude/settings.json` and `.claude/settings.local.json` are read.

@@ -1,6 +1,6 @@
 /**
  * `stale`, the two lines AGT-C18 Build 4 still owed (`src/methods/stale.ts`): what was learned and nobody has
- * confirmed in sixty days, and the skills that are behind what was learned since (AGT-C16 Build 1 and 2). Each is one
+ * confirmed in sixty days, and the skills that are behind what was learned since. Each is one
  * line `{ kind, said, count, clear }`, and `clear` names the real handle, so an agent starting work can make the call
  * with no model in the room.
  *

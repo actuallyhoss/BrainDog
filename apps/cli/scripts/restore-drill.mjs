@@ -7,7 +7,7 @@
  *                                           [--bucket <name>] [--report <origin>] [--no-round-trip]
  *   node apps/cli/scripts/restore-drill.mjs --print-timer --record <rec_id> --directory --identity-cmd "<command>" ...
  *
- * FETCHED AS THE OPERATOR (LCH-C04 job 1). The Worker never serves a copy as a file (`apps/worker/src/route.ts`
+ * FETCHED AS THE OPERATOR. The Worker never serves a copy as a file (`apps/worker/src/route.ts`
  * `copyAsked`), and only the operator holds the key that opens one, so `--record` and `--directory` fetch the night's
  * sealed object with `wrangler r2 object get --remote`, signed in as the operator wrangler already is, into a folder
  * under the OS temp directory that goes when the drill ends. `--record` is repeatable, and the run is PASS only when
@@ -77,7 +77,7 @@ const BUCKET = 'braindog-blobs';
 const RECORD_COPY = (rec) => `${rec}/snapshots/latest.brainl.age`;
 const DIRECTORY_COPY = 'directory/snapshots/latest.dirl.age';
 const REC_ID = /^rec_[0-9A-HJKMNP-TV-Z]{26}$/;
-/** The door that keeps the host's last drill (LCH-C04 job 3). */
+/** The door that keeps the host's last drill. */
 const DRILL_DOOR = '/account/ops/drill';
 
 // ─── bech32, for the identity he holds and the recipient it answers to ─────────────────────────────────────────────
@@ -705,7 +705,7 @@ async function drillDirectory(copyPath, ctx) {
  *
  * COUNTS ONLY: when, whether it passed, how many copies, rows, lists and people, and how many records the Directory
  * lists. No id, name or address leaves this machine. THE KEY GOES ONLY OVER HTTPS, or to this machine for a test.
- * A 404 is the door not being there yet (LCH-C04 job 3), which is told apart from a refused key.
+ * A 404 is the door not being there yet, which is told apart from a refused key.
  */
 async function report(origin, run, key) {
   if (key === '') return 'not sent: no key';

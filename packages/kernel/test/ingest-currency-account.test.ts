@@ -1,5 +1,5 @@
 /**
- * A text with no currency code is in its account's currency (REC-A03 job 5, the kernel half).
+ * A text with no currency code is in its account's currency (the kernel half).
  *
  * BEFORE: the bank add-on declared GBP as its fallback in twenty-two places, and a text printing an amount with no code
  * filed in sterling whatever the account held. A pattern's money form now says `currency: { of: 'account', field:

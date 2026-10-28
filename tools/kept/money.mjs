@@ -1,5 +1,5 @@
 /**
- * The kept lane's money checks (SHL-A19 job 3): a rates poll, Stripe against the stand-in, a salary rule on the
+ * The kept lane's money checks: a rates poll, Stripe against the stand-in, a salary rule on the
  * primitives, and a bank text through card-alerts' door. Each answers one line or two, `{ name, pass, said }`, with
  * `skipped` and why where it had nothing to do, and `todo` where what it asserts waits on work named in the line.
  *

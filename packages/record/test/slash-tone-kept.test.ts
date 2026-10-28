@@ -1,5 +1,5 @@
 /**
- * SLASH'S TONE IS ONLY EVER HIS WORDS (ENG-B20 job 2, `src/slash.ts` `toneFault`, `ownWords`).
+ * SLASH'S TONE IS ONLY EVER HIS WORDS (`src/slash.ts` `toneFault`, `ownWords`).
  *
  * The aim: "spark basically organizes and designs the tone of your braindog to fit your exact product". What
  * was true before: a model's voice line or label was filed as a `settings` draft with no check that the words were his,

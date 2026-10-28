@@ -1,5 +1,5 @@
 /**
- * A bill's add and edit form offers the account it is paid from (REC-A09 step 1).
+ * A bill's add and edit form offers the account it is paid from.
  *
  * `bill-takes-book` reads `account` on Bills and invoices, and a rule that reads a field nobody can fill never runs.
  * The form draws every field its list declares, in the order declared, leaving out a secret and the two a list keeps

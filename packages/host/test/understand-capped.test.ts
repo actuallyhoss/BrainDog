@@ -1,5 +1,5 @@
 /**
- * Slash's who-is-who questions held to three waiting, each with the day it lapses (ENG-B14 job 6; HD.224 "max 3
+ * Slash's who-is-who questions held to three waiting, each with the day it lapses (HD.224 "max 3
  * waiting", HD.579 "every proposal states a deadline"): the notes pass and the offers pass file only into what is left
  * of `WHO_WAITING_MOST`, strongest first, and an offer the owner said no to is not filed again.
  *

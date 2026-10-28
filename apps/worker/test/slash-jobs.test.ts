@@ -1,5 +1,5 @@
 /**
- * An embedding on the Cloud is one ledger row (ENG-B18 job 1). `workerModelJobs`'s `embed` once called `aiInference`
+ * An embedding on the Cloud is one ledger row. `workerModelJobs`'s `embed` once called `aiInference`
  * straight, past the engine, so no `slash_call` row was written and the month's embed count read 0 whatever was sent.
  * It now goes through the engine's `embedTexts`, over the same `AI` binding (`slash.ts` `embedOver`), and each call is a
  * row of kind `embed`, purpose `embed`, spending `background`, which `backgroundMeter` counts and the operator's ceiling

@@ -1,5 +1,5 @@
 /**
- * The route rows for giving things a colour of their own (`packages/record/src/methods/hues.ts`, PGS-A06 step 5).
+ * The route rows for giving things a colour of their own (`packages/record/src/methods/hues.ts`).
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD: `router-groups` holds each row's group to
  * `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same name to the guard its group implies.

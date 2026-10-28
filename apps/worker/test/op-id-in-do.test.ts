@@ -1,5 +1,5 @@
 /**
- * A write sent twice with one operation id is one entry, on a record that lives in a Durable Object (AGT-B05 job 4).
+ * A write sent twice with one operation id is one entry, on a record that lives in a Durable Object.
  *
  * WHY THIS FILE EXISTS. The command line now sends a create or an update once more, with the same `op_id`, when the
  * host's answer was lost (`apps/cli/src/bridge.ts`, held by `apps/cli/test/op-id.test.ts` over a self-host). The replay

@@ -1,5 +1,5 @@
 /**
- * Money's question about paydays on a month's last day (REC-B13 step 4), as the script a host runs and the declaration
+ * Money's question about paydays on a month's last day, as the script a host runs and the declaration
  * a pack document carries.
  *
  * A LINE WHOSE "NEXT" IS A MONTH'S LAST DAY SAYS ONE OF TWO THINGS, and the record cannot tell which. A salary on

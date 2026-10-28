@@ -1,5 +1,5 @@
 /**
- * A RUN AS A CONVERSATION, TOP TO BOTTOM (`RunPanel.svelte`, AGT-C12 build 5): who it was and where it worked, its
+ * A RUN AS A CONVERSATION, TOP TO BOTTOM (`RunPanel.svelte`): who it was and where it worked, its
  * stretches (started, came back, ended), what it said it is doing, what it asked, its dead ends, what it noted, its
  * helpers, and the run whose step it took. The panel's own two parts, what it did (`run-lines.ts`) and the step it left (`api.ts`
  * `stepLeft`), sit between `doing` and `asked`, and after `tried`.

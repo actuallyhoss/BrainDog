@@ -218,7 +218,7 @@ test('with a token set, a request without it is refused before it reaches the re
     const res = await fetch(`http://127.0.0.1:${s.port}/api/boot`);
     assert.equal(res.status, 401);
     const none = ((await res.json()) as Answer).refusal;
-    /* AND IT SAYS ONLY `unauthorized` (LCH-C08 job 2), the Worker's one
+    /* AND IT SAYS ONLY `unauthorized`, the Worker's one
        401 body: which of the two it was, nothing sent or a credential nobody issued, goes to the log. */
     assert.deepEqual(none, { code: 'UNAUTHORIZED', fix: 'unauthorized' });
 

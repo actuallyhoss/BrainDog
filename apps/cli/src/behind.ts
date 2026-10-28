@@ -1,6 +1,5 @@
 /**
- * Whether this command is behind the host it talks to, said in one line where the start hook prints the lapse warning
- * (AGT-A04 job 3).
+ * Whether this command is behind the host it talks to, said in one line where the start hook prints the lapse warning.
  *
  * THE HOST SAYS WHAT IT NEEDS AT ITS BUILD ADDRESS, `/.well-known/braindog-build`, as `{ app, min_cli }` with no
  * credential (`packages/mcp/src/build.ts`). A command built on a day before `min_cli` is one the host no longer works
@@ -154,7 +153,7 @@ export async function behindLine(io: BehindIo): Promise<string | null> {
   }
 }
 
-/** How long one quiet doctor run is kept before the start hook runs it again (AGT-A10 job 4). */
+/** How long one quiet doctor run is kept before the start hook runs it again. */
 export const DOCTOR_EVERY_MS = 7 * 86_400_000;
 
 /**

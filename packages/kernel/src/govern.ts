@@ -807,7 +807,7 @@ function askedAlready(deps: GovernDeps, by: string, p: Proposal, body: Record<st
       cause,
     );
     if (held) {
-      /* ONE OPEN ARRANGEMENT PER CAUSE, AND IT CARRIES THE WHOLE LIST (REC-A06 step 8). A second arrangement with the
+      /* ONE OPEN ARRANGEMENT PER CAUSE, AND IT CARRIES THE WHOLE LIST. A second arrangement with the
          cause adds the parts the open one lacks to it, so an agent that finds a fourth key to ask for does not wait for
          the first three to be answered, and the owner reads one card. */
       if (held.body_kind === 'arrange' && p.body_kind === 'arrange') {
@@ -2294,7 +2294,7 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
     return null;
   };
 
-  /* A VALUE AS ITS SETTING'S TYPE SAYS (REC-A06 step 3), where the pack is installed and declares the setting: a `list`
+  /* A VALUE AS ITS SETTING'S TYPE SAYS, where the pack is installed and declares the setting: a `list`
      is lines of text, and any other type is coerced as its field would be (`configValue`), so what the gate would refuse
      on apply is refused here, at the key. A pack the same arrangement installs, or a setting it does not declare, is
      the record's to check from its catalogue, and only the shape is held: text, a number, true or false, a list of
@@ -2404,7 +2404,7 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
         fix: `rows is a list of one to ${ARRANGE_ROWS} rows, each {"register":"<id>","fields":{...},"links":{"<field>":<position of an earlier row>}}.`,
         at: 'body.rows',
       };
-    /* OR A PATCH (REC-A06 step 4): `{ register, at, version, patch }` and the fields it was read as, checked as a
+    /* OR A PATCH: `{ register, at, version, patch }` and the fields it was read as, checked as a
        rowset's update is, list by list so each is counted in its place. */
     const rows = body.rows as unknown[];
     for (const register of new Set(rows.flatMap((r) => (isMap(r) && 'at' in r && typeof r.register === 'string' ? [r.register] : [])))) {
@@ -2464,7 +2464,7 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
   return null;
 }
 
-/* ── the parts of an arrangement (REC-A06 step 7) ────────────────────────── */
+/* ── the parts of an arrangement ────────────────────────── */
 
 /**
  * One part of an arrangement, which an accept may take or leave: an install, a pack turned on or off, a page, a
@@ -3379,7 +3379,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     only = new Set(picked);
   }
 
-  /* SOME OF AN ARRANGEMENT, BY PART (REC-A06 step 7). What is taken is applied as one, all or none, and the rest stays
+  /* SOME OF AN ARRANGEMENT, BY PART. What is taken is applied as one, all or none, and the rest stays
      open as the same question: its id, its cause and its history. A part another part needs is never taken alone, and
      the refusal names both as the owner reads them. Every part named is every part, which is an accept as it always was. */
   const naming = 'decide' in verdict ? verdict.decide.parts : undefined;

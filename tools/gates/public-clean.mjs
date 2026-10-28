@@ -114,15 +114,15 @@ export function licenceFindings(files, read) {
   const apache = [/Apache License/u, 'say Apache License'];
   const two = [/Version 2\.0/u, 'say Version 2.0'];
   const quartz = [/Quartz Apps LLC/u, 'name Quartz Apps LLC'];
-  must('LICENSE', 'the repository is open source under Apache-2.0 (RQ-LCH-127, RQ-LCH-261)', apache, two, quartz);
-  must('apps/cli/LICENSE', 'the command ships under Apache-2.0 (RQ-LCH-261)', apache, two, quartz);
-  must('packages/render/LICENSE', 'packages/render is MIT (RQ-LCH-128, RQ-LCH-261)', [/MIT License/u, 'say MIT License'], quartz);
-  must('LICENSING.md', 'the glyphs are Lucide\'s and say so (RQ-LCH-264)', [/Lucide/u, 'credit Lucide']);
+  must('LICENSE', 'the repository is open source under Apache-2.0', apache, two, quartz);
+  must('apps/cli/LICENSE', 'the command ships under Apache-2.0', apache, two, quartz);
+  must('packages/render/LICENSE', 'packages/render is MIT', [/MIT License/u, 'say MIT License'], quartz);
+  must('LICENSING.md', 'the glyphs are Lucide\'s and say so', [/Lucide/u, 'credit Lucide']);
   /* AT THE ROOT ONLY. Two third-party notices sit deeper in (the glyphs' and the site's) and are right where they are. */
   for (const file of files.filter((f) => /^NOTICE(?:\.\w+)?$/iu.test(f)))
-    out.push({ file, why: 'is a NOTICE at the root, and the repository carries none (RQ-LCH-263)' });
+    out.push({ file, why: 'is a NOTICE at the root, and the repository carries none' });
   for (const file of files.filter((f) => /^CHANGELOG(?:\.\w+)?$/iu.test(f)))
-    out.push({ file, why: 'is a changelog at the root, and the changelog is the site\'s (RQ-LCH-291)' });
+    out.push({ file, why: 'is a changelog at the root, and the changelog is the site\'s' });
   return out;
 }
 
@@ -134,22 +134,22 @@ export function readmeFindings(text) {
   const out = [];
   const lines = text.split('\n');
   const heading = lines.findIndex((l) => /^#{1,6}\s+Licen[cs]e\b/iu.test(l));
-  if (heading === -1) out.push({ line: 1, why: 'has no Licence section, and the README names its licences (RQ-LCH-130)' });
+  if (heading === -1) out.push({ line: 1, why: 'has no Licence section, and the README names its licences' });
   else {
     const level = /^#+/u.exec(lines[heading])[0].length;
     const after = lines.slice(heading + 1);
     const end = after.findIndex((l) => /^#+\s/u.test(l) && /^#+/u.exec(l)[0].length <= level);
     const body = (end === -1 ? after : after.slice(0, end)).join('\n');
-    if (!/Apache/u.test(body)) out.push({ line: heading + 1, why: 'has a Licence section that does not name Apache-2.0 (RQ-LCH-130)' });
-    if (!/\bMIT\b/u.test(body)) out.push({ line: heading + 1, why: 'has a Licence section that does not name MIT (RQ-LCH-130)' });
+    if (!/Apache/u.test(body)) out.push({ line: heading + 1, why: 'has a Licence section that does not name Apache-2.0' });
+    if (!/\bMIT\b/u.test(body)) out.push({ line: heading + 1, why: 'has a Licence section that does not name MIT' });
   }
   const IMAGES = [/!\[[^\]]*\]\(\s*<?([^)\s>]+)/gu, /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)/giu, /<source\b[^>]*\bsrcset\s*=\s*["']([^"'\s]+)/giu];
   lines.forEach((l, i) => {
-    if (PRICE.test(l)) out.push({ line: i + 1, why: 'prints a price, and the README carries none (RQ-LCH-269)' });
+    if (PRICE.test(l)) out.push({ line: i + 1, why: 'prints a price, and the README carries none' });
     for (const p of IMAGES)
       for (const m of l.matchAll(p))
         if (!BANNER.includes(m[1].replace(/^\.\//u, '')))
-          out.push({ line: i + 1, why: `shows an image that is not the banner (${m[1]}), and the README carries no badge (RQ-LCH-270)` });
+          out.push({ line: i + 1, why: `shows an image that is not the banner (${m[1]}), and the README carries no badge` });
   });
   return out;
 }
@@ -235,7 +235,7 @@ export default function publicClean(
        number, and a comparison with a function is false both ways. */
     const may = Object.hasOwn(allowed, rel) ? allowed[rel] : 0;
     if (hits.length > may)
-      for (const h of hits) findings.push(`  ${rel}:${h.line}  names "${h.word}", a private word (RQ-LCH-268)`);
+      for (const h of hits) findings.push(`  ${rel}:${h.line}  names "${h.word}", a private word`);
     else {
       allowedLines += hits.length;
       if (hits.length < may) shrink.push(`  ${rel}: allowed ${may}, now ${hits.length}`);
@@ -246,7 +246,7 @@ export default function publicClean(
   /* (b) and (c). */
   for (const { file, why } of licenceFindings(files, read)) findings.push(`  ${file}  ${why}`);
   const readme = files.includes('README.md') ? read('README.md') : null;
-  if (readme === null) findings.push('  README.md  is missing, and the README names the licences (RQ-LCH-130)');
+  if (readme === null) findings.push('  README.md  is missing, and the README names the licences');
   else for (const { line, why } of readmeFindings(readme)) findings.push(`  README.md:${line}  ${why}`);
 
   /* (d), only where the owner's list is. The term is never printed: the output of a gate is a log somebody else reads.

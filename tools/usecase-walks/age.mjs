@@ -1,6 +1,5 @@
 /**
- * Ageing a record: a person's week, or their three months, written as the entries they would have kept by then
- * (USE-A01 job 2).
+ * Ageing a record: a person's week, or their three months, written as the entries they would have kept by then.
  *
  * THROUGH THE RECORD'S OWN DOOR, WITH THE WALK'S KEY. Every entry is one `create`, the call any agent holding a key
  * makes, so the record checks each one as it checks anybody's, asks about it as it asks about anybody's, and counts

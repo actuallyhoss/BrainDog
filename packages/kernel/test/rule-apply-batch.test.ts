@@ -1,5 +1,5 @@
 /**
- * One press is one Undo (SHL-D07 job 3, kernel half): `applyRule` takes a `batch` and writes every row under it, and its
+ * One press is one Undo (kernel half): `applyRule` takes a `batch` and writes every row under it, and its
  * answer, like the dry run's, says how many it filled and how many it left, and the two add up.
  */
 import { test } from 'node:test';

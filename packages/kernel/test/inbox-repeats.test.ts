@@ -1,5 +1,5 @@
 /**
- * The inbox says which skipped texts are repeats by the record's own mark (audit-35 finding 3, the kernel half).
+ * The inbox says which skipped texts are repeats by the record's own mark (the kernel half).
  *
  * MEASURED BEFORE: the Inbox found repeats by one page of skipped texts whose reason started "Looks like a repeat". A
  * page full of texts a rule set aside pushed a real second charge off it, and a repeat written before batch 35 never

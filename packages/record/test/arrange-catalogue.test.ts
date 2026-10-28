@@ -1,5 +1,5 @@
 /**
- * An arrangement finds any current add-on in the host's whole catalogue (REC-A06 step 1), and settings sent with an
+ * An arrangement finds any current add-on in the host's whole catalogue, and settings sent with an
  * install fill it (step 2, first half).
  *
  * The arranger found an add-on only in the host's short list and refused the rest. Here the short list is empty and the

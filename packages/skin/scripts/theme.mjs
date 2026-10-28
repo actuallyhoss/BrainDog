@@ -184,7 +184,7 @@ const alphaDoc = toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + a11y;
 
 /**
  * `--tokens <file>` VALIDATES A TOKEN FILE IN PLACE OF THE FOUR PALETTES, so the check can be pointed at one
- * (PRF-B02 job 5). Until this the gate could only ever validate what the seed generates, which the generator had
+ * Until this the gate could only ever validate what the seed generates, which the generator had
  * already solved to pass, so nothing had shown it refuse anything; `tools/gates/negative/theme/` is the file that does.
  *
  * The file is JSON: `{ "theme": "house", "light": { "<role>": "#rrggbb" }, "dark": { ... } }`. It names a shipped

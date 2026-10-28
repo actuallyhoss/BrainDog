@@ -1,6 +1,6 @@
 /**
  * The canary look reads through the session its sign-in left, sends it to the canary and nowhere else, cannot press,
- * and will not start without one (PRF-A09 job 4).
+ * and will not start without one.
  *
  * A HOST OF ITS OWN ON LOOPBACK stands in for brain.dog and counts what reaches it, so "refused" means "never left".
  * The session is a file of this test's, named through `CANARY_SESSION` in the `env` handed to `open`.

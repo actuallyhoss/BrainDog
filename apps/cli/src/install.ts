@@ -969,7 +969,7 @@ function planServers(file: string, options: Options): Plan {
 }
 
 /**
- * THE `description:` OF A SKILL'S FRONT MATTER, AND NOTHING ELSE OF ITS TEXT (H.620), with the indented lines that
+ * THE `description:` OF A SKILL'S FRONT MATTER, AND NOTHING ELSE OF ITS TEXT, with the indented lines that
  * carry it on, or null when there is no front matter or no description in it. Whose skill a folder is, is said by
  * its description: a folder of notes that mentions the old host further down is nobody's skill, and one with no
  * front matter says nothing about whose it is. `doctor` reads skills by this same reader, so the two never disagree.
@@ -1016,7 +1016,7 @@ function planSkills(skills: string, options: Options): Plan {
       /* No `SKILL.md`, or one that cannot be read: nothing says whose it is, so it is left. */
       continue;
     }
-    /* THE DESCRIPTION LINE ONLY (H.620): a body or a reference file that mentions the host is somebody's notes. */
+    /* THE DESCRIPTION LINE ONLY: a body or a reference file that mentions the host is somebody's notes. */
     const description = descriptionOf(text)?.toLowerCase();
     if (!old || description === undefined || !old.skills.some((marker) => description.includes(marker.toLowerCase()))) continue;
     let to = join(skills, '.replaced', `${name}-${date}`);
@@ -1050,7 +1050,7 @@ function planAgentSkill(file: string, options: Options): Plan {
   return { lines, write: { file, had, value: text } };
 }
 
-/* ── `pack install --force` and `pack uninstall --force` (SHL-A12 job 6) ───────────────────────────────────────── */
+/* ── `pack install --force` and `pack uninstall --force` ───────────────────────────────────────── */
 
 /**
  * The usage line for `--force`, for the `pack` usage text to carry beside install and uninstall.

@@ -1,5 +1,5 @@
 /**
- * Lateness on Money's Heads up is said in the danger colour as well as in words (audit-56 #4): `{{bad:…}}` had a
+ * Lateness on Money's Heads up is said in the danger colour as well as in words: `{{bad:…}}` had a
  * writer in render (`packages/render/src/inline.ts`) and no page that used it, so "past their due date" was plain text.
  *
  * THE WORDS STAY, AND THE COLOUR REPEATS THEM: the phrase is the words that say it is late, so the line reads the same

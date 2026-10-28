@@ -1,5 +1,5 @@
 /**
- * The restore drill's door (LCH-C04 job 3): `restore-drill.mjs --report` posts its counts to `/account/ops/drill`, behind
+ * The restore drill's door: `restore-drill.mjs --report` posts its counts to `/account/ops/drill`, behind
  * the provision key as `/account/ops/restore-point` is; the Directory keeps the host's last drill, the operator's record
  * takes one note, and anyone signed in reads it at `GET /account/drill`.
  *

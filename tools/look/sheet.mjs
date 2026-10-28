@@ -1,6 +1,5 @@
 /**
- * One contact sheet a theme for a look: every screen of the set as a line, its three widths side by side
- * (PRF-A02 job 5).
+ * One contact sheet a theme for a look: every screen of the set as a line, its three widths side by side.
  *
  * THE SHEET IS WHAT THE READER OPENS FIRST, and `rubric.md` is what it reads it against. Each screen carries its name,
  * its address, what it settled into and anything raw `said.json` counted in its text, so a fault is named before the

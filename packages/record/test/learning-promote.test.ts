@@ -1,6 +1,6 @@
 /**
  * One lesson learned twice (`src/learning-promote.ts`, and `learningsTwice` and `promoteLearnings` in
- * `src/methods/learnings.ts`, AGT-D15 jobs 2 and 3): two active learnings in two projects, the same topic, four words
+ * `src/methods/learnings.ts`): two active learnings in two projects, the same topic, four words
  * in five shared once folded, are one lesson, offered on a person's press as one question that keeps it once for
  * everywhere.
  *

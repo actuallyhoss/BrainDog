@@ -44,7 +44,7 @@ const METHODS = { visa: 'pm_card_visa', failsLater: 'pm_card_chargeCustomerFail'
 export const NAMES = { key: 'STRIPE_TEST_KEY', oldKey: 'STRIPE_OLD_TEST_KEY', log: 'PAY_LOG' };
 
 /** Why extra usage has no step to run. */
-export const EXTRA_SKIPPED = 'extra usage (LCH-A11) needs a migration, which is the owner’s to make, so it is not built and there is nothing to run.';
+export const EXTRA_SKIPPED = 'extra usage needs a migration, which is the owner’s to make, so it is not built and there is nothing to run.';
 
 /** Stripe's event types the webhook acts on (`ACTS` in `apps/worker/src/billing.ts`). */
 export const ACTED = [

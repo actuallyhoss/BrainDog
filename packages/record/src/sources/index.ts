@@ -1,5 +1,5 @@
 /**
- * The sources the record hands the page reader (PGS-A11 job 3): what a page may draw that the kernel cannot read by
+ * The sources the record hands the page reader: what a page may draw that the kernel cannot read by
  * itself, because only the record knows who is reading and what it holds. Each is a `HostSource` (`PageDeps.hostSources`
  * in `kernel/src/pages.ts`), its rows read on the kernel's one rows path, so a page or an agent writes
  * `{ kind: table, source: lists }` and draws every list with its count, with nothing hardcoded.

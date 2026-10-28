@@ -1,5 +1,5 @@
 /**
- * The operator's gift door (`ops-plan.ts`, LCH-A12 job 2): no key is no door, a wrong key is a 401 that names the
+ * The operator's gift door (`ops-plan.ts`): no key is no door, a wrong key is a 401 that names the
  * header, a gift writes a `comp` row with no customer and moves the plan, taking it back returns a record that fits
  * to Free with no row, and a record with two people, or one that pays through Stripe, is refused in one sentence.
  *

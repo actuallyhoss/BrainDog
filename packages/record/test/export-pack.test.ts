@@ -1,5 +1,5 @@
 /**
- * `exportPack` (`src/methods/export-pack.ts`, SHL-B09 job 2): an add-on made from what a person made on a fresh record.
+ * `exportPack` (`src/methods/export-pack.ts`): an add-on made from what a person made on a fresh record.
  *
  * The first record has Portfolio installed as a person installs it, and lists, a figure, a page and an automation of
  * its own, set from the app (`setDeclaration`). What it offers is its own and never the add-on's. The page and the

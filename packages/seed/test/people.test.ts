@@ -335,7 +335,7 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
   assert.equal(list.rows.length, ORGANISATIONS.length);
 });
 
-/* ── Somebody held twice (AGT-D05 job 5): the kernel's built-in `held-twice`, said on the page ─────────────────────── */
+/* ── Somebody held twice: the kernel's built-in `held-twice`, said on the page ─────────────────────── */
 
 type Drawn = PageResult['blocks'][number] & { body?: string; lead?: boolean; tone?: string; span?: number; when?: unknown };
 const twice = (k: Kernel): unknown => {

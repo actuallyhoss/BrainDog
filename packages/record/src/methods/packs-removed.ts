@@ -1,5 +1,5 @@
 /**
- * What was taken out of this record and can still be put back: `packsRemoved` (ADMIN, a read), SHL-A12 job 3, the
+ * What was taken out of this record and can still be put back: `packsRemoved` (ADMIN, a read), the
  * record's half of "Removed" on the Add-ons screen.
  *
  * BEFORE THIS NOBODY COULD SEE WHAT AN UNINSTALL KEPT. Taking an add-on out keeps its rows, and the kernel keeps the

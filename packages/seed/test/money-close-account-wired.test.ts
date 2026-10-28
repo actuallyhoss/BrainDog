@@ -1,5 +1,5 @@
 /**
- * What starts `script.close_account` (REC-B15 step 3, the rules): an account whose status becomes Closed.
+ * What starts `script.close_account` (the rules): an account whose status becomes Closed.
  *
  * `money-close-account.test.ts` MEASURES THE DECISION AND THE SCRIPT, HANDED THEIR INPUT BY THE TEST. This measures who
  * hands it on a record: Money's own rule (`account-closed` in `MONEY_AUTOMATIONS`) and the automation started on the

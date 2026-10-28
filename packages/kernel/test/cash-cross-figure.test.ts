@@ -1,9 +1,9 @@
 /**
- * `value: { crosscheck: { of } }` (REC-A17 job 4, the nightly half): Cash now less Cash now walked entry by entry from
+ * `value: { crosscheck: { of } }` (the nightly half): Cash now less Cash now walked entry by entry from
  * each account's newest statement, a currency at a time. Nought on a record whose figure is right, and the difference
  * the moment one entry is read one minor unit apart.
  *
- * "Wrong money on a screen is the worst class of defect in this repo" (W.512). The walk and the roll read the same
+ * "Wrong money on a screen is the worst class of defect in this repo". The walk and the roll read the same
  * entries, so no honest entry sets them apart: the planted one is an entry the WALK is handed one minor unit heavier
  * than the record holds, through the `Sql` port, which is what a change to either reader's arithmetic looks like.
  */

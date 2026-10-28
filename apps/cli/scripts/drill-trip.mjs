@@ -1,5 +1,5 @@
 /**
- * The round trip, on the record the restore drill has just put back (LCH-C04 job 2).
+ * The round trip, on the record the restore drill has just put back.
  *
  *   import { roundTrip } from './drill-trip.mjs';
  *   const trip = await roundTrip(data, { main: MAIN });   // { pass, steps: [{ name, pass, said }] }

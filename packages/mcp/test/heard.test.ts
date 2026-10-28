@@ -1,5 +1,5 @@
 /**
- * The door marks itself (AGT-B01 job 4): `handle` calls the surface's optional `heard` for `hello`, `listed`, `called`
+ * The door marks itself: `handle` calls the surface's optional `heard` for `hello`, `listed`, `called`
  * and an INTERNAL answer, never waits on it, and a mark that fails leaves the call whole.
  *
  * Over the stub surface and over `serveMcp`, since the HTTP host is the transport that hands `handle` a caller.

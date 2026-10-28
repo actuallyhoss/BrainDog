@@ -1,8 +1,8 @@
 /**
  * A running total and a measured trend are read.
  *
- * "a cumulative reducer with an optional stop condition, returning the first row that crosses" (P.218), and "compound
- * growth with a band, or flat" (P.221). Both were published shapes refused by name. Held here:
+ * "a cumulative reducer with an optional stop condition, returning the first row that crosses", and "compound
+ * growth with a band, or flat". Both were published shapes refused by name. Held here:
  *
  *  - `{ running: { sum, order, until: { gte: n } } }` walks the entries in order and answers the total at the stop, with
  *    the entry that reached the line; with no stop, or a line nothing reaches, it answers the total at the end;

@@ -1,6 +1,6 @@
 /**
  * Every first-party module and every pack in `packs/`, taken from the version brain.dog last served to the one in this
- * tree, over a record that has rows in it (REC-A17 job 2).
+ * tree, over a record that has rows in it.
  *
  * WHY. "must still open with rows kept after every change" (HD.477). A rehearsal opens an older record with the new
  * kernel (`apps/cli/test/migration-rehearsal.test.ts`), and `pack-versions.test.ts` walks each module's versions, but

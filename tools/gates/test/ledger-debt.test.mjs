@@ -1,5 +1,5 @@
 /**
- * `bundle` and `refusals` read their numbers off `ledger.json` (PRF-B03 jobs 3 and 4).
+ * `bundle` and `refusals` read their numbers off `ledger.json`.
  *
  *   node --test tools/gates/test/ledger-debt.test.mjs
  *

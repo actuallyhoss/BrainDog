@@ -1,5 +1,5 @@
 /**
- * The lane's sixth step: a stranger's whole life on the canary's host (LCH-A03 job 5).
+ * The lane's sixth step: a stranger's whole life on the canary's host.
  *
  * THE DRILL ITSELF IS `tools/drill/run.mjs`; this file only says when the lane runs it. It signs up with the canary's own
  * mail door, reads the letter in the canary's Inbox with the canary's agent key, makes a Free record, tries the lock,

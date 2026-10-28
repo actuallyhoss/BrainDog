@@ -82,7 +82,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
 };
 
 /**
- * THIS MONTH AGAINST LAST, BY WHAT IT WAS FOR (REC-B19 job 2). Spread LAST in `figures/index.ts`, so every figure a
+ * THIS MONTH AGAINST LAST, BY WHAT IT WAS FOR. Spread LAST in `figures/index.ts`, so every figure a
  * record already holds keeps its place in the document.
  *
  * THREE WINDOWS, IN THE GRAMMAR'S OWN DAY WORDS. `bom-1m` is the first day of last month and `bom` the first of this

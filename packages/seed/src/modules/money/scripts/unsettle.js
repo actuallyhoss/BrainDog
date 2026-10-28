@@ -1,5 +1,5 @@
 /**
- * What deleting a payment does to the bill it paid (REC-B11 job 6, "Paid means paid"), as the decision, the script a
+ * What deleting a payment does to the bill it paid ("Paid means paid"), as the decision, the script a
  * host runs round it, the declaration a pack document carries, and the rule that starts it.
  *
  * A PAYMENT DELETED UNPAYS, as one made void does (`settle` in `settle.js`). Handed the bill a deleted Ledger entry

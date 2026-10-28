@@ -1,5 +1,5 @@
 /**
- * The skills the agents add-on ships (`packs/agents-skills.ts`, REC-A13 step 3, REC-A07 step 4), held to what makes them
+ * The skills the agents add-on ships (`packs/agents-skills.ts`), held to what makes them
  * safe to hand every record: they name nobody, every verb they tell a session to call is one it can call,
  * each carries a version, and the catalogue offers them with the agents add-on.
  *

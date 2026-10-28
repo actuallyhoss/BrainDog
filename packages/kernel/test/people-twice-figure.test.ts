@@ -1,5 +1,5 @@
 /**
- * `held-twice`, the figure that says how many people a record holds more than once (AGT-D05 job 1, AGT-B11 step 5).
+ * `held-twice`, the figure that says how many people a record holds more than once.
  *
  * WHAT WAS MEASURED BEFORE IT: his own record held him twice, one row with an address and one from the import, and the
  * count (`peopleTwice` in `people.ts`) was only ever asked by the nightly pass, which holds the record's own parts. No

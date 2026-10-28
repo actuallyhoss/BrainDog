@@ -89,7 +89,7 @@ import { answers, forward, forwards, serverKeyFor, startRecord } from './record.
 export const needs = ['builds'];
 
 /* THE PREFERENCES NO PAGE LOAD CAN SETTLE, `EXCUSED` below, held at module scope so `ledger.mjs` reads how many there
-   are without a browser (PRF-B03 step 3). `ledger.json` holds `prefs.UNCOVERED` at its newest line: the list only
+   are without a browser. `ledger.json` holds `prefs.UNCOVERED` at its newest line: the list only
    shrinks, and a fall is a line written there. */
 export const UNCOVERED = new Set(['theme', 'chars', 'seen', 'columns', 'defined']);
 
@@ -594,7 +594,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       name: 'look.theme',
       record: true,
       fresh: true,
-      what: 'which installed look the page is drawn in, when the record keeps the pick (PGS-A21)',
+      what: 'which installed look the page is drawn in, when the record keeps the pick',
       route: '/',
       values: [{ '@record': {} }, { '@record': { 'look.theme': 'house' } }],
       probe: () => getComputedStyle(document.documentElement).getPropertyValue('--red-fill').trim() || 'no accent',

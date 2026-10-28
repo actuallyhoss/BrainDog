@@ -76,7 +76,7 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
     { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
     /* INDEXED, because a book's page filters its bills by it. */
     { ...BOOK, index: true },
-    /* THE ACCOUNT A BILL IS PAID FROM, OR AN INVOICE INTO (REC-A09 step 1). Optional, as on an instalment: a bill nobody
+    /* THE ACCOUNT A BILL IS PAID FROM, OR AN INVOICE INTO. Optional, as on an instalment: a bill nobody
        has put on an account holds none. It is what `bill-takes-book` reads, so a bill on Acme's account is in Acme's
        book by no hand. INDEXED, because the nightly count asks for the bills of one account, AND IT IS THE EIGHTH AND
        LAST INDEX THIS LIST MAY HOLD (`INDEX_CEILING`): the next field a page filters on wants one of these given up. */
@@ -136,7 +136,7 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
      */
     { id: 'chased', label: 'Chasing since', type: 'day' },
     /**
-     * A MESSAGE READY TO SEND, SINCE money-core 3.17.0 (REC-B22 step 1). The record writes it when "Chase it" is the
+     * A MESSAGE READY TO SEND, SINCE money-core 3.17.0. The record writes it when "Chase it" is the
      * answer (`invoice-chased` in `MONEY_AUTOMATIONS`): the invoice's own amount and due day in one plain sentence.
      * Written only where the field is empty, never over words somebody changed. Not indexed: nothing filters on it.
      */

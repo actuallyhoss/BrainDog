@@ -1,5 +1,5 @@
 /**
- * A PAGE'S READS GO OUT TOGETHER (EXP-D04 job 2). The reader asked the record about each list a page draws one after
+ * A PAGE'S READS GO OUT TOGETHER. The reader asked the record about each list a page draws one after
  * another, then walked each linked list one after another, so a page of three lists waited six round trips before its
  * first block. These hold that every list's ask is out before the first one answers, that the page drawn is the page
  * the one-at-a-time reader drew, and that one list the record will not describe is said by its own block alone.

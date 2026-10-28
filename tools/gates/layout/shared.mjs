@@ -58,7 +58,7 @@ export const SHAPES = [
 ];
 
 /**
- * WHAT A SETTLED SCREEN PRINTS (PRF-B04 job 5, `printed.mjs` `checkScreen`): on every page-run, a raw id, a raw time,
+ * WHAT A SETTLED SCREEN PRINTS (`printed.mjs` `checkScreen`): on every page-run, a raw id, a raw time,
  * a key, a value that never arrived or a page error is a finding of this gate too. Said once a screen, and only of
  * a screen that settled.
  */

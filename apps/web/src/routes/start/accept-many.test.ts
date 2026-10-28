@@ -1,5 +1,5 @@
 /**
- * A zip of tables is one list for each (`importFiles` in `accept.ts`, USE-B10 job 7): what one press writes when the
+ * A zip of tables is one list for each (`importFiles` in `accept.ts`): what one press writes when the
  * person brought a Notion export, or any zip, and the first run drew one tile for each table inside.
  *
  * THE ZIP IS WRITTEN HERE BY HAND, with the same tiny writer `lib/start/zip.test.ts` uses (stored entries only), and read

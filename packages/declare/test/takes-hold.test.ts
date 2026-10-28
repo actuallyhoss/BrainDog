@@ -1,5 +1,5 @@
 /**
- * When a changed setting takes hold (SHL-A09 job 5): at once for what reads it when read, and at the next install or
+ * When a changed setting takes hold: at once for what reads it when read, and at the next install or
  * update for what is filled into a declaration. Worked out from the add-on's own file, through the plan's own reader.
  */
 

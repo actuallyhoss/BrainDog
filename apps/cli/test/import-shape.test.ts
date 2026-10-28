@@ -1,5 +1,5 @@
 /**
- * `braindog import` refuses a shape copy before it is checked or sent (PRF-A13 job 4).
+ * `braindog import` refuses a shape copy before it is checked or sent.
  *
  *   node --test apps/cli/test/import-shape.test.ts
  *

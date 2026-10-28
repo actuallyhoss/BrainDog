@@ -1,5 +1,5 @@
 /**
- * An arrangement carries the whole list (REC-A06 job 4, the record half): its rows may be patches of entries already
+ * An arrangement carries the whole list (the record half): its rows may be patches of entries already
  * here, a setting a declaration reads plans its add-on again, the keys it needs are the record's to say, and every part
  * has an id an accept can name.
  *

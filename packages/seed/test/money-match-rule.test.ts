@@ -1,5 +1,5 @@
 /**
- * What starts `script.match_payment` (REC-B11 step 3, the rules): a cleared Ledger entry that settles nothing.
+ * What starts `script.match_payment` (the rules): a cleared Ledger entry that settles nothing.
  *
  * `money-match-payment.test.ts` MEASURES THE DECISION AND THE SCRIPT, HANDED THEIR INPUT BY THE TEST. This measures the
  * chain on a record, as `money-settle-rule.test.ts` does for `settle`: Money's own rules installed from its pack

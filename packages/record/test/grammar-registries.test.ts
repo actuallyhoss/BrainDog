@@ -1,5 +1,5 @@
 /**
- * The grammar an agent and Slash are handed says what the registries hold (PGS-A08 step 4).
+ * The grammar an agent and Slash are handed says what the registries hold.
  *
  * THE SOURCES LINE WAS TYPED BY HAND, and it had already left out `exceptions` the day that source was registered: a
  * page that wanted what went quiet was a page no agent was told it could write. It is built now from the kernel's

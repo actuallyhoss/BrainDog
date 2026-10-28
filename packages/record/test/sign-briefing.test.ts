@@ -1,5 +1,5 @@
 /**
- * `briefing-true` (PRF-A05 job 2): the record's own `context` for the repositories with the newest runs, checked claim by
+ * `briefing-true`: the record's own `context` for the repositories with the newest runs, checked claim by
  * claim against reads of the tables, and filed through the kernel's `signRead`.
  *
  * A green record built through public verbs (runs written and attached, a question asked); a red one the same way (the

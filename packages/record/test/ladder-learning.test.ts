@@ -1,5 +1,5 @@
 /**
- * Capturing a learning needs nobody (AGT-C14 Build 1): an agent at the lowest rung adds a learning where its
+ * Capturing a learning needs nobody: an agent at the lowest rung adds a learning where its
  * run is, and confirms one, with no question filed. What stays a question: a run that read text from outside the
  * record, a learning anywhere but where the run is, a move of where one applies, any other change to one, and every
  * write to any other list.

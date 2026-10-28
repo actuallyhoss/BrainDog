@@ -1,5 +1,5 @@
 /**
- * Activity (PGS-C24 job 7): one declared page, its line, the log as a feed a day at a time, and a side column of who
+ * Activity: one declared page, its line, the log as a feed a day at a time, and a side column of who
  * worked, what changed, the busy hours and what an agent asked, on a real record.
  *
  * WHAT WAS MEASURED BEFORE THIS. Activity was one hand-built screen at `/audit`: nobody could move a tile of it in Edit

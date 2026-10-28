@@ -120,7 +120,7 @@ export const BEAT_MS = 60_000;
 /**
  * A run says it is still working: its `last_seen` moves to now, in place, and answers whether it moved.
  *
- * A HEARTBEAT IS NOT A WRITE (P.132): no version, no `updated_at`, no event, the same in-place statement the ladder
+ * A HEARTBEAT IS NOT A WRITE: no version, no `updated_at`, no event, the same in-place statement the ladder
  * gives a found run (`attribute` in `index.ts`), so a session that reads, thinks or edits files reads as working without
  * a line in its history or a conflict on its next edit of its own row.
  *

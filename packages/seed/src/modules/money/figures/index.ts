@@ -1,6 +1,6 @@
 /**
  * Money's figures, in the order a record has always held them. Each group is its own file, cut out of `money.ts` with no
- * change (REC-B01 job 1), the signs of life added after them, and the order of the spreads here is the order of
+ * change, the signs of life added after them, and the order of the spreads here is the order of
  * the document, which the pinned fingerprint holds.
  */
 
@@ -38,28 +38,28 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   ...INSTALMENTS_FIGURES,
 
   /* ── signs of life ───────────────────────────────────────────────────────
-     Whether Money is being kept at all, since money-core 3.15.0 (REC-B01 job 3). Last, so every figure above keeps its
+     Whether Money is being kept at all, since money-core 3.15.0. Last, so every figure above keeps its
      place in the document. */
 
   ...SIGNS_FIGURES,
 
   /* ── which way a category is for ─────────────────────────────────────────
-     The categories an entry going the other way points at, since money-core 3.16.0 (REC-A13 job 2). After the signs,
+     The categories an entry going the other way points at, since money-core 3.16.0. After the signs,
      so every figure above keeps its place in the document. */
 
   ...DIRECTION_FIGURES,
-  /* WHO FILED THE LEDGER, SINCE money-core 3.17.0 (REC-B20 job 2, filing-figures-61): two counts of the entries made, by
+  /* WHO FILED THE LEDGER, SINCE money-core 3.17.0 (filing-figures-61): two counts of the entries made, by
      who made them, read from the Ledger's own history. LAST, so every figure above keeps its place in the document. */
   ...FILING_FIGURES,
 
   /* ── this month against last ─────────────────────────────────────────────
-     Where the money went last month, and this month so far against it, by category (REC-B19 job 2, spend-figures-63).
+     Where the money went last month, and this month so far against it, by category (spend-figures-63).
      They read the Ledger as `SPENDING_FIGURES` does and are NOT spread with it: LAST, so every figure above keeps its
      place in the document. */
 
   ...SPEND_VS_LAST_FIGURES,
 
-  /* THE DAY A CATEGORY PASSED ITS BUDGET, SINCE money-core 3.17.0 (REC-B19 step 4, budget-passed-on-68): one running
+  /* THE DAY A CATEGORY PASSED ITS BUDGET, SINCE money-core 3.17.0 (budget-passed-on-68): one running
      total with a stop. After the spend figures, so every figure above keeps its place in the document. */
   ...BUDGET_FIGURES,
 
@@ -68,7 +68,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   ...PLAN_FIGURES,
   ...PLANS_FIGURES,
 
-  /* A BOOK'S OWN MONTH, AND WHAT IS FILED IN NO BOOK (REC-A09 step 2, book-figures-71): money in, money out and what is
+  /* A BOOK'S OWN MONTH, AND WHAT IS FILED IN NO BOOK (book-figures-71): money in, money out and what is
      left, read once per book, and a count a list of what no book holds. LAST, so every figure above keeps its place in
      the document. */
   ...BOOK_FIGURES,

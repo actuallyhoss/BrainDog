@@ -1,5 +1,5 @@
 /**
- * A page over the log is filtered by its own three questions (PGS-C24 job 3): who wrote a line, what kind of change it
+ * A page over the log is filtered by its own three questions: who wrote a line, what kind of change it
  * was and which list it was on. Each is answered from the last 30 days of the log with names and counts, never an id;
  * a choice narrows the feed; the page's own order of filters is kept. Invented agents, people and lists throughout.
  */

@@ -558,14 +558,14 @@ const withoutLedgerTile = (doc: Body): Body => ({
   ),
 });
 /**
- * AND 3.17.0'S PLANS (plans-list-66, REC-B12 jobs 1 and 2), folded into the same unreleased step: the list Plans goes,
+ * AND 3.17.0'S PLANS (plans-list-66), folded into the same unreleased step: the list Plans goes,
  * an instalment loses Part of and Left after, and the script that makes and counts plans goes with the rule that starts it.
  * AND BATCH 68'S, folded into the same unreleased step: the rule a new plan starts the script by (plans-calm-67-68), the
  * page of one plan with its eight figures (plan-page-68), and the day a category passed its budget (budget-passed-on-68).
  */
 const PLAN_FIELDS: ReadonlySet<string> = new Set(['plan_row', 'left_after']);
 const PLAN_FIGURES_68: ReadonlySet<string> = new Set(['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due', 'installments-paid-by-plan', 'installments-total-by-plan', 'budget-passed-on']);
-/** AND 3.17.0'S PAYEE (payee-field-68, REC-B16 step 2), folded into the same unreleased step: the Ledger loses `payee`, and `counterparty_text` is labelled Paid to or from again. */
+/** AND 3.17.0'S PAYEE (payee-field-68), folded into the same unreleased step: the Ledger loses `payee`, and `counterparty_text` is labelled Paid to or from again. */
 const withoutPayee = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[]).map((d) =>
@@ -584,7 +584,7 @@ const withoutEveryday = (doc: Body): Body => {
     ),
   };
 };
-/** AND BATCH 70'S (instalments-tile-70, REC-B12 job 5): Money's Instalments tile counts the list's own parts again, as it did before it read the two figures by plan. */
+/** AND BATCH 70'S (instalments-tile-70): Money's Instalments tile counts the list's own parts again, as it did before it read the two figures by plan. */
 const INSTALMENTS_BY_PARTS: Body = {
   kind: 'progress',
   heading: 'Instalments',
@@ -598,7 +598,7 @@ const INSTALMENTS_BY_PARTS: Body = {
   empty: 'Nothing is being paid in parts.',
 };
 /**
- * AND BATCH 70'S (money-wire-70, REC-B19 jobs 3 and 4): This month's spending and Budgets leave Money, Being chased
+ * AND BATCH 70'S (money-wire-70): This month's spending and Budgets leave Money, Being chased
  * stands straight after Instalments again, and the folded History heading is back over In and out, by month.
  */
 const HISTORY_FOLD: Body = { kind: 'section', heading: 'History', icon: 'history', span: 12, fold: true, when: { metric: 'cash-accounts', gt: 0 } };
@@ -650,7 +650,7 @@ const beforeUiPass = (doc: Body, id: 'portfolio' | 'work'): Body => ({
   }),
 });
 /**
- * AND BATCH 71'S BOOKS (book-fill-71, book-figures-71, book-page-71; REC-A09 steps 1 to 3), folded into the same
+ * AND BATCH 71'S BOOKS (book-fill-71, book-figures-71, book-page-71), folded into the same
  * unreleased step: the three rules that file a thing in its account's book go with the script they start, the seven
  * figures of a book's month and of what no book holds go, and a book's page loses This month.
  */
@@ -696,7 +696,7 @@ const withoutBatch74 = (doc: Body): Body => ({
 });
 /**
  * AND BATCH 75'S, folded into the same unreleased step and undone first: an invoice's Draft to send goes from Bills and
- * invoices, and the step that writes it goes from the rule that answers Chase it (money-chase-draft-75, REC-B22 step 1).
+ * invoices, and the step that writes it goes from the rule that answers Chase it (money-chase-draft-75).
  */
 const withoutBatch75 = (doc: Body): Body => ({
   ...doc,
@@ -748,9 +748,9 @@ const withoutBatch77 = (doc: Body): Body => ({
  * AND BATCH 78'S, folded into the same unreleased step and undone first. Money's line of what there is draws again on
  * one book alone, and the same line ending on the year goes (money-lasts-line-78); the Heads up line on
  * categories that Money gave up for it was never in a released version and is taken off by `withoutDirection`, so it
- * is not put back. A book's line that its money lasts the year goes (book-lasts-year-78, REC-A09 step 2). And the
+ * is not put back. A book's line that its money lasts the year goes (book-lasts-year-78). And the
  * search for what a payment paid goes whole: its script, the rule that starts it and the rule that marks an
- * instalment paid by the payment it names (match-payment-78, REC-B11 step 3). `repeating-overdue`, whose `where` and
+ * instalment paid by the payment it names (match-payment-78). `repeating-overdue`, whose `where` and
  * count batch 78 changed, is dropped whole with the other signs (`SIGNS_ADDED`).
  *
  * AND BATCH 80'S SECOND STEP OF THAT RULE, with the script it starts (repeating-settle-79-80): the rule goes whole
@@ -768,7 +768,7 @@ const withoutBatch78 = (doc: Body): Body => {
   const book = withPage(money, 'money-book', (now) => now.filter((b) => !(b.kind === 'note' && (b.when as Body | undefined)?.metric === 'book-lasts-until:{{name}}')));
   return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles' && d.script !== 'file_back' && d.script !== 'learn_category' && d.rule !== 'rule-files-back' && d.rule !== 'category-teaches' && d.rule !== 'category-taught' && d.script !== 'settle_matched_line' && d.rule !== 'recurring-went-through') };
 };
-/** AND BATCH 92'S, folded into the same unreleased step and undone first (money-every-month-92, REC-B23 jobs 5 to 7): the walk of the next thirty days stands under Coming and going again, Every month goes, and the chart reads twelve months back. And a deleted payment no longer reopens its bill (unsettle-92): `payment-unsettles` and its script go. The walk put back walks no add-on's list, which it did not then (Certificates came in money-core 3.29.0). */
+/** AND BATCH 92'S, folded into the same unreleased step and undone first (money-every-month-92): the walk of the next thirty days stands under Coming and going again, Every month goes, and the chart reads twelve months back. And a deleted payment no longer reopens its bill (unsettle-92): `payment-unsettles` and its script go. The walk put back walks no add-on's list, which it did not then (Certificates came in money-core 3.29.0). */
 const NEXT_30_BRIDGE = withoutLegs(NEXT_30.find((x) => x.kind === 'bridge') as Body, (register) => !ADDON_LEG_LISTS.has(register));
 const withoutBatch92 = (doc: Body): Body => {
   const money = withPage(doc, 'money', (now) => now.filter((b) => b.heading !== 'Every month').flatMap((b) => (b.heading === 'Coming and going' ? [b, NEXT_30_BRIDGE] : [b])).map((b) => (b.heading === 'In and out, by month' ? { ...b, back: 12 } : b)));
@@ -776,7 +776,7 @@ const withoutBatch92 = (doc: Body): Body => {
 };
 /**
  * AND BATCH 95'S, folded into the same unreleased step and undone first (money-board-place-95, REC-B23 step 7;
- * money-lasts-no-income-95, REC-B07 step 8). Waiting on you stands under Accounts in the side column again and the
+ * money-lasts-no-income-95). Waiting on you stands under Accounts in the side column again and the
  * costs by category leave Money; and the line loses how long the cash lasts with no income, its figure with it, each of
  * the three lead notes ending where it ended before. On a document without the second job both find nothing.
  */
@@ -1298,7 +1298,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the unreleased 1.19.0
          (waiting-work-projects-99). */
       /* AND WORK'S HEAD AND ITS OPEN WORK WITH NO PROJECT, a fold, a list and the figure both are gated on, added inside
-         the unreleased 1.19.0 (work-head-and-no-project-101, AGT-D14 job 1). */
+         the unreleased 1.19.0 (work-head-and-no-project-101). */
       const headless = {
         ...doc,
         declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'tasks-no-project').map((d) => (d.page === 'work' ? (({ header: _head, ...rest }) => rest)(d) : d)),

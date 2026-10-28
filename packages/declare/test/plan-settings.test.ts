@@ -1,5 +1,5 @@
 /**
- * Settings sent with an install fill that install (REC-A06 step 2, first half).
+ * Settings sent with an install fill that install (first half).
  *
  * `plan(pack, installed, { settings })` takes the values in hand: each declaration reading a setting is written with the
  * value sent, the install keeps it as chosen, and the next plan reads it as `kept`. A value the setting will not take is a

@@ -1,5 +1,5 @@
 /**
- * The card's Next slot says what is true about the step (AGT-B08 job 4, with AGT-C05's card line), on `card()` itself.
+ * The card's Next slot says what is true about the step (with AGT-C05's card line), on `card()` itself.
  *
  * The record works out `next_lines`, `also_here` and `handoff.earlier`, and the card read none of them: it printed its
  * own wording of the step with "N dead ends" in More, so a session was never told "Nothing was handed over", who took

@@ -2,7 +2,7 @@
 
 export const SPENDING: Record<string, unknown>[] = [
   {
-    /* THIS MONTH SO FAR AGAINST LAST MONTH TO THE SAME DAY, ONE PART A CATEGORY (REC-B19 job 3), over the one figure
+    /* THIS MONTH SO FAR AGAINST LAST MONTH TO THE SAME DAY, ONE PART A CATEGORY, over the one figure
        that holds both months (`spent-vs-last-month`, `figures/spending.ts`): each part answers its difference, its two
        halves, and a change only where the record lets one be said. A category with nothing in one of the months, or
        with under half the other's entries, is answered a difference and no change, so nothing drawn from this block

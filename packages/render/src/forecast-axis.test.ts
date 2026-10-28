@@ -1,5 +1,5 @@
 /**
- * Where a forecast's value axis starts (REC-B08 jobs 4 to 6): fitted to the walk unless the block says `axis: zero`,
+ * Where a forecast's value axis starts: fitted to the walk unless the block says `axis: zero`,
  * and a fitted axis that leaves zero out says so, with a break at its end nearest zero beside the real amount and the
  * words in the chart's name. And the what-if is held in memory only, so a page come back to draws the host's walk.
  */

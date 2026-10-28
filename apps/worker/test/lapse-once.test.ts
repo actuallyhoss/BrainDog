@@ -1,5 +1,5 @@
 /**
- * A lapse is said once (LCH-A12 job 3, "Read-only until billing resumes.", HD.435): a lapsed record that skips a
+ * A lapse is said once ("Read-only until billing resumes.", HD.435): a lapsed record that skips a
  * hundred queued jobs is left with its one line, and with nothing filed on Decide, nothing queued and no fault.
  *
  * OVER THE REAL KERNEL, with the jobs written straight into its outbox, and the Worker's two lapsed paths run as

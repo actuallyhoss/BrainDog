@@ -1,5 +1,5 @@
 /**
- * A RUN IS A RUN, EVERYWHERE A PERSON READS (AGT-C12 build 7, job g): no screen and no word file calls an agent's run a
+ * A RUN IS A RUN, EVERYWHERE A PERSON READS (job g): no screen and no word file calls an agent's run a
  * session. The record's list of runs is still `session` underneath, so its id, its icon and the paths built on it are
  * allowed; so are comments, which nobody reads on a screen. Signing in has sessions of its own, and Settings > Sessions
  * says them.

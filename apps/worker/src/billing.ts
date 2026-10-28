@@ -187,7 +187,7 @@ const planOfMeter = (plan: string): ListedPlan =>
   plan === FREE_PLAN.directory ? 'free' : plan === HOSTED_PLANS.plus.directory ? 'plus' : 'cloud';
 
 /**
- * Whether the Stripe price a plan's setting names charges what the one table of plans says (audit-38-39 finding 9):
+ * Whether the Stripe price a plan's setting names charges what the one table of plans says:
  * `null` when it does, or the refusal that opens no payment page.
  *
  * READ AT EVERY CHECKOUT AND NOT TRUSTED FROM THE SETTING, because the list and the checkout say `planPrice`, from

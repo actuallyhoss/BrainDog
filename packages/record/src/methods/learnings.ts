@@ -33,7 +33,7 @@
  *
  * IT READS AND WRITES NOTHING ELSE. No run is opened by asking and nothing is confirmed by being read.
  *
- * ONE LESSON LEARNED TWICE (AGT-D15 jobs 2 and 3). `learningsTwice` (READ+) says which lessons two projects learned
+ * ONE LESSON LEARNED TWICE. `learningsTwice` (READ+) says which lessons two projects learned
  * on their own, by the rule in `../learning-promote.ts`, and `promoteLearnings` (DATA, a person's only) puts each to
  * Decide as one question. It is asked when a person asks and never by the night: a matcher may show, and only a press
  * asks. Here and not in the kernel, so no kernel export and no table line was needed.
@@ -243,7 +243,7 @@ function fadingList(deps: RecordDeps) {
   return null;
 }
 
-/* ── one lesson learned twice (AGT-D15 jobs 2 and 3) ─────────────────────────────────────────────────────────────── */
+/* ── one lesson learned twice ─────────────────────────────────────────────────────────────── */
 
 /** One side of a lesson learned twice, as a person reads it: the learning by its spoken id, its words, its project's name. */
 export type TwiceSide = { spoken: string; lesson: string; project: string };

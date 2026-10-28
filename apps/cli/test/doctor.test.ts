@@ -34,7 +34,7 @@ const SHORT = 'q7Rw2xT9';
 const OLD_HOOK = `sh /opt/tallybook/hooks/session-start.sh --token ${TOKEN}`;
 const OLD_SERVER = { type: 'stdio', command: 'node', args: ['/opt/tallybook/mcp/tallybook-mcp.mjs', '--hb', TOKEN] };
 const OLD_SKILL = '---\nname: old-brain\ndescription: Read and write the shared brain at https://tallybook.example.\n---\n\n# Tallybook\n';
-/* Notes that mention the host in their body and not in their description: no skill of the old tool's (H.620). */
+/* Notes that mention the host in their body and not in their description: no skill of the old tool's. */
 const NOTES = '---\nname: notes\ndescription: Notes on moving between tools.\n---\n\nWe left https://tallybook.example in March.\n';
 const CRONTAB = `# nightly\n0 3 * * * node /opt/tallybook/mcp/tallybook-mcp.mjs sync ${SHORT}\n15 4 * * * /usr/bin/true\n`;
 

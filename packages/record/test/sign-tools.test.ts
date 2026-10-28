@@ -1,5 +1,5 @@
 /**
- * `tools-listed` (PRF-A05 job 3): the sessions the agent door was given the tool list against the sessions that said
+ * `tools-listed`: the sessions the agent door was given the tool list against the sessions that said
  * hello, from the kernel's `doorMarks` and the marks themselves, filed through `signRead`. Marks are left through the
  * kernel's own `heard`, as the door leaves them.
  *

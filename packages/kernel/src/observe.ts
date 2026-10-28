@@ -140,7 +140,7 @@ export type Analysis = {
 
 const DAY_MS = 86_400_000;
 
-/* ── presence, read one way (ENG-B13 job 3) ──────────────────────────── */
+/* ── presence, read one way ──────────────────────────── */
 
 /**
  * The three places this record writes down that something happened, each with the column that says which thing, the

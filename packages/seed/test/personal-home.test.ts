@@ -154,7 +154,7 @@ test('EACH FIRST ACT GOES ONCE ITS THING EXISTS: an account counted as cash, a s
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
 });
 
-/* ── a person's first day holds what the words point at (USE-B08 job 5, Personal 2.6.0) ───────────────────── */
+/* ── a person's first day holds what the words point at (Personal 2.6.0) ───────────────────── */
 
 /**
  * THE MODULES A SENTENCE POINTS AT, as the first run hears them (`modulesOf` in `apps/web/src/lib/start/propose.ts`,

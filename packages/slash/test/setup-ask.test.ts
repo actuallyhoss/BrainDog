@@ -1,5 +1,5 @@
 /**
- * The reader asks back (USE-B06 job 1): the one question a reading may carry, held by `setupOf` to what a first run can
+ * The reader asks back: the one question a reading may carry, held by `setupOf` to what a first run can
  * use. One question and never two (settled on 9 October), about one of five things, one line, short choices, and never
  * about a name or a currency the person already typed.
  */

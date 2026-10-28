@@ -1,5 +1,5 @@
 /**
- * `arrived` (PRF-A20 job 2): whether what shipped is what runs. An add-on one version behind its catalogue reads green
+ * `arrived`: whether what shipped is what runs. An add-on one version behind its catalogue reads green
  * for two nights and red on the third, naming it and what turns it on, and green the night after it updates; an update
  * waiting on its question past two nights is red; the command's build more than two days behind the host's is red, a
  * checkout's says nothing; a cloud host with no model is red, a self-host says nothing. Filed through `fileRecordSigns`.

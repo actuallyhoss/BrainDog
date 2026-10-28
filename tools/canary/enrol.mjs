@@ -1,6 +1,5 @@
 /**
- * The canary's sitting: the one time a person makes the credentials the lane after a deploy signs in with
- * (PRF-A09 job 1).
+ * The canary's sitting: the one time a person makes the credentials the lane after a deploy signs in with.
  *
  *   node tools/canary/enrol.mjs            on his Mac, by him, once: app.brain.dog, the record `ops`
  *   node tools/canary/enrol.mjs --dry      every step against a fresh local self-host, and what it would set

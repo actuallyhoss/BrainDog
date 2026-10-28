@@ -1,5 +1,5 @@
 /**
- * The first read before there is an account (USE-B05 job 1): `readSetup` reads a stranger's sentence once through the
+ * The first read before there is an account: `readSetup` reads a stranger's sentence once through the
  * model it is handed and holds the answer as `proposeSetup` does, with no record, no owner and no ledger.
  *
  * THE MODEL IS CANNED (`double.ts`) AND NOTHING ELSE IS BUILT: no SQLite is opened and no `core` made, so a read that

@@ -1,5 +1,5 @@
 /**
- * Who a Ledger entry was paid to or from, in a person's words (REC-B16 step 2, the seed half), beside the words the
+ * Who a Ledger entry was paid to or from, in a person's words (the seed half), beside the words the
  * bank wrote.
  *
  * WHAT WAS WRONG. The Ledger held one text for the other side of a payment, `counterparty_text`, and called it "Paid to

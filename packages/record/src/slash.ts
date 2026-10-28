@@ -1927,7 +1927,7 @@ function changeBody(
   const stray = listed.find((d) => typeof d?.kind !== 'string' || !BUILDS.has(d.kind));
   if (stray !== undefined)
     return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule, a metric, a page or a script.` };
-  /* A SCRIPT SLASH WRITES SENDS NONE OF HIS KEYS (H.735, "F8 Slash scripts proposal-only no keychain keys"). The question
+  /* A SCRIPT SLASH WRITES SENDS NONE OF HIS KEYS ("F8 Slash scripts proposal-only no keychain keys"). The question
      used to say "sending your key ..." and file it; on any path, pressed or described, one naming a key is dropped. */
   if (listed.some((d) => d.kind === 'script' && namesKey(partOf(d.body).keys))) return { ok: false, why: KEYED_SCRIPT };
   /* THE WHOLE BODY AND NOT ONLY ITS DECLARATIONS, because every key a model writes beside `to` is filed with it (the

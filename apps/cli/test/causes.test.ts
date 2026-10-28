@@ -1,5 +1,5 @@
 /**
- * The command line's own questions are asked once (AGT-C07 g): `skills sync`, `pack install` and `usecase install` each
+ * The command line's own questions are asked once: `skills sync`, `pack install` and `usecase install` each
  * send a `cause`, and a record that already holds it open answers `joined` with its own sentence, which is what is printed.
  *
  * THE STUB KEEPS CAUSES AS THE RECORD DOES (`packages/kernel/src/govern.ts` `askedAlready`): the first question with a

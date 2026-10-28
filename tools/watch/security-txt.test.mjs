@@ -1,5 +1,5 @@
 /**
- * The door for a vulnerability, held to one address (LCH-C12 job 3): `security.txt`'s `Contact`, `SECURITY.md`'s
+ * The door for a vulnerability, held to one address: `security.txt`'s `Contact`, `SECURITY.md`'s
  * fallback address, and the address the site's `/security` page gives are one string; `Expires` is more than 60 days
  * away; `Canonical` and `Policy` are there. Read only: nothing here writes a file.
  *

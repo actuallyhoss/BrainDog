@@ -24,7 +24,7 @@ export type Inline =
   | { type: 'em'; body: Inline[] }
   | { type: 'link'; href: string; body: Inline[] }
   /**
-   * A phrase in the danger colour, `{{bad:three days overdue}}` (H.202). Its words are inline text, so a path, a
+   * A phrase in the danger colour, `{{bad:three days overdue}}`. Its words are inline text, so a path, a
    * typed value and a bold run inside read as they do outside; one `bad` never holds another.
    *
    * `bad` IS THE ONLY COLOUR WITH A FORM, and it is a word about the thing and not a paint: there is no `good`, no

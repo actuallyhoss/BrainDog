@@ -1,6 +1,6 @@
 /**
  * When a changed setting takes hold, as an add-on's settings page says it under each setting: "Takes effect now." or
- * "Takes effect when Kiln next updates." (SHL-A09 job 6).
+ * "Takes effect when Kiln next updates.".
  *
  * WORKED OUT FROM THE ADD-ON'S OWN FILE, never typed per setting. A setting the file fills into a declaration
  * (`{{config:<key>}}`) is stored as it was filled, so a new value waits for the next install or update; any other is

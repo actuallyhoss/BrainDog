@@ -7,7 +7,7 @@
  * local: `brainl.ts`'s `LOCAL_ROWS` leaves them out of every copy and every file. So the facts never travel, a write
  * after tonight's dump does not change tomorrow's bytes, and there is no table to migrate.
  *
- * A NOTE BEGINNING `failed:` IS A NIGHT THAT DID NOT COPY, as he worded it (P.173), and never a copy: its time is not
+ * A NOTE BEGINNING `failed:` IS A NIGHT THAT DID NOT COPY, as he worded it, and never a copy: its time is not
  * `last_copy_at`. The same night raises one fault (`fault.ts`, cause `NIGHT_FAULT`), and the same cause the next night
  * counts one more of that fault rather than opening a second. A copy kept clears it. Never a question.
  *

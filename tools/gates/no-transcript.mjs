@@ -1,5 +1,5 @@
 /**
- * `no-transcript`: nothing BrainDog runs on a person's machine reads an agent's session transcript (AGT-B10 job 4).
+ * `no-transcript`: nothing BrainDog runs on a person's machine reads an agent's session transcript.
  *
  *   node tools/gates/no-transcript.mjs [root]
  *

@@ -1,5 +1,5 @@
 /**
- * People and Services each carry what waits on you about their own rows (PGS-C18 job 3): a queue of the open questions
+ * People and Services each carry what waits on you about their own rows: a queue of the open questions
  * whose row is on the page's list, a first clause in the page's line that counts them, and Services' types in words.
  *
  * WHY THIS FILE EXISTS. On the owner's record Decide's badge said 25 while People and Services said nothing waits:

@@ -1,5 +1,5 @@
 /**
- * One governor for every question Slash would file (ENG-B17 job 1): `mayPropose` holds the floor of a person's own use,
+ * One governor for every question Slash would file: `mayPropose` holds the floor of a person's own use,
  * the brake over his last twenty answers, and one arrangement offer a week, and says why in one sentence.
  *
  * Over a real record's tables, with the events and questions written straight into them, so the counts read are the

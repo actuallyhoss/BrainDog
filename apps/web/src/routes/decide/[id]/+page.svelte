@@ -307,7 +307,7 @@
     onheld: readHeld,
   } satisfies KeysContext);
 
-  /* THE PARTS OF AN ARRANGEMENT, A TICK EACH (REC-A07 step 2): the ones unticked by hand are kept here, and what Accept
+  /* THE PARTS OF AN ARRANGEMENT, A TICK EACH: the ones unticked by hand are kept here, and what Accept
      sends is worked out from them and the keys the record holds (`ticksOf`), so a part whose key is missing is off
      without anybody unticking it and comes back on once the key is held. */
   let partsOff = $state<string[]>([]);

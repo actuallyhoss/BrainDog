@@ -1,5 +1,5 @@
 /**
- * What "Chase it" leaves on a late invoice (REC-B22 step 1): the day, a note, and a message ready to send.
+ * What "Chase it" leaves on a late invoice: the day, a note, and a message ready to send.
  *
  * IT LEFT THE DAY AND THE NOTE AND NOTHING TO SEND, so a person who chose to chase still had the whole message to
  * write. The draft is the invoice's own amount and due day in one plain sentence, kept in `chase_draft` ("Draft to

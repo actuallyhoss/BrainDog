@@ -108,7 +108,7 @@ const TYPES = {
 export default async function passkey(root = join(import.meta.dirname, '..', '..')) {
   const ROOT = join(root, 'apps', 'web', 'build');
 
-  /* THE ONE PLANTED FAULT, NAMED IN `BRAINDOG_GATE_SEED` (PRF-B02 job 4, `negative/passkey-left/`). A seed this gate
+  /* THE ONE PLANTED FAULT, NAMED IN `BRAINDOG_GATE_SEED` (`negative/passkey-left/`). A seed this gate
      does not know is refused before anything is started, so a misspelt seed cannot run the ceremony clean and pass. */
   const seeds = new Set((process.env.BRAINDOG_GATE_SEED ?? '').split(',').map((s) => s.trim()).filter(Boolean));
   const unknown = [...seeds].filter((s) => !SEEDS.includes(s));

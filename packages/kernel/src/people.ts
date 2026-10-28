@@ -800,8 +800,8 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
     if (!written.ok) return written as Result<Met>;
     const fresher = reaskOrgs(deps, orgs, [row.id]);
     if (!fresher.ok) return fresher as Result<Met>;
-    /* A MAIL, A BANK TEXT OR A COMMIT MEETING AN ORGANISATION ALREADY HELD WRITES ITS LINE AND NOTHING ELSE (research-
-       audit-21 H1): `org: "Stripe"` with `domain: evil.test` must not file evil.test's mail under the real Stripe. What
+    /* A MAIL, A BANK TEXT OR A COMMIT MEETING AN ORGANISATION ALREADY HELD WRITES ITS LINE AND NOTHING ELSE:
+       `org: "Stripe"` with `domain: evil.test` must not file evil.test's mail under the real Stripe. What
        it would have added is asked once instead. */
     if (s.untrusted || s.commit) {
       const offered = offerOrg(deps, orgs, written.value, s, name, [...(newDomain ? [`domain:${domain}`] : []), ...fresh]);

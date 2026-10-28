@@ -1,5 +1,5 @@
 /**
- * The line under each setting of an add-on's page, and the toast after a save (SHL-A09 job 6): "Takes effect now." or
+ * The line under each setting of an add-on's page, and the toast after a save: "Takes effect now." or
  * "Takes effect when <add-on> next updates.", worked out from the add-on's file and never typed per setting.
  */
 

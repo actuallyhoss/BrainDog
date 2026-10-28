@@ -1,7 +1,7 @@
 /**
- * A file put at the address its hash makes (`src/files.ts`, R.260), over a map standing in for R2: the right hash keeps
+ * A file put at the address its hash makes (`src/files.ts`), over a map standing in for R2: the right hash keeps
  * the bytes and answers their name, one byte changed is `CHECKSUM_MISMATCH` and keeps nothing, the same put twice is one
- * file, and a file read back says `noindex` beside the sandbox policy and `nosniff` (P.166). The Kennel's index carries
+ * file, and a file read back says `noindex` beside the sandbox policy and `nosniff`. The Kennel's index carries
  * no CORS header.
  *
  * The bytes are invented: a PNG's eight-byte signature and a few made-up bytes after it, which is all the sniff reads.

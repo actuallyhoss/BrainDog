@@ -1,5 +1,5 @@
 /**
- * The kit's own test (USE-A01 job 3): a list that cannot be met turns the verdict
+ * The kit's own test: a list that cannot be met turns the verdict
  * red, and a record left behind fails the run. The walk is the real one (`walk.mjs` `walk`), over doors and a browser
  * made here, so nothing is signed up and no page is opened: what is tested is that the kit cannot say green when it
  * should not.

@@ -1,6 +1,6 @@
 /**
  * What the model is told matches the rules the record holds: a script Slash writes sends no
- * key ("F8 Slash scripts proposal-only no keychain keys", H.735), the one example page is an invented one and never a real
+ * key ("F8 Slash scripts proposal-only no keychain keys"), the one example page is an invented one and never a real
  * project's, a figure is always written as the path it was handed ("Spark may not type a number. It may only name a
  * path.", HD.563), and a page is never offered for a thing that already has one.
  */

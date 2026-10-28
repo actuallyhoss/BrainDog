@@ -67,7 +67,7 @@ export type Door =
   /** `refusal` absent on a 401 is the Worker's own sentence for "nothing presented"; a 429 has `retryAfter`. */
   | { door: 'refused'; status: 401 | 403 | 429 | 503; refusal?: Refusal; retryAfter?: number; cookie?: string };
 
-/** The one 401 body (LCH-C08 job 2): "A `401` says only `unauthorized`." The sentence goes to the log (`notYou`). */
+/** The one 401 body: "A `401` says only `unauthorized`." The sentence goes to the log (`notYou`). */
 const NOT_YOU: Refusal = { code: 'UNAUTHORIZED', fix: 'unauthorized' };
 const notYou = (): Refusal => {
   op({ op: 'unauthorized', door: 'session', why: 'That did not sign you in.' });

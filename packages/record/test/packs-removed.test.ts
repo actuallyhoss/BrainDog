@@ -1,5 +1,5 @@
 /**
- * `packsRemoved` (`src/methods/packs-removed.ts`, SHL-A12 job 3): what was taken out of a record and can still be put
+ * `packsRemoved` (`src/methods/packs-removed.ts`): what was taken out of a record and can still be put
  * back, on a fresh record with a made-up add-on of one list.
  *
  * Installed, three entries written, taken out: it is listed, newest first, with its list by name and the three entries

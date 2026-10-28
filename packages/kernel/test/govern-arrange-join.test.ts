@@ -1,5 +1,5 @@
 /**
- * One open arrangement per cause, and it carries the whole list (REC-A06 step 8).
+ * One open arrangement per cause, and it carries the whole list.
  *
  * WHAT WAS MEASURED BEFORE THIS. A second arrangement with the cause of an open one was answered `joined` and its parts
  * were dropped: an agent that found a fourth key to ask for after filing three had to wait for the owner to answer the

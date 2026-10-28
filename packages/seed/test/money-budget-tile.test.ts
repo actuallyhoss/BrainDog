@@ -1,5 +1,5 @@
 /**
- * Money's own budget tile and the line a passed budget writes (REC-B19 job 4, `parts/budget.ts`).
+ * Money's own budget tile and the line a passed budget writes (`parts/budget.ts`).
  *
  * The clock is 25 October 2026, as in `money-budget-passed.test.ts`. Outing may have E£1,000.00 a month and Groceries
  * E£3,000.00; Rent holds no budget.

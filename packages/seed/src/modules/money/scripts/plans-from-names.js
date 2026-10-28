@@ -1,5 +1,5 @@
 /**
- * A plan as a row of its own, and what is left of it after each part (REC-B12 jobs 1 and 2), as the decision, the
+ * A plan as a row of its own, and what is left of it after each part, as the decision, the
  * script a host runs round it, and the declaration a pack document carries.
  *
  * A PLAN WAS ONLY A NAME ITS PARTS SHARED. Handed the parts on Instalments and the rows on Plans, `plansFromNames`

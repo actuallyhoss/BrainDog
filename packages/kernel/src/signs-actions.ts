@@ -1,9 +1,9 @@
 /**
- * The signs of what runs by itself and what arrives (SHL-C01 job 1): five readings in the shape `signs.ts` sets,
+ * The signs of what runs by itself and what arrives: five readings in the shape `signs.ts` sets,
  * joined to its closed list with one import and one spread, and the read a project's blockers take from
  * (`actionsBlocking`, for REC-C09).
  *
- * WHY THIS EXISTS. "Now needs to name a failed `pull` too" (P.191), "a dead job", "a run is never skipped
+ * WHY THIS EXISTS. "Now needs to name a failed `pull` too", "a dead job", "a run is never skipped
  * silently". A paused action showed its last status in "Runs on" and nowhere else; a schedule row that failed
  * eight times became one question in Decide per dead job; no sign read the schedule, the meter or the doors. Since
  * AGT-C06 the eighth attempt raises a fault for the operator (`schedule.ts`), and the owner sees one line here.

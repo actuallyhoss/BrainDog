@@ -1,6 +1,6 @@
 /**
  * The board tool without a browser: what it takes, what a board folder reads as, what it draws, the page installed
- * through the record's own door, the yes it writes, and the sheet (EXP-A01 jobs 1, 2 and 6).
+ * through the record's own door, the yes it writes, and the sheet.
  *
  *   node --test tools/look/test/board.test.mjs
  *

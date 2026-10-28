@@ -1,5 +1,5 @@
 /**
- * THE DAILY LOOK IS HANDED THE REACH CANDIDATES (ENG-B20 job 3). The one `look` ask a day carries the add-ons and skills
+ * THE DAILY LOOK IS HANDED THE REACH CANDIDATES. The one `look` ask a day carries the add-ons and skills
  * `packages/record/src/reach.ts` found, as `reach`, beside how the record is used, and the instructions say in one line
  * to rank them with the rest and never invent one. No new ask: the same `draft` the look already sends. And nothing is
  * asked while his switch for Slash reading on its own is off (`mayThink`), through the fake adapter only.

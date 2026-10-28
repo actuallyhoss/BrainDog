@@ -1,5 +1,5 @@
 /**
- * AGT-B10 job 3, his "Hooks install shows changes first": `braindog setup` step 2 prints the lines it will add to Claude
+ * his "Hooks install shows changes first": `braindog setup` step 2 prints the lines it will add to Claude
  * Code's settings before any file changes, asks on a terminal, writes with `--yes` without asking, and off a terminal
  * with no `--yes` stops after the plan and says how to go on.
  *
@@ -117,7 +117,7 @@ test('--dry-run still only shows, and a second run with nothing to add asks noth
   assert.ok(!again.out.join('\n').includes('rec_test-setup-never-printed'));
 });
 
-/* ── every app and every profile (AGT-A07 Build 2 and 5, AGT-D11 job 4) ── */
+/* ── every app and every profile ── */
 
 /**
  * A record with a tools register: three tools for everywhere (one handed a key, one whose program is a Windows path)

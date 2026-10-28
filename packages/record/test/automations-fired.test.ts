@@ -1,5 +1,5 @@
 /**
- * What a rule has done, as `automations` answers it: `fired`, `last_at`, `why_idle` and `family` (SHL-D07 job 2).
+ * What a rule has done, as `automations` answers it: `fired`, `last_at`, `why_idle` and `family`.
  *
  * THE RULE: "how many rows a rule has filed, and never for one that has not". The count is the kernel's `rule_stat`,
  * the whole of it and not a page of history. A rule that has done nothing says why in one sentence, counted from the

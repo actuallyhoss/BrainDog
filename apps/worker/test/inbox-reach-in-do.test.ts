@@ -1,7 +1,6 @@
 /**
  * An agent sorts the money inbox on the Cloud: a token its owner minted with the `inbox` reach reads the digest, one
- * state and one arrival whole, files one arrival and puts one back, on a record that lives in a Durable Object
- * (AGT-B13 job 6).
+ * state and one arrival whole, files one arrival and puts one back, on a record that lives in a Durable Object.
  *
  * WHY THIS FILE EXISTS. The read, the digest and the triage door were held over the record on `node:sqlite`
  * (`packages/record/test/inbox-digest.test.ts`, `triage-door.test.ts`) and the reach's crossing of the Worker over

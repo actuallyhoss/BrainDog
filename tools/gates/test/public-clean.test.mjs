@@ -54,7 +54,7 @@ const findings = (out) => out.split('\n').filter((l) => /^ {2}(?!public-clean:)\
 test('the planted tree is red on its changelog, and on nothing else', () => {
   const r = run(planted);
   assert.equal(r.status, 1, r.out);
-  assert.deepEqual(findings(r.out), ["  CHANGELOG.md  is a changelog at the root, and the changelog is the site's (RQ-LCH-291)"]);
+  assert.deepEqual(findings(r.out), ["  CHANGELOG.md  is a changelog at the root, and the changelog is the site's"]);
 });
 
 test('the same tree without the changelog is green', (t) => {
@@ -122,7 +122,7 @@ test('(c) a badge, a price and a Licence section that names one licence are each
   assert.match(said(`Pro is $12 a month.\n\n${licence}`).join(), /^1 prints a price/u);
   assert.deepEqual(said('Ten seats, 40 USD.\n\n## Licence\n\nApache only.\n').map((l) => l.split(',')[0]).sort(), [
     '1 prints a price',
-    '3 has a Licence section that does not name MIT (RQ-LCH-130)',
+    '3 has a Licence section that does not name MIT',
   ]);
   assert.match(said('# Nothing about licences\n').join(), /has no Licence section/u);
   assert.deepEqual(said(`Run \`$ pnpm install\`.\n\n${licence}`), [], 'a shell prompt is not a price');

@@ -1,6 +1,6 @@
 /**
- * Money's figure over which way a category is for, SINCE money-core 3.16.0 (REC-A13 job 2). "5 of 15 categories carry the
- * wrong direction" (H.607): his five categories read "Money out", an import filed money coming in under them, and nothing
+ * Money's figure over which way a category is for, SINCE money-core 3.16.0. "5 of 15 categories carry the
+ * wrong direction": his five categories read "Money out", an import filed money coming in under them, and nothing
  * on any page noticed a category whose entries go the other way.
  */
 

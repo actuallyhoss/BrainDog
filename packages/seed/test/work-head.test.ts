@@ -1,5 +1,5 @@
 /**
- * Work's head, and the open work that belongs to no project (work 1.19.0; PGS-A14's done-when, AGT-D14 job 1).
+ * Work's head, and the open work that belongs to no project (work 1.19.0; PGS-A14's done-when).
  *
  * Work opened on its line and the capture line, with no count beside its name, no Add and nowhere to search, and an
  * open task typed in a hurry with no project was on no list that said so: the Board drew it with a dash under Project.

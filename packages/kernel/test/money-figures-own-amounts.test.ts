@@ -1,5 +1,5 @@
 /**
- * EACH ACCOUNT'S OWN AMOUNT (REC-B23 job 1): Cash now by account reads a dollar account in dollars beside the pound
+ * EACH ACCOUNT'S OWN AMOUNT: Cash now by account reads a dollar account in dollars beside the pound
  * accounts, never converted into pounds. Only what is added up across accounts, Cash now itself, is converted.
  *
  * THE HEADLINES ARE THE MONEY HELD, not the money due or owed, and each amount is drawn as it is kept

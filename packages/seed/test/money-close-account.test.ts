@@ -1,5 +1,5 @@
 /**
- * Closing an account (REC-B15 step 3), one test an effect.
+ * Closing an account, one test an effect.
  *
  * `closeAccount` IS THE DECISION AND `run` IS THE SCRIPT ROUND IT, and both are measured, as `money-settle.test.ts`
  * measures Money's other rule script: the decision on plain fields, and the script as a host's sandbox runs it, its

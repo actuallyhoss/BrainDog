@@ -1,5 +1,5 @@
 /**
- * The agents' lists are found by the part they play, never by their ids (SHL-A16 jobs 1 to 3, the record's half).
+ * The agents' lists are found by the part they play, never by their ids (the record's half).
  *
  * THREE RECORDS, ONE ANSWER. The agents add-on under its own ids answers as it always has; the same lists under other
  * ids, each declaring its `role:`, answer the same; and a record that keeps none of them answers its empty answers, in

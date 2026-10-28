@@ -1,5 +1,5 @@
 /**
- * The sources the record hands the page reader (PGS-A11 job 3): a name no registered source answers is asked of
+ * The sources the record hands the page reader: a name no registered source answers is asked of
  * `PageDeps.hostSources`, and its rows come back on the one rows path, `columns`, `where` and `order` read against its
  * fields and `limit` passed through. A field it does not hold is refused at read; a registered name and a list are never
  * shadowed by one; a source that reads across the record is named `*`. Invented source and rows throughout.

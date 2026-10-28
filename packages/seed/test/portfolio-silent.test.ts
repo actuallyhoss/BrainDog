@@ -1,5 +1,5 @@
 /**
- * An earning project that went silent, and the numbers a project sent this week (REC-C08 step 9, REC-C16 part b; founder
+ * An earning project that went silent, and the numbers a project sent this week (REC-C16 part b; founder
  * 2.5.0).
  *
  * HIS NINE EARNING PROJECTS HELD THREE PRODUCTS, TWO PIECES OF CLIENT WORK AND FOUR PIECES OF INFRASTRUCTURE, and nothing

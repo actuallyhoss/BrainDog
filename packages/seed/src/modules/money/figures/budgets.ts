@@ -4,7 +4,7 @@ import type { SeedMetric } from '../../base.ts';
 import { MONEY } from './shared.ts';
 
 /**
- * THE DAY A CATEGORY PASSED ITS BUDGET, SINCE money-core 3.17.0 (REC-B19 step 4). It is what the line "Outing passed its
+ * THE DAY A CATEGORY PASSED ITS BUDGET, SINCE money-core 3.17.0. It is what the line "Outing passed its
  * budget on 19 Oct." is written from, and it is declared with no tile of its own: Money's page is at its ceiling of
  * blocks, so the budget block that reads it is a later job.
  *

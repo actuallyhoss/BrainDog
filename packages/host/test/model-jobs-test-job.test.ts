@@ -1,5 +1,5 @@
 /**
- * The silent model's test spends no job's attempts (audit-38-39 finding 7). A job leased as the test and acked `failed`
+ * The silent model's test spends no job's attempts. A job leased as the test and acked `failed`
  * lost one of its eight attempts every half hour, the oldest each time, so it died in about four hours of silence. The test
  * is one call that leases nothing: eight of them leave every job `pending` with its attempts as they were, and the first
  * one answered runs the pass as before, at once. Over a real record's outbox, so the attempts read are the kernel's own.

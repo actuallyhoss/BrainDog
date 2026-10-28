@@ -1,12 +1,12 @@
 /**
  * What the browser's engine got right, carried into the record's parser, and the day words a figure's window is said in.
  *
- * FOUR CHECKS WERE THE BROWSER'S BEFORE ITS ENGINE WENT (H.361): a money literal read in its currency's own units, an
+ * FOUR CHECKS WERE THE BROWSER'S BEFORE ITS ENGINE WENT: a money literal read in its currency's own units, an
  * instant compared by the day, a field, a value and a ref spelled the way a screen spells them, and a count of every
  * match when no row is asked for. `where.ts` in the app now reads this package's parser, so each of the four is held
  * here once, against a real record, where a regression would otherwise pass every browser test.
  *
- * AND A DAY WORD CARRIES AN OFFSET (H.271): `bom-1m` is the start of last month, so last month's spending is one
+ * AND A DAY WORD CARRIES AN OFFSET: `bom-1m` is the start of last month, so last month's spending is one
  * sentence. The printer and the parser are one table (`daySaid`), pinned here at a month end, where `eom-1m` read as
  * "a month before the last day" and as "the last day of last month" are different days.
  *

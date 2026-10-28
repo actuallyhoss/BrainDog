@@ -775,7 +775,7 @@ const TIER_THEN_DUE = [
 ] as const;
 
 /**
- * OPEN WORK WITH NO PROJECT, AS ONE TILE, SINCE work 1.19.0 (AGT-D14 job 1): the five newest, each with its due day, so
+ * OPEN WORK WITH NO PROJECT, AS ONE TILE, SINCE work 1.19.0: the five newest, each with its due day, so
  * a task typed in a hurry is seen where it can be given a project. A record whose every open task has a project draws
  * nothing: a table holding no task is not drawn (`holdsNothing` in `packages/kernel/src/drawn.ts`), and on Work the
  * fold over it is gated on `tasks-no-project`. NO `when:` OF ITS OWN, because the add-on file waits it on Projects

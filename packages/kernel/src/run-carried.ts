@@ -11,7 +11,7 @@
  * is the record's.
  *
  * A STEP LEFT SOMEWHERE ELSE IS NOT A STEP HERE. A carried run's `next` was written for a session that is gone, so it
- * drops unless the run is in the `handoff` state, the one state that says a step waits to be taken (H.630).
+ * drops unless the run is in the `handoff` state, the one state that says a step waits to be taken.
  *
  * The kernel's write path calls this before its field loop and applies the answer after the stamp (`index.ts`).
  */

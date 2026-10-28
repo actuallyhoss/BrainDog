@@ -1,6 +1,6 @@
 /**
  * Three suggestions wait at most, a stronger one takes the weakest one's place, and one nobody answered by its day is
- * taken back by the asker itself (ENG-B14 job 1).
+ * taken back by the asker itself.
  *
  * WHAT WAS MEASURED BEFORE THIS. A fourth open arrangement was refused however strong it was, and nothing an asker filed
  * had a day it ended, so suggestions sat unanswered for five days and more and Decide filled with old ones.

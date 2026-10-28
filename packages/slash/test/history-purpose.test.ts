@@ -1,5 +1,5 @@
 /**
- * An ask in the owner's list says what it was for (ENG-A05 job 6).
+ * An ask in the owner's list says what it was for.
  *
  * RED BEFORE THIS: `history` selected the ledger's columns without `purpose`, the one the store has written since
  * version 3, so `Asked` had no such field and every case here read `undefined`. A page that lists the asks could not

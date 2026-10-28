@@ -1,6 +1,6 @@
 /**
  * What the night counts of the record itself (`night-counts.ts`) and the two figures that read it back:
- * `lists-shrunk` (REC-A17 job 3) and `documents-dead-paths` (REC-A13 job 1).
+ * `lists-shrunk` and `documents-dead-paths`.
  *
  * A LOSS NOBODY MADE IS THE ONE THING `lists-shrunk` COUNTS: a person's delete is in the log, and the sweep clears only
  * what was deleted long ago, so neither is a shrink. A row gone from the table with no delete is. A PLACEHOLDER THAT NAMES

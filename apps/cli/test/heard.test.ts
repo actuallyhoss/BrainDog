@@ -1,5 +1,5 @@
 /**
- * THE COMMAND'S HALF OF THE AGENT DOOR'S SIGNS (AGT-B01 job 6): the start hook's time, kept in the session file and
+ * THE COMMAND'S HALF OF THE AGENT DOOR'S SIGNS: the start hook's time, kept in the session file and
  * sent as a `hook` mark by the next hook of the same session (`owedMark`), and the command's build on every call.
  *
  * WHY. His Mac ran the command of 1 October for a week, and the hook's speed was never measured on a real machine

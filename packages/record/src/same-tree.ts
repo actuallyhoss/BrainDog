@@ -18,7 +18,7 @@
 
 import { agentOf, presenceOf, type Json } from '@braindog/kernel';
 
-/** The warning, said once on a card when another working run is in the same tree (P.136). */
+/** The warning, said once on a card when another working run is in the same tree. */
 export const TREE_WARNING = 'Two sessions in one working tree overwrite each other. Coordinate or stop.';
 
 /** How many working runs "Also here" names before it counts the rest. */

@@ -779,7 +779,7 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
 });
 
 /**
- * ROOM FOR WHERE THE MONEY WENT (REC-B19 jobs 3 and 4, money-wire-70). A page declares twenty-four blocks at the most
+ * ROOM FOR WHERE THE MONEY WENT (money-wire-70). A page declares twenty-four blocks at the most
  * (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`) and Money stood at twenty-four, so the two tiles came in for two
  * that went: the folded History heading, which stood over one chart, and Being chased. Nothing above Heads up moved,
  * because that is the page a person reads each morning.
@@ -1011,7 +1011,7 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, Coming up is the next few things, and wha
 
 /**
  * A FRESH RECORD READS A CALM PAGE: no tile whose question has no answer yet. What is left is the headline tile and the
- * box to add the first account, which is the one thing to do. No question is asked on Money since REC-B23 step 7 (they
+ * box to add the first account, which is the one thing to do. No question is asked on Money now (they
  * are Decide's), so a record nobody has asked anything of draws no band saying so.
  */
 test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line and the box to add an account', async () => {

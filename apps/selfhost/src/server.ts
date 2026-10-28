@@ -222,7 +222,7 @@ function slashLedger(dir: string): string {
  * permission check below this line is the same code. `contextFor`, further down, is the order.
  */
 /**
- * THE ONE 401 BODY (LCH-C08 job 2, P.154): a `401` says only `unauthorized`, the Worker's body exactly. A
+ * THE ONE 401 BODY: a `401` says only `unauthorized`, the Worker's body exactly. A
  * credential this record does not know (`49 §5.4` step 1) and none at all where one is needed answer the same, and which
  * of the two it was goes to the log.
  */

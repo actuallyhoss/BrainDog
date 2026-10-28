@@ -1,5 +1,5 @@
 /**
- * What deleting a payment does to the bill it paid (REC-B11 job 6, "Paid means paid"): `scripts/unsettle.js`.
+ * What deleting a payment does to the bill it paid ("Paid means paid"): `scripts/unsettle.js`.
  *
  * MEASURED BEFORE: a payment made void reopened its bill (`settle`'s void branch), and a payment deleted left the bill
  * paid, with its day and its sum, by nothing, since `payment-settles` starts on a create or an update alone and

@@ -1,5 +1,5 @@
 /**
- * `checkPaths` (REC-A12 job 4): each `{{path}}` a document holds, once and in order, with whether the record has
+ * `checkPaths`: each `{{path}}` a document holds, once and in order, with whether the record has
  * anything by that name, read as a note block reads it. The importer asks it before it writes a document, so a path the
  * record cannot answer is written as text and named, never printed with its braces on a page.
  */

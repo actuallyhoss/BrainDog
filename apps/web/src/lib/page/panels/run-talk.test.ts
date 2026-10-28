@@ -1,5 +1,5 @@
 /**
- * A RUN AS A CONVERSATION, TOP TO BOTTOM (`run-talk.ts`, AGT-C12 build 5): who and where, its stretches, what it said
+ * A RUN AS A CONVERSATION, TOP TO BOTTOM (`run-talk.ts`): who and where, its stretches, what it said
  * it is doing, what it asked, its dead ends, what it noted, its helpers and the run whose step it took, each a section that is absent
  * when it has nothing true to say. Read in UTC here, so a time is the same wherever the test runs.
  */

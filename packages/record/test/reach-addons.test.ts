@@ -1,5 +1,5 @@
 /**
- * THE ADD-ON SOURCE (ENG-B20 job 1, `packages/record/src/reach.ts` `addonOffers`). Every catalogue entry here is
+ * THE ADD-ON SOURCE (`packages/record/src/reach.ts` `addonOffers`). Every catalogue entry here is
  * invented: an add-on is offered for what the record already holds, in one sentence with the count and the day it rests
  * on, by the catalogue's own title, and never by its id or a list's handle.
  */

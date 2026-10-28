@@ -421,11 +421,11 @@ END)`;
 /** A band's place in the order, as SQL over `COST_SQL`'s answer, for an `ORDER BY` that ranks as `costRank` does. */
 export const COST_RANK_SQL = `(CASE ${COST_SQL} ${COSTS.map((c, i) => `WHEN '${c}' THEN ${i}`).join(' ')} ELSE ${COSTS.length} END)`;
 
-/* ── How long a question can wait (AGT-C08 job 3) ── */
+/* ── How long a question can wait ── */
 
 /**
  * Whether an open question can wait, as a word the record computes, ranked first in the queue: "the ranking is a
- * saved-view sort" (P.84), and nothing in the order knew that something falls due tomorrow.
+ * saved-view sort", and nothing in the order knew that something falls due tomorrow.
  *
  * - `soon` — a row it would change carries a deadline day inside 48 hours (a field declared `deadline: true`, typed a
  *            day, in the row as it is or in what the question would write), or it moves money, as `BAND_SQL` reads

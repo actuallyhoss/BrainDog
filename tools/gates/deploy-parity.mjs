@@ -126,7 +126,7 @@ export default async function deployParity(root = join(dirname(fileURLToPath(imp
   }
 
   /**
-   * A HOST ON THIS MACHINE MAY BE NAMED WITH ITS SCHEME, which is how `self-test` plants one (PRF-B02 job 6):
+   * A HOST ON THIS MACHINE MAY BE NAMED WITH ITS SCHEME, which is how `self-test` plants one:
    * `negative/deploy-parity/` is served on a loopback port that names another build, and this gate must go red on it.
    * A bare name is `https://` as it always was. Plain `http://` is taken only for loopback, because a deploy compared
    * over plain http is a comparison anybody on the path could answer.

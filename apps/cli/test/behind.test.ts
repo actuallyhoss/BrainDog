@@ -1,5 +1,5 @@
 /**
- * The start hook's line when this command is behind its host (AGT-A04 job 3), against a local server that answers the
+ * The start hook's line when this command is behind its host, against a local server that answers the
  * build address as a host does. The claims are the scope's: "needs" before `min_cli`, "can" past fourteen days behind
  * the host's build, at most one request a day per host, two seconds at most, and a host that does not answer is no line.
  */
@@ -103,7 +103,7 @@ test('an unreachable host, a wrong answer, a checkout and a broken hosts file ar
   assert.equal(existsSync(checkPath(broken.home)), false);
 });
 
-/* ONCE A WEEK, A QUIET DOCTOR RUN (AGT-A10 job 4): its line only when it lists something, run again only after seven days,
+/* ONCE A WEEK, A QUIET DOCTOR RUN: its line only when it lists something, run again only after seven days,
    when it was run written before the run, and a run that throws is no line. */
 test('the weekly doctor line: said when doctor lists places, kept quiet for seven days, and nothing on a throw', (t) => {
   const root = mkdtempSync(join(tmpdir(), 'braindog-doctor-line-'));

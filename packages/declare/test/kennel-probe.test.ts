@@ -1,5 +1,5 @@
 /**
- * The Kennel's reserved `probe-` prefix (`PROBE_PREFIX` in `src/kennel.ts`, SHL-B01 job 2): an id that begins with it
+ * The Kennel's reserved `probe-` prefix (`PROBE_PREFIX` in `src/kennel.ts`): an id that begins with it
  * is refused, with a sentence, from every publisher until the operator trusts one with `probe`
  * (`braindog kennel review trust <publisher> --probe`), and from that one it is taken only as an unlisted add-on.
  *

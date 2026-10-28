@@ -1,5 +1,5 @@
 /**
- * `engineReadings`, the method that answers the engine's readings (ENG-B01 job 3).
+ * `engineReadings`, the method that answers the engine's readings.
  *
  * WHY THIS FILE EXISTS. The arithmetic (`src/engine-readings.ts`) counted a ledger nothing handed it, so the vital signs
  * could not say whether a model answered. Asserted here: with a reader handed in the method answers exactly what the

@@ -1,5 +1,5 @@
 /**
- * Who suggested, who drafted and who settled: the one fact a line of the log says about a suggestion (ENG-B16 job 3).
+ * Who suggested, who drafted and who settled: the one fact a line of the log says about a suggestion.
  *
  * THE CLIENT TYPED FIVE KEYS AND NO HOST SENT THEM. Activity and a row's history read "Slash suggested · Mara accepted,
  * drafted by the model" off `suggested_by`, `drafted_by`, `answer_label`, `settled_by` and `undone`

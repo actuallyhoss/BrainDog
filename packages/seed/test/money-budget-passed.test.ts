@@ -1,5 +1,5 @@
 /**
- * The day a category passed its budget (REC-B19 step 4), read through the kernel on a record that installed Money the
+ * The day a category passed its budget, read through the kernel on a record that installed Money the
  * way a person does, gave one category a most a month, and then spent on it.
  *
  * The clock is 25 October 2026. Outing may have E£1,000.00 a month; E£400.00, E£400.00 and E£300.00 went on it on the

@@ -1,6 +1,6 @@
 /**
  * What each pattern did with what came in, and the one press that files a repeat after all: `inboxPatterns`, READ+, and
- * `fileAsSecond`, ADMIN (REC-A03 steps 3 and 5, so "bank messages file by themselves").
+ * `fileAsSecond`, ADMIN (so "bank messages file by themselves").
  *
  * WHAT A PATTERN DID IS THE KERNEL'S (`patternReport` in `kernel/src/ingest.ts`): door by door, each pattern by its own
  * description with what it filed, what it skipped and why, and what waits, and one count for the texts no pattern read.

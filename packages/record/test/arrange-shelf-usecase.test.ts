@@ -1,5 +1,5 @@
 /**
- * An arrangement whose `usecase` is a use case the host's whole catalogue serves, and no short list holds (USE-A16 job 5).
+ * An arrangement whose `usecase` is a use case the host's whole catalogue serves, and no short list holds.
  *
  * THE FIRST RUN NOW HEARS A CATALOGUE USE CASE BY ITS WORDS (`apps/web/src/lib/arrange.ts`), and what it proposes is
  * accepted as one call, `setup`, which reads it as an arrangement led by that use case. Here the short list is empty and

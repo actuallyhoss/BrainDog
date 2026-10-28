@@ -1,5 +1,5 @@
 /**
- * The signs of what runs by itself and what arrives (SHL-C01 job 1, `signs-actions.ts`), each read on a record built
+ * The signs of what runs by itself and what arrives (`signs-actions.ts`), each read on a record built
  * through the kernel's own verbs where a verb makes the thing: a poll the provider refuses pauses, a job that fails eight
  * times stops, texts arrive at the bank's door and then stop, a message comes in that nothing verified. Each threshold is
  * met on both sides of its line, so a threshold moved by one turns a case here the other colour.

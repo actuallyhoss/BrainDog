@@ -1,5 +1,5 @@
 /**
- * One month's use reads the same everywhere it is counted (SHL-C12 jobs 1 and 3): the `actions` read, a project's "Runs
+ * One month's use reads the same everywhere it is counted: the `actions` read, a project's "Runs
  * on" and the three `usage.*` sources a usage page is declared over.
  *
  * ON A REAL RECORD: two projects, three scheduled actions, and every run written by the meter itself (`meter`) on the day

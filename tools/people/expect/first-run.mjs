@@ -265,7 +265,7 @@ export const expect = {
   /* ── the checks beside the steps (CHECKS): the hard sentence, and the friction as numbers ───────────── */
 
   /**
-   * Her hard sentence, the one with no word the rules listen for, names her use case (USE-B05 job 10). It is the model's
+   * Her hard sentence, the one with no word the rules listen for, names her use case. It is the model's
    * to read: read by the rules alone (`seen.by`), nothing is measured, and the line says what they read.
    */
   hard(seen, person) {

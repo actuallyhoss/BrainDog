@@ -1,5 +1,5 @@
 /**
- * A PATTERN DRAFT ASKS THE GOVERNOR FIRST (ENG-B17 job 4). What the model drafts is filed as Slash's question by the
+ * A PATTERN DRAFT ASKS THE GOVERNOR FIRST. What the model drafts is filed as Slash's question by the
  * kernel's ack, so the pass asks `mayPropose` (the floor and the brake) before it sends a draft to the model. Held, the
  * model is never asked, Decide holds nothing new, the job is done, and one line says how many were held and why. Free,
  * the draft is sent and filed as it always was; a host that hands no governor sends every draft, as before. Over a real

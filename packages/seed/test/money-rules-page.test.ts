@@ -1,5 +1,5 @@
 /**
- * The page Filing rules and its figures (REC-B10 job 10), one test an effect.
+ * The page Filing rules and its figures, one test an effect.
  *
  * ON A RECORD HOLDING MONEY AS ITS PACK DOCUMENT SAYS IT, as `money-filing.test.ts` measures the list: the three packs
  * installed with no example entries, rules and entries written as a person writes them, the record's own step filing

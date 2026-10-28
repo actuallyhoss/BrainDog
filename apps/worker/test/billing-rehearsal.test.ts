@@ -1,5 +1,5 @@
 /**
- * Checkout rehearsed from start to finish (LCH-A13 jobs 1, 2 and 4; "runs one test checkout end to end", H.17): one
+ * Checkout rehearsed from start to finish ("runs one test checkout end to end"): one
  * stranger's whole paid life through the Worker's real billing doors, against a Stripe that remembers
  * (`fake-stripe.ts`). Free; Cloud bought on the Checkout page; the plan and the allowance move; a second person joins and
  * the invoice still shows one seat; Cloud Plus confirmed on the portal and its 400 credits; packs bought, one by bank

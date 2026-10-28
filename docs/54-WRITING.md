@@ -16,7 +16,7 @@ declares; the page lint reads what a page prints on a real record, and Health sh
 | entity | the thing's own name | An engineer's word for a thing; nobody keeps an entity. | `plain-words` |
 | credential | key | The product calls them keys, and the Keys page is where they live. | `plain-words` |
 | register | list | Register as a noun is the kernel's word for a list. To register, the verb, is plain and is not matched. | `plain-words` |
-| pack | add-on | Say add-ons, not packs, on screen (W.48). To pack and send an order, the verb, is plain and is not matched. | `system-word` |
+| pack | add-on | Say add-ons, not packs, on screen. To pack and send an order, the verb, is plain and is not matched. | `system-word` |
 | slug | address | A developer's word for the end of an address. | `system-word` |
 | schema | the fields a list holds | Developer vocabulary in visible copy. | `system-word` |
 | declaration | what an add-on sets up | How the engine is built, not what the person sees. | `system-word` |

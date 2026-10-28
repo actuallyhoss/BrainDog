@@ -50,7 +50,7 @@ const pageStatus = (launch: { public: boolean }): number => {
 };
 
 test('the flag is off until the owner flips it, and it holds the page and its feed', () => {
-  assert.equal(LAUNCH.public, false, "LAUNCH.public is on: that is the owner's choice (LCH-A20), not a build");
+  assert.equal(LAUNCH.public, false, "LAUNCH.public is on: that is the owner's choice, not a build");
   assert.equal(held(), true);
   /* The pricing page came back on 20 October as the early access page, three of the pages for one kind of person
      went, and the teams page went while inviting people is held (22 October). */

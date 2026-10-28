@@ -1,5 +1,5 @@
 /**
- * The parts of an add-on that wait on what the record holds (SHL-A08 job 2): `resolveWhen`, `holdsOf`, `settleWhen`.
+ * The parts of an add-on that wait on what the record holds: `resolveWhen`, `holdsOf`, `settleWhen`.
  *
  * BEFORE: a stranger's add-on could not say "this field is there once the record has People". Only the seed's own
  * documents were cut per record (`firstPartyDocument(id, { holds })`), by code nobody else could reach. Now a part says

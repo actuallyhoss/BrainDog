@@ -466,7 +466,7 @@ export function heldIn(file) {
   return held;
 }
 
-/* THE HELD LIST, BY THE NAME THE LEDGER READS IT UNDER (PRF-B03 step 3): `ledger.json` holds `core-names.HELD` at its
+/* THE HELD LIST, BY THE NAME THE LEDGER READS IT UNDER: `ledger.json` holds `core-names.HELD` at its
    newest line, so the list only shrinks, and a fall is a line written there. */
 export const HELD = heldIn(fileURLToPath(new URL('./core-names.held.json', import.meta.url)));
 

@@ -411,7 +411,7 @@ function setTestNext(deps: ModelJobsDeps, key: object, at: number | null): void 
  * Settings by the same read. The first silent pass opens the wait and says so in one line; it does not test at once, because
  * the call that just failed was the test. A read that throws is no news, and the pass runs as it always did.
  *
- * THE TEST IS ONE CALL AND NOT A JOB (audit-38-39 finding 7). A job leased as the test and acked `failed` spent one of its
+ * THE TEST IS ONE CALL AND NOT A JOB. A job leased as the test and acked `failed` spent one of its
  * eight attempts every silent half hour, and the oldest job was leased each time, so it died in about four hours: the kernel
  * hands this pass no verb that puts a lease back without an attempt (`unlease` is not on `Kernel`). A call over a digest of
  * nobody's leases nothing, a model never reached costs nothing on the month (`backgroundMeter`), and one that answers is
@@ -558,7 +558,7 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
 
   /* THE THREE OLDEST OF HOW MANY WAIT: the engine sends the oldest three by `ts` and names the count; the
      kernel's payload says `waiting` (`ingest.ts` `propose`), and a shape read here counts its own. */
-  /* AND ONLY WHERE SLASH MAY ASK (ENG-B17 job 4): the floor and the brake (`mayPropose`) are asked before the model,
+  /* AND ONLY WHERE SLASH MAY ASK: the floor and the brake (`mayPropose`) are asked before the model,
      because what it drafts is filed as Slash's question by the ack. Held, nothing is sent and nothing filed; the pass
      counts it and says why, and the arrivals wait in the inbox to be noticed again. Nothing here lifts the brake. */
   const may = governor?.();

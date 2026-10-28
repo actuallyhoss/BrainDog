@@ -125,7 +125,7 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
      reads every fixed address and draws every page to learn what to list, a round trip each over this transport. A host
      that answers it with a refusal is listed the old way, so a host older than the route costs nothing but the time. */
   if (routed.has('offered')) later.offered = (ctx: Ctx) => ask<unknown>(ctx, 'offered');
-  /* `beat` AT MOST ONCE A MINUTE FROM HERE (AGT-C03 step 4): the door beats on every tool call it admits and the record
+  /* `beat` AT MOST ONCE A MINUTE FROM HERE: the door beats on every tool call it admits and the record
      keeps one a minute, so the rest would be a round trip each for nothing. Its own two-second deadline, so it outlives
      the call it rode on. So Codex and any stdio client without the PostToolUse hook reads Working too. */
   let beatAt = 0;

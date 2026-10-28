@@ -1,5 +1,5 @@
 /**
- * The kept lane's project checks (SHL-A19 job 4): project-brief's fields on Projects with no question asked,
+ * The kept lane's project checks: project-brief's fields on Projects with no question asked,
  * portfolio-bands' rows from the names its settings hold, and the roadmap page drawing.
  *
  * READ FROM EACH PACK'S OWN TEST FIRST: `packs/project-brief/project-brief.test.ts` (the plan lays the brief on Projects

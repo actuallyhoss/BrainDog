@@ -287,7 +287,7 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
           return `<span class="bad">${renderInline(n.body, opts)}</span>`;
         case 'path':
           /* A PATH THAT NAMES NOTHING IS THE AUTHOR'S TEXT, DOTTED, like any token that was not one: no value will
-             ever come, so it is no hole and has no dash (P.252). Only prose reaches here with one; a chip, a tile and
+             ever come, so it is no hole and has no dash. Only prose reaches here with one; a chip, a tile and
              a bar leave such a figure out (`drawnRows`). */
           if (n.named === false) return `<span class="unresolved">${escape(n.path)}</span>`;
           // A path with no value renders as the path, marked, and it is an AFFORDANCE: an

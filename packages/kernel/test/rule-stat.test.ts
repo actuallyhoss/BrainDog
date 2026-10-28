@@ -1,5 +1,5 @@
 /**
- * A rule's standing count (`rule_stat`, SHL-D07 job 1): "how many rows a rule has filed, and never for one that has not".
+ * A rule's standing count (`rule_stat`): "how many rows a rule has filed, and never for one that has not".
  *
  * Raised where an inline rule's patch lands and where `startRun` opens a run. A tried run goes through `openRun` alone and
  * counts nothing, and a rule that has matched nothing has no line, which the page reads as "never".

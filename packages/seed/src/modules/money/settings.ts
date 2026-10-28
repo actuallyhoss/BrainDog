@@ -1,6 +1,5 @@
 /**
- * Money's settings: the home currency, the rest days, and the targets a person changes later. Cut out of `money.ts` with no change
- * (REC-B01 job 1).
+ * Money's settings: the home currency, the rest days, and the targets a person changes later. Cut out of `money.ts` with no change.
  */
 
 /**

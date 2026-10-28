@@ -1,5 +1,5 @@
 /**
- * Runs on, said true (AGT-D12 job 2, batch 89): six of a project's own a tile, who used each by the agent's name, and
+ * Runs on, said true (batch 89): six of a project's own a tile, who used each by the agent's name, and
  * under them how many more apply everywhere.
  *
  * HIS BRAINDOG PAGE READ "S731" AND A RAW TIME beside a key, three a tile, and every project page listed the same
@@ -126,7 +126,7 @@ test('WHO IS THE NAME THE KERNEL ANSWERS: the most names it gives, never the run
   const tools = headed(opened(k, 'Harbour'), 'Tools and servers');
   assert.equal(tools.rows.length, 1);
   const row = tools.rows[0]!.fields;
-  /* `used_agents` ONCE THE KERNEL ANSWERS IT (AGT-D12 job 1), up to three names; `used_agent` until then. */
+  /* `used_agents` ONCE THE KERNEL ANSWERS IT, up to three names; `used_agent` until then. */
   const field = Object.hasOwn(row, 'used_agents') ? 'used_agents' : 'used_agent';
   assert.deepEqual(role(declared('Tools and servers'), 'who'), [field], `the kernel answers ${field} and the tile does not read it`);
   assert.deepEqual(role(declared('Keys'), 'who'), [field]);

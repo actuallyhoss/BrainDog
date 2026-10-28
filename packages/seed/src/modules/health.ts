@@ -1,5 +1,5 @@
 /**
- * Health: the record's vital signs, as one page every record can open (PRF-A05 job 5: when a check fails, the app
+ * Health: the record's vital signs, as one page every record can open (when a check fails, the app
  * says so).
  *
  * DRAWN FROM FOUR NAMES THE KERNEL ANSWERS AND NOTHING ELSE: the built-in page source `signs` (each vital sign with its

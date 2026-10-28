@@ -1,5 +1,5 @@
 /**
- * The two finders the first batch left out (AGT-C18 build 1): `questions-moot` and `faults-open`.
+ * The two finders the first batch left out: `questions-moot` and `faults-open`.
  *
  * WHAT WAS MEASURED BEFORE THIS. The tidy counted runs, steps and old questions, so "how good is braindog's mcp at
  * cleaning up stale stuff?" was answered without the two things most often stale on a record: a question that

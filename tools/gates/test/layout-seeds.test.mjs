@@ -1,5 +1,5 @@
 /**
- * THE LAYOUT GATE'S PLANTED FAULTS, ASKED WITHOUT LAUNCHING A BROWSER (PRF-B02 job 2).
+ * THE LAYOUT GATE'S PLANTED FAULTS, ASKED WITHOUT LAUNCHING A BROWSER.
  *
  *   node --test tools/gates/test/layout-seeds.test.mjs
  *

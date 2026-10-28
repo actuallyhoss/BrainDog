@@ -1,5 +1,5 @@
 /**
- * `openPage`, the one way a gate opens a page (PRF-B04 job 1), held without a browser.
+ * `openPage`, the one way a gate opens a page, held without a browser.
  *   node --test tools/gates/test/lib-open-page.test.mjs
  *
  * `pagePlan` is read whole, and `openPage` is driven against a stand-in that writes down every call, so the order is

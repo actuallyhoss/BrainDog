@@ -1,5 +1,5 @@
 /**
- * Where what has no scope belongs, read and asked (`src/methods/stale.ts`, AGT-D04 jobs 2 and 3): `scopeProposals` says
+ * Where what has no scope belongs, read and asked (`src/methods/stale.ts`): `scopeProposals` says
  * a list's moves with their reasons, and `proposeScopes` puts them to Decide as one question a list, signed by the
  * person who pressed, with the things left in a finished project as one question of three answers.
  *

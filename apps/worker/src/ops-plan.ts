@@ -1,5 +1,5 @@
 /**
- * The operator's gift (LCH-A12 job 2, "operator comp plan", H.822): `POST /account/ops/plan` gives a record Cloud or
+ * The operator's gift ("operator comp plan"): `POST /account/ops/plan` gives a record Cloud or
  * Cloud Plus with no card, and takes it back in one call.
  *
  * `{ record, plan: 'hosted' | 'plus', note? }` WRITES THE RECORD'S BILLING ROW AS `comp`, with no Stripe customer, no
@@ -47,7 +47,7 @@ export type GiftRow = { record: string; person: string; customer: string; subscr
 
 /**
  * What this door asks of the Directory's billing group. `set` with `state: 'comp'` and an empty customer is the gift's
- * row (LCH-A12 job 1); `unbill` removes a `comp` row and nothing else.
+ * row; `unbill` removes a `comp` row and nothing else.
  */
 export type GiftCall =
   | { op: 'of'; record: string }

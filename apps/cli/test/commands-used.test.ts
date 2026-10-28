@@ -1,6 +1,6 @@
 /**
  * The command lines a project is worked with, read from its own Claude Code settings and sent by name only as
- * `toolsSeen` command lines when a session ends (AGT-D10 job 5, its settings half). No transcript is opened: the
+ * `toolsSeen` command lines when a session ends (its settings half). No transcript is opened: the
  * half of the scope that counts the session's shell calls is left out by his "transcripts never read".
  */
 

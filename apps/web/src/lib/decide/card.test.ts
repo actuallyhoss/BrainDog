@@ -457,7 +457,7 @@ test('THE FOUR DRAWS AND THE PALETTE DRAW THIS CARD', () => {
   assert.doesNotMatch(card, /—/u);
 });
 
-/* ── an arrangement in its own summary (REC-A07 step 3) ── */
+/* ── an arrangement in its own summary ── */
 
 const ARRANGEMENT = {
   why: ['The money has stood still since the move.'],

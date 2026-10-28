@@ -1,5 +1,5 @@
 /**
- * What an agent's list of resources is made from, in one read: `offered` (AGT-B04 job 1).
+ * What an agent's list of resources is made from, in one read: `offered`.
  *
  * WHAT WAS SLOW. The agent door read every fixed address in full to learn whether to list it, then drew every page to
  * find its figures: 20 seconds on a record of 54 pages, then 8, at every session start. `offered` answers the same

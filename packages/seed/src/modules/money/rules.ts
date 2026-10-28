@@ -285,7 +285,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [
       { set: { field: 'chased', to: '{{trigger.day}}' } },
       { note: 'You chose to chase this in Decide.' },
-      /* AND A MESSAGE READY TO SEND (REC-B22 step 1), in "Draft to send": the invoice's own amount and due day in one
+      /* AND A MESSAGE READY TO SEND, in "Draft to send": the invoice's own amount and due day in one
          plain sentence, in the two forms a template writes a message in (`{{short:amount}}`, `{{on:due}}`). It names
          nobody, so it reads whole on an invoice with no person on it. WRITTEN ONLY WHERE THERE IS NONE: an invoice
          asked about again (a new due day) keeps the words somebody changed. AN INVOICE PAID IN PART is drafted for
@@ -301,7 +301,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     /* ENDED, THE STATE EVERY READER OF `recurring` ALREADY LEAVES OUT: the walk, the monthly figures and the page. */
     steps: [{ move: 'ended' }],
   },
-  /* "IT WENT THROUGH" MOVES "NEXT" ONE CYCLE ON AND MARKS ITS BILL PAID (REC-B11 step 5, money-next-moves-100), through `settle` told there is
+  /* "IT WENT THROUGH" MOVES "NEXT" ONE CYCLE ON AND MARKS ITS BILL PAID (money-next-moves-100), through `settle` told there is
      no payment (`SETTLE_LINE_SCRIPT`), on the line the question names, handed as its list and number. */
   {
     rule: 'recurring-went-through',
@@ -317,7 +317,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
      `packages/kernel/src/signs.ts`). */
   LAST_DAY_SCRIPT,
   /**
-   * PAID IS WHAT A PAYMENT DID (REC-B11 step 4): a Ledger entry that names a bill in "Settles" starts `script.settle`,
+   * PAID IS WHAT A PAYMENT DID: a Ledger entry that names a bill in "Settles" starts `script.settle`,
    * which counts every payment naming that bill and writes "Paid so far", part or paid, and the day (`scripts/settle.js`).
    * Until this rule the script was in no pack document, and the four fields it fills were filled by a person.
    *
@@ -352,7 +352,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   ...MOVE_LINE,
   ...CARD_OWED,
   /**
-   * A PAYMENT THAT NAMES NOTHING FINDS WHAT IT PAID (REC-B11 step 3, match-payment-78): a cleared Ledger entry with
+   * A PAYMENT THAT NAMES NOTHING FINDS WHAT IT PAID (match-payment-78): a cleared Ledger entry with
    * nothing in "Settles" starts `script.match_payment`, which looks among the open bills, instalments and repeating
    * lines for the one it paid (`scripts/match-payment.js`). Exactly one for the same money is linked; several, or an
    * amount further off, is a question on Decide whose answers carry the link, so picking one writes it and needs no
@@ -394,7 +394,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.row.paid_by}}', item: '{{trigger.entry}}' } } }],
   },
   /**
-   * A THING ON AN ACCOUNT IS IN THAT ACCOUNT'S BOOK (REC-A09 job 1): a Ledger entry, a bill, a repeating line or an instalment
+   * A THING ON AN ACCOUNT IS IN THAT ACCOUNT'S BOOK: a Ledger entry, a bill, a repeating line or an instalment
    * written with an account and no book starts `script.book_from_account`, which fills the book from the account
    * (`scripts/book-from-account.js`). Until these rules a book's page counted only what somebody filed by hand, and
    * nothing a bank's text wrote.
@@ -428,7 +428,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   })),
   BOOK_FROM_ACCOUNT_SCRIPT,
   /**
-   * A PLAN IS A ROW OF ITS OWN, AND EACH PART SAYS WHAT IS LEFT AFTER IT (REC-B12 jobs 1 and 2): an instalment made, or
+   * A PLAN IS A ROW OF ITS OWN, AND EACH PART SAYS WHAT IS LEFT AFTER IT: an instalment made, or
    * one whose plan, amount, day, status or number changed, starts `script.plans_from_names` for that part's plan
    * (`scripts/plans-from-names.js`). The script also runs once a day over every plan, which is how a record that held
    * plans only as names gets its rows. A PLAN MADE STARTS THE SCRIPT AGAIN, handed the plan (`plan-links-parts`), so
@@ -452,7 +452,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'plans_from_names', as: 'linking', input: {} } }] },
   PLANS_FROM_NAMES_SCRIPT,
   /**
-   * A NEW OR CHANGED FILING RULE FILES WHAT IT MATCHES (REC-B10 step 5, since money-core 3.17.0): a rule made, or one
+   * A NEW OR CHANGED FILING RULE FILES WHAT IT MATCHES (since money-core 3.17.0): a rule made, or one
    * whose text, way of matching, what it reads, way, category, account or status changed, starts `script.file_back`,
    * which files the Ledger entries of the last 400 days with no category that the rule fits, by the category rule's own
    * ladder, as one change with one Undo (`scripts/file-back.js`). Until this a rule filed only what arrived after it.
@@ -469,7 +469,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   },
   FILE_BACK_SCRIPT,
   /**
-   * A CATEGORY SET BY HAND ASKS ONCE WHETHER THE PAYEE ALWAYS GOES THERE (REC-B10 step 6): "File every Talabat under
+   * A CATEGORY SET BY HAND ASKS ONCE WHETHER THE PAYEE ALWAYS GOES THERE: "File every Talabat under
    * Outing from now on? 14 more like it have no category." (`scripts/learn-category.js`). Yes is `category-taught`,
    * which runs the script again with the answer, and the script makes the rule; making it starts `rule-files-back`.
    * "Only this one" starts nothing, and the question's cause, one a payee, is what stops it being asked again.
@@ -505,7 +505,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
 ];
 
 /**
- * CLOSING AN ACCOUNT THAT STILL HOLDS MONEY (REC-B15 step 3): the script, the rule that starts it when an account's
+ * CLOSING AN ACCOUNT THAT STILL HOLDS MONEY: the script, the rule that starts it when an account's
  * status becomes Closed, and the automation that runs it again with the answer, so "Move it to Savings" writes the two
  * legs of the move. Both halves and the script together, as `payment-settles` and `SETTLE_SCRIPT` arrive.
  *

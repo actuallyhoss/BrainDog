@@ -1,5 +1,5 @@
 /**
- * The engine's probe, the host's half (ENG-A08 job 3): one press asks each model of the answer route whether it answers now.
+ * The engine's probe, the host's half: one press asks each model of the answer route whether it answers now.
  *
  * WHY IT EXISTS. The engine's health is read from the ledger (`engine-health.ts`), and while no model answers the record's
  * jobs wait and the model is tried every half hour (`model-jobs.ts`, `MODEL_TEST_EVERY_MS`). Nobody could ask "does it

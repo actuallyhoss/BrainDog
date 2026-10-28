@@ -66,7 +66,7 @@ const HEADERS: [string, string][] = [
 /**
  * The last nightly walk, as `nightly()` hands it to the Directory (`Directory$.nightDone`): when it closed, how many records
  * it reached, how many copies it wrote and how many failed, and whether the Directory's own copy was written. Then each
- * other job of the night by its failures (audit-35): the deleted records' copies that would not expire, the
+ * other job of the night by its failures: the deleted records' copies that would not expire, the
  * records whose keys are still under an old root key, the erasures still open, and whether the install counts were
  * written, absent where the walk counted nothing. `stopped` is a walk that threw, or a night that could not start: kept so
  * the night before it cannot go on saying it ran.

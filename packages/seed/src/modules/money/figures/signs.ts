@@ -1,5 +1,5 @@
 /**
- * Money's signs of life, SINCE money-core 3.15.0 (REC-B01 job 3): figures that say whether Money is being kept, not what
+ * Money's signs of life, SINCE money-core 3.15.0: figures that say whether Money is being kept, not what
  * it holds. "i see no progress": his Money page said the oldest balance was from 3 September and no screen
  * said the Ledger stopped on 28 September.
  *
@@ -19,7 +19,7 @@
  *   `{ count: 'missing' }`). It waited until `figureLists` (`money-figures.ts`) named the lists Cash now reads for its
  *   line, so a member who may not see Cash now is not shown how many nights it missed either.
  *
- * ONE MORE IN 3.17.0 (REC-B11 step 8):
+ * ONE MORE IN 3.17.0:
  * - `repeating-overdue`, how many live repeating lines have a "Next" more than three days gone. `settle` moves "Next"
  *   when a payment is matched to the line, and until this nothing said when one was not. In the same unreleased 3.17.0
  *   (repeating-sign-fix-69) it counts only a line a payment was matched to before, so a line just

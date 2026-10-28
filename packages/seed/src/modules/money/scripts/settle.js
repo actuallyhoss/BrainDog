@@ -1,5 +1,5 @@
 /**
- * What a payment does to the thing it pays (REC-B11 step 4), as the decision, the script a host runs round it, and the
+ * What a payment does to the thing it pays, as the decision, the script a host runs round it, and the
  * declaration a pack document carries.
  *
  * PAID IS WHAT A PAYMENT DID, NOT A STATUS SOMEBODY REMEMBERED TO SET. Handed a Ledger entry and the bill, instalment

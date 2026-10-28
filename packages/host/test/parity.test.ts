@@ -1,5 +1,5 @@
 /**
- * The Cloud and a self-host answer the same (LCH-C13 job 3, HD.132: "product must answer the same wherever run").
+ * The Cloud and a self-host answer the same (HD.132: "product must answer the same wherever run").
  *
  * FORTY CALLS, GOOD AND REFUSED, sent in the same order to the Worker as it ships (`apps/worker/test/cloud-harness.ts`:
  * `src/index.ts` bundled, a real Directory, real record objects) and to the self-host server started in this process

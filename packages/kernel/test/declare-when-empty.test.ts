@@ -1,5 +1,5 @@
 /**
- * A block's `when:` may say a figure has no value (H.270): `{ metric, empty: true }`.
+ * A block's `when:` may say a figure has no value: `{ metric, empty: true }`.
  *
  * NO COMPARISON HOLDS OF A FIGURE NOBODY HAS GIVEN A VALUE, so a page could not say "No balance has been typed yet" in
  * the place its sentence about cash goes. `empty` is that one test. This file holds the declaration half: what a page

@@ -1,5 +1,5 @@
 /**
- * `printed`: what a settled screen prints that a person should never read (PRF-B04 job 7).
+ * `printed`: what a settled screen prints that a person should never read.
  *
  *   node tools/gates/printed.mjs     every address the gates' record gives, drawn on its clock, at a phone's width
  *

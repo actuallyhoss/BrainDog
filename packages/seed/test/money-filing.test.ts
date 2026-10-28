@@ -1,5 +1,5 @@
 /**
- * Filing rules (REC-B10 job 3), read through the kernel on a record that installed Money the way a person does, with
+ * Filing rules, read through the kernel on a record that installed Money the way a person does, with
  * no example entries. Categorising rules by prefix, contains, regex, ranked, with a dry run, and no category
  * is better than a wrong one.
  *

@@ -1,6 +1,6 @@
 /**
  * THE SKILLS THE AGENTS ADD-ON SHIPS reach a record the first night, as one question, and a newer text reaches a record
- * still holding the old one as it came (REC-A13 step 3, REC-A07 step 4; `noticeWhole` in `src/slash.ts`).
+ * still holding the old one as it came (`noticeWhole` in `src/slash.ts`).
  *
  * THE REAL CATALOGUE, so what is held here is what a host offers: `seedCatalogue()`, whose agents entry carries
  * `AGENTS_SKILLS`. A version 2 is made from it by `shipping`, as the add-on would ship one, so no test here waits on a

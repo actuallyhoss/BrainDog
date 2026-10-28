@@ -1,7 +1,7 @@
 /**
  * Money's sample rows: the studio the sample record shows, and the nights and the cash line worked back from them.
  *
- * Cut out of `money.ts` with no change (REC-B01 job 1). Rows reach a record only when it is made from the sample or a
+ * Cut out of `money.ts` with no change. Rows reach a record only when it is made from the sample or a
  * list is empty, so nothing here is in the pack's fingerprint.
  */
 

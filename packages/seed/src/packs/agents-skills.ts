@@ -1,5 +1,5 @@
 /**
- * THE SKILLS THE AGENTS ADD-ON SHIPS (REC-A13 step 3, REC-A07 step 4): what a session working in any BrainDog reaches for
+ * THE SKILLS THE AGENTS ADD-ON SHIPS: what a session working in any BrainDog reaches for
  * after an import, and when the record's signs go red. Slash offers them to a record with agents on, the night they are
  * missing, as one question (`noticeWhole` in `packages/record/src/slash.ts`); the owner's yes writes them to Skills.
  *
@@ -61,7 +61,7 @@ Read \`braindog:grammar/proposals\` for its shape. Put in it, as parts:
 const MARK_CLEARED = "- Call \`pagesCensus\`. A project whose page heading names a glyph no host draws (\`glyphs_unknown\`) has its mark cleared.\n";
 
 /**
- * VERSION 2 (REC-C17 step 3): a mark that names no glyph is given the nearest one a host draws, as a part of the same
+ * VERSION 2: a mark that names no glyph is given the nearest one a host draws, as a part of the same
  * arrangement, and cleared only where none is near. The glyphs are the ones \`braindog:grammar/page\` already hands, by
  * group, so the skill names no glyph of its own.
  */

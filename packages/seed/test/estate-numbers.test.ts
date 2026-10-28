@@ -1,5 +1,5 @@
 /**
- * A service's numbers, on Renewals: "Server and provider numbers" (REC-C12 steps 2 and 3).
+ * A service's numbers, on Renewals: "Server and provider numbers".
  *
  * WHY THIS FILE EXISTS. An imported record held seventeen readings about two servers and the providers behind them, how
  * full a disk was and what a provider had billed so far, and each sat in Numbers with no project and nothing saying

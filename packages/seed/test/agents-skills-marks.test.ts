@@ -1,5 +1,5 @@
 /**
- * After an import, version 2 (REC-C17 step 3): a project whose heading names a glyph no host draws is offered the
+ * After an import, version 2: a project whose heading names a glyph no host draws is offered the
  * nearest glyph a host draws, as a part of the same arrangement, and its mark is cleared only where none is near.
  * Version 1, which only cleared it, is kept in `was`, so a record still holding it untouched is offered the new text.
  *

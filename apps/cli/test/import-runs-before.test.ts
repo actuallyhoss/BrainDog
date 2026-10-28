@@ -1,5 +1,5 @@
 /**
- * Runs carried in by the import keep the day they were last seen in the old system (AGT-C10 job 4).
+ * Runs carried in by the import keep the day they were last seen in the old system.
  *
  * MEASURED BEFORE: the kernel refused `last_seen` from every caller, so the adapter left it out and all 295 of the
  * owner's imported runs read as last seen on the morning of the import, 291 abandoned ones still holding a next step.

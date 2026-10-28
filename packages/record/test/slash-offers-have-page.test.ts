@@ -1,5 +1,5 @@
 /**
- * Slash's two page rules asking the one recommender (`design-agent.ts` `recommend`, ENG-B14 job 3): a page for somebody
+ * Slash's two page rules asking the one recommender (`design-agent.ts` `recommend`): a page for somebody
  * or something that keeps coming up (`slash.ts` `entityDrafts`), and a page for a list that grows (`noticeUsage`).
  *
  * WHAT THESE HOLD. Whether a thing has a page is read off the pages as drawn: a project whose page was made from a

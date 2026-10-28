@@ -1,5 +1,5 @@
 /**
- * What the model is told when it composes a page (ENG-B09 job 6): `SLASH_COMPOSE_INSTRUCTIONS`, which took the place of
+ * What the model is told when it composes a page: `SLASH_COMPOSE_INSTRUCTIONS`, which took the place of
  * the headline instructions on both adapters. The record refuses a line with a typed digit from here on, so the
  * instructions say the rule the check holds the model to: a number is written as its hole.
  */

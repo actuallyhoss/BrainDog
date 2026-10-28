@@ -1,6 +1,5 @@
 /**
- * What a project runs on says which agents used each thing and how often, and how many reach it from everywhere
- * (AGT-D12 job 1).
+ * What a project runs on says which agents used each thing and how often, and how many reach it from everywhere.
  *
  * HIS PROJECT PAGES NAMED ONE AGENT AT MOST beside a key or a tool, the one whose run used it last, and a block that
  * showed five of what applies everywhere could not say how many more there were. Each row now says `used_runs`, how many

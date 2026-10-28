@@ -1,6 +1,6 @@
 /**
  * What more than one of Money's lists declares: the bank's available figure, the widened register type, and the link
- * to a book. Cut out of `money.ts` with no change (REC-B01 job 1).
+ * to a book. Cut out of `money.ts` with no change.
  */
 
 import type { RatesFields, RegisterDecl } from '@braindog/kernel';

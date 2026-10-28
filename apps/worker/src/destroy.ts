@@ -134,7 +134,7 @@ export async function expireFinal(blobs: Pick<Blobs, 'list' | 'delete'>, record:
 }
 
 /**
- * What a delete kept and what it took (LCH-A03 job 3): the final copy's key, which starts `final-` inside the record's
+ * What a delete kept and what it took: the final copy's key, which starts `final-` inside the record's
  * prefix, and how many other copies and files the sweep deleted. THE KEY IS A NAME AND NOT A SECRET: the bytes behind
  * it are sealed, and the owner is owed knowing which copy is kept for `FINAL_KEPT_DAYS` and nothing else.
  */

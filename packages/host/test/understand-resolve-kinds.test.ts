@@ -1,5 +1,5 @@
 /**
- * The host's half for the other pairs (ENG-B04 job 3): an `infer.resolve` job now holds two organisations or two
+ * The host's half for the other pairs: an `infer.resolve` job now holds two organisations or two
  * projects beside the people, each with its kind. The model reads each side's kind as the kernel queued it, a verdict on
  * a pair of organisations is kept and acked as any other, an answer about a handle it was not handed is dropped, and a
  * side of another kind than its pair is never one. Every model here is the fake adapter: no key, nothing sent. The gate

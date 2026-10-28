@@ -1,5 +1,5 @@
 /**
- * A page's whole look on the Worker (ENG-B09 job 7), through the record's own step: the daily look (`slashLook`, the
+ * A page's whole look on the Worker, through the record's own step: the daily look (`slashLook`, the
  * record's `slashTick`) asks the included model for each page's line and how it is arranged, and what comes back is the
  * record's look.
  *

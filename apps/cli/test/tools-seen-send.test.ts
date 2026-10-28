@@ -1,5 +1,5 @@
 /**
- * `scanTools` through `toolsSeen` (AGT-D02 job 4), against a stand-in client: one call for what this machine holds,
+ * `scanTools` through `toolsSeen`, against a stand-in client: one call for what this machine holds,
  * 50 a call, one line an answer, and the scan as before when the record has no such method.
  *
  * THE VALUES ARE OBVIOUSLY FAKE, made per run. The one place a value may go is the stand-in depositor; every call, line

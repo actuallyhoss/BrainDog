@@ -124,7 +124,7 @@ const withNumbersThisWeek = (blocks: readonly Record<string, unknown>[]): Record
   );
 
 /**
- * AN EARNING PROJECT THAT WENT SILENT, SINCE 2.5.0 (REC-C08 step 9): marked Earning, with no cleared money in on the
+ * AN EARNING PROJECT THAT WENT SILENT, SINCE 2.5.0: marked Earning, with no cleared money in on the
  * Ledger and no number sent in 90 days. The after-an-import skill reads it to propose a lane (`agents-skills.ts`), and
  * Projects names them. A count of projects and never a sum, so no two currencies meet in it.
  *
@@ -406,7 +406,7 @@ export const FOUNDER = {
      decimal `value`, which stops being required; the blocks over Numbers read it as their fifth column and the project
      moves to the sixth; Latest numbers shows it beside Value; and `poll-setup` says to fill the live feed add-on. A
      field added, one made optional and columns added, so a minor step. 2.4.0 is live. Folded into the same unreleased
-     2.5.0 (REC-C16 part b, REC-C08 step 9): `project-numbers-7d`, the numbers a project sent this week, as the last
+     2.5.0 (REC-C16 part b): `project-numbers-7d`, the numbers a project sent this week, as the last
      figure of Where it stands on `page.project`; and `projects-earning-silent`, a project marked Earning with no cleared
      money in and no number in 90 days, named on Projects in a line under In play. Two figures, a cell and a block laid
      on another pack's page added, nothing taken away.
@@ -452,8 +452,8 @@ export const FOUNDER = {
      the notes, runs and rows that name it, newest first, from the record's `about` read. Three blocks added, nothing
      taken away, so still inside the unreleased 2.6.0.
 
-     2.7.0, A FOUNDER'S FIRST DAY HOLDS WHAT THE WORDS POINT AT (USE-B08 job 5; "make sure that the braindog experience
-     is not overwhelming for new users", W.149). `needs` is Projects and Money: a fresh record installs those two, then
+     2.7.0, A FOUNDER'S FIRST DAY HOLDS WHAT THE WORDS POINT AT ("make sure that the braindog experience
+     is not overwhelming for new users"). `needs` is Projects and Money: a fresh record installs those two, then
      People for a name, Services for domains or renewals and Work for tasks, each only when the sentence points at it,
      and the rest is offered when its moment comes. Day 0 opened on eighteen lists. Home already leads from the money
      and the numbers, this pack's own list; a block over a list the record does not hold is cut at install (`fitted`),
@@ -857,7 +857,7 @@ export const FOUNDER = {
       /* `panel: reporting` NAMES THE KEY AND THE POLL FORM the app draws under this section (`panel-of.ts`), so a person
          or Slash renaming the heading keeps them. */
       { page: 'page.relation', after: 'People', block: { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' } },
-      /* WHICH EARNING PROJECTS WENT SILENT, ON PROJECTS, SINCE 2.5.0 (REC-C08 step 9), by name and under the cards in play:
+      /* WHICH EARNING PROJECTS WENT SILENT, ON PROJECTS, SINCE 2.5.0, by name and under the cards in play:
          drawn only while one has, so a record whose earning projects all took money or sent a number says nothing. LAST, so
          the blocks laid before it keep their places. */
       {

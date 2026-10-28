@@ -1,5 +1,5 @@
 /**
- * The host's half for the other pairs (ENG-B04 job 3), through the kernel end to end: tonight's `infer.resolve` job
+ * The host's half for the other pairs, through the kernel end to end: tonight's `infer.resolve` job
  * hands a model two organisations of one name beside the people, by name and kind and never an address; the answer's
  * verdict on a pair of organisations files nothing and folds nothing, and is kept in the done job, where `pairsFor`
  * reads it. Read as two, the pair leaves the offers; read as one, it is kept first with `judged`; in doubt, it is

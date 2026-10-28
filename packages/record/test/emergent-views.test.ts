@@ -1,5 +1,5 @@
 /**
- * A saved view opened often is offered a place in the rail (`emergent-views.ts`, USE-B13 job 2).
+ * A saved view opened often is offered a place in the rail (`emergent-views.ts`).
  *
  * WHAT IS HELD: five opens in fourteen days offer "Keep Open tasks in the rail?", whose keeping moves only the view's
  * `nav`, to the end of the section that draws Tasks, after every page already there, and which the record takes; four

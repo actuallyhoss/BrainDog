@@ -1,5 +1,5 @@
 /**
- * `briefing`, the read (`src/methods/briefing.ts`, ENG-B12 job 2): what Today opens on, answered from what the record
+ * `briefing`, the read (`src/methods/briefing.ts`): what Today opens on, answered from what the record
  * already holds. A bill late since yesterday, two questions asked in the same words and a run that left a next step are
  * three cards in that order, each with what it opens and each said by the rules; a fresh record is answered no card;
  * and a caller a list is closed to is answered no card from it.

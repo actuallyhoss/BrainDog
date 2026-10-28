@@ -684,7 +684,7 @@ export function pageWrites(deps: WritesDeps) {
     return true;
   }
 
-  /* ── a declared action pressed (PGS-A12 jobs 7 and 8) ───────────────────────── */
+  /* ── a declared action pressed ───────────────────────── */
 
   /**
    * What a press was made on. A drawn row carries its record row (`ref`), and its fields are read off the block that

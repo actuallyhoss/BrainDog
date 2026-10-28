@@ -1,7 +1,7 @@
 /**
  * The Cloud's answers, held to the shapes the web app reads them as.
  *
- * WHY THIS EXISTS (PRF-B05 job 4). Four answers reach the app from the Cloud and from no self-host a gate ran: the
+ * WHY THIS EXISTS. Four answers reach the app from the Cloud and from no self-host a gate ran: the
  * account's usage, the account's billing, Slash's status with a model behind it, and `boot` saying `cloud`. Each is read
  * through a type somebody wrote out by hand on the web's side, and Usage's parted from the Directory's once already:
  * the reader asked for `included` where the answer said `asks`, `toLocaleString` ran on nothing, and `/usage` told an

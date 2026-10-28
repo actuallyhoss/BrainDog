@@ -137,7 +137,7 @@ test('an update that leaves the changed list as the pack wrote it still says it 
   sql.close();
 });
 
-/* ── a note written again keeps its text (REC-A13 step 4) ─────────────────── */
+/* ── a note written again keeps its text ─────────────────── */
 
 const NOTE = 'A type family for screens.\n\nStage: building\n\nBlockers:\n- the italic is not drawn\n\nPlan:\n1. Draw the italic (so it ships)\n2. Hint it\n\nThe revenue is {{revenue.monthly}}.';
 

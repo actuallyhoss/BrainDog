@@ -1,5 +1,5 @@
 /**
- * THE SELF-HOST REFUSES A RECORD WHOSE APPLIED MIGRATION IS NOT THE TEXT THE LOCK HOLDS (LCH-C06 job 5): a record made
+ * THE SELF-HOST REFUSES A RECORD WHOSE APPLIED MIGRATION IS NOT THE TEXT THE LOCK HOLDS: a record made
  * by `init`, one checksum in its migration ledger changed, and `serve` stops before it listens, with the sentence and
  * the fix on stderr and exit 1. An applied migration is never edited, so a build that disagrees with the record is at
  * fault and must not start on it.

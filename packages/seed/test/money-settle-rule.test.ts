@@ -1,5 +1,5 @@
 /**
- * What starts `script.settle` (REC-B11 step 4, the rule): a Ledger entry that names a bill in "Settles".
+ * What starts `script.settle` (the rule): a Ledger entry that names a bill in "Settles".
  *
  * `money-settle.test.ts` MEASURES THE DECISION AND THE SCRIPT, HANDED THEIR INPUT BY THE TEST. This measures who hands
  * it on a record: Money's own rule (`payment-settles` in `MONEY_AUTOMATIONS`), installed from Money's pack document,

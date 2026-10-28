@@ -1,5 +1,5 @@
 /**
- * The Kennel's scratch install ("install-into-scratch validation", R.14): before anything is listed,
+ * The Kennel's scratch install ("install-into-scratch validation"): before anything is listed,
  * the submitted add-on is installed into an empty record with the modules it requires, every page it brings is read,
  * and the first one that does not draw is the answer, in the record's own code and sentence, naming the page.
  *

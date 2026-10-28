@@ -1,5 +1,5 @@
 /**
- * `words-guide`: the writing guide's page, made from the words list (EXP-B07 job 5).
+ * `words-guide`: the writing guide's page, made from the words list.
  *
  *   node tools/gates/words-guide.mjs            writes docs/54-WRITING.md
  *   node tools/gates/words-guide.mjs --check    exits 1 when the page is not what the list makes

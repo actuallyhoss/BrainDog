@@ -606,7 +606,7 @@ const projectsPage = (): PageBlock[] =>
 const MONTH_LAID = withAdds(projectsPage(), additionsOf([{ id: 'portfolio-bands', manifest: readFileSync(PACK_FILE, 'utf8') }], 'page.portfolio')).some(
   (l) => l.block.columns?.some((c) => c.label === 'This month') === true,
 );
-const NOT_DRAWN = 'until a card reads its figure off a figure (PGS-C29 job 2: packages/kernel/src/pages.ts, and fits in page-adds.ts)';
+const NOT_DRAWN = 'until a card reads its figure off a figure (packages/kernel/src/pages.ts, and fits in page-adds.ts)';
 
 test('2.2.0 IS 2.1.0 WITH TWO ADDITIONS TO PROJECTS, and nothing else moved', () => {
   const was = JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/portfolio-bands/2.1.0.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;

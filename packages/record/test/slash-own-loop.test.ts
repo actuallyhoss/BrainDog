@@ -1,7 +1,7 @@
 /**
- * SLASH'S LIMITS, HELD ON A REAL RECORD (ENG-A14 job 2, ENG-B20 job 2's skill half; `src/slash.ts`).
+ * SLASH'S LIMITS, HELD ON A REAL RECORD (ENG-B20 job 2's skill half; `src/slash.ts`).
  *
- * The rule: "F8 Slash scripts proposal-only no keychain keys" (H.735). Three holds, each through the press the owner makes:
+ * The rule: "F8 Slash scripts proposal-only no keychain keys". Three holds, each through the press the owner makes:
  *   - a script that would send one of his keys is dropped with `KEYED_SCRIPT`, and no question is filed;
  *   - a draft that reaches Slash's own prefs, its settings door or the ladder's thresholds is dropped (`ownLoopFault`);
  *   - a skill an add-on only names is offered only with steps quoted from three runs' handoffs, and with none, not at all.

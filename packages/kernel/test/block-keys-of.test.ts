@@ -1,7 +1,7 @@
 /**
  * WHO MAY CARRY `of:`, held at the table (`block-keys.ts`) and at the install that refuses from it (`declare.ts`).
  *
- * `of:` names the whole a block is set against. A ring read one from the start; since PGS-B05 a heat over a list reads
+ * `of:` names the whole a block is set against. A ring read one from the start; now a heat over a list reads
  * one too, each day's wash being the share of that day's whole its `where` admits. The table said `of: ['ring']` until
  * then, so a heat written with the sentence was refused at install with "of: is read by ring blocks".
  *

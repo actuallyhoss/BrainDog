@@ -1,5 +1,5 @@
 /**
- * MONEY'S HOME, BLOCK BY BLOCK (REC-B23 job 10): what it holds, in what order and under what condition, read off the
+ * MONEY'S HOME, BLOCK BY BLOCK: what it holds, in what order and under what condition, read off the
  * declaration and then off the page a record draws.
  *
  * SINCE money-core 3.29.0 the home is a front door: one line, the hero (Cash now with the walk ahead drawn small and

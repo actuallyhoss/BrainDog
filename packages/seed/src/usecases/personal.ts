@@ -147,8 +147,8 @@ export const PERSONAL = {
      kept, a line names one; while no project is live, a line names one in the Building lane. Each is drawn on its own
      count, so Home drops it once the thing exists. Three blocks and one count are added and nothing goes, so a minor
      step beside 2.4.0, which is live.
-     2.6.0: a person's first day holds what their words point at (USE-B08 job 5; "make sure that the braindog
-     experience is not overwhelming for new users", W.149). `needs` is Money and the Projects its bills and this pack's
+     2.6.0: a person's first day holds what their words point at ("make sure that the braindog
+     experience is not overwhelming for new users"). `needs` is Money and the Projects its bills and this pack's
      project steps point at; People comes when a name is said, and anything else is offered when its moment comes. Home already leads from
      Money's own figures and this pack's lists, and a block or a role over a list the record does not hold is cut at
      install (`fitted`). 2.5.0 is published in the catalogue and frozen, and the file it shares changes (`needs`), so

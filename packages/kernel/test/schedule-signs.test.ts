@@ -1,5 +1,5 @@
 /**
- * The vital signs' night, wired into the record (PRF-A01 job 4): armed as the record opens, run at five past midnight
+ * The vital signs' night, wired into the record: armed as the record opens, run at five past midnight
  * by the `snapshot` handler, armed again whatever happened, and the two verbs the record and the host call.
  *
  * What is asserted is what the owner's record does with nobody's hand: it opens, and the next morning there is a row a

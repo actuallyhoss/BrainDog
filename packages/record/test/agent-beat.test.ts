@@ -1,5 +1,5 @@
 /**
- * `beat`: a session says it is still working, through the record (AGT-C03 job 2).
+ * `beat`: a session says it is still working, through the record.
  *
  * MEASURED BEFORE: last seen moved only when a run wrote, so on the owner's record a session that read and edited files
  * for half an hour read as Quiet beside one that had died. What is asserted is what the Agents page reads after a beat:

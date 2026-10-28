@@ -1,7 +1,7 @@
 /**
  * Whether the first reading is right: the read set's sentences asked of the real model through the one door sign-up
  * reads with (`readSetup`, `packages/slash/src/propose.ts`), with the offer the first run makes (`offerOf`,
- * `apps/web/src/lib/start/offer.ts`), and scored (USE-B05 job 9).
+ * `apps/web/src/lib/start/offer.ts`), and scored.
  *
  *   node tools/first-read-eval/run.mjs --spend               the real model; needs MODEL_CHECK_TOKEN and MODEL_CHECK_ACCOUNT
  *   node tools/first-read-eval/run.mjs --fake <file>         a canned file answers in the model's place; spends nothing
@@ -223,7 +223,7 @@ export async function main({ argv = process.argv.slice(2), env = process.env, se
     return 3;
   }
   if (typeof readSetup !== 'function') {
-    print('first read eval: readSetup is not in packages/slash/src/propose.ts yet (USE-B05 job 1). Nothing was asked.');
+    print('first read eval: readSetup is not in packages/slash/src/propose.ts yet. Nothing was asked.');
     return 3;
   }
   const { offerOf } = await import('../../apps/web/src/lib/start/offer.ts');

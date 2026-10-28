@@ -29,7 +29,7 @@
  * - `keys`: the keys of the closed lists the part draws (a service's type, `vm`). One printed as itself where its name
  *   goes is a finding; a key a list names (`domain`, drawn "Domain") never prints as itself.
  *
- * THE PRINT RULES OF THE WORDS (EXP-B07 job 3) sit beside the drawing rules. `long-dash` in the scope is `em-dash`
+ * THE PRINT RULES OF THE WORDS sit beside the drawing rules. `long-dash` in the scope is `em-dash`
  * here, the rule that was already the page's; it keeps its name, since the sign and the gates already say it.
  *
  * MONEY IS WRITTEN ONE WAY: `two-spellings` finds one currency drawn by its sign and by its code in one part,

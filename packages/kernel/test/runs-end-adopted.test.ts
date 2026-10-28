@@ -1,5 +1,5 @@
 /**
- * A second end never ends another run (audit-35 finding 2, `endRun`).
+ * A second end never ends another run (`endRun`).
  *
  * MEASURED BEFORE: S1 has no client id and S2 has one, both of one key on one machine and repository. Ending S1 twice,
  * the second call answered `{ run: 'S2', state: 'done', changed: true }`: the ladder dropped the finished S1 and rung 4

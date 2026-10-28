@@ -1,5 +1,5 @@
 /**
- * Paydays in Money (REC-B13 jobs 2 to 4): a repeating line's days of the month and its rule for a rest day, Money's rest
+ * Paydays in Money: a repeating line's days of the month and its rule for a rest day, Money's rest
  * days, the leg that hands both to the walk, and the one question about lines on a month's last day.
  *
  * RED FIRST: with `day_of_month` and `weekend` out of `lists/recurring.ts`, the first test fails on the fields and the

@@ -1,5 +1,5 @@
 /**
- * `pages`: one row a page, read off the pages census (PGS-A11 job 3, over PGS-A01): its address and title, how many
+ * `pages`: one row a page, read off the pages census (over PGS-A01): its address and title, how many
  * blocks it has and how many draw, how many are refused, how many paths name nothing, and how many dashes it shows. The
  * census as rows, so a page can draw the record's own health of pages as a table and sort it by what is broken.
  *

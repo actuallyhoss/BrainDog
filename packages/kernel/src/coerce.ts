@@ -519,8 +519,8 @@ export const CURRENCY_FIXED_SENTENCE =
  * `CURRENCY_FIXED` when a write would change the code a `currency_fixed` field already holds, or `null`.
  *
  * THE CODE IS LOCKED AND THE NUMBER IS NOT. `immutable` locks a whole field, and the Ledger's amount is corrected often
- * and never moves between currencies: a transaction's currency is one of the things he listed as never changing
- * (P.205), and a row whose code changed in place would carry a history in which one amount was two kinds of money.
+ * and never moves between currencies: a transaction's currency is one of the things he listed as never changing,
+ * and a row whose code changed in place would carry a history in which one amount was two kinds of money.
  * `next` is the coerced value, so `egp` and `EGP` are one code. Clearing the field is not a change of code.
  */
 export function currencyFixed(field: FieldDecl, stored: unknown, next: unknown, at = field.id): Refusal | null {

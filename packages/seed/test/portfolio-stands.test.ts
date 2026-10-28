@@ -1,5 +1,5 @@
 /**
- * Where a project stands is said, by somebody or by what happened on it (REC-C16 job 1, and REC-C08 step 6; portfolio
+ * Where a project stands is said, by somebody or by what happened on it (and REC-C08 step 6; portfolio
  * 1.16.0).
  *
  * HIS RECORD WAS A DASH. A project page's Where it stands read four typed fields, health, progress, aim and agent, and

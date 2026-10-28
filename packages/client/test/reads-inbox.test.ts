@@ -1,5 +1,5 @@
 /**
- * What batch 88 added, through the client: `inbox` asked for a digest or for one arrival (AGT-B13 job 5), typed by what
+ * What batch 88 added, through the client: `inbox` asked for a digest or for one arrival, typed by what
  * it is asked.
  *
  * NOT A STAND-IN FETCH, as `reads-learnings.test.ts` is not: `serveApi` over a real record, so what the client sends is what the

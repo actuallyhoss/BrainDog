@@ -2,8 +2,8 @@
  * WHAT MAKES TWO ROWS OF THE AGENTS ADD-ON ONE THING, SINCE 1.13.0 (AGT-C13 job e, with AGT-D03's half): learnings by
  * their lesson, skills by their name as written, tools by their name, and keys by their name with the sealed one kept,
  * each within its project. Said as data, so every record that installs the add-on gets it; the kernel reads it
- * (`same:` among a list's own keys in `packages/kernel/src/declare.ts`). And a learning's kind gains `rule`
- * (AGT-B09 job 4), and the learnings' own words carry the four-part test (AGT-D15 job 1).
+ * (`same:` among a list's own keys in `packages/kernel/src/declare.ts`). And a learning's kind gains `rule`,
+ * and the learnings' own words carry the four-part test.
  */
 
 import { test } from 'node:test';

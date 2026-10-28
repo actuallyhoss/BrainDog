@@ -1,7 +1,7 @@
 /**
- * `fenceChecks`: the public fence, asked of the canary on every deploy (LCH-C08 job 4).
+ * `fenceChecks`: the public fence, asked of the canary on every deploy.
  *
- * The rules: "A `401` says only `unauthorized`." (P.154) and "`noindex`, the URL is the capability" (P.166). Each
+ * The rules: "A `401` says only `unauthorized`." and "`noindex`, the URL is the capability". Each
  * check below is one line of the smoke, in the shape `smoke.mjs` asks (`method`, `url`, `expects`, `judge`), and
  * says one fact about the fence: a wrong bearer is 401 with exactly that body; no door answers a page on another
  * site; every JSON answer is `no-store`; a picture is kept by its SHA-256 and served sandboxed, `nosniff` and
@@ -33,7 +33,7 @@ const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
 /** The site every question says it comes from: one nobody runs, so an answer opened to it is opened to any. */
 export const ELSEWHERE = 'https://elsewhere.example';
 
-/** The one body a 401 may carry (LCH-C08 job 2). */
+/** The one body a 401 may carry. */
 export const UNAUTHORIZED_BODY = Object.freeze({ ok: false, refusal: Object.freeze({ code: 'UNAUTHORIZED', fix: 'unauthorized' }) });
 
 /** The most one file may be, as `apps/worker/src/files.ts` `FILE_MOST` says; `smoke.test.mjs` holds the two equal. */

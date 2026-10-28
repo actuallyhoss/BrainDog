@@ -1,5 +1,5 @@
 /**
- * What the rates tile on an add-on's page draws (REC-B02 step 5): the newest rate of each pair, and the last 90 days of
+ * What the rates tile on an add-on's page draws: the newest rate of each pair, and the last 90 days of
  * a pair once it has rates enough to say something.
  *
  * BEFORE: the tile was a sentence and a button, and held no rate at all, so a person who had set the fetch up could not

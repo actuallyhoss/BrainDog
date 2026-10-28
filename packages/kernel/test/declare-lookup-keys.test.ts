@@ -1,5 +1,5 @@
 /**
- * A lookup's three optional keys at install (REC-A02 step 8): `says`, the noun its question uses; `where`, a filter over
+ * A lookup's three optional keys at install: `says`, the noun its question uses; `where`, a filter over
  * the list; `split`, a field holding several values parted by commas.
  *
  * BEFORE: every key beside `register` and `by` was refused as one that "would install and do nothing", so an add-on could

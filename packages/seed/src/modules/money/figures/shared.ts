@@ -1,6 +1,6 @@
 /**
  * What more than one of Money's figures reads: the format every money figure is in, and the day that stands for never.
- * Cut out of `money.ts` with no change (REC-B01 job 1).
+ * Cut out of `money.ts` with no change.
  */
 
 /**

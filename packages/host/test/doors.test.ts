@@ -1,5 +1,5 @@
 /**
- * Every door a self-host has answers, or says in a sentence what this host lacks (LCH-C13 job 4): the software
+ * Every door a self-host has answers, or says in a sentence what this host lacks: the software
  * stays self-hostable.
  *
  * EVERY ROUTE OF `ROUTES` IS ASKED ON THE SELF-HOST, started in this process as `apps/selfhost/test/front-doors.test.ts`

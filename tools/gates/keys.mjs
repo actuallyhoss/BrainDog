@@ -66,7 +66,7 @@ export function bindingsIn(source) {
 export const skips = (row) => !row.bare || row.scope === 'palette' || row.scope === 'nav';
 
 /* THE BINDINGS SKIPPED, BY ID, OFF THIS REPOSITORY'S REGISTRY, so `ledger.mjs` reads how many without a browser or a
-   build (PRF-B03 step 3). The run counts the same rows by the same `skips`, so the two cannot disagree. `ledger.json`
+   build. The run counts the same rows by the same `skips`, so the two cannot disagree. `ledger.json`
    holds `keys.SKIPPED` at its newest line: the list only shrinks, and a fall is a line written there. A registry that
    is not there is `null`, which the ledger names as not a list, rather than a throw that would stop `run.mjs` reading
    `needs`. */

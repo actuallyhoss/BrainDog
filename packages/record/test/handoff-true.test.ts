@@ -1,5 +1,5 @@
 /**
- * The briefing card's Next slot is true about the step, through the record (AGT-B08 job 4, AGT-C05's card line): each
+ * The briefing card's Next slot is true about the step, through the record (AGT-C05's card line): each
  * case is a fresh record with no seed, runs placed by repository alone, and the card read the way a starting session
  * reads it, from `context`.
  *

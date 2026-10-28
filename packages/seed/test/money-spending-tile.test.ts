@@ -1,5 +1,5 @@
 /**
- * Money's tile "Spent this month" (REC-B19 job 3), read through the kernel on a record that installed Money the
+ * Money's tile "Spent this month", read through the kernel on a record that installed Money the
  * way a person does and then kept two months of spending in four categories.
  *
  * WHAT IS HELD HERE: `parts/spending.ts` gives one block under that heading over `spent-by-category-month`, it is drawn

@@ -1,5 +1,5 @@
 /**
- * The engine's readings, the method: `engineReadings`, READ+ (ENG-B01 job 3).
+ * The engine's readings, the method: `engineReadings`, READ+.
  *
  * WHAT WAS ASKED OF THE MODEL, WHAT IT ANSWERED, WHAT WAS KEPT AND REFUSED, AND WHAT THE RECORD STILL DOES NOT
  * UNDERSTAND, over the last 30 days. The counting is `../engine-readings.ts`, which reads nothing. The ledger it counts
@@ -194,7 +194,7 @@ export function methods(deps: RecordDeps) {
       const month = new Date(now - MONTH_DAYS * DAY).toISOString();
       const kernel = deps.kernel as Kernel | undefined;
       const tz = kernel?.identity?.()?.tz;
-      /* THE BRAKE COUNTS AN OFFER HE LET PASS AS A NO (ENG-B17 job 2), so it is asked what today is in the record's zone. */
+      /* THE BRAKE COUNTS AN OFFER HE LET PASS AS A NO, so it is asked what today is in the record's zone. */
       const readings = engineReadings({
         now,
         calls,

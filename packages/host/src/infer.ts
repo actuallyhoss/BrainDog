@@ -308,7 +308,7 @@ export const paused = (rows: readonly LastRow[], now: number): boolean => paused
 /** How one attempt ended, as the walk reads it. */
 type Ended = 'answered' | 'not_served' | 'no_answer' | 'late' | 'schema' | 'budget' | 'refused';
 
-/** A refusal's `why` where the port carries one (ENG-A06 job 1), and the sentence where it does not yet. */
+/** A refusal's `why` where the port carries one, and the sentence where it does not yet. */
 const notServed = (refusal: Refusal): boolean => {
   const why = (refusal as { why?: unknown }).why;
   return typeof why === 'string' ? why === NOT_SERVED : refusal.fix.includes(NOT_SERVED);

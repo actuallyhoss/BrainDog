@@ -1,5 +1,5 @@
 /**
- * The host's last restore drill, kept by the Directory (LCH-C04 job 3, the scope's critic): one `dir_meta` row, the
+ * The host's last restore drill, kept by the Directory (the scope's critic): one `dir_meta` row, the
  * newest put wins, counts only, and a stored shape this build cannot read is no drill rather than a throw.
  */
 

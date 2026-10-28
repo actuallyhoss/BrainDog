@@ -1240,7 +1240,7 @@ const resource = (path: string, description: string): Resource => ({
 });
 
 /**
- * What is on offer, twelve at a time, and searched by a word (SHL-B05 job 6).
+ * What is on offer, twelve at a time, and searched by a word.
  *
  * THE OFFER WAS EVERY ADD-ON THE HOST HOLDS, and once the whole catalogue is on offer that is more than an arrangement
  * read in a turn can carry. `braindog:arrangement` keeps the first twelve and says how many more there are;
@@ -1437,7 +1437,7 @@ type Done = {
 };
 
 /**
- * One beat for one tool call the door admitted (AGT-C03 step 4, "a real heartbeat"): the caller's run is heard from
+ * One beat for one tool call the door admitted ("a real heartbeat"): the caller's run is heard from
  * now, so a client with no hook of its own reads Working through a long stretch of reads, not Quiet.
  *
  * NEVER WAITED ON, AND EVERY WAY IT CAN GO WRONG IS SWALLOWED, as `rpc.ts`'s marks are: a beat that throws, refuses,
@@ -3662,7 +3662,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * claude.ai takes from one result, and Notion's server answers the same way rather than with a part of it.
    */
   /**
-   * The inbox at its three addresses (AGT-B13 job 4), each one read of the record said as lines.
+   * The inbox at its three addresses, each one read of the record said as lines.
    *
    * `braindog:inbox` IS THE DIGEST: the counts of all six states and each state's lines, held to `ANSWER_MOST` by
    * `inboxDigestLines`, so 32 waiting arrivals are one read and a busy inbox cannot blow the answer. `<state>` is that

@@ -2,7 +2,7 @@
  * WHAT HE DID IN HIS RECORD IS KEPT, AND WHAT HIS RECORD LACKS IS ASKED ONCE.
  *
  * Two tests the generic importer lost when it was made generic come back on the invented export: a row he deleted
- * here stays deleted when the same export is imported again, and the report says so (H.611, "import never resurrects
+ * here stays deleted when the same export is imported again, and the report says so ("import never resurrects
  * rows"). And money in two currencies on a record with no home currency is one question on Decide, filed before any
  * row is written, and never filed again on a later night.
  *

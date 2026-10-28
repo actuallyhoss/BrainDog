@@ -1,5 +1,5 @@
 /**
- * A hole in a note names a figure with its parameter (REC-B12 step 4): `{{project-cost:Kiln}}` reads the figure with
+ * A hole in a note names a figure with its parameter: `{{project-cost:Kiln}}` reads the figure with
  * `Kiln` filled in, as a figure cell always has (`fill(decl, null, param)`), and the first colon separates.
  *
  * WHAT WAS MEASURED BEFORE IT: a path had no colon, so the hole was never asked and a plan's lead sentence,

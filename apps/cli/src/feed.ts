@@ -4,7 +4,7 @@
  * THE FILE IS A LIST OF FILLS IN THE FILL'S OWN SHAPE, the `FeedSpec` of `packs/live-feed/fill.ts` field for field:
  * `[{ "id": "oxbow-gg", "url": "https://oxbow.gg/api/stats", "every": "1d", "measures": [...] }, ...]`. So a person's
  * feeds live in their own setup file and never in this repository (a person's oxbow.gg and pinwheel feeds become two fills
- * of it in their setup file, never files in the repo, P.598), and what one feed can say is what the add-on says.
+ * of it in their setup file, never files in the repo), and what one feed can say is what the add-on says.
  *
  * ONE BUILDER. Each fill is built with the add-on's own `fillFeed` over `live-feed.pack.json`, as the app's form and
  * the importer are to, and filed as one question with its document, `body_kind: pack`, the shape the form files

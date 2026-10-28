@@ -1,5 +1,5 @@
 /**
- * A skill's steps, from what agents' runs wrote when they handed off (ENG-B20 job 2, ENG-A14 job 2).
+ * A skill's steps, from what agents' runs wrote when they handed off.
  *
  * A SKILL IS OFFERED ONLY WITH STEPS. Slash offered a skill a use case only names with the body "Its steps are not
  * written yet.", so what the owner was asked to accept was a name (`slash.ts`). A step is what at least three different

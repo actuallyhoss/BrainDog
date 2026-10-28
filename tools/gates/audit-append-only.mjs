@@ -3,7 +3,7 @@
  *
  *   node tools/gates/audit-append-only.mjs [root]
  *
- * THE AUDIT IS APPEND-ONLY (W.525), AND THE LOG IS A TABLE ANYBODY CAN `UPDATE`. On 9 October six statements
+ * THE AUDIT IS APPEND-ONLY, AND THE LOG IS A TABLE ANYBODY CAN `UPDATE`. On 9 October six statements
  * under `packages/*\/src` rewrote or reordered a line of `event`, and nothing failed on a seventh. The brief counted
  * four, the planner five: a count written down by hand is out of date by the next batch, which is why this list is a
  * list and its size is read off it, never written.
@@ -162,7 +162,7 @@ export default function auditAppendOnly(
   for (const f of findings) console.error(f);
   console.error(
     `\n  audit-append-only: ${where}, ${findings.length} finding(s).\n` +
-      '  The log is append-only (W.525). A statement that rewrites a line of it goes on the list in this file with\n' +
+      '  The log is append-only. A statement that rewrites a line of it goes on the list in this file with\n' +
       '  its reason, and the list only shrinks: ledger.json holds its size.',
   );
   return 1;

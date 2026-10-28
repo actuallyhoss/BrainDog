@@ -1,5 +1,5 @@
 /**
- * The rail's places as data (SHL-A18 job 1): the ordered places a person's rail draws, each with the page it opens, its
+ * The rail's places as data: the ordered places a person's rail draws, each with the page it opens, its
  * glyph, its name and who put it there, so the web shell draws them and holds no order of its own.
  *
  * THE AIM: "The fixed part is small: the frame.", and "how dynamic is everything?". The web ranked

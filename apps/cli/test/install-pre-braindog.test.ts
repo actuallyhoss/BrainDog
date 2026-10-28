@@ -1,5 +1,5 @@
 /**
- * AGT-A07 Build 3, his "It left `*.pre-braindog` backups of the old files next to each one": the first copy BrainDog
+ * his "It left `*.pre-braindog` backups of the old files next to each one": the first copy BrainDog
  * keeps of a file it changes is `<file>.pre-braindog`, later copies keep the names they always had, `.bak` and `.bak1`,
  * and no copy is ever written over by a later one.
  *

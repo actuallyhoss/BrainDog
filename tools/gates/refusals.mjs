@@ -482,7 +482,7 @@ export default function refusals(
   }
 
   /**
-   * THE FOUR NAMED DEVIATIONS, AND NO NUMBER (PRF-B03 job 4). This was a budget of four written in this file, against
+   * THE FOUR NAMED DEVIATIONS, AND NO NUMBER. This was a budget of four written in this file, against
    * the first line of `budgets.json`, which says every number a gate is held to lives there. And a count can stay four
    * while what it counts changes: a fixture that left and a new invented code in its place read as the same four. So
    * the four are lines in `ledger.json` under `deviations.refusals`, each the code it stands for, what it is, why it is

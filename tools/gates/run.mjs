@@ -187,7 +187,7 @@ const GATES = [
      in a sentence, the long dash) over every copy string the app ships. Beside `em-dash` because it reads the same
      copy for a wider list, and its `page` entries are the page lint's, so a page and the source are judged by one. */
   ['words', call(join(here, 'words.mjs'))],
-  /* AND THE WRITING GUIDE IS THE LIST, PRINTED (EXP-B07 job 5): docs/54-WRITING.md is what words.json makes. */
+  /* AND THE WRITING GUIDE IS THE LIST, PRINTED: docs/54-WRITING.md is what words.json makes. */
   ['words-guide', ['node', [join(here, 'words-guide.mjs'), '--check']]],
   /* AND THE ONE CLOCK: a run's `last_seen` compared with the time anywhere outside `presence.ts` is the
      rail, Today and Agents saying three numbers again. Today's hits are allowed by count, and the list only shrinks. */
@@ -256,7 +256,7 @@ const GATES = [
   /* AND MONEY'S WHERE IT WENT, OPENED (PGS-C20's guard): on a fresh record with twelve entries this month, five unfiled
      from two payees, the folded heading is on Money shut and opens on its two blocks, at 390 and the desk. */
   ['money-where', call(join(here, 'walks', 'money-where.walk.mjs'))],
-  /* WHAT A SETTLED SCREEN PRINTS (PRF-B04 job 7): every address the gates' record gives, drawn once at 390 on the record's
+  /* WHAT A SETTLED SCREEN PRINTS: every address the gates' record gives, drawn once at 390 on the record's
      clock, red on a raw id, a raw time, a key, a value that never arrived or a page error. Its own ephemeral port, for
      the reason passkey has one. */
   ['printed', call(join(here, 'printed.mjs'))],

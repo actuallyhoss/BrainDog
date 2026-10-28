@@ -1,6 +1,6 @@
 /**
  * THE FIRST READ ON THE CLOUD: what `serveFirstRead` (`@braindog/host/first-read`) is handed at `/auth/signup/read`,
- * so a stranger's sentence at sign-up can be read by the included model before there is an account (USE-B05 job 3).
+ * so a stranger's sentence at sign-up can be read by the included model before there is an account.
  *
  * OFF AS SHIPPED, AND ONLY THE OPERATOR SWITCHES IT ON. Each reading is a model call that costs money, and a stranger's
  * words reach a model only after the operator's yes, so the door is `on` only where `FIRST_READ_DAILY` is a whole number

@@ -1,5 +1,5 @@
 /**
- * Money says calmly how long the money lasts (REC-B07 jobs 7 and 8, money-lasts-tile-100). Since money-core 3.29.0 that is
+ * Money says calmly how long the money lasts (money-lasts-tile-100). Since money-core 3.29.0 that is
  * two cells of the hero, With what is due and expected and With no money coming in, and no tile of their own. A cell
  * whose figure has no value is not drawn, so a record whose money lasts the year reads no day.
  *

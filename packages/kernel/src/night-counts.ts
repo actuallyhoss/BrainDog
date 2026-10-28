@@ -3,11 +3,11 @@
  * (`built-in-figures.ts`, `readListsShrunk` and `readDeadPaths`).
  *
  * `countLists`: how many rows each list holds, live and deleted, kept as `counts:<list>:live` and `counts:<list>:deleted`
- * (REC-A17 job 3). Nothing counted his rows across a deploy, so a list that lost what nobody deleted would only be seen
+ * Nothing counted his rows across a deploy, so a list that lost what nobody deleted would only be seen
  * when he looked for something and it was gone. `lists-shrunk` compares two nights.
  *
  * `deadPaths`: how many `{{...}}` placeholders in the record's documents name nothing here, kept as `paths:dead`
- * (REC-A13 job 1). His project notes held 67 placeholders and nothing read a note's paths until a page drew it. The walk
+ * His project notes held 67 placeholders and nothing read a note's paths until a page drew it. The walk
  * reads a bounded number of rows a night, from where the last night stopped, by the rule `checkPaths` answers a
  * document with (record `methods/pages-census.ts`): `pathsOf` finds the paths, a field of the row's own list is named,
  * and the record's own read (`unnamed`) says which of the rest name nothing.

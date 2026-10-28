@@ -1,5 +1,5 @@
 /**
- * `model-answers` (PRF-A05 job 1): filed by the host from Slash's ledger and the dead model jobs, read back through the
+ * `model-answers`: filed by the host from Slash's ledger and the dead model jobs, read back through the
  * kernel's own `signs`. A green week, a red week whose newest ask failed, a red week of a dead job saying the fault's
  * own sentence and never its error, the 9-in-10 line, a hold in flight counted as nothing, the same count Settings reads,
  * a spent month read red until it turns and never as "No one asked", the other dead work in the facts, and an empty

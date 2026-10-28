@@ -1,5 +1,5 @@
 /**
- * One lesson learned twice, the cases `learning-promote.test.ts` leaves out (AGT-D15 jobs 2 and 3, built in batch 90 as
+ * One lesson learned twice, the cases `learning-promote.test.ts` leaves out (built in batch 90 as
  * `learningsTwice` and `promoteLearnings` in `src/methods/learnings.ts`).
  *
  * WHAT IS PINNED HERE. Somebody the learnings are closed to hears nothing: the read is refused, the press is refused,

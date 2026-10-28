@@ -1,5 +1,5 @@
 /**
- * The scope of what has none, proposed with its reasons (AGT-D04 job 1): each of decision 5's four votes alone, two
+ * The scope of what has none, proposed with its reasons: each of decision 5's four votes alone, two
  * that agree, two that disagree, a row already placed, a declined pair, the rows a finished project strands, and the
  * question's line at nought, one and many.
  */

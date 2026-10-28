@@ -1267,7 +1267,7 @@ export function understoodBrief(value: Record<string, unknown>, look: Look): str
   return out.join('\n');
 }
 
-/* ── The inbox at the agent door (AGT-B13 job 4) ──────────────────────────────────────────────────────────────────── */
+/* ── The inbox at the agent door ──────────────────────────────────────────────────────────────────── */
 
 /**
  * The six states in the order the door says them: what waits on a person first, then what was settled. `proposed` waits

@@ -1,5 +1,5 @@
 /**
- * A declared action pressed through the page's one `act` (PGS-A12 jobs 7 and 8): held with its Undo, asked first where
+ * A declared action pressed through the page's one `act`: held with its Undo, asked first where
  * it names a loss, refused in the record's own words with nothing left changed, and said and not run where this host
  * cannot carry it out.
  *

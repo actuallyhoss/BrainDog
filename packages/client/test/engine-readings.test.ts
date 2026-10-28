@@ -1,6 +1,6 @@
 /**
- * `client.engineReadings` ASKS THE RECORD WHAT THE MODEL WAS ASKED AND WHAT THE RECORD STILL DOES NOT UNDERSTAND
- * (ENG-B01 job 3), as a read of the method `engineReadings`, and hands back the record's answer unchanged: each purpose's
+ * `client.engineReadings` ASKS THE RECORD WHAT THE MODEL WAS ASKED AND WHAT THE RECORD STILL DOES NOT UNDERSTAND,
+ * as a read of the method `engineReadings`, and hands back the record's answer unchanged: each purpose's
  * asks, answers, kept and refused, what is owed and the last error, then the mentions pointing at nothing and the open
  * questions by cause. `null` comes from a host that hands the record no ledger.
  *

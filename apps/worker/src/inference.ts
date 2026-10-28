@@ -50,7 +50,7 @@ import {
 } from '@braindog/ports';
 
 /**
- * THE PORT IS IMPORTED, AND THE COPY THIS FILE CARRIED IS GONE (ENG-A06 job 1). It was here only while the barrel did not
+ * THE PORT IS IMPORTED, AND THE COPY THIS FILE CARRIED IS GONE. It was here only while the barrel did not
  * export `packages/ports/src/inference.ts`; the barrel does now (`export * from './inference.ts'`), so the three refusals
  * are the port's own, sentence for sentence, and they carry `why` for a router as well. Re-exported so the Worker's own
  * callers and tests keep the one import they had.

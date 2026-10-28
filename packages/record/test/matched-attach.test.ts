@@ -1,5 +1,5 @@
 /**
- * `matched` lists the names Slash put on somebody alone (ENG-B15 job 4): once Slash stands at Do and tell on attaching,
+ * `matched` lists the names Slash put on somebody alone: once Slash stands at Do and tell on attaching,
  * its question is accepted by the ladder and the line lands under the ladder's name. Each is listed as an `attach`,
  * with the text's own words, who it went to and the batch its Undo takes; one the owner answered is not, nor one
  * undone. One Undo of it takes Slash's rung back (`landed`).

@@ -1,5 +1,5 @@
 /**
- * Migration 35 marks the repeats a record held before a skip kept its mark (audit-35 finding 3, the back-fill).
+ * Migration 35 marks the repeats a record held before a skip kept its mark (the back-fill).
  *
  * MEASURED BEFORE: a text skipped as a repeat before 7b88e5c2 kept only "transactions#1 already says this." and no
  * `match` line, so "Held as repeats" was empty on a record that took texts then, and "It is a second one" refused each.

@@ -1,5 +1,5 @@
 /**
- * A book's own month (REC-A09 step 2), read through the kernel on a record that installed Money the way a person does
+ * A book's own month, read through the kernel on a record that installed Money the way a person does
  * and then kept two books.
  *
  * The clock is 18 September 2026. A book's month is the cleared entries of the Ledger filed in it since the first, a

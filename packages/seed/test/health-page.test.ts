@@ -1,5 +1,5 @@
 /**
- * Health (PRF-A05 job 5): the record's vital signs as one declared page, drawn from the built-in source `signs` and the
+ * Health: the record's vital signs as one declared page, drawn from the built-in source `signs` and the
  * built-in figures `signs-red` and `green-days`, and from nothing else.
  *
  * READ THROUGH THE KERNEL'S OWN `readPage`, over a host that hands it signs and two figures, so what is asserted is what

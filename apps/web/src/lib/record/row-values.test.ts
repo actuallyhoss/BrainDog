@@ -1,5 +1,5 @@
 /**
- * An entry's own document, drawn on its own screen (PGS-B03 c): the resolver over what the record read for it prints the
+ * An entry's own document, drawn on its own screen: the resolver over what the record read for it prints the
  * stage and the count where the screen printed holes, through the same renderer the screen draws with.
  *
  * WHAT WAS MEASURED BEFORE IT: the screen's resolver was `() => null`, so every `{{path}}` in a project's note was a hole,

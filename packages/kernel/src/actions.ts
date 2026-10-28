@@ -1693,7 +1693,7 @@ export type Egress = {
   line: string;
   /**
    * An action sending a key gets a line of its own (question 8). A project's action names the project and the key, and
-   * says when the key is kept for every project (H.762); a key whose keychain entry names no host says the host this
+   * says when the key is kept for every project; a key whose keychain entry names no host says the host this
    * approval pins it to. `null` when there is neither.
    */
   key_line: string | null;
@@ -1758,7 +1758,7 @@ export function egressOf(
      The line names the project and the key, which is the fact somebody would otherwise have to go and look up. A key
      kept for another project never gets this far: `keyOutOfScope` refuses it at declaration. */
   const said: string[] = [];
-  /* A GLOBAL KEY IN A PROJECT'S ACTION KEEPS ITS OWN LINE (H.762), and says it is kept for every project, because that
+  /* A GLOBAL KEY IN A PROJECT'S ACTION KEEPS ITS OWN LINE, and says it is kept for every project, because that
      is the one thing a reader approving a project's action would otherwise assume the other way. `scopeOf` reads the
      key's row; without one, or for a key no row places, the line says what it always did. */
   if (project !== null && key !== null)

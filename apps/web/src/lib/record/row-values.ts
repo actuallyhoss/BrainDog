@@ -1,5 +1,5 @@
 /**
- * THE RESOLVER AN ENTRY'S OWN DOCUMENT IS DRAWN WITH (PGS-B03 c), over what the record read for it (`get` with
+ * THE RESOLVER AN ENTRY'S OWN DOCUMENT IS DRAWN WITH, over what the record read for it (`get` with
  * `values: true`, `docValues` in the record). Before it the entry's screen answered nothing for every path, so a
  * project's note that said `{{blockers.count}} in the way` printed a hole on the project's own screen.
  *

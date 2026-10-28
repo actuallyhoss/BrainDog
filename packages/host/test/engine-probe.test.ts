@@ -1,5 +1,5 @@
 /**
- * The engine's probe, the host's half (ENG-A08 job 3): one press asks each model of the answer route a fixed prompt.
+ * The engine's probe, the host's half: one press asks each model of the answer route a fixed prompt.
  *
  * WHY THIS FILE EXISTS. After he mended a key he waited half an hour for the jobs' next try to know whether the model
  * answered. Each case hands the probe a canned wire (no real model, no real key) over Slash's real ledger, and reads both

@@ -23,7 +23,7 @@
  * undone, and when a nightly job that was answered spoke about it. The hash of two rows is the one a nightly job
  * already names a pair by, so a pair shown under either reader is the same pair.
  *
- * A MODEL WEEDS, AND NEVER DECIDES (ENG-B04 job 3). A nightly job that was answered keeps each verdict in its band
+ * A MODEL WEEDS, AND NEVER DECIDES. A nightly job that was answered keeps each verdict in its band
  * (`people.ts` `answeredOnly`): a pair read as two things, or under the low band, is settled and left out; one in the
  * top band is kept with `judged`, its score, and ranks first; one between is offered as if no model had spoken. A job
  * answered before verdicts were kept says no band, and every pair it spoke about is settled, as before. Nothing is

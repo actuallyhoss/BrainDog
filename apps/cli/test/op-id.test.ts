@@ -1,5 +1,5 @@
 /**
- * A write whose answer was lost is sent once more with the same operation id, and is one entry (AGT-B05 job 3).
+ * A write whose answer was lost is sent once more with the same operation id, and is one entry.
  *
  * WHY THIS FILE EXISTS. The bridge never sent a tool call twice, so a create that timed out was answered UNREACHABLE
  * whether the host had written it or not, and the agent wrote it again: two tasks for one "add a task". Now `forward`
@@ -9,7 +9,7 @@
  * THE HOST HERE IS A FAKE THAT KEEPS ENTRIES BY OPERATION ID, as the kernel does (`opId` in
  * `packages/kernel/src/index.ts`), and loses the answer it chooses after it has written. That is the failure itself: the
  * write landed and the answer did not. The last case runs the same through a real self-host, whose door lists the
- * argument (`packages/mcp/src/index.ts`, AGT-B05 job 1); it turns to a todo if the door stops listing it.
+ * argument (`packages/mcp/src/index.ts`); it turns to a todo if the door stops listing it.
  *
  * RED FIRST, MEASURED over a copy of `src/bridge.ts` with one line changed: with the retry in `forward` gone, the lost
  * create, the twice-away create, the update and the self-host case go red (one POST, UNREACHABLE); with `withOpId`
@@ -202,7 +202,7 @@ test('withOpId AND opTools: only create and update, only a listed argument, and 
   assert.equal(withOpId({ jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'braindog:boot' } }, takes).again, false);
 });
 
-/* THE DOOR TAKES THE ARGUMENT once `create` lists it (AGT-B05 job 1); until then it refuses it, and this case waits. */
+/* THE DOOR TAKES THE ARGUMENT once `create` lists it; until then it refuses it, and this case waits. */
 const listed = opTools({ tools: TOOLS.map((x) => ({ name: x.name, inputSchema: (x as unknown as { input: unknown }).input })) }).has('create');
 
 /** A real self-host holding a Things list, and a fetch to it that throws away the first answer to the tool `lost`. */

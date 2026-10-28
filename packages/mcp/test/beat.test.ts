@@ -1,5 +1,5 @@
 /**
- * The agent door beats on each tool call (AGT-C03 step 4, "a real heartbeat"): any client on the door reads Working
+ * The agent door beats on each tool call ("a real heartbeat"): any client on the door reads Working
  * while it calls tools, hook or none. A beat is never waited on and never fails or slows the call it rides on, a call
  * the door refused before the record saw it does not beat, and a surface with no `beat` answers as it always has.
  */

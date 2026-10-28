@@ -1,5 +1,5 @@
 /**
- * A book's page says its month: one row of In this month, Out this month and Net (REC-A09 step 3), one test an effect.
+ * A book's page says its month: one row of In this month, Out this month and Net, one test an effect.
  *
  * ON A RECORD HOLDING MONEY AS ITS PACK DOCUMENT SAYS IT, as `money-book-figures.test.ts` measures the figures: the
  * three packs installed with no example entries, two books with an account each, Ledger entries written as a person
@@ -8,7 +8,7 @@
  *
  * RED FIRST: with no row on `pages/book.ts` the page has no block called This month.
  *
- * AND ITS MONTHS AND WHAT IT IS OWED (REC-A09 step 3, second half): a chart of the book's in and out by month, and a row
+ * AND ITS MONTHS AND WHAT IT IS OWED (second half): a chart of the book's in and out by month, and a row
  * of owed to, owed by and lasts until. A BLOCK IS ON THE PAGE ONCE EVERY FIGURE IT READS IS DECLARED (`bookPage`), so
  * the page is held here both ways: with every figure, and with the figures the tree has today.
  *
@@ -443,7 +443,7 @@ test('WHAT IS DUE IS READ ABOUT THIS BOOK, each cell by its own words and none r
   assert.equal(blockOf(r.k, OWED, 'Household').drawn, false, "another book's bill drew a row here");
 });
 
-/* THAT A BOOK'S MONEY LASTS THE YEAR IS SAID (REC-A09 step 2, book-lasts-year-78). The cell Money lasts until holds a
+/* THAT A BOOK'S MONEY LASTS THE YEAR IS SAID (book-lasts-year-78). The cell Money lasts until holds a
    day only while the walk goes under, so a book whose money lasts read nothing of how long: the good news was a gap in
    a row, or no row at all. One line under What is due says it, drawn on the reading carrying `beyond`, the walk having
    reached its last day above zero, and never on the figure being empty, which a book nobody put money in is too. */

@@ -1,5 +1,5 @@
 /**
- * The computed sources as data (SHL-A18 job 2): every source a block may name in place of a list, each with the block
+ * The computed sources as data: every source a block may name in place of a list, each with the block
  * kind it draws as, so the web asks for "computed, draws as forecast" and spells no source id
  * (`apps/web/src/lib/page/BlockSlot.svelte` named the walk's source twice).
  *

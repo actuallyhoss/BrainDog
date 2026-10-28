@@ -1,5 +1,5 @@
 /**
- * SLASH'S REACH: TOOLS AND SKILLS, AND TONE (ENG-B20 job 1).
+ * SLASH'S REACH: TOOLS AND SKILLS, AND TONE.
  *
  * The aim: "spark basically organizes and designs the tone of your braindog to fit your exact product." and "the
  * pages you see, the extensions, the pages, the tools, everything." The one recommender (`design-agent.ts`) weighs the

@@ -1,5 +1,5 @@
 /**
- * The card an ask on `/slash` draws where he asked (ENG-B16 job 2): one card, from the palette's own `filedCard`, saying
+ * The card an ask on `/slash` draws where he asked: one card, from the palette's own `filedCard`, saying
  * both names once answered; none for a reading; and, left unanswered, the filing that already waits on Decide.
  */
 

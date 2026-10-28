@@ -1,5 +1,5 @@
 /**
- * The agent door's list of resources from one read: `resources()` over the record's `offered` (AGT-B04 jobs 2 to 5).
+ * The agent door's list of resources from one read: `resources()` over the record's `offered`.
  *
  * WHAT WAS SLOW. `resources/list` read every fixed address in full to learn whether to list it, then drew every page to
  * find its figures: 8 seconds on the owner's record of 54 pages, at every session start. With `offered` the record says

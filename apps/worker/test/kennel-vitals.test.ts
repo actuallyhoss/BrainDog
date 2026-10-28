@@ -1,5 +1,5 @@
 /**
- * The Kennel's four vital signs (`kennelVitals` in `src/kennel.ts`, SHL-B01 job 5) over a map standing in for R2 and a
+ * The Kennel's four vital signs (`kennelVitals` in `src/kennel.ts`) over a map standing in for R2 and a
  * function standing in for the static assets: a well night says four marked lines, and each sign goes red on its own
  * planted case while the other three stay well. Then the nightly walk carries them into the note (`summaryOf`).
  */

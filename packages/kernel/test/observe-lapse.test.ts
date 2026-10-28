@@ -1,5 +1,5 @@
 /**
- * An offer he let lapse is a no on the brake (ENG-B17 job 2): `slashBrake` counts it in the window, ordered by when it
+ * An offer he let lapse is a no on the brake: `slashBrake` counts it in the window, ordered by when it
  * lapsed, and `mayPropose` says so in its sentence.
  *
  * HOW A LAPSE IS CLOSED TODAY. The design agent's `queueOf` only computes `lapsed` (an open offer whose `lapses` day is

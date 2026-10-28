@@ -1,5 +1,5 @@
 /**
- * Every optional setting of `wrangler.jsonc`, unset, and the door that needs it asked (LCH-C13 job 5, "product must
+ * Every optional setting of `wrangler.jsonc`, unset, and the door that needs it asked ("product must
  * answer the same wherever run", HD.132): the refusal names the setting, so an operator who left one out reads which.
  *
  * THE LIST IS READ FROM THE CONFIG, NEVER WRITTEN HERE. The vars are the keys of every environment's `vars`; the secrets

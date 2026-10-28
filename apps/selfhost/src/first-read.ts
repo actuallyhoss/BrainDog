@@ -1,6 +1,6 @@
 /**
  * THE FIRST READ ON A SELF-HOST: what `serveFirstRead` (`@braindog/host/first-read`) is handed at `/auth/signup/read`,
- * the same door the Cloud mounts (USE-B05 job 4), over this host's own model and a count kept in memory.
+ * the same door the Cloud mounts, over this host's own model and a count kept in memory.
  *
  * OFF AS SHIPPED, AS ON THE CLOUD. The door is `on` only where this host has a model (`SLASH_ENDPOINT`, read by
  * `slashFromEnv`) and `FIRST_READ_DAILY` is a whole number above 0, the operator's yes to a stranger's words reaching that

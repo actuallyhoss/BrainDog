@@ -1,5 +1,5 @@
 /**
- * Checkout charges what the page said (audit-38-39 finding 9). The list and the checkout read a plan's price from the one
+ * Checkout charges what the page said. The list and the checkout read a plan's price from the one
  * table of plans, and Stripe charges the price a setting names, so checkout reads that price first: one amount in
  * dollars that is the table's opens the page, and any other answer is refused in one sentence before a session is made.
  *

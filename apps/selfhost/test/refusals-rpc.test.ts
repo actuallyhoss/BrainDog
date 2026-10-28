@@ -103,7 +103,7 @@ for (const fixture of slice) {
       assert.ok(refusal !== undefined && !Array.isArray(refusal), `${where} was refused with no refusal object`);
       assert.equal(refusal.code, fixture.keys.get('code'));
 
-      /* A 401 SAYS ONLY `unauthorized` (LCH-C08 job 2, P.154): the one body on both hosts, with no `at` and no
+      /* A 401 SAYS ONLY `unauthorized`: the one body on both hosts, with no `at` and no
          sentence, whatever the fixture's header still says. Its reason is in the log. */
       if (refusal.code === 'UNAUTHORIZED') {
         assert.equal(res.status, 401, `${where} answered ${String(res.status)}`);

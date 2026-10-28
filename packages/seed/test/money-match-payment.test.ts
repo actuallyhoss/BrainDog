@@ -1,5 +1,5 @@
 /**
- * A payment that names nothing finds what it pays (REC-B11 step 3), one test an effect.
+ * A payment that names nothing finds what it pays, one test an effect.
  *
  * `matchPayment` IS THE DECISION AND `run` IS THE SCRIPT ROUND IT, and both are measured: the decision on plain fields,
  * and the script as a host's sandbox runs it, its declared `source` imported as a module and handed a `ctx`, the way

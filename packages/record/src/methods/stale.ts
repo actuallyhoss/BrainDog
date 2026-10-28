@@ -344,7 +344,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
 export const staleCount = (lines: readonly StaleLine[]): number => lines.reduce((n, l) => n + l.count, 0);
 
 /* ---------------------------------------------------------------------------------------------------------------------
- * WHERE WHAT HAS NO SCOPE BELONGS (AGT-D04 jobs 2 and 3): `scopeProposals` (READ+) says it a list, and `proposeScopes`
+ * WHERE WHAT HAS NO SCOPE BELONGS: `scopeProposals` (READ+) says it a list, and `proposeScopes`
  * (DATA) puts it on Decide as one question a list, so a person answers once and not once a row. The votes are
  * `scope-propose.ts`'s, pure; what is here gathers what they read, with reads the record already makes, under the
  * caller's own grant, and files what they answer.

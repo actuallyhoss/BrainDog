@@ -5260,7 +5260,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(row ? { row: true as const } : {}),
       });
     }
-    /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`, ENG-B09 job 5): each page whose basis moved
+    /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`): each page whose basis moved
        is kept with when it was first seen owed (`HEADLINES_OWED`), and none is asked about until `HEADLINE_OWED_MS` after
        the first, so the writes of one sitting are answered in one ask. The night asks every page it owes at once. */
     const waits = again ? owedSince(owedOn(prefs[HEADLINES_OWED]), due.map((d) => ({ page: d.page.page, basis: askedAt(d.basis, d.facts) })), clock.now()) : [];
@@ -11379,7 +11379,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          finding from this, each with its page's address by its title. */
       const slugs = new Map(kernel.pages().map((p) => [p.title, p.slug] as const));
       kernel.setPref(ROUND_HOLDER, ROUND_KEPT, keptRound(round, clock.now(), (title) => slugs.get(title) ?? null));
-      /* THE PAGES CENSUS BESIDE THE LINT (PGS-A01 step 5): every page, read as the system, and the suggested pages waiting
+      /* THE PAGES CENSUS BESIDE THE LINT: every page, read as the system, and the suggested pages waiting
          in the holding pen, so the sign also says which pages show a refused block or print a path that named nothing. */
       const census = await censusMethods(methodDeps()).pagesCensus(undefined, { principal: { kind: 'system', id: 'signs' } });
       const suggested = penFor({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(), use: { sql, nowMs: clock.now() } }).filter((i) => i.kind === 'page').length;
@@ -15171,7 +15171,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (reader !== null) trust.markUntrusted(reader, 'the inbox');
         return answer({ counts: kernel.inboxCounts(), states });
       }
-      /* `repeats: true` PAGES THROUGH THE SECOND COPIES ALONE (audit-35 #3): a skipped arrival ingest marked as repeating a
+      /* `repeats: true` PAGES THROUGH THE SECOND COPIES ALONE: a skipped arrival ingest marked as repeating a
          row, each carrying that row's id as `repeats`, so "It is a second one" is offered by the mark and a page of rule
          skips can no longer hide a real second charge. */
       const repeats: unknown = args?.repeats;

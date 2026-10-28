@@ -1,5 +1,5 @@
 /**
- * A project page says who worked on it once, and what it runs on under one heading (AGT-C12 job d, AGT-D12 job 2).
+ * A project page says who worked on it once, and what it runs on under one heading (AGT-C12 job d).
  *
  * HIS PROJECT PAGES LISTED SIX CARDS ALL TITLED BY THE RECORD'S OWN NAME FOR A RUN. The Agents tile read every run
  * placed in the project, so a run and each helper it started were a card apiece, and so was a run that opened and

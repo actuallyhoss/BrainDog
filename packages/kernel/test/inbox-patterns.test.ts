@@ -1,5 +1,5 @@
 /**
- * What each pattern did with the last fourteen days, door by door (REC-A03 step 5): filed, skipped with its reason,
+ * What each pattern did with the last fourteen days, door by door: filed, skipped with its reason,
  * waiting, and one line for the texts no pattern read. The agent door reads it as `braindog:inbox/patterns`, and the
  * Inbox draws it under "What comes in".
  *

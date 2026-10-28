@@ -1,5 +1,5 @@
 /**
- * An arrangement carries the whole list (REC-A06 job 5, steps 5 and 6, and F67): one proposal installs an add-on, changes
+ * An arrangement carries the whole list (steps 5 and 6, and F67): one proposal installs an add-on, changes
  * a setting of one already here, patches an entry and declares a daily feed, and the owner reads it as one question of
  * four parts. Each call out is listed by host and how often, each key it needs names the parts that need it, and an
  * accept that leaves one part unticked leaves one question open holding that part.

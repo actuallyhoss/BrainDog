@@ -1,5 +1,5 @@
 /**
- * A project's one line is typed on its card on Projects (PGS-C15 job 4): the In play cards say `edit: true` on `about`
+ * A project's one line is typed on its card on Projects: the In play cards say `edit: true` on `about`
  * and on nothing else, the page still installs on a fresh record, and the line reaches the page the web draws.
  *
  * WHAT IS TYPED IS THE WEB'S (`apps/web/src/lib/page/card-writes.ts`), through the writer every page write uses. Here

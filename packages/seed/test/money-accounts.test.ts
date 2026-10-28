@@ -1,5 +1,5 @@
 /**
- * An account that closes (REC-B15 jobs 2 and 5): it leaves the forms, the count of accounts and Cash now, and every
+ * An account that closes: it leaves the forms, the count of accounts and Cash now, and every
  * month it was open reads as it did.
  *
  * WHY. An account money moved through cannot be deleted (`delete: 'refuse_while_referenced'`), so until it could close

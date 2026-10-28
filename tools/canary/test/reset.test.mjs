@@ -1,6 +1,6 @@
 /**
  * The weekly reset puts a record back through its own `export` and `import`, as its owner, and says so only when the
- * record reads back as itself (PRF-A09 job 5).
+ * record reads back as itself.
  *
  * TWO FRESH SELF-HOSTS: one stands in for the canary, and the other's export for the lived profile, which keeps the
  * test to seconds; the lived build itself is what `reset.mjs` reads when it runs.

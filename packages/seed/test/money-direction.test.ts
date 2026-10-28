@@ -1,6 +1,6 @@
 /**
- * Categories going the other way (REC-A13 job 2), read through the kernel on a record that installed Money the way a
- * person does, with no example entries. "5 of 15 categories carry the wrong direction" (H.607): an import filed money
+ * Categories going the other way, read through the kernel on a record that installed Money the way a
+ * person does, with no example entries. "5 of 15 categories carry the wrong direction": an import filed money
  * coming in under categories marked "Money out", and nothing noticed.
  *
  * RED FIRST: with `direction.ts` out of `figures/index.ts` the first test fails on `METRICS`, and with the hop's `where`

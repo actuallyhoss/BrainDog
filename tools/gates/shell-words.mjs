@@ -289,7 +289,7 @@ const EXEMPT = {
   },
 };
 
-/* THE EXEMPT PATHS, BY THE NAME THE LEDGER READS THEM UNDER (PRF-B03 step 3): `ledger.json` holds `shell-words.EXEMPT`
+/* THE EXEMPT PATHS, BY THE NAME THE LEDGER READS THEM UNDER: `ledger.json` holds `shell-words.EXEMPT`
    at its newest line, so this list only shrinks, and a fall is a line written there. */
 export { EXEMPT };
 

@@ -1,5 +1,5 @@
 /**
- * AGT-B10 job 1, and AGT-C03's beat: the start and end entries say they are working, every BrainDog hook entry ends
+ * and AGT-C03's beat: the start and end entries say they are working, every BrainDog hook entry ends
  * inside ten seconds, the beat after each tool call says nothing, and an older entry of BrainDog's own is rewritten
  * where it stands rather than joined by a second.
  *

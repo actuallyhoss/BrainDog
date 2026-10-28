@@ -1,5 +1,5 @@
 /**
- * A sealed key nobody opens is counted (AGT-D17 job 1): the figure `keys-unopened` and the tidy's finder of that name.
+ * A sealed key nobody opens is counted: the figure `keys-unopened` and the tidy's finder of that name.
  *
  * WHAT WAS MEASURED BEFORE THIS. Each opening stamped its grant's `last_opened` and nothing read it, so a key sealed
  * two years ago and never opened looked the same as one opened this morning. These hold the count on a real record:

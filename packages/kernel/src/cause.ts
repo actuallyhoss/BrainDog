@@ -254,7 +254,7 @@ export const RECHECK_BOUND = 200;
 const MOOTABLE = "body_kind IN ('rowset', 'change', 'pack', 'settings')";
 
 /**
- * Close each open question that is already so, as `moot` (AGT-C08 job 2). The hourly sweep runs it (`sweepRecord`), so a
+ * Close each open question that is already so, as `moot`. The hourly sweep runs it (`sweepRecord`), so a
  * question about rows the owner then changes by hand to what it asked is gone inside the hour.
  *
  * BOUNDED AND TURNING. At most `RECHECK_BOUND` questions a tick, oldest first, and each hour starts that many further

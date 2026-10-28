@@ -1,5 +1,5 @@
 /**
- * What this caller is offered, in one read: `offered`, READ+ (AGT-B04 job 1, "the list of resources in under a second").
+ * What this caller is offered, in one read: `offered`, READ+ ("the list of resources in under a second").
  *
  * WHAT WAS SLOW. The agent door listed its resources by reading every fixed address in full to see whether it answered,
  * then drawing every page to find the figures on it, then listing the skills: 20 seconds on a record of 54 pages, 8

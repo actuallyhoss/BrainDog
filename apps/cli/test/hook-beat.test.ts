@@ -1,5 +1,5 @@
 /**
- * `braindog hook beat` (AGT-B10 job 5, AGT-C03 step 5): after a tool call, one `beat` for the session's run at most
+ * `braindog hook beat`: after a tool call, one `beat` for the session's run at most
  * every five minutes, inside two seconds, never thrown; and the hook script reads the stamp's age before Node starts.
  *
  * MEASURED BEFORE THIS EXISTED: a session that edited files for forty minutes and called no BrainDog tool read Quiet,

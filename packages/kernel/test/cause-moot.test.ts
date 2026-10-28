@@ -1,5 +1,5 @@
 /**
- * A question already so is closed as moot within the hour (AGT-C08 job 2).
+ * A question already so is closed as moot within the hour.
  *
  * WHAT WAS MEASURED BEFORE THIS. A question about rows the owner then changed by hand to the very values it asked for
  * stayed open until somebody pressed something ("how good is braindog's mcp at cleaning up stale stuff?").

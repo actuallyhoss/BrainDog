@@ -1,5 +1,5 @@
 /**
- * The shape copy's guard (PRF-A13 job 2, `area-proof-a.md` 2.5 "Guard").
+ * The shape copy's guard (`area-proof-a.md` 2.5 "Guard").
  *
  * A record written from a marked vocabulary, in every place a person's words can live: a register of his own with
  * his field ids and his states, its entries, a person, a membership, a key's label and hint, a decision, a

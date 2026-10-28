@@ -14,7 +14,7 @@ const IN_THE_ORDER_MADE = [{ field: 'seq', dir: 'asc' }];
 
 export const BUDGET: Record<string, unknown>[] = [
   {
-    /* WHAT IS LEFT OF EACH MONTH'S BUDGET, ON MONEY ITSELF (REC-B19 step 4), for categories and budgets. The
+    /* WHAT IS LEFT OF EACH MONTH'S BUDGET, ON MONEY ITSELF, for categories and budgets. The
        block that pairs each budgeted category with what it has spent was the Personal use case's alone
        (`usecases/personal.ts`), so a record that keeps its money here and is not a household's had a budget field on
        its categories and nowhere that read it. Each category that holds a most a month is set against what the ledger

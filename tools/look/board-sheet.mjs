@@ -1,6 +1,6 @@
 /**
  * The sheet of one board: every picture of a drawing, light and then dark, the screen as it is today beside the
- * candidate and each variant, the checks it is judged by, and what it could not draw yet (EXP-A01 job 2).
+ * candidate and each variant, the checks it is judged by, and what it could not draw yet.
  *
  *   node tools/look/board-sheet.mjs <drawing folder>      draws the sheets again from its drawing.json
  *

@@ -1,5 +1,5 @@
 /**
- * The card's two late lines (AGT-C18 part B, AGT-C14 build 3): how many things went stale where the session stands, and
+ * The card's two late lines (AGT-C18 part B): how many things went stale where the session stands, and
  * which two lessons Learned leads with.
  *
  * THE NUMBER WAS COUNTED AND NEVER SHOWN. `context` sends `stale` on every call and the card said nothing of it, so no

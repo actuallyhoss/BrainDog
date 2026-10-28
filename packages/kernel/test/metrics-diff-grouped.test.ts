@@ -1,7 +1,7 @@
 /**
  * A difference is read in parts, and against the window before.
  *
- * "spent-vs-last-month (diff, for "Outings up 40%" note and paired bars)" (H.207). A difference of two halves grouped
+ * "spent-vs-last-month (diff, for "Outings up 40%" note and paired bars)". A difference of two halves grouped
  * by a field was refused whole, "a ratio or a diff is not grouped in this build; group each half as its own figure",
  * so nothing could say which category moved against last month. Held here:
  *

@@ -1,5 +1,5 @@
 /**
- * Two offers a list earns by growing as it is used (USE-B13 jobs 5 and 7; `29 §3` T4 and the open-count trigger; W.146:
+ * Two offers a list earns by growing as it is used (`29 §3` T4 and the open-count trigger; W.146:
  * "make sure it's something that grows as user uses it").
  *
  * A GROUPING (`groupingsOffered`): a list that a page draws as a table and that holds `GROUP_ROWS_FEWEST` entries or

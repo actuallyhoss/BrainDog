@@ -1,5 +1,5 @@
 /**
- * Closing an account (REC-B15 step 3), as the decision, the script a host runs round it, and the declaration a pack
+ * Closing an account, as the decision, the script a host runs round it, and the declaration a pack
  * document carries.
  *
  * AN ACCOUNT MONEY MOVED THROUGH IS CLOSED, NOT DELETED (`lists/accounts.ts`), and closing one that still holds money

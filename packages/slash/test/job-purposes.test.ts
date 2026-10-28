@@ -1,5 +1,5 @@
 /**
- * Each piece of the record's own work says on its ledger row what it bought (ENG-A10 job 2, budget-plan-86#6).
+ * Each piece of the record's own work says on its ledger row what it bought (budget-plan-86#6).
  *
  * RED BEFORE THIS: `jobs.ts` wrote every row it accounted with the one `WORK`, purpose `look`. So a digest's two
  * sentences, a pattern drafted for the inbox and every embedding were filed under the daily look: Usage read the

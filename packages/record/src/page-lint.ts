@@ -381,7 +381,7 @@ export function lintRound(deps: PageLintDeps): PageLintRound {
 /* ── the sign ───────────────────────────────────────────────────────────── */
 
 /**
- * The four counts the pages census adds to the sign (PGS-A01 step 5), as the kernel files them beside its value
+ * The four counts the pages census adds to the sign, as the kernel files them beside its value
  * (`SIGN_COUNTS` in `kernel/src/signs.ts`): pages with a refused block, pages that print a path that named nothing, pages
  * the record does not hold, and suggested pages waiting. `suggested_waiting` is left out when nobody counted it.
  */
@@ -487,7 +487,7 @@ const says = (n: number, one: string, many: string, names: readonly string[] = [
   n <= 0 ? '' : `${n === 1 ? `1 ${one}` : `${integer(n)} ${many}`}${listed(names)}.`;
 
 /**
- * The round's reading with the pages census beside it (PGS-A01 step 5): the four counts ride on the reading, and the
+ * The round's reading with the pages census beside it: the four counts ride on the reading, and the
  * sentence names the worst first. A REFUSED BLOCK AND A PATH THAT NAMED NOTHING TURN THE SIGN RED, whatever the lint
  * found: either is a page that shows its reader less than the record holds. Pages the record does not hold and
  * suggested pages waiting are said, never judged. The census is the record's own (`pagesCensus`), never a second scan.

@@ -1,5 +1,5 @@
 /**
- * The days a deleted record's last copy is kept are one number everywhere it is said (LCH-A16 job 1, "privacy text
+ * The days a deleted record's last copy is kept are one number everywhere it is said ("privacy text
  * says so", HD.394).
  *
  * THE NUMBER IS `FINAL_KEPT_DAYS` (`apps/worker/src/destroy.ts`), the one the night's expiry runs on. The app's delete

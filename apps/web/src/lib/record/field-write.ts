@@ -22,7 +22,7 @@
  * `money` with no currency were both ACCEPTED, which is worse: a link to no list, and an amount nobody said the
  * currency of. So a choice is sent with its values, a link with the list it points at (picked from the record's own,
  * never typed), money only once the record has a currency of its own, and `list` is always a list of text; `fieldOf` refuses each missing piece in
- * one sentence before anything is sent, and the record is to refuse the same at lint (SHL-B11 job 1). `secret` is never
+ * one sentence before anything is sent, and the record is to refuse the same at lint. `secret` is never
  * a field on a row. `instant` and `duration` are left for the Fields sheet, which asks more: its kinds are
  * `SHEET_KINDS` below, and `drafted` asks each the one more thing it needs by the same rules.
  */
@@ -108,7 +108,7 @@ export function choicesSaid(typed: string): { ok: true; values: string[] } | { o
  * The currency money is kept in, or the sentence saying why it is not one: `'record'`, the record's own, picked by that
  * word or by its code. `home` is the record's own (`homeCurrency()`).
  *
- * ONLY THE RECORD'S OWN, UNTIL THE KERNEL TAKES A FIELD'S CURRENCY (`FIELD_KEYS` has no `currency`, SHL-B11 job 1). The
+ * ONLY THE RECORD'S OWN, UNTIL THE KERNEL TAKES A FIELD'S CURRENCY (`FIELD_KEYS` has no `currency`). The
  * one other place a field says a currency is its default, and a default is written into every row made after it: a
  * Fee declared as nought in yen read 0 JPY on each new project, a figure nobody typed. So another code is refused in
  * one sentence rather than sent that way, and a code the runtime does not know is refused as not a currency.

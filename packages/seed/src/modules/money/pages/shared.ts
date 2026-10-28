@@ -1,6 +1,6 @@
 /**
  * What more than one of Money's pages, or a use case's Home, reads: one book's walk, the week's bills, the thirty days'
- * sentence and the columns of what moved. Cut out of `money.ts` with no change (REC-B01 job 1).
+ * sentence and the columns of what moved. Cut out of `money.ts` with no change.
  */
 
 import type { Leg } from '@braindog/kernel';

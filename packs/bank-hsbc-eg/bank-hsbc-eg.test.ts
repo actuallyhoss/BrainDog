@@ -367,7 +367,7 @@ test('AN ACQUIRER\'S PREFIX COMES OFF THE MERCHANT (1.4.0): a card charge at FAW
  * TWO EQUAL WITHDRAWALS ARE TWO ROWS WHEN EACH PRINTS ITS OWN BALANCE. The account line's near rule read the amount,
  * the account, a day either side and the start of the description, and two cash withdrawals of one amount on one day
  * share all four, so the second was skipped as already said. The balance each prints is what the account held after it,
- * so the rule reads it too (H.792). A day apart is checked as well, because it is the case the near rule's day window
+ * so the rule reads it too. A day apart is checked as well, because it is the case the near rule's day window
  * was written for. A balance CAN come back to a figure it printed before, so this tells most twins apart and not all:
  * the known skip below is the one it misses.
  */

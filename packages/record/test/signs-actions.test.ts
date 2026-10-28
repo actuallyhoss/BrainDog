@@ -1,5 +1,5 @@
 /**
- * The record's briefing names the signs of what runs by itself and what arrives (SHL-C01 job 4): a paused action, a job
+ * The record's briefing names the signs of what runs by itself and what arrives: a paused action, a job
  * that stopped after failing and a message nothing verified each reach `context` as a red sign, by name and sentence,
  * through `redSigns` and the kernel's closed list with no line of the record's own. And the `signs` read answers them.
  *

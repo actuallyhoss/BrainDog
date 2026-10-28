@@ -1,5 +1,5 @@
 /**
- * THE TWO KEYS THAT CARRY THE ACTIVITY PAGE (PGS-C24 job 1). The hand-built Activity draws a heading a day and one line
+ * THE TWO KEYS THAT CARRY THE ACTIVITY PAGE. The hand-built Activity draws a heading a day and one line
  * a run; a declared feed could say neither, so `/audit` could not be a page.
  *
  * `group: day` answers every row with `day`, the day it was written in the record's own zone, and nothing is folded

@@ -8,7 +8,7 @@
  * ITS OWN PAGES GO IN ON THAT SMALLER RECORD because a block that reads a list the record does not hold says so
  * (`when: { holds }`), and the plan takes the block out and the list out of the page's `requires` with it
  * (`packages/declare/src/when.ts`). A block that does not say so is still refused: that is what cutting a use case's
- * pages to fit (`fitted`, USE-B08 job 3) is for.
+ * pages to fit (`fitted`) is for.
  */
 
 import { test } from 'node:test';
@@ -70,7 +70,7 @@ test('A USE CASE STANDS ON ITS NEEDS, and on all of its modules when it says non
   assert.deepEqual(standsOn(pottery()), ['money-core']);
   const { needs: _, ...without } = pottery();
   assert.deepEqual(standsOn(without as UseCase), ['portfolio', 'people', 'money-core']);
-  /* FOUNDER 2.7.0 AND PERSONAL 2.6.0 SAY THEIR NEEDS (USE-B08 job 5), Projects and Money; a built-in that says none
+  /* FOUNDER 2.7.0 AND PERSONAL 2.6.0 SAY THEIR NEEDS, Projects and Money; a built-in that says none
      installs what it did before this. */
   assert.deepEqual(useCase('founder')!.needs, ['portfolio', 'money-core']);
   assert.deepEqual(useCase('personal')!.needs, ['portfolio', 'money-core']);

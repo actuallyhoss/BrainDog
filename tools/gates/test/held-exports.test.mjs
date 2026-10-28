@@ -1,5 +1,5 @@
 /**
- * The five held lists the ledger reads off their gates (PRF-B03 step 3), held to the ledger's newest lines.
+ * The five held lists the ledger reads off their gates, held to the ledger's newest lines.
  *
  *   node --test tools/gates/test/held-exports.test.mjs
  *

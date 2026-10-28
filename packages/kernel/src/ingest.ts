@@ -720,7 +720,7 @@ export const UNVERIFIED = 'nothing verified this arrival, so no pattern was offe
 export const UNVERIFIED_KEPT = 200;
 export const UNVERIFIED_BYTES = 25_000_000;
 
-/** The field a bank door reads the payee into, as printed (`loop/contract-17.md`), and the one an arrival keeps. */
+/** The field a bank door reads the payee into, as printed, and the one an arrival keeps. */
 export const COUNTERPARTY = 'counterparty_text';
 
 /**
@@ -1082,7 +1082,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason });
     }
 
-    /* HIS ACCEPTANCE IS THE APPROVAL THE CEILING WAITS FOR (ENG-B07). The header's rule is that a pattern nobody has
+    /* HIS ACCEPTANCE IS THE APPROVAL THE CEILING WAITS FOR. The header's rule is that a pattern nobody has
        approved yet writing rows into somebody's ledger is the one failure this design exists to prevent, and every
        pattern a model drafts is installed at `needs-review` for that reason. A person who said yes to the shape's one
        question has approved it: from then on what it reads exactly files as `exact`, and what it reads in part still
@@ -1122,7 +1122,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        key is the same from either (`payeeName` answers the text itself where its name would fold to another payee),
        so a payee met under the bank's words before this is the same one after. */
     const clean = printed === '' ? '' : payeeName(printed);
-    /* A NAME THE CARD TEXT MAY HAVE CUT IS NOBODY TO MEET (the audit of 25 October, Y2): met, it made a shop called
+    /* A NAME THE CARD TEXT MAY HAVE CUT IS NOBODY TO MEET: met, it made a shop called
        "Orbt Speciali" beside the same shop's whole name. The row still keeps the bank's words, and with them the key, so
        a shop the record holds by it is linked by the walk over the past (`backfill.ts`), which makes none from it. */
     if (printed !== '' && !mayBeCut(printed)) heard.counterparty = clean;
@@ -1166,7 +1166,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
     const pending = tails.filter((t) => !confirmedTail(deps.sql, t));
 
     /**
-     * ONE QUESTION PER LIST AND DIGITS, AT EVERY DOOR, WHERE THE ACCOUNT IS THE ONLY THING NOT READ (REC-A02).
+     * ONE QUESTION PER LIST AND DIGITS, AT EVERY DOOR, WHERE THE ACCOUNT IS THE ONLY THING NOT READ.
      *
      * Digits printed for an account nobody holds them on, and nothing else missing: the arrival waits under the one
      * question "Which account is the card ending 1234?", which every later text printing those digits joins, at this
@@ -1220,7 +1220,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
        * unreadable one is almost always a format that changed at their end and can be fixed here. Both
        * were named by one clause that said *could not read*, which is true of only one of them.
        *
-       * AND EACH SAYS THE PATTERN BY ITS NAME AND THE FIELDS BY THEIR LABELS (REC-A03). It named the pattern by its id
+       * AND EACH SAYS THE PATTERN BY ITS NAME AND THE FIELDS BY THEIR LABELS. It named the pattern by its id
        * and the fields by theirs, "bank-from-out could not read account, on out of this one", in front of a person who
        * chose neither word. `could not read ... out of this one` and `could not make sense of` are kept, so a check that
        * matched the sentence still finds it; a receipt already in a record keeps the words it was written with.
@@ -1228,7 +1228,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       const absent = missed.filter((field) => !invalid.includes(field));
       const words = wordsFor(deps, matched, register, arrival.channel);
       const by = opening(patternSaid(deps, matched));
-      /* EXCEPT AN ACCOUNT NOT FOUND, which is said in his words (REC-A02 step 7): the message printed no digits to ask
+      /* EXCEPT AN ACCOUNT NOT FOUND, which is said in his words: the message printed no digits to ask
          about, so it waits on its own question, and its reason names the field as the record speaks it and no pattern. */
       const unfound = absent.length > 0 && invalid.length === 0 && absent.every((field) => read.lookups.includes(field));
       const clauses = [
@@ -1280,9 +1280,9 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       store(state, reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
 
-      /* THE QUESTION IS SAID IN A PERSON'S WORDS, and since REC-A03 the reason is too. The reason is the inbox's; the
+      /* THE QUESTION IS SAID IN A PERSON'S WORDS, and now the reason is too. The reason is the inbox's; the
          question is what Decide draws, and it named the pattern and the list by their ids (`heldAsked`). */
-      /* A PATTERN DRAWN FOR A SHAPE ASKS ONE QUESTION FOR IT, NEVER ONE PER TEXT (ENG-B07). A text it reads only in part,
+      /* A PATTERN DRAWN FOR A SHAPE ASKS ONE QUESTION FOR IT, NEVER ONE PER TEXT. A text it reads only in part,
          or that its ceiling holds, joins the shape's one open question, whose count and samples grow; with none open and
          the pattern accepted it waits, and nothing new is asked by itself. A tail to confirm keeps its own question,
          because accepting that one is what confirms the account. */
@@ -1350,7 +1350,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
 
     const conflict = matched.on_conflict ?? 'skip';
     if (existing && conflict === 'skip') {
-      /* A SKIP IS NEVER SILENT (REC-A03): it keeps the row it repeats, on its `match` line, and says it by its name,
+      /* A SKIP IS NEVER SILENT: it keeps the row it repeats, on its `match` line, and says it by its name,
          amount and day, so the Inbox can offer "It is a second one" on the text itself. */
       const reason = repeatSaid(deps, register, existing, matched.dedupe);
       store('skipped', reason);
@@ -1385,7 +1385,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
           ...(Array.isArray(dedupe) ? [] : [`${said(dedupe.near.day)} within a day of it`]),
           ...(!Array.isArray(dedupe) && dedupe.near.prefix ? [`${said(dedupe.near.prefix.field)} starting the same way`] : []),
         ]);
-      /* THE ROW BY ITS TITLE AND THE PATTERN BY ITS NAME (REC-A03), where this said `transactions#1` and `bank-card`: the
+      /* THE ROW BY ITS TITLE AND THE PATTERN BY ITS NAME, where this said `transactions#1` and `bank-card`: the
          row's id still rides in `resembles`, for a screen and not for a person. */
       const title = rowTitle(deps.sql, register, existing.id);
       const reason = `This looks like ${title ?? `one already in ${words.list}`}, with ${listedIn((field) => fieldSaid(schema, field))}, so ${patternSaid(deps, matched)} held it for a person rather than skip it or file it twice.`;
@@ -1595,7 +1595,7 @@ export function openRowset(
 }
 
 /**
- * The cause of a question an arrival opens (AGT-C07): what `openRowset` joins on, the pattern, the list, the words, the
+ * The cause of a question an arrival opens: what `openRowset` joins on, the pattern, the list, the words, the
  * context, what it resembles and the payee it is about, hashed. Not its rows, which grow as arrivals join it, so the
  * cause stays put while the question does.
  */
@@ -1657,7 +1657,7 @@ function joinsOn(deps: IngestDeps, register: string, rows: readonly Record<strin
   return once.length === 1 ? once[0]! : JSON.stringify(once);
 }
 
-/* ── the digits a lookup reads an account by (REC-A02) ─────────────────── */
+/* ── the digits a lookup reads an account by ─────────────────── */
 
 /** The shortest bare run of digits read as an account's number rather than an amount, for the reverse tail. */
 const BARE_NUMBER = 8;
@@ -1708,7 +1708,7 @@ function firstRun(masked: string): { digits: string; starred: boolean } | null {
 /**
  * The reverse tail: printed digits longer than a stored value of three digits or more that they end in (`printedTail`).
  *
- * A BARE RUN IS KEPT BY ITS LAST FOUR, or by the stored value where that is longer (audit-34 finding 9). A bare run of
+ * A BARE RUN IS KEPT BY ITS LAST FOUR, or by the stored value where that is longer. A bare run of
  * `BARE_NUMBER` digits or more is a whole card or account number, and what is answered here is what a confirmation, a
  * tail question and an account's field keep: a text that printed a card's sixteen digits must never put them there.
  */
@@ -1889,7 +1889,7 @@ function currenciesOf(form: unknown, depth = 1): CurrencyOf[] {
 
 /**
  * `form` with each `currency: { of, field }` replaced by the code the row in `extracted[of]` holds there, or taken out
- * where it holds none: then only a code the text prints is read, and a text with neither waits (REC-A03).
+ * where it holds none: then only a code the text prints is read, and a text with neither waits.
  */
 function currencyFilled(deps: IngestDeps, form: Extractor, extracted: Record<string, unknown>, depth = 1): Extractor {
   if (form === null || typeof form !== 'object' || depth > NESTING) return form;
@@ -1995,7 +1995,7 @@ function readFields(deps: IngestDeps, matched: IngestDecl, body: string, text: s
   return read;
 }
 
-/* ── one question per list and digits, whatever door (REC-A02) ───────────── */
+/* ── one question per list and digits, whatever door ───────────── */
 
 /** The answer that says none of the accounts offered is the one. */
 export const NONE = 'none';
@@ -2012,7 +2012,7 @@ const MOVE_DAYS = 30;
 /**
  * The cause of a tail question: the list the lookup reads, the field and the digits.
  *
- * NOT THE DOOR (audit-34 finding 5). The owner's card ending 7731 is printed by the bank's mail and by its texts, two
+ * NOT THE DOOR. The owner's card ending 7731 is printed by the bank's mail and by its texts, two
  * doors, and with the door in the cause it was asked about twice and one answer closed one of the two.
  */
 export const tailCause = (register: string, by: string, digits: string): string => `tail:${register}:${by}:${digits}`;
@@ -2059,7 +2059,7 @@ function rowSaid(sql: Sql, register: string, row: { id: string; seq: number | nu
  * answer read the account the same way, as the same digits kept short, and never as an account that holds others.
  *
  * MEASURED ON THE LIVE RECORD, 20 Oct: HSBC (EGP) held 826 and the bank's texts print 5826. The question offered every
- * account as holding nothing yet, and pressing HSBC was refused because it "already holds 014".
+ * account as holding nothing yet, and pressing HSBC was refused because it "already holds 826".
  */
 const endsIn = (held: string, digits: string): boolean => /^\d{3,}$/.test(held) && held.length < digits.length && digits.endsWith(held);
 
@@ -2169,7 +2169,7 @@ function askTail(
     if (amount !== null) totals[amount.currency] = (totals[amount.currency] ?? 0) + amount.amount;
   };
   /* A QUESTION ASKED AGAIN AFTER "NONE OF THESE" CARRIES WHAT WAITED UNDER THE ANSWERED ONE, which is still held, and
-     what they come to: the count and the sum are of the same messages (audit-34 finding 8). */
+     what they come to: the count and the sum are of the same messages. */
   if (open === undefined)
     for (const d of declinedRaws(deps, q.asked)) {
       if (d.raw === q.raw || raws.includes(d.raw)) continue;
@@ -2362,7 +2362,7 @@ function keepRaw(sql: Sql, suggestion: string, raw: string): void {
 export type Answered = { id: string; option: string | null; actor: string; batch: string | null };
 
 /**
- * A decision just made on a question the inbox asked, carried out (REC-A02). The record calls this from `decide`, in the
+ * A decision just made on a question the inbox asked, carried out. The record calls this from `decide`, in the
  * decision's own transaction, so a refusal here takes the decision back with it.
  *
  * A TAIL QUESTION ANSWERED WITH AN ACCOUNT, in one change: the digits are written to the field the lookup reads (added to
@@ -2380,7 +2380,7 @@ export type Answered = { id: string; option: string | null; actor: string; batch
  */
 export function answerAsked(deps: IngestDeps, a: Answered): Result<string | null> {
   const q = deps.sql.one<{ body_kind: string; body: string; status: string }>('SELECT body_kind, body, status FROM suggestion WHERE id = ?', a.id);
-  /* A SHAPE'S ONE PATTERN QUESTION, whatever its cause, since the accept path hands every body here (ENG-B07). */
+  /* A SHAPE'S ONE PATTERN QUESTION, whatever its cause, since the accept path hands every body here. */
   if (q?.body_kind === 'pattern') {
     const asked = q.status === 'resolved' ? parsed(q.body) : null;
     return asked === null ? ok(null) : answerPattern(deps, a, asked);
@@ -2444,7 +2444,7 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
     return v === null || v === undefined || typeof v === 'object' ? '' : String(v).trim();
   };
   const holds = (r: LiveRow): boolean => (tail.split ? partsOf(valueOf(r)) : [valueOf(r)]).includes(tail.digits);
-  /* DIGITS ARE NEVER MOVED IN SILENCE (audit-34 finding 6). Digits a person put on an account, or confirmed there, are
+  /* DIGITS ARE NEVER MOVED IN SILENCE. Digits a person put on an account, or confirmed there, are
      his word: an answer that would take them off another account, or write over them on this one, is refused in one
      sentence that names the account, and nothing is written. Digits an agent put and nobody confirmed are a guess, and
      the answer is the correction: they are taken or written over, and the closing line says so. */
@@ -2497,8 +2497,7 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
     line.slice(0, 280),
   );
   for (const other of off) askMove(deps, at, { tail, from: other.id, to: chosen.id, since: deps.nowMs - MOVE_DAYS * 86_400_000 });
-  /* WHAT ELSE WAITED FOR THESE DIGITS is read again now, not at the next text, AT EVERY DOOR THAT READS THEM (audit-34
-     finding 5): the bank's mail and its texts print one card, and a question the other door asked before the cause
+  /* WHAT ELSE WAITED FOR THESE DIGITS is read again now, not at the next text, AT EVERY DOOR THAT READS THEM: the bank's mail and its texts print one card, and a question the other door asked before the cause
      stopped naming a door closes with this answer, as filed (`sweepDoor`). */
   for (const door of doorsReading(deps, tail)) {
     const swept = sweepDoor(deps, door);
@@ -2517,7 +2516,7 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
 export function reopenedTail(sql: Sql, suggestion: string): number {
   const q = sql.one<{ body_kind: string; body: string; status: string }>('SELECT body_kind, body, status FROM suggestion WHERE id = ?', suggestion);
   const body = q?.status === 'open' ? parsed(q.body) : null;
-  /* AND A SHAPE'S PATTERN QUESTION, whose texts wait again as nothing read them (ENG-B07). */
+  /* AND A SHAPE'S PATTERN QUESTION, whose texts wait again as nothing read them. */
   if (body !== null && q?.body_kind === 'pattern') return reopenedPattern(sql, suggestion, body);
   const tail = body === null ? null : tailAsked(body);
   if (body === null || tail === null) return 0;
@@ -2839,7 +2838,7 @@ function sweepDoor(deps: IngestDeps, door: string): Result<null> {
       "SELECT e.actor AS actor, e.batch AS batch FROM event r JOIN event e ON e.rowid = r.rowid - 1 AND e.kind = 'decide' WHERE r.kind = 'resolve' AND r.target = ? ORDER BY r.rowid DESC LIMIT 1",
       `suggestion:${q.id}`,
     );
-    /* ONE ANSWER THAT CANNOT BE CARRIED OUT NEVER STOPS THE DOOR (audit-34 finding 7). It runs in a savepoint of its own,
+    /* ONE ANSWER THAT CANNOT BE CARRIED OUT NEVER STOPS THE DOOR. It runs in a savepoint of its own,
        so what it wrote before it failed is taken back; the failure is put in the log once per answer, on the question,
        and the sweep goes on, so the text that came is filed. The answer is tried again at the next text, since a write
        that failed may not fail twice. Only `decide`, which hands an answer here itself, refuses with the error. */
@@ -2899,7 +2898,7 @@ function sweepDoor(deps: IngestDeps, door: string): Result<null> {
     );
   }
 
-  /* A PATTERN UPDATED SINCE IT HELD A TEXT reads that text again, once (REC-A02 step 11), here as well as where the record
+  /* A PATTERN UPDATED SINCE IT HELD A TEXT reads that text again, once, here as well as where the record
      hands an install to `rerunHeld`: a pack's update lands on more than one path, and a text its fix would read must not
      wait on which one it took. The run again writes a newer `match` line, so the next sweep finds nothing to do. */
   const unread = readBefore(deps.sql, patterns, SWEEP_MOST);
@@ -3207,7 +3206,7 @@ export function approvedPattern(sql: Sql, ingest: string): string | null {
 }
 
 /**
- * Where a text a drawn pattern did not file waits (ENG-B07): in the shape's one open pattern question, joined, which
+ * Where a text a drawn pattern did not file waits: in the shape's one open pattern question, joined, which
  * answers its id; quietly, which answers `null`, when the pattern was accepted and no question is open; and `undefined`
  * for a pattern nobody was asked about, which asks as it always did.
  */
@@ -3286,7 +3285,7 @@ function patternFiledSaid(filed: number, already: number, part: number, unread: 
 }
 
 /**
- * A shape's one pattern question, answered, carried out (ENG-B07): "The ingest proposal loop" (R.107).
+ * A shape's one pattern question, answered, carried out: "The ingest proposal loop".
  *
  * A YES FILES EVERYTHING THE PATTERN READS, WITH ONE UNDO. Every text of the shape that waits runs again through the
  * pattern the yes installed, from its stored bytes, oldest first, 200 at a time (`replayHeld`). The yes is the approval
@@ -3404,7 +3403,7 @@ function readBefore(sql: Sql, patterns: readonly IngestDecl[], most: number): st
 }
 
 /**
- * A text skipped as a repeat, filed after all as a second one: "It is a second one" in the Inbox (REC-A03). It runs again
+ * A text skipped as a repeat, filed after all as a second one: "It is a second one" in the Inbox. It runs again
  * with its pattern's repeat check off for this one run, so it is written beside the row it looked like.
  */
 export function fileAsSecond(deps: IngestDeps, raw: string): Result<Arrived> {
@@ -3415,7 +3414,7 @@ export function fileAsSecond(deps: IngestDeps, raw: string): Result<Arrived> {
   if (row === undefined || row.state !== 'skipped')
     return no<Arrived>('OUT_OF_BOUNDS', 'Only a message skipped as a repeat can be filed as a second one.', { at: 'raw' });
   /* A REPEAT BY ITS MARK, NOT BY ITS STATE: a rule's skip is `skipped` too, and filed from here it skipped again and
-     answered ok, or, with the rule edited since, filed past the repeat check (audit-35, finding 4). Only a newest
+     answered ok, or, with the rule edited since, filed past the repeat check. Only a newest
      `match` line carrying `field: 'repeats'` is a repeat. */
   const mark = deps.sql.one<{ field: string | null }>("SELECT field FROM event WHERE kind = 'match' AND target = ? ORDER BY rowid DESC LIMIT 1", `inbox_raw:${raw}`);
   if (mark?.field !== 'repeats') return no<Arrived>('OUT_OF_BOUNDS', 'This message was set aside by a rule, not as a repeat.', { at: 'raw' });
@@ -3469,7 +3468,7 @@ function repeatSaid(deps: IngestDeps, register: string, existing: { id: string }
   return `Looks like a repeat of ${parts.join(', ')}.`;
 }
 
-/* ── what each pattern did (REC-A03) ────────────────────────────────────── */
+/* ── what each pattern did ────────────────────────────────────── */
 
 /** One pattern's last days: what it filed, what it skipped and why, and what waits. `ingest` is a handle, `said` its name. */
 export type PatternLine = { ingest: string; said: string; filed: number; skipped: { reason: string; n: number }[]; waiting: number };
@@ -3619,7 +3618,7 @@ function wordsFor(deps: IngestDeps, matched: IngestDecl, register: string, chann
 }
 
 /**
- * What a held reason calls the pattern that read the arrival (REC-A03): its own `description`, else its door's, else the
+ * What a held reason calls the pattern that read the arrival: its own `description`, else its door's, else the
  * title of the add-on that declared it, else its door's add-on, as `wordsFor` names where a question came from. With
  * none of the four it is "the pattern", because its id is a word nobody chose for a person to read. Lower case as
  * declared; a sentence that opens with it says it through `opening`.
@@ -3956,7 +3955,7 @@ function draftedShapes(sql: Sql, nowMs: number): Set<string> {
 /**
  * The shapes owed a draft: three or more waiting, no question open for the shape, no answer to one, and no draft out.
  *
- * OWED UNTIL IT IS ANSWERED, NOT ONCE (ENG-B07). The draft used to be earned at exactly the third arrival, so a call
+ * OWED UNTIL IT IS ANSWERED, NOT ONCE. The draft used to be earned at exactly the third arrival, so a call
  * that failed, or a third that came while another was being filed, left the shape waiting behind a button for ever.
  * Now every arrival of a shape asks whether it is still owed, and these four are the whole answer.
  *
@@ -4320,7 +4319,7 @@ function tailOf(deps: IngestDeps, form: Extractor, text: string, value: Json, de
  * the digits, in the first token, where the anchor put the mask, with no letter straight after them. Three digits at
  * least, and fewer than the whole value, because a value no longer than the digits would have been a whole token.
  *
- * AND THE OTHER WAY ROUND, THE REVERSE TAIL (REC-A02): digits printed LONGER than a value of three digits or more that
+ * AND THE OTHER WAY ROUND, THE REVERSE TAIL: digits printed LONGER than a value of three digits or more that
  * they end in, `***7731` against a stored `731`, or a whole account number against its last four. Behind stars, or a
  * bare run of `BARE_NUMBER` digits or more, which is an account's number and not an amount, since an amount is printed
  * with its separators. The digits answered are the ones printed, which is what a confirmation is kept by.
@@ -4370,7 +4369,7 @@ const CONFIRMS_READ = 500;
  * Whether a person has said that `tail.digits`, as a bank prints them, are `tail.row`: by accepting an arrival filed to
  * that row by those digits, or by answering a tail question with that row.
  *
- * ACROSS PATTERNS (REC-A02). What a person confirmed is that these digits are that account, which stays true whichever
+ * ACROSS PATTERNS. What a person confirmed is that these digits are that account, which stays true whichever
  * pattern, field or door printed them; read per pattern, the same card was asked about once for its texts and again for
  * its mails.
  *

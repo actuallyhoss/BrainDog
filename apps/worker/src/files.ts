@@ -1,7 +1,7 @@
 /**
  * A record's files on the Cloud: `PUT /api/files/<sha256>` keeps the bytes at the address their hash makes, `PUT
  * /api/files` keeps them and answers the name, and `GET /api/files/<sha256>` gives them back (`51 §5.5`, `12 §8` "The
- * asset store", R.260). All three also under `/app/<slug>/api/files`, which is the address the app calls from.
+ * asset store"). All three also under `/app/<slug>/api/files`, which is the address the app calls from.
  *
  * THE BYTES NEVER CROSS INTO THE RECORD'S OBJECT. A row holds `{ sha256, mime, bytes, name }` (`kernel/src/coerce.ts`
  * `file`) and the bytes sit in `BLOBS` at `rec_<id>/a/<sha256>`, so a photo of a receipt costs the record's single
@@ -49,7 +49,7 @@ export const SHA256 = /^[0-9a-f]{64}$/;
  * `default-src 'none'; sandbox` MAKES THE ANSWER INERT even when a browser opens it as a page: no script, no form, no
  * plugin, no same-origin. `nosniff` stops a browser guessing a type the check did not give it. `private` because a file
  * is one record's and a shared cache must never hand it to somebody else; `immutable` because the name is the hash, so
- * the bytes behind one name can never change. `noindex` because the address is the capability (P.166): a search engine
+ * the bytes behind one name can never change. `noindex` because the address is the capability: a search engine
  * that found one must never list it.
  */
 export const FILE_HEADERS: Readonly<Record<string, string>> = {
@@ -205,7 +205,7 @@ const MISMATCH: Refusal = { code: 'CHECKSUM_MISMATCH', fix: 'These bytes do not 
 const EMPTY: Refusal = { code: 'BODY_MALFORMED', fix: 'The file arrived empty. Send its bytes as the body.' };
 const CANNOT_READ: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Reading a file here takes somebody who can read this record, or a token.' };
 const CANNOT_WRITE: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Adding a file takes somebody who can write here, or a token with write scope.' };
-/** The one 401 body (LCH-C08 job 2): "A `401` says only `unauthorized`." What to do is the app's to say, not a stranger's to read. */
+/** The one 401 body: "A `401` says only `unauthorized`." What to do is the app's to say, not a stranger's to read. */
 const NOBODY: Refusal = { code: 'UNAUTHORIZED', fix: 'unauthorized' };
 
 /**

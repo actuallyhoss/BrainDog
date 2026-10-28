@@ -153,7 +153,7 @@ const WAITING_HOLDER = 'braindog:waiting';
 
 /**
  * `install`, with what the plan held back written on the add-on (migration 38) and the add-on's file kept beside it for as
- * long as a part waits (SHL-A08 job 4).
+ * long as a part waits.
  *
  * WHY THE FILE IS KEPT. A part that says `when: { holds: [people] }` is cut out of what the install stages, and the record
  * stores declarations and a manifest, never the file. So the day People arrives nothing the record held could say what
@@ -221,7 +221,7 @@ function arrivedSaid(kernel: Kernel, before: readonly { at: string; holds: reado
 
 /**
  * AFTER AN INSTALL, AN UPDATE OR A SWITCH-ON: every add-on with a part waiting is planned again over what the record holds
- * now, and a part whose wait is over lands (SHL-A08 job 4). Answers the add-ons something landed for.
+ * now, and a part whose wait is over lands. Answers the add-ons something landed for.
  *
  * BEFORE: a field that waited for People stayed out for good once People was installed, until somebody installed the
  * add-on a second time by hand. Now it is there within the next plan, with no press.
@@ -365,7 +365,7 @@ const offered = (items: readonly { id: string; title: string }[]): string => {
 };
 
 /**
- * A key an arrangement needs, worked out by the record (REC-A06 step 6): its label, the one host it opens, whether a run by
+ * A key an arrangement needs, worked out by the record: its label, the one host it opens, whether a run by
  * itself uses it, and the parts that need it, so Decide unticks the part a missing key holds and leaves the rest.
  */
 export type ArrangeNeed = { label: string; opens: string; scheduled: boolean; parts: string[] };
@@ -414,7 +414,7 @@ export function needsByPart(approve: readonly string[], owners: ReadonlyMap<stri
 }
 
 /**
- * One call out of an arrangement, listed on the question by host and how often (REC-A06 step 5): the part that makes it,
+ * One call out of an arrangement, listed on the question by host and how often: the part that makes it,
  * the host it goes to, the interval it runs on (`null` when only a rule runs it), and the most a rule may make in a day.
  */
 export type ArrangeCall = { part: string; host: string | null; every: string | null; per_day: number | null };
@@ -422,7 +422,7 @@ type Call = ArrangeCall;
 const callAt = (part: string, host: string | null, every: string | null, per_day: number | null): Call => ({ part, host, every, per_day });
 
 /**
- * TWO ARRANGEMENTS WITH ONE CAUSE AS ONE QUESTION (REC-A06 step 8): the open one, widened with the parts of the next, which
+ * TWO ARRANGEMENTS WITH ONE CAUSE AS ONE QUESTION: the open one, widened with the parts of the next, which
  * govern files in its place and notes once. Both are bodies as `prepare` filed them, so nothing here is the proposer's.
  *
  * WHAT BOTH CARRY IS SAID ONCE. An add-on installed by both, a line both call out and a part both hold are one; a page or
@@ -1163,7 +1163,7 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /**
-   * A SETTING A DECLARATION READS PLANS ITS ADD-ON AGAIN (REC-A06 step 2, second half). A setting is read when its add-on
+   * A SETTING A DECLARATION READS PLANS ITS ADD-ON AGAIN (second half). A setting is read when its add-on
    * is planned and installed, and `setPackConfig` changes nothing installed, so a later change to the book every title of
    * an add-on reads reached none of them until its next update. Such a change plans the add-on again at the version it
    * holds with the new values in hand (`declare` `plan`), filed as one approved change: the plan step, marked `replan`, and
@@ -1183,11 +1183,11 @@ export function arranger(d: ArrangeDeps) {
     return planned;
   }
 
-  /** One part of an arrangement an accept may take on its own (REC-A06 step 7). */
+  /** One part of an arrangement an accept may take on its own. */
   type Part = Body & { id: string; kind: string; label: string };
 
   /**
-   * THE PARTS AN ACCEPT MAY TAKE ONE BY ONE (REC-A06 step 7). Every install, add-on turned on or off, add-on's settings,
+   * THE PARTS AN ACCEPT MAY TAKE ONE BY ONE. Every install, add-on turned on or off, add-on's settings,
    * group of entries by list, page and choice has an id the accept names (`parts`), a label the owner reads, and what it
    * covers in this body: `pack` for an install (its plan step, and the settings sent with it, which fill it), a turn on or
    * off, and a settings part (its settings, and its `replan` step); `register` for a group of entries, new and changed;
@@ -1247,7 +1247,7 @@ export function arranger(d: ArrangeDeps) {
       );
       out.push({ id: `page:${slug}`, kind: 'page', label: `The ${said} page`, page: String(page.id), ...requires(from.map((q) => `install:${q}`)) });
     }
-    /* A DECLARATION IS A PART OF ITS OWN (REC-A06 step 5), named by its own name and needing the install that brings a
+    /* A DECLARATION IS A PART OF ITS OWN, named by its own name and needing the install that brings a
        list it reads. govern's `partsOf` adds the settings it reads. */
     for (const decl of o.declarations ?? []) {
       const id = String(decl.id);
@@ -1585,7 +1585,7 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /**
-   * THE DECLARATIONS AN ARRANGEMENT CARRIES (REC-A06 step 5), each `{ id, kind, body }`, checked as a `change` is: the
+   * THE DECLARATIONS AN ARRANGEMENT CARRIES, each `{ id, kind, body }`, checked as a `change` is: the
    * kernel's own checks over the batch, with the record laid under it as the add-ons before it leave it, and what each
    * calls out worked out here from its body, never from the proposer. Only a call that is new, or whose host, key or
    * fields differ from the one installed, is asked about (the kernel's `review`). A page goes under `pages`, where it is
@@ -1659,7 +1659,7 @@ export function arranger(d: ArrangeDeps) {
    * is one it declares, and a link is a ref field pointing at the list of the earlier row it names. Whether a value is valid
    * is the write path's, when the arrangement is accepted, as it is for a rowset.
    *
-   * A ROW MAY BE A PATCH (REC-A06 step 4): `{ register, at, version, patch }`, checked as a rowset's update is (govern
+   * A ROW MAY BE A PATCH: `{ register, at, version, patch }`, checked as a rowset's update is (govern
    * `checkUpdates`), and filed with `before`, the entry's fields now, so Decide says what it changes from. A version gone
    * stale refuses the whole question, naming the entry by its title.
    */
@@ -2020,7 +2020,7 @@ export function arranger(d: ArrangeDeps) {
         });
       }
     }
-    /* THE DECLARATIONS IT CARRIES (REC-A06 step 5), one install, each at the version the owner was shown, before the pages
+    /* THE DECLARATIONS IT CARRIES, one install, each at the version the owner was shown, before the pages
        that may read them. */
     if (declarations.length > 0) {
       const was = declarations.map((x) => live.get(String(x.id)));

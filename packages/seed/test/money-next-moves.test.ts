@@ -1,5 +1,5 @@
 /**
- * A REPEATING LINE'S "NEXT" MOVES WHEN IT IS PAID (REC-B11 jobs 4 and 5, money-next-moves-100).
+ * A REPEATING LINE'S "NEXT" MOVES WHEN IT IS PAID (money-next-moves-100).
  *
  * `script.settle_matched_line` is back in Money's pack: `payment-matches` starts it as its second step, and "It went
  * through" starts it on the line (`recurring-went-through`). The day "Next" moves to is the walk's own step, handed by

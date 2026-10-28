@@ -1,5 +1,5 @@
 /**
- * The Kennel holds a publisher to the key they signed with (SHL-B07 jobs 4 and 8). Once an author signs, every later
+ * The Kennel holds a publisher to the key they signed with. Once an author signs, every later
  * version under their name, of any id, is signed by that key or a key it rotated to; an unsigned one and one signed by a
  * stranger's key are refused in one sentence, and an author who never signed publishes unsigned as before.
  *

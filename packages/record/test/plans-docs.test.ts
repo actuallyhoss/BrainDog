@@ -1,5 +1,5 @@
 /**
- * The two documents that say the plans' figures say the table's (LCH-A08 job 5).
+ * The two documents that say the plans' figures say the table's.
  *
  * WHY THIS TEST. Cloud Plus was 75,000 runs in the code and 60,000 in `docs/15-ROADMAP.md`, and nothing read the
  * document. So the roadmap's paragraph on what connectors cost and ADR-071's table in `docs/16-DECISIONS.md` are read

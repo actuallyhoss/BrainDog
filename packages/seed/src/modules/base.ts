@@ -247,7 +247,7 @@ export type SeedRule = { rule: string; pack?: string; register: string; when: st
 export const CALENDAR_SOURCE = 'deadlines';
 
 /**
- * Activity: everything written to the record, a day at a time, with who did it beside it (PGS-C24 job 7).
+ * Activity: everything written to the record, a day at a time, with who did it beside it.
  *
  * ONE FEED OVER THE RECORD'S OWN LOG. `source: activity` reads every change whoever made it, so the page names no list and
  * leans on no register. `group: day` is a heading each day in the record's own zone, `fold: run` is one line for each

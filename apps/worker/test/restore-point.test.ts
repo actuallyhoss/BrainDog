@@ -1,5 +1,5 @@
 /**
- * A deploy's restore point (LCH-C06 jobs 3 and 4): `src/restore-point.ts`'s walk, the `before-deploy` label's seven days
+ * A deploy's restore point: `src/restore-point.ts`'s walk, the `before-deploy` label's seven days
  * in `copies.ts`, and `/account/ops/restore-point` through the Worker as it ships (`cloud-harness.ts`).
  *
  * WHAT THIS HOLDS. Check mode opens every record somebody wrote in the last seven days and copies nothing; a real run

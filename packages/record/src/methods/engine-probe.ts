@@ -1,5 +1,5 @@
 /**
- * The engine's probe, the record's half: `engineProbe`, ADMIN (ENG-A08 job 2).
+ * The engine's probe, the record's half: `engineProbe`, ADMIN.
  *
  * "DOES THE MODEL ANSWER NOW?", ON HIS PRESS. The engine's health is read from the ledger (`engine.ts`, `engineHealth`),
  * and while no model answers the jobs wait and the model is tried every half hour, so after he mended a key he waited

@@ -88,7 +88,7 @@ test('a background pattern call is named by its question, and any other unfiled 
   );
 });
 
-/* THE MONTH BY PURPOSE (ENG-A05 job 5). The ledger says what each ask was for, so the section counts by that and no
+/* THE MONTH BY PURPOSE. The ledger says what each ask was for, so the section counts by that and no
    longer by the call's kind, and a host built before the column falls back to the kind. */
 const NOON = Date.parse('2026-10-02T12:00:00.000Z');
 const asked = (id: string, over: Partial<SlashAsked>): SlashAsked => ({

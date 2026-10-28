@@ -1,5 +1,5 @@
 /**
- * The engine's ledger, read on a host for the record's `engineReadings` (ENG-B01 job 3): what the model was asked and what
+ * The engine's ledger, read on a host for the record's `engineReadings`: what the model was asked and what
  * it answered since an instant, the open questions by their cause, and each mention's attached or not.
  *
  * WHY A HOST BUILDS IT. The ledger is Slash's own (`slash_call`), which the record may not open, so the record takes the

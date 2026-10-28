@@ -474,7 +474,7 @@ function waitingBrief(c: Context, at: CardAt): string | null {
 const writtenOn = (row: Brief): string => (typeof row.created_at === 'string' ? row.created_at : '');
 
 /**
- * WHICH LESSON COMES FIRST (AGT-C14 build 3, the order `braindog:learnings` reads in): a method before a fact, this
+ * WHICH LESSON COMES FIRST (the order `braindog:learnings` reads in): a method before a fact, this
  * project's before the ones that apply everywhere, then the newest. Read off the row's own `kind`, `scope` and
  * `created_at`, so it costs no read. A lesson with no kind, or a kind that is not a method, is a fact: nothing unnamed
  * outranks a method. Two the record gives no day for are equal, and a stable sort leaves them as the record sent them,

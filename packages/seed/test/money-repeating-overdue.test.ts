@@ -1,5 +1,5 @@
 /**
- * A repeating line whose "Next" is stuck (REC-B11 step 8, `src/modules/money/figures/signs.ts`), read through the kernel
+ * A repeating line whose "Next" is stuck (`src/modules/money/figures/signs.ts`), read through the kernel
  * on a record that installed money-core the way a person does, with no example rows.
  *
  * Money's `settle` script moves "Next" one cycle on when a payment is matched to the line. Nothing said when it did not:

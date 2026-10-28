@@ -1,5 +1,5 @@
 /**
- * A page's earlier versions, read (`pageVersions`, PGS-A07 job 4).
+ * A page's earlier versions, read (`pageVersions`).
  *
  * The kernel keeps every version of a page's declaration, and the app could show only the body before the last Apply.
  * The read lists them newest first, each with who applied it and when, and says a person by name: no person id, no

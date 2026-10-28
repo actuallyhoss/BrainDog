@@ -1,5 +1,5 @@
 /**
- * A model's answer about two people, settled in three bands (ENG-B04 job 1, decision 2 of the engine's second part).
+ * A model's answer about two people, settled in three bands (decision 2 of the engine's second part).
  *
  * Under 0.6 the pair is dropped. From 0.6 it is one question that carries its evidence sentence. From 0.9 it is still
  * a question, one that says the two look certain, unless the host hands the switch on AND something else the record

@@ -1,5 +1,5 @@
 /**
- * WHAT A PAGE DRAWS IS THE RECORD'S TO SAY (PGS-A05 job 1): `readPage` marks each block it leaves out `drawn: false`
+ * WHAT A PAGE DRAWS IS THE RECORD'S TO SAY: `readPage` marks each block it leaves out `drawn: false`
  * with `why` (`drawn.ts` `markDrawn`), so an agent reading the page, a shared page and an export draw what the screen
  * does. One case a why, and a box over nothing shut by the one rule, never a second beside it.
  */

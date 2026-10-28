@@ -441,15 +441,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   PEOPLE 3.1.0 ARE RELEASED, so each is a version of its own. Blocks on pages a record already holds, no list, field
  *   or figure, so each is a minor step that reaches a record on its own.
  * - money-core 3.14.0: an account's `last4` reads "Digits the bank prints", where it said "Last four digits", the words a
- *   question about an unknown card quotes back (REC-A02 job 7). Some banks print two,
+ *   question about an unknown card quotes back. Some banks print two,
  *   three or six, and the field holds whatever the message names. The id stays `last4`, so every bank pattern's lookup
  *   still reads it. A label on a field a record already holds, so a minor step that reaches a record on its own. Money's
- *   module is cut into a folder in the same step (`modules/money/`, REC-B01 job 1), which moves no byte of the document.
+ *   module is cut into a folder in the same step (`modules/money/`), which moves no byte of the document.
  * - money-core 3.15.0: Money's first sign of life, `ledger-rows-7d`, how many cleared Ledger rows are dated in the last
  *   seven days, with a target of at least one so a Ledger that stopped reads as missing its mark (REC-B01 job 3,
  *   `modules/money/figures/signs.ts`). The other three signs the unit names wait for words the kernel does not read yet,
  *   and come in a later step. One figure added, no list or field, so a minor step that reaches a record on its own.
- * - people 3.3.0: Health, a page of the record's vital signs (PRF-A05 job 5, modules/health.ts): one line from signs-red,
+ * - people 3.3.0: Health, a page of the record's vital signs (modules/health.ts): one line from signs-red,
  *   then the signs by state, Needs a look first, and a sign with nothing to read under Not read yet, never Alive. It reads
  *   the kernel's signs source and two built-in figures and no list, so it leans on nothing. A page added, nothing taken
  *   away, so a minor step that reaches a record on its own and asks no question. UNRELEASED, so batch 47 folds in: under
@@ -457,7 +457,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   lines say every watched sign was green, since the hold watches ten signs and not all of them.
  * - money-core 3.16.0, ONE UNRELEASED STEP, everything since 3.15.0 folded into it. Three more signs, once the kernel reads
  *   their words (`age`, `currencies`, `empty`): `ledger-newest-days`, `currencies-held` and `uncategorised-share-30d`
- *   (REC-B01 jobs 2 and 3, `modules/money/figures/signs.ts`), and two more: `statement-oldest-days`, the age of the
+ *   (`modules/money/figures/signs.ts`), and two more: `statement-oldest-days`, the age of the
  *   oldest balance (`rolled.read: age`), and `nights-missed-30d`, the nights the cash line kept no point, once a
  *   kept line names the lists its figure reads. Paydays: a repeating line gains `day_of_month` (a day 1 to 31,
  *   last, or two, '15, last', labelled "Days of the month") and `weekend` (leave, before, after; default leave), Money
@@ -473,7 +473,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `balance`, an instalment's `amount` and a repeating line's `amount` declare `currency_from`, so an amount sent with
  *   no code takes its account's. Today's money this week (uc6-money-47): `received-7d`, the Ledger's money in over
  *   seven days, and `settled-in-7d`, bills and invoices paid to you over seven days, each currency on its own. Categories going
- *   the other way (hop-figures-50, REC-A13 job 2): `categories-against-direction`, live categories marked one way that a Ledger
+ *   the other way (hop-figures-50): `categories-against-direction`, live categories marked one way that a Ledger
  *   entry going the other way points at, read through `where`'s `pointed` hop, with its line under Heads up. Figures,
  *   a script, fields and a setting added and a rule taken away, nothing another pack reads,
  *   so a minor step. NOT A QUIET ONE: a rule taken away is a loss (`packs/quiet.ts`), so a record on 3.15.0 or before is
@@ -484,7 +484,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   MONEY-CORE 3.16.0 IS RELEASED (`test/fixtures/released/money-core-3.16.0.json`), so this is a version of its own. One
  *   figure added, nothing taken away or retyped, so a minor step that reaches a record on its own. The Money page draws it (cash-page-54): one tile under the walk while it is not nought. The line it drew while no
  *   balance is typed went before release, for the lead a record with two books opens on (below).
- *   Filing rules (filing-list-56, REC-B10 job 3): a list of its own, a text, how it matches, which way and the category
+ *   Filing rules (filing-list-56): a list of its own, a text, how it matches, which way and the category
  *   it files under; the Ledger says which rule filed an entry (`filed_by`); a rule for money in never files money out,
  *   and a category's own Matches files for this one version more, live and the right way only.
  *   A closed account (account-state-56): Accounts gains Status, open or closed, with closed its finished state, and
@@ -511,12 +511,12 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   ids, which the script reads as well as a handle. The bill is part paid with the sum so far, or paid with the day;
  *   only cleared money is counted. Nothing starts it for an instalment or a repeating line: Settles points at Bills
  *   alone. A rule and a script added inside the unreleased step, so no version of its own.
- *   One more sign of life (repeating-overdue-67, REC-B11 step 8): `repeating-overdue`, how many live repeating lines
+ *   One more sign of life (repeating-overdue-67): `repeating-overdue`, how many live repeating lines
  *   have a Next more than three days gone, with nought the target. Only a line a payment was matched to before is
  *   counted (repeating-sign-fix-69): `last_paid is set`. And named for it, Matched repeating lines past their day
  *   (repeating-sign-72), so nought is no word on a line nothing was matched to. A figure added
  *   inside the unreleased step.
- *   A name beside the bank's words (payee-field-68, REC-B16 step 2): the Ledger gains `payee`, Paid to or from,
+ *   A name beside the bank's words (payee-field-68): the Ledger gains `payee`, Paid to or from,
  *   searchable and not indexed, and `counterparty_text` is labelled As the bank wrote it.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
@@ -541,10 +541,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   play and read "0 of 11 projects in play say what they earned in a year" on a record that never meant to say. The
  *   words are the same. PORTFOLIO 1.16.0 IS RELEASED, so this is a version of its own. One `when` changed on the two
  *   keyed copies of a block that is there, nothing added or taken away, so a minor step. And Projects' In play cards
- *   say `edit: true` on `about` (card-edit-wire-93, PGS-C15, inside the unreleased step), so a project's one line is
+ *   say `edit: true` on `about` (card-edit-wire-93, inside the unreleased step), so a project's one line is
  *   typed on its card where the reader may write the list: one key on a column that is there, so no version of its own.
  *   And Projects draws the questions about its own list (`list is things`) as a queue gated on
- *   `questions-open-in:things`, with a clause in the line (waiting-work-projects-99, PGS-C18, batch 99, inside the
+ *   `questions-open-in:things`, with a clause in the line (waiting-work-projects-99, batch 99, inside the
  *   unreleased step): one block added to a page that is there, nothing taken away.
  * - work 1.19.0: a thread has six states and declared moves, a day it aims for, and a follow-up takes
  *   its parent's project, thread and owner one by one (and the agent, when the agent holding the parent made the
@@ -554,10 +554,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   and source changed, nothing taken away, so a minor step. And the Board page takes Work's capture line, first after
  *   its sentence (board-capture-line-83, batch 83, inside the unreleased step): one block added to a page that is
  *   there, nothing taken away. And Work draws the questions about its own list (`list is tasks`) as a queue gated on
- *   `questions-open-in:tasks`, with a clause in the line (waiting-work-projects-99, PGS-C18, batch 99, inside the
+ *   `questions-open-in:tasks`, with a clause in the line (waiting-work-projects-99, batch 99, inside the
  *   unreleased step): one block added to a page that is there, nothing taken away. And Work declares a head, its open
  *   count, Add and a search word, and lists open work with no project under a fold of its own, over a new figure
- *   `tasks-no-project` (work-head-and-no-project-101, AGT-D14 job 1, PGS-A14, batch 101, inside the unreleased step):
+ *   `tasks-no-project` (work-head-and-no-project-101, PGS-A14, batch 101, inside the unreleased step):
  *   one figure and two blocks added, nothing taken away. And the Board reads every task in play before any done one,
  *   its line says what is kept for later, and Everything open goes from under it (inside
  *   the unreleased step): one block taken from a page that is there, no id added or taken away.
@@ -575,8 +575,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 63's changes
  *   with no version of its own, pinned once (`2c10a714a36d7c85`): four figures of this month's spending against last,
  *   `spent-last-month`, `spent-by-category-last-month`, `spent-by-category-to-date-last-month` and
- *   `spent-vs-last-month`, a difference by category against the month before (spend-figures-63, REC-B19 job 2); the
- *   Ledger tile reads `filed-today` and `filed-for-you-30d` in its written line (ledger-by-63, REC-B20 job 3), which
+ *   `spent-vs-last-month`, a difference by category against the month before (spend-figures-63); the
+ *   Ledger tile reads `filed-today` and `filed-for-you-30d` in its written line (ledger-by-63), which
  *   no host draws yet; `filed-for-you-30d` counts what an agent, a bank add-on or a rule made, where it counted
  *   anything but a person (filing-figures-draw-62-63); and `settle` leaves a Paid so far somebody typed when a pending
  *   or void payment paid none of it.
@@ -592,18 +592,18 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   above); the page `money-plan`, one plan's page, with six figures of one plan, `plan-parts-paid`, `plan-parts`,
  *   `plan-paid`, `plan-left`, `plan-next-due` and `plan-last-due`, and two by plan, `installments-paid-by-plan` and
  *   `installments-total-by-plan` (plan-page-68); and `budget-passed-on`, the day a category's spending
- *   reached its budget, a running total with a stop (budget-passed-on-68, REC-B19 step 4).
+ *   reached its budget, a running total with a stop (budget-passed-on-68).
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 70's change with
  *   no version of its own: the cash walk's leg of everyday spending (everyday-leg-69-70), measured
  *   over the Ledger and moved a week at a time, on Cash ahead, its bridge and the four figures over the walk.
  * - money-core 3.17.0, still unreleased, takes batch 70's page changes too, each a block changed and no id added or
  *   taken away: Money's Instalments tile reads each plan's paid of total from its two figures by plan
- *   (instalments-tile-70, REC-B12 job 5); Money places This month's spending and Budgets after Instalments, and the
- *   History heading and Being chased leave the page (money-wire-70, REC-B19 jobs 3 and 4); a plan's page is led by
+ *   (instalments-tile-70); Money places This month's spending and Budgets after Instalments, and the
+ *   History heading and Being chased leave the page (money-wire-70); a plan's page is led by
  *   one sentence (plan-lead-sentence-70); and a filing rule's Reads choice `payee` is labelled As the bank wrote it
  *   (filing-reads-words-70).
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 71's books with
- *   no version of its own (REC-A09 steps 1 to 3): three rules and `script.book_from_account` file a Ledger entry, a
+ *   no version of its own: three rules and `script.book_from_account` file a Ledger entry, a
  *   repeating line or an instalment in its account's book (book-fill-71); seven figures say one book's month and what
  *   is filed in no book (book-figures-71); and the book page gained This month, a row of the three (book-page-71).
  *   And batch 72's (plan-lead-all-paid-72), in the same unreleased step: two figures of one plan, `plan-parts-open` and
@@ -624,10 +624,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   (seed-money-signs-73-74).
  *   And batch 75's, in the same unreleased step: Bills and invoices gains `chase_draft`, Draft to send, and
  *   `invoice-chased` writes it where it is empty when Chase it is answered, the invoice's amount and due day in one
- *   sentence, never over words somebody changed (money-chase-draft-75, REC-B22 step 1). No id added or taken away.
+ *   sentence, never over words somebody changed (money-chase-draft-75). No id added or taken away.
  *   And batch 76's, in the same unreleased step: `book-lasts-until`, the day one book's money runs out, walked from
  *   that book's cash over its own bills, repeating lines, instalments and money on its way, and the cell Money lasts
- *   until on a book's What is due (book-lasts-until-76, REC-A09 step 2); and Money's seeds carry a starter set of
+ *   until on a book's What is due (book-lasts-until-76); and Money's seeds carry a starter set of
  *   eight categories, in and out, in place of one of the sample's (ruling 341, money-starter-categories-76), which no
  *   fingerprint reads. NO RECORD IS GIVEN IT AS ITS OWN YET: nothing that installs asks for `starters`, so the set
  *   reaches a record only among the sample's rows, tagged as examples, and the change notes do not promise it (audit
@@ -642,10 +642,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   signs-metric-75-76). Money's line is split in two, one drawn, so a record whose money lasts reads that it lasts
  *   the year, and Heads up gives up its line on categories marked the other way so the page stays at twenty-four
  *   blocks, the figure still declared (money-lasts-line-78). A book's page gains one line under What is due,
- *   that its money lasts the year, drawn on `book-lasts-until` carrying `beyond` (book-lasts-year-78, REC-A09 step 2).
+ *   that its money lasts the year, drawn on `book-lasts-until` carrying `beyond` (book-lasts-year-78).
  *   And a cleared payment that names nothing finds what it paid: `script.match_payment`, `rule.payment-matches` that
  *   starts it, and `rule.instalment-settles` that runs `settle` once an instalment names its payment
- *   (match-payment-78, REC-B11 step 3). A repeating line found is said in the run and not marked
+ *   (match-payment-78). A repeating line found is said in the run and not marked
  *   (repeat-next-80b-82: the step that kept the payment on it could not move its Next, so it is held); no question
  *   is asked that has a repeating line among its answers.
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 82's changes

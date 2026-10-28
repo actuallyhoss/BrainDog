@@ -1,5 +1,5 @@
 /**
- * The vital sign "The model answers" (`model-answers`, PRF-A05 job 1), filed by the
+ * The vital sign "The model answers" (`model-answers`), filed by the
  * host once a night through the kernel's one verb for it, `signRead`.
  *
  * WHY THE HOST FILES IT. The kernel cannot see a model call: every ask is written to Slash's own ledger, `slash_call`

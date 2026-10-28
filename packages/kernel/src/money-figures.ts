@@ -533,9 +533,9 @@ function foreignShare(amounts: readonly Amount[], said: string | null, rates: Ev
 const dayText = (v: unknown): string | null => (typeof v === 'string' ? v.slice(0, 10) : null);
 
 /**
- * A rolled figure, less the same money walked entry by entry (REC-A17 job 4): nought, or the figure is wrong.
+ * A rolled figure, less the same money walked entry by entry: nought, or the figure is wrong.
  *
- * "WRONG MONEY ON A SCREEN IS THE WORST CLASS OF DEFECT IN THIS REPO" (W.512), and nothing compared a money figure
+ * "WRONG MONEY ON A SCREEN IS THE WORST CLASS OF DEFECT IN THIS REPO", and nothing compared a money figure
  * with its rows on a lived record. `readRolled` picks each account's statement and adds its moves inside SQLite, one
  * `ORDER BY ... LIMIT 1` and one `sum(CASE ...)` an account. This reads the same entries out one at a time and does
  * every comparison of days, every choice of statement, every sign and every addition here, in plain code, so a change

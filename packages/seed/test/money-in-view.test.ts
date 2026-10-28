@@ -1,5 +1,5 @@
 /**
- * Who filed each line, in view (REC-B20 job 2, `src/modules/money/figures/filing.ts`): Money's two figures over who MADE
+ * Who filed each line, in view (`src/modules/money/figures/filing.ts`): Money's two figures over who MADE
  * the Ledger's entries, read through the kernel on a record that installed money-core the way a person does, with no
  * example rows, and a bank add-on's pattern beside it.
  *

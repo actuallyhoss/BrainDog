@@ -12,7 +12,7 @@
  * the two back. The question carries the pair's own hash under `pair`, which is what the kernel reads a pair as settled
  * by (`settledIn`), so once asked, answered or undone, the pair is never offered again.
  *
- * A MODEL WEEDS THE OFFERS, AND NEVER PRESSES (ENG-B04 job 3). Where a model may read, the nightly job hands it these
+ * A MODEL WEEDS THE OFFERS, AND NEVER PRESSES. Where a model may read, the nightly job hands it these
  * pairs too, and its answer is kept in the done job: a pair it read as two is no longer offered, and one it read as one
  * is offered first, with `judged` and the sentence `Slash reads these as one.` beside the record's own reason. Nothing
  * is filed or folded on its word: the press is still his, and the question still his to answer.

@@ -1,5 +1,5 @@
 /**
- * `printed`, the rule that reads what a settled screen prints (PRF-B04 job 7), held without a browser.
+ * `printed`, the rule that reads what a settled screen prints, held without a browser.
  *   node --test tools/gates/test/printed.test.mjs
  *
  * `checkScreen` is read rule by rule over words written here, and every planted tree under `negative/printed-*` is run

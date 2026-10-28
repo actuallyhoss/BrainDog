@@ -1,5 +1,5 @@
 /**
- * `canary`: the canary record, read through the session its sign-in left, and nothing pressed (PRF-A09 job 4).
+ * `canary`: the canary record, read through the session its sign-in left, and nothing pressed.
  *
  *   node tools/look/run.mjs --source canary --set all              the canary SMOKE_SLUG names, on CANARY_ORIGIN
  *   node tools/look/run.mjs --source canary:self-host --set all    a fresh self-host, signed in by its own key

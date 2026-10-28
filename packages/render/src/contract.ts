@@ -2,7 +2,7 @@
  * The names a drawn page is read by: the classes and data attributes that tests, gates and the rule sheet's
  * `expect.json` (`packs/rule-sheet`) find things with.
  *
- * "DO NOT RENAME CLASSES/DATA READ BY TESTS" (H.205), AND NOTHING SAID WHICH THEY WERE. A class is a word in a template
+ * "DO NOT RENAME CLASSES/DATA READ BY TESTS", AND NOTHING SAID WHICH THEY WERE. A class is a word in a template
  * string in `html.ts` and a word in a template in `svelte/`, and a gate reads it as a third spelling in a selector. A
  * rename on one side drew a page the gate could not find anything on, and a gate that finds nothing is quiet, not red.
  * So the names are here, once, and `contract.test.ts` draws a write-up through BOTH renderers and fails when either

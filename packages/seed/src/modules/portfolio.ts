@@ -1675,7 +1675,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         limit: 3,
       },
       {
-        /* WHAT IT RUNS ON, UNDER ITS OWN HEADING (AGT-D12 job 2: "Each project page has a Runs on section listing its
+        /* WHAT IT RUNS ON, UNDER ITS OWN HEADING ("Each project page has a Runs on section listing its
            keys, MCP servers and skills, with the global ones it inherits shown faintly beneath"). The three tiles sat
            among the money under "More about" the project, and what reaches a project from everywhere was said nowhere
            on its page. One boxed tile now: the project's own keys, tools and skills, six of each, and under them
@@ -1707,7 +1707,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            WHO USED IT IS SAID BY THE AGENT'S NAME, "Claude Code", and `used_at` says when anybody last did (AGT-D12
            job 2, batch 89: "Claude Code, 2 days ago"). It was `used_by`, the run's handle, `S731`, which said nothing
            to a person. `used_agents` is the agents whose runs used it in ninety days, newest first and three at most,
-           "Claude Code, Codex" (AGT-D12 job 1, `runs-on.ts`), so the label is "Used by" and not "Last used by". A
+           "Claude Code, Codex" (`runs-on.ts`), so the label is "Used by" and not "Last used by". A
            skill has no use the record counts, so it names neither.
 
            SIX OF EACH SINCE portfolio 1.17.0 (batch 89), where it was three since work 1.15.0, and none that says it is

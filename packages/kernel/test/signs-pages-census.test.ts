@@ -1,5 +1,5 @@
 /**
- * The sign `pages-clean` with the pages census beside it (PGS-A01 step 5): the kernel files the four counts with the
+ * The sign `pages-clean` with the pages census beside it: the kernel files the four counts with the
  * reading and reads them back, through `signRead` as the record files it, and refuses a count that is not a whole
  * number, or one the sign does not count, with a sentence that names what it does count.
  */

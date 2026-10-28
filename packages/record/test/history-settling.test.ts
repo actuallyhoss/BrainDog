@@ -1,5 +1,5 @@
 /**
- * Who suggested, who drafted and who settled, on the record's own reads (ENG-B16 job 3, `settling.ts`).
+ * Who suggested, who drafted and who settled, on the record's own reads (`settling.ts`).
  *
  * THE CLIENT TYPED FIVE KEYS AND NO HOST SENT THEM, so Activity and a row's history said only who signed a line. These
  * cases hold the one fact on a real record: Slash drafts rows by its rules and the owner accepts them, so the `decide`

@@ -1,5 +1,5 @@
 /**
- * A plan as a thing of its own (REC-B12 jobs 1 and 2), one test an effect.
+ * A plan as a thing of its own, one test an effect.
  *
  * `plansFromNames` IS THE DECISION AND `run` IS THE SCRIPT ROUND IT, and both are measured, as `money-settle.test.ts`
  * measures `settle`: the decision on plain fields, and the script as a host's sandbox runs it, its declared `source`

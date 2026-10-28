@@ -40,7 +40,7 @@ test('TWENTY TEXTS FOR ONE CARD AT FIVE SHOPS ARE ONE QUESTION, which asks which
     context: string;
     options: { id: string; label: string; because: string; recommended?: boolean }[];
   };
-  /* THE LIST, THE FIELD AND THE DIGITS, AND NOT THE DOOR: the bank's mail and its texts print one card (audit-34 finding 5). */
+  /* THE LIST, THE FIELD AND THE DIGITS, AND NOT THE DOOR: the bank's mail and its texts print one card. */
   assert.equal(body.cause, 'tail:accounts:last4:1234', 'the cause is kept on the question, as no column holds it yet');
   assert.equal(body.count, 20);
   /* ONE SUM PER CURRENCY, in minor units: 10.00 to 29.00 is 390.00. */

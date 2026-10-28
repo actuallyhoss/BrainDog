@@ -1,5 +1,5 @@
 /**
- * A finding of the weekly analysis files no question (ENG-B17 job 4). It used to come back as "Look into it / Not now",
+ * A finding of the weekly analysis files no question. It used to come back as "Look into it / Not now",
  * signed by Slash, two answers that changed nothing; now the job settles done, the finding's sentence is logged as a
  * reading, and Decide holds nothing new. Over a real record's outbox, so the ack is the kernel's own, the one that files
  * whatever question a draft comes back with.

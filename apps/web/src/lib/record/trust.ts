@@ -1,5 +1,5 @@
 /**
- * The ladder of trust as a person reads it: one sentence for each agent and each kind of change (`trust`, ENG-A12,
+ * The ladder of trust as a person reads it: one sentence for each agent and each kind of change (`trust`,
  * a ladder per agent and kind).
  *
  * PURE, SO `node --test` CAN IMPORT IT. The words and the rules live here and `TrustRows.svelte` only draws what these

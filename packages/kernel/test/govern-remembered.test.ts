@@ -1,5 +1,5 @@
 /**
- * A question the person answered is answered from memory when it is asked again (AGT-C08 job 1).
+ * A question the person answered is answered from memory when it is asked again.
  *
  * WHAT WAS MEASURED BEFORE THIS. A decline closed the question and kept no key to find it by: an agent that proposed again
  * what the owner had said no to the day before filed a new question, and Decide's count went up for an ask he had

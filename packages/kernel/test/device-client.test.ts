@@ -1,5 +1,5 @@
 /**
- * A machine's sign-in is stamped, and can be renamed (AGT-A06 jobs 5 and 6).
+ * A machine's sign-in is stamped, and can be renamed.
  *
  * What is asserted: a login exchange mints a token whose app is BrainDog's own command on the machine its label names,
  * stamped by the kernel; the owner renames the machine and the grant and its live token say the new name together; and

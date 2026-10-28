@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { budget, newestSource } from './lib.mjs';
 
 /**
- * THE ENTRY SCRIPT'S DEBT, OFF THE LEDGER (PRF-B03 job 3). The number this gate fails above used to be `mainJsBaseline`
+ * THE ENTRY SCRIPT'S DEBT, OFF THE LEDGER. The number this gate fails above used to be `mainJsBaseline`
  * in `budgets.json`, raised eleven times with a sentence added to one comment string each time and nothing checking that
  * a change carried one. It is now the newest line of `debts["bundle.mainJsBrotli"]` in `ledger.json`, where every line
  * is dated with its reason and the `ledger` gate is red on a line higher than the one before. This reads it and nothing

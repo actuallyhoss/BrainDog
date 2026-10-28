@@ -1,5 +1,5 @@
 /**
- * `packsRemoved` over the wire (`src/routes/packs-removed.ts`, SHL-A12 job 3): one ADMIN row that writes nothing and
+ * `packsRemoved` over the wire (`src/routes/packs-removed.ts`): one ADMIN row that writes nothing and
  * takes nothing, in the shape `router-groups` and `guards` read, naming the record method of the same name.
  *
  * THE GROUP IS WHAT THE METHOD'S FIRST STATEMENT IMPLIES: `admin(ctx)`, as `uninstallPack` starts, so the row is

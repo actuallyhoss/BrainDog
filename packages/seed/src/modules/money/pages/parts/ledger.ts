@@ -31,7 +31,7 @@ export const LEDGER: Record<string, unknown>[] = [
        ITS OWN EMPTY LINE, for the one place that rule lets a tile say it: where the Ledger is the first thing a page
        has to say.
 
-       ITS WRITTEN LINE COUNTS THE DAY (REC-B20 job 3). Agents do the legwork in view: a person cleared their
+       ITS WRITTEN LINE COUNTS THE DAY. Agents do the legwork in view: a person cleared their
        bank's messages into the Ledger and Money said nothing of who filed them. `filed-today` and `filed-for-you-30d`
        were installed and drawn nowhere, and this line reads both: how many entries were made today, and how many
        anything but a person made in 30 days.
@@ -46,7 +46,7 @@ export const LEDGER: Record<string, unknown>[] = [
        THE APP DRAWS THIS LINE ABOVE THE MOVEMENTS when the record answered both figures (`writtenLine` in the app's
        `apps/web/src/lib/record/blocks.ts`), and draws none while either is unanswered.
 
-       THE NAME IS WHO WAS PAID, AND THE BANK'S OWN LINE WHERE NOBODY IS KNOWN (REC-B16 step 5). The record keeps the
+       THE NAME IS WHO WAS PAID, AND THE BANK'S OWN LINE WHERE NOBODY IS KNOWN. The record keeps the
        payee by the name a person reads (`payee`, filled where a bank door read one), and an entry a person typed holds
        none. A payee column alone would say `Chillout` on one line and nothing at all on the line under it, so the
        column names a second field (`or: 'what'`, a column's own key since batch 72) and a host reads the description

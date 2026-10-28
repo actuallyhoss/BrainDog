@@ -1,5 +1,5 @@
 /**
- * A thing that holds money takes its account's book (REC-A09 job 1), as the decision, the script a host runs round
+ * A thing that holds money takes its account's book, as the decision, the script a host runs round
  * it, and the declaration a pack document carries.
  *
  * A BOOK'S PAGE READS THE BOOK ON EACH LIST, because a filter cannot follow an entry to its account's book
@@ -64,7 +64,7 @@ export default async function run(ctx) {
   const PAGE = 50;
   const MOST = 200;
   /* THE LISTS THAT HOLD AN ACCOUNT, and what one thing on each is called. Bills and invoices is among them since it
-     gained an account (REC-A09 step 1), and is said by the list's own name: half of them are invoices. */
+     gained an account, and is said by the list's own name: half of them are invoices. */
   const LISTS = ['transactions', 'obligations', 'recurring', 'installments'];
   const STANDS = {
     transactions: (s) => s !== 'void',

@@ -214,7 +214,7 @@ export function sharedSaid(sql: Pick<Sql, 'one'>, catalog: LensCatalog, waiting:
 }
 
 /**
- * WHAT THE OWNER HAS SHARED OUT, as Today says it in one line (T12, §6 default 1): how many live
+ * WHAT THE OWNER HAS SHARED OUT, as Today says it in one line (§6 default 1): how many live
  * shares, who they are with by name (three, then how many more), and the shares made in the last day, each as "You shared Kiln with
  * priya@studio.co." `needs` is true when one of those is wide (an address at Edit or Manage, or no end) and the owner
  * has no passkey to have confirmed it with, which is the one case the record could not ask "Confirm it's you" and so

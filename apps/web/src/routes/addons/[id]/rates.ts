@@ -1,5 +1,5 @@
 /**
- * What the rates tile on an add-on's page draws (REC-B02 step 5): the newest rate of each pair of currencies, and the
+ * What the rates tile on an add-on's page draws: the newest rate of each pair of currencies, and the
  * last 90 days of a pair once it holds rates enough to say something.
  *
  * THE TILE HELD NO RATE. It was a sentence and a button, so the page where the fetch is set up never showed what it

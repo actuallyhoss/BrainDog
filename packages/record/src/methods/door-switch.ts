@@ -2,7 +2,7 @@
  * A door switched off and on again without losing its address: `doorSwitch({ ingest, on })` (ADMIN), and the three reads
  * the host and the doors list ask of it.
  *
- * THERE WAS "no way to switch a door off" (H.101). The only way to stop a door was to retire its declaration, which
+ * THERE WAS "no way to switch a door off". The only way to stop a door was to retire its declaration, which
  * drops its token (`heldDigest` in `index.ts`), so a sender stopped for an afternoon needed a new address the morning
  * after. Off is kept BESIDE the digest and never in place of it: `ingest_off.<id>` holds the instant it went off, and
  * `ingest_token.<id>` is not touched, so turning it on again is the same address the sender already posts to.

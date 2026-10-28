@@ -1,5 +1,5 @@
 /**
- * WHAT A BLOCK MAY BECOME (PGS-B08 c): the kinds that read the cells this block reads, so a table turns into cards and a
+ * WHAT A BLOCK MAY BECOME: the kinds that read the cells this block reads, so a table turns into cards and a
  * bar into a line from the block's own menu without a field named again.
  *
  * THE CELLS DECIDE, NOT THE PICTURE. Two families read a list's rows by `columns:` (`kinds/listed.ts`, `pages.ts`): the

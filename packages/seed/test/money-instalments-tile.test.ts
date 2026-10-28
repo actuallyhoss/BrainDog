@@ -1,5 +1,5 @@
 /**
- * Money's Instalments tile (REC-B12 job 5), one test an effect.
+ * Money's Instalments tile, one test an effect.
  *
  * ON A RECORD HOLDING MONEY AS ITS PACK DOCUMENT SAYS IT, as `money-plan-page.test.ts` measures a plan's own page: the
  * three packs installed with no example entries, a plan and its parts written as a person writes them, and Money read

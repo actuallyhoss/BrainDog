@@ -60,7 +60,7 @@ export type SignReading = { state: SignState; value: number | null; said: string
 
 /**
  * THE COUNTS A FILED SIGN MAY CARRY BESIDE ITS ONE VALUE, a closed list a sign, each with the words a person reads it
- * by. `pages-clean` carries the pages census's four (PGS-A01 step 5): its value stays the number of faults, and these
+ * by. `pages-clean` carries the pages census's four: its value stays the number of faults, and these
  * say which kind. Each is a whole number of nought or more, and a filing may leave one out when nobody counted it.
  * Kept in the row's `facts`, as its last entry and the one that is not a line (`{ counts }`), so no column is added.
  */
@@ -655,7 +655,7 @@ const filed = (sign: string, name: string, hand: 'record' | 'host', version = 1)
 /**
  * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then `arrived` (filed by the record), the
  * seven automation signs (`signs-flow.ts`) and the five of what runs by itself and arrives (SHL-C01,
- * `signs-actions.ts`), a spread each, the vitals of `signs-vitals.ts`, and last `rates-current` (REC-B02 step 7), how old
+ * `signs-actions.ts`), a spread each, the vitals of `signs-vitals.ts`, and last `rates-current`, how old
  * the newest exchange rate is on a record with money in more than one currency. The ids are 2.2's; a person reads the names.
  */
 export const VITAL_SIGNS: readonly SignReader[] = [
@@ -667,13 +667,13 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('questions-by-cause', 'Each problem is asked once', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs) => readCauses(sql, nowMs)),
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
   kernel('runs-true', 'Agent runs end cleanly', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs), 2),
-  /* Version 2 (PGS-A01 step 5): a refused block or a path that named nothing, counted by the pages census, is red too. */
+  /* Version 2: a refused block or a path that named nothing, counted by the pages census, is red too. */
   filed('pages-clean', 'Pages draw without errors', 'host', 2),
   filed('arrived', 'What shipped has arrived', 'record'),
   ...SIGNS_FLOW,
   ...SIGNS_ACTIONS,
   ...SIGNS_VITALS,
-  /* After the money-shaped ones (REC-B02 step 7): the age the `rates-age-days` figure reads, red past its own line. */
+  /* After the money-shaped ones: the age the `rates-age-days` figure reads, red past its own line. */
   kernel('rates-current', 'Rates are current', { RATES_STALE_DAYS }, readRatesCurrent),
 ];
 

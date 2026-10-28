@@ -1,5 +1,5 @@
 /**
- * `rates-current`, "Rates are current" (REC-B02 step 7): the vital sign that reads the age the `rates-age-days` figure
+ * `rates-current`, "Rates are current": the vital sign that reads the age the `rates-age-days` figure
  * reads, so stale rates turn a sign red and the skill "Keep a record current" offers a feed of rates in its one
  * question. Red past the line the figure's own note names (`RATE_STALE_DAYS`, `fx.ts`), none on a record whose money
  * is in one currency, however old its rates.

@@ -1,5 +1,5 @@
 /**
- * A shape copy is never put back as a record (PRF-A13 job 4): `importBrainl` refuses one unless it was asked for.
+ * A shape copy is never put back as a record: `importBrainl` refuses one unless it was asked for.
  *
  *   node --test packages/kernel/test/import-shape.test.ts
  *

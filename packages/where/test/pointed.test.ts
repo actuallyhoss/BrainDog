@@ -1,7 +1,7 @@
 /**
  * A hop against the ref: `{ pointed: { register, by, where? } }`.
  *
- * TWO FIGURES NEED IT (REC-A13 job 2, REC-C08 step 9): the spending categories an incoming entry points at, and the
+ * TWO FIGURES NEED IT: the spending categories an incoming entry points at, and the
  * earning categories nothing has come in against. Both ask about the entries that point AT a row, and `via` walks a
  * ref forward from the row that holds it, so neither could be said. These hold the hop in SQL, against both ways a
  * caller names the outer table, with a deleted entry and an entry pointing nowhere in the data to keep the answer honest.

@@ -1,5 +1,5 @@
 /**
- * `setDecider` over the wire (`src/routes/decider.ts`, USE-A13 job 3): one ADMIN row that writes, in the shape
+ * `setDecider` over the wire (`src/routes/decider.ts`): one ADMIN row that writes, in the shape
  * `router-groups` and `guards` read, naming the record method of the same name.
  *
  * THE GROUP IS WHAT THE METHOD'S FIRST STATEMENT IMPLIES: `admin(ctx)`, so the row is ADMIN. Until `routes/index.ts`

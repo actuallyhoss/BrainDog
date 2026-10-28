@@ -1,6 +1,6 @@
 /**
  * The lived record's two profiles read as they were made to: `default` red on the signs an untended record is red on,
- * `lived-well` green on the same signs, over the same five weeks (PRF-A07 job 5, PRF-A01's guard).
+ * `lived-well` green on the same signs, over the same five weeks (PRF-A01's guard).
  *
  *   node --test tools/gates/test/lived.test.mjs
  *

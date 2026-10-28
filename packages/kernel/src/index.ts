@@ -1293,8 +1293,8 @@ export type InboxLine = {
    */
   settled?: ArrivalSettlement;
   /**
-   * The id of the row a skipped arrival repeats, read from the `repeats` mark ingest wrote on its newest `match` line
-   * (audit-35 #3). Absent on any arrival the dedupe did not set aside, a rule's skip among them, so a screen offers
+   * The id of the row a skipped arrival repeats, read from the `repeats` mark ingest wrote on its newest `match` line.
+   * Absent on any arrival the dedupe did not set aside, a rule's skip among them, so a screen offers
    * "It is a second one" by this mark and never by the reason's words.
    */
   repeats?: string;
@@ -5837,7 +5837,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /**
    * TELLING THE PERSON AN AGENT ASKED THEM SOMETHING. A run's new question, the first of its cause, is an
-   * active notice; one that cannot wait (`soon`, AGT-C08, read by the queue's own `WAIT_SQL`) is time-sensitive, pushed
+   * active notice; one that cannot wait (`soon`, read by the queue's own `WAIT_SQL`) is time-sensitive, pushed
    * once for its cause. Before this a question an agent filed reached nobody until Decide was opened.
    *
    * THROUGH `notify` AND NOTHING BESIDE IT, so the record's quiet hours hold it and an active push is one an hour and
@@ -6013,7 +6013,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return transaction((): Result<Ended> => {
       const at = locateRun(w);
       if (at.found?.foreign) return notYours<Ended>(`${prefix}${String(at.found.seq)}`);
-      /* A NAMED RUN IS ENDED, NEVER A GUESS (audit-35 #2). The ladder drops a name whose run is finished, and with no
+      /* A NAMED RUN IS ENDED, NEVER A GUESS. The ladder drops a name whose run is finished, and with no
          client id rung 4 then adopts the caller's newest live run: a retried `end S1` ended S2, which was still working.
          With nothing live to adopt, the same retry was refused as a session that never wrote. A caller that named its
          run is answered for that run. A client id never reaches here, since rung 3 answers it. */
@@ -7306,7 +7306,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ...(r.wait === 'soon' || r.wait === 'old' || r.wait === 'new' ? { waits: r.wait } : {}),
       ...(candidates.length > 0 ? { candidates } : {}),
       ...(Array.isArray(body.rows) ? { held: body.rows.length } : {}),
-      /* WHAT IT IS ABOUT, AS ONE KEY, and how many open questions share it (AGT-C07 d), read in the page's own query
+      /* WHAT IT IS ABOUT, AS ONE KEY, and how many open questions share it, read in the page's own query
          (`ALIKE_SQL`) and never once per question. Absent from a question the record has no cause for. */
       ...(typeof r.cause === 'string' && r.cause !== '' ? { cause: r.cause, alike: Math.max(1, Number(r.alike ?? 1)) } : {}),
       ...facts,
@@ -10726,9 +10726,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     inboxWaiting: (): number =>
       Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM inbox_raw WHERE state IN ('untriaged', 'review')")?.n ?? 0),
 
-    /** What each pattern did with the last `days` days of arrivals, door by door (REC-A03 step 5). */
+    /** What each pattern did with the last `days` days of arrivals, door by door. */
     patternReport: (days = 14): PatternReport => patternReport(sql, clock.now(), days),
-    /** "It is a second one": a text skipped as a repeat, filed after all (REC-A03 step 3). */
+    /** "It is a second one": a text skipped as a repeat, filed after all. */
     fileAsSecond: (raw: string): Result<Arrived> => attempt(sql, transaction, () => fileAsSecond(ingestDeps(), raw)),
     /**
      * How many arrivals are in each state the inbox can be read in, every one of the six named and zero when none.
@@ -10765,7 +10765,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (asked.length === 0) return [];
       /* THE REPEATS MARK IS READ IN THE PAGE'S OWN QUERY, never once per arrival: the newest `match` line of a skipped
          arrival, kept only when ingest marked it `repeats`. `repeats: true` pages through those alone, so a page full of
-         balance alerts set aside by a rule can no longer push a real second charge out of sight (audit-35 #3). */
+         balance alerts set aside by a rule can no longer push a real second charge out of sight. */
       const mark = `CASE WHEN r.state = 'skipped' THEN (SELECT CASE WHEN e.field = 'repeats' THEN e.from_v END FROM event e
           WHERE e.target = 'inbox_raw:' || r.id AND e.kind = 'match' ORDER BY e.rowid DESC LIMIT 1) END`;
       return sql
@@ -11986,7 +11986,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
            AFTER `reload`, so the identity's timezone is the one just installed. */
         armDerived(batch);
-        /* A PATTERN UPDATED READS WHAT ITS OLDER VERSION HELD, once (REC-A02 step 11). */
+        /* A PATTERN UPDATED READS WHAT ITS OLDER VERSION HELD, once. */
         const patterns = batch.flatMap((d) => (d.kind === 'ingest' && typeof (d.body as { ingest?: unknown }).ingest === 'string' ? [(d.body as { ingest: string }).ingest] : []));
         if (patterns.length > 0) transaction(() => rerunHeld(ingestDeps(), patterns));
       }

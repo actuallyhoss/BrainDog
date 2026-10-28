@@ -147,7 +147,7 @@ export const decide = {
   /* TRUE OF THE RECORD TODAY: `govern.ts` refuses an approval whose key is missing, and `actions.ts` one held only for a
      person. When an accept can take some parts and leave the rest, this says that instead. */
   arrangeNeedsNote: 'A part that needs a key stays open until its key is held. Add the key here and it is taken with the rest; without it, Accept takes the rest and that part waits here.',
-  /* WHAT ACCEPT TAKES (REC-A07 step 2): a tick per part, and why one is off. */
+  /* WHAT ACCEPT TAKES: a tick per part, and why one is off. */
   arrangeTakesH: 'What Accept takes',
   arrangeTakesHint: 'Untick a part to leave it for later. What you leave stays here as the same question.',
   arrangeTake: (name: string) => `Take ${name}`,

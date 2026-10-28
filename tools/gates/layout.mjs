@@ -26,7 +26,7 @@
  * whole design. So an element is a finding only if nothing above it scrolls or clips. The document
  * scrolling sideways is a finding always, with no exceptions.
  *
- * THIS FILE IS THE ENTRY, AND EACH RULE'S CHECK IS A FILE IN `layout/` (PRF-B04 job 8). What is here is what the
+ * THIS FILE IS THE ENTRY, AND EACH RULE'S CHECK IS A FILE IN `layout/`. What is here is what the
  * runner and `self-test` read, `needs`, `slices`, `RULES` and `seedsOf`, and the run itself: the port, the record and
  * the browser, which widths and which seeds each pass draws, and the lines at the end. Beside it:
  *

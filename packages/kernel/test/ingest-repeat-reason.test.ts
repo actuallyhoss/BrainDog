@@ -1,9 +1,9 @@
 /**
- * A text skipped as a repeat keeps its reason and the row it repeats (REC-A03 step 3, the kernel half).
+ * A text skipped as a repeat keeps its reason and the row it repeats (the kernel half).
  *
  * BEFORE: "transactions#4 already says this.", a list's id and a number in front of a person, and nothing kept that a
  * screen could offer "It is a second one" on. A real bank sends two equal charges a day apart, and a skip with no way
- * back is a charge lost without a word (P.353: "silent skip with a reason").
+ * back is a charge lost without a word ("silent skip with a reason").
  */
 
 import { test } from 'node:test';

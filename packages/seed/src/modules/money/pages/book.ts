@@ -25,7 +25,7 @@ import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
  * SINCE money-core 3.17.0 a book whose money never goes under in the year reads one line that it lasts (`lastsNote`),
  * and a record holding categories marked against how the Ledger books them says how many (`againstNotes`).
  *
- * A BLOCK IS ON THE PAGE ONCE EVERY FIGURE IT READS IS DECLARED (REC-A09 step 3, second half). What a book is owed and
+ * A BLOCK IS ON THE PAGE ONCE EVERY FIGURE IT READS IS DECLARED (second half). What a book is owed and
  * its months are read from figures of one book (`figures/books.ts`), and those are declared by their own jobs: a cell
  * naming a figure nobody declared is refused where it is read, and a chart's `when:` naming one draws nothing for ever.
  * So the page is built over `declared`, and the one Money ships is built over the figures Money declares.
@@ -71,7 +71,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       empty: 'Nothing in {{name}} is dated ahead yet.',
     },
     {
-      /* THIS BOOK'S MONTH IN ONE ROW (REC-A09 step 3): what came in, what went out and what is left, each read once a
+      /* THIS BOOK'S MONTH IN ONE ROW: what came in, what went out and what is left, each read once a
          book as `book-cash` is (`figures/books.ts`). UNDER THE CASH AND ITS WALK AND NOT BETWEEN THEM: the two are one
          row of twelve, and a tile of twelve set between them would leave the cash alone on a line.
 
@@ -197,7 +197,7 @@ const OWED_CELLS: [figure: string, label: string][] = [
 
 /**
  * WHAT THIS BOOK IS OWED AND OWES, AND HOW LONG ITS MONEY LASTS, IN ONE ROW under its month: the rest of the figures
- * read once a book (REC-A09 step 2). A ROW OF ITS OWN AND NOT THREE MORE CELLS OF THIS MONTH, because that row is drawn
+ * read once a book. A ROW OF ITS OWN AND NOT THREE MORE CELLS OF THIS MONTH, because that row is drawn
  * only while the month has money in it and a bill is owed whatever moved this month.
  *
  * A CELL FOR EACH FIGURE DECLARED, in this order, and no row with none. NO `when:`, because a block's `when:` reads one
@@ -211,7 +211,7 @@ function owedRow(declared: (figure: string) => boolean): Record<string, unknown>
 }
 
 /**
- * THAT THE MONEY LASTS THE YEAR IS A LINE, BECAUSE NO CELL SAYS IT (REC-A09 step 2). `book-lasts-until` holds a day only
+ * THAT THE MONEY LASTS THE YEAR IS A LINE, BECAUSE NO CELL SAYS IT. `book-lasts-until` holds a day only
  * while the walk goes under (`figures/books.ts`), so on a book whose money lasts the cell Money lasts until is left
  * out, and the row with it where nothing else is due: the good news read as nothing at all. One line under What is due
  * says it, as Home's line of what there is does (`usecases/founder.ts`).

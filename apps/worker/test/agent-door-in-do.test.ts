@@ -1,6 +1,6 @@
 /**
  * The agent door's own signs on the Cloud: a session over `/mcp` moves hello, listed and called in `doorSigns`, and its
- * key's last tool call in `doorHealth`, on a record that lives in a Durable Object (AGT-B01 job 7).
+ * key's last tool call in `doorHealth`, on a record that lives in a Durable Object.
  *
  * WHY THIS FILE EXISTS. The marks were held over a stub surface (`packages/mcp/test/heard.test.ts`) and over the record
  * on `node:sqlite` (`packages/record/test/door-heard.test.ts`). The agent door had no test on the Worker's own runtime,

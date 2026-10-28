@@ -1,5 +1,5 @@
 /**
- * Who filed the Ledger, in view (REC-B20 job 2): two figures over who MADE each Ledger entry, read from the record's
+ * Who filed the Ledger, in view: two figures over who MADE each Ledger entry, read from the record's
  * history (`events.<list>`, `packages/kernel/src/metrics.ts`). Agents do the legwork in view: who
  * wrote an entry was always in the history, and Money said none of it.
  *
@@ -65,7 +65,7 @@ export const FILING_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
-   * HOW MANY LEDGER ENTRIES EACH FILING RULE FILED, SINCE money-core 3.17.0 (REC-B10 job 10): every entry whose
+   * HOW MANY LEDGER ENTRIES EACH FILING RULE FILED, SINCE money-core 3.17.0: every entry whose
    * `filed_by` names a rule, in parts by that rule, each part called by the rule's own text (`label`). The page Filing
    * rules draws the parts (`pages/rules.ts`), so a person sees which rules work and which file nothing.
    *

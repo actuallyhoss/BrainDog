@@ -1,5 +1,5 @@
 /**
- * Slash earns an attach (ENG-B15 job 3, "Slash may act on its own", "always undoable", "never money"): ten attach
+ * Slash earns an attach ("Slash may act on its own", "always undoable", "never money"): ten attach
  * questions kept as they were offer the next rung once, in words that say what it does and that it asked; an Undo takes
  * it back to Ask and the next asks again; an attach on a row with an amount is on the money floor and is never offered.
  */

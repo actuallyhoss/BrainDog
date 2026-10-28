@@ -26,7 +26,7 @@ import { HELD, held } from '../../apps/site/src/lib/launch.ts';
 const fill = (seg, value) => ({ [seg]: String(value) });
 
 /**
- * EVERY ROUTE'S SAMPLE, IN ONE TABLE, keyed `<app>:<pattern>` (PRF-B04 job 2). It was two: `SAMPLES` by segment name and
+ * EVERY ROUTE'S SAMPLE, IN ONE TABLE, keyed `<app>:<pattern>`. It was two: `SAMPLES` by segment name and
  * `BY_ROUTE` by pattern, and a segment's name decided which id a route got, so `/automations/[id]` and
  * `/packs/browse/[id]` opened `SG5`, a question's id that no automation and no catalogue entry has, and both were
  * measured as not found. Keyed by app because `/packs/[id]` is two routes: the record app's add-on and the site's listing.

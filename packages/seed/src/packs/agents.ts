@@ -36,7 +36,7 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
     role: 'learnings',
     fade: { field: 'confirmed_on', after: '90d' },
     seq_prefix: 'LN',
-    /* THE FOUR-PART TEST IN ONE LINE, SINCE 1.13.0 (AGT-D15 job 1): an agent reads a list's own words with its shape, and
+    /* THE FOUR-PART TEST IN ONE LINE, SINCE 1.13.0: an agent reads a list's own words with its shape, and
        the test was in one document and in nothing an agent reads. No full stop, because a page says "Learnings holds"
        and this, and ends it. */
     holds:
@@ -61,7 +61,7 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role
       /* The failure that taught it. Required, because a lesson with no failure behind it cannot be
          checked when it stops being true. */
       { id: 'because', label: 'Because', type: 'text', required: true, min: 24, max: 600, search: true },
-      /* `rule` SINCE 1.13.0 (AGT-B09 job 4): what a person writes for every session to be handed first, such as "divide
+      /* `rule` SINCE 1.13.0: what a person writes for every session to be handed first, such as "divide
          estimates by 4". An added value, so no row changes. */
       { id: 'kind', label: 'Kind', type: 'enum', values: ['method', 'fact', 'rule'], labels: { rule: 'Rule' }, required: true, index: true },
       { id: 'project', label: 'Where it applies', type: 'ref', to: 'things', index: true, scope: { widen: 'person' } },
@@ -784,7 +784,7 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      makes two of them one (`same:`), a learning's kind gains `rule`, and the learnings' own words say when to
      record one; no row changes. Needs a look gains a sixth line, over the record's `stale-rows-same`, with the
      way to fold what is here twice on each of those four lists. And with 1.13.0 the skill After an import
-     ships its second text (REC-C17 step 3, `agents-skills.ts`): a mark that names no glyph is given the nearest one a
+     ships its second text (`agents-skills.ts`): a mark that names no glyph is given the nearest one a
      host draws, in the same arrangement, and cleared only where none is near. A skill travels beside this document, not
      in it, and takes its own `rev`, so the document and its fingerprint are as they were.
      1.14.0 TAKES NOTHING AWAY BUT A BLOCK, SO IT IS MINOR (the Agents page made calm): the line says how many are at work,

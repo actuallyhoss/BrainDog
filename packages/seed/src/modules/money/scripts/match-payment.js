@@ -1,5 +1,5 @@
 /**
- * A payment that names nothing finds what it pays (REC-B11 step 3), as the decision, the script a host runs round it,
+ * A payment that names nothing finds what it pays, as the decision, the script a host runs round it,
  * and the declaration a pack document carries. `settle.js` is what the link then does; this file only finds the link.
  *
  * WHAT IT LOOKS FOR. Handed a cleared Ledger entry that settles nothing and that no instalment names, and the open

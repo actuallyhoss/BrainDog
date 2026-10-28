@@ -1,5 +1,5 @@
 /**
- * Filing rules that learn (REC-B10 steps 5 and 6): a new or changed rule files back what it matches, and a category set
+ * Filing rules that learn: a new or changed rule files back what it matches, and a category set
  * by hand asks once whether the payee always goes there. No category is better than a wrong one.
  *
  * MEASURED ON A RECORD, as `money-match-rule.test.ts` measures `match_payment`: Money installed from its pack document,

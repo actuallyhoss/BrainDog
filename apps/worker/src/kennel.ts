@@ -461,7 +461,7 @@ export const REVIEW_LATE_MS = 7 * 86_400_000;
 export const VITAL_FILES_MOST = 500;
 
 /**
- * One of the Kennel's four vital signs (SHL-B01 job 5), as the night's note in the ops record says it: which sign,
+ * One of the Kennel's four vital signs, as the night's note in the ops record says it: which sign,
  * whether it is well, and its line. A RED LINE CARRIES A MARK AND A WORD, never colour alone.
  */
 export type KennelSign = { sign: 'index' | 'counts' | 'review' | 'outside'; ok: boolean; line: string };

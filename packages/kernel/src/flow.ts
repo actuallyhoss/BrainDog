@@ -272,7 +272,7 @@ export type Installed = { id: string; version: number; body: FlowDecl };
 /**
  * What a run's question carries beside its words and its options, onto the suggestion's body: the run and the step it
  * answers, the one member it is put to, and what it asks for. `shape` is always said, `choice` included, so Decide
- * draws the input the step asked for without reading the rule (PGS-A25 draws it). `currency` is an `amount`'s code, read
+ * draws the input the step asked for without reading the rule. `currency` is an `amount`'s code, read
  * from the step or its row when the question was asked; an amount with none asks the person to say their code.
  */
 export type AskAbout = { run: string; step: number; to?: string; shape?: AskShape; currency?: string };

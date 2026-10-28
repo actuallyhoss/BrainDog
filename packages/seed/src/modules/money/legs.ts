@@ -1,6 +1,6 @@
 /**
  * The walk and the roll every Money figure and page reads, each written once: the lists that hold a dated amount, the
- * repeating lines a monthly figure counts, and Cash now's arithmetic. Cut out of `money.ts` with no change (REC-B01 job 1).
+ * repeating lines a monthly figure counts, and Cash now's arithmetic. Cut out of `money.ts` with no change.
  */
 
 import type { Leg } from '@braindog/kernel';

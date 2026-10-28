@@ -1,5 +1,5 @@
 /**
- * The line an add-on's page says about its parts that wait (SHL-A08 job 5): "1 part waits for People."
+ * The line an add-on's page says about its parts that wait: "1 part waits for People."
  *
  * BEFORE: an add-on whose field waited for People installed without it and said nothing anywhere, so a person could not
  * tell a part that waits from a part that is missing. Now the page reads the add-on's own file, lays it over what the

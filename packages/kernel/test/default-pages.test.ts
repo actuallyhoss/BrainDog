@@ -1,5 +1,5 @@
 /**
- * THE PAGE EVERY LIST HAS (PGS-A23 job 1): `listPage(decl)` composes it from what the list says of itself, in the keys
+ * THE PAGE EVERY LIST HAS: `listPage(decl)` composes it from what the list says of itself, in the keys
  * the page grammar admits today, and the kernel's own page check finds no fault in it.
  */
 

@@ -6,7 +6,7 @@ import type { SeedPage } from '../../base.ts';
 const HAS_FILED = { metric: 'rule-filed', gte: 1 };
 
 /**
- * ONE PAGE, UNDER MONEY, SINCE money-core 3.17.0 (REC-B10 job 10): what the record has learnt to file by itself, rule by
+ * ONE PAGE, UNDER MONEY, SINCE money-core 3.17.0: what the record has learnt to file by itself, rule by
  * rule: a page Filing rules under Money, with each rule, its category, how many rows it filed and the day of the
  * last. It is where a person sees the rules work, and turns a wrong one off from the rule it opens.
  *

@@ -1,5 +1,5 @@
 /**
- * The briefing on the Worker (`src/slash.ts`, ENG-B12 job 5): the one ask for Today's cards, through the included model
+ * The briefing on the Worker (`src/slash.ts`): the one ask for Today's cards, through the included model
  * and through his own key, whichever he chose.
  *
  * BEFORE THIS, THE WORKER'S MODEL OBJECT HAD NO `brief`. It lists its asks one by one, so whatever the host's adapters

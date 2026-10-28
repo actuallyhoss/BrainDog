@@ -1,4 +1,4 @@
-/** Money's figures of one book's month, and of what is filed in no book (REC-A09 step 2). */
+/** Money's figures of one book's month, and of what is filed in no book. */
 
 import { LOOKUPS, OPEN, type SeedMetric } from '../../base.ts';
 import { BOOK_LEGS } from '../pages/shared.ts';

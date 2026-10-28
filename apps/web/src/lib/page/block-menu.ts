@@ -1,5 +1,5 @@
 /**
- * THE BLOCK MENU AS A LIST, pure (PGS-B08 a): what a block's own menu offers, in order, and the one change each press
+ * THE BLOCK MENU AS A LIST, pure: what a block's own menu offers, in order, and the one change each press
  * makes to the page's look. `BlockMenu.svelte` draws the rows and writes the change; every rule lives here, so
  * `block-menu.test.ts` holds it.
  *

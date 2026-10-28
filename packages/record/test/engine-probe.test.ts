@@ -1,5 +1,5 @@
 /**
- * `engineProbe`, the record's half of the engine's probe (ENG-A08 job 2).
+ * `engineProbe`, the record's half of the engine's probe.
  *
  * WHY THIS FILE EXISTS. After he mended a key he waited half an hour to learn whether the model answered. The host builds
  * the probe and hands it in; asserted here: the owner's press is answered from it whole with when the next may go, a

@@ -294,7 +294,7 @@ export function methods(deps: RecordDeps) {
      * A session is still working: the caller's run is heard from now, and nothing else changes. A token's call, needing
      * `propose`, as `end` and `attach` do.
      *
-     * A HEARTBEAT IS NOT A WRITE (P.132). Last seen moved only when a run wrote, so a session that read, thought or edited
+     * A HEARTBEAT IS NOT A WRITE. Last seen moved only when a run wrote, so a session that read, thought or edited
      * files for half an hour read as Quiet beside one that had died. The kernel's `heartbeat` moves `last_seen` in place
      * (`beatRun`): no version, no event, no line in the run's history, at most once a minute.
      *

@@ -1,5 +1,5 @@
 /**
- * THE REWRITE OF A NOTE LOSES NO TEXT (REC-A13 step 4). An arrangement that lifts a project's one line, its plan and what
+ * THE REWRITE OF A NOTE LOSES NO TEXT. An arrangement that lifts a project's one line, its plan and what
  * is in the way out of its note, and writes the note again, keeps every character of the old note: in the new note, or
  * in a field it was lifted into. The check is on lengths, which is what a session can work out before it files and what
  * the record can work out before it takes the yes: the old note is no longer than the new note and everything lifted out

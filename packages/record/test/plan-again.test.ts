@@ -1,5 +1,5 @@
 /**
- * A part of an add-on that waited for something the record did not hold arrives when the record holds it (SHL-A08 job 4).
+ * A part of an add-on that waited for something the record did not hold arrives when the record holds it.
  *
  * BEFORE: an add-on's field that said `when: { holds: [people] }` was left out on a record without People, and stayed out
  * after People was installed, until somebody installed the add-on again by hand. Now every install and switch-on plans

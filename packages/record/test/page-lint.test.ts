@@ -73,7 +73,7 @@ test('A NOTE THAT PRINTS THREE RAW THINGS IS THREE FINDINGS, named by page and p
   assert.deepEqual(ran, { ran: true, state: 'red', findings: 3, pages: 1 });
   const s = sign(api);
   assert.equal(s.state, 'red');
-  /* AND THE PAGES CENSUS BESIDE THE LINT (PGS-A01 step 5): the note's `{{revenue.monthly}}` names nothing on this
+  /* AND THE PAGES CENSUS BESIDE THE LINT: the note's `{{revenue.monthly}}` names nothing on this
      record, so the census counts the page once more and its fact names the path, ahead of the lint's three. */
   assert.equal(s.value, 4);
   assert.equal(s.said, '1 page prints a path that names nothing: Kiln. 1 page prints something raw: Kiln.');

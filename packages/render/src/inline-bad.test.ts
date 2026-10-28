@@ -1,5 +1,5 @@
 /**
- * `{{bad:words}}`: a phrase drawn in the danger colour, and the only colour that has a form (H.202).
+ * `{{bad:words}}`: a phrase drawn in the danger colour, and the only colour that has a form.
  *
  * WHAT IS HELD HERE: the words are inline text, so a path, a typed value and a bold run inside all
  * read as they do outside; a form with no words is the author's text; no other colour word is a form;

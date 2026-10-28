@@ -1,5 +1,5 @@
 /**
- * `huesWanted` and `giveHues` (PGS-A06 step 5): the rows of a list that names an accent and hold no hue are counted, and
+ * `huesWanted` and `giveHues`: the rows of a list that names an accent and hold no hue are counted, and
  * one press gives each a hue of its own, once, in one batch that one Undo takes back.
  *
  * THE METHOD FILE OVER A REAL KERNEL. The rows made "before" are written through the kernel's own `create`, which gives

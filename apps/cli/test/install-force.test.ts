@@ -1,5 +1,5 @@
 /**
- * `braindog pack install --force` and `pack uninstall --force` (SHL-A12 job 6), against a stand-in client.
+ * `braindog pack install --force` and `pack uninstall --force`, against a stand-in client.
  *
  * `--force` is his press at the terminal on an update that takes a list away while it holds items: the install is sent
  * with `retireWithRows`, which lifts `WOULD_ORPHAN` and nothing else, and says so in one line ("Forced: Services keeps

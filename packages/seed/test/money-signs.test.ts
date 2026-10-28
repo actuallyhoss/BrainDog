@@ -1,5 +1,5 @@
 /**
- * Money's signs of life (REC-B01 job 3, `src/modules/money/figures/signs.ts`), read through the kernel on a record that
+ * Money's signs of life (`src/modules/money/figures/signs.ts`), read through the kernel on a record that
  * installed money-core the way a person does, with no example rows.
  *
  * `ledger-rows-7d` is the one declared. The other three the unit names (`ledger-newest-days`, `currencies-held`,

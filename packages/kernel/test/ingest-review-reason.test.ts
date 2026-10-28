@@ -10,7 +10,7 @@
  * defaulted under a `needs-review` ceiling.
  *
  * `proposed` STAYS WHERE IT IS TRUE. An arrival whose state IS `proposed` keeps the words "proposed rather than
- * written". And since REC-A03 every one of these says the pattern by its name, here its description, never its id.
+ * written". And now every one of these says the pattern by its name, here its description, never its id.
  */
 
 import { test } from 'node:test';

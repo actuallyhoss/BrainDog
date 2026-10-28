@@ -75,7 +75,7 @@ export const HEADS_UP: Record<string, unknown>[] = [
     when: { any: [{ metric: 'overdue', gt: 0 }, { metric: 'installments-late', gt: 0 }] },
   },
   {
-    /* A CATEGORY MARKED ONE WAY THAT HOLDS MONEY GOING THE OTHER, SINCE money-core 3.16.0 (REC-A13 job 2): an import
+    /* A CATEGORY MARKED ONE WAY THAT HOLDS MONEY GOING THE OTHER, SINCE money-core 3.16.0: an import
        that filed money coming in under a category marked "Money out" leaves every figure by category wrong in silence.
        The line says how many and what makes it right, Either way being the category's own word for both
        (`lists/categories.ts`); drawn only while one is (`categories-against-direction`). */

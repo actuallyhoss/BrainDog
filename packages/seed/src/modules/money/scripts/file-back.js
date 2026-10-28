@@ -1,5 +1,5 @@
 /**
- * A new or changed filing rule files what it matches that has no category (REC-B10 step 5), as the decision, the
+ * A new or changed filing rule files what it matches that has no category, as the decision, the
  * script a host runs round it, and the declaration a pack document carries. `learn-category.js` reads the same
  * decision, so the count a question promises is the number this files.
  *

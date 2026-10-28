@@ -1,5 +1,5 @@
 /**
- * The restore drill's door (LCH-C04 job 3): what `restore-drill.mjs --report` posts to `/account/ops/drill`, read, and
+ * The restore drill's door: what `restore-drill.mjs --report` posts to `/account/ops/drill`, read, and
  * what the host then says about it.
  *
  * COUNTS ONLY. The drill sends `{ at, pass, copies, rows, lists, people, records }` (`report` in

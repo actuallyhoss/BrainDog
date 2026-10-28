@@ -2,7 +2,7 @@
  * `braindog tidy [--ask] [--json]`: what went stale on the record, read now, and the call that clears each (over
  * AGT-C18's registry). Steps left earlier that nobody took, questions that waited, and a line for each finder that
  * found something, each as the record says it. Under them, how many things with no place look like they belong to a
- * project (`scopeProposals`, AGT-D04 job 6) and how many lessons two projects learned twice (`learningsTwice`).
+ * project (`scopeProposals`) and how many lessons two projects learned twice (`learningsTwice`).
  *
  * WITHOUT `--ask` IT READS AND NOTHING ELSE: `stale`, `scopeProposals` and `learningsTwice`, three GETs, and no session
  * headers, so it names no run, opens none and fires no hook. It files nothing and answers nothing: the line under each

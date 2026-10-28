@@ -1,7 +1,7 @@
 /**
  * What of an add-on waits for the record to hold something, as its page says it: "1 part waits for People."
  *
- * WORKED OUT ON READ, NOT STORED (SHL-A08 job 5). The record keeps no note of what waited when the add-on was installed,
+ * WORKED OUT ON READ, NOT STORED. The record keeps no note of what waited when the add-on was installed,
  * so the page reads the add-on's own file at the version installed, lays it over what the record holds now, and counts
  * the parts that would still be left out (`resolveWhen` in `@braindog/declare`). A part that waits says
  * `when: { holds: [people] }`; BrainDog's own modules cut theirs another way and say none.

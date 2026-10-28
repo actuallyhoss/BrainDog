@@ -1,5 +1,5 @@
 /**
- * The record's own pattern draft reads the three oldest arrivals of a shape and is told how many wait (ENG-B07 job 3).
+ * The record's own pattern draft reads the three oldest arrivals of a shape and is told how many wait.
  *
  * RED BEFORE THIS: `draftPattern` sent every sample it was handed, in the order handed, and the prompt said only "N
  * messages arrived". A host that handed the newest five had a pattern written from this week's text, and the model never

@@ -1,5 +1,5 @@
 /**
- * A settings value may be a list of text, checked as the setting's type says (REC-A06 step 3, the kernel's half).
+ * A settings value may be a list of text, checked as the setting's type says (the kernel's half).
  *
  * BEFORE: `propose` took text, a number, true or false, or null, so a `list` setting (the words a script matches a bank
  * line against) could be set on the settings screen and never proposed: an arrangement carrying the owner's list was

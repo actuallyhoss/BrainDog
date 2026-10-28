@@ -2,7 +2,7 @@
  * The names an automation's body points at: the title of every list, field, person, call, script, door, figure and kind
  * of job it names, keyed by the id as the body stores it.
  *
- * "NAME ON RULE" (H.408). A card printed a list or a call by its id in words (`flow.ts`'s `idWords`), because the read
+ * "NAME ON RULE". A card printed a list or a call by its id in words (`flow.ts`'s `idWords`), because the read
  * of one automation answered the body and nothing it names, and the editor's names map was filled from the page's own
  * data, which knows the lists the rail shows and nothing else. The record holds every one of these titles, so it says
  * them once, beside the body, and every card can read "When an item in Ledger is added" and never a stored id.

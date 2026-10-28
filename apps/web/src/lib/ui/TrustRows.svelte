@@ -1,5 +1,5 @@
 <!--
-  What each agent may do on its own: the ladder of trust, read back (`trust`, ENG-A12, a ladder per
+  What each agent may do on its own: the ladder of trust, read back (`trust`, a ladder per
   agent and kind).
 
   ONE TILE, ONE SENTENCE A LINE: an agent, a kind of change, and what the rung means, "Claude Code may add tasks and do

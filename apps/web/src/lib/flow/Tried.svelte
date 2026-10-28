@@ -194,7 +194,7 @@
       />
     {/if}
     <p class="tried-count num">{said.matches(t.matches ?? 0, t.rows)}</p>
-    <!-- WHICH RULE GETS THERE FIRST (SHL-D07 job 6): the dry run's `won`, `lost` and `takenBy`, one line each by name. -->
+    <!-- WHICH RULE GETS THERE FIRST: the dry run's `won`, `lost` and `takenBy`, one line each by name. -->
     {#each contest as line (line)}<p class="tried-note num">{line}</p>{/each}
     {#if t.sample.length > 0}
       <ul class="tried-rows">

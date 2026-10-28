@@ -1,5 +1,5 @@
 /**
- * MONEY'S ACCOUNTS TILE READS EACH ACCOUNT IN ITS OWN CURRENCY (REC-B23 job 1): on a record kept in pounds, a dollar
+ * MONEY'S ACCOUNTS TILE READS EACH ACCOUNT IN ITS OWN CURRENCY: on a record kept in pounds, a dollar
  * account is a part in dollars beside the pound account, never turned into pounds. Cash now itself is still one figure
  * in pounds, the dollars converted at the record's rate.
  *

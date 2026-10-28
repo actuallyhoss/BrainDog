@@ -274,7 +274,7 @@ test('AN IDENTITY INSIDE THE REPOSITORY IS REFUSED BEFORE IT IS READ, and a seal
   assert.deepEqual(leftIn(n.temp), []);
 });
 
-// ─── fetched as the operator (LCH-C04 job 1) ──────────────────────────────────────────────────────────────────────
+// ─── fetched as the operator ──────────────────────────────────────────────────────────────────────
 
 /**
  * A wrangler that reads from a folder: `r2 object get <bucket>/<key> --remote --file <dest>` copies `<r2>/<bucket>/<key>`

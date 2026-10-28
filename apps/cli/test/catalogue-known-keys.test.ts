@@ -1,5 +1,5 @@
 /**
- * Trust in a publisher is the record's in the terminal too (SHL-B07 job 7): the keys the app's Browse keeps in the
+ * Trust in a publisher is the record's in the terminal too: the keys the app's Browse keeps in the
  * record's `packs.known_keys` are read by the command line, a key first met here is kept there, and a machine with no
  * record to read keeps its own `known-keys.json` as before, said once. A key other than the one seen before is held back,
  * as Browse holds it, until `--trust-key`.

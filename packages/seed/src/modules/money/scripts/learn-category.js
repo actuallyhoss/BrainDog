@@ -1,5 +1,5 @@
 /**
- * The record learns from a person's hand (REC-B10 step 6): a category set on a Ledger entry by hand asks once whether
+ * The record learns from a person's hand: a category set on a Ledger entry by hand asks once whether
  * every entry from that payee should go there, as the question, the script a host runs round it, and the declaration a
  * pack document carries.
  *

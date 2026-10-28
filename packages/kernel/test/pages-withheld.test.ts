@@ -1,5 +1,5 @@
 /**
- * ONE RULE FOR WHETHER A PAGE IS THERE FOR ITS READER (H.366): `whollyWithheld` is true when the page has a
+ * ONE RULE FOR WHETHER A PAGE IS THERE FOR ITS READER: `whollyWithheld` is true when the page has a
  * block and every block carries a refusal that holds it back from the reader, never one that asks its author to fix it.
  */
 

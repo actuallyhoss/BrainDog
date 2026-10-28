@@ -112,7 +112,7 @@ export async function readExports(page: LogPager): Promise<string[] | null> {
 }
 
 /**
- * THIS HOST'S LAST RESTORE TEST (LCH-C04 job 4), from `GET /account/drill`: `{ at, pass, record_copies, directory_only }`, or `{ at: null }`
+ * THIS HOST'S LAST RESTORE TEST, from `GET /account/drill`: `{ at, pass, record_copies, directory_only }`, or `{ at: null }`
  * before the first. A FACT ABOUT THE HOST AND NOT THE RECORD (the scope's critic): only the operator holds the key that
  * opens the copies, so every record on the host reads the same line, and nothing here is drawn for one record alone.
  */

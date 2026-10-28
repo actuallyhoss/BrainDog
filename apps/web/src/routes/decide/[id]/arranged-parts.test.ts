@@ -1,5 +1,5 @@
 /**
- * An arrangement accepted in part (REC-A07 step 2, REC-A06 step 7): a tick per part, a part whose key the record does not
+ * An arrangement accepted in part: a tick per part, a part whose key the record does not
  * hold unticked by itself with the part that needs it, and saying why; Accept sending the ticked ids, and the kernel
  * taking them. And an update that takes away a door messages still come to: it says they stop being filed,
  * and Accept asks twice, unless an add-on takes the door over.

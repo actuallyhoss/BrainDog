@@ -417,7 +417,7 @@ function joinedOf(q: QueueQuestion, merge: Merge | null): number {
 }
 
 /**
- * AN ARRANGEMENT IS SAID IN ITS OWN SUMMARY (REC-A07 step 3): what it sets up, then the keys, updates, feeds and rows it
+ * AN ARRANGEMENT IS SAID IN ITS OWN SUMMARY: what it sets up, then the keys, updates, feeds and rows it
  * holds, counted, as its own question page heads its story (`arranged.ts` `arrangedOf`, "Sets this BrainDog up for
  * Money: 2 keys, 3 updates, 2 feeds."). It takes the place of the general line of what accepting does, and is said on
  * every card, the lead's or not, since it is what the card is. Read from the body the record filed, which a host hands

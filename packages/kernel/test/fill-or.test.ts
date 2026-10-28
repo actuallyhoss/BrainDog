@@ -2,9 +2,9 @@
  * `{{path or "words"}}`: what a run writes where a path reaches nothing, said by the rule.
  *
  * WHAT WAS WRONG. A run path that reached an empty or missing value was written as the dash, so a note read
- * `Keys: —` and the owner read it as a failed run on brace values (H.774). The rule can now say what goes there.
+ * `Keys: —` and the owner read it as a failed run on brace values. The rule can now say what goes there.
  * A path with no `or` still writes what it wrote before: switching that to a failed step waits on a count over
- * every installed rule and one question to the owner (SHL-D06 job 3).
+ * every installed rule and one question to the owner.
  *
  * ON A FRESH RECORD, through the real runner and the real pass. The lint does not yet admit `or` where it reads a
  * step (`flow-lint.ts` and `declare.ts` are another job's), so a rule spelling it is written into the table over a

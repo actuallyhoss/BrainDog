@@ -20,7 +20,7 @@
  * starts the same way, when there is one: that row is stamped as seen and nothing is added. A row is asked about only
  * when how it starts would change, as "Change how <name> starts?".
  *
- * THE RECORD DOES THAT MATCHING WHEN IT CAN (AGT-D02 job 4). A scan sends everything it found in one `toolsSeen` call,
+ * THE RECORD DOES THAT MATCHING WHEN IT CAN. A scan sends everything it found in one `toolsSeen` call,
  * 50 a call, matched there against every row rather than the ones one context shows, and says one line an answer. A
  * record or a command line without `toolsSeen` is scanned as below, unchanged.
  *
@@ -29,11 +29,11 @@
  * replaced only when it is still what BrainDog last wrote, by `~/.braindog/tools-lock.json`, or still the entry the
  * scan read.
  *
- * NOTHING DEAD OR FOREIGN IS WRITTEN (AGT-A07 build 4). A tool whose program is neither on this machine's path nor a
+ * NOTHING DEAD OR FOREIGN IS WRITTEN. A tool whose program is neither on this machine's path nor a
  * file here, or which starts from another system's path (a drive letter off Windows, another system's home folder),
  * is left out with one line naming it, so a new machine is never handed what only ran on another one.
  *
- * WHAT CLAUDE CODE IS CONNECTED TO BEYOND ITS FILES IS AN INTEGRATION (AGT-D10 job 6). When the scan is handed
+ * WHAT CLAUDE CODE IS CONNECTED TO BEYOND ITS FILES IS AN INTEGRATION. When the scan is handed
  * `connected` (`braindog tools scan` hands it `claude mcp list`, by `clients/connected.ts`), each entry whose name or
  * address no config file read here holds (a connector added in the claude.ai app, a server a plugin registered) goes
  * the same way a server does, as `kind: 'integration'`: its address when one was printed, no transport, no command, and
@@ -542,7 +542,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   };
 
   /**
-   * THE RECORD MATCHES WHAT THIS MACHINE HOLDS (AGT-D02 job 4). Every tool found is sent in `toolsSeen`, 50 a call, and
+   * THE RECORD MATCHES WHAT THIS MACHINE HOLDS. Every tool found is sent in `toolsSeen`, 50 a call, and
    * each answer is one line. The record matches a tool to its row by what it runs, among all of its rows and not the
    * ones one context shows, so a new server is always recorded, nothing past that cut is lost, and a second machine's
    * path is not a change to ask about. `false` when the record, or this command line, has no `toolsSeen`: the scan

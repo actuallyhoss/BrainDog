@@ -8,7 +8,7 @@
  * closes that address only when it owns nothing else.
  *
  * WHAT THE DELETE KEPT is the record's answer: `destroyRecord` (`apps/worker/src/destroy.ts`) answers `{ kept, removed }`,
- * the final copy's key and how many other copies and files it took (LCH-A03 job 3). A host whose delete does not pass
+ * the final copy's key and how many other copies and files it took. A host whose delete does not pass
  * that answer on yet is asserted as deleted, and the step says it cannot read what was kept.
  *
  * `erase` IS LCH-A16's LIVED PROOF: in the drill's own record a second person joins by invitation, attaches a file in a

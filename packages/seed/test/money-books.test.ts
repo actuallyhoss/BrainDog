@@ -1,5 +1,5 @@
 /**
- * A Ledger entry, a bill, a repeating line and an instalment take their account's book (REC-A09 job 1).
+ * A Ledger entry, a bill, a repeating line and an instalment take their account's book.
  *
  * EVERY MONEY LIST CARRIES AN OPTIONAL LINK TO A BOOK, AND UNTIL NOW NOTHING FILLED IT. A book's page reads the field on
  * each list, since a filter cannot follow an entry to its account's book, so an entry typed in on Acme's account sat
@@ -368,7 +368,7 @@ test('a record with no book, or with nothing out of its book, is asked nothing',
 });
 
 /**
- * A BILL TAKES ITS ACCOUNT'S BOOK TOO (REC-A09 step 1). Bills and invoices holds the account a bill is paid from or an
+ * A BILL TAKES ITS ACCOUNT'S BOOK TOO. Bills and invoices holds the account a bill is paid from or an
  * invoice is paid into, optional as it is on an instalment, and `bill-takes-book` is the fourth rule. Until the list
  * held one there was nothing to take a book from, and a bill was in a book only when somebody filed it there.
  */

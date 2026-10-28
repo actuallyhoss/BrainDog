@@ -1,5 +1,5 @@
 /**
- * Everyday spending in the walk ahead, measured end to end (REC-B07 job 10, money-lasts-tile-100): a fresh record with
+ * Everyday spending in the walk ahead, measured end to end (money-lasts-tile-100): a fresh record with
  * a salary, three full months of card spending and no bills, read through a figure over Cash ahead's own legs.
  *
  * WHY. The kernel moves a week's share of what was spent each week to the horizon (`packages/kernel/src/forecast.ts`,

@@ -1,5 +1,5 @@
 /**
- * A part that waits on what the record holds (SHL-A08 job 1): `when: { holds: [people] }` on a declaration, a field, a
+ * A part that waits on what the record holds: `when: { holds: [people] }` on a declaration, a field, a
  * block, a column, a leg, a pairing clause or a role.
  *
  * BEFORE: only the seed's own `firstPartyDocument(id, { holds })` could cut a part per record, and a stranger's add-on

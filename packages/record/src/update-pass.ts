@@ -157,7 +157,7 @@ export function passFolder<L extends Foldable>(passes: readonly UpdatePass[]): {
 
 /**
  * THE SAME VERSION OF ONE ADD-ON PUT IN TWICE ON ONE DAY BY THE RECORD ITSELF, which is a fault in the tick and never the
- * plain case of two versions shipped that day (SHL-A21 job 1). Each pack and version with the day and the count, oldest
+ * plain case of two versions shipped that day. Each pack and version with the day and the count, oldest
  * day first; an empty answer is a log with no such day.
  */
 export function installedTwice(sql: Sql): { pack: string; version: string; day: string; times: number }[] {

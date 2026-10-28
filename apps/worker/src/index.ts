@@ -3035,14 +3035,14 @@ const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null, 
  * place that is honest about which: the changelog, on the marketing site, with no credential
  * needed to read it.
  */
-/* AND NOW IT SAYS ONLY `unauthorized` (LCH-C08 job 2): the sentence and whether sign-in is on go to the log, and the
+/* AND NOW IT SAYS ONLY `unauthorized`: the sentence and whether sign-in is on go to the log, and the
    body is the one 401 every door of this Worker answers, so nothing is taught to a stranger that the owner's log does not
    already hold. */
 const unauthorized = (env: Env): Response =>
   saidUnauthorized('bearer', (env.SESSION_SECRET ?? '').length >= 32 ? 'a bearer this record does not know, sign-in on' : 'a bearer this record does not know, sign-in off');
 
 /**
- * THE ONE 401 BODY (LCH-C08 job 2, the rule "A `401` says only `unauthorized`.", P.154): every 401 this Worker answers
+ * THE ONE 401 BODY (the rule "A `401` says only `unauthorized`."): every 401 this Worker answers
  * itself carries `{ code: 'UNAUTHORIZED', fix: 'unauthorized' }` and nothing else, and the reason goes to one
  * `op: 'unauthorized'` line, so a stranger learns nothing of which door or why (`scripts/fence.mjs` checks it).
  */
@@ -3358,7 +3358,7 @@ async function nightly(env: Env): Promise<void> {
     now: () => Date.now(),
   }).catch(async (e: unknown) => {
     /* A WALK THAT THREW IS A NIGHT THAT DID NOT RUN, kept as one so last night's `ran` does not stand for a day more
-       (audit-35), and mailed before the throw makes the invocation red. */
+      , and mailed before the throw makes the invocation red. */
     await keepNight(directory, stoppedNight(directoryFailed));
     await opsAlert(env, { op: 'night', why: 'the walk stopped' }, alertClaim(env));
     throw e;
@@ -3377,7 +3377,7 @@ async function nightly(env: Env): Promise<void> {
     backups_failed: walked.failed,
     directory: directoryFailed === null ? 'ok' : 'failed',
     /* AND EVERY OTHER JOB OF THE NIGHT BY ITS FAILURES, so `ran` is not said over expiries, re-wraps, erasures or counts
-       that did not finish (audit-35). */
+       that did not finish. */
     expiry_failed: walked.expiryFailed,
     stragglers: walked.stragglers,
     erase_open: walked.eraseOpen,
@@ -4405,7 +4405,7 @@ const OPS_DRILL = /^\/+account\/+ops\/+drill\/*$/;
 const DRILL = /^\/+account\/+drill\/*$/;
 
 /**
- * `/account/ops/drill`: the restore drill's counts (LCH-C04 job 3, `restore-drill.mjs --report`). `POST { at, pass, copies,
+ * `/account/ops/drill`: the restore drill's counts (`restore-drill.mjs --report`). `POST { at, pass, copies,
  * rows, lists, people, records }`, read by `readDrill` and kept as the host's last drill in the Directory. When
  * `OPS_RECORD` names the operator's record it also takes the note `drill <date> · pass · <n> records` (`· directory only` where no record's copy was opened), as the walk's
  * summary does; a note that could not be written is a line, and the drill is still kept.

@@ -1,6 +1,6 @@
 /**
  * Money's lists, in the order a record has always held them. Each list is its own file, cut out of `money.ts` with no
- * change (REC-B01 job 1), and the order here is the order of the document, which the pinned fingerprint holds.
+ * change, and the order here is the order of the document, which the pinned fingerprint holds.
  */
 
 import { ACCOUNTS_REGISTER } from './accounts.ts';

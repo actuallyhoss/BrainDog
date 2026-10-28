@@ -1,8 +1,8 @@
 /**
- * Cash now, worked out a second way (REC-A17 job 4, the test half): each liquid account walked entry by entry from its
+ * Cash now, worked out a second way (the test half): each liquid account walked entry by entry from its
  * newest statement to today, in the test's own arithmetic, must equal what `cash-now` reads, one currency at a time.
  *
- * WHY. "Wrong money on a screen is the worst class of defect in this repo" (W.512), and no check compared a money
+ * WHY. "Wrong money on a screen is the worst class of defect in this repo", and no check compared a money
  * figure with its rows. `cash-now` rolls each account forward in SQL (`readRolled` in `packages/kernel/src/money-figures.ts`);
  * this walks the same rows in plain code, never through that function, so a change to either that moves a penny goes red.
  *

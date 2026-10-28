@@ -6,7 +6,7 @@ export const INSTALMENTS: Record<string, unknown>[] = [
        plan, "3 of 8". A plan is the parts that share its `plan`, so no plan is a row anybody has to keep in step with
        its parts. Only while something is left to pay in parts.
 
-       EACH PLAN READS ITS TWO COUNTS FROM THE FIGURES THE OWNER NAMED (REC-B12 job 5), the parts paid by plan and the
+       EACH PLAN READS ITS TWO COUNTS FROM THE FIGURES THE OWNER NAMED, the parts paid by plan and the
        parts in all by plan (`figures/plans.ts`), and no longer from a count of the list's rows a host made itself. So
        the tile and a plan's own page say one number from one sentence each: a cancelled part is in neither, as it is
        out of the walk, and money coming in by parts is not what this asks, so only what goes out is counted. A plan

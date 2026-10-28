@@ -1,5 +1,5 @@
 /**
- * The record's sources for the page reader (PGS-A11 job 3): `lists`, one row a list the reader may read with the count
+ * The record's sources for the page reader: `lists`, one row a list the reader may read with the count
  * its own `list` read answers, and `pages`, one row a page off the census. Over a real kernel on a fresh record; the
  * record's guard is stood in for by one that refuses as it does, a caller held to some lists reading only those.
  * Invented lists and names throughout.

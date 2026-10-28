@@ -1,5 +1,5 @@
 /**
- * `lookup`'s reverse tail and a field that splits (REC-A02 step 9).
+ * `lookup`'s reverse tail and a field that splits.
  *
  * THE OTHER DIRECTION OF THE TAIL. The masked rule reads digits printed behind stars as the end of a LONGER stored value.
  * The reverse reads a stored value of three digits or more as the end of LONGER printed digits: a card typed as its last

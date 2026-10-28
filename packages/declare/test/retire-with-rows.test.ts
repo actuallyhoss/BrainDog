@@ -1,5 +1,5 @@
 /**
- * A plan that retires a list holding rows, taken on his press and never by itself (SHL-A12 job 2).
+ * A plan that retires a list holding rows, taken on his press and never by itself.
  *
  * `install` refused such a plan `WOULD_ORPHAN` ("there are 41 rows in it. Move them first.") and nothing showed him the
  * removal, so an add-on update that dropped a list he had used could never be taken. Retiring takes nothing: the

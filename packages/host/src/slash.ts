@@ -143,7 +143,7 @@ export const GOOD_PAGE = {
  * with the sandbox's two calls (`ctx.fetch` and `ctx.write`, `packages/script/src/prelude.ts`), it can. What a description
  * may not build is said beside it, as the record holds it (`describedScript`): a clock and no list read.
  *
- * THE DAILY LOOK IS HANDED THE REACH CANDIDATES BESIDE HOW THE RECORD IS USED (ENG-B20 job 3): the add-ons and skills
+ * THE DAILY LOOK IS HANDED THE REACH CANDIDATES BESIDE HOW THE RECORD IS USED: the add-ons and skills
  * `packages/record/src/reach.ts` found in what the record holds, as `reach` in the same input. No new ask: the one look
  * a day ranks them with the rest, and is told in one line never to invent one.
  */

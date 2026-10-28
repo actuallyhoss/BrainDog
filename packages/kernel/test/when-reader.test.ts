@@ -1,5 +1,5 @@
 /**
- * A `when:` by who reads the page (PGS-A17 step 3): `{ reader: owner }`, one of four words or a list of them, so a block
+ * A `when:` by who reads the page: `{ reader: owner }`, one of four words or a list of them, so a block
  * can be shown to its owner alone, and a host that has not said who reads is sent no block that asks.
  */
 

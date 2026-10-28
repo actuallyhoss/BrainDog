@@ -1,7 +1,7 @@
 /**
- * The Money page says when Cash now is not what its entries add up to (REC-A17 job 4, the page half).
+ * The Money page says when Cash now is not what its entries add up to (the page half).
  *
- * WHY. "Wrong money on a screen is the worst class of defect in this repo" (W.512). The record checks Cash now against
+ * WHY. "Wrong money on a screen is the worst class of defect in this repo". The record checks Cash now against
  * a second walk of the same entries (`cash-cross-check`, `packages/kernel/src/money-figures.ts` `readCrosscheck`), and
  * until this nothing on a page drew what that check found: a figure a penny out read exactly like a figure that was right.
  *

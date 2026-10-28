@@ -1,6 +1,6 @@
 /**
  * The card an agent starts from, on the Cloud: the card the start hook prints and the card `context` answers over
- * `/mcp` are one text, drawn by the record in a Durable Object (AGT-B07 job 9).
+ * `/mcp` are one text, drawn by the record in a Durable Object.
  *
  * WHY THIS FILE EXISTS. The card is composed in the record (`packages/record/src/card.ts`, `carded` in `briefing()`),
  * and what held it was the record over `node:sqlite` (`packages/record/test/card.test.ts`) and the hook's own printer

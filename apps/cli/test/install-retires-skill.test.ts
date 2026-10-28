@@ -212,7 +212,7 @@ test('THROUGH main.ts, each profile lists + mcpServers.braindog and - skills/old
 });
 
 /*
- * A SKILL IS TOLD BY ITS DESCRIPTION LINE AND NOTHING ELSE (H.620). Read by its whole text, a folder of notes that
+ * A SKILL IS TOLD BY ITS DESCRIPTION LINE AND NOTHING ELSE. Read by its whole text, a folder of notes that
  * mentions the old host further down was taken for the old tool's skill and set aside, and these three cases are the
  * shapes that went wrong: the same body under two descriptions, a body that mentions the host, and no front matter.
  */

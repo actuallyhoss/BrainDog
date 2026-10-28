@@ -24,7 +24,7 @@ export const LASTS_SAID = {
 };
 
 /**
- * HOW LONG THE MONEY LASTS, CALM, SINCE money-core 3.17.0 (REC-B07 step 8, "runway in info colour, danger only below
+ * HOW LONG THE MONEY LASTS, CALM, SINCE money-core 3.17.0 ("runway in info colour, danger only below
  * zero"). Drawn while Cash now is at or above nought, so a record whose money lasts the year reads "Lasts past 7 Oct
  * 2027" (the walk's `beyond`, drawn by the app as an answer and not as a missing figure), and one whose money runs out
  * on what is due reads the day, "30 Oct", with "In 23 days" under it. "LASTS PAST" WAITS ON THE KERNEL: until

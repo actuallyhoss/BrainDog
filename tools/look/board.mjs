@@ -212,7 +212,7 @@ export function yesOf(root, board, drawing, { said, taken, seen = false, units, 
 
 /**
  * The source a board draws from, the look's own (`sources/`). `shape:<path>` is a shape copy, opened by the file
- * source's `openShape` (PRF-A13 job 5, in `sources/file.mjs`), and said to wait for that job until it is there.
+ * source's `openShape` (in `sources/file.mjs`), and said to wait for that job until it is there.
  */
 export async function openFor(asked) {
   if (asked.name === 'shape') {

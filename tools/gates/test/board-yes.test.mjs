@@ -1,5 +1,5 @@
 /**
- * `board-yes`: a governed screen changes only with a board with a yes (EXP-A01 job 5).
+ * `board-yes`: a governed screen changes only with a board with a yes.
  *
  *   node --test tools/gates/test/board-yes.test.mjs
  *

@@ -1,5 +1,5 @@
 /**
- * The red signs in the briefing (SHL-D01 job 2): `context` carries each sign that is red now, by its name and its one
+ * The red signs in the briefing: `context` carries each sign that is red now, by its name and its one
  * sentence, so a session starts knowing what is broken on the record.
  *
  * ONLY TO A CALLER WHO READS THE WHOLE RECORD, as `signs` answers only them (`methods/signs.ts`): a sign counts across

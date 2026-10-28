@@ -1,5 +1,5 @@
 /**
- * THE `signs` PAGE SOURCE (PRF-A05 job 4): each vital sign as a row, its id, name, state, number and its own sentence,
+ * THE `signs` PAGE SOURCE: each vital sign as a row, its id, name, state, number and its own sentence,
  * read through `PageDeps.signs`, which the record wires to `readSigns`. Health is drawn from it.
  *
  * A sign with nothing to read is `none`, never green: one the record reads `none` stays `none`, and a state out of shape

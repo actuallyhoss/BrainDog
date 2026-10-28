@@ -1,5 +1,5 @@
 /**
- * THE VALUES AN ENTRY'S OWN DOCUMENTS READ (PGS-B03 b). A document field is drawn by the same interpreter a declared page
+ * THE VALUES AN ENTRY'S OWN DOCUMENTS READ. A document field is drawn by the same interpreter a declared page
  * uses, and its `{{path}}`s are the record's to answer, as a page's are. On the entry's own screen nothing answered them,
  * so a project's note that said `{{blockers.count}} in the way` printed a hole where the project page printed a number.
  *

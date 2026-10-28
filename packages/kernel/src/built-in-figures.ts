@@ -908,7 +908,7 @@ const PEOPLE_TWICE_SHOWN: MetricDecl = {
   format: 'int',
 };
 
-/* ── what the night counts (REC-A17 job 3, REC-A13 job 1) ────────────── */
+/* ── what the night counts ────────────── */
 
 /** The source of `lists-shrunk`: the night's counts of each list (`night-counts.ts`, `countLists`). */
 export const RECORD_LISTS = 'record.lists';
@@ -1583,7 +1583,7 @@ function feedsOf(sql: Sql): { everyMs: number; lastGoodMs: number }[] {
   return out;
 }
 
-/* ── the night's counts, read back (REC-A17 job 3, REC-A13 job 1) ────── */
+/* ── the night's counts, read back ────── */
 
 /** What a person calls a list: its declared name, or its id with `_` as a space. */
 function listNamed(sql: Sql, list: string): string {

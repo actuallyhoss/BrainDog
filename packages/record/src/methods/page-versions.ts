@@ -1,5 +1,5 @@
 /**
- * One page's versions: `pageVersions({ page })`, READ, writing nothing (PGS-A07 job 4).
+ * One page's versions: `pageVersions({ page })`, READ, writing nothing.
  *
  * THE KERNEL KEEPS EVERY VERSION OF A DECLARATION AND NOTHING LISTED A PAGE'S. A new version is a new row beside the
  * old one, which is stamped `superseded_at` (`kernel/src/declare.ts`), and the app's source view held only the body

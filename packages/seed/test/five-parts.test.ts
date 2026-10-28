@@ -1,7 +1,7 @@
 /**
- * Every module page carries the five parts (PGS-C18 job 5): its line, a queue of what waits on you about its own list,
+ * Every module page carries the five parts: its line, a queue of what waits on you about its own list,
  * its figures, the agents at work on it, and the list itself. Work, Projects, People and Services, each with at most six
- * tiles before its fold. And Activity declares the three things a person narrows the log by (PGS-C24 job 3).
+ * tiles before its fold. And Activity declares the three things a person narrows the log by.
  *
  * WHY THIS FILE EXISTS. On the owner's record a page said all was quiet while Decide's badge said 25, People drew no
  * figure, and neither People nor Services showed an agent at work, though agents had met everybody on People. Each page

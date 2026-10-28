@@ -421,7 +421,7 @@ test('the pure parts: names, the second name, and how a read is sent', () => {
   assert.equal(post.body, '{"body":{"page":"p"}}');
 });
 
-/* THE FENCE (LCH-C08 job 4), RUN WHOLE AGAINST ITS OWN STUB. `fenceHost` gives each of the fence's questions the
+/* THE FENCE, RUN WHOLE AGAINST ITS OWN STUB. `fenceHost` gives each of the fence's questions the
    answer the hosts give once LCH-C08 lands: the file door's own headers, sniff and type rule from `files.ts`, so the
    stub cannot drift from the door it stands in for. `wrong` is `{ check, answer }`, or a list of them: each question
    answered otherwise. */

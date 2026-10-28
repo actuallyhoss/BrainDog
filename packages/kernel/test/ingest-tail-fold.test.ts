@@ -1,5 +1,5 @@
 /**
- * The questions per message already open are folded into the one (REC-A02 step 6).
+ * The questions per message already open are folded into the one.
  *
  * HIS RECORD HOLDS THEM ALREADY: about seventeen questions, one per bank text, each asking to add a row whose account was
  * not read, filed before a tail had a question of its own. They carry no `raws` (that came with this change) and were

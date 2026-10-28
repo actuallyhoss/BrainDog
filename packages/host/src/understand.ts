@@ -377,7 +377,7 @@ export async function settleResolve(
     /* NOR IS ONE THAT HOLDS WHAT IS NEVER SENT (`infer.ts` `neverSent`: a sealed field, a key, a file's bytes). */
     if (neverSent(a) !== null || neverSent(b) !== null) continue;
     /* A PERSON BESIDE AN ORGANISATION IS NEVER ONE (`contract-17`): said so for nothing and kept, so it is not queued again.
-       THE PAIR'S OWN KIND IS TAKEN AS WELL (ENG-B04 job 3): a pair of organisations or projects says so, and a side of
+       THE PAIR'S OWN KIND IS TAKEN AS WELL: a pair of organisations or projects says so, and a side of
        another kind than its pair is never one either. A pair that names no kind is an older job's, of two people. */
     if (a.kind !== b.kind || (p.kind !== undefined && a.kind !== p.kind)) {
       never.push({ hash: p.hash, same: false, confidence: 0 });

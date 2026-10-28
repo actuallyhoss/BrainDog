@@ -336,7 +336,7 @@ export function penQueued(deps: PenDeps): PenQueue {
   const pages = pagesOffered(deps).filter((p) => !weekly.has(p.register));
   const shapes = shapesOffered(deps);
   const grows = [...groupingsOffered(deps), ...openRowsOffered(deps)];
-  /* A SAVED VIEW OPENED OFTEN (USE-B13 job 2, `emergent-views.ts`): its place in the rail, weighed beside the grows offers. */
+  /* A SAVED VIEW OPENED OFTEN (`emergent-views.ts`): its place in the rail, weighed beside the grows offers. */
   const places = viewPlacesOffered(deps);
   const asked = slashAsked(deps);
   const names = new Map([...deps.kernel.registers()].map(([id, decl]) => [id, decl.name]));
@@ -348,7 +348,7 @@ export function penQueued(deps: PenDeps): PenQueue {
     o.earned ? [{ ...o.earned, list: o.item.register, listName: names.get(o.item.register) ?? o.item.register, pageTitle: o.earned.page, label: o.earned.what, rows: o.rows, title: o.item.title, why: o.item.why }] : [],
   );
   const weighed = new Map(recommend({ nowMs, pages: drawnOf(deps), lists: grownOf(deps, pages, nowMs), earned }).map((o) => [o.key, o]));
-  /* THE GROWS OFFERS (USE-B13 jobs 5 and 7) are weighed beside the recommender's, so `asOffer` knows a grouping it never weighed. */
+  /* THE GROWS OFFERS are weighed beside the recommender's, so `asOffer` knows a grouping it never weighed. */
   for (const o of growsWeighed(grows)) weighed.set(o.key, o);
   for (const o of placesWeighed(places)) weighed.set(o.key, o);
 

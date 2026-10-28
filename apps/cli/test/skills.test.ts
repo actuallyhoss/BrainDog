@@ -427,7 +427,7 @@ test('A LINK A REPOSITORY PLANTS IS NEVER FOLLOWED: a temporary name or a linked
   assert.ok(lines.some((l) => l.includes('goes through a link in this repository')), lines.join('\n'));
 });
 
-/* ── the whole list (AGT-C15) ──────────────────────────────────────────── */
+/* ── the whole list ──────────────────────────────────────────── */
 
 const numbered = (n: number) => `kiln-skill-${String(n).padStart(2, '0')}`;
 
@@ -516,7 +516,7 @@ test('A NAME WITHIN ITS SCOPE IS THE SKILL: a project file named as a global ski
   assert.deepEqual(await h.sync(), []);
 });
 
-/* ── never committed (H.495) ───────────────────────────────────────────── */
+/* ── never committed ───────────────────────────────────────────── */
 
 const gitIn = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
 
@@ -688,7 +688,7 @@ test('THE START HOOK SYNCS SKILLS on startup, after its card, and not on a compa
   await hook('startup');
   const lines = (written[0] ?? '').split('\n');
   /* Never the sync's lines: they carry file paths, and are not what an agent starts from. The stub sends no card (the
-     record draws it, AGT-B07, and counts the skills itself), so the start prints the one line. */
+     record draws it, and counts the skills itself), so the start prints the one line. */
   assert.deepEqual(lines, ['Connected to BrainDog. Call context.']);
   assert.ok(existsSync(h.global('kiln-release')));
   assert.deepEqual(h.seen.map((s) => s.method), ['attach', 'get']);

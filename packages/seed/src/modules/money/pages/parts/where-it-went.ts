@@ -17,7 +17,7 @@ const PAYEE_BARS = 8;
 
 export const WHERE_IT_WENT: Record<string, unknown>[] = [
   {
-    /* WHERE THE MONEY WENT, ON MONEY ITSELF (PGS-C20 job 2): "Unfiled grouped by merchant, where, bars, share" (the
+    /* WHERE THE MONEY WENT, ON MONEY ITSELF: "Unfiled grouped by merchant, where, bars, share" (the
        owner). A heading folded shut at the end of the page, so the tiles a person reads before the fold stay the six
        they were, and what is under it is a press away.
 
@@ -35,7 +35,7 @@ export const WHERE_IT_WENT: Record<string, unknown>[] = [
 
        WHAT NOBODY GAVE A CATEGORY IS THE WHOLE LESS THE PARTS, named "No category yet" and never left out: it is the
        part a person can still do something about, and the "yet" says so. The app draws it after the track and outside
-       its scale (the `hole` tone, PGS-C20 job 1), so a month mostly unfiled does not shrink every category to a sliver.
+       its scale (the `hole` tone), so a month mostly unfiled does not shrink every category to a sliver.
 
        ONLY WHILE THIS MONTH HAS SPENDING, so a month nobody has spent in yet draws no empty track. */
     kind: 'split',
@@ -49,7 +49,7 @@ export const WHERE_IT_WENT: Record<string, unknown>[] = [
     empty: 'Nothing spent this month yet.',
   },
   {
-    /* WHO WAS PAID, IN WHAT NOBODY HAS FILED (P.537): the last 91 days of payments out with no category, one bar a
+    /* WHO WAS PAID, IN WHAT NOBODY HAS FILED: the last 91 days of payments out with no category, one bar a
        payee by the name a person gave it (`payee`, "Paid to or from", `lists/transactions.ts`), the largest first,
        eight bars and the rest. Filing the largest one files the most money, so the bar says where to start.
 

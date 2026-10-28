@@ -1,6 +1,5 @@
 /**
- * The pictures of a look: each screen of the set at each width, light and dark, and one line of `said.json` for each
- * (PRF-A02 job 4).
+ * The pictures of a look: each screen of the set at each width, light and dark, and one line of `said.json` for each.
  *
  * `run.mjs` serves the built app and the source, then hands this file `{ origin, app, set, out, source }` and closes
  * when it returns. Nothing here starts a server or opens a record: it drives a headless browser at the look's own

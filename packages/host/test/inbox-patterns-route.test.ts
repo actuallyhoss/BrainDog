@@ -1,5 +1,5 @@
 /**
- * `inboxPatterns` and `fileAsSecond` (REC-A03 steps 3 and 5): the report routed as a READ+ read that writes nothing and
+ * `inboxPatterns` and `fileAsSecond`: the report routed as a READ+ read that writes nothing and
  * takes its window as a whole number, the press as an ADMIN write a token never reaches, each handed to the record
  * method of the same name, and each answered `NOT_IN_THIS_BUILD` by a record built before it had one, never a 500.
  *

@@ -1,5 +1,5 @@
 /**
- * A SOURCE THIS BUILD HAS NEVER HEARD OF DRAWS BY ITS FIELDS (PGS-A11 job 9). Before, a block over any source with no arm
+ * A SOURCE THIS BUILD HAS NEVER HEARD OF DRAWS BY ITS FIELDS. Before, a block over any source with no arm
  * in `page-live.ts` came back as the line saying it cannot be drawn, so the record's `lists` (every list with its count)
  * drew nothing until somebody wrote an arm for it. These hold that a planted `lists` answer lays out as three columns,
  * name, count and changed, with whole counts; that money goes through the one money writer; that a record that sent no

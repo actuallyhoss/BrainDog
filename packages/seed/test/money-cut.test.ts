@@ -1,5 +1,5 @@
 /**
- * Money is a folder, and `money.ts` is one line that exports it (REC-B01 job 1).
+ * Money is a folder, and `money.ts` is one line that exports it.
  *
  * THE CUT WAS A PURE MOVE, AND THIS IS WHAT KEEPS IT ONE. `money.ts` was 2,858 lines that every unit after it had to
  * edit at once. A part that grows back into it, or a part file that grows past what one person reads in a sitting, is
@@ -47,7 +47,7 @@ test('THE ONE LINE STILL EXPORTS EVERY NAME MONEY EXPORTED BEFORE THE CUT, so no
   ]);
 });
 
-test('AN ACCOUNT ASKS FOR THE DIGITS THE BANK PRINTS, under the id every bank pattern reads (REC-A02 job 7)', () => {
+test('AN ACCOUNT ASKS FOR THE DIGITS THE BANK PRINTS, under the id every bank pattern reads', () => {
   const last4 = money.MONEY_REGISTERS.accounts?.fields.find((f) => f.id === 'last4');
   assert.equal(last4?.label, 'Digits the bank prints');
 });

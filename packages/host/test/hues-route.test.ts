@@ -1,5 +1,5 @@
 /**
- * `huesWanted` and `giveHues` over the wire (PGS-A06 step 5): a READ+ read that counts the things with no colour of their
+ * `huesWanted` and `giveHues` over the wire: a READ+ read that counts the things with no colour of their
  * own, and a DATA write the person presses, each handed to the record method of the same name.
  *
  * THE GROUPS ARE WHAT `router-groups` COUNTS (`docs/30-BLUEPRINT.md` §5): one READ+ row and one DATA row that writes.
