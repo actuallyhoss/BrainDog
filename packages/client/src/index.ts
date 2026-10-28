@@ -1226,6 +1226,43 @@ export type SlashAsked = {
   filed: string | null;
 };
 
+/**
+ * One thing Slash did in a conversation, or holds for a yes (`ChatAction` in `packages/slash/src/types.ts`, restated). A
+ * `done` has happened and `undo.batch` is what `undo({ batch })` takes back; an `ask` waits on `slashAct`. `state` is
+ * said on a thread read back, once an `ask` is answered.
+ */
+export type SlashChatAction = {
+  id: string;
+  kind: 'done' | 'ask';
+  title: string;
+  detail?: string;
+  undo?: { batch: string };
+  href?: string;
+  state?: 'open' | 'accepted' | 'declined';
+};
+
+/** One event of a conversation's turn, as `POST /api/slash/chat` streams them, one a line. `done` always comes last. */
+export type SlashChatEvent =
+  | { type: 'thread'; id: string }
+  | { type: 'step'; text: string }
+  | { type: 'delta'; text: string }
+  | ({ type: 'action' } & Omit<SlashChatAction, 'state'>)
+  | { type: 'navigate'; href: string; label: string }
+  | { type: 'error'; text: string }
+  | { type: 'done'; spent: { asks: number; left: number | null } };
+
+/** What a person sends: the words, the conversation they continue, and where they are. */
+export type SlashChatInput = { thread?: string; message: string; page?: { path: string; title?: string; row?: string } };
+
+/** A held action answered (`POST /api/slash/act`). */
+export type SlashActed = { ok: true; receipt?: string; undo?: { batch: string } };
+
+/** One conversation read back (`GET /api/slash/thread/<id>`), its turns oldest first. */
+export type SlashThread = { id: string; turns: { role: 'you' | 'slash'; text: string; actions: SlashChatAction[] }[] };
+
+/** What matters now, up to three short lines for an empty palette (`GET /api/slash/now`). No model is asked. */
+export type SlashNow = { lines: { text: string; href?: string }[] };
+
 /** `slashAnswer`'s answer, `Proposal` in the same file. `filed` is the `SG<n>` it put on Decide, or `null` for a `query`. */
 export type SlashProposal = {
   text: string;
@@ -2205,7 +2242,7 @@ export function createClient(options: ClientOptions) {
    * browser's own and it sends both by itself.
    */
   async function hostDoor<T>(
-    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern' | 'slash/setup' | 'slash/mapping',
+    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern' | 'slash/setup' | 'slash/mapping' | 'slash/act',
     args: Record<string, unknown>,
     how: { busy?: () => void } = {},
   ): Promise<Result<T>> {
@@ -2249,7 +2286,7 @@ export function createClient(options: ClientOptions) {
     );
   }
 
-  async function hostGet<T>(path: 'slash/status' | `slash/asks?limit=${number}`): Promise<Result<T>> {
+  async function hostGet<T>(path: 'slash/status' | 'slash/now' | `slash/thread/${string}` | `slash/asks?limit=${number}`): Promise<Result<T>> {
     return hostAnswer<T>(() => doFetch(`${base}/api/${path}`, { method: 'GET' }));
   }
 
@@ -2352,6 +2389,78 @@ export function createClient(options: ClientOptions) {
      * nothing: the proposal goes to Decide like any other, and is refused once the month's asks are spent.
      */
     slashPattern: (samples: readonly string[]) => hostDoor<SlashProposal>('slash/pattern', { samples: [...samples] }),
+    /**
+     * One turn of a conversation with Slash, its events handed to `onEvent` as they arrive: the thread, each step, each
+     * action, the answer in pieces, and `done`, which always comes last. Pass the thread's id back to continue it. A door
+     * that refuses before the turn starts is answered as a refusal, and said to `onEvent` as an `error` and a `done` too,
+     * so a screen drawing the events alone still ends.
+     */
+    slashChat: async (input: SlashChatInput, onEvent: (event: SlashChatEvent) => void): Promise<Result<{ thread: string | null }>> => {
+      OUT.clear();
+      SENT += 1;
+      const ended = (refusal: Refusal): Result<{ thread: string | null }> => {
+        onEvent({ type: 'error', text: refusal.fix });
+        onEvent({ type: 'done', spent: { asks: 0, left: null } });
+        return { ok: false, refusal };
+      };
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/slash/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+      } catch (e) {
+        return ended(unreachable(e instanceof Error ? e.message : String(e)));
+      }
+      if (!(res.headers.get('content-type') ?? '').includes('ndjson') || res.body === null) {
+        let body: unknown;
+        try {
+          body = await res.json();
+        } catch {
+          return ended(unreachable(`${res.status} with a body that is not JSON`));
+        }
+        const out = answered<unknown>(res.status, body);
+        return ended(out.ok ? unreachable(`${res.status} with an answer that is not a conversation`) : 'refusal' in out ? out.refusal : unreachable(`${res.status}`));
+      }
+      let thread: string | null = null;
+      let done = false;
+      const said = (line: string): void => {
+        if (line.trim() === '') return;
+        let event: unknown;
+        try {
+          event = JSON.parse(line);
+        } catch {
+          return;
+        }
+        if (event === null || typeof event !== 'object' || typeof (event as { type?: unknown }).type !== 'string') return;
+        const e = event as SlashChatEvent;
+        if (e.type === 'thread') thread = e.id;
+        if (e.type === 'done') done = true;
+        onEvent(e);
+      };
+      const reader = res.body.getReader();
+      const text = new TextDecoder();
+      let held = '';
+      try {
+        for (let part = await reader.read(); !part.done; part = await reader.read()) {
+          held += text.decode(part.value, { stream: true });
+          let at = held.indexOf('\n');
+          while (at >= 0) {
+            said(held.slice(0, at));
+            held = held.slice(at + 1);
+            at = held.indexOf('\n');
+          }
+        }
+        said(held + text.decode());
+      } catch (e) {
+        if (!done) return ended(unreachable(e instanceof Error ? e.message : String(e)));
+      }
+      if (!done) onEvent({ type: 'done', spent: { asks: 0, left: null } });
+      return { ok: true, value: { thread } };
+    },
+    /** Say yes or no to an action Slash held. A yes makes it and answers its receipt and the batch an Undo takes. */
+    slashAct: (id: string, accept: boolean) => hostDoor<SlashActed>('slash/act', { id, accept }),
+    /** One conversation, its turns oldest first, for the person who had it. */
+    slashThread: (id: string) => hostGet<SlashThread>(`slash/thread/${encodeURIComponent(id)}`),
+    /** Up to three short lines of what matters now, for the palette opened empty. Asks no model and spends no ask. */
+    slashNow: () => hostGet<SlashNow>('slash/now'),
     /**
      * The first run's two asks: a setup from what a person said about themselves, `{ said, offer, today }`, and how a
      * file exported elsewhere maps into the record, `{ file, columns, sample, lists }`. Both propose and neither writes.
