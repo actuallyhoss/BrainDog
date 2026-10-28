@@ -41,7 +41,7 @@
       "shape": "\\bpacks?\\b(?!,? (?:and|or) (?:send|ship|post))",
       "say": "add-on",
       "page": "system-word",
-      "why": "Say add-ons, not packs, on screen (W.48). To pack and send an order, the verb, is plain and is not matched."
+      "why": "Say add-ons, not packs, on screen. To pack and send an order, the verb, is plain and is not matched."
     },
     {
       "name": "slug",

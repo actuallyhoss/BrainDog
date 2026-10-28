@@ -49,7 +49,8 @@ function tree(t, files = {}, drop = ['CHANGELOG.md']) {
   return at;
 }
 
-const findings = (out) => out.split('\n').filter((l) => /^ {2}(?!public-clean:)\S.*(?:RQ-LCH-\d+|private list)/u.test(l));
+/** A finding is a path, a line number where it has one, two spaces, and why: the summary and the advice under it are not. */
+const findings = (out) => out.split('\n').filter((l) => /^ {2}(?!public-clean:)[^\s:]+(?::\d+)? {2}\S/u.test(l));
 
 test('the planted tree is red on its changelog, and on nothing else', () => {
   const r = run(planted);
