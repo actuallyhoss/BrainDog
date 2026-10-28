@@ -99,7 +99,7 @@ test('THE CHECKER REFUSES WHAT IT SHOULD: a key gone, a kind changed, a word out
 /** `LedgerTotals` in `apps/web/src/lib/record/actions.ts`: `Totals` with `ms` and `held` always said. */
 const TOTALS = { runs: 'number', requests: 'number', bytes: 'number', failures: 'number', ms: 'number', held: 'number' } as const;
 
-/** `AccountUsage`, the same file, key for key. `slash.cap` and `extra` are the two keys no host sends yet. */
+/** `AccountUsage`, the same file, key for key. `slash.cap` is the one key no host sends yet; `extra` is `null` on a plan that sells none. */
 const USAGE = keys({
   from: 'day',
   to: 'day',
@@ -122,7 +122,7 @@ const USAGE = keys({
       days: list(keys({ day: 'day', ...TOTALS })),
       counted: list(keys({ action: 'string', ...TOTALS })),
       slash: optional(keys({ included: optional(or('number', 'null')), used: optional('number'), packs: optional('number'), left: optional(or('number', 'null')), asks: 'number', neurons: 'number', days: list(keys({ day: 'day', asks: 'number', neurons: 'number' })), cap: optional(or('number', 'null')) })),
-      extra: optional(keys({ on: 'boolean', units: 'number', cost: 'number', cap: 'number', currency: 'string' })),
+      extra: optional(or(keys({ on: 'boolean', cap_cents: 'number', cents: 'number', reported_cents: 'number', month: 'month', month_cap_cents: 'number' }), 'null')),
     }),
   ),
 });
