@@ -173,8 +173,9 @@
      (`Hole.svelte`): it opens the place the value lives, or offers to find it out. On an inert page it stays a mark. */
   /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
   /* THE PAGE'S HEADLINE LINE SAYS WHOLE UNITS: "Cash is EGP 1,086,213", the way a person says it,
-     where it said "EGP 1,086,213.41" (`money.ts` `symbolText`). */
-  const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency(), block.kind === 'note' && block.lead === true));
+     where it said "EGP 1,086,213.41" (`money.ts` `symbolText`). AND SO DOES EVERY SENTENCE, as `moneyWhole` says a
+     sentence is a display figure: Zakat's tile said "EGP 40,873" over a step that said "EGP 40,872.50" of the same sum. */
+  const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency(), block.kind === 'note'));
 
   /* ── the fold ──────────────────────────────────────────────────────────────
      A LONG LIST ON A HOME SHOWS ITS FIRST ROWS AND FOLDS THE REST in place, one press away, as Today folds what needs
