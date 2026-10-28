@@ -158,7 +158,7 @@
       "requires": [ "register.tasks" ],
       "pack": "work",
       "header": {
-        "count": { "metric": "tasks-in-play" },
+        "count": { "metric": "open-tasks" },
         "action": { "verb": "row.create", "label": "Add" }
       },
       "filters": [
@@ -403,7 +403,7 @@
       "requires": [ "register.tasks" ],
       "pack": "work",
       "blocks": [
-        { "kind": "note", "lead": true, "span": 12, "body": "Your dated tasks on one time axis. Drag one to move its day." },
+        { "kind": "note", "lead": true, "span": 12, "body": "{{tasks-overdue}} past their date, {{tasks-due-7d}} due in 7 days" },
         {
           "kind": "roadmap",
           "heading": "In play",
