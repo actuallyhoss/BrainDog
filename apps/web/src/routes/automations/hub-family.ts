@@ -12,7 +12,7 @@
  * PURE, so it loads in plain Node: the clock is an argument.
  */
 
-import { hubWords, onDay, spell, type HubRow } from './hub.ts';
+import { hubWords, onDay, type HubRow } from './hub.ts';
 
 /** What a row needs to be folded: its key, its family, and its count. */
 export type Kin = Pick<HubRow, 'key' | 'family' | 'fired' | 'lastAt'>;
@@ -36,8 +36,8 @@ export type Fold<T extends Kin> = { kind: 'one'; row: T } | { kind: 'family'; fa
 export const familyWords = {
   count: (n: number) => `${n.toLocaleString('en')} rules`,
   alone: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'rule' : 'rules'} on their own`,
-  noneRan: 'None has run',
-  someNever: (n: number) => `${spell(n, true)} never ran.`,
+  noneRan: 'Never ran',
+  someNever: (n: number) => `${n.toLocaleString('en')} never ran`,
   /* WHAT THE FAMILY'S SWITCHES SAY TOGETHER, in the column every other row's switch stands in. */
   allOn: 'All on',
   allOff: 'All off',
@@ -56,9 +56,9 @@ export function familyOn(members: readonly { toggle?: { on: boolean } | null | u
 const and = (names: readonly string[]): string =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 
-/** A family's name: what its actions act on, and the list: "Category on Ledger". One whose actions name nothing is the list's rules. */
+/** A family's name: what its actions act on, and the list: "Category on Ledger". One whose actions name nothing is the list's name alone, since its line already says "3 rules". */
 export function familyName(list: string, did: readonly string[]): string {
-  return did.length === 0 ? `Rules on ${list}` : `${and(did)} on ${list}`;
+  return did.length === 0 ? list : `${and(did)} on ${list}`;
 }
 
 /**
@@ -110,6 +110,6 @@ function foldOf<T extends Kin>(key: string, list: string, did: readonly string[]
 export function familySaid(f: Family<Kin>, now: number): string {
   if (f.fired === null) return '';
   if (f.fired === 0) return familyWords.noneRan;
-  const ran = hubWords.ranCount(f.fired, f.lastAt ? onDay(f.lastAt, now) : '');
-  return f.never > 0 ? `${ran} ${familyWords.someNever(f.never)}` : ran;
+  const ran = hubWords.ranCount(f.fired, f.lastAt ? onDay(f.lastAt, now) : '').replace(/\.$/u, '');
+  return f.never > 0 ? `${ran} · ${familyWords.someNever(f.never)}` : ran;
 }

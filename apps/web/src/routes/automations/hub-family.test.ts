@@ -24,7 +24,7 @@ test('TWO FAMILIES CALLED THE SAME ARE ONE ROW, where the first of them was', ()
   const ledger = (key: string, family: string, fired: number): Kin => ({ key, fired, lastAt: null, family: { key: family, list: 'Ledger', did: [] } });
   const rows = [ledger('a', 'reg_ledger/inline/a', 2), ledger('b', 'reg_ledger/inline/a', 0), kin('lonely', 1, null, null), ledger('c', 'reg_ledger/inline/b', 4), ledger('d', 'reg_ledger/inline/b', 1)];
   const out = families(rows);
-  assert.deepEqual(out.map((f) => (f.kind === 'one' ? f.row.key : f.family.name)), ['Rules on Ledger', 'lonely']);
+  assert.deepEqual(out.map((f) => (f.kind === 'one' ? f.row.key : f.family.name)), ['Ledger', 'lonely']);
   const f = out[0];
   assert.ok(f?.kind === 'family');
   assert.deepEqual(f.family.members.map((m) => m.key), ['a', 'b', 'c', 'd']);
@@ -53,7 +53,7 @@ test('A FAMILY SUMS ITS COUNT, TAKES THE NEWEST FIRING, AND COUNTS THE ONES THAT
   assert.equal(f.family.fired, 12);
   assert.equal(f.family.never, 1);
   assert.equal(f.family.lastAt, new Date(2026, 9, 10, 9).toISOString());
-  assert.equal(familySaid(f.family, NOW), 'Ran 12 times, last on 10 Oct. One never ran.');
+  assert.equal(familySaid(f.family, NOW), 'Ran 12 times, last on 10 Oct · 1 never ran');
 });
 
 test('A FAMILY WITH A MEMBER THAT CAME WITH NO COUNT SAYS NO SUM, and one where none ran says so', () => {
@@ -63,7 +63,7 @@ test('A FAMILY WITH A MEMBER THAT CAME WITH NO COUNT SAYS NO SUM, and one where 
   assert.equal(familySaid(some.family, NOW), '');
   const none = families([kin('a', 0), kin('b', 0)])[0];
   assert.ok(none?.kind === 'family');
-  assert.equal(familySaid(none.family, NOW), 'None has run');
+  assert.equal(familySaid(none.family, NOW), 'Never ran');
 });
 
 test("A FAMILY'S NAME IS THE FIELDS AND THE LIST, NEVER THE KEY", () => {
@@ -72,7 +72,7 @@ test("A FAMILY'S NAME IS THE FIELDS AND THE LIST, NEVER THE KEY", () => {
   assert.equal(f.family.name, 'Shelf on Parcels');
   assert.doesNotMatch(f.family.name, /reg_|inline|set:|\//u);
   assert.equal(familyName('Parcels', ['Shelf', 'Tags']), 'Shelf and Tags on Parcels');
-  assert.equal(familyName('Parcels', []), 'Rules on Parcels');
+  assert.equal(familyName('Parcels', []), 'Parcels');
 });
 
 test('a family says its switches together, in the column a switch stands in', () => {

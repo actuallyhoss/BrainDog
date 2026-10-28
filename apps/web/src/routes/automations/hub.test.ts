@@ -97,11 +97,11 @@ test('WITH THE RECORD\'S COUNT, THE SENTENCE SAYS HOW MANY RAN, HOW MANY NEVER D
   const rows = [...ledger, auto('Standup', { register: 'tasks', fired: 9, month: { runs: 9, failures: 2 } }), auto('Old one', { enabled: false, fired: 0 })];
   const s = hubSentence(rows, (id) => (id === 'transactions' ? 'Ledger' : id));
   assert.deepEqual(s, {
-    text: '13 automations are on, 12 of them rules on Ledger; six have run and seven never have, and two runs failed this month.',
-    needs: 'two runs failed this month',
+    text: '13 on, 12 on Ledger · 6 ran, 7 never · 2 runs failed this month',
+    needs: '2 runs failed this month',
   });
   /* A HOST THAT SENDS NO COUNT IS SAID AS BEFORE. */
-  assert.equal(hubSentence([auto('Standup', { month: { runs: 3, failures: 0 } })])?.text, 'One automation runs by itself, and none failed this month.');
+  assert.equal(hubSentence([auto('Standup', { month: { runs: 3, failures: 0 } })])?.text, '1 on · none failed this month');
 });
 
 test('THE SENTENCE NAMES THE ONE THAT IS FAILING, AND ONLY THAT PHRASE NEEDS HIM', () => {
@@ -110,20 +110,20 @@ test('THE SENTENCE NAMES THE ONE THAT IS FAILING, AND ONLY THAT PHRASE NEEDS HIM
     auto('Chase invoices', { last: { at: iso(NOW - 3_600_000), state: 'failed', say: null }, month: { runs: 12, failures: 3 } }),
     auto('Old one', { enabled: false }),
   ]);
-  assert.deepEqual(s, { text: 'Two automations run by themselves, and Chase invoices is failing.', needs: 'Chase invoices is failing' });
+  assert.deepEqual(s, { text: '2 on · Chase invoices is failing', needs: 'Chase invoices is failing' });
   assert.ok(s && s.text.includes(s.needs));
 });
 
 test('WITH NOTHING FAILING NOW, THE MONTH IS COUNTED, AND A MONTH WITH NO FAILURE IS NOT RED', () => {
   assert.deepEqual(hubSentence([auto('A', { month: { runs: 4, failures: 2 } })]), {
-    text: 'One automation runs by itself, and two runs failed this month.',
-    needs: 'two runs failed this month',
+    text: '1 on · 2 runs failed this month',
+    needs: '2 runs failed this month',
   });
-  assert.deepEqual(hubSentence([auto('A', { month: { runs: 4, failures: 0 } })]), { text: 'One automation runs by itself, and none failed this month.', needs: '' });
+  assert.deepEqual(hubSentence([auto('A', { month: { runs: 4, failures: 0 } })]), { text: '1 on · none failed this month', needs: '' });
   /* A HOST THAT SENDS NO MONTH IS NOT TOLD "NONE FAILED". */
-  assert.deepEqual(hubSentence([auto('A')]), { text: 'One automation runs by itself.', needs: '' });
+  assert.deepEqual(hubSentence([auto('A')]), { text: '1 on', needs: '' });
   assert.equal(hubSentence([]), null);
-  assert.equal(hubSentence([auto('A', { enabled: false }), auto('B', { enabled: false })])?.text, 'Every automation here is turned off.');
+  assert.equal(hubSentence([auto('A', { enabled: false }), auto('B', { enabled: false })])?.text, 'All off');
 });
 
 test('A ROW SAYS ITS LAST RUN ON ITS SECOND LINE AND ITS NEXT IN THE COLUMN, NEVER BOTH IN ONE', () => {
@@ -285,7 +285,7 @@ test('THE HEAT GRID IS FOURTEEN DAYS, OLDEST FIRST, AND THE SIX THAT RAN MOST', 
   assert.equal(heat.values[0]?.at(-1), 1);
   assert.equal(heat.values[0]?.at(-2), 1);
   assert.equal(heat.values[1]?.at(-2), 1);
-  assert.equal(heatReading(lines, heat), 'Standup ran most, twice in the last 14 days; one failed, on Chase.');
+  assert.equal(heatReading(lines, heat), 'Standup ran most, 2 times in the last 14 days; one failed, on Chase.');
   assert.equal(runHeat([run('Too old', at(2026, 9, 1))], NOW), null, 'nothing in the window, no chart');
   /* A TIE NAMES NONE AS RUNNING MOST. */
   const tie = [run('Standup', at(2026, 9, 29, 8)), run('Chase', at(2026, 9, 29, 9))];

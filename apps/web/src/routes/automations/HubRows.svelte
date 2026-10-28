@@ -308,15 +308,17 @@
     transform: rotate(180deg);
   }
 
-  /* THE MEMBERS SIT UNDER THE FAMILY, their wells lined up with its words, so the fold reads as one thing opened. */
+  /* ON THE ROWS' OWN EDGE: the ledger reaches out by --sp-3 and each row pads back in by as much. */
   .alone-cap {
     padding-block: var(--sp-3) var(--sp-1);
+    padding-inline: var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 600;
     list-style: none;
   }
 
+  /* THE MEMBERS SIT UNDER THE FAMILY, their wells lined up with its words, so the fold reads as one thing opened. */
   .members {
     margin: 0 0 var(--sp-2) calc(var(--well-l) + var(--sp-3));
   }

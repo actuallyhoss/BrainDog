@@ -200,8 +200,8 @@ export function spell(n: number, start = false): string {
   return start ? said.charAt(0).toUpperCase() + said.slice(1) : said;
 }
 
-/** "once", "twice", "14 times". */
-export const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n.toLocaleString('en')} times`);
+/** "once", "2 times", "14 times": a figure, never the word for it. */
+export const times = (n: number): string => (n === 1 ? 'once' : `${n.toLocaleString('en')} times`);
 
 /** "A", "A and B", "A, B and C". */
 function andList(names: readonly string[]): string {
@@ -224,13 +224,7 @@ export type Sentence = { text: string; needs: string };
 export function hubSentence(rows: readonly AutomationRow[], listSaid?: (id: string) => string): Sentence | null {
   if (rows.length === 0) return null;
   const on = rows.filter((r) => r.enabled);
-  const counted = counts(on, listSaid);
-  const first =
-    on.length === 0
-      ? rows.length === 1
-        ? 'The one automation here is turned off'
-        : 'Every automation here is turned off'
-      : (counted ?? `${spell(on.length, true)} ${on.length === 1 ? 'automation runs by itself' : 'automations run by themselves'}`);
+  const first = on.length === 0 ? (rows.length === 1 ? 'Off' : 'All off') : (counts(on, listSaid) ?? `${num(on.length)} on`);
   const failing = on.filter((r) => r.last?.state === 'failed').map((r) => r.name);
   const monthly = rows.filter((r) => r.month !== null);
   const failed = monthly.reduce((n, r) => n + (r.month?.failures ?? 0), 0);
@@ -238,16 +232,18 @@ export function hubSentence(rows: readonly AutomationRow[], listSaid?: (id: stri
   let needs = '';
   if (failing.length === 1) needs = `${failing[0]} is failing`;
   else if (failing.length === 2) needs = `${andList(failing)} are failing`;
-  else if (failing.length > 2) needs = `${spell(failing.length)} are failing`;
-  else if (failed > 0) needs = `${spell(failed)} ${failed === 1 ? 'run' : 'runs'} failed this month`;
+  else if (failing.length > 2) needs = `${num(failing.length)} failing`;
+  else if (failed > 0) needs = `${num(failed)} ${failed === 1 ? 'run' : 'runs'} failed this month`;
 
-  if (needs) return { text: `${first}, and ${needs}.`, needs };
-  if (monthly.length > 0 && on.length > 0) return { text: `${first}, and none failed this month.`, needs: '' };
-  return { text: `${first}.`, needs: '' };
+  /* FIGURES, NOT WORDS, between middots: "38 on · 4 ran, 34 never · none failed this month". */
+  const tail = needs || (monthly.length > 0 && on.length > 0 ? 'none failed this month' : '');
+  return { text: [first, tail].filter(Boolean).join(' · '), needs };
 }
 
 /** Past this many rules on one list, the sentence names them apart: a record that files by payee grows one a payee. */
 export const ONE_LIST_MANY = 10;
+
+const num = (n: number): string => n.toLocaleString('en');
 
 /**
  * THE ON RULES AS THE RECORD COUNTS THEM: how many are on, the list most of them are
@@ -262,15 +258,9 @@ function counts(on: readonly AutomationRow[], listSaid?: (id: string) => string)
   const by = new Map<string, number>();
   for (const r of on) if (r.register) by.set(r.register, (by.get(r.register) ?? 0) + 1);
   const [list, most] = [...by].sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
-  const lead = `${spell(on.length, true)} ${on.length === 1 ? 'automation is' : 'automations are'} on`;
-  const many = list !== null && listSaid && most > ONE_LIST_MANY ? `, ${spell(most)} of them rules on ${listSaid(list)}` : '';
-  const done =
-    never === 0
-      ? on.length === 1 ? 'it has run' : 'every one has run'
-      : ran === 0
-        ? on.length === 1 ? 'it has never run' : 'none has run yet'
-        : `${spell(ran)} ${ran === 1 ? 'has' : 'have'} run and ${spell(never)} never ${never === 1 ? 'has' : 'have'}`;
-  return `${lead}${many}; ${done}`;
+  const many = list !== null && listSaid && most > ONE_LIST_MANY ? `, ${num(most)} on ${listSaid(list)}` : '';
+  const done = never === 0 ? 'all have run' : ran === 0 ? 'none has run' : `${num(ran)} ran, ${num(never)} never`;
+  return `${num(on.length)} on${many} · ${done}`;
 }
 
 /* ── an automation's row ────────────────────────────────────────────────── */
@@ -867,8 +857,10 @@ export function pageSentence(row: Counted | null, now: number): Sentence | null 
   if (!row.enabled) return { text: flowWords.off, needs: '' };
   const next = row.next ? flowWords.nextRun(since(row.next, now)) : '';
   if (!row.last) {
-    /* THE WHOLE COUNT WHERE THE RECORD SENT ONE, as the hub's row says it, and the log's page only where it did not. */
-    const text = [countSaid(row, now) || lastSaid(row, now), next].filter(Boolean).join(' ');
+    /* THE WHOLE COUNT WHERE THE RECORD SENT ONE, as the hub's row says it, and the log's page only where it did not.
+       ONE THAT NEVER RAN SAYS ONLY THAT under the title: the sentence under it already says what would start it. */
+    const count = typeof row.fired === 'number' && row.fired <= 0 ? hubWords.neverRan : countSaid(row, now);
+    const text = [count || lastSaid(row, now), next].filter(Boolean).join(' ');
     return text === '' ? null : { text, needs: '' };
   }
   const state = flowWords.runState[row.last.state] ?? row.last.state;
