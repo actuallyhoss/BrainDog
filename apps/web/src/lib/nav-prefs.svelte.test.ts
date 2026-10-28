@@ -119,7 +119,7 @@ test('NOBODY CHOSE, SO THE TOP BAR: the default shell is the bar of 19 October, 
   assert.equal(offline.shape, 'bar');
 });
 
-test("THE RECORD'S `rail` IS NOBODY'S CHOICE AND DRAWS THE DEFAULT TOP BAR, and a rail chosen now is kept as `side`", async () => {
+test("THE RECORD'S `rail` AND `side` ARE NOBODY'S CHOICE NOW AND DRAW THE DEFAULT TOP BAR", async () => {
   const old = new NavPrefs({ order: [], hidden: [] });
   old.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
   assert.equal(old.shape, 'bar', 'a legacy rail was read as somebody choosing the rail');
@@ -127,18 +127,14 @@ test("THE RECORD'S `rail` IS NOBODY'S CHOICE AND DRAWS THE DEFAULT TOP BAR, and 
 
   const chosen = new NavPrefs({ order: [], hidden: [] });
   chosen.adopt({ 'nav.shape': 'side' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-  assert.deepEqual([chosen.shape, chosen.chosen], ['rail', 'rail']);
+  assert.deepEqual([chosen.shape, chosen.chosen], ['bar', undefined], 'a rail kept by an older build drew something other than the top bar');
 
   const io = recorder();
   const picking = new NavPrefs({ order: [], hidden: [] });
   picking.adopt({ 'nav.shape': 'menu' }, 'https://app.example', io.send);
   assert.equal(picking.shape, 'menu');
-  await picking.setShape('rail');
   await picking.setShape('bar');
-  assert.deepEqual(io.sent, [
-    { key: 'nav.shape', value: 'side' },
-    { key: 'nav.shape', value: 'bar' },
-  ]);
+  assert.deepEqual(io.sent, [{ key: 'nav.shape', value: 'bar' }]);
 });
 
 test('A REFUSED SHAPE PUTS BACK NO CHOICE AT ALL, so the default stays the default', async () => {
@@ -213,7 +209,7 @@ test("A LEGACY `rail` IS NOT BROUGHT BACK BY THE COOKIE, AND THE TOP BAR'S OLD `
     jar('rail');
     const unset = new NavPrefs();
     unset.adopt({}, 'https://app.example', quiet());
-    assert.equal(unset.shape, 'rail', 'a device with a rail and a record with no shape lost the rail');
+    assert.equal(unset.shape, 'bar', 'a rail an older build left on the device was drawn as a choice');
 
     /* AND WITH NO RECORD THE COOKIE IS THE WHOLE ANSWER, a top bar included: nobody else could have written it. */
     jar('bar');

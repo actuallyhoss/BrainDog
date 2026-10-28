@@ -66,7 +66,6 @@
   /* Named as types, which the compiler erases: the layout still reaches both, as `dead-copy` reads it. */
   import type PaletteView from '$lib/palette/Palette.svelte';
   import type KeymapView from '$lib/ui/Keymap.svelte';
-  import type SidebarView from '$lib/ui/Sidebar.svelte';
   import type SideBarView from '$lib/shell/SideBar.svelte';
   import { SIDE_KEY, sideKept } from '$lib/shell/side.ts';
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
@@ -116,19 +115,6 @@
     void import('$lib/palette/Palette.svelte').then((m) => (Palette = m.default));
     void import('$lib/ui/Keymap.svelte').then((m) => (Keymap = m.default));
     void import('$lib/ui/CopyMark.svelte').then((m) => (CopyMark = m.default));
-  });
-
-  /* THE SIDE RAIL, AND ONLY FOR SOMEBODY WHO CHOSE IT. The top bar is the shell again (chosen 20 October) and the
-     rail is one choice away in Settings, so its script and its styles would ride in the entry every visit loads, for
-     the few who pick it, and the entry has a budget (`tools/gates/budgets.json`). Asked for once the shape says `rail`.
-
-     AND THE SCREEN IS NOT SETTLED UNTIL IT IS THERE. `data-screen` is what a gate waits for before it reads the window,
-     and a screen that computes its content at once settles on its first frame, before the rail's chunk can land: the
-     `prefs` gate's shape probe counts `nav.rail` at that moment. So the claim waits for the rail, as it would for a
-     call the screen made. */
-  let Sidebar = $state<typeof SidebarView | null>(null);
-  $effect(() => {
-    if (shape === 'rail' && Sidebar === null) void import('$lib/ui/Sidebar.svelte').then((m) => (Sidebar = m.default));
   });
 
   /* FRAME B'S SIDEBAR (23 October): under the top bar, the record's projects. Shown or hidden and its width are this
@@ -386,7 +372,7 @@
   let sideOver = $state(false);
   const sideOn = $derived(navPrefs.shape === 'bar' && !narrow && deskWide && sideShown);
   const railOn = $derived(navPrefs.shape === 'bar' && !narrow && !sideOn);
-  const overOn = $derived(navPrefs.shape !== 'rail' && !narrow && sideOver && !sideOn);
+  const overOn = $derived(!narrow && sideOver && !sideOn);
   /* THE PROJECTS PLACE is the one whose own things are projects' pages, else the section called Projects: its heading
      is the sidebar's projects part, never a place of its own. */
   const projectsPlace = $derived(
@@ -395,7 +381,7 @@
       null,
   );
   /* ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE, at its own address (`MENU`); the desk draws Today there. */
-  const phoneMenu = $derived(navPrefs.shape !== 'rail' && narrow && placeOf(here(page.url.pathname), page.url.searchParams) === MENU);
+  const phoneMenu = $derived(narrow && placeOf(here(page.url.pathname), page.url.searchParams) === MENU);
   $effect(() => {
     if ((sideOn || railOn || overOn || phoneMenu) && SideBar === null) void import('$lib/shell/SideBar.svelte').then((m) => (SideBar = m.default));
   });
@@ -407,7 +393,7 @@
      its edge was (`slide`); under 1,280 the full sidebar opens or closes as a drawer over the rail. */
   const RAIL_W = 56;
   async function toggleSide(): Promise<void> {
-    if (shape === 'rail' || narrow) return;
+    if (narrow) return;
     if (shape !== 'bar' || !deskWide) return void (sideOver = !sideOver);
     const was = sideShown ? sideWidth : RAIL_W;
     sideShown = !sideShown;
@@ -614,22 +600,6 @@
       stop?.();
     };
   });
-
-  /**
-   * THE RAIL AT ITS NARROW WIDTH, WHICH IS WHAT "COLLAPSED" MEANS TO EVERYBODY WHO SAYS IT.
-   *
-   * This was `railOff`, and `sidebar: false` took the entire rail out of the shell and left one
-   * button in an empty gutter. Two things were wrong with that. It is not the state people ask for
-   * — a collapsed sidebar is the one that keeps its glyphs — and it stranded anybody who pressed
-   * the chord by accident, because the preference persists and the only ways back were a second
-   * chord, the palette, or noticing a 40px gutter with one control in it.
-   *
-   * SO THE SAME PREFERENCE NARROWS THE RAIL INSTEAD. Every row survives, the spine survives, the
-   * record switcher survives, and `Sidebar` gives the names back on hover and on focus. There is
-   * nothing to strand somebody with, so there is nothing to rescue them from either, and the
-   * restore button that used to live in the gutter is gone with the state that needed it.
-   */
-  let railIcons = $state(pref.read().sidebar === false);
 
   /**
    * WHICH SHAPE OF NAVIGATION THIS PERSON CHOSE, from `19 §3`'s three.
@@ -884,7 +854,6 @@
    * that can be so placed, never of every node in the work.
    */
   let sliding: Animation | null = null;
-  let railSlot = $state<HTMLElement>();
 
   /** What inside the work can be placed on the window: an open non-modal dialog, or what says it is (`data-fixed`). */
   const PINNED = 'dialog[open]:not(:modal), [data-fixed]';
@@ -936,38 +905,7 @@
     }
   }
 
-  $effect(() => {
-    const slot = railSlot;
-    if (!slot || typeof ResizeObserver !== 'function') return;
-    let width = -1;
-    let view = window.innerWidth;
-    const seen = new ResizeObserver(() => {
-      const now = slot.getBoundingClientRect().width;
-      const was = width;
-      const viewWas = view;
-      width = now;
-      view = window.innerWidth;
-      /* The first answer is the rail as it was drawn; a rail that is not drawn (a phone) has no edge to slide. */
-      if (was <= 0 || now <= 0 || view !== viewWas) return;
-      const el = document.getElementById('main');
-      if (!el) return;
-      /* THE EDGE BESIDE THE RAIL, which is the right one under `dir="rtl"`: a wider rail moves it the other way. */
-      slide(el, getComputedStyle(el).direction === 'rtl' ? now - was : was - now);
-    });
-    seen.observe(slot);
-    return () => seen.disconnect();
-  });
 
-  /* One function, because the chord and the restore control are the same act and a second copy of
-     two lines is a second place for the preference to be written differently. */
-  function toggleRail() {
-    /* A WIDTH IS NOT A THING A TOP BAR HAS. `⌘\` is the rail's own chord, and on the other two
-       shapes it wrote a preference that nothing on screen could show, so the one feedback the chord
-       gives was that nothing happened. It does nothing where there is no rail to narrow. */
-    if (shape !== 'rail') return;
-    railIcons = !railIcons;
-    pref.write({ sidebar: !railIcons });
-  }
   const go = new GoPrefix();
 
   /* THE HAIRLINE READS THE POLL NOW, AND IT WAS ONCE A CONSTANT. `const live = 'open'` stood here with a comment
@@ -1182,19 +1120,6 @@
       return;
     }
 
-    /* `⌘\` — the rail narrows to its glyphs and the work takes the width.
-       IT USED TO FOLD TO NOTHING, on the argument that `19 §3` forbids an icon rail. That is not
-       what §3 says. §3 argues that a nav which is a QUERY over `page` rows, variable in length and
-       sectioned, cannot be the kind of thing a strip of UNLABELLED icons holds — and it is arguing
-       about the DEFAULT. This is neither: it is a state a person chooses, it keeps the sections and
-       the order, and every glyph says its name on hover and on focus. What §3 does rule out is what
-       was built instead, a nav with nothing in it at all. */
-    if (mod && e.key === '\\') {
-      e.preventDefault();
-      toggleRail();
-      return;
-    }
-
     /* `⌘Z` — the newest undo the toast stack is still offering, and past the stack the newest change this tab wrote. The
        toast stack is no longer the whole undo history: `lib/data/undo.ts` holds the last sixty batches this tab wrote, and
        `undo-replay.ts` takes back the newest of them when no toast offers one (02 §8 makes the unit a `batch`). */
@@ -1246,7 +1171,7 @@
       return;
     }
     /* `[` HIDES OR SHOWS THE SIDEBAR, a character key, so `Character keys: Off` silences it too. */
-    if (e.key === '[' && !mod && !e.altKey && shape !== 'rail' && !narrow) {
+    if (e.key === '[' && !mod && !e.altKey && !narrow) {
       e.preventDefault();
       void toggleSide();
       return;
@@ -1309,30 +1234,7 @@
        first third. That is the artefact somebody hands an accountant. -->
   <main id="main" class="bare" data-screen={settled()}>{@render children()}</main>
 {:else}
-  <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape} data-side={sideOn ? '' : railOn ? 'rail' : undefined} style:--side-col={sideOn ? `${sideWidth}px` : railOn ? `${RAIL_W}px` : undefined}>
-    {#if shape === 'rail'}
-      <div class="rail-slot" bind:this={railSlot}>
-        {#if Sidebar}
-        <Sidebar
-          icons={railIcons}
-          ontoggle={toggleRail}
-          places={rail.places}
-          things={rail.things}
-          more={rail.rest}
-          views={rail.views}
-          hidden={hiddenCount}
-          pen={data.pen}
-          record={data.index.name}
-          {records}
-          refused={recordsRefused}
-          registers={data.index.registers}
-          {spine}
-          {inbox}
-          working={workingNow()}
-        />
-        {/if}
-      </div>
-    {:else}
+  <div class="shell" data-shape={shape} data-side={sideOn ? '' : railOn ? 'rail' : undefined} style:--side-col={sideOn ? `${sideWidth}px` : railOn ? `${RAIL_W}px` : undefined}>
       {#if sideOn || railOn}
         <!-- THE SIDEBAR, THE WINDOW'S FULL HEIGHT: the full column from 1,280, else its rail; its width held while its
              chunk arrives. -->
@@ -1393,7 +1295,6 @@
           {/if}
         </div>
       {/if}
-    {/if}
 
     <!--
       `{#key}`, SO ARRIVING SOMEWHERE IS AN EVENT AND NOT A REPAINT.
@@ -1415,7 +1316,7 @@
     {#key page.url.pathname}
     <!-- NOTHING THAT WRITES IS PRESSED WHILE THE SCREEN IS A SAVED COPY (`held.svelte.ts`): the quiet mark is up, a screen
          draws what it kept and asks again, or the shell is the last copy. Links still go. -->
-    <main id="main" class="body" data-screen={shape === 'rail' && Sidebar === null ? undefined : settled()} {@attach holdIn(() => presses.held || data.stale === true)}>
+    <main id="main" class="body" data-screen={settled()} {@attach holdIn(() => presses.held || data.stale === true)}>
       <!-- THE QUIET MARK, over the work while something drawn from the local copy is asked again (`CopyMark.svelte`). -->
       {#if CopyMark}<CopyMark />{/if}
       <Pull />
@@ -1577,21 +1478,6 @@
     grid-template-columns: auto minmax(0, 1fr);
     block-size: 100dvh;
     overflow: hidden;
-  }
-
-  /* The rail's column, the window's full height, with nothing round it: the rail pads itself.
-
-     AT THE MENU'S LEVEL, because the record switcher's menu opens inside it: at `auto` the work's sticky title row,
-     later in the page and at `--z-sheet`, was drawn over any part of the menu that reached past the rail. */
-  .rail-slot {
-    position: relative;
-    z-index: var(--z-palette);
-    display: flex;
-  }
-
-  /* THE RAIL'S WIDTH, HELD WHILE ITS CHUNK ARRIVES, so the work beside it does not start at the window's edge and jump. */
-  .rail-slot:empty {
-    inline-size: var(--rail, 216px);
   }
 
   /* THE OTHER TWO SHAPES ARE ONE COLUMN WITH A STRIP ON TOP, and the strip is `auto` for the same
@@ -1809,10 +1695,6 @@
   }
 
   @media (width < 900px) {
-    .rail-slot {
-      display: none;
-    }
-
     /* `19 §3`'S SECOND CONDITION, AND IT IS ONE RULE. Below 900px the tab bar is the navigation
        whatever the shape says, so the strip goes and the grid is one column with one row again —
        without the second half of that, `main` would sit in an `auto` row inside a `100dvh` box with

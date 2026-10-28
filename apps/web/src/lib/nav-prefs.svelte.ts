@@ -43,13 +43,19 @@ const LEGACY_DISMISSED = 'bd_design_dismissed';
 /** The most dismissals kept, the record's own `PEN_DISMISSED_MOST`: past it the oldest is let go first. */
 const DISMISSED_MOST = 500;
 
-export type NavShape = 'rail' | 'bar' | 'menu';
+/**
+ * THE TWO SHAPES A PERSON CHOOSES BETWEEN: the top bar with its sidebar, or the one menu button. The side rail of before
+ * 23 October is no longer a choice (`d8`: five settings, navigation one of them); a rail kept by an older build, on the
+ * record (`side`) or in the cookie (`rail`), is read as no choice, and the top bar is drawn.
+ */
+export type NavShape = 'bar' | 'menu';
 
 export type Prefs = {
   'nav.order'?: string[];
   'nav.hidden'?: string[];
   'nav.tabs'?: string[];
-  'nav.shape'?: NavShape | 'side';
+  /** `rail` and `side` are an older build's words, read as no choice (`shapeKept`). */
+  'nav.shape'?: NavShape | 'rail' | 'side';
   'pen.suggest'?: boolean;
   'pen.dismissed'?: string[];
   /**
@@ -80,19 +86,15 @@ export type Saved = { from: 'kept' } | { from: 'device' } | { from: 'refused'; f
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
-/**
- * Where the navigation lives when nobody said: the top bar of 19 October (chosen 20 October), from 900px up. The
- * side rail stays one choice away in Settings > Navigation.
- */
+/** Where the navigation lives when nobody said: the top bar of 19 October (chosen 20 October), from 900px up. */
 const SHAPE_DEFAULT: NavShape = 'bar';
 
 /**
- * THE RECORD'S WORD FOR THE SIDE RAIL IS `side`, AND ITS `rail` IS NOBODY'S CHOICE. Builds before the top bar led copied
- * the device's shape to the record on first load, so a record holds `rail` whether or not anybody picked it. A rail
- * chosen now is kept as `side`, and a `rail` read back is read as no choice at all, which draws the default (the top bar),
- * so a record that kept one by accident and a record that kept nothing draw the same frame.
+ * THE RECORD'S `side` AND `rail` ARE BOTH NO CHOICE NOW. `side` was a side rail somebody chose, and `rail` was nobody's
+ * choice (builds before the top bar led copied the device's shape to the record on first load). The rail is gone as a
+ * shape, so both read as no choice at all, which draws the default (the top bar).
  */
-const shapeKept = (v: unknown): NavShape | undefined => (v === 'side' ? 'rail' : v === 'bar' || v === 'menu' ? v : undefined);
+const shapeKept = (v: unknown): NavShape | undefined => (v === 'bar' || v === 'menu' ? v : undefined);
 
 /**
  * THE DEVICE'S COPY OF THE SHAPE, AS A CHOICE OR AS NOTHING, for a record that keeps no shape of its own.
@@ -101,7 +103,7 @@ const shapeKept = (v: unknown): NavShape | undefined => (v === 'side' ? 'rail' :
  * cookie, `bar` included when nobody had chosen one, so a `bar` here reads as nobody's choice, which is the top bar again.
  * A shape somebody chose on a record is kept by the record (`setShape`), and its word stands over this.
  */
-const deviceChose = (held: NavShape | undefined): NavShape | undefined => (held === 'bar' ? undefined : held);
+const deviceChose = (held: unknown): NavShape | undefined => (held === 'menu' ? held : undefined);
 
 /** A name map kept whole: only text keys that are addresses, and text names within the length a nav item takes. */
 const names = (v: unknown): Record<string, string> => {
@@ -214,7 +216,7 @@ const fromDevice = (): Start => {
     order: held.nav ?? [],
     hidden: readList(HIDDEN),
     tabs: readList(TABS),
-    shape: held.shape,
+    shape: held.shape === 'bar' || held.shape === 'menu' ? held.shape : undefined,
     suggest: held.suggestPages,
     dismissed: readList(DISMISSED),
     home: address(readKept(HOME)),
@@ -319,8 +321,9 @@ export class NavPrefs {
     keepList(TABS, this.tabs);
 
     const held = pref.read();
-    /* A LEGACY `rail` GOES STRAIGHT TO THE DEFAULT, past the cookie: the cookie's copy was written from that same `rail`. */
-    this.chosen = shapeKept(prefs['nav.shape']) ?? (prefs['nav.shape'] === 'rail' ? undefined : deviceChose(held.shape));
+    /* A LEGACY `rail` OR `side` GOES STRAIGHT TO THE DEFAULT, past the cookie: the cookie's copy was written from it. */
+    const said = prefs['nav.shape'];
+    this.chosen = shapeKept(said) ?? (said === 'rail' || said === 'side' ? undefined : deviceChose(held.shape));
     const suggest = prefs['pen.suggest'];
     this.suggest = typeof suggest === 'boolean' ? suggest : (held.suggestPages ?? true);
     /* THE COOKIE IS WRITTEN FROM A CHOICE ONLY, and the default leaves it empty, so the next change of default is not
@@ -436,10 +439,10 @@ export class NavPrefs {
     const before = this.chosen;
     this.chosen = next;
     pref.write({ shape: next });
-    /* A RAIL GOES AS `side`, the record's word for a rail somebody chose, and NO CHOICE GOES AS `rail`, its word for
-       nobody's (`shapeKept`), which every device reads as the default past its own copy. Not `null`, for `setHome`'s
-       reason: a key taken off the record answers nothing, and another device would keep the shape it last heard of. */
-    return this.#commit('nav.shape', next === undefined ? 'rail' : next === 'rail' ? 'side' : next, () => {
+    /* NO CHOICE GOES AS `rail`, the record's word for nobody's (`shapeKept`), which every device reads as the default past
+       its own copy. Not `null`, for `setHome`'s reason: a key taken off the record answers nothing, and another device
+       would keep the shape it last heard of. */
+    return this.#commit('nav.shape', next ?? 'rail', () => {
       this.chosen = before;
       pref.write({ shape: before });
     });
