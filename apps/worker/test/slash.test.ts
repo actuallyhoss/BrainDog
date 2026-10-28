@@ -209,11 +209,14 @@ test("A REAL ASK ON HIS OWN KEY REACHES THE PACKAGE'S ENGINE THROUGH THE WORKER'
   /* THE FOLD'S LAST LINE IS THE KEYCHAIN, REFUSED, on every ask (`46 §4.2`), which is the boundary showing in the output. */
   assert.deepEqual(proposed.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
 
-  /* THE QUESTION IS ON THE REAL RECORD'S DECIDE. */
+  /* THE QUESTION IS ON THE REAL RECORD'S DECIDE, open, and on the shelf of agents' suggestions rather than in Needs you,
+     since a rowset one press takes and one Put back undoes is Slash's suggestion, not a call only he can make. */
+  const filed = (await api.governance({ id: String(proposed.filed) }, OWNER)) as { ok: boolean; value: { status: string; opened_by: string } | null };
+  assert.ok(filed.ok);
+  assert.deepEqual([filed.value?.status, filed.value?.opened_by], ['open', 'slash']);
   const boot = (await api.boot(OWNER)) as { ok: boolean; value: { waiting: { id: string }[] } };
   assert.ok(boot.ok);
-  assert.equal(boot.value.waiting.length, 1);
-  assert.equal(boot.value.waiting[0]!.id, proposed.filed);
+  assert.deepEqual(boot.value.waiting, [], 'an undoable suggestion is not counted as waiting on him');
 
   /* AND THE ANSWER CAME FROM THE PACKAGE'S ENGINE AND NOT FROM THE RULES: two rows in Slash's OWN meter, and the record's
      own Slash still modelless, so nothing here could have come from `SlashModel.draft`. */
@@ -264,10 +267,10 @@ test("AND THE SAME ASK REACHES IT THROUGH THE SELF-HOST'S BUILDER, over the oper
   assert.match(String(out.value.filed), /^SG[0-9]+$/u, 'nothing was filed on the record');
 
   /* FILED AS `slash`, which is the one actor this package's single write is allowed to be (`30 §3`). */
-  const queue = (await api.governance({ limit: 5 }, OWNER)) as { ok: boolean; value: { body_kind: string; opened_by: string }[] };
-  assert.ok(queue.ok);
-  assert.equal(queue.value[0]!.body_kind, 'rowset');
-  assert.equal(queue.value[0]!.opened_by, 'slash');
+  const filed = (await api.governance({ id: String(out.value.filed) }, OWNER)) as { ok: boolean; value: { body_kind: string; opened_by: string } | null };
+  assert.ok(filed.ok);
+  assert.equal(filed.value?.body_kind, 'rowset');
+  assert.equal(filed.value?.opened_by, 'slash');
   assert.equal((wire.sent[0]!.headers as Record<string, string>).authorization, 'Bearer fake-operator-key');
 
   sql.close();
