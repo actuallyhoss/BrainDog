@@ -44,7 +44,10 @@ export type Binding = {
  * overridden.
  */
 export const NEVER_BIND = [
-  ...'TNWLDPSFGOHJR'.split('').map((k) => `Mod+${k}`),
+  /* `Mod+J` IS ASK'S, the one chord taken off this list on purpose: ⌘J opens Slash as ⌘K opens the search, the pair
+     every palette that answers in words has taught. Where a browser keeps Ctrl+J for its downloads, `/` and the bar's
+     field still reach Ask. `Mod+Shift+J` stays the browser's. */
+  ...'TNWLDPSFGOHR'.split('').map((k) => `Mod+${k}`),
   ...'NWBOJR'.split('').map((k) => `Mod+Shift+${k}`),
   'Mod+Shift+Delete',
   ...Array.from({ length: 9 }, (_, i) => `Mod+${i + 1}`),
@@ -76,6 +79,7 @@ export const SCROLL_KEYS = ['Space', 'PageDown', 'PageUp'] as const;
 export const BINDINGS: Binding[] = [
   { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the search', bare: false },
   { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Search from anywhere', bare: true },
+  { id: 'palette-ask', scope: 'document', key: '⌘J', label: 'Ask Slash', bare: false },
   /* `g s` IS BACK, BECAUSE SEARCH BECAME A PLACE YOU GO. This row printed it while nothing bound
      it, and the fix at the time was to delete the key: *"search is not a place you go, it is the
      thing under the launcher"* — which was true while the palette was the only search, and which

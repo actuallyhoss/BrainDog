@@ -226,7 +226,7 @@ export const shell = {
   /* THE FLAT NAV'S OWN ROW (`flatNav` in `lib/nav.ts`): the screen every record opens on. */
   today: 'Today',
   /* The search button at the head of the rail, which says its two keys where the pointer rests on it. */
-  searchKeys: 'Search (press / or Ctrl K)',
+  searchKeys: 'Find with / or Ctrl K, ask Slash with Ctrl J',
 
   /* MONEY IS AN INTEGER IN MINOR UNITS, and this is the one place a person types one. The sentence
      says what to do rather than what is wrong: "not a number" is a verdict, and "digits and at most

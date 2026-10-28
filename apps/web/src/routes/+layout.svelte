@@ -69,7 +69,7 @@
   import type SideBarView from '$lib/shell/SideBar.svelte';
   import { SIDE_KEY, sideKept } from '$lib/shell/side.ts';
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
-  import { palette } from '$lib/palette/open.svelte.ts';
+  import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
   import { FACTS_KEY, IN_MORE, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
@@ -1114,9 +1114,16 @@
     // Never while typing. One test, in the registry, and no screen implements its own.
     if (typing() && !mod) return;
 
-    if (mod && e.key.toLowerCase() === 'k') {
+    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      palette.open = true;
+      openPalette();
+      return;
+    }
+
+    /* `⌘J` OPENS STRAIGHT INTO ASK, where the conversation with Slash was left; with the palette open it moves there. */
+    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
+      e.preventDefault();
+      openAsk();
       return;
     }
 
@@ -1178,7 +1185,7 @@
     }
     if (e.key === '/') {
       e.preventDefault();
-      palette.open = true;
+      openPalette();
       return;
     }
     // `?` is help. It is never "ask the assistant".
@@ -1262,7 +1269,7 @@
       {/if}
       <div class="bar-slot">
         {#if shape === 'bar'}
-          <TopBar {crumb} onfind={() => (palette.open = true)} />
+          <TopBar {crumb} onfind={openPalette} />
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
@@ -1357,7 +1364,7 @@
     tab bar is the navigation there whatever the shape says.
   -->
   {#if shape === 'menu'}
-    <button type="button" class="launcher tap" onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
+    <button type="button" class="launcher tap" onclick={openPalette} aria-label={copy.paletteLabel}>
       <Icon name="search" size="l" />
     </button>
   {/if}

@@ -53,7 +53,7 @@
   import Define from './Define.svelte';
   import { at, here } from '../at.ts';
   import { copy } from '../copy.ts';
-  import { palette } from '../palette/open.svelte.ts';
+  import { openPalette } from '../palette/open.svelte.ts';
   import Bell from '../shell/Bell.svelte';
   import { frame } from '../shell/frame.svelte.ts';
   import RecordMark from '../shell/RecordMark.svelte';
@@ -240,7 +240,7 @@
   <span class="bar-end">
     {#if barred && actions}<span class="head-actions bar-actions">{@render actions()}</span>{/if}
     {#if !searching}
-      <button type="button" class="find tap" data-palette-from aria-label={copy.paletteLabel} onclick={() => (palette.open = true)}>
+      <button type="button" class="find tap" data-palette-from aria-label={copy.paletteLabel} onclick={openPalette}>
         <Icon name="search" size="l" />
       </button>
     {/if}

@@ -19,6 +19,7 @@
   import type { Crumb } from '../shell/side.ts';
   import YouMenu from '../shell/YouMenu.svelte';
   import Icon from './Icon.svelte';
+  import Kbd from './Kbd.svelte';
 
   let {
     crumb = [],
@@ -51,10 +52,11 @@
     </ol>
   </div>
 
-  <!-- THE ONE WAY TO ASK, drawn as the field the palette opens out of (`data-palette-from`), its key at rest. -->
+  <!-- THE ONE WAY TO ASK, drawn as the field the palette opens out of (`data-palette-from`), its key at rest: `/` finds,
+       and ⌘J (Ctrl J off a Mac) opens straight into Ask, which is the key the hint names. -->
   {#if !searching}
-    <button type="button" class="bar-ask tap" data-palette-from="bar" aria-keyshortcuts="/ Control+K Meta+K" onclick={() => onfind?.()}>
-      <Icon name="search" size="m" /><span class="bar-ask-words">{copy.palettePlaceholder}</span><kbd aria-hidden="true">/</kbd>
+    <button type="button" class="bar-ask tap" data-palette-from="bar" aria-keyshortcuts="/ Control+K Meta+K Control+J Meta+J" title={copy.searchKeys} onclick={() => onfind?.()}>
+      <Icon name="search" size="m" /><span class="bar-ask-words">{copy.palettePlaceholder}</span><span class="bar-ask-key" aria-hidden="true"><Kbd keys="⌘J" /></span>
     </button>
   {/if}
 
@@ -172,18 +174,10 @@
     white-space: nowrap;
   }
 
-  .bar-ask kbd {
-    display: inline-grid;
-    place-items: center;
+  .bar-ask-key {
+    display: inline-flex;
     flex: none;
-    min-inline-size: 20px;
-    block-size: 20px;
-    background: var(--tile);
-    border: 1px solid var(--rule);
-    border-radius: var(--r-xs);
     color: var(--ink-3);
-    font: inherit;
-    font-family: var(--font-mono);
     font-size: var(--fs-cap);
   }
 

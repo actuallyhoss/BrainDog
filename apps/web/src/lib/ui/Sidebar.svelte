@@ -85,7 +85,7 @@
   import { hueFor } from './hue.ts';
   import Kbd from './Kbd.svelte';
   import Mark from './Mark.svelte';
-  import { palette } from '../palette/open.svelte.ts';
+  import { openPalette } from '../palette/open.svelte.ts';
   import Menu from './Menu.svelte';
   import { toasts } from './toast.svelte.ts';
   import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
@@ -499,7 +499,7 @@
 
   <!-- THE ASK FIELD: the palette, drawn as the field it opens, and the field it opens out of (`data-palette-from`). Its
        two keys are in the tooltip, and `/` on the cap. -->
-  <button type="button" class="ask tap" data-palette-from="bar" data-label={words.ask} aria-label={words.ask} aria-keyshortcuts="/ Control+K Meta+K" title={copy.searchKeys} onclick={() => (palette.open = true)}>
+  <button type="button" class="ask tap" data-palette-from="bar" data-label={words.ask} aria-label={words.ask} aria-keyshortcuts="/ Control+K Meta+K Control+J Meta+J" title={copy.searchKeys} onclick={openPalette}>
     <Icon name="search" size="m" />
     <span class="ask-words">{words.ask}</span>
     <span class="ask-key" aria-hidden="true"><Kbd keys="/" /></span>
