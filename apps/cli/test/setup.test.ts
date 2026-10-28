@@ -24,7 +24,7 @@ import { claudeDesktopFolder, vscodeUserFolder } from '../src/clients/others.ts'
 import { hostKey, readHosts, saveHosts, target } from '../src/http.ts';
 import { HOOK_STATUS, keepCopy } from '../src/install.ts';
 import { logout } from '../src/logout.ts';
-import { agentKindOf, agentTokens, profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
+import { PLUGIN_LINE, agentKindOf, agentTokens, profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
 import { keepPin, pinOf, pinsFile } from '../src/pins.ts';
 import { renderEntry } from '../src/tools.ts';
 
@@ -288,9 +288,10 @@ test('a dry run says one line per app and profile, and the two things left, and 
   ])
     assert.ok(text.includes(line), `missing: ${line}\n${text}`);
   const key = hostKey(host);
-  assert.deepEqual(m.out.slice(-3), [
+  assert.deepEqual(m.out.slice(-4), [
     'This repository has 2 tools of its own. Write them with braindog tools write --scope project.',
     `2 tools need keys. Approve this machine for them with braindog login ${key} --keychain things#1.`,
+    PLUGIN_LINE,
     'That was a dry run, so nothing was signed in, written, registered or proposed.',
   ]);
 });
