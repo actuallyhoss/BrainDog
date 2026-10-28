@@ -49,6 +49,34 @@ const binding = {
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(inputs),
     });
+    /* A STREAM ASKED FOR IS HANDED BACK AS THE BINDING HANDS IT BACK, its body, timed to its end as it is read. */
+    if (inputs.stream === true && res.ok && (res.headers.get('content-type') ?? '').includes('event-stream')) {
+      const call = { ms: 0, first: null, words: null, in: undefined, out: undefined, thought: undefined };
+      traced.push(call);
+      let tail = '';
+      return res.body.pipeThrough(
+        new TransformStream({
+          transform(chunk, out) {
+            /* THE FIRST CHUNK, AND THE FIRST THAT CARRIES WORDS: the gap between them is the model thinking. */
+            const said = new TextDecoder().decode(chunk);
+            call.first ??= Math.round(performance.now() - t0);
+            if (call.words == null && /"content":\s*"[^"]/.test(said)) {
+              call.words = Math.round(performance.now() - t0);
+              call.wordsAt = performance.now();
+            }
+            tail = (tail + said).slice(-600);
+            out.enqueue(chunk);
+          },
+          flush() {
+            call.ms = Math.round(performance.now() - t0);
+            /* THE LAST CHUNK'S COUNTS ARE THE CALL'S WHOLE ONES (`apps/worker/src/inference.ts`, `readStream`). */
+            const last = tail.slice(Math.max(0, tail.lastIndexOf('"response"')));
+            call.in = Number(/"prompt_tokens":\s*(\d+)/.exec(last)?.[1]) || undefined;
+            call.out = Number(/"completion_tokens":\s*(\d+)/.exec(last)?.[1]) || undefined;
+          },
+        }),
+      );
+    }
     const body = await res.json().catch(() => null);
     const u = body?.result?.usage ?? {};
     traced.push({ ms: Math.round(performance.now() - t0), in: u.prompt_tokens, out: u.completion_tokens, thought: u.completion_tokens_details?.reasoning_tokens });
@@ -121,14 +149,17 @@ for (const [i, q] of QUESTIONS.entries()) {
   const errors = events.filter((e) => e.type === 'error').map((e) => e.text);
   const actions = events.filter((e) => e.type === 'action').map(({ type, ...a }) => a);
   actionsOf.set(n, actions);
-  const row = { n, said: q.say, steps, answer, actions, errors, ms, firstWords: first, modelCalls: modelCalls - calls0, calls: traced, want: q.want };
+  /* HOW LONG THE FIRST WORDS WAITED AFTER THE ANSWERING CALL'S OWN FIRST WORDS, which is what streaming can shorten. */
+  const answering = traced.at(-1);
+  const lag = first !== null && answering?.wordsAt != null ? Math.round(t0 + first - answering.wordsAt) : null;
+  const row = { n, said: q.say, steps, answer, actions, errors, ms, firstWords: first, lag, modelCalls: modelCalls - calls0, calls: traced, want: q.want };
   report.push(row);
   console.log(`\n#${n} ${q.say}${q.after ? `  (after #${q.after})` : ''}`);
   console.log(`  steps: ${steps.join(' | ') || '-'}`);
   console.log(`  answer: ${answer || '-'}`);
   for (const a of actions) console.log(`  action: ${a.kind} ${a.title}${a.detail ? ` (${a.detail})` : ''}`);
   for (const e of errors) console.log(`  error: ${e}`);
-  console.log(`  ${ms} ms, first words at ${first ?? '-'} ms, ${modelCalls - calls0} model calls: ${traced.map((c) => `${c.ms}ms ${c.in}in/${c.out}out(${c.thought ?? '?'} thinking)`).join(', ')}${q.want ? `\n  want: ${q.want}` : ''}`);
+  console.log(`  ${ms} ms, first words at ${first ?? '-'} ms${lag === null ? '' : ` (${lag} ms after the model's)`}, ${modelCalls - calls0} model calls: ${traced.map((c) => `${c.ms}ms${c.first == null ? '' : ` (first chunk ${c.first}ms, words ${c.words ?? '-'}ms)`} ${c.in}in/${c.out}out(${c.thought ?? '?'} thinking)`).join(', ')}${q.want ? `\n  want: ${q.want}` : ''}`);
 }
 
 /* THE LEDGER'S OWN COUNT OF WHAT WAS SPENT, from the rows the engine wrote. */
