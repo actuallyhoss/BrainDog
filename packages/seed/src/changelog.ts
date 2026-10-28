@@ -22,7 +22,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   portfolio: [
     {
       version: '1.30.0',
-      notes: 'Projects opens on what is true today: which projects are late, what falls due this week, whose numbers went quiet and what renews, by name, with what the earning ones bring in a month beside it. One list follows, earning first, then what is moving, then what is quiet, and the parked and finished fold into a strip.',
+      notes: 'Projects opens on today: what is late, due this week, gone quiet or renewing. One list follows, earning first.',
     },
     {
       version: '1.29.0',
@@ -132,13 +132,13 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.1.0', notes: "Scripts calls the column that says how each script is doing Status." },
     {
       version: '1.0.0',
-      notes: 'Health, Scripts, Calendar and Activity now come with BrainDog itself and no longer with People. They are the same pages with the same names, so your sidebar order and anything you hid stay as you left them.',
+      notes: 'Health, Scripts, Calendar and Activity now come with BrainDog itself. Your sidebar stays as it was.',
     },
   ],
   people: [
     {
       version: '4.0.0',
-      notes: 'Health, Scripts, Calendar and Activity moved out of People into the pages BrainDog itself keeps. Nothing you see changes, and your sidebar order and hides stay as they were.',
+      notes: 'Health, Scripts, Calendar and Activity moved to BrainDog itself. Your sidebar stays as it was.',
     },
     {
       version: '3.9.0',
@@ -194,7 +194,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.29.0',
-      notes: "Money is a section with a page for each job: Accounts, Ledger, Budgets, Coming up, Forecast, Reports and Payees. The home leads with your cash and what comes up next. Budgets are offered from last month's spending, never set for you. The ledger reads by day, each line with its category's chip, and a quick add puts in a line in a few taps. The forecast is redrawn. Property, Insurance, Trips, Certificates, Debts, Goals and Zakat come as add-ons.",
+      notes: "A page for each job: Accounts, Ledger, Budgets, Coming up, Forecast, Reports and Payees. Budgets are offered from last month, never set for you.",
     },
     {
       version: '3.28.0',
@@ -323,7 +323,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
-    { version: '2.5.0', notes: 'The Vault is now the Keychain, and a service page says its keys are kept there. Nothing you keep is moved or changed.' },
+    { version: '2.5.0', notes: 'The Vault is now the Keychain. Nothing you keep moved.' },
     { version: '2.4.0', notes: 'Services names what is lapsing: each one by its name, who it is with and the day it was due to renew, where At a glance was, while anything is. How many renew in 30 days is still on Today.' },
     {
       version: '2.3.0',
@@ -345,7 +345,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   work: [
     {
       version: '1.19.0',
-      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot go to done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread and owner where it names none. A step an agent adds under its own task stays with that agent. A thread that is held up can be marked done. Board has a line to add a task. A project with nothing written on its tasks for more than thirty days is marked quiet. Work has a head with a search, and lists open work with no project. Work shows Late, Waiting on you, This week and With an agent in that order, and its Open count is the sum of its project chips. Work narrows to yours, the agents' or all of it, and folds what has not moved in three months. Board shows every open task, says how many are kept for later, and no longer lists them again under the board.",
+      notes: "Threads can be ideas or planned, with a day they aim for. Work leads with Late, Waiting on you, This week and With an agent, and Board lists every open task.",
     },
     {
       version: '1.18.0',
@@ -398,7 +398,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   agents: [
     {
       version: '1.24.0',
-      notes: 'The agents page shows how much of what each agent suggests you accept unchanged, overall and by kind of change. How the brain changed gains a timeline: learnings as they arrive with the failure behind each, skills with their text before and after, and learnings marked where they fade.',
+      notes: "Shows how much of each agent's suggestions you accept unchanged, and a timeline of how the brain changed.",
     },
     { version: '1.23.0', notes: 'A key says which account it is for, such as a user name or an address, as a keychain item does. It is never the key itself.' },
     {
