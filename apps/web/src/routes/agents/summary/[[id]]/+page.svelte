@@ -1,0 +1,144 @@
+<!--
+  A summary: `/agents/summary/<id>`, what a phone's tap on the 08:00 or 17:00 notice opens, and `/agents/summary` for
+  every summary this record sends.
+
+  WHAT IT WOULD SAY NOW, from the record's `digestToday`, the same assembly the scheduled one sends, held to what this
+  reader may read: what waits for you, what your agents did, and what is stuck, each section with the door to where it
+  is answered. A section with nothing in it is left out, as the summary itself leaves it out. The words are
+  `$lib/agents/summary.ts`.
+-->
+<script lang="ts">
+  import { page } from '$app/state';
+  import { createClient } from '@braindog/client';
+  import { apiBase, at } from '$lib/at.ts';
+  import { read } from '$lib/data/read.svelte.ts';
+  import { titleOf } from '$lib/title.ts';
+  import { summariesOf, summaryHref, summaryWords as words, type Summary } from '$lib/agents/summary.ts';
+  import PageHead from '$lib/ui/PageHead.svelte';
+  import ReadState from '$lib/ui/ReadState.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Button from '$lib/ui/Button.svelte';
+
+  const id = $derived(typeof page.params.id === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/u.test(page.params.id) ? page.params.id : null);
+
+  const held = read<Summary[]>(
+    () => `summary:${apiBase()}:${id ?? '*'}`,
+    async () => {
+      const out = (await createClient({ base: apiBase() }).call('digestToday', id === null ? {} : { digest: id })) as { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; at?: string } };
+      if (!out.ok) return out as never;
+      return { ok: true as const, value: summariesOf(out.value) };
+    },
+  );
+
+  const summaries = $derived(held.value ?? []);
+  const title = $derived(id !== null && summaries.length === 1 ? summaries[0]!.name : words.all);
+</script>
+
+<svelte:head><title>{titleOf(title)}</title></svelte:head>
+
+<PageHead icon="bell" {title} kicker={words.parent} back="/p/agents" sentence={words.sentAt} />
+<div class="page">
+  {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+    <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+  {:else if summaries.length === 0}
+    <Tile>
+      <p class="said">{words.none}</p>
+      <p class="said quiet">{words.offer}</p>
+      <div class="foot"><Button href="/addons/agent-notes">{words.getIt}</Button></div>
+    </Tile>
+  {:else}
+    {#each summaries as s (s.id)}
+      <Tile icon={id === null ? "bell" : undefined} title={id === null ? s.name : undefined}>
+        {#if id === null}<p class="said quiet"><a href={at(summaryHref(s.id))}>{s.headline}</a></p>{/if}
+        {#if s.sections.length === 0}
+          <p class="said quiet">{words.nothing}</p>
+        {:else}
+          {#each s.sections as sec (sec.source + sec.heading)}
+            <section class="sec">
+              <h2 class="sec-head">{sec.heading}</h2>
+              <ul class="lines">
+                {#each sec.lines as l (l.key)}
+                  <li class="line">
+                    <span class="line-text" dir="auto">{l.text}</span>
+                    {#if l.detail}<span class="line-detail" dir="auto">{l.detail}</span>{/if}
+                  </li>
+                {/each}
+                {#if sec.more > 0}<li class="line line-detail">{words.more(sec.more)}</li>{/if}
+              </ul>
+              {#if sec.href}
+                <div class="foot"><Button size="sm" href={sec.href}>{sec.href === '/decide' ? words.decide : words.upNext}</Button></div>
+              {/if}
+            </section>
+          {/each}
+        {/if}
+      </Tile>
+    {/each}
+  {/if}
+</div>
+
+<style>
+  .page {
+    display: grid;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  .said {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .quiet {
+    color: var(--ink-2);
+  }
+
+  .sec + .sec {
+    margin-block-start: var(--sp-4);
+  }
+
+  .sec-head {
+    margin: 0 0 var(--sp-1);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+  }
+
+  .lines {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .line {
+    display: grid;
+    gap: 2px;
+    padding-block: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .line + .line {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .line-text {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .line-detail {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .foot {
+    margin-block-start: var(--sp-2);
+  }
+</style>
