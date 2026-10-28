@@ -71,11 +71,12 @@
 </script>
 
 {#snippet help(id: string, field: string, said: string)}
-  <p class="help" id={id} class:wrong={faultAt(field) !== null}>{faultAt(field) ?? said}</p>
+  {#if (faultAt(field) ?? said) !== ''}<p class="help" id={id} class:wrong={faultAt(field) !== null}>{faultAt(field) ?? said}</p>{/if}
 {/snippet}
 
 <div class="form">
-  <Tile class="section" data-surface="tile" title={words.heading}>
+  <!-- NO TITLE ON THE TILE: the page's own heading is "New kind", one line over it. -->
+  <Tile class="section" data-surface="tile">
     <div class="section-body">
       <!-- ONE COLUMN, 720PX AT MOST (24 October): what it is, how far it may go, and the rest under More. -->
       <div class="fields">
@@ -85,7 +86,7 @@
           <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
             <input id="kind-title" class="field-input" type="text" autocomplete="off" maxlength="120" aria-describedby="kind-title-help" aria-invalid={faultAt('title') ? 'true' : undefined} bind:value={draft.title} />
           </div>
-          {@render help('kind-title-help', 'title', words.titleHelp)}
+          {@render help('kind-title-help', 'title', '')}
         </div>
 
         <div class="item">
