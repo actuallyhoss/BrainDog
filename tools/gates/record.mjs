@@ -108,7 +108,7 @@ async function plantRuns(kernel) {
     {
       id: 'job.stale-tasks',
       kind: 'job',
-      body: { job: 'stale-tasks', title: 'Stale tasks', prompt: 'Read my open tasks and say which have not moved in a month.', tools: ['mcp__braindog__search'], turns: 6, permission: 'dontAsk' },
+      body: { job: 'stale-tasks', title: 'Stale tasks', prompt: 'Read my open tasks and say which have not moved in a month.', tools: ['mcp__braindog__search'], turns: 1, permission: 'dontAsk' },
     },
   ]);
   if (!installed.ok) throw new Error(`the look's record could not take its runs: ${installed.refusal?.fix ?? 'no reason given'}`);
