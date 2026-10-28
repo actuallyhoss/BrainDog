@@ -449,6 +449,8 @@ function guardedSql(storage: DurableObjectStorage): Sql {
 
 /** Where an object keeps the build it last opened as, in its own storage and outside the record (`Record$` `#booted`). */
 const BOOTED = 'braindog.booted';
+/** Where the record's answers kept beside it go in this object's store (`RecordDeps.kept`). */
+const KEPT_PREFIX = 'braindog.kept.';
 
 /** Where an object keeps the alarm step it is in, so an alarm cut off by the runtime is named by the next one (`#step`). */
 const ALARM_STEP = 'braindog.alarm-step';
@@ -875,6 +877,14 @@ export class Record$ extends DurableObject<Env> {
         sql,
         clock: { now: () => Date.now() },
         scheduler: this.#alarm,
+        /* A FEW ANSWERS BESIDE THE RECORD, IN THIS OBJECT'S OWN STORE AND NEVER IN ITS TABLES (`RecordDeps.kept`), as the
+           build it last opened as is (`BOOTED`): Today as it was last drawn, so the first open after a deploy is answered
+           at once and drawn again behind it. `deleteAll` takes them with everything else. */
+        kept: {
+          get: (key) => this.ctx.storage.get(`${KEPT_PREFIX}${key}`),
+          put: (key, value) => this.ctx.storage.put(`${KEPT_PREFIX}${key}`, value),
+          delete: (key) => this.ctx.storage.delete(`${KEPT_PREFIX}${key}`),
+        },
         /**
          * WHAT SIGNS AN EXPORTED `.brain`, AND IT WAS MISSING. Measured before this line existed: a
          * hosted export carried the `dog_sig` header with no row under it, and `checkBrainl` refuses

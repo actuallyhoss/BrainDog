@@ -79,6 +79,40 @@ test('EACH PROJECT IS COUNTED ITS LATE WORK, one more for a task past its day th
   sql.close();
 });
 
+test('A RESTART KEEPS TODAY AS IT WAS LAST DRAWN beside the record: the first read after it is answered at once, behind', async () => {
+  const sql = openSqlite();
+  const store = new Map<string, unknown>();
+  const kept = {
+    get: async (k: string) => structuredClone(store.get(k)),
+    put: async (k: string, v: unknown) => void store.set(k, structuredClone(v)),
+    delete: async (k: string) => store.delete(k),
+  };
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW), kept });
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAT', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  assert.ok((await installSeed(api.kernel)).ok);
+  const drawn = value<TodayAnswer>(await api.today({ body: BODY }, owner));
+  /* The store is written behind the answer. */
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(store.size >= 2, 'the drawing and its order are kept');
+
+  /* THE OBJECT STARTS AGAIN over the same record and the same store, with nothing in memory. */
+  const read: string[] = [];
+  const again = await createRecordApi({ sql, clock: fixedClock(NOW), kept: { ...kept, get: async (k: string) => (read.push(k), kept.get(k)) } });
+  const first = value<TodayAnswer>(await again.today({ body: BODY }, owner));
+  assert.ok(read.some((k) => k.startsWith('today.kept.')), 'what memory did not hold is read from the store');
+  /* At the same version and inside `HELD_MS`, the kept drawing is the answer as it stands. */
+  assert.deepEqual(first, drawn);
+  /* `fresh` never reads the store, and is drawn now. */
+  const asked = read.length;
+  assert.equal(value<TodayAnswer>(await again.today({ body: BODY, fresh: true }, owner)).behind, undefined);
+  assert.equal(read.length, asked);
+
+  /* ANOTHER READER'S DRAWING IS NOT HANDED OVER: a key is the reader and the body. */
+  const other = await createRecordApi({ sql, clock: fixedClock(NOW), kept: { ...kept, get: async () => undefined } });
+  assert.equal(value<TodayAnswer>(await other.today({ body: BODY }, owner)).behind, undefined);
+  sql.close();
+});
+
 test('A BODY THAT DRAWS NO PROJECT CARDS asks nothing of them, and a body that is not one is refused', async () => {
   const { sql, api } = await record();
   const got = value<TodayAnswer>(await api.today({ body: { ...BODY, blocks: [BODY.blocks[0]] } }, owner));

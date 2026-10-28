@@ -846,6 +846,13 @@ const HELD_MS = 30_000;
 const TODAY_BEHIND_MS = 21_600_000;
 /** The most Todays held at once, one for each body and reader; past it the oldest goes. */
 const TODAY_KEPT_MOST = 8;
+/** The key Today's drawings are kept under in the host's store beside the record (`RecordDeps.kept`). */
+const TODAY_KEPT_KEY = 'today.kept';
+/** Today as it was drawn: the record's version then, when, the day where the record is, and the answer. */
+type TodayDrawn = { version: string; at: number; day: string; value: TodayAnswer };
+/** A key's SHA-256 in hex, so a key of any length names one entry in a store whose keys are short. */
+const digestOf = async (key: string): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)))].map((b) => b.toString(16).padStart(2, '0')).join('');
 /** How long a fact about the questions is held while only the runs have moved (`quietFor`). */
 const QUIET_HELD_MS = 300_000;
 /** The most field names one `list` may ask for (`fields`). */
@@ -2161,6 +2168,13 @@ export type SlashHeld = {
   release(): void;
 };
 
+/** A host's store beside the record (`RecordDeps.kept`): a value by key, kept as it was put. Any call may reject. */
+export type KeptStore = {
+  get(key: string): Promise<unknown>;
+  put(key: string, value: unknown): Promise<void>;
+  delete(key: string): Promise<unknown>;
+};
+
 export type RecordDeps = {
   sql: Sql;
   clock: Clock;
@@ -2215,6 +2229,12 @@ export type RecordDeps = {
    * deletes what a copy brought.
    */
   sealed?: SealedStore | undefined;
+  /**
+   * WHERE THIS HOST KEEPS A FEW ANSWERS BESIDE THE RECORD AND NEVER IN IT, across a restart of the object that holds it:
+   * Today as it was last drawn (`today`). A deploy restarts every record's object, and what was held in its memory went
+   * with it, so the first Today after one waited for the whole body. Absent, they are held in memory only.
+   */
+  kept?: KeptStore | undefined;
   /**
    * Where this host keeps visuals' pages, and the file store their pictures are in (`methods/visuals.ts`). Absent,
    * `attachVisual` and `visual` refuse `NOT_IN_THIS_BUILD`, and `visuals` still lists what the log names.
@@ -2506,7 +2526,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'kept' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * The visual pages whose text names whoever an erasure is for, by their SHA-256. A page is kept outside the file, so
@@ -10703,7 +10723,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * at once with `fresh`, which is always drawn now. Held in this object's memory only, never stored, for the same day
    * where the record is and at most `TODAY_BEHIND_MS`, so a stale body is never older than that.
    */
-  const todayKept = new Map<string, { version: string; at: number; day: string; value: TodayAnswer }>();
+  const todayKept = new Map<string, TodayDrawn>();
+  /**
+   * AND BESIDE THE RECORD, IN THE HOST'S STORE (`deps.kept`), so the first Today after a restart is answered at once too:
+   * each drawing under its key's digest, and the digests in the order they were drawn, the oldest let go past
+   * `TODAY_KEPT_MOST`. Held to the same day and age as in memory, and a store that fails is a store that is not there.
+   */
+  const keptToday = async (key: string): Promise<TodayDrawn | undefined> => {
+    if (deps.kept === undefined) return undefined;
+    const got = (await deps.kept.get(`${TODAY_KEPT_KEY}.${await digestOf(key)}`).catch(() => undefined)) as Partial<TodayDrawn> | undefined;
+    if (got === undefined || got === null || typeof got !== 'object') return undefined;
+    if (typeof got.version !== 'string' || typeof got.at !== 'number' || typeof got.day !== 'string' || got.value === null || typeof got.value !== 'object') return undefined;
+    return got as TodayDrawn;
+  };
+  const keepToday = async (key: string, drawn: TodayDrawn): Promise<void> => {
+    const store = deps.kept;
+    if (store === undefined) return;
+    const at = await digestOf(key);
+    const listed = await store.get(TODAY_KEPT_KEY).catch(() => undefined);
+    const order = [...(Array.isArray(listed) ? listed.filter((d): d is string => typeof d === 'string' && d !== at) : []), at];
+    await store.put(`${TODAY_KEPT_KEY}.${at}`, drawn);
+    for (const gone of order.splice(0, Math.max(0, order.length - TODAY_KEPT_MOST))) await store.delete(`${TODAY_KEPT_KEY}.${gone}`);
+    await store.put(TODAY_KEPT_KEY, order);
+  };
   /** A drawing of Today out now, by the same key, so an ask that must be fresh waits for it rather than drawing twice. */
   const todayOut = new Map<string, Promise<Result<TodayAnswer>>>();
   /** The methods a project's page asks for its shape (`project-shape.ts`); set once `api` and its wrappers are. */
@@ -12085,6 +12127,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (allows(ctx, 'owner') !== null) return draw();
       const { batch: _batch, provedAt: _proved, ...caller } = ctx;
       const key = JSON.stringify([caller, body]);
+      /* WHAT THIS OBJECT DID NOT HOLD IN MEMORY, AS AFTER A RESTART, IS READ FROM BESIDE THE RECORD first (`keptToday`). */
+      if (!todayKept.has(key) && said.fresh !== true) {
+        const stored = await keptToday(key);
+        if (stored !== undefined && !todayKept.has(key)) todayKept.set(key, stored);
+      }
       const now = clock.now();
       const day = localDays(readableZone(kernel.identity()?.tz))(now);
       const version = stamp();
@@ -12096,9 +12143,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out !== undefined) return out.then((r) => (r.ok ? ok(structuredClone(r.value)) : r));
       const drawing = draw().then((r) => {
         if (r.ok) {
+          const drawn: TodayDrawn = { version, at: now, day, value: structuredClone(r.value) };
           todayKept.delete(key);
-          todayKept.set(key, { version, at: now, day, value: structuredClone(r.value) });
+          todayKept.set(key, drawn);
           if (todayKept.size > TODAY_KEPT_MOST) todayKept.delete(todayKept.keys().next().value as string);
+          void keepToday(key, drawn).catch(() => undefined);
         }
         return r;
       });
