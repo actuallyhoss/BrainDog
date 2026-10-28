@@ -13,14 +13,14 @@ export const words = {
   searchHint: 'Search add-ons and starters',
   /* THE STORE: starters first, then the shelves, and what the record suggests itself. */
   store: {
-    sentence: 'Things you can add to your record. Each one shows you its plan before anything changes.',
+    sentence: 'Each shows its plan before anything changes.',
     suggested: 'Suggested for you',
     suggestedNote: 'from your own record',
     starters: 'Starters',
-    startersNote: 'a set of add-ons, pages and words to begin with',
+    startersNote: 'whole setups to begin with',
     examples: 'Example setups',
     examplesLine: (names: readonly string[]): string =>
-      `${names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`}: whole setups to copy from, for trades BrainDog does not run itself.`,
+      `${names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`}: setups to copy from.`,
     seeExamples: (n: number): string => `See ${n}`,
     hideExamples: 'Fewer',
     yourStarter: 'Your starter',
@@ -41,7 +41,7 @@ export const words = {
      its versions with the one on this record marked; and who made it, under what licence, and where it is offered. */
   about: {
     reaches: 'What it reaches',
-    reachesNothing: 'Nothing outside your record. It reads and writes only this record.',
+    reachesNothing: 'Only this record.',
     madeBy: 'Made by',
     author: 'Author',
     listedAt: 'Offered',
@@ -69,7 +69,7 @@ export const words = {
   orders: { 'for-you': 'For you', installed: 'Most used', newest: 'Newest' },
   kinds: { module: 'Part of BrainDog', usecase: 'Starter', pack: 'Add-on' },
   nothingFound: 'Nothing matches that search',
-  nothingFoundBody: 'Try fewer words, or pick All.',
+  nothingFoundBody: 'Try fewer words.',
   installs: (n: number): string => `On ${n}+ BrainDogs`,
   /* UNDER TEN INSTALLS THE STORE SAYS NO NUMBER (`roundCount`), so an add-on from outside that nobody much holds yet is "New". */
   newOne: 'New in the store',
@@ -85,7 +85,7 @@ export const words = {
   verified: 'Verified',
   reviewed: 'Reviewed by BrainDog',
   signedBy: (key: string): string => `Signed with key ${key}`,
-  callsNothing: 'Calls out to nothing. It reads and writes only this record.',
+  callsNothing: 'Nothing outside this record.',
   callsOut: (hosts: readonly string[]): string => `Calls out to ${hosts.join(', ')}`,
   adds: 'What it adds',
   addsLists: 'Lists',
@@ -121,7 +121,7 @@ export const words = {
   calls: 'What it calls out to',
   /* WHAT WAITS, SAID AS SENTENCES under the plan (`offer.ts` `waitsOf`). */
   waits: 'What waits',
-  waitsNote: 'These arrive on their own once you have what they wait for.',
+  waitsNote: 'They arrive once you have what they wait for.',
   /* WHAT A PART WAITS FOR WHEN IT NAMES A ROLE AND NOT A LIST (`@braindog/declare` `when.ts`): whichever list plays the
      role will do, so it is said in plain words and never as one list's name. */
   waitsOn: { rates: 'exchange rates', meets: 'a list of people', org: 'a list of organisations' } as Readonly<Record<string, string>>,
@@ -130,7 +130,7 @@ export const words = {
   requiresNothing: 'Nothing else',
   licence: 'Licence',
   pages: 'Its pages',
-  noPreview: 'No drawing of its pages yet. What it adds names each one.',
+  noPreview: 'No drawing of its pages yet.',
   previewRefused: 'This drawing could not be read.',
   yanked: (reason: string): string => `Taken back: ${reason}`,
   install: (title: string): string => `Install ${title}`,

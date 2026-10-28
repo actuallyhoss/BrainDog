@@ -54,7 +54,7 @@
   {#if why}<p class="sc-why"><Icon name="info" size="s" /><span>{why}</span></p>{/if}
   <div class="sc-foot">
     {#if ours}
-      <span class="sc-by" data-ours=""><Icon name="check" size="s" />{words.store.byBrainDog}</span>
+      <span class="sc-by">{words.store.byBrainDog}</span>
     {:else if by}
       <span class="sc-by">{by}</span>
     {/if}
@@ -149,10 +149,6 @@
     min-inline-size: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-  }
-
-  .sc-by[data-ours] {
-    color: var(--good);
   }
 
   /* THE CUE: a quiet button whose hit box is the whole card. */

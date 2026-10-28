@@ -12,7 +12,7 @@
 
 export const words = {
   /* THE PAGE'S SENTENCE (agents F27): what the file is, in the words a person uses for it, and what stays out. */
-  what: 'A file of your starter: your add-ons, pages, nav order and the names you gave things. Nothing you wrote goes in unless you pick it below.',
+  what: 'Your add-ons, pages and names in one file. Your entries stay out unless you pick them.',
   /* TWO STEPS, SINCE the screens scope of 24 October: name the file, then pick what goes in and send it. */
   about: '1. Name the file',
   send: '2. Pick what goes in, then send it',
@@ -27,10 +27,10 @@ export const words = {
   sinceBuiltIn: (title: string): string => `${title} as BrainDog ships it`,
   sinceInstalled: (version: string): string => `${version}, as installed`,
   changesFirst: 'What goes out',
-  firstAll: 'It is the first version, so everything in it is new.',
-  noChanges: 'Nothing changed, so this would be the same file under a new version.',
+  firstAll: 'First version, so all of it is new.',
+  noChanges: 'Nothing changed since then.',
   drafting: 'Writing the file…',
-  unwritten: 'The file could not be written just now. Change any field to try again.',
+  unwritten: 'Could not write the file. Change any field to try again.',
   installer: 'As somebody installing it sees it',
 } as const;
 
