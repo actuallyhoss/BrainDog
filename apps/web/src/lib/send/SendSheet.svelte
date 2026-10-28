@@ -18,6 +18,7 @@
   import { overlays } from '../a11y/keys.svelte.ts';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
+  import Segmented from '../ui/Segmented.svelte';
   import { toasts } from '../ui/toast.svelte.ts';
   import AttachPicker from './AttachPicker.svelte';
   import { deliver } from './convos.svelte.ts';
@@ -178,10 +179,10 @@
       <label class="ss-opt" data-on={choice === 'slash' ? '' : undefined}>
         <input type="radio" name="{uid}-to" value="slash" bind:group={choice} />
         <span class="ss-words"><span class="ss-name">{sendWords.slash}</span></span>
-        <span class="segmented ss-mode" role="group" aria-label={sendWords.slash}>
+        <Segmented class="ss-mode" role="group" aria-label={sendWords.slash}>
           <button type="button" class="segment" data-on={mode === 'quick' ? '' : undefined} aria-pressed={mode === 'quick'} onclick={() => ((mode = 'quick'), (choice = 'slash'))}>{sendWords.quick}</button>
           <button type="button" class="segment" data-on={mode === 'deep' ? '' : undefined} aria-pressed={mode === 'deep'} onclick={() => ((mode = 'deep'), (choice = 'slash'))}>{sendWords.deep}</button>
-        </span>
+        </Segmented>
       </label>
       {#each macs as t (t.id)}
         <label class="ss-opt" data-on={choice === t.id ? '' : undefined}>
@@ -426,7 +427,7 @@
     line-height: 1.4;
   }
 
-  .ss-mode {
+  .ss-opt :global(.ss-mode) {
     flex: none;
     align-self: center;
   }
