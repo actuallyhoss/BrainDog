@@ -24,6 +24,8 @@
   import { apiBase } from '$lib/at.ts';
   import { rowWriter } from '$lib/record/rows-write.ts';
   import Button from '$lib/ui/Button.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import { shownName } from '$lib/shell/side.ts';
   import { agentsOn, slotStyle, takenBackFree, type ProjectCard as Card } from './project-cards.ts';
   import { projectKept } from '$lib/funnel.ts';
@@ -55,6 +57,9 @@
      as it does for any row. The desk reads again when the record moves, so a local note hides the card at once. */
   let gone = $state<ReadonlySet<number>>(new Set());
   let failed = $state<string | null>(null);
+  /* A CARD'S VERBS AT THE POINTER (`ItemMenu`). */
+  let menuCard = $state<Card | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
   const writer = $derived(rowWriter(apiBase()));
   const hide = (seq: number) => (gone = new Set([...gone, seq]));
   async function keep(c: Card) {
@@ -156,7 +161,7 @@
     </header>
     <ul class="cards">
       {#each inLane as c (c.key)}
-        <li>
+        <li {@attach ownMenu((p) => ((menuCard = c), (point = p)))}>
           {#if c.draft}
             <div class="draft" style={slotStyle(c.hue)}>
               <a class="d-open" href={at(c.href)}>
@@ -185,6 +190,17 @@
     </ul>
   </div>
 {/if}
+
+<!-- A CARD'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). -->
+<ItemMenu label={menuCard ? shownName(menuCard.name) : words.all} bind:at={point} href={menuCard?.href}>
+  {#if menuCard}
+    {@const c = menuCard}
+    {#if c.draft}
+      <button role="menuitem" type="button" onclick={() => keep(c)}><Icon name="check" size="s" /><span class="mi-name">{words.keep}</span></button>
+      {#if takenBackFree(c, Date.now())}<button role="menuitem" type="button" onclick={() => notOne(c)}><Icon name="close" size="s" /><span class="mi-name">{words.notOne}</span></button>{/if}
+    {/if}
+  {/if}
+</ItemMenu>
 
 <style>
   .projects {

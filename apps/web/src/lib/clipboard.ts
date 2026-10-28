@@ -58,3 +58,6 @@ export const putSpoken = (register: string, seq: number): Promise<void> => put(`
  */
 export const putLink = (register: string, seq: number): Promise<void> =>
   put(`${location.origin}${at(`/r/${register}/${seq}`)}`);
+
+/** A place in the app by its address, absolute and under this record's slug, as `putLink` copies a row's. */
+export const putHref = (href: string): Promise<void> => put(`${location.origin}${at(href)}`);

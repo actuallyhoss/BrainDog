@@ -19,6 +19,8 @@
   import { homeCurrency } from '../record/api.ts';
   import { symbolText } from '../record/money.ts';
   import Icon from '../ui/Icon.svelte';
+  import ItemMenu from '../ui/ItemMenu.svelte';
+  import { ownMenu } from '../ui/context-menu.ts';
   import type { HomeLine, HomeRows } from './home-rows.ts';
   import { words } from './words.ts';
 
@@ -46,6 +48,10 @@
 
   /* AN AMOUNT AS A SENTENCE SAYS IT, "−£9,190", the home currency by its sign and any other by its code (`symbolText`). */
   const said = (text: string): string => symbolText(text, homeCurrency());
+
+  /* A LINE'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). */
+  let menuLine = $state<HomeLine | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
 
   /* THE LINES LAST DRAWN, so a ticked one the next read left out goes back at its place. Not state: only read here. */
   let last: HomeLine[] = [];
@@ -81,10 +87,17 @@
   {#if line.amount}<span class="hl-amount num" data-dir={line.amount.dir}>{said(line.amount.text)}</span>{/if}
 {/snippet}
 
+<ItemMenu label={menuLine?.title ?? ''} bind:at={point} href={menuLine?.href}>
+  {#if menuLine && menuLine.tick !== undefined && ontick && !isDone(menuLine)}
+    {@const line = menuLine}
+    <button role="menuitem" type="button" onclick={() => tick(line)}><Icon name="check" size="s" /><span class="mi-name">{words.markDone(line.title)}</span></button>
+  {/if}
+</ItemMenu>
+
 {#if rows.kind === 'late'}
   <ul class="home-late">
     {#each late as line (line.key)}
-      <li class="hl" data-row={line.key} data-late={line.late ? '' : undefined} data-done={isDone(line) ? '' : undefined}>
+      <li class="hl" data-row={line.key} data-late={line.late ? '' : undefined} data-done={isDone(line) ? '' : undefined} {@attach ownMenu((p) => ((menuLine = line), (point = p)))}>
         {#if line.tick !== undefined && ontick}
           <button
             type="button"

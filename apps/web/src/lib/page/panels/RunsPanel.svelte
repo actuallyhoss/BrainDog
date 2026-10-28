@@ -25,6 +25,8 @@
   import { control, type LiveRun, type Project } from '$lib/record/instruct.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import AgentMark from '$lib/ui/AgentMark.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import { agentKindOf } from '$lib/ui/face.ts';
   import { kindIcon, type RunLine } from '../../../routes/automations/hub.ts';
   import { listen } from '../listen.svelte.ts';
@@ -78,7 +80,13 @@
 
   /** How a line ended, from its sentence where it carries no word of its own: "Refused" of "Refused 2h ago." */
   const firstWord = (said: string): string => said.split(/\s/u)[0]?.replace(/[.,]$/u, '') ?? said;
+
+  /* A RUN'S VERBS AT THE POINTER: a right-click or a held thumb on its line, or `⇧F10` (`ownMenu`). */
+  let menuLine = $state<RunLine | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
 </script>
+
+<ItemMenu label={menuLine?.name ?? ''} bind:at={point} href={menuLine?.path} />
 
 {#if drew !== true}
   <!-- NOT READ YET, OR NOTHING HAS RUN: the tile is left out whole (`BlockSlot.svelte`'s rule for a panel that drew
@@ -90,7 +98,7 @@
     <ul class="runs-list">
       {#each shown as { line, n } (line.key)}
         {@const project = line.project ? (projects.get(line.project)?.name ?? null) : null}
-        <li class="runs-line" data-bad={line.bad ? '' : undefined}>
+        <li class="runs-line" data-bad={line.bad ? '' : undefined} {@attach line.path && ownMenu((p) => ((menuLine = line), (point = p)))}>
           <span class="runs-mark">{#if line.agent}<AgentMark kind={agentKindOf(line.agent)} size="s" />{:else}<Icon name={kindIcon(line.kind)} size="s" />{/if}</span>
           {#if line.path}<a class="runs-name" href={at(line.path)} title={line.name}>{line.name}</a>{:else}<span class="runs-name" title={line.name}>{line.name}</span>{/if}
           <span class="runs-end">

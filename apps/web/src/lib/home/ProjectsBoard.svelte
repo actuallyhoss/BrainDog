@@ -20,6 +20,8 @@
   import { live } from '$lib/data/live.svelte.ts';
   import AgentFace from '$lib/ui/AgentFace.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -50,6 +52,10 @@
   const H = 24;
   const trail = (r: BoardRow) => (r.number.kind === 'kpi' ? trailOf(r.number.points, W, H) : null);
   const share = (minor: number, total: number) => `${Math.max(2, Math.round((minor / Math.max(1, total)) * 100))}%`;
+
+  /* A PROJECT'S VERBS AT THE POINTER: a right-click or a held thumb on its row, or `⇧F10` (`ownMenu`). */
+  let menuRow = $state<BoardRow | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
 </script>
 
 {#if board}
@@ -107,7 +113,7 @@
           <ul class="rows">
             {#each g.rows as r (r.key)}
               {@const s = trail(r)}
-              <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined}>
+              <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined} {@attach ownMenu((p) => ((menuRow = r), (point = p)))}>
                 <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title" dir="auto">{r.name}</span></a>
                 <p class="r-next" dir="auto" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
                 <div class="r-chip">{#if r.chip}<span class="chip" data-tone={r.chip.tone}>{#if r.chip.tone === 'late'}<span class="dot"></span>{/if}{r.chip.text}</span>{/if}</div>
@@ -151,6 +157,8 @@
 {:else if !failed}
   <Waiting rows={4} />
 {/if}
+
+<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} />
 
 {#snippet week(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'])}
   <section class="wk" role="listitem" aria-label={title} data-tone={t.count > 0 ? tone : undefined}>

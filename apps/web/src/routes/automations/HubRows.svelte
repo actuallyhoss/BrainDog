@@ -27,6 +27,8 @@
   import { ownPress } from '$lib/record/actions.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import { families, familyOn, familySaid, familyWords } from './hub-family.ts';
   import type { HubRow } from './hub.ts';
 
@@ -62,7 +64,23 @@
   };
   /* THIS BROWSER'S CLOCK, read once when the list is drawn, as the rows' own sentences were. */
   const now = Date.now();
+
+  /* A RULE'S VERBS AT THE POINTER: a right-click or a held thumb on its row, or `⇧F10` (`ownMenu`). */
+  let menuRow = $state<HubRow | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
+  const heard = (r: HubRow) => ownMenu((p) => ((menuRow = r), (point = p)));
 </script>
+
+<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.path}>
+  {#if menuRow?.toggle && ontoggle}
+    {@const r = menuRow}
+    {@const t = menuRow.toggle}
+    <button role="menuitemcheckbox" type="button" aria-checked={t.on} disabled={busy !== null} onclick={() => ontoggle(r.key, !t.on)}><Icon name="check" size="s" /><span class="mi-name">{t.label}</span></button>
+  {/if}
+  {#if menuRow?.fix}
+    <a role="menuitem" href={at(menuRow.fix.path)}><Icon name="arrow" size="s" /><span class="mi-name">{menuRow.fix.label}</span></a>
+  {/if}
+</ItemMenu>
 
 {#snippet body(r: HubRow, linked: boolean)}
   <IconWell name={r.icon ?? 'refresh'} size="l" />
@@ -125,7 +143,7 @@
       <li class="alone-cap">{familyWords.alone(alone)}</li>
     {/if}
     {#if f.kind === 'one'}
-      <li>{@render item(f.row)}</li>
+      <li {@attach heard(f.row)}>{@render item(f.row)}</li>
     {:else}
       {@const fam = f.family}
       {@const shown = opened.has(fam.key)}
@@ -149,7 +167,7 @@
         {#if shown}
           <ul class="ledger ledger-lead members">
             {#each fam.members as m (m.key)}
-              <li>{@render item(m)}</li>
+              <li {@attach heard(m)}>{@render item(m)}</li>
             {/each}
           </ul>
         {/if}

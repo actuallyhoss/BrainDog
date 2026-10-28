@@ -20,6 +20,8 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { writeAmount } from 'braindog-render';
   import type { HomeLine } from './home-rows.ts';
@@ -101,6 +103,10 @@
     aside = new Set([...aside, line.key]);
     toasts.push(lateWords.notYetSaid(line.title));
   }
+
+  /* A LINE'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). */
+  let menuLine = $state<HomeLine | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
 </script>
 
 <Tile icon="clock" title={heading} count={kept.length + more} data-late-tile>
@@ -109,7 +115,13 @@
       {@const verb = verbOf(line, writes)}
       {@const bill = isBill(line)}
       {@const amount = amountSaid(line)}
-      <li class="ln" data-row={line.key} data-bill={bill ? '' : undefined} data-done={done.has(line.key) ? '' : undefined}>
+      <li
+        class="ln"
+        data-row={line.key}
+        data-bill={bill ? '' : undefined}
+        data-done={done.has(line.key) ? '' : undefined}
+        {@attach ownMenu((p) => ((menuLine = line), (point = p)))}
+      >
         {#if !bill && verb}
           <!-- A TASK IS A QUIET TICK at the line's start: the row's own verb is its name for a screen reader. A box, as
                Today's other ticks are, so `x` presses it from the keyboard (`PageBody.svelte`). -->
@@ -141,6 +153,15 @@
   {/if}
   {#if more > 0 && (open || hidden === 0)}<p class="late-past">{words.past(more)}</p>{/if}
 </Tile>
+
+<ItemMenu label={menuLine?.title ?? heading} bind:at={point} href={menuLine?.href}>
+  {#if menuLine}
+    {@const line = menuLine}
+    {@const verb = verbOf(line, writes)}
+    {#if verb && !done.has(line.key)}<button role="menuitem" type="button" onclick={() => void finish(line)}><Icon name="check" size="s" /><span class="mi-name">{verb}</span></button>{/if}
+    {#if verb && isBill(line) && !done.has(line.key)}<button role="menuitem" type="button" onclick={() => notYet(line)}><Icon name="clock" size="s" /><span class="mi-name">{lateWords.notYet}</span></button>{/if}
+  {/if}
+</ItemMenu>
 
 <style>
   .late {

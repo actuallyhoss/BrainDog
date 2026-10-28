@@ -60,6 +60,8 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -263,7 +265,13 @@
     toasts.push(words.startedToast(kind.title), { intent: 'good' });
     await goto(at(`/jobs/${encodeURIComponent(got.value.id)}`));
   }
+
+  /* A RUN'S VERBS AT THE POINTER: a right-click or a held thumb on its row, or `⇧F10` (`ownMenu`). */
+  let menuRun = $state<{ name: string; href: string } | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
 </script>
+
+<ItemMenu label={menuRun?.name ?? ''} bind:at={point} href={menuRun?.href} />
 
 <svelte:head><title>{titleOf(repo ? words.headingFor(repo) : words.heading)}</title></svelte:head>
 
@@ -325,7 +333,7 @@
                   {@const state = statusOf(r.status, r.lost, r.cancel)}
                   {@const outcome = outcomeOf(r)}
                   {@const took = tookOf(r, now)}
-                  <li data-live={isLive(r.status) ? '' : undefined}>
+                  <li data-live={isLive(r.status) ? '' : undefined} {@attach ownMenu((p) => ((menuRun = { name: runName(r), href: `/jobs/${encodeURIComponent(r.id)}` }), (point = p)))}>
                     <!-- THE WHOLE ROW IS THE LINK, and its name is the run's: the kind, then the outcome and the facts. -->
                     <a class="line line-tall run" href={at(`/jobs/${encodeURIComponent(r.id)}`)}>
                       <IconWell name={iconOf(r)} size="l" tone={outcome === 'running' ? 'live' : undefined} />

@@ -83,6 +83,8 @@
   import { step } from '$lib/funnel.ts';
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import { amountAnswer, moneyRowOf, outcomeOf } from './money-row.ts';
   import { presses } from '$lib/data/held.svelte.ts';
   import { history } from '$lib/data/undo.ts';
@@ -227,6 +229,10 @@
   const selected = $derived(picked ?? startsOn(card));
   /* NOT NOW opens the question's own page at the step that puts it off; only where this card is the way in to it. */
   const notNow = $derived(drawn && whole && !link && !compact && onpress === undefined && card.merge === null);
+
+  /* THE CARD'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). */
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
+  const heard = ownMenu((p) => (point = p));
   const chosenForAll = $derived(pick?.has(question.id) ?? false);
   const bulkFix = $derived(pick?.fixes.get(question.id) ?? '');
   const optId = (key: string): string => idOf?.(key) ?? `${uid}-opt-${key}`;
@@ -673,6 +679,11 @@
 
 <!-- ASK ME LATER (today F11): a quiet clock and its words at the row's end, opening the question's own page at the step
      that puts it off. The clock alone floated under the answers on every card and said nothing until it was pressed. -->
+<ItemMenu label={card.question} bind:at={point} href={card.href}>
+  {#if notNow && !kept}<a role="menuitem" href={at(`${card.href}?defer`)}><Icon name="clock" size="s" /><span class="mi-name">{queueWords.notNow}</span></a>{/if}
+  {#if pick && drawn && !kept}<button role="menuitemcheckbox" type="button" aria-checked={chosenForAll} onclick={() => pick?.toggle(question)}><Icon name="check" size="s" /><span class="mi-name">{copy.select}</span></button>{/if}
+</ItemMenu>
+
 {#snippet later(inlined = false)}
   {#if inlined && answerRow.later}
     <!-- THE ASKER'S OWN LATER IS THE CARD'S ONE QUIET LATER: an answer like any other, drawn bare. -->
@@ -717,7 +728,7 @@
   <!-- A MONEY ROW (today F4): the well, what it is and the amount, how late in red, the answers, and who asked at the
        foot. The question in full is on its own page, which the title opens. THE WELL IS NEUTRAL here as on Today
        (polish 8, VERIFY P7): the late word carries the red, once. -->
-  <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl}>
+  <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl} {@attach heard}>
     <span class="dr-well"><IconWell name={row.owed ? 'arrowDown' : 'money'} size="l" /></span>
     <h3 class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}><span data-own>{row.title}</span></a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</h3>
     <span class="dr-amount num">{row.amount}</span>
@@ -744,6 +755,7 @@
     data-compact={compact ? '' : undefined}
     data-side={side ? '' : undefined}
     bind:this={cardEl}
+    {@attach heard}
   >
     {#if pick && drawn}
       <!-- THE BOX THE RENDERER'S QUEUE DRAWS FOR A BULK ANSWER, named for the question alone. `x` presses it from the

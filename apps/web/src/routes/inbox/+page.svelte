@@ -56,6 +56,8 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { ownMenu } from '$lib/ui/context-menu.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
@@ -210,6 +212,9 @@
   const answered = $derived(live !== null);
 
   let open = $state<string | null>(null);
+  /* AN ARRIVAL'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). */
+  let menuItem = $state<InboxItem | null>(null);
+  let point = $state<{ x: number; y: number; height: number } | null>(null);
 
   /**
    * WHAT EACH WAITING ARRIVAL IS, the record's line under its title ("Payment, EGP 420, Quietcart", "From Mara Okafor").
@@ -664,6 +669,16 @@
 <svelte:head><title>{titleOf(said('inbox'))}</title></svelte:head>
 <svelte:window {onkeydown} bind:innerWidth={viewWidth} />
 
+<ItemMenu label={menuItem?.subject ?? words.waiting} bind:at={point}>
+  {#if menuItem}
+    {@const item = menuItem}
+    <button role="menuitem" type="button" disabled={busy} onclick={() => settle(item, 'file')}><Icon name="check" size="s" /><span class="mi-name">{words.file}</span></button>
+    <button role="menuitemcheckbox" type="button" aria-checked={picked.has(item.id)} onclick={() => toggle(item.id)}><Icon name="check" size="s" /><span class="mi-name">{copy.select}</span></button>
+    <hr />
+    <button role="menuitem" type="button" disabled={busy} onclick={() => settle(item, 'archive')}><Icon name="archive" size="s" /><span class="mi-name">{words.archive}</span></button>
+  {/if}
+</ItemMenu>
+
 {#snippet fileInto(where: 'bar' | 'row')}
   <!-- THE LIST A FILING GOES INTO, a pill in the toolbar, where it stays in view while the list scrolls. A phone's head
        scrolls away with the page, so there the open row and the selection's bar carry it too. -->
@@ -1064,7 +1079,7 @@
             <ul class="ledger arrivals" data-picking={picking ? '' : undefined}>
               {#each d.items as item (item.id)}
                 {@const i = place.get(item.id) ?? -1}
-                <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined}>
+                <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined} {@attach ownMenu((p) => ((cursor = i), (menuItem = item), (point = p)))}>
                   <!-- THE LEADING MARK IS THE CHECK THAT SELECTS IT: a 20px ring, ink with its tick once picked. -->
                   <button
                     type="button"
