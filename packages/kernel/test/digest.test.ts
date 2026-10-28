@@ -278,7 +278,8 @@ test('A PUSH CARRIES NO CONTENT, only which phone it rings', async () => {
 
   const row = outbox(sql)[0]!;
   assert.equal(row.kind, 'notify.push');
-  assert.deepEqual(JSON.parse(row.payload), { sub: { id: 'ps_1' } });
+  /* WHERE A TAP OPENS rides with it: the summary's own screen, a path in the app, which says no content either. */
+  assert.deepEqual(JSON.parse(row.payload), { sub: { id: 'ps_1' }, open: '/agents/summary/money-weekly' });
   assert.ok(!row.payload.includes('Invoice 41'), 'the push carried the content');
   assert.ok(!row.payload.includes('fcm.googleapis.com'), 'the push carried the address');
   sql.close();
