@@ -198,21 +198,28 @@ test('no line a check says holds a long dash', () => {
   for (const snap of screens) for (const r of checkDrawn(snap, MARIAM)) assert.doesNotMatch(r.saw, /\u2014/u);
 });
 
-/* ── the web's own rail and tab bar, rendered ─────────────────────────────────────────────────────────── */
+/* ── the web's own sidebar and tab bar, rendered ──────────────────────────────────────────────────────── */
 
 const PLACE = (key, label, href) => ({ key, href, label, icon: 'today', near: [href] });
 const PLACES = [PLACE('today', 'Today', '/'), PLACE('decide', 'Decide', '/decide'), PLACE('people', 'People', '/p/people'), PLACE('money', 'Money', '/p/money')];
 const DATA = { me: { owner: true, person: 'p1', prefs: {} }, names: { p1: 'Mariam Said' }, pages: [], lists: [] };
 
-test('the rail as the web draws it says where each row goes, and its rows are read from that', async () => {
-  const html = await markupOf('lib/ui/Sidebar.svelte', { places: PLACES, pen: [], record: 'Candles', registers: [] }, { data: DATA, path: '/app/' });
+/** The sidebar as the shell draws it for `places` (`side.ts` `sideModel`), with no list and no project read yet. */
+const sideAs = async (places) => {
+  const { sideModel } = await import('../../../apps/web/src/lib/shell/side.ts');
+  const model = sideModel({ places, others: [], projects: null, lists: [], homes: new Map(), views: {}, tools: [], foot: [] });
+  return markupOf('lib/shell/SideBar.svelte', { base: '', lists: [], model, lit: '/', mode: 'full', shown: true }, { data: DATA, path: '/app/' });
+};
+
+test('the sidebar as the web draws it says where each row goes, and its rows are read from that', async () => {
+  const html = await sideAs(PLACES);
   const snap = { path: '/app/', width: 1440, ...readMarkup(html), counts: {}, owner: true };
   const money = snap.roles.find((r) => r.landmark === 'navigation' && r.role === 'link' && r.name === 'Money');
   assert.equal(money?.href, '/app/p/money');
   assert.equal(firstScreen['rail-has-rows']({ ...snap, behind: { '/app/p/money': EMPTY } }).pass, false);
   assert.equal(firstScreen['rail-has-rows']({ ...snap, behind: { '/app/p/money': { ...EMPTY, Ledger: 3 } } }).pass, true);
-  /* With Money gone the rail is the three and its own doors, and nothing in it is taken for a place. */
-  const three = await markupOf('lib/ui/Sidebar.svelte', { places: PLACES.slice(0, 3), pen: [], record: 'Candles', registers: [] }, { data: DATA, path: '/app/' });
+  /* With Money gone the sidebar is the three and its own doors, and nothing in it is taken for a place. */
+  const three = await sideAs(PLACES.slice(0, 3));
   const calm = firstScreen['rail-has-rows']({ path: '/app/', width: 1440, ...readMarkup(three), counts: {}, behind: {}, owner: true });
   assert.equal(calm.pass, true, calm.saw);
   assert.match(calm.saw, /no place besides Today, Decide and People/u);

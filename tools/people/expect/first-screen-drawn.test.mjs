@@ -1,6 +1,6 @@
 /**
  * The first screens as drawn: the markup reader, the two checks that read the shell, one walk as
- * Mariam whose rail and Today are rendered from the web's own parts and judged, and four people's walks held to a rail
+ * Mariam whose sidebar and Today are rendered from the web's own parts and judged, and four people's walks held to a rail
  * with no empty place in it. Run it alone:
  * `node --test tools/people/expect/first-screen-drawn.test.mjs`.
  */
@@ -11,9 +11,7 @@ import { readFileSync } from 'node:fs';
 
 import { DRAWN_UNITS, SIGNS, checkDrawn, drawnScreen, drawnScreens, firstScreen, report } from './first-screen.mjs';
 import { readMarkup } from './markup.mjs';
-import { markupOf } from './draw.mjs';
 import { saidLists } from './screens.mjs';
-import { pageWords } from '../../../apps/web/src/lib/record/page-new.ts';
 import { signsLine } from '../../../apps/web/src/lib/home/default-home.ts';
 
 const MARIAM = JSON.parse(readFileSync(new URL('../mariam.json', import.meta.url), 'utf8'));
@@ -89,54 +87,9 @@ test('no line a check says holds a long dash', () => {
   for (const snap of [SHELL(), SHELL({ owner: false }), SHELL({ roles: [] })]) for (const r of checkDrawn(snap, MARIAM)) assert.doesNotMatch(r.saw, /\u2014/u);
 });
 
-/* ── the web's own rail, rendered ─────────────────────────────────────────────────────────────────────── */
-
-const PLACE = (key, label, href) => ({ key, href, label, icon: 'today', near: [href] });
-const PLACES = [PLACE('today', 'Today', '/'), PLACE('decide', 'Decide', '/decide')];
-const railAs = async (owner, places = PLACES, more = {}) => {
-  const data = { me: { owner, person: 'p1', prefs: {} }, names: { p1: 'Mariam Said' }, pages: [], lists: [] };
-  const html = await markupOf('lib/ui/Sidebar.svelte', { places, pen: [], record: 'Candles', registers: [{ id: 'orders', name: 'Orders', count: 2, icon: 'task' }], ...more }, { data, path: '/app/' });
-  return { html, snap: { path: '/app/', width: 1440, ...readMarkup(html), owner } };
-};
-const named = (snap, role, name) => snap.roles.filter((r) => r.landmark === 'navigation' && r.role === role && r.name === name).length;
-
-test('the rail of a record with no made page draws Pages once, with one New page under it', async () => {
-  const { html, snap } = await railAs(true);
-  assert.equal(html.split('data-pages-heading').length - 1, 1);
-  assert.equal(named(snap, 'heading', pageWords.section), 1);
-  assert.equal(named(snap, 'button', pageWords.newPage), 1);
-  assert.equal(named(snap, 'button', pageWords.suggestPage), 0);
-  assert.equal(drawnScreen['pages-line'](snap).pass, true);
-  /* The lists are folded at rest, so their rows are not met, and nothing is said of them. */
-  assert.equal(named(snap, 'link', 'Orders 2'), 0);
-});
-
-test('somebody who does not own the record is offered Suggest a page, once', async () => {
-  const { snap } = await railAs(false);
-  assert.equal(named(snap, 'button', pageWords.suggestPage), 1);
-  assert.equal(named(snap, 'button', pageWords.newPage), 0);
-  assert.equal(drawnScreen['pages-line'](snap).pass, true);
-  assert.equal(drawnScreen['pages-line']({ ...snap, owner: true }).pass, false);
-});
-
-test('once a page is made the Pages place holds the line and the heading goes', async () => {
-  const pages = PLACE(`section:${pageWords.section}`, pageWords.section, '/p/candle-costs');
-  const { html, snap } = await railAs(true, [...PLACES, pages]);
-  assert.equal(html.includes('data-pages-heading'), false);
-  assert.equal(named(snap, 'heading', pageWords.section), 0);
-  assert.equal(named(snap, 'button', pageWords.newPage), 1);
-  assert.match(drawnScreen['pages-line'](snap).saw, /once, under the Pages place/u);
-});
-
-test('the narrow rail has no room for the line, and is not blamed for it', async () => {
-  const { snap } = await railAs(true, PLACES, { icons: true });
-  assert.equal(named(snap, 'button', pageWords.newPage), 0);
-  assert.equal(drawnScreen['pages-line'](snap).pass, null);
-});
-
 /* ── one walk, drawn ──────────────────────────────────────────────────────────────────────────────────── */
 
-test('Mariam: the rail and Today are drawn at both moments, every check that reads them is green', { timeout: 120_000 }, async () => {
+test('Mariam: the sidebar and Today are drawn at both moments, every check that reads them is green', { timeout: 120_000 }, async () => {
   const { screens, why } = await drawnScreens(MARIAM);
   assert.equal(why, null);
   const drawn = screens.filter((s) => s.words !== true && s.width === 1440);
@@ -145,11 +98,8 @@ test('Mariam: the rail and Today are drawn at both moments, every check that rea
   assert.equal(todays.length, 2);
   for (const s of drawn) {
     assert.equal(s.owner, true);
-    assert.equal(named(s, 'button', pageWords.newPage), 1, s.moment);
-    assert.equal(named(s, 'heading', pageWords.section), 1, s.moment);
     /* THE RAIL'S ROWS ARE THE PRODUCT'S TO GET RIGHT and are held to being read, in the test beside this one. */
     for (const r of checkDrawn(s, MARIAM)) if (r.id !== 'rail-has-rows') assert.notEqual(r.pass, false, `${s.path} ${s.moment}: ${r.id}: ${r.saw}`);
-    assert.equal(drawnScreen['pages-line'](s).pass, true);
   }
   for (const s of todays) {
     assert.ok(s.roles.some((r) => r.landmark === 'main' && r.role === 'heading' && r.name === 'Today'), 'Today has its name in main');
