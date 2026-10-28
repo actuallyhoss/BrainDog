@@ -196,8 +196,8 @@ test('THE TIMELINE IS ONE LIST, NOT A STRETCHED DRAWING: no name is placed over 
 
 test('the rows are also a lane list a screen reader reads, each with its span of days, and the tone keeps its glyph', () => {
   const html = toHTML(parse(FENCE), { now: NOW });
-  assert.match(html, /<span class="roadmap-item-title"[^>]*>Build the kiln page<\/span> <span class="roadmap-item-when num">1 – 10 Sep 2026<\/span>/u);
-  assert.match(html, /<span class="roadmap-item-title"[^>]*>Launch<\/span> <span class="roadmap-item-when num">30 Sep 2026<\/span>/u);
+  assert.match(html, /<span class="roadmap-item-title"[^>]*>Build the kiln page<\/span> <span class="roadmap-item-when num">1 – 10 Sep<\/span>/u);
+  assert.match(html, /<span class="roadmap-item-title"[^>]*>Launch<\/span> <span class="roadmap-item-when num">30 Sep<\/span>/u);
   assert.doesNotMatch(html, /roadmap-table/u, 'no three-column table to break a name inside its words on a phone');
   assert.match(html, /Regate window<span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>/u);
 });

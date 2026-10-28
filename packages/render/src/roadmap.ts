@@ -606,7 +606,7 @@ export type RoadmapLine = { row: number; title: string; tone?: Tone; from: strin
  * THE ORDER IS THE AUTHOR'S. The plan hands back bars and then stems, so a table built in that order put every
  * window ahead of every date, and a date written first was read last.
  */
-export function roadmapLines(plan: RoadmapPlan): RoadmapLine[] {
+export function roadmapLines(plan: RoadmapPlan, now?: number): RoadmapLine[] {
   const tone = (t?: Tone): { tone?: Tone } => (t ? { tone: t } : {});
   return [
     ...plan.bars.map((b) => ({
@@ -615,11 +615,11 @@ export function roadmapLines(plan: RoadmapPlan): RoadmapLine[] {
       ...tone(b.tone),
       from: day(b.start),
       due: day(b.end),
-      when: roadmapWhen(b.start, b.end),
+      when: roadmapWhen(b.start, b.end, now),
       at: roadmapShare(b.x),
       span: roadmapShare(b.width),
     })),
-    ...plan.stems.map((s) => ({ row: s.row, title: s.title, ...tone(s.tone), from: MISSING, due: day(s.day), when: day(s.day), at: roadmapShare(s.x), span: '0' })),
+    ...plan.stems.map((s) => ({ row: s.row, title: s.title, ...tone(s.tone), from: MISSING, due: day(s.day), when: roadmapWhen(s.day, s.day, now), at: roadmapShare(s.x), span: '0' })),
   ].sort((a, z) => a.row - z.row);
 }
 
@@ -630,10 +630,13 @@ export function roadmapLines(plan: RoadmapPlan): RoadmapLine[] {
  * A PHONE READ THE TWO DAYS AS TWO COLUMNS, and at 390 the name beside them broke inside its words
  * (`kilnfonts.exa mple`). One short span under the name leaves the name the whole line.
  */
-export function roadmapWhen(start: string, end: string): string {
-  if (start === end) return day(end);
+export function roadmapWhen(start: string, end: string, now?: number): string {
+  /* THE READER'S OWN YEAR IS LEFT OFF, as `dateSaid` says a day: `4 – 6 Sep` this year, `4 – 6 Sep 2027` the next. */
+  const year = now === undefined ? null : String(new Date(now).getFullYear());
+  const mine = (said: string): string => (year !== null && start.slice(0, 4) === year && end.slice(0, 4) === year ? said.replace(new RegExp(` ${year}$`, 'u'), '') : said);
+  if (start === end) return mine(day(end));
   const [a, z] = [day(start), day(end)];
-  if (start.slice(0, 7) === end.slice(0, 7)) return `${a.split(' ')[0]} – ${z}`;
-  if (start.slice(0, 4) === end.slice(0, 4)) return `${a.split(' ').slice(0, 2).join(' ')} – ${z}`;
+  if (start.slice(0, 7) === end.slice(0, 7)) return mine(`${a.split(' ')[0]} – ${z}`);
+  if (start.slice(0, 4) === end.slice(0, 4)) return mine(`${a.split(' ').slice(0, 2).join(' ')} – ${z}`);
   return `${a} – ${z}`;
 }

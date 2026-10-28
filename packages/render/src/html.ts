@@ -1870,7 +1870,7 @@ function roadmap(b: Block, o: RenderOptions): string {
   const axis = `<ol class="roadmap-axis"${plan.weekly ? ' data-weekly=""' : ''} aria-hidden="true">${roadmapAxis(plan)
     .map((t) => `<li class="roadmap-tick" style="--at:${roadmapShare(t.x)}">${escape(t.label)}</li>`)
     .join('')}${plan.today === null ? '' : `<li class="roadmap-today" style="--at:${roadmapShare(plan.today)}">${ROADMAP_TODAY}</li>`}</ol>`;
-  const lines = roadmapLines(plan);
+  const lines = roadmapLines(plan, o.now ?? Date.now());
   const list = `<ol class="roadmap-list" aria-label="${escape(roadmapSentence(plan))}">${lines
     .map(
       (p) =>
