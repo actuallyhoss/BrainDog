@@ -125,6 +125,35 @@ test('every list lives under its place, a list named as a place is that place, a
   assert.deepEqual(m.more.map((l) => `${l.label} ${String(l.count)}`), ['Services 35', 'Notes 4']);
 });
 
+test('A PAGE A PLACE DECLARES AND THE LIST OF THE SAME NAME ARE ONE ROW: the page, whose list is a tap away on it', () => {
+  const lists = [
+    list('accounts', { name: 'Accounts', count: 13, facts: facts({ money: true }) }),
+    list('transactions', { name: 'Ledger', count: 336, facts: facts({ money: true }) }),
+    list('filing_rules', { name: 'Filing rules', count: 15, facts: facts({ money: true }) }),
+    list('categories', { name: 'Categories', count: 15, facts: facts({ money: true }) }),
+  ];
+  const places = [TODAY, MONEY];
+  const m = sideModel({
+    places,
+    others: [],
+    projects: null,
+    lists,
+    homes: homesOf(lists, places, AT),
+    views: {
+      [MONEY.key]: [
+        { href: '/p/money-accounts', label: 'Accounts', icon: 'doc' },
+        { href: '/p/money-ledger', label: 'Ledger', icon: 'doc' },
+        { href: '/p/money-rules', label: 'Filing rules', icon: 'doc' },
+      ],
+    },
+    tools: [],
+    foot: [],
+    counted: {},
+  });
+  const kids = m.places.find((p) => p.label === 'Money')?.kids ?? [];
+  assert.deepEqual(kids.map((k) => `${k.label} ${k.href}`), ['Accounts /p/money-accounts', 'Ledger /p/money-ledger', 'Filing rules /p/money-rules', 'Categories /r/categories']);
+});
+
 test('EXACTLY ONE ROW IS LIT: the row the page is on most closely, a list over its place and a project over Projects', () => {
   const m = MODEL();
   assert.equal(litOf('/', m), '/');

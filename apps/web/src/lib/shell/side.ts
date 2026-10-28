@@ -297,13 +297,24 @@ export function sideModel(o: {
       .flatMap((l) => [{ href: `/r/${l.id}`, label: l.name, icon: l.icon, count: l.count }, ...l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' }))]);
   const own = (key: string): SideLink[] => o.tools.filter((t) => t.home === key).map(({ home: _, ...t }) => t);
   const viewsOf = (l: SideList | undefined): SideLink[] => (l ? l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })) : []);
+  /* ONE ROW FOR ONE WORD UNDER A PLACE: a page the place declares (Money's Accounts, Ledger, Filing rules) and the list
+     of the same name were two rows. The page is the row, and its list is a tap away on it. */
+  const once = (rows: readonly SideLink[]): SideLink[] => {
+    const seen = new Set<string>();
+    return rows.filter((r) => {
+      const at = word(r.label);
+      if (seen.has(at)) return false;
+      seen.add(at);
+      return true;
+    });
+  };
   const places = o.places.map((p): SidePlace => {
     const l = folded.get(p.key);
     return {
       ...p,
       ...(p.count === undefined && l ? { count: l.count } : {}),
       ...(l ? { list: l.id } : {}),
-      kids: [...(o.views[p.key] ?? []), ...viewsOf(l), ...rows(p.key), ...own(p.key)],
+      kids: once([...(o.views[p.key] ?? []), ...viewsOf(l), ...rows(p.key), ...own(p.key)]),
     };
   });
   const others = o.others.map((p): SideLink => {
