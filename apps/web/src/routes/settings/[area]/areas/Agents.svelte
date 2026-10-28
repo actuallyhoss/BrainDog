@@ -72,6 +72,7 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import SlashAsks from '$lib/ui/SlashAsks.svelte';
   import SlashModel from '$lib/ui/SlashModel.svelte';
+  import SlashBrain from '$lib/ui/SlashBrain.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
   import SlashReads from '$lib/ui/SlashReads.svelte';
   import TrustRows from '$lib/ui/TrustRows.svelte';
@@ -804,6 +805,8 @@
   <SlashReads row />
 </Tile>
 <SlashModel owner={anOwner} />
+<!-- SLASH'S TWO DEPTHS, and Claude on the owner's Mac while a runner there is live: a machine let in to run work. -->
+<SlashBrain owner={anOwner} mac={rows.some((c) => c.live && c.machine?.reach === 'runner')} />
 
 <style>
   /* THE CONNECTED TILE'S ROWS: the face or the 32px well, the name over what is known about it, what it can
