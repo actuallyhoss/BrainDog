@@ -2,8 +2,12 @@
  * The local copy: what this person may read of this record, kept in the browser, so a screen draws at once on open.
  *
  * HOW IT STAYS CORRECT.
- * - ONE OWNER AT A TIME: a record, a person, the scope boot gave them and this build. Any other owner, or the record's
- *   own format moving, wipes it before anything is drawn or kept.
+ * - ONE OWNER AT A TIME: a record, a person and the scope boot gave them. Any other owner, or the record's own format
+ *   moving, wipes it before anything is drawn or kept.
+ * - A NEW BUILD KEEPS IT, AS DRAWN BEFORE AND NEVER AS CURRENT. A deploy wiped the copy, so the first open of every
+ *   screen after one waited for the record as if nothing had ever been kept, on a day of several deploys. An answer
+ *   another build kept is drawn at once and always asked again (`current` false), until this build keeps it anew.
+ *   What is stored changing shape is `LOCAL_FORMAT`, which still wipes.
  * - A CURSOR IN THE RECORD'S CHANGE LOG, taken BEFORE the first answer is kept. On open and on every move the version
  *   poll hears, the copy asks `whatsNew({ cursor, everything })` for the lines since, and every answer read from a
  *   list a line touched is PATCHED IN PLACE or dropped (`patched`, below). A line it cannot place in the log at all (a
@@ -154,7 +158,7 @@ export type Owner = { base: string; person: string; scope: string; guest?: { unt
 
 export type Meta = {
   format: number;
-  /** The app build that wrote it. */
+  /** The app build that last claimed it. */
   build: string;
   owner: Owner;
   /** The record's own format, kernel and primitives as the poll last heard them; `null` until it has. */
@@ -248,6 +252,8 @@ export type Stored = {
   bytes?: number;
   /** Rows deletes took out, by the spot path they were held at, for a restore to put back. */
   gone?: Gone[];
+  /** The app build that kept it: one kept by another build is never current. Absent on answers kept before it was said. */
+  build?: string;
 };
 
 type Gone = { at: string; row: Row & Record<string, unknown> };
@@ -1135,7 +1141,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
 
   const load = (): Promise<Meta | null> =>
     (loaded ??= store.meta().then(
-      (m) => (meta = m && m.format === LOCAL_FORMAT && m.build === opts.build ? m : null),
+      (m) => (meta = m && m.format === LOCAL_FORMAT ? m : null),
       () => null,
     ));
 
@@ -1214,13 +1220,15 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
           if (owner.guest !== undefined) await write({ ...m, owner, ...live });
           return;
         }
+        /* THE BUILD THAT CLAIMS IT IS SAID ON IT, and what an older one kept stays, drawn as it was and asked again. */
+        const built = m !== null && m.build !== opts.build ? { build: opts.build } : {};
         claimed = owner;
         droppedAll();
         if (m === null || !sameOwner(m.owner, owner)) {
           epoch += 1;
           await store.clear().catch(() => undefined);
           await write({ format: LOCAL_FORMAT, build: opts.build, owner, record: null, cursor: null, cursorId: null, ...live });
-        } else if (owner.guest !== undefined) await write({ ...m, owner, ...live });
+        } else if (owner.guest !== undefined || built.build !== undefined) await write({ ...m, owner, ...live, ...built });
         asked += 1;
         await catchUp(asked);
       });
@@ -1250,7 +1258,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       if (row === null || t < row.kept || t >= keptUntil(m, row.kept)) return null;
       /* OPENED NOW, for eviction, written at most once an hour an answer: a read that writes on every draw costs a write. */
       if (claimed !== null && t - (row.opened ?? row.kept) >= TOUCH_MS) void store.touch(row.at, t).catch(() => undefined);
-      return { value: row.value as T, decls: row.decls, current: claimed !== null && !row.always && caught === asked && sameDay(row.kept, t), kept: row.kept };
+      return { value: row.value as T, decls: row.decls, current: claimed !== null && !row.always && row.build === opts.build && caught === asked && sameDay(row.kept, t), kept: row.kept };
     },
     async held(base, person) {
       const m = meta ?? (await load());
@@ -1294,6 +1302,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
           opened: t,
           ...(spots && spots.length > 0 ? { spots } : {}),
           ...(how.always ? { always: true } : {}),
+          build: opts.build,
         };
         row.bytes = JSON.stringify(row).length;
         /* AN ANSWER BIGGER THAN THE WHOLE BUDGET is never kept: it would evict everything and still be over. */

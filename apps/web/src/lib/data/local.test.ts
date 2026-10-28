@@ -188,7 +188,25 @@ test('BEFORE THIS TAB CLAIMS IT, only the person the last shell named is answere
   assert.equal(await next.answer('work', 'k', 'https://a', 'p_bo'), null);
   assert.deepEqual(await next.answer('work', 'k', 'https://a', 'p_ada'), { value: 'w', decls: { tasks: DECL }, current: false, kept: NOON });
   const built = localCopy(store, () => fake.log, { build: 'b2', now: () => NOON });
-  assert.equal(await built.answer('work', 'k', 'https://a', 'p_ada'), null, 'another build reads no copy');
+  assert.deepEqual(await built.answer('work', 'k', 'https://a', 'p_ada'), { value: 'w', decls: { tasks: DECL }, current: false, kept: NOON }, 'another build draws the copy');
+});
+
+test('A NEW BUILD KEEPS THE COPY, drawn and asked again, never current until it keeps the answer itself', async () => {
+  const store = memoryStore();
+  const fake = fakeLog();
+  const first = localCopy(store, () => fake.log, { build: 'b1', now: () => NOON });
+  await first.claim(ada);
+  await first.put('work', 'k', ['tasks'], { tasks: DECL }, 'w', first.ticket());
+  assert.equal((await first.answer('work', 'k', 'https://a', 'p_ada'))?.current, true, 'its own build reads it as current');
+
+  const next = localCopy(store, () => fake.log, { build: 'b2', now: () => NOON });
+  await next.claim(ada);
+  const drawn = await next.answer('work', 'k', 'https://a', 'p_ada');
+  assert.equal(drawn?.value, 'w', 'what the last build kept is drawn');
+  assert.equal(drawn?.current, false, 'and asked again');
+  assert.equal(store.saved?.build, 'b2', 'the claim says the new build');
+  await next.put('work', 'k', ['tasks'], { tasks: DECL }, 'w2', next.ticket());
+  assert.deepEqual(await next.answer('work', 'k', 'https://a', 'p_ada'), { value: 'w2', decls: { tasks: DECL }, current: true, kept: NOON }, 'kept again by this build, it is current');
 });
 
 /* ── patching in place ─────────────────────────────────────────────────── */
