@@ -173,8 +173,14 @@ const REPORTED_MOST = 200;
 /** How long the bridge waits, once its input closed, for the session's end hook to say it is ending the run itself. */
 export const END_GRACE_MS = 1_500;
 
-/** The most the end itself may take, inside the two seconds an app gives a server between closing it and stopping it. */
-export const END_MS = 3_000;
+/**
+ * The most the end itself may take. An app gives a server two seconds between closing its input and SIGTERM, and two
+ * more before SIGKILL; the command takes SIGTERM as the end of input (`main.ts`), so the grace and the end fit in four.
+ */
+export const END_MS = 2_000;
+
+/** How long after a stop signal the command leaves whatever it is doing: the grace, the end and a little over. */
+export const SIGNAL_EXIT_MS = END_GRACE_MS + END_MS + 500;
 
 /**
  * The session headers for a request, given what the app said it is in its hello: `sessionHeaders` in `position.ts`,

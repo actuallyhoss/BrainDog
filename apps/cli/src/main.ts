@@ -31,7 +31,7 @@ import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
 import { behindLine, doctorLine, installedBuild } from './behind.ts';
-import { serveBridge } from './bridge.ts';
+import { serveBridge, SIGNAL_EXIT_MS } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { mark } from './hook-trace.ts';
 import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, hookWork, parentOf, unreachable } from './hooks.ts';
@@ -638,6 +638,19 @@ async function mcp(args: string[]): Promise<void> {
     const session = agent === 'codex' && hostSessionOf(process.env) === null ? codexSession(process.ppid) : undefined;
     /* AN UPDATE UNDER THIS SESSION IS SAID ONCE in its next tool answer (`installed-build.ts`); a checkout says nothing. */
     const installed = installedBuild() ? watchInstalled({ file: fileURLToPath(import.meta.url), mine: cliBuild() }) : undefined;
+    /* A STOP SIGNAL IS THE APP CLOSING THIS SERVER, AND THE RUN STILL ENDS. An app gives a server two seconds between
+       closing its input and SIGTERM, and a closed window sends SIGHUP; the end waits up to `END_GRACE_MS` for the end
+       hook and then asks the host, which did not fit, so a run that closed normally was killed before its end was sent
+       and the sweep wrote it off as abandoned twelve hours later. The first signal ends the input instead, so the close
+       runs as it would at the end of input, and the process leaves on its own or at the latest `SIGNAL_EXIT_MS` on. */
+    let signalled = false;
+    const closeOnSignal = () => {
+      if (signalled) return;
+      signalled = true;
+      process.stdin.push(null);
+      setTimeout(() => process.exit(0), SIGNAL_EXIT_MS).unref();
+    };
+    for (const signal of ['SIGTERM', 'SIGHUP', 'SIGINT'] as const) process.on(signal, closeOnSignal);
     await serveBridge({ input: process.stdin, output, say, session, installed }, to, hints);
     process.exitCode = 0;
     setTimeout(() => process.exit(0), 1_000).unref();
