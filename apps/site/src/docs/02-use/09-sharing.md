@@ -21,7 +21,7 @@ A record keeps at least one owner, and you cannot change your own level. Another
 
 ## Teams, roles and private rows
 
-On Cloud Plus and on a self-host, a second person can join the record. People hold one of four roles on the whole record: **Viewer** reads, **Member** reads, writes rows and proposes, **Admin** also settles who is on the record, and **Owner** keeps the rest. Billing for teams is not switched on yet, so the gate waits for it.
+On Cloud Plus, a second person can join the record. People hold one of four roles on the whole record: **Viewer** reads, **Member** reads, writes rows and proposes, **Admin** also settles who is on the record, and **Owner** keeps the rest. Billing for teams is not switched on yet, so the gate waits for it.
 
 A row you made can be kept to yourself: choose **Private to me** in its row menu, and a lock shows on the row, its card and the board. Nobody else reads it, in a list, a figure, a search or an export. Only you can share it again.
 
