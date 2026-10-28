@@ -12,9 +12,9 @@ export const summaryWords = {
   heading: 'Summary',
   parent: 'Agents',
   all: 'Summaries',
-  nothing: 'Nothing waits and nothing new happened, so this summary would not be sent now.',
-  none: 'No summary is set up on this record yet.',
-  offer: 'Agent notes sends two a day, at 08:00 and 17:00 your time: what waits for you, what your agents did, and what is stuck.',
+  nothing: 'Nothing to send now.',
+  none: 'No summaries yet.',
+  offer: 'Agent notes sends one at 08:00 and 17:00.',
   getIt: 'Get Agent notes',
   /* WHAT THE STORE IS SEARCHED FOR, the add-on's name as a person would type it, so the button lands on whichever
      add-on goes by it today and the web holds no add-on's id. */
@@ -22,7 +22,7 @@ export const summaryWords = {
   open: 'Open',
   decide: 'Open Decide',
   upNext: 'Open Agents',
-  sentAt: 'Sent to this app and your phone at the times it was set up for, in this record’s time zone, and held through quiet hours.',
+  sentAt: 'Sent here and to your phone, held through quiet hours.',
   more: (n: number) => `and ${n} more`,
 } as const;
 

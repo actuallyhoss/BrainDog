@@ -36,7 +36,7 @@
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
 
-<PageHead icon="bell" {title} kicker={words.parent} back="/p/agents" sentence={words.sentAt} />
+<PageHead icon="bell" {title} kicker={words.parent} back="/p/agents" sentence={summaries.length > 0 ? words.sentAt : undefined} />
 <div class="page">
   {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
     <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
