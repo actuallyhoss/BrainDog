@@ -177,6 +177,8 @@ const linked = async (said: string, tools: ChatTools): Promise<{ text: string; f
   /* AN ID AS THE RESULTS PRINT IT, `(tasks#3)` or bare, IS A LINK TOO: the included model copies an id the way it read
      it as often as it writes the brace it was asked for, and an id left as text is a code a person cannot press. */
   const answer = said
+    /* A BRACE WRITTEN LOOSELY, `{{ref:obligations SG9}}` or `{{ ref: tasks#3 }}`, is read for the id it ends with. */
+    .replace(/\{\{\s*ref\s*:\s*(?:[^}]*\s)?([^}\s]+)\s*\}\}/gu, '{{ref:$1}}')
     .replace(/\s*\(\s*([a-z][a-z0-9_]*#[1-9][0-9]*)\s*\)/gu, ' {{ref:$1}}')
     .replace(/(?<![{:\w#])([a-z][a-z0-9_]*#[1-9][0-9]*)(?![\w}])/gu, '{{ref:$1}}');
   const asked = [...new Set([...answer.matchAll(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu)].map((m) => m[1] ?? ''))].slice(0, REFS_MOST);
@@ -212,7 +214,11 @@ const linked = async (said: string, tools: ChatTools): Promise<{ text: string; f
       const at = to.get(id);
       return at ? `{{ref:${at}}}` : '';
     })
-    .replace(/\{\{(?!ref:)[^}]*\}\}/gu, '')
+    .replace(/\{\{(?!ref:[a-z][a-z0-9_]*#[1-9][0-9]*\}\})[^}]*\}\}/gu, '')
+    /* AND THE PUNCTUATION A NAME OR A BRACE LEFT BEHIND WHEN IT MOVED OR WENT: "two of them:, " and ", and, ". */
+    .replace(/([:,;])\s*,/gu, '$1')
+    .replace(/\band,\s/gu, 'and ')
+    .replace(/\(\s*\)/gu, '')
     .replace(/[ \t]{2,}/gu, ' ')
     .replace(/\s+([.,;:!?])/gu, '$1')
     .trim();
