@@ -2024,6 +2024,12 @@ function shownOn(deps: PageDeps, register: string, schema: Schema, blocks: reado
     if (got.bad.length === 0) said.push(got.predicate);
   }
   if (state === undefined || open.length === 0) return open;
+  /* EVERY BLOCK OVER THE LIST DRAWS ONLY FINISHED ROWS, as Reports reads cleared Ledger lines alone: the open rows are
+     none of what the page shows, and its month picker read "Last month 0" over a month of spending. The chips count the
+     rows the blocks draw. A finished-only block beside a block of open rows (Work's "Done this week") is not this. */
+  const finishedOnly = (p: Predicate | undefined): p is Predicate =>
+    p !== undefined && names(p, state) && !values.some((v) => !done.includes(v) && could(p, state, v, schema, false));
+  if (said.length > 0 && said.every(finishedOnly)) return said.length === 1 ? [said[0]!] : [{ any: said as Predicate[] }];
   const mixes = (p: Predicate | undefined): boolean =>
     p !== undefined &&
     values.some((v) => done.includes(v) && could(p, state, v, schema, false)) &&
