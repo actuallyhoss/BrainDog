@@ -16,6 +16,9 @@
   A KIND PUT BACK TO ASKING CARRIES THE WORDS, never the colour alone: "Put back" in the deeper red, then why, as the
   record worded it.
 
+  EACH AGENT'S ONE NUMBER: under its last line, the share of its suggestions you accepted unchanged over 90 days
+  (`keptSentence`), the same number the Agents page draws with its kinds.
+
   OUTSIDE TEXT SAYS SO: under an agent whose run read the inbox, or anything else from outside the
   record, one muted line says it asks about everything in that run and why. Under the floors, each import asks whether
   all of it is his (`ImportAsk.svelte`), loaded only when the record holds one, so no other screen carries it. A host
@@ -30,6 +33,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { markedLine, readImports, type ImportRow } from './imports.ts';
+  import { keptSentence } from '$lib/record/kept.ts';
 
   let standing = $state<TrustStanding | null>(null);
   /** The line whose press is on its way, so it is not sent twice. */
@@ -40,16 +44,27 @@
   /** Each agent's marked line, by its place in the record's order, read off the standing `readTrust` keeps. */
   const marked = $derived(standing ? standing.agents.map(markedLine) : []);
 
-  /* THE AGENTS THAT ASK BEFORE EVERY CHANGE ARE ONE LINE, unless a marked line is said under one of them. */
-  const lines = $derived(standing ? trustLines(standing, Date.now(), (i) => !marked[i]) : []);
+  /* EACH AGENT'S ACCEPTED-UNCHANGED SHARE, the one number its suggestions are judged by, under its last line. */
+  const kept = $derived(standing ? standing.agents.map((a) => (a.kept ? keptSentence(a.kept) : null)) : []);
+
+  /* THE AGENTS THAT ASK BEFORE EVERY CHANGE ARE ONE LINE, unless a marked line or a share is said under one of them. */
+  const lines = $derived(standing ? trustLines(standing, Date.now(), (i) => !marked[i] && !kept[i]) : []);
   /** The imports the record holds, or `null` when it sent none or has no such call. */
   let imports = $state<ImportRow[] | null>(null);
 
   /* The marked line goes after an agent's last line: an agent's lines are keyed by its place, `0` or `0:1`. */
-  const markedAfter = (i: number): string | null => {
+  const lastOf = (i: number): number | null => {
     const at = lines[i]?.key.split(':')[0];
     if (at === undefined || lines[i + 1]?.key.split(':')[0] === at) return null;
-    return marked[Number(at)] ?? null;
+    return Number(at);
+  };
+  const markedAfter = (i: number): string | null => {
+    const at = lastOf(i);
+    return at === null ? null : (marked[at] ?? null);
+  };
+  const keptAfter = (i: number): string | null => {
+    const at = lastOf(i);
+    return at === null ? null : (kept[at] ?? null);
   };
 
   const client = () => createClient({ base: apiBase() });
@@ -105,6 +120,9 @@
             {#if l.take}
               <!-- The label says the verb and the line says what it is for, so a screen reader hears both. -->
               <Button size="sm" disabled={pressing !== null} aria-label={`${words.askAgain}: ${l.text}`} onclick={() => void askAgain(l)}>{words.askAgain}</Button>
+            {/if}
+            {#if keptAfter(i)}
+              <p class="trust-marked">{keptAfter(i)}</p>
             {/if}
             {#if markedAfter(i)}
               <p class="trust-marked" dir="auto">{markedAfter(i)}</p>
