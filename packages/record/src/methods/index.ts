@@ -81,6 +81,7 @@ import { methods as pushTestMethods } from './push-test.ts';
 import { methods as doorSwitchMethods } from './door-switch.ts';
 import { methods as actionRun } from './action-run.ts';
 import { methods as instructions } from './instructions.ts';
+import { methods as sendMethods } from './send.ts';
 import { methods as agentProfile } from './agent-profile.ts';
 import { methods as sharing } from './sharing.ts';
 import { methods as schemasMethods } from './schemas.ts';
@@ -297,6 +298,7 @@ export function methods(deps: RecordDeps) {
     ...doorSwitchMethods(deps),
     ...actionRun({ ...deps, nudgeAction }),
     ...instructions(deps),
+    ...sendMethods(deps),
     ...agentProfile(deps),
     ...sharing(deps),
     ...schemasMethods(deps),

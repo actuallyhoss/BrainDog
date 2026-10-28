@@ -84,7 +84,10 @@ export function lineOf(i: Instr, by: string): string {
   /* THE QUESTIONS IT NAMES, by name, with the call that answers one: the run gives his answer, never its own. */
   const open = (i.answers ?? []).filter((a) => !(i.answered ?? []).includes(a.question)).map((a) => a.question);
   const named = open.length === 0 ? '' : ` It lets you answer ${open.join(', ')} as he said, with instructions answer ${open[0]!}${i.taken_by === null ? ' once you take it' : ''}.`;
-  return `${by} said in BrainDog (${i.id}): "${said}". ${answer}${named}`;
+  /* WHAT HE SENT WITH IT AND WHETHER IT MAY CHANGE FILES, said in the same line, so every path hands both on. */
+  const rows = (i.attach ?? []).length === 0 ? '' : ` He sent ${i.attach.join(', ')} with it: read each with get.`;
+  const leave = i.may_change === true ? ' You may change files for it.' : i.may_change === false ? ' Change no file for it; propose what should change instead.' : '';
+  return `${by} said in BrainDog (${i.id}): "${said}".${rows}${leave} ${answer}${named}`;
 }
 
 /** An instruction as `Told`, its maker named once. */

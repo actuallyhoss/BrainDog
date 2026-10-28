@@ -55,7 +55,11 @@ export function methods(deps: RecordDeps) {
     async cancelJob(args: { id?: unknown }, ctx: CallContext): Promise<Result<Cancelled>> {
       const stop = admin(ctx, 'stop a job');
       if (stop) return { ok: false, refusal: stop };
-      return tail(kernel.jobs.cancel(args ?? {}));
+      const out = kernel.jobs.cancel(args ?? {});
+      /* A JOB STOPPED BEFORE A MACHINE TOOK IT answers what it carried at once (`settleJob`); one running is answered
+         when its runner ends it. */
+      if (out.ok && out.value.status === 'cancelled') kernel.settleJob(out.value.id);
+      return tail(out);
     },
 
     /** The jobs on this record, newest first, in one state or all of them, a page at a time. */
@@ -81,19 +85,22 @@ export function methods(deps: RecordDeps) {
     /* THE ANSWER IS TYPED FROM `kernel.jobs.claim` AND NOT BY NAME, because `@braindog/kernel` already exports a
        `Claimed` (the scheduler's, `schedule.ts`), so the job's own `Claimed` cannot be exported under that name too. */
     async claimJob(
-      args: { wait?: unknown; host?: unknown; seats?: unknown } | undefined,
+      args: { wait?: unknown; host?: unknown; seats?: unknown; repos?: unknown } | undefined,
       ctx: CallContext,
     ): Promise<Awaited<ReturnType<RecordDeps['kernel']['jobs']['claim']>>> {
       const machine = runner(ctx);
       if (refused(machine)) return { ok: false, refusal: machine };
-      return tail(await kernel.jobs.claim(machine, { host: args?.host, seats: args?.seats }));
+      return tail(await kernel.jobs.claim(machine, { host: args?.host, seats: args?.seats, repos: args?.repos }));
     },
 
     /** A runner reports the next line of the job it holds, and learns whether it was stopped. */
     async postJobEvent(args: PostJobEventArgs, ctx: CallContext): Promise<Result<Posted>> {
       const machine = runner(ctx);
       if (refused(machine)) return { ok: false, refusal: machine };
-      return tail(kernel.jobs.post(machine, args ?? {}));
+      const out = kernel.jobs.post(machine, args ?? {});
+      /* ITS END ANSWERS WHAT IT CARRIED that its run left open, from what the run said last (`settleJob`). */
+      if (out.ok && args?.kind === 'end' && typeof args.job_id === 'string') kernel.settleJob(args.job_id);
+      return tail(out);
     },
 
     /** A runner asks whether its job was stopped, and renews its lease by asking. */

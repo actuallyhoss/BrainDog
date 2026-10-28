@@ -2668,6 +2668,21 @@ export function createClient(options: ClientOptions) {
     instructionList: (args: { state?: string; project?: string; task?: string; run?: string; limit?: number; cursor?: string } = {}) =>
       call<Answer<'instructionList'>>('instructionList', args as Record<string, unknown>),
     /**
+     * Send to…: who he can send a request to from a row now (`row`, or a `project`), each with its `id` for `sendTo`.
+     * READ+, the owner's.
+     */
+    sendTargets: (args: { row?: string; project?: string } = {}) => call<Answer<'sendTargets'>>('sendTargets', args as Record<string, unknown>),
+    /**
+     * Send one request from a row: `target` is `auto` or an id `sendTargets` listed. Answers the instruction's spoken
+     * name and where it went, or `{ route: 'slash' }` for the app to ask Slash itself. DATA, a person only.
+     */
+    sendTo: (args: { target: string; note?: string; attach?: string[]; may_change?: boolean; profile?: string; repo?: string; row?: string; project?: string }) =>
+      call<Answer<'sendTo'>>('sendTo', args as Record<string, unknown>),
+    /** One request he sent (`IN12`): its state, reply, what it is doing now and its receipts, for the strip. READ+. */
+    sent: (args: { id: string }) => call<Answer<'sent'>>('sent', args as Record<string, unknown>),
+    /** What he sent that is still in flight, or every request about one `row` from the last week. READ+. */
+    sentList: (args: { row?: string } = {}) => call<Answer<'sentList'>>('sentList', args as Record<string, unknown>),
+    /**
      * An agent's own instructions: with nothing, what is pending (marked seen); `take` one; `reply` to one with `said`
      * and `state` (done, needs_you or declined); or `seen`, the ids a client showed it, with `how`. DATA.
      */
