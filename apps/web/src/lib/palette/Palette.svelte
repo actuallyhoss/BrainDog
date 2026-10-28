@@ -202,8 +202,9 @@
    * does what the waiting card asks and Esc leaves it. A question reached from Find (its row, or Today's three) starts a
    * new conversation and Esc goes back to Find with the words as they were; ⌘J opens straight into the conversation where
    * it was left, and Esc there closes. ⌘K moves back to Find. The thread outlives the palette, so it can be reopened.
+   * On a host with no model behind Slash there is no Ask, absent rather than refused, and ⌘J opens Find.
    */
-  const inAsk = $derived(opener.mode === 'ask');
+  const inAsk = $derived(opener.mode === 'ask' && slashHere);
   /* WHAT FIND'S FIELD SAID WHEN A QUESTION LEFT IT FOR ASK, or `null` when Ask was opened straight. */
   let backTo = $state<string | null>(null);
   /* THE MODE THE PALETTE LAST DREW, so a move made from outside it (⌘K, ⌘J) is told from one made here. */
