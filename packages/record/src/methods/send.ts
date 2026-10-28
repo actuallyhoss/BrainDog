@@ -56,9 +56,12 @@ export type Sent = { id: string; routed_to: { kind: TargetKind; label: string };
 export type SentOne = Omit<Told, 'job'> & {
   routed_to: { kind: TargetKind; label: string };
   seen: { run: string; how: string; at: string }[];
-  receipts: Receipts | null;
+  /** What the run changed while it held it, one line a batch, newest first: `said` is "2 changes: Fix the login, tasks#12". */
+  receipts: { batch: string; said: string; at: string; rows: string[] }[];
+  /** The run, its head before and after, and how many changes in all, or `null` before a run took it. */
+  changed: Omit<Receipts, 'batches'> | null;
   /** What the run is at now, one short line, while it works: the job's last step, or the session's own. */
-  doing: string | null;
+  progress: string | null;
   /** The job carrying it to a machine, as the queue holds it, or `null` for one sent to a session or whoever is next. */
   job: { id: string; status: string; cost_minor: number | null; cost_currency: string | null; ms: number | null } | null;
 };
@@ -78,7 +81,8 @@ const ROW_DAYS = 7;
 const TARGETS_TAKES = ['row', 'project'] as const;
 const SEND_TAKES = ['target', 'note', 'attach', 'may_change', 'profile', 'repo', 'row', 'project'] as const;
 const SENT_TAKES = ['id'] as const;
-const LIST_TAKES = ['row'] as const;
+const LIST_TAKES = ['row', 'open'] as const;
+const REPLY_TAKES = ['id', 'note'] as const;
 
 /** Each agent as a person calls it. */
 const AGENT_SAID: Readonly<Record<string, string>> = {
@@ -317,15 +321,51 @@ export function methods(deps: RecordDeps) {
       const d = (run?.fields as Record<string, unknown> | undefined)?.doing;
       said = typeof d === 'string' && d.trim() !== '' ? d.trim() : null;
     }
+    const r = receiptsOf(sql, kernel, i, new Date(clock.now()).toISOString(), ctx, sight);
+    const { batches, ...changed } = r ?? { batches: [] as Receipts['batches'] };
     return {
       ...toldOf(sql, i),
       routed_to: routedOf(i),
       seen: kernel.instructionSeen(i.id),
-      receipts: receiptsOf(sql, kernel, i, new Date(clock.now()).toISOString(), ctx, sight),
-      doing: said,
+      receipts: batches.map((b) => ({
+        batch: b.batch,
+        at: b.at,
+        rows: b.rows,
+        said: `${String(b.changes)} ${b.changes === 1 ? 'change' : 'changes'}${b.names.length === 0 ? '' : `: ${b.names.join(', ')}`}`,
+      })),
+      changed: r === null ? null : (changed as Omit<Receipts, 'batches'>),
+      progress: said,
       job,
     };
   };
+
+  /**
+   * One thing sent with a request, as the run reads it, or `null` when he is not shown it or it is not there: a row as
+   * `tasks#12` (its spoken name, from `list#seq` or an id), a question or decision as `decide:SG12` said `SG12`, a run
+   * as `run:S883` said `S883`, and a sign as `sign:<id>`, kept so, since a sign is no row.
+   */
+  const attachedAs = (ctx: CallContext, given: string): string | null => {
+    const ref = given.trim();
+    if (ref === '' || ref.length > 120) return null;
+    const colon = /^(decide|run|sign):(.+)$/u.exec(ref);
+    if (colon?.[1] === 'decide') {
+      const id = colon[2]!.trim();
+      const key = deps.spokenAs(id) ?? id;
+      return deps.sightOf(ctx, `suggestion:${key}`) ?? deps.sightOf(ctx, `decision:${key}`);
+    }
+    if (colon?.[1] === 'sign') {
+      const id = colon[2]!.trim();
+      const signs = kernel.signs();
+      return signs.ok && signs.value.signs.some((x) => x.sign === id) ? `sign:${id}` : null;
+    }
+    const got = kernel.get(colon?.[1] === 'run' ? colon[2]!.trim() : ref, { includeDeleted: colon?.[1] === 'run' });
+    if (got === null || !sight.admits(ctx, got)) return null;
+    if (colon?.[1] === 'run' && got.register !== 'session') return null;
+    return kernel.nameOf(got.id);
+  };
+
+  /** Who a person's call is, for the kernel's instruction path. */
+  const asPerson = (ctx: CallContext) => ({ actor: ctx.principal.kind === 'person' ? ctx.principal.id : 'system', principal: { kind: 'person' as const } });
 
   return {
     /**
@@ -371,13 +411,12 @@ export function methods(deps: RecordDeps) {
       if (profile !== null && !SEAT_NAME.test(profile)) return no('VALUE_MALFORMED', 'Name the profile as its runs name it, like studio or default: a name, never a folder.', { at: 'profile' });
       if (repo !== null && !REPO_NAME.test(repo)) return no('VALUE_MALFORMED', "Name the folder as the machine maps it, like braindog: a name, never a path.", { at: 'repo' });
 
-      /* THE ROWS IT CARRIES, THE ROW IT WAS SENT FROM FIRST, each one he is shown, by its spoken name. */
+      /* WHAT IT CARRIES, THE ROW IT WAS SENT FROM FIRST, each one he is shown (`attachedAs`). */
       const attach: string[] = [];
       for (const ref of [...(row === null ? [] : [row]), ...((a.attach as string[] | undefined) ?? [])]) {
-        const got = kernel.get(ref.trim());
-        if (got === null || !sight.admits(ctx, got)) return no('ROW_UNKNOWN', `There is no row called ${ref.trim().slice(0, 80)}.`, { at: 'attach' });
-        const spoken = kernel.nameOf(got.id);
-        if (!attach.includes(spoken)) attach.push(spoken);
+        const named = attachedAs(ctx, ref);
+        if (named === null) return no('ROW_UNKNOWN', `There is nothing called ${ref.trim().slice(0, 80)} to send.`, { at: 'attach' });
+        if (!attach.includes(named)) attach.push(named);
       }
       const project = projectFor(ctx, a);
       const said = note !== '' ? note : attach.length > 0 ? `Look at ${attach.join(', ')} and tell me what you find.` : '';
@@ -403,7 +442,7 @@ export function methods(deps: RecordDeps) {
 
       if (kind === 'session') {
         const run = chosen.slice('session:'.length);
-        const made = kernel.instruct({ actor: ctx.principal.kind === 'person' ? ctx.principal.id : 'system', principal: { kind: 'person' } }, {
+        const made = kernel.instruct(asPerson(ctx), {
           ...common,
           kind: 'tell',
           to: 'run',
@@ -416,7 +455,7 @@ export function methods(deps: RecordDeps) {
       }
 
       if (kind === 'next') {
-        const made = kernel.instruct({ actor: ctx.principal.kind === 'person' ? ctx.principal.id : 'system', principal: { kind: 'person' } }, {
+        const made = kernel.instruct(asPerson(ctx), {
           ...common,
           kind: 'tell',
           to: 'agent',
@@ -459,7 +498,7 @@ export function methods(deps: RecordDeps) {
           );
         return tail(started as Result<never>);
       }
-      const made = kernel.instruct({ actor: ctx.principal.kind === 'person' ? ctx.principal.id : 'system', principal: { kind: 'person' } }, {
+      const made = kernel.instruct(asPerson(ctx), {
         ...common,
         kind: 'tell',
         to: 'agent',
@@ -496,7 +535,7 @@ export function methods(deps: RecordDeps) {
      * What he sent that is still in flight (Sent, Seen, Working or Needs you), newest first: the Sent tray. With `row`,
      * every send that carried that row from the last week, settled ones too, for the strip on the row.
      */
-    async sentList(args: { row?: string } | undefined, ctx: CallContext): Promise<Result<{ sent: SentOne[] }>> {
+    async sentList(args: { row?: string; open?: string } | undefined, ctx: CallContext): Promise<Result<{ sent: SentOne[] }>> {
       const stop = guard(ctx, 'owner');
       if (stop) return { ok: false, refusal: stop };
       const a = (args ?? {}) as Record<string, unknown>;
@@ -506,6 +545,7 @@ export function methods(deps: RecordDeps) {
       const row = rowSaid === null ? null : kernel.get(rowSaid);
       if (rowSaid !== null && (row === null || !sight.admits(ctx, row))) return no('ROW_UNKNOWN', `There is no row called ${rowSaid.slice(0, 80)}.`, { at: 'row' });
       const me = ctx.principal.kind === 'person' ? ctx.principal.id : null;
+      const inFlightOnly = typeof a.open === 'string' && /^(?:1|true|yes)$/iu.test(a.open);
       const since = new Date(clock.now() - ROW_DAYS * 86_400_000).toISOString();
       const seqs =
         row === null
@@ -516,7 +556,8 @@ export function methods(deps: RecordDeps) {
             )
           : sql.all<{ seq: number }>(
               `SELECT e.seq AS seq FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND e.created_at >= ?
-                 AND EXISTS (SELECT 1 FROM event v, json_each(v.to_v) j WHERE v.target = 'entry:' || e.id AND v.kind = 'note' AND v.field = 'attach' AND json_valid(v.to_v) AND j.value = ?)
+                 AND EXISTS (SELECT 1 FROM event v WHERE v.target = 'entry:' || e.id AND v.kind = 'note' AND v.field = 'attach'
+                   AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(v.to_v) THEN v.to_v ELSE '[]' END) j WHERE j.value = ?))
                ORDER BY e.seq DESC LIMIT ?`,
               INSTRUCTIONS,
               since,
@@ -527,10 +568,101 @@ export function methods(deps: RecordDeps) {
       for (const { seq } of seqs) {
         const i = kernel.instruction(`IN${String(seq)}`);
         if (i === null || (me !== null && i.by !== me) || (row === null && i.kind !== 'tell')) continue;
+        /* `open=1` WITH A ROW: only what is still in flight about it. */
+        if (inFlightOnly && !['sent', 'seen', 'working', 'needs_you'].includes(i.state)) continue;
         out.push(sentOne(ctx, i));
         if (out.length >= LIST_MOST) break;
       }
       return ok({ sent: out });
+    },
+
+    /**
+     * He takes back a send (`POST /api/send/<id>/withdraw`): one no run has taken is Withdrawn; one a machine is working
+     * on stops its job, and ends Declined once the machine stops. One a session took is refused with what to do
+     * instead, as `withdrawInstruction` says it. DATA, a person's alone.
+     */
+    async sendWithdraw(args: { id?: string } | undefined, ctx: CallContext): Promise<Result<SentOne>> {
+      const stop = guard(ctx, 'owner');
+      if (ctx.principal.kind === 'token') return no('NEEDS_BROWSER_SESSION', 'Only the person who sent it takes a request back, in BrainDog.', { at: 'principal' });
+      if (stop) return { ok: false, refusal: stop };
+      const a = (args ?? {}) as Record<string, unknown>;
+      const stray = strayOf('sendWithdraw', a, SENT_TAKES);
+      if (stray) return stray;
+      const id = text(a.id);
+      const i = id === null ? null : kernel.instruction(id);
+      if (i === null) return no('ROW_UNKNOWN', `There is no request called ${(id ?? '').slice(0, 40)}.`, { at: 'id' });
+      if (i.job !== null) {
+        const barred = admin(ctx, 'stop a request on a machine');
+        if (barred) return { ok: false, refusal: barred };
+        const cancelled = kernel.jobs.cancel({ id: i.job });
+        if (cancelled.ok && cancelled.value.status === 'cancelled') kernel.settleJob(i.job);
+        if (i.state === 'sent' || i.state === 'seen') {
+          const out = kernel.withdrawInstruction(asPerson(ctx), i.id);
+          if (!out.ok && kernel.instruction(i.id)?.state !== 'declined') return tail(out as Result<never>);
+        }
+        return tail(ok(sentOne(ctx, kernel.instruction(i.id) ?? i)));
+      }
+      const out = kernel.withdrawInstruction(asPerson(ctx), i.id);
+      if (!out.ok) return tail(out as Result<never>);
+      return tail(ok(sentOne(ctx, out.value)));
+    },
+
+    /**
+     * He follows up a send (`POST /api/send/<id>/reply`, `{ note }`): a new instruction, his, to the same place, carrying
+     * the same rows and leave, its words saying which send it follows. To the run that took the first while that run is
+     * open; to the same job while that job still runs; else the same way the first went (the same machine, a fresh job,
+     * or whoever is next there). Answers the new send, as `sendTo` does. DATA, a person's alone.
+     */
+    async sendReply(args: { id?: string; note?: string } | undefined, ctx: CallContext): Promise<Result<Sent>> {
+      const stop = guard(ctx, 'owner');
+      if (ctx.principal.kind === 'token') return no('NEEDS_BROWSER_SESSION', 'Only a person sends a request, signed in to BrainDog. An agent answers with instructions.', { at: 'principal' });
+      if (stop) return { ok: false, refusal: stop };
+      const a = (args ?? {}) as Record<string, unknown>;
+      const stray = strayOf('sendReply', a, REPLY_TAKES);
+      if (stray) return stray;
+      const id = text(a.id);
+      const note = text(a.note);
+      if (note === null) return no('REQUIRED_MISSING', 'Say what to add.', { at: 'note' });
+      const first = id === null ? null : kernel.instruction(id);
+      if (first === null) return no('ROW_UNKNOWN', `There is no request called ${(id ?? '').slice(0, 40)}.`, { at: 'id' });
+      const head = `Following up ${first.id}: `;
+      const said = [...`${head}${note}`].slice(0, 2_000).join('');
+      const carried = { said, attach: first.attach, ...(first.may_change === null ? {} : { may_change: first.may_change }), ...(first.project === null ? {} : { project: first.project }) };
+      const where = { ...(first.repo === null ? {} : { repo: first.repo }), ...(first.machine === null ? {} : { machine: first.machine }), ...(first.seat === null ? {} : { seat: first.seat }) };
+
+      /* THE RUN THAT TOOK IT, WHILE IT IS OPEN: a session hears it at its next step, a job's run when it asks again. */
+      const runRow = first.taken_by === null ? null : kernel.get(first.taken_by);
+      const runOpen = runRow !== null && (runRow.state === 'active' || runRow.state === 'idle');
+      const jobOpen = first.job !== null && ['queued', 'claimed'].includes(sql.one<{ status: string }>('SELECT status FROM job WHERE id = ?', first.job)?.status ?? '');
+      if (first.job !== null && jobOpen) {
+        const made = kernel.instruct(asPerson(ctx), { ...carried, ...where, kind: 'tell', to: 'agent', to_agent: 'claude', when: 'now', job: first.job, waits_ms: 86_400_000 });
+        return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(made.value), job: first.job }) : (made as Result<never>));
+      }
+      if (first.job === null && runOpen) {
+        const made = kernel.instruct(asPerson(ctx), { ...carried, ...(first.repo === null ? {} : { repo: first.repo }), kind: 'tell', to: 'run', to_run: first.taken_by!, when: 'now' });
+        return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(made.value) }) : (made as Result<never>));
+      }
+      if (first.job !== null) {
+        /* THE SAME MACHINE, A FRESH JOB: the first one's ended, and its words are on the first send for the run to read. */
+        const barred = admin(ctx, 'send a request to a machine');
+        if (barred) return { ok: false, refusal: barred };
+        const started = kernel.jobs.create({
+          kind: first.may_change === true ? CHANGE_KIND : ASK_KIND,
+          args: { repo: first.repo ?? '-' },
+          ...(first.attach.length > 0 ? { about: first.attach[0] } : {}),
+          ...(first.machine === null ? {} : { machine: first.machine }),
+          ...(first.seat === null ? {} : { seat: first.seat }),
+        });
+        if (!started.ok) return tail(started as Result<never>);
+        const made = kernel.instruct(asPerson(ctx), { ...carried, ...where, kind: 'tell', to: 'agent', to_agent: 'claude', when: 'now', job: started.value.id, waits_ms: 86_400_000 });
+        if (!made.ok) {
+          kernel.jobs.cancel({ id: started.value.id });
+          return tail(made as Result<never>);
+        }
+        return tail(ok({ id: made.value.id, routed_to: routedOf(made.value), job: started.value.id }));
+      }
+      const made = kernel.instruct(asPerson(ctx), { ...carried, ...where, kind: 'tell', to: 'agent', to_agent: first.to_agent ?? 'claude', when: 'next' });
+      return tail(made.ok ? ok({ id: made.value.id, routed_to: routedOf(made.value) }) : (made as Result<never>));
     },
   };
 }

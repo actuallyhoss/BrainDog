@@ -99,7 +99,8 @@ export function lineOf(i: Instr, by: string): string {
  * the list they are rows of (`kernelStop`).
  */
 export function toldTo(readable: RecordDeps['readable'], ctx: CallContext, open: readonly Instr[]): Instr[] {
-  return readable(ctx, INSTRUCTIONS) === null ? [...open] : open.filter((i) => i.to === 'run');
+  /* ONE A JOB CARRIES IS ITS RUN'S AS ONE SENT BY NAME IS: it reaches no run but the one that job's bearer opened. */
+  return readable(ctx, INSTRUCTIONS) === null ? [...open] : open.filter((i) => i.to === 'run' || i.job !== null);
 }
 
 export function toldOf(sql: Sql, i: Instr): Told {

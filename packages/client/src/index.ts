@@ -2680,8 +2680,12 @@ export function createClient(options: ClientOptions) {
       call<Answer<'sendTo'>>('sendTo', args as Record<string, unknown>),
     /** One request he sent (`IN12`): its state, reply, what it is doing now and its receipts, for the strip. READ+. */
     sent: (args: { id: string }) => call<Answer<'sent'>>('sent', args as Record<string, unknown>),
-    /** What he sent that is still in flight, or every request about one `row` from the last week. READ+. */
-    sentList: (args: { row?: string } = {}) => call<Answer<'sentList'>>('sentList', args as Record<string, unknown>),
+    /** What he sent that is still in flight, or every request about one `row` from the last week (`open: '1'` for in flight). READ+. */
+    sentList: (args: { row?: string; open?: string } = {}) => call<Answer<'sentList'>>('sentList', args as Record<string, unknown>),
+    /** Take back a request he sent, or stop its job on the machine. DATA, a person only. */
+    sendWithdraw: (args: { id: string }) => call<Answer<'sendWithdraw'>>('sendWithdraw', args as Record<string, unknown>),
+    /** Follow up a request he sent with `note`, to the same run while it is open. DATA, a person only. */
+    sendReply: (args: { id: string; note: string }) => call<Answer<'sendReply'>>('sendReply', args as Record<string, unknown>),
     /**
      * An agent's own instructions: with nothing, what is pending (marked seen); `take` one; `reply` to one with `said`
      * and `state` (done, needs_you or declined); or `seen`, the ids a client showed it, with `how`. DATA.

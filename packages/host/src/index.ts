@@ -22,6 +22,7 @@ import { FIREWALL_FAULT, firewall } from '@braindog/record/sight';
 
 import { crashed } from './crash.ts';
 import { EXTRA_ROUTES } from './routes/index.ts';
+import { sendPathOf } from './send-paths.ts';
 
 export { HINTS, hintsOf, sessionOf, withSession, type SessionHints } from './session.ts';
 export { serveKeychain, servesKeychain, KEYCHAIN_HEADERS, keychainReply, type KeychainAsk, type KeychainDoor, type KeychainGrantSeen, type KeychainTokenAsk } from './keychain.ts';
@@ -574,7 +575,10 @@ export async function serveApi(
   ctx: unknown,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const name = url.pathname.replace(/^\/+api\/+/, '').replace(/\/+$/, '');
+  /* "SEND TO…" IS CALLED BY PATHS (`/api/send/<id>/reply`), each a method of the table under another name
+     (`send-paths.ts`); every other path names its method. */
+  const pathed = sendPathOf(request.method, url.pathname);
+  const name = pathed?.name ?? url.pathname.replace(/^\/+api\/+/, '').replace(/\/+$/, '');
 
   const route = BY_NAME.get(name);
   const handler = handlers[name];
@@ -685,6 +689,9 @@ export async function serveApi(
       }
     }
   }
+
+  /* THE ID A PATH NAMES IS PUT OVER THE BODY'S, so a body never points a path at another send. */
+  if (pathed !== null) Object.assign(args, pathed.args);
 
   /* NOTHING THROWS ACROSS THIS BOUNDARY, and this is where that promise is kept. A handler that
      throws (an argument nobody coerced, a driver error, a bug) used to escape here, and the caller
