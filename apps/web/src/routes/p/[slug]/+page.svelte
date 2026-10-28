@@ -157,13 +157,14 @@
     if (remembered === null) return;
     return untrack(() => holdPresses());
   });
-  function fromLocal(asked: string, choice: Record<string, string>) {
+  function fromLocal(asked: string, choice: Record<string, string>, drawn: () => void) {
     /* One later than the wait is drawn when it lands, while the record has not answered: `got` is its answer once it has. */
     const draw = (near: Near<Opened> | null) => {
       if (near === null || near.value.from !== 'live' || (route.params.slug ?? '') !== asked || got !== null) return;
       answered(asked, near.value);
       copied = asked;
       painted('page', 'copy');
+      drawn();
     };
     void nearLocal<Opened>(PAGE_COPY, pageKey(apiBase(), asked, choice), apiBase(), draw).then(draw);
   }
@@ -184,7 +185,9 @@
     const mark = localTicket();
     /* A PAGE DRAWN FROM WHAT THIS TAB KEPT IS THE SCREEN, and the read behind it lands over it: the bracket is closed now
        and not when the record answers, as Today's is (`Home.svelte`), so Back to Money is settled when it is drawn and
-       not after the figures have been worked out again. A refusal of that read is still said (`closeRead`). */
+       not after the figures have been worked out again. A refusal of that read is still said (`closeRead`). THE SAME
+       FOR THE LOCAL COPY'S PAGE on a reload: it is drawn and marked, so the screen is settled, and the copy's own mark
+       stays up over it until the record answers (`holdCopyMark`). */
     let released = false;
     const closeRead = (ok: boolean): void => {
       if (released) return ok ? undefined : closed(false, opened());
@@ -196,7 +199,7 @@
       remembered = asked;
       painted('page', 'memory');
       closeRead(true);
-    } else fromLocal(asked, choice);
+    } else fromLocal(asked, choice, () => closeRead(true));
     waited = 0;
     clearTimeout(holdTimer);
     holdTimer = setTimeout(() => (waited = HOLD_MS), HOLD_MS);

@@ -148,6 +148,8 @@
         calls = near.value.calls;
         fromCopy = true;
         painted('decide', 'copy');
+        /* THE COPY'S QUEUE IS THE SCREEN TOO, as what this tab kept is: drawn and marked, the read lands over it. */
+        drawnKept?.();
       };
       void nearLocal<KeptDecide>(DECIDE_COPY, apiBase(), apiBase(), draw).then(draw);
     }
