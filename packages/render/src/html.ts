@@ -34,7 +34,7 @@ import { PATH_DONE, PATH_NEXT, pathMore, pathPlan, unvalued } from './path.ts';
 import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
-import { TODO_META_JOIN, todoLines, todoMeta as metaCells, todoTitle } from './todo.ts';
+import { TODO_META_JOIN, boardMeta, todoLines, todoTitle } from './todo.ts';
 import {
   TIMELINE_CHIP,
   rowsCell,
@@ -350,8 +350,9 @@ const todoMeta = (parts: readonly string[], opts: RenderOptions): string =>
  * padded to four with a blank, is the markup it was before a card could carry a second fact.
  */
 const boardDetail = (cells: readonly string[], opts: RenderOptions): string => {
-  if ((cells[3] ?? '').trim() === '') return cell('card-detail', cells[2], opts);
-  return `<span class="card-detail">${metaCells(cells).map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>`;
+  const parts = boardMeta(cells, opts.now);
+  if ((cells[3] ?? '').trim() === '') return cell('card-detail', parts[0], opts);
+  return `<span class="card-detail">${parts.map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>`;
 };
 
 /** The dot itself, said the same way `Table`, `Grid` and `List` say it. */

@@ -77,13 +77,26 @@
     padding-inline-end: calc(28px + var(--sp-1));
   }
 
-  /* A long word (an invoice number, an address) breaks rather than widening its lane past the others. */
+  /* A LONG WORD (an address, an invoice number) IS CUT WITH AN ELLIPSIS, never broken inside itself: a lane is narrow,
+     and "kilnfonts.exampl" over a lone "e" read as two words. The title wraps between its words as before; only a word
+     wider than the lane is cut, and the card's page says it whole. */
+  .board-col .card-title,
+  .board-col .card-title > .item-open {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+  }
+
   .board-col .card-title {
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
     line-height: var(--lh-head);
-    overflow-wrap: anywhere;
+  }
+
+  .board-col .card-title > .item-open {
+    display: block;
+    inline-size: 100%;
   }
 
   /* ── board: the move ────────────────────────────────────────────────────

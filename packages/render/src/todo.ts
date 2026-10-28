@@ -76,3 +76,22 @@ export function todoLines(cells: readonly string[], now?: number, done = false):
   if (SAID_DAY.test(second.trim())) return { detail: '', meta: [said(second), ...meta] };
   return { detail: second, meta };
 }
+
+/** The columns of a board whose cards are finished, by the value they are filed under. */
+const FINISHED = /^(done|dropped|finished|closed|cancelled)$/iu;
+
+/**
+ * A BOARD CARD'S QUIET LINE, for both renderers: its third cell, and its fourth after the dot where it has one. A day
+ * that is past on a card still to do is said as late, in the red phrase, and every other day is left as written, so
+ * the board's one colour is what is late. A card filed under a finished column is never late.
+ */
+export function boardMeta(cells: readonly string[], now: number = Date.now()): string[] {
+  const done = FINISHED.test((cells[0] ?? '').trim());
+  const late = (c: string): string => {
+    if (done || !SAID_DAY.test(c.trim())) return c;
+    const said = todoDay(c, now);
+    return said.startsWith('{{bad:') ? said : c;
+  };
+  const parts = (cells[3] ?? '').trim() === '' ? [cells[2] ?? ''] : todoMeta(cells);
+  return parts.map((c, n) => (n === 0 ? late(c) : c));
+}

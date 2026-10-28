@@ -16,7 +16,7 @@
   import { figureChars, headlineFigure, hrefFor, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, laneShown, moveTarget, type Moves } from '../../src/board.ts';
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
-  import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
+  import { TODO_META_JOIN, boardMeta } from '../../src/todo.ts';
   import { valueWord } from '../../src/format.ts';
   import { written } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
@@ -331,10 +331,12 @@
   {/if}
   <!-- THE FOURTH CELL JOINS THE THIRD ON THE ONE LINE, by the dot a `todo`'s two facts are joined with, and a
        card without one draws the line it always drew. -->
+  <!-- A PAST DAY ON A CARD STILL TO DO IS SAID LATE, in red, and nothing else on the board is (`boardMeta`). -->
+  {@const meta = boardMeta(row.cells, opts.now)}
   {#if (row.cells[3] ?? '').trim() !== ''}
-    <span class="card-detail">{#each todoMeta(row.cells) as part, n}{#if n > 0}{TODO_META_JOIN}{/if}<Text nodes={inline(part, opts)} {opts} />{/each}</span>
+    <span class="card-detail">{#each meta as part, n}{#if n > 0}{TODO_META_JOIN}{/if}<Text nodes={inline(part, opts)} {opts} />{/each}</span>
   {:else}
-    <span class="card-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
+    <span class="card-detail"><Text nodes={inline(meta[0] ?? '', opts)} {opts} /></span>
   {/if}
   <!-- A WORD, NOT A COLOUR, so it needs no tone and draws no glyph: `13 §5.1` bans colour carrying
        meaning alone, and the way out of that rule is to say the thing rather than to tint it. The
