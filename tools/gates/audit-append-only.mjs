@@ -52,8 +52,8 @@ export const REWRITE = /\b(?:UPDATE(?:\s+OR\s+[A-Z]+)?|DELETE\s+FROM|REPLACE\s+I
 export const ALLOWED = [
   {
     file: 'packages/kernel/src/erase.ts',
-    statement: 'UPDATE event SET from_v = CASE WHEN from_v IS NULL',
-    why: 'Erasing a person: every line that names them, or is about a row that was erased, keeps its place in the log and loses its words.',
+    statement: 'UPDATE event SET field = CASE WHEN field IS NULL OR NOT ? THEN field ELSE ? END, from_v = CASE WHEN from_v IS NULL',
+    why: 'Erasing a person: every line that names them, or is about a row that was erased, keeps its place in the log and loses its words, the field it names included.',
   },
   {
     file: 'packages/kernel/src/flow.ts',
