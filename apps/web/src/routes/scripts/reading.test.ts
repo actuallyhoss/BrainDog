@@ -70,7 +70,7 @@ test('a row of the page’s scripts block says what starts it and where it stand
   const ok = scriptOf({ script: 'fx', title: 'FX rate', status: 'on', every: '1d', rule: true, last_at: '2026-09-29T08:00:00Z', last: 'ok', said: '' }, NOW);
   assert.equal(ok.script, 'fx');
   assert.equal(ok.title, 'FX rate');
-  assert.equal(ok.what, 'Runs every day and when an automation starts it');
+  assert.equal(ok.what, 'Every day · by automation');
   assert.match(ok.said, /^Last ran /u);
   assert.equal(ok.tone, undefined);
   assert.deepEqual(

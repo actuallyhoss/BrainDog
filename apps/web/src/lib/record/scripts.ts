@@ -198,6 +198,10 @@ export const words = {
   rule: 'when an automation starts it',
   runs: (parts: string[]) => `Runs ${parts.join(' and ')}.`,
   never: 'Runs only when started by hand.',
+  /* THE SAME, AS A LIST'S CELL (`startsShort`). */
+  doorShort: (door: string) => `on ${door}`,
+  ruleShort: 'by automation',
+  byHand: 'By hand',
   /* Where it stands. */
   paused: (n: number) => `Paused after ${n} refused runs one after another. It runs again when you resume it.`,
   notRun: (next: string | null) => (next === null ? 'Not run yet.' : next === DUE ? 'Not run yet. Due to run.' : `Not run yet. First run ${next}.`),
@@ -270,9 +274,22 @@ export function nextSaid(iso: string, now: number = recordNow()): string {
   return days === 0 ? `today at ${time}` : days === 1 ? `tomorrow at ${time}` : `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]!} at ${time}`;
 }
 
-/** What starts a script and where it stands, as the list's one meta line: "Runs every day · Not run yet". */
+/**
+ * WHAT STARTS A SCRIPT, AS A LIST'S CELL SAYS IT: "Every day · by automation", the clock first, never a sentence. The
+ * script's own page keeps the sentence (`startsBy`).
+ */
+export function startsShort(s: Pick<ScriptRow, 'runs'>): string {
+  const parts: string[] = [];
+  if (s.runs.every !== null) parts.push(words.every(s.runs.every));
+  if (s.runs.door !== null) parts.push(words.doorShort(humanize(s.runs.door)));
+  if (s.runs.rule) parts.push(words.ruleShort);
+  const said = parts.length === 0 ? words.byHand : parts.join(' · ');
+  return said.charAt(0).toUpperCase() + said.slice(1);
+}
+
+/** What starts a script and where it stands, as the list's one meta line: "Every day · Not run yet". */
 export function rowOf(s: Pick<ScriptRow, 'runs' | 'status' | 'last' | 'next'>, now: number = recordNow()): { what: string; said: string; tone: 'warn' | 'bad' | undefined } {
-  const what = startsBy(s).replace(/\.$/u, '');
+  const what = startsShort(s);
   if (s.status === 'paused') return { what, said: words.short.paused, tone: 'warn' };
   if (s.last?.outcome === 'refused') return { what, said: words.short.refused, tone: 'bad' };
   if (s.last !== null) return { what, said: words.short.ran(since(s.last.at, now)), tone: undefined };

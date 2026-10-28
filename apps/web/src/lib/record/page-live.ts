@@ -1763,7 +1763,7 @@ export function blockOf(
   /* THE INSTALLED SCRIPTS (`packages/kernel/src/sources/scripts.ts`), one row a script, which `/scripts` draws.
      `scripts` names no register, so the common path below would draw them as a block this build cannot draw. A row is
      keyed by its script and opens its own page, and two of its cells are said as the old list said them (`scriptOf`):
-     `every` is what starts it ("Runs every day and when an automation starts it") and `last_at` where it stands ("Last
+     `every` is what starts it ("Every day · by automation") and `last_at` where it stands ("Last
      ran 2 hours ago", "Paused"). A paused one, or one refused on its last run, carries its tone, drawn with its glyph. */
   if (b.source === 'scripts') {
     const register = 'scripts';
