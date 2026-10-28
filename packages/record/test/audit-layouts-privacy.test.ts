@@ -248,9 +248,13 @@ test('EVERY KEY THE KERNEL ANSWERS IS TAKEN OFF A HELD BLOCK, so an answer key a
 /* ── the queue ───────────────────────────────────────────────────────────────────────────────────────── */
 
 test('Q1 A QUEUE IS HELD FROM A MEMBER WHO DOES NOT READ EVERY LIST, as governance holds the rowset back from her', async () => {
-  const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) });
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   assert.ok((await api.kernel.install([reg('areas', 'Areas', 'name', [{ id: 'name', type: 'text', required: true }]), reg('diary', 'Diary', 'what', [{ id: 'what', type: 'text', required: true }]), DECLS.at(-1)!])).ok);
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  /* EVERY QUESTION IN NEEDS YOU, the agents' shelf turned off: Slash's diary line would wait there, and the queue the
+     page draws is what this tests. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_1', 'decide.agents_apart', 'false', '2026-10-01T00:00:00.000Z')");
   assert.ok(api.kernel.propose({ question: 'Add the diary line?', body_kind: 'rowset', body: { register: 'diary', rows: [{ what: 'Dinner with the auditor about Sam' }] } } as never, 'slash').ok);
   value(await api.invite({ person: 'p_9', name: 'Wren', level: 'read', registers: { diary: 'append' } } as never, owner));
   const held = api.kernel.access('p_9')!;

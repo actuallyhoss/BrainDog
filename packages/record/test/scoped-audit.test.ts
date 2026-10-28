@@ -351,6 +351,9 @@ test('7. A CURSOR ON A QUESTION SHE MAY NOT SEE IS ANSWERED AS ONE ON NO QUESTIO
 
 test('THE OWNER READS WHAT THEY READ BEFORE: every page, every block, the prediction and every digest section', async () => {
   const { api, sql } = await record();
+  /* EVERY QUESTION IN NEEDS YOU, the agents' shelf turned off: the agent's diary note would wait there, and what the
+     owner's queue reads is what this tests. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_1', 'decide.agents_apart', 'false', '2026-10-01T00:00:00.000Z')");
   value(await api.propose({ question: 'File the note that Sam is on the redundancy list?', body_kind: 'rowset', body: { register: 'diary', rows: [{ body: 'Sam is on the list' }] } } as never, agent));
   await predict(api);
 

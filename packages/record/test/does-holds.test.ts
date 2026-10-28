@@ -46,6 +46,9 @@ test('A FIELD THE LIST LACKS IS NOT NAMED ON THE LINE, and tags and a field with
   const api = await createRecordApi({ sql, clock: { now: () => NOW } as never });
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   value(await api.kernel.install([TASKS]));
+  /* EVERY QUESTION IN NEEDS YOU, the agents' shelf turned off: an agent's undoable edits would wait there, and the line
+     the queue's lead says is what this tests. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('p_1', 'decide.agents_apart', 'false', '2026-10-01T00:00:00.000Z')");
   sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES ('t_claude', 'p_1', 'h', 'write', 'Claude Code', '2026-10-01T00:00:00.000Z')");
   const ship = value<Entry>(await api.create({ register: 'tasks', fields: { name: 'Ship' } }, owner));
   const ask = async (question: string, patch: Record<string, unknown>) =>
