@@ -328,25 +328,24 @@
       <Button weight="quiet" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
     {/snippet}
     {#if sections.shared.length === 0 && linkCount === 0}
-      <Empty kind="no-data-yet" title={copy.sharingNothing} body={copy.sharingNothingBody} />
+      <Empty kind="no-data-yet" compact title={copy.sharingNothing} />
     {:else if sections.shared.length > 0}
       <ul class="bunches">{#each sections.shared as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
     {/if}
     <Links inside bind:count={linkCount} />
   </Tile>
 
-  <Tile icon="clock" title={copy.sharingWaiting} count={sections.waiting.reduce((n, b) => n + b.rows.length, 0) || undefined}>
-    <p class="hint">{copy.sharingWaitingLead}</p>
-    {#if sections.waiting.length === 0}
-      <p class="none">{copy.sharingNoneWaiting}</p>
-    {:else}
+  <!-- WAITING AND ENDED ARE DRAWN ONLY WHILE THEY HOLD SOMETHING: a tile that says "none" is a tile of nothing. -->
+  {#if sections.waiting.length > 0}
+    <Tile icon="clock" title={copy.sharingWaiting} count={sections.waiting.reduce((n, b) => n + b.rows.length, 0) || undefined}>
+      <p class="hint">{copy.sharingWaitingLead}</p>
       <ul class="bunches">{#each sections.waiting as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
-    {/if}
-  </Tile>
+    </Tile>
+  {/if}
 
   <Tile icon="user-plus" title={copy.sharingGroups} count={groups?.length || undefined}>
     {#if (groups ?? []).length === 0}
-      <Empty kind="no-data-yet" title={copy.sharingNoGroups} body={copy.sharingNoGroupsBody} />
+      <Empty kind="no-data-yet" compact title={copy.sharingNoGroups} />
     {:else}
       <ul class="bunches">
         {#each groups ?? [] as g (g.id)}
@@ -396,14 +395,12 @@
     </form>
   </Tile>
 
-  <Tile icon="history" title={copy.sharingEnded} count={sections.ended.reduce((n, b) => n + b.rows.length, 0) || undefined}>
-    <p class="hint">{copy.sharingEndedLead}</p>
-    {#if sections.ended.length === 0}
-      <p class="none">{copy.sharingNoneEnded}</p>
-    {:else}
+  {#if sections.ended.length > 0}
+    <Tile icon="history" title={copy.sharingEnded} count={sections.ended.reduce((n, b) => n + b.rows.length, 0) || undefined}>
+      <p class="hint">{copy.sharingEndedLead}</p>
       <ul class="bunches">{#each sections.ended as b (b.key)}{@render bunchOf(b, true)}{/each}</ul>
-    {/if}
-  </Tile>
+    </Tile>
+  {/if}
 
   {#if seenOf}
     <Sheet bind:open={seenOpen} title={copy.sharingSeenTitle(seenOf.name)} subtitle={copy.sharingSeenLead}>
@@ -449,8 +446,7 @@
     min-block-size: var(--tap);
   }
 
-  .hint,
-  .none {
+  .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
     color: var(--ink-3);
