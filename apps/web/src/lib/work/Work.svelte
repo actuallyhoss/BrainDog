@@ -32,6 +32,7 @@
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { pageKey } from '$lib/record/kept-pages.ts';
   import { pageLists } from '$lib/record/page-lists.ts';
+  import { plainOf, revivedOf } from '$lib/data/plain.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { pageReader, type Opened } from '$lib/record/page-live.ts';
   import PageView from '$lib/page/PageView.svelte';
@@ -83,7 +84,8 @@
   const localKey = (asked: Readonly<Record<string, string>>) => pageKey(apiBase(), WORK_PAGE, asked);
   function keepPage(asked: Readonly<Record<string, string>>, out: Opened, mark: number) {
     if (out.from !== 'live') return;
-    keepLocal(PAGE_COPY, localKey(asked), pageLists(out.page.blocks), out, mark, {}, { always: true });
+    /* AS PLAIN JSON (`plain.ts`): its rows name projects by a reference, a `Map` the copy would refuse whole. */
+    keepLocal(PAGE_COPY, localKey(asked), pageLists(out.page.blocks), plainOf(out), mark, {}, { always: true });
   }
 
   /* A FIRST READ BLANKS THE PAGE; A NEW CHOICE OF FILTER DOES NOT, so the strip stays under the finger that chose. */
@@ -111,7 +113,7 @@
     if (got === null) {
       const draw = (near: Near<Opened> | null) => {
         if (near === null || near.value.from !== 'live' || got !== null || mine !== started) return;
-        got = near.value;
+        got = revivedOf<Opened>(near.value);
         copied = true;
         painted(WORK_PAGE, 'copy');
       };

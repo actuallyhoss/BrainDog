@@ -41,7 +41,9 @@
   import { isDay } from '$lib/record/day-href.ts';
   import { pageKey } from '$lib/record/kept-pages.ts';
   import { pageLists } from '$lib/record/page-lists.ts';
-  import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { plainOf, revivedOf } from '$lib/data/plain.ts';
+  import { keepLocal, localTicket, nearLocal, settledLocal } from '$lib/data/local-tab.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
@@ -157,21 +159,59 @@
     if (remembered === null) return;
     return untrack(() => holdPresses());
   });
+  /**
+   * THE CODE A DRAWN PAGE'S PARTS ARE DRAWN BY, each fetched as its block draws (`BlockSlot.svelte`): a project's parts
+   * and its shape, the desk's tiles, the projects board. The same addresses, so it is the chunks the page asks anyway.
+   */
+  function partsCode(page: Opened): Promise<unknown> {
+    if (page.from !== 'live') return Promise.resolve();
+    const blocks = page.page.blocks as readonly { kind?: unknown; key?: unknown; desk?: { kind?: unknown } }[];
+    const code: Promise<unknown>[] = [];
+    if (blocks.some((b) => b.kind === 'project')) code.push(import('$lib/page/shape-hold.svelte.ts'), import('$lib/page/ProjectPart.svelte'));
+    if (blocks.some((b) => b.key === 'board')) code.push(import('$lib/home/ProjectsBoard.svelte'));
+    const desks = new Set(blocks.map((b) => b.desk?.kind));
+    if (desks.has('late')) code.push(import('$lib/home/LateNow.svelte'));
+    if (desks.has('working')) code.push(import('$lib/home/WorkingNow.svelte'));
+    if (desks.has('projects')) code.push(import('$lib/home/ProjectCards.svelte'));
+    return Promise.all(code);
+  }
   function fromLocal(asked: string, choice: Record<string, string>, drawn: () => void) {
     /* One later than the wait is drawn when it lands, while the record has not answered: `got` is its answer once it has. */
     const draw = (near: Near<Opened> | null) => {
       if (near === null || near.value.from !== 'live' || (route.params.slug ?? '') !== asked || got !== null) return;
-      answered(asked, near.value);
+      /* KEPT AS PLAIN JSON (`plain.ts`), its `Map`s written as entries, and read back into them here. */
+      const page = revivedOf<Opened>(near.value);
+      answered(asked, page);
       copied = asked;
       painted('page', 'copy');
-      drawn();
+      /* SETTLED ONCE THE CODE ITS PARTS ARE DRAWN BY HAS LANDED, and a frame after it: the record's answer took long
+         enough for it to arrive, and a copy drawn at once said the screen was ready over a project page with no parts. */
+      void partsCode(page)
+        .then(() => tick())
+        .then(drawn, drawn);
     };
     void nearLocal<Opened>(PAGE_COPY, pageKey(apiBase(), asked, choice), apiBase(), draw).then(draw);
   }
   /** Keep a live answer in the local copy, `always`, so it is only ever drawn while the page asks again. */
-  function keepPage(asked: string, choice: Record<string, string>, out: Opened, mark: number) {
+  async function keepPage(asked: string, choice: Record<string, string>, out: Opened, mark: number) {
     if (out.from !== 'live') return;
-    keepLocal(PAGE_COPY, pageKey(apiBase(), asked, choice), pageLists(out.page.blocks), out, mark, {}, { always: true });
+    /* A CATCH-UP WHILE IT WAS OUT, OR THE COPY CLAIMED UNDER IT, DOES NOT COST IT ITS PLACE, as Today's does not
+       (`Home.svelte`): it is never drawn as current, only while the page asks again, so it is kept under the ticket
+       the copy holds once it has settled. On a record its agents write to all day, a page's read almost always met
+       one, and was never kept for the next open. */
+    let ticket = mark;
+    if (localTicket() !== mark) {
+      await settledLocal();
+      ticket = localTicket();
+    }
+    /* AND IT NAMES THE LISTS THE COPY KEEPS, as Today's does: a page with the runs on it (a project, Agents) or a list
+       that seals a value named one the copy never keeps, so the whole page was never kept. The rows it draws of them
+       go with it as drawn, and are asked again with the rest on every open. */
+    const l = await import('$lib/data/local.ts');
+    const lists = pageLists(out.page.blocks).filter((id) => !l.NEVER_KEPT.has(id) && (REGISTERS[id] === undefined || !l.holdsSecret(REGISTERS[id])));
+    /* AS PLAIN JSON: a page whose blocks name rows by a reference carries a `Map` of their names, and the copy keeps
+       nothing that is not plain, so Money and Projects were never kept at all. */
+    keepLocal(PAGE_COPY, pageKey(apiBase(), asked, choice), lists, plainOf(out), ticket, {}, { always: true });
   }
 
   async function readLive(asked: string) {
@@ -221,7 +261,7 @@
     answered(asked, out);
     copied = null;
     if (out.from === 'live') painted('page', 'network');
-    keepPage(asked, choice, out, mark);
+    void keepPage(asked, choice, out, mark);
     reading = false;
     closeRead(out.from !== 'refused');
   }
@@ -259,7 +299,7 @@
         if (out.from === 'live') {
           answered(asked, out);
           copied = null;
-          keepPage(asked, choice, out, mark);
+          void keepPage(asked, choice, out, mark);
         }
       }
     } finally {
