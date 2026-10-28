@@ -43,7 +43,7 @@ export const SCRIPTS_PAGES: Record<string, SeedPage> = {
         columns: [
           { field: 'title', label: 'Script' },
           { field: 'every', label: 'Runs' },
-          { field: 'last_at', label: 'Where it stands' },
+          { field: 'last_at', label: 'Status' },
         ],
         empty: 'No scripts yet. A script is a short program an agent writes and you accept.',
       },

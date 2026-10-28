@@ -183,7 +183,7 @@ export function afterResume(rows: readonly Script[], script: string, nowIso: str
 export const words = {
   heading: 'Scripts',
   /* THE TILE ON A SCRIPT'S OWN PAGE that says where it stands, over the form that changes it. */
-  standing: 'Where it stands',
+  standing: 'Status',
   /* THE ONE WAY IN, since nothing on this list otherwise starts a script. */
   newScript: 'New script',
   none: 'No scripts yet',

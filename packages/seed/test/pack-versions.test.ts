@@ -2267,6 +2267,16 @@ const DECLARED: Record<string, Version> = {
       '`page.health`, `page.scripts`, `page.calendar` and `page.activity` are no longer declared here: People hands the four to `core` under the same ids, and `page.people` and the rest are as they were -> 227130b05c177df0',
     ],
   },
+  /* SCRIPTS' COLUMN OF WHERE EACH STANDS IS CALLED STATUS. core 1.0.0 is on master, so a version of its own. */
+  'core@1.1.0': {
+    holds: `
+      page.activity page.calendar page.health page.scripts
+    `,
+    declares: 'debc6ef13f7f548d',
+    history: [
+      '`page.scripts` heads its `last_at` column "Status" where it said "Where it stands"; words on a column, nothing else moved -> debc6ef13f7f548d',
+    ],
+  },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
     holds: `

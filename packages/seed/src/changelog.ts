@@ -129,6 +129,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   core: [
+    { version: '1.1.0', notes: "Scripts calls the column that says how each script is doing Status." },
     {
       version: '1.0.0',
       notes: 'Health, Scripts, Calendar and Activity now come with BrainDog itself and no longer with People. They are the same pages with the same names, so your sidebar order and anything you hid stay as you left them.',

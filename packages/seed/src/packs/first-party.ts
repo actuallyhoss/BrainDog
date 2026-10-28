@@ -807,9 +807,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   holds (`CORE_PAGES`), under the same page ids, so the navigation order and hides that name them stay as they are.
  *   People hands the four to core in the same plan (`hands`), which the quiet updater reads as not lost. A page leaves, so
  *   People's step is a major one. Core is 1.0.0, and a record that never held it takes it in the same pass.
+ * - core 1.1.0: `page.scripts` heads the column of where each script stands "Status". Words on a column, no id added or
+ *   taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  core: '1.0.0',
+  core: '1.1.0',
   portfolio: '1.30.0',
   people: '4.0.0',
   'money-core': '3.29.0',
