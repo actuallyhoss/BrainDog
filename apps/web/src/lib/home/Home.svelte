@@ -133,7 +133,18 @@
 
   /* THE READER ONCE ITS CODE HAS LANDED (`pageViewOf`), drawn where it is the moment it has. */
   let PageView = $state.raw<typeof PageViewOf | null>(pageViewHad);
-  if (PageView === null) void pageViewOf().then((m) => (PageView = m.default), () => undefined);
+  /* AND ITS CODE IS PART OF THE SCREEN, held open until it lands: a read that answered first said Today was ready over a
+     page with no body, which then took a long task to draw a moment later, and a press in that moment waited on it. */
+  if (PageView === null) {
+    const held = opened();
+    void pageViewOf().then(
+      (m) => {
+        PageView = m.default;
+        closed(true, held);
+      },
+      () => closed(false, held),
+    );
+  }
 
   /* WHAT HE HAS SHARED OUT, for the one line in Needs you's foot (`shared-line.ts`): asked once the screen is idle, an
      owner's alone, and never a part of `boot`, which an owner is answered as before sharing. */
