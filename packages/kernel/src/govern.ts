@@ -1171,6 +1171,99 @@ export function sweepLapsed(deps: Pick<GovernDeps, 'sql' | 'mint'>, nowMs: numbe
   return { withdrawn };
 }
 
+/* ── a question that can no longer apply withdraws itself ─────────────── */
+
+/** The line under a question whose rows changed since it was asked, so no answer could do what it asked. */
+export const CHANGED_NOTE = 'Taken back: what it asked about changed since, so it no longer applies.';
+/** The line under a question whose rows, or the row it is about, are gone. */
+export const GONE_NOTE = 'Taken back: what it asked about is gone.';
+
+/** How many open questions one sweep reads, so an hour's tick costs the same whatever the queue holds. */
+const STALE_BOUND = 200;
+
+/**
+ * Why an open question can no longer apply, as the line it closes with, or `null` while it still can.
+ *
+ *   - a rowset that updates a row that is gone, or one that moved since it was asked in a way `moved` cannot carry it
+ *     over (a field it changes was written since to another value, or what moved the row is not in the log): accepting
+ *     it is refused, and would be refused for ever;
+ *   - a choice whose every option that writes would leave every entry it names, each gone or changed the same way:
+ *     whatever is picked writes nothing of what was asked;
+ *   - a question about one row (`about`, a spoken id) whose row is deleted.
+ *
+ * EXACT, AND A MISS ONLY MEANS IT WAITS. A row that moved where the question's fields did not is carried over at the
+ * press (`moved`), so it is not stale here; a question a rule or an agent can no longer apply is never answered for
+ * anybody: it is taken back, with no decision written and nothing observed against whoever asked.
+ */
+export function staleWhy(deps: Pick<GovernDeps, 'sql' | 'row'>, q: { id: string; body_kind: string; body: unknown }): string | null {
+  const body = isMap(q.body) ? q.body : typeof q.body === 'string' ? parse(q.body) : null;
+  if (body === null) return null;
+  /* ONE UPDATE ROW: `gone`, `changed`, or `null` when an answer can still write it. */
+  const rowFate = (list: string, r: Record<string, unknown>): 'gone' | 'changed' | null => {
+    if (typeof r.at !== 'string') return null;
+    const row = deps.row(list, r.at);
+    if (!row || row.deleted) return isMap(r.patch) && Object.hasOwn(r.patch, 'deleted_at') ? null : 'gone';
+    if (typeof r.version !== 'number') return null;
+    const now = deps.sql.one<{ version: number }>('SELECT version FROM entry WHERE id = ?', row.id);
+    if (!now || now.version === r.version) return null;
+    const met = moved(deps as GovernDeps, q.id, list, r);
+    return met === null || !met.ok ? 'changed' : null;
+  };
+  const about = typeof body.about === 'string' ? /^([a-z][a-z0-9_]{0,31})#[1-9]\d*$/u.exec(body.about) : null;
+  if (about !== null) {
+    const row = deps.row(about[1]!, body.about as string);
+    if (row !== null && row.deleted) return GONE_NOTE;
+  }
+  if (q.body_kind === 'rowset' && typeof body.register === 'string') {
+    const register = body.register;
+    const fates = listOf(body.rows)
+      .filter(isMap)
+      .map((r) => rowFate(typeof r.register === 'string' ? r.register : register, r));
+    if (fates.includes('gone')) return GONE_NOTE;
+    if (fates.includes('changed')) return CHANGED_NOTE;
+    return null;
+  }
+  if (q.body_kind === 'options') {
+    const writing = listOf(body.options).filter((o): o is Record<string, unknown> => isMap(o) && o.patches !== undefined);
+    if (writing.length === 0) return null;
+    const fates = writing.map((o) => {
+      const lists = patchLists(o.patches, 'patches');
+      if (!lists.ok) return null;
+      const each = [...lists.value].flatMap(([list, rows]) => rows.map((r) => rowFate(list, r)));
+      if (each.length === 0 || each.some((f) => f === null)) return null;
+      return each.every((f) => f === 'gone') ? 'gone' : 'changed';
+    });
+    if (fates.some((f) => f === null)) return null;
+    return fates.every((f) => f === 'gone') ? GONE_NOTE : CHANGED_NOTE;
+  }
+  return null;
+}
+
+/**
+ * Take back each open question that can no longer apply (`staleWhy`), signed by the record (`system`) with the line that
+ * says why, so it leaves Needs you on its own instead of waiting for ever. The hourly sweep runs it after `recheck`.
+ * Bounded and turning as `recheck` is. Run it inside the caller's transaction.
+ */
+export function sweepStale(deps: Pick<GovernDeps, 'sql' | 'row' | 'mint'>, nowMs: number): { withdrawn: string[] } {
+  const open = "status = 'open' AND body_kind IN ('rowset', 'options')";
+  const total = deps.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM suggestion WHERE ${open}`)?.n ?? 0;
+  if (total === 0) return { withdrawn: [] };
+  type Open = { id: string; body_kind: string; body: string };
+  const read = (offset: number, limit: number): Open[] =>
+    limit <= 0 ? [] : deps.sql.all<Open>(`SELECT id, body_kind, body FROM suggestion WHERE ${open} ORDER BY opened_at ASC, id ASC LIMIT ? OFFSET ?`, limit, offset);
+  const from = total <= STALE_BOUND ? 0 : (Math.floor(nowMs / 3_600_000) * STALE_BOUND) % total;
+  const walked = [...read(from, STALE_BOUND), ...read(0, Math.min(from, from + STALE_BOUND - total))];
+  const at = instant(nowMs);
+  const withdrawn: string[] = [];
+  for (const q of walked) {
+    const why = staleWhy(deps, q);
+    if (why === null) continue;
+    takeBack(deps, q.id, 'system', at, why);
+    withdrawn.push(q.id);
+  }
+  return { withdrawn };
+}
+
 /** What a join note holds in `to_v`, so a join is told from any other note on the question. */
 const JOINED = 'joined';
 

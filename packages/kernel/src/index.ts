@@ -155,6 +155,7 @@ import {
   deciderFault as deciderFaultIn,
   countGovernance,
   countOpenQuestions,
+  sweepStale,
   apartIds,
   apartJson,
   NOT_APART,
@@ -673,7 +674,7 @@ export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
 export { LIST_PAGE_COLUMNS, LIST_PAGE_ROWS, listPage, type ListPage, type ListPageBlock, type ListPageColumn, type ListPageFilter, type ListPageSaid, type ListPageShape, type ListPageField } from './default-pages.ts';
 /* An arrangement's parts (govern-parts-43), by their ids and needs; `partsOf` is fx.ts's name here, so it goes out as arrangePartsOf. */
-export { ANSWERED_IN, APART_PREF, apartIds, apartJson, NOT_APART, ARRANGING, BODY_KINDS, COVERED, GOVERNANCE, HANDLED_PREF, apartOn, HANDLED_REASONS, HANDLED_RULE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, handledFault, handledOn, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
+export { ANSWERED_IN, CHANGED_NOTE, GONE_NOTE, APART_PREF, apartIds, apartJson, NOT_APART, ARRANGING, BODY_KINDS, COVERED, GOVERNANCE, HANDLED_PREF, apartOn, HANDLED_REASONS, HANDLED_RULE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, handledFault, handledOn, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
 /* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent
    stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
@@ -9149,6 +9150,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* A QUESTION THAT IS ALREADY SO is closed as moot in the same hour, with the sentence that says why (`cause.ts`
        `recheck`): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
     transaction(() => recheck(sql, clock.now(), mint));
+    /* AND A QUESTION THAT CAN NO LONGER APPLY takes itself back in the same hour (`govern.ts` `sweepStale`): its rows
+       changed so no answer could write them, or what it asked about is gone. One line in Handled says which. */
+    transaction(() => sweepStale(governDeps(), clock.now()));
     /* AND WHAT STILL WAITS AND IS SMALL SETTLES ITSELF (`settleWaiting`), small and reversible: a question asked again is closed,
        and an arrangement of the owner's own rows that BrainDog or his agent filed is answered as `rule:handled`, one
        line in Handled today with its Undo. Each settle in its own savepoint, so one refusal leaves that question open. */
