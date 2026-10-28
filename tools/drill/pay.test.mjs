@@ -19,7 +19,7 @@ import { OPERATOR, startCloud } from '../../apps/worker/test/cloud-serve.ts';
 import { HOST as CLOUD_HOST } from '../../apps/worker/test/cloud-harness.ts';
 import { fakeStripe } from '../../apps/worker/test/fake-stripe.ts';
 import { capturedMail, drill } from './steps.mjs';
-import { ACTED, EXTRA_SKIPPED, NAMES, PAY, STEPS, appliedIn, argsOf, payFor, runPay } from './pay.mjs';
+import { ACTED, EXTRA_UNSOLD, NAMES, PAY, STEPS, appliedIn, argsOf, payFor, runPay } from './pay.mjs';
 
 const HOST = 'https://alpha.example.test';
 const OLD = 'sk_test_made_up_pasted_key_0000';
@@ -91,8 +91,7 @@ test('EACH MISSING NAME MAKES ITS STEPS SKIP AND SAY WHY, AND NOTHING IS RED', a
   assert.deepEqual([by.mode.pass, by.mode.skipped], [true, undefined]);
   assert.equal(by['old-key'].said, `skipped: ${NAMES.oldKey} is not set, so whether the pasted key was rolled cannot be asked.`);
   assert.equal(by['sign-in'].said, 'skipped: CANARY_MAIL_DOOR is not set, so no stranger signs up.');
-  assert.equal(by.extra.said, `skipped: ${EXTRA_SKIPPED}`);
-  for (const name of ['free', 'upgrade', 'allowance', 'switch', 'invite', 'pack', 'past-due', 'cancel', 'delete', 'events'])
+  for (const name of ['free', 'upgrade', 'allowance', 'switch', 'invite', 'pack', 'extra', 'past-due', 'cancel', 'delete', 'events'])
     assert.deepEqual([by[name].skipped, by[name].said], [true, 'skipped: no stranger is signed in with a record of their own.'], name);
   assert.ok(results.every((r) => r.pass), 'a missing name turned a step red');
 });
@@ -197,7 +196,7 @@ test('THE WHOLE WALK ON THE HARNESS: every step green against the fake Stripe, e
     assert.deepEqual(lines.filter((x) => x.includes('"op":"billing"') && x.includes('"ok":false')), [], 'billing wrote a failure');
     assert.deepEqual(said.map((r) => r.name), PAY);
     for (const name of PAY.filter((n) => n !== 'extra' && n !== 'delete')) assert.deepEqual([by[name].pass, by[name].skipped], [true, undefined], `${name}: ${by[name].said}`);
-    assert.equal(by.extra.said, `skipped: ${EXTRA_SKIPPED}`);
+    assert.equal(by.extra.said, `skipped: ${EXTRA_UNSOLD}`);
     assert.match(by.invite.said, /still shows one seat at 17\.00/u);
     assert.match(by.cancel.said, /read-only: “Read-only until billing resumes\. Export is available\.”/u);
     /* A LAPSED OWNER CANNOT DELETE THEIR RECORD TODAY (`mayWrite` in apps/worker/src/lapse.ts lets only `export` by):

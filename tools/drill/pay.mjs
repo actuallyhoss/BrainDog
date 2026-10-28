@@ -6,8 +6,9 @@
  * THE SAME WALK `apps/worker/test/billing-rehearsal.test.ts` TAKES against a fake Stripe, step for step and by the same
  * names (`PAY`): Free; Cloud bought on Stripe's Checkout page with the test Visa; the plan and the allowance move;
  * Cloud Plus confirmed on the portal and its 400 credits; a second person joins and the invoice still shows one seat; a
- * pack; a renewal on a failing card reads `past_due` and recovers; a cancel leaves the record read-only with its one
- * sentence; it is deleted. Then the events: each acted-on type Stripe sent was delivered, and the Worker's lines say so.
+ * pack; extra usage turned on and off where the host sells it; a renewal on a failing card reads `past_due` and
+ * recovers; a cancel leaves the record read-only with its one sentence; it is deleted. Then the events: each acted-on
+ * type Stripe sent was delivered, and the Worker's lines say so.
  *
  * PRODUCTION IS ALWAYS REFUSED, and so is any host whose `/healthz` does not say billing is in test mode, and a key in
  * the environment that is a live one. There is no flag that lets it pay for real.
@@ -43,8 +44,11 @@ const METHODS = { visa: 'pm_card_visa', failsLater: 'pm_card_chargeCustomerFail'
 /** The environment's names this reads. Their values are never printed. */
 export const NAMES = { key: 'STRIPE_TEST_KEY', oldKey: 'STRIPE_OLD_TEST_KEY', log: 'PAY_LOG' };
 
-/** Why extra usage has no step to run. */
-export const EXTRA_SKIPPED = 'extra usage needs a migration, which is the owner’s to make, so it is not built and there is nothing to run.';
+/** Why extra usage has no step to run on a host: it sells none (`extra` in `GET /account/billing`). */
+export const EXTRA_UNSOLD = 'this host does not sell extra usage, so there is nothing to turn on.';
+
+/** The cap the walk turns extra usage on with, in whole cents. */
+const EXTRA_CAP = 500;
 
 /** Stripe's event types the webhook acts on (`ACTS` in `apps/worker/src/billing.ts`). */
 export const ACTED = [
@@ -68,7 +72,8 @@ const LIVE_KEY = /^[sr]k_live_/u;
 export const HELP = `node tools/drill/pay.mjs --host <origin> [--steps a,b]
 
 One stranger's paid life on a host in test mode: Free, Cloud, Cloud Plus, a second person (teams are part of Plus), a pack,
-a failed renewal and its recovery, a cancel, the delete, and every acted-on event delivered.
+extra usage on and off where the host sells it, a failed renewal and its recovery, a cancel, the delete, and every
+acted-on event delivered.
 Steps, in order: ${PAY.join(', ')}.
 Production is always refused, and so is a host whose billing is not in test mode.
 
@@ -119,10 +124,10 @@ export function payFor(host, env = process.env, { buyer = null, send = fetch, wa
 }
 
 /** One Stripe call with a key: `{ status, body }`, status 0 when Stripe did not answer. The key goes in the header only. */
-export async function stripe(p, method, path, form = {}, key = p.key) {
+export async function stripe(p, method, path, form = {}, key = p.key, more = {}) {
   const q = new URLSearchParams(Object.entries(form).map(([k, v]) => [k, String(v)])).toString();
   const url = `https://api.stripe.com${path}${method === 'GET' && q ? `?${q}` : ''}`;
-  const headers = { authorization: `Bearer ${key}`, accept: 'application/json', ...(method === 'POST' ? { 'content-type': 'application/x-www-form-urlencoded' } : {}) };
+  const headers = { authorization: `Bearer ${key}`, accept: 'application/json', ...(method === 'POST' ? { 'content-type': 'application/x-www-form-urlencoded' } : {}), ...more };
   try {
     const res = await p.send(url, { method, headers, ...(method === 'POST' ? { body: q } : {}), redirect: 'manual', signal: AbortSignal.timeout(30_000) });
     let body = null;
@@ -138,7 +143,7 @@ export async function stripe(p, method, path, form = {}, key = p.key) {
 }
 
 /** `read()` asked again every `p.every` until `done` holds of its answer or `p.waitMs` has passed. Answers the last one. */
-async function until(p, read, done) {
+export async function until(p, read, done) {
   const end = p.now() + p.waitMs;
   let got = await read();
   while (!done(got) && p.now() < end) {
@@ -149,7 +154,7 @@ async function until(p, read, done) {
 }
 
 /** The walk's record as `GET /account/billing` lists it, or `null`. */
-async function listed(p) {
+export async function listed(p) {
   const out = await ask(p.d, '/account/billing', { method: 'GET' });
   const all = out.said?.value?.records ?? [];
   return all.find((r) => (p.record ? r.record === p.record : r.slug === p.d.made?.slug)) ?? null;
@@ -309,8 +314,40 @@ async function pack(p) {
   return ok(p.d, 'pack', `paid ${dollars(small.cents)} with the test Visa; the record has ${r.credits} pack credits.`);
 }
 
-/** `extra`: listed, and skipped with its sentence. */
-const extra = async (p) => skip(p.d, 'extra', EXTRA_SKIPPED);
+/** Extra usage set to `cents` for the walk's record: the `extra` the host answers, or `{ refused }` with its sentence. */
+async function extraTo(p, cents) {
+  const out = await ask(p.d, '/account/billing/extra', { body: { record: p.record, cap_cents: cents } });
+  return out.said?.ok === true && out.said.value?.extra ? out.said.value.extra : { refused: fixOf(out) };
+}
+
+/** The price of each item on the walk's subscription, as Stripe reads it. */
+const pricesOn = async (p) => ((await stripe(p, 'GET', `/v1/subscriptions/${p.sub}`)).body?.items?.data ?? []).map((i) => String(i?.price?.id ?? ''));
+
+/**
+ * `extra`: where the host sells extra usage, it is turned on with a cap of five dollars; the answer and the month say
+ * so, and the subscription gains an item that is not the plan's. Then it is turned off and reads off.
+ */
+async function extra(p) {
+  const why = wants(p);
+  if (why) return skip(p.d, 'extra', why);
+  const sold = await ask(p.d, '/account/billing', { method: 'GET' });
+  if (sold.said?.value?.extra !== true) return skip(p.d, 'extra', EXTRA_UNSOLD);
+  const stripeRead = p.key && p.sub;
+  const before = stripeRead ? await pricesOn(p) : [];
+  const on = await extraTo(p, EXTRA_CAP);
+  if (on.on !== true || on.cap_cents !== EXTRA_CAP) return red(p.d, 'extra', `turning extra usage on with a cap of ${dollars(EXTRA_CAP)} answered ${on.refused ?? `on ${on.on}, cap ${on.cap_cents}`}.`);
+  const m = (await month(p))?.extra ?? null;
+  if (m?.on !== true || m?.cap_cents !== EXTRA_CAP) return red(p.d, 'extra', `extra usage was turned on, and the month reads ${m ? `on ${m.on}, cap ${m.cap_cents}` : 'none'}.`);
+  if (stripeRead) {
+    const after = await pricesOn(p);
+    if (after.length !== before.length + 1 || !after.some((x) => x !== '' && !before.includes(x))) return red(p.d, 'extra', `extra usage was turned on, and the subscription has ${after.length} items where it gains one that is not the plan’s.`);
+  }
+  const off = await extraTo(p, 0);
+  if (off.on !== false) return red(p.d, 'extra', `turning extra usage off answered ${off.refused ?? 'that it is still on'}.`);
+  const m2 = (await month(p))?.extra ?? null;
+  if (m2?.on === true) return red(p.d, 'extra', 'extra usage was turned off, and the month still reads it on.');
+  return ok(p.d, 'extra', `extra usage turned on with a cap of ${dollars(EXTRA_CAP)}, the month said so${stripeRead ? ', the subscription gained its metered item' : `; the subscription was not read, since ${p.key ? 'it is not known' : `${NAMES.key} is not set`}`}; then off, and it reads off.`);
+}
 
 /** The customer's card moved to one of Stripe's test payment methods, made the subscription's own. `true` when Stripe took it. */
 async function cardOn(p, method) {
