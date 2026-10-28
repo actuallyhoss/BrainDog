@@ -1608,6 +1608,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* LINES OF ONE BOX READ AS ONE LIST: a note straight after a note sits a small step under it, not a section's gap.
+     Money's Heads up drew three one-line warnings 68px apart. */
+  .box > .block-slot:has(:global(.block[data-kind='note'])) + .block-slot:has(:global(.block[data-kind='note'])) {
+    margin-block-start: calc(var(--sp-1) - var(--sp-5));
+  }
+
   /* FORCED COLOURS DRAW NO FILL, and a tile with no edge would be words on nothing. */
   @media (forced-colors: active) {
     .block-slot,
