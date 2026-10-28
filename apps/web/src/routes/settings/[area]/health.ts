@@ -198,7 +198,7 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
   if ((redSigns(more.signs) ?? 0) > 0) {
     const lead = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '');
     const raw = lead?.said;
-    const named = raw === undefined ? 'One check needs a look' : plainSign(raw).replace(/[.!?]$/u, '');
+    const named = raw === undefined ? 'One check needs a look' : upper(plainSign(raw).replace(/[.!?]$/u, ''));
     const link =
       /* AN OLD RATE LINKS TO WHAT CURES IT: a feed that is paused to where scheduled actions start again, anything else to
          the switch that keeps rates current, in Money's settings. Both rate signs, by their ids: "How old is the newest
