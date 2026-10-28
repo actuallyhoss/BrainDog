@@ -332,7 +332,7 @@
   {:else if part === 'runs-on' && runsLines.length > 0}
     <!-- WHAT IT RUNS ON AND WHEN EACH RENEWS, from its services, the soonest first; the numbers feed as one line that
          says whether it is quiet, its setup behind it; then the keys, tools and skills its agents used. -->
-    <Tile icon="plug" title="Runs on and renewals" count={runsLines.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsLines.length}>
+    <Tile icon="plug" title="Runs on" count={runsLines.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsLines.length}>
       <ul class="r-list">
         {#each runsLines.slice(0, LINES_SHOWN) as l, n (n)}
           <li class="r-row" data-tone={l.tone}>
@@ -1021,9 +1021,16 @@
     display: none;
   }
 
+  /* AT A DESK THE PARTS OF A ROW END LEVEL: the last tile of each grows to the row's height, so a short tile beside a
+     tall one leaves no hole on the board above the next row. */
   @media (width >= 1100px) {
     .shape-row {
       grid-template-columns: repeat(12, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .shape-part > :global(:last-child) {
+      flex-grow: 1;
     }
 
     .shape-part {

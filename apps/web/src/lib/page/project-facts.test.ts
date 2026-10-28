@@ -95,7 +95,7 @@ test('late work leads the headline and the red button opens it', () => {
   const hero = heroFactsOf(f, numbersOf(f));
   assert.equal(hero.headline, '“Deploy the first wave” was due Mon 26 Oct and is a day late.');
   assert.match(hero.lede ?? '', /“Ship the second” is due Sat 31 Oct\./u);
-  assert.deepEqual(hero.red, { said: 'Open “Deploy the first wave”', href: '/r/tasks/1' });
+  assert.deepEqual(hero.red, { said: 'Open the late task', href: '/r/tasks/1' });
   assert.deepEqual(hero.soft, { said: 'Open all 2 tasks', href: '/r/tasks?lantern' });
 });
 
@@ -124,7 +124,7 @@ test('an earning project leads with what it brought in, and its side tile is mon
   assert.equal(side.kind, 'money');
   if (side.kind === 'money') {
     assert.equal(side.figure, '$4,815');
-    assert.equal(side.sub, 'in, Sep');
+    assert.equal(side.sub, 'in Sep');
     assert.deepEqual(side.lines, [
       { k: 'Out this month', v: '$1,206' },
       { k: 'Kept', v: 'about $3,609' },
@@ -135,7 +135,7 @@ test('an earning project leads with what it brought in, and its side tile is mon
 test('an earning project with repeating money and no money key number leads with it a month, with it a line under one', () => {
   const recurring = [{ what: 'Store payout', direction: 'in', amount: { minor: 93_000, currency: 'USD' }, every: 'monthly', nextDue: '2026-11-15', state: 'live' }];
   const alone = sideOf(base({ lane: 'earning', recurring }), numbersOf(base()));
-  assert.equal(alone.kind === 'money' && `${alone.figure} ${alone.sub}`, '$930 in, a month');
+  assert.equal(alone.kind === 'money' && `${alone.figure} ${alone.sub}`, '$930 a month');
   const kpis = [{ name: 'Revenue', measure: 'Revenue', unit: 'USD', every: '1m', headline: true, points: [{ at: '2026-09-30', amount: 'USD 2,300.00' }], latest: { at: '2026-09-30', amount: 'USD 2,300.00' }, change: null, target: null, targetBy: null }];
   const both = sideOf(base({ lane: 'earning', recurring, kpis }), numbersOf(base()));
   assert.equal(both.kind === 'money' && both.figure, '$2,300');

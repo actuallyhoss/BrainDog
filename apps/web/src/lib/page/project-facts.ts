@@ -282,13 +282,13 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
 
   const red: Act =
     late.length === 1
-      ? { said: `Open ${quoted(late[0]!.title)}`, href: late[0]!.href }
+      ? { said: 'Open the late task', href: late[0]!.href }
       : late.length > 1 && f.hrefs.work
         ? { said: `Open the ${late.length} late tasks`, href: f.hrefs.work }
         : numbers.banner
           ? { said: 'Fix the numbers feed', href: f.hrefs.feed }
           : due.length > 0
-            ? { said: `Open ${quoted(due[0]!.title)}`, href: due[0]!.href }
+            ? { said: 'Open the next task', href: due[0]!.href }
             : null;
   const soft: Act =
     late.length > 0 && numbers.banner
@@ -336,7 +336,7 @@ export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
       return {
         kind: 'money',
         figure: f.format(m.now.minor, m.now.currency),
-        sub: `in, ${month}`,
+        sub: `in ${month}`,
         stale,
         bars: m.points.slice(-13),
         lines: [
@@ -353,7 +353,7 @@ export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
       return {
         kind: 'money',
         figure: f.format(minor, cur),
-        sub: 'in, a month',
+        sub: 'a month',
         stale: paused ? `paused${paused.nextDue ? `, was due ${daySaid(paused.nextDue, f.today)}` : ''}` : null,
         bars: [],
         lines: [...(out ? [{ k: 'Out this month', v: f.format(out.minor, out.currency) }] : []), ...recLines],
@@ -433,7 +433,7 @@ export function runsOnOf(f: Pick<FactsIn, 'today' | 'format'> & { services: read
       const soon = s.renews !== null && daysBetween(f.today, s.renews) <= 30;
       return {
         name: s.name,
-        sub: [s.kind, s.provider, s.cost && s.cost.minor > 0 ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}`.trim() : ''].filter(Boolean).join(' · '),
+        sub: [s.provider || s.kind, s.cost && s.cost.minor > 0 ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}`.trim() : ''].filter(Boolean).join(' · '),
         right: s.renews ? `renews ${daySaid(s.renews, f.today)}` : '',
         tone: soon ? 'warn' : 'plain',
         href: s.href,

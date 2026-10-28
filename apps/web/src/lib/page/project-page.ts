@@ -100,7 +100,7 @@ export function onProject<T extends Block>(blocks: readonly T[], register: strin
   return [...kept.slice(0, at), section, ...ordered, ...kept.slice(end)].filter((_, n) => n !== plan);
 }
 
-/** "Bills and invoices 9, keeping it alive 2, notes, what changed and plan by date": what a folded More about holds. */
+/** "Bills and invoices 9 · Keeping it alive 2 · Notes · Plan by date": what a folded More about holds, as its labels. */
 export function moreSaid(blocks: readonly Block[]): string {
   const at = blocks.findIndex((b) => b.kind === 'section' && b.fold === true && b.box === true);
   if (at === -1) return '';
@@ -110,9 +110,8 @@ export function moreSaid(blocks: readonly Block[]): string {
     if (b.kind === 'section' && main(b)) break;
     if (b.drawn === false || typeof b.heading !== 'string' || b.heading.trim() === '') continue;
     const count = b.register && typeof b.total === 'number' && b.total > 0 ? ` ${b.total.toLocaleString('en-GB')}` : '';
-    const words = b.heading.trim();
-    parts.push(`${parts.length === 0 ? words : words.charAt(0).toLowerCase() + words.slice(1)}${count}`);
+    parts.push(`${b.heading.trim()}${count}`);
   }
-  /* "A, b and c": the last joined by and, so the line reads as a sentence and not a run of labels. */
-  return parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  /* LABELS WITH THEIR COUNTS, read at a glance: the fold's own headings, never a sentence made of them. */
+  return parts.join(' · ');
 }
