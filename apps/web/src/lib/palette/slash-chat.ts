@@ -107,11 +107,28 @@ export function eventOf(line: string): ChatEvent | null {
     case 'done': {
       const s = isObj(v.spent) ? v.spent : {};
       const spent: Spent = { asks: typeof s.asks === 'number' ? s.asks : 0, left: typeof s.left === 'number' ? s.left : null };
-      return { type: 'done', spent, ...(isObj(v.figures) ? { figures: v.figures } : {}) };
+      const figures = figuresOf(v.figures);
+      return { type: 'done', spent, ...(figures ? { figures } : {}) };
     }
     default:
       return null;
   }
+}
+
+/**
+ * The rows an answer named, keyed the way `cite.ts` reads a `{{ref:…}}`. The record sends a list of `{ref, label}`, one
+ * per row, and a map already keyed is taken as it stands.
+ */
+function figuresOf(raw: unknown): Record<string, unknown> | null {
+  if (isObj(raw)) return raw;
+  if (!Array.isArray(raw)) return null;
+  const out: Record<string, unknown> = {};
+  for (const f of raw) {
+    if (!isObj(f) || !str(f.ref)) continue;
+    const m = /^([a-z][a-z0-9_-]*)#(\d+)$/u.exec(f.ref as string);
+    if (m) out[`ref:${f.ref as string}`] = { kind: 'row', register: m[1], seq: Number(m[2]), title: str(f.label) ?? '' };
+  }
+  return out;
 }
 
 function actionOf(v: Record<string, unknown>): ChatAction | null {
@@ -231,6 +248,23 @@ export async function thread(base: string, id: string): Promise<Thread | null> {
       return [{ role: t.role, text: t.text, actions }];
     });
     return { id: str(body.id) ?? id, turns };
+  } catch {
+    return null;
+  }
+}
+
+/** The conversations the record keeps, newest first, so one had on another device is listed too. `null` when the host has no such door. */
+export async function threads(base: string): Promise<KeptThread[] | null> {
+  try {
+    const res = await fetch(`${base}/api/slash/threads`);
+    if (!res.ok) return null;
+    const body: unknown = await res.json();
+    if (!isObj(body) || !Array.isArray(body.threads)) return null;
+    return body.threads.flatMap((t): KeptThread[] => {
+      if (!isObj(t) || !str(t.id)) return [];
+      const at = typeof t.at === 'number' ? t.at : typeof t.at === 'string' ? Date.parse(t.at) : NaN;
+      return [{ id: t.id as string, title: str(t.title) ?? '', at: Number.isFinite(at) ? at : 0 }];
+    });
   } catch {
     return null;
   }

@@ -2,15 +2,15 @@
   The Slash page: the conversations asked lately, newest first, each one press from going on with it.
 
   A CONVERSATION IS CONTINUED WHERE IT WAS HAD, in the palette's Ask, opened over this page with the thread read back from
-  the record (`openThread`). "New conversation" opens Ask empty. This device keeps the list (`keptThreads`), so a
-  conversation had on another device is not listed here.
+  the record (`openThread`). "New conversation" opens Ask empty. The record lists its conversations (`threads`), so one
+  had on another device is here too; this device's own list fills in when the record cannot be reached.
 
   UNDER THE LIST, ONE QUIET LINK TO WHAT SLASH SUGGESTED AND WHAT CAME OF IT, the page this was before (`?history`).
 -->
 <script lang="ts">
   import { since } from 'braindog-render';
-  import { at } from '$lib/at.ts';
-  import { keptThreads, type KeptThread } from '$lib/palette/slash-chat.ts';
+  import { apiBase, at } from '$lib/at.ts';
+  import { keptThreads, threads as recordThreads, type KeptThread } from '$lib/palette/slash-chat.ts';
   import { openAsk, openThread, palette } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -34,6 +34,13 @@
     threads = keptThreads();
     now = Date.now();
     drew('ready');
+    void recordThreads(apiBase()).then((kept) => {
+      if (!kept) return;
+      const mine = keptThreads();
+      const byId = new Map(mine.map((t) => [t.id, t]));
+      for (const t of kept) byId.set(t.id, { ...t, title: t.title || byId.get(t.id)?.title || '' });
+      threads = [...byId.values()].sort((a, b) => b.at - a.at);
+    });
   });
 
   async function fresh() {
