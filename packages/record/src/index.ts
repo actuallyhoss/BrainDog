@@ -160,7 +160,7 @@ import type { Json as JsonValue } from '@braindog/kernel';
 import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
 import { LATE_DAYS, atWork, presenceOf, waiting as waitingOf, waitingOn, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
+import { catalogueDrafts, describedPresses, nightKeeps, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
 import { askedFault, declinedInput, describe, pinMoved, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDeclined, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
@@ -3773,7 +3773,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (deps.catalogueOffers) {
       try {
         const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
-        drafts = [...drafts, ...catalogueDrafts(await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true }))))];
+        /* NOT ONE THE RECORD'S OWN PASS KEEPS CURRENT (`nightKeeps`): it is put in or asked about there, once. */
+        drafts = [...drafts, ...catalogueDrafts((await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true })))).filter((o) => !nightKeeps(o)))];
       } catch {
         dropped.push('The catalogue could not be read, so no update from it was asked about.');
       }
@@ -4514,8 +4515,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         propose: async (q) => {
           const prepared = await arrangement.prepare('pack', q.body);
           const put = prepared.ok ? kernel.propose({ question: q.question, body_kind: 'pack', body: prepared.value }, actor) : prepared;
-          /* THE VERSION ASKED ABOUT IS KEPT BESIDE THE QUESTION, so a no is remembered for that version (`firstPartyAnswered`). */
-          const to = shippedVersion(q.body.install);
+          /* THE VERSION ASKED ABOUT IS KEPT BESIDE THE QUESTION, so a no is remembered for that version (`firstPartyAnswered`):
+             the catalogue's for an add-on, which this build does not ship. */
+          const to = q.version ?? shippedVersion(q.body.install);
           if (put.ok && to !== undefined) kernel.setPref(FIRST_PARTY_ASKED, put.value.id, { pack: q.body.install, version: to });
           return put;
         },
@@ -4532,8 +4534,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const offers = await deps.catalogueOffers(kernel.packStates().map((p) => ({ id: p.id, version: p.version ?? '0.0.0', on: p.disabled_at === null })));
           return offers.flatMap((o) => {
             const doc = (o.body as { doc?: unknown }).doc;
-            const sameKey = o.installedSignedBy === null || o.signedBy === o.installedSignedBy || o.rotated;
-            if (o.firstParty !== true || !sameKey || shippedVersion(o.id) !== undefined || declined[o.id] === o.to) return [];
+            if (!nightKeeps(o) || shippedVersion(o.id) !== undefined || declined[o.id] === o.to) return [];
             return doc !== null && typeof doc === 'object' && !Array.isArray(doc) ? [{ id: o.id, title: o.title, from: o.from, to: o.to, doc: doc as Record<string, unknown> }] : [];
           });
         },

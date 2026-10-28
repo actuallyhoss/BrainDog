@@ -3012,6 +3012,13 @@ export type CatalogueOffer = {
   firstParty?: boolean;
 };
 
+/**
+ * Whether the record's own update pass keeps this offer current (`firstPartyTick`): BrainDog's own, under the key that
+ * signed the version installed or a successor it named. That pass puts it in or asks about it once and keeps a no, so
+ * Slash leaves it alone: asking too, it asked again the day after a no.
+ */
+export const nightKeeps = (o: CatalogueOffer): boolean => o.firstParty === true && (o.installedSignedBy === null || o.signedBy === o.installedSignedBy || o.rotated);
+
 /** The one line saying who signed a version, held to the key that signed the version installed. */
 function keyNote(o: CatalogueOffer): { text: string; warning: boolean } {
   const was = o.installedSignedBy;

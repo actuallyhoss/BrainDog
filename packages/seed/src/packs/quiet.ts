@@ -39,9 +39,9 @@
  * AND BRAINDOG'S OWN ADD-ONS FROM THE CATALOGUE, LAST. An add-on BrainDog publishes and
  * lists (Profiles, Setup sync, Pad and the rest) is BrainDog's own as much as a module is, so a newer version reaches a
  * record that holds it on the same terms, with one more: it goes in only when it reaches nothing new as well as losing
- * nothing (`reachesNew`: no service, key or approval it did not have, no script it did not run). Otherwise it is never
- * asked about here: it waits on the Updates card in Add-ons, where its plan says what changes. A community add-on and a
- * private one are not lent at all, so each always asks.
+ * nothing (`reachesNew`: no service, key or approval it did not have, no script it did not run). Otherwise it is asked
+ * about once on Decide, as a module is, with the catalogue's document so a yes installs it; a no is kept for that
+ * version. A community add-on is not lent at all, so Slash asks about it.
  */
 
 import type { Diff } from '@braindog/declare';
@@ -56,8 +56,11 @@ import { CORE_CAME_FROM, FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument }
 
 type Body = Record<string, unknown>;
 
-/** The one question an update that would lose something files: install this pack, from the record's own document. */
-export type QuietQuestion = { question: string; body_kind: 'pack'; body: { install: string } };
+/**
+ * The one question an update that would lose something files: install this pack, from the record's own document for a
+ * module, or from the catalogue's (`doc`) for an add-on, with the version asked about (`version`) so a no is kept for it.
+ */
+export type QuietQuestion = { question: string; body_kind: 'pack'; body: { install: string; doc?: Body }; version?: string };
 
 /** What the caller lends: the record as it is, its plan and install, and Decide. */
 export type QuietPort = {
@@ -325,8 +328,8 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
   await again();
 
   /* BRAINDOG'S OWN ADD-ONS, after the modules and use cases they stand on: in when the plan loses nothing and reaches
-     nothing new, else said and left for the Updates card. Never asked about here, and never a community one. A private one
-     of BrainDog's, for one bank, is BrainDog's own all the same (`catalogue-offers.ts`). */
+     nothing new, else asked once on Decide. Never a community one. A private one of BrainDog's, for one bank, is
+     BrainDog's own all the same (`catalogue-offers.ts`). */
   const addons = (await port.addons?.()) ?? [];
   /** The add-ons a conflict held back, with the packs that held them: planned again once one of those has gone in. */
   const heldBack = new Map<string, ReadonlySet<string>>();
@@ -342,9 +345,17 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     const diff = planned.value;
     const lose = [...losses(diff, nameOf, tookOff), ...reachesNew(diff)];
     const blocked = unready(diff);
-    if (blocked !== null || lose.length > 0) {
+    if (blocked !== null) {
       if (diff.conflicts.length > 0) heldBack.set(a.id, new Set(diff.conflicts.map((c) => c.pack)));
-      return { ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked ?? `Updating it would ${lostSaid(lose)}, so it waits for you in Add-ons.` };
+      return { ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked };
+    }
+    /* ONE THAT WOULD LOSE OR NEWLY REACH SOMETHING IS ASKED ONCE ON DECIDE, as a module is, where a yes installs it. Said
+       only in a pref and on the Updates card, it was asked nowhere, and Slash's question for it waited behind its cap. */
+    if (lose.length > 0) {
+      if (await port.asking(a.id)) return { ...step, did: 'waiting', lose };
+      if ((await port.remembers?.(a.id)) !== true) return { ...step, did: 'refused', lose, why: `Updating it would ${lostSaid(lose)}, so it waits for you in Add-ons.` };
+      const asked = await port.propose(addonQuestion(a, lose));
+      return asked.ok ? { ...step, did: 'asked', lose } : { ...step, did: 'refused', lose, why: fixOf(asked) };
     }
     const put = await port.install(doc, diff.planHash);
     if (!put.ok) return { ...step, did: 'refused', why: fixOf(put) };
@@ -398,6 +409,19 @@ export function questionFor(id: string, lose: readonly string[]): QuietQuestion 
     question: `${name} has a newer version. Updating it would ${lostSaid(lose)}. Update ${name}?`,
     body_kind: 'pack',
     body: { install: id },
+  };
+}
+
+/**
+ * The one question for an add-on: named by its title, and carrying the catalogue's document as the catalogue offered it,
+ * so a yes installs that version and Slash, reading the same offer, finds it asked already.
+ */
+export function addonQuestion(a: QuietAddon, lose: readonly string[]): QuietQuestion {
+  return {
+    question: `${a.title} has a newer version. Updating it would ${lostSaid(lose)}. Update ${a.title}?`,
+    body_kind: 'pack',
+    body: { install: a.id, doc: a.doc },
+    version: a.to,
   };
 }
 
