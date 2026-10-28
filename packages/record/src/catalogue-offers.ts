@@ -68,7 +68,11 @@ export function offersFromCatalogue(read: CatalogueReader): (held: readonly { id
         hostsAdded: u.changes?.hosts.added ?? [],
         removed: (u.changes?.removed ?? []).map((r) => r.title),
         changesKnown: u.changes !== null,
-        firstParty: u.file.kind === 'pack' && u.entry.publisher?.kind === 'braindog' && u.entry.private !== true,
+        /* PRIVATE IS WHERE IT IS SHOWN, NOT WHO KEEPS IT CURRENT: an add-on BrainDog publishes for one bank is unlisted and
+           never suggested, and still updates itself when nothing the person changed would be lost, as every other one of
+           BrainDog's own does. Held back for being private, a bank's alerts sat a version behind for weeks, asked about
+           nowhere, with the newer version changing nothing it read or wrote. */
+        firstParty: u.file.kind === 'pack' && u.entry.publisher?.kind === 'braindog',
       });
     }
     return offers;

@@ -194,7 +194,8 @@ export type CatalogueEntry = {
   unlisted?: true;
   /**
    * PRIVATE: an add-on for one bank, one country or one person (`packs/listed.json` `private`). Always unlisted as well,
-   * installable by id or link only, never suggested, and never updated without asking, whoever made it.
+   * installable by id or link only, never suggested. Somebody else's is never updated without asking; BrainDog's own updates itself when nothing would
+   * be lost, as its listed ones do (`catalogue-offers.ts` `firstParty`).
    */
   private?: true;
   /** A starter shown on the store's "Example setups" shelf: a whole setup to copy from, for a trade BrainDog does not run itself. */

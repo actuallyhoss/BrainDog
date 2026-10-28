@@ -3008,7 +3008,7 @@ export type CatalogueOffer = {
   removed: readonly string[];
   /** `false` when the catalogue no longer holds the version installed, so `hostsAdded` and `removed` could not be read. */
   changesKnown: boolean;
-  /** An add-on BrainDog publishes and does not hold private, whose update may go in on its own (`quiet.ts` `addons`). */
+  /** An add-on BrainDog publishes, listed or private, whose update may go in on its own (`quiet.ts` `addons`). */
   firstParty?: boolean;
 };
 

@@ -229,7 +229,7 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
 /* THE PACKS HE MARKED LISTED, read before any entry is described, and held to ids the index has. AND THE REST OF HIS
    LISTING, each optional: `usecases`, the starters from `packs/` the store lists (a built-in starter is always listed);
    `examples`, the ones of those shown as example setups; `private`, the add-ons for one bank, country or person, never
-   listed and never updated without asking; and `shelves`, the store shelf each listed add-on stands on. */
+   listed or suggested (BrainDog's own still update themselves when nothing would be lost); and `shelves`, the store shelf each listed add-on stands on. */
 const listedPath = join(packsDir, LISTED_FILE);
 const marked = new Set();
 /** `null` while no `usecases` key is there: every starter from `packs/` is then listed, as before the key existed. */

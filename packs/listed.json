@@ -1,5 +1,5 @@
 {
-  "note": "The store's listing, by catalogue id. Only the owner changes it (call 12 of the 22 Oct audit): a pack not named under packs installs by id and is in no listing. usecases are the starters from packs/ the store lists (the built-in starters always are), examples the ones shown as example setups, private the add-ons for one bank, country or person (never listed, never updated without asking), and shelves the store shelf each one stands on. tools/catalogue/from-packs.mjs reads it.",
+  "note": "The store's listing, by catalogue id. Only the owner changes it (call 12 of the 22 Oct audit): a pack not named under packs installs by id and is in no listing. usecases are the starters from packs/ the store lists (the built-in starters always are), examples the ones shown as example setups, private the add-ons for one bank, country or person (never listed or suggested; BrainDog's own still update themselves when nothing would be lost), and shelves the store shelf each one stands on. tools/catalogue/from-packs.mjs reads it.",
   "packs": [
     "agent-notes",
     "card-alerts",

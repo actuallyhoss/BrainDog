@@ -325,7 +325,8 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
   await again();
 
   /* BRAINDOG'S OWN ADD-ONS, after the modules and use cases they stand on: in when the plan loses nothing and reaches
-     nothing new, else said and left for the Updates card. Never asked about here, and never a community or private one. */
+     nothing new, else said and left for the Updates card. Never asked about here, and never a community one. A private one
+     of BrainDog's, for one bank, is BrainDog's own all the same (`catalogue-offers.ts`). */
   const addons = (await port.addons?.()) ?? [];
   /** The add-ons a conflict held back, with the packs that held them: planned again once one of those has gone in. */
   const heldBack = new Map<string, ReadonlySet<string>>();
