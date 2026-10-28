@@ -796,4 +796,11 @@
     outline: 1px solid var(--rule-strong);
     outline-offset: -1px;
   }
+
+  /* A HELD THUMB ON AN ITEM WITH A MENU OPENS THAT MENU (`context-menu.ts`), not the system's preview of a link. */
+  @media (pointer: coarse) {
+    [data-menu-host] {
+      -webkit-touch-callout: none;
+    }
+  }
 }

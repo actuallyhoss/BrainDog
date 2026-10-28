@@ -6,6 +6,10 @@
   no button: the list is placed at that rect and clamped to the screen, which is how a row's menu opens from `⇧F10`
   (`RowMenu` is this, with its own last item). The items, the keys and the roles are the same in every form.
 
+  AND A MENU WITH A BUTTON OPENS AT THE POINTER TOO: a right-click, a held thumb or `⇧F10` on the item it belongs to
+  sends its trigger `menuat` (`context-menu.ts`), and the same list opens at that point, drawn at the end of the page so
+  no card around it can clip it, and gives focus back to what had it.
+
   NOT A `<dialog>` WITH A MOUSE. A menu is a short list of things to do to the thing you clicked, and with a mouse it
   belongs next to that thing: a modal for six items takes the whole screen away to offer you a choice you could have
   made in place. Under a thumb (below 640px, or a coarse pointer at any width) a list the size of a trigger opened under
@@ -35,6 +39,7 @@
   import { tick, untrack } from 'svelte';
   import type { Snippet } from 'svelte';
   import { settled } from './panel.ts';
+  import { menuAt, type MenuAt } from './context-menu.ts';
   import Sheet from './Sheet.svelte';
 
   let {
@@ -67,6 +72,12 @@
 
   /** A menu with no button, opened at a rect. */
   const anchored = $derived(trigger === undefined);
+
+  /** WHERE A RIGHT-CLICK OPENED A MENU THAT HAS A BUTTON, and what had focus then; null when it hangs from its button. */
+  let point = $state.raw<{ x: number; y: number; height: number } | null>(null);
+  let back: HTMLElement | null = null;
+  /** Placed at a rect, by its caller or by the pointer, rather than hung from a button. */
+  const floating = $derived(anchored || point !== null);
 
   /**
    * WHEN THE MENU IS THE SHEET: below 640px, or under a coarse pointer at any width (design 6.3). Read once each time
@@ -102,15 +113,18 @@
 
   $effect(() => {
     const want = open && (!anchored || at != null);
+    const spot = at ?? point;
     untrack(() => {
       if (want) {
         exits++;
         stay?.();
         stay = null;
         if (!shown) sheet = matchMedia(SHEET).matches;
-        if (at) {
-          if (kept !== at) fitted = null;
-          kept = at;
+        /* A MENU WITH NO BUTTON GIVES FOCUS BACK TO WHAT HAD IT, as one with a button gives it to the button. */
+        if (told && anchored) back = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        if (spot) {
+          if (kept !== spot) fitted = null;
+          kept = spot;
         }
         told = false;
         leaving = false;
@@ -134,6 +148,7 @@
           stay = null;
           shown = false;
           leaving = false;
+          point = null;
         };
         if (list) stay = settled(list, gone);
         else gone();
@@ -145,7 +160,8 @@
      again on its way out is the same list, still `inert` when this runs. The sheet's dialog focuses its first row
      itself. */
   $effect(() => {
-    if (!open || !list || !anchored || sheet) return;
+    if (!open || !list || !floating || sheet) return;
+    void point;
     untrack(fit);
     void tick().then(() => {
       if (open && !leaving) items()[0]?.focus();
@@ -165,7 +181,7 @@
    * says which edge it pops from: the top, or the bottom when it opens above its trigger.
    */
   function place() {
-    if (!list || sheet || anchored) return;
+    if (!list || sheet || floating) return;
     list.style.setProperty('--menu-shift', '0px');
     list.style.setProperty('--menu-lift', '0px');
     list.style.setProperty('--menu-room', 'none');
@@ -201,7 +217,7 @@
   const HEIGHT = 240;
   let fitted = $state.raw<{ top: number; from: string; room: number | null } | null>(null);
   const placed = $derived.by(() => {
-    const spot = at ?? kept;
+    const spot = at ?? point ?? kept;
     if (!spot || typeof window === 'undefined') return { left: 0, top: 0, from: '0%', room: null as number | null };
     const below = spot.y + spot.height + 4;
     const flip = below + HEIGHT > window.innerHeight;
@@ -214,8 +230,8 @@
   });
 
   function fit() {
-    const spot = at ?? kept;
-    if (!list || !spot || sheet || !anchored) return;
+    const spot = at ?? point ?? kept;
+    if (!list || !spot || sheet || !floating) return;
     const height = list.offsetHeight;
     const below = spot.y + spot.height + 4;
     const roomBelow = window.innerHeight - GUTTER - below;
@@ -229,6 +245,7 @@
   }
 
   function show(land: 'first' | 'last') {
+    point = null;
     open = true;
     // One frame, because the list does not exist until the `{#if}` has rendered it.
     requestAnimationFrame(() => {
@@ -241,7 +258,23 @@
   function close(refocus = true) {
     if (!open) return;
     open = false;
-    if (refocus && !anchored) button?.focus();
+    if (!refocus) return;
+    if (point || anchored) (back?.isConnected ? back : button)?.focus();
+    else button?.focus();
+  }
+
+  /** At the pointer, from `context-menu.ts`: the same list, placed at the point, the first item focused. */
+  const heard = menuAt((d: MenuAt) => {
+    back = d.back;
+    point = { x: d.x, y: d.y, height: d.height };
+    open = true;
+  });
+
+  /** A list at the pointer is drawn at the end of the page, so no card, scroller or stacking context around its button
+      can clip it or put it under a neighbour. */
+  function lifted(node: HTMLElement) {
+    document.body.appendChild(node);
+    return () => node.remove();
   }
 
   function onTriggerKey(e: KeyboardEvent) {
@@ -263,7 +296,7 @@
    */
   function onListKey(e: KeyboardEvent) {
     const all = items();
-    if (anchored || ['Escape', 'ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' '].includes(e.key)) e.stopPropagation();
+    if (floating || ['Escape', 'ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' '].includes(e.key)) e.stopPropagation();
     const n = all.indexOf(document.activeElement as HTMLElement);
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -296,7 +329,7 @@
   /** Pointerdown, not click: a click that lands on a control elsewhere should close this AND press that. */
   function onPointerDown(e: PointerEvent) {
     if (!open || sheet) return;
-    const inside = anchored ? list?.contains(e.target as Node) : root?.contains(e.target as Node);
+    const inside = floating ? list?.contains(e.target as Node) : root?.contains(e.target as Node);
     if (!inside) close(false);
   }
 </script>
@@ -311,13 +344,13 @@
     class="menu"
     data-form={form}
     data-align={align}
-    data-at={anchored ? '' : undefined}
+    data-at={floating ? '' : undefined}
     data-leaving={form === 'pop' && leaving ? '' : undefined}
     inert={form === 'pop' && leaving}
     role="menu"
     tabindex="-1"
     aria-label={label}
-    style={form === 'pop' && anchored
+    style={form === 'pop' && floating
       ? `left:${placed.left}px; top:${placed.top}px; --menu-from:${placed.from}${placed.room === null ? '' : `; --menu-room:${placed.room}px`}`
       : undefined}
     onkeydown={onListKey}
@@ -345,12 +378,15 @@
       aria-expanded={open}
       onclick={() => (open ? close() : show('first'))}
       onkeydown={onTriggerKey}
+      {@attach heard}
     >
       {@render trigger?.()}
     </button>
 
     {#if sheet}
       <Sheet kind="menu" title={label} bind:open onclose={ended}>{@render rows('sheet')}</Sheet>
+    {:else if shown && point}
+      <div {@attach lifted}>{@render rows('pop')}</div>
     {:else if shown}
       {@render rows('pop')}
     {/if}

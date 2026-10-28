@@ -49,6 +49,7 @@
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { inField, notTheShells } from '$lib/a11y/typed.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
+  import { watchMenus } from '$lib/ui/context-menu.ts';
   import TopBar from '$lib/ui/TopBar.svelte';
   import { assets } from '$app/paths';
 
@@ -1083,6 +1084,9 @@
   let sheetSays = $state(0);
   const leadIn = () => import('$lib/a11y/goto.ts').then((m) => (lead = m));
   const railRows = () => [...rail.places, ...rail.rest].map((i) => ({ href: i.href, name: i.label }));
+
+  /* A RIGHT-CLICK, A HELD THUMB OR `⇧F10` ON AN ITEM WITH A "…" OPENS THAT MENU (`context-menu.ts`), once for every screen. */
+  $effect(() => watchMenus());
 
   /** When a key was last typed in a field, in event time: read before any screen's own handler can move the focus. */
   let typedAt = Number.NEGATIVE_INFINITY;
