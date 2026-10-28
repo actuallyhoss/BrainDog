@@ -299,13 +299,14 @@ test('A PROPOSAL ARRIVES FROM THE PACKAGE\'S ENGINE ONTO A REAL RECORD\'S DECIDE
   assert.deepEqual(out.value.read.at(-1), { register: 'grant', rows: 0, predicate: 'refused' });
   assert.deepEqual(out.value.read.at(0), { register: 'tasks', rows: 2, predicate: '{"field":"state","is":"open"}' });
 
-  /* THE QUESTION IS ON DECIDE, IN THE REAL RECORD, FILED AS SLASH. */
+  /* THE QUESTION IS ON DECIDE, IN THE REAL RECORD, FILED AS SLASH: on the agents' shelf, since one press puts it back,
+     so it is not counted as waiting on him. */
   const boot = (await api.boot(owner)) as { ok: boolean; value: { waiting: { id: string; question: string }[] } };
   assert.ok(boot.ok);
-  assert.equal(boot.value.waiting.length, 1);
-  assert.equal(boot.value.waiting[0]!.id, out.value.filed);
+  assert.equal(boot.value.waiting.length, 0);
   const queue = (await api.governance({ limit: 5 }, owner)) as { ok: boolean; value: { id: string; body_kind: string; opened_by: string }[] };
   assert.ok(queue.ok);
+  assert.equal(queue.value[0]!.id, out.value.filed);
   assert.equal(queue.value[0]!.body_kind, 'rowset');
   assert.equal(queue.value[0]!.opened_by, 'slash');
 
