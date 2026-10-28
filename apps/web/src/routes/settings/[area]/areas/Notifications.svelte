@@ -21,6 +21,7 @@
   import { ownsRecord } from '../../levels.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
+  import SummariesTile from '$lib/agents/SummariesTile.svelte';
 
   /* EVERY AREA TAKES THE SAME PROPS. This one reads who is asking, since only an owner moves the quiet hours. */
   let props: AreaProps = $props();
@@ -148,6 +149,10 @@
 <Tile icon="bell" title={copy.whenWeInterrupt}>
   <p class="said-once">{words.interrupts}</p>
 </Tile>
+
+<!-- THE SUMMARY THE SENTENCE ABOVE PROMISES: which ones this record sends, each opening its screen, or the add-on that
+     sends the two a day. -->
+<SummariesTile />
 
 <!-- THE RULES THAT TELL YOU ARE AUTOMATIONS': one row to them, where each rule's own page turns its notices off for
      you. Listing them here read every rule, one by one, before the screen settled. -->
