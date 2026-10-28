@@ -146,6 +146,123 @@ const holds = (value: number, evidence: readonly number[], scaled: boolean): boo
  */
 const sentences = (text: string): string[] => (text.match(/[^\n]*?(?:[.!?](?=\s|$)|\n|$)\s*/gu) ?? []).filter((s) => s.trim() !== '');
 
+/* ── reading a step as it streams ────────────────────────────────────────────────────────────────────────────────── */
+
+const SPACE = /\s/u;
+
+/** A JSON string from the quote at `at`: its value so far, and the index past its closing quote, or -1 while it is open. */
+const stringAt = (text: string, at: number): { value: string; end: number } => {
+  let value = '';
+  let i = at + 1;
+  while (i < text.length) {
+    const c = text[i]!;
+    if (c === '"') return { value, end: i + 1 };
+    if (c !== '\\') {
+      value += c;
+      i++;
+      continue;
+    }
+    /* AN ESCAPE IS TAKEN WHOLE OR NOT YET, so a piece never ends half a character. */
+    const e = text[i + 1];
+    if (e === undefined) break;
+    if (e === 'u') {
+      const hex = text.slice(i + 2, i + 6);
+      if (!/^[0-9a-fA-F]{4}$/u.test(hex)) break;
+      const code = parseInt(hex, 16);
+      /* A HIGH SURROGATE WAITS FOR ITS PAIR. */
+      if (code >= 0xd800 && code <= 0xdbff) {
+        const low = /^\\u([0-9a-fA-F]{4})/u.exec(text.slice(i + 6, i + 12));
+        if (low === null) break;
+        value += String.fromCharCode(code, parseInt(low[1]!, 16));
+        i += 12;
+        continue;
+      }
+      value += String.fromCharCode(code);
+      i += 6;
+      continue;
+    }
+    value += e === 'n' ? '\n' : e === 't' ? '\t' : e === 'r' ? '\r' : e === 'b' ? '\b' : e === 'f' ? '\f' : e;
+    i += 2;
+  }
+  return { value, end: -1 };
+};
+
+/** The index past the JSON value at `at`, or -1 while it is still arriving. */
+const valueEnd = (text: string, at: number): number => {
+  const c = text[at];
+  if (c === undefined) return -1;
+  if (c === '"') return stringAt(text, at).end;
+  if (c === '{' || c === '[') {
+    let depth = 0;
+    for (let i = at; i < text.length; i++) {
+      const d = text[i]!;
+      if (d === '"') {
+        const end = stringAt(text, i).end;
+        if (end < 0) return -1;
+        i = end - 1;
+      } else if (d === '{' || d === '[') depth++;
+      else if (d === '}' || d === ']') {
+        depth--;
+        if (depth === 0) return i + 1;
+      }
+    }
+    return -1;
+  }
+  for (let i = at; i < text.length; i++) if (text[i] === ',' || text[i] === '}' || text[i] === ']' || SPACE.test(text[i]!)) return i;
+  return -1;
+};
+
+/**
+ * One step's answer read while it is still arriving: whether it calls anything (`none`, `some`, or not said yet) and the
+ * words of its `say` so far. Only the object's own two keys are read, so a `say` inside a call's arguments is not the
+ * answer.
+ */
+export const peekStep = (text: string): { calls: 'none' | 'some' | null; say: string | null } => {
+  let calls: 'none' | 'some' | null = null;
+  let say: string | null = null;
+  let i = text.indexOf('{');
+  if (i < 0) return { calls, say };
+  i++;
+  const skip = (): void => {
+    while (i < text.length && SPACE.test(text[i]!)) i++;
+  };
+  for (;;) {
+    skip();
+    if (text[i] === ',') {
+      i++;
+      continue;
+    }
+    if (text[i] !== '"') break;
+    const key = stringAt(text, i);
+    if (key.end < 0) break;
+    i = key.end;
+    skip();
+    if (text[i] !== ':') break;
+    i++;
+    skip();
+    if (i >= text.length) break;
+    if (key.value === 'calls' && calls === null) {
+      if (text[i] !== '[') calls = 'none';
+      else {
+        let j = i + 1;
+        while (j < text.length && SPACE.test(text[j]!)) j++;
+        if (j < text.length) calls = text[j] === ']' ? 'none' : 'some';
+      }
+    }
+    if (key.value === 'say' && text[i] === '"') {
+      const said = stringAt(text, i);
+      say = said.value;
+      if (said.end < 0) break;
+      i = said.end;
+      continue;
+    }
+    const end = valueEnd(text, i);
+    if (end < 0) break;
+    i = end;
+  }
+  return { calls, say };
+};
+
 /**
  * The answer with every figure no evidence holds taken out, the sentence it stood in with it, and how many went.
  * Braces are not read: an id inside `{{ref:…}}` is not a figure.
@@ -173,7 +290,13 @@ const QUALIFIED = /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u;
  * taken out: the answer is prose, and a brace the screen cannot draw would print as itself. `figures` names each row
  * linked, so the screen draws a link by the row's own name.
  */
-const linked = async (said: string, tools: ChatTools): Promise<{ text: string; figures: ChatFigure[] }> => {
+/**
+ * What `linked` has looked up so far in one answer, so an answer drawn a sentence at a time looks each id up once, links
+ * at most `REFS_MOST` across the whole of it, and names each row once in `figures`.
+ */
+type Looked = { to: Map<string, string | null>; figures: ChatFigure[] };
+
+const linked = async (said: string, tools: ChatTools, looked: Looked = { to: new Map(), figures: [] }): Promise<{ text: string; figures: ChatFigure[] }> => {
   /* AN ID AS THE RESULTS PRINT IT, `(tasks#3)` or bare, IS A LINK TOO: the included model copies an id the way it read
      it as often as it writes the brace it was asked for, and an id left as text is a code a person cannot press. */
   const answer = said
@@ -181,10 +304,18 @@ const linked = async (said: string, tools: ChatTools): Promise<{ text: string; f
     .replace(/\{\{\s*ref\s*:\s*(?:[^}]*\s)?([^}\s]+)\s*\}\}/gu, '{{ref:$1}}')
     .replace(/\s*\(\s*([a-z][a-z0-9_]*#[1-9][0-9]*)\s*\)/gu, ' {{ref:$1}}')
     .replace(/(?<![{:\w#])([a-z][a-z0-9_]*#[1-9][0-9]*)(?![\w}])/gu, '{{ref:$1}}');
-  const asked = [...new Set([...answer.matchAll(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu)].map((m) => m[1] ?? ''))].slice(0, REFS_MOST);
-  const to = new Map<string, string | null>();
-  const figures: ChatFigure[] = [];
+  const { to, figures } = looked;
+  const asked = [...new Set([...answer.matchAll(/\{\{\s*ref:\s*([^}\s]+)\s*\}\}/gu)].map((m) => m[1] ?? ''))].filter(
+    (id) => to.has(id) || to.size < REFS_MOST,
+  );
+  const cited: ChatFigure[] = [];
   for (const id of asked) {
+    if (to.has(id)) {
+      const known = figures.find((f) => f.ref === to.get(id));
+      if (known !== undefined && !cited.includes(known)) cited.push(known);
+      continue;
+    }
+    if (to.size >= REFS_MOST) continue;
     let at: { ref: string; label: string } | null = null;
     try {
       at = tools.ref ? await tools.ref(id) : QUALIFIED.test(id) ? { ref: id, label: '' } : null;
@@ -192,14 +323,19 @@ const linked = async (said: string, tools: ChatTools): Promise<{ text: string; f
       at = null;
     }
     to.set(id, at?.ref ?? null);
-    if (at !== null && at.label !== '' && !figures.some((f) => f.ref === at.ref)) figures.push({ ref: at.ref, label: at.label });
+    if (at !== null && at.label !== '') {
+      const known = figures.find((f) => f.ref === at.ref) ?? { ref: at.ref, label: at.label };
+      if (!figures.includes(known)) figures.push(known);
+      if (!cited.includes(known)) cited.push(known);
+    }
   }
   /* A ROW IS NAMED ONCE, BY ITS LINK. The screen draws a brace as the row's own name, so "Studio rent
      {{ref:obligations#16}}" printed the name twice, and "Studio rent is late (obligations#16)" printed it at the end. Where
      the row's name stands in the answer, the first place it stands becomes the link and the brace goes; where it does not,
      the brace stays where it was written. */
   let named = answer;
-  for (const [id, at] of to) {
+  for (const id of asked) {
+    const at = to.get(id);
     const label = figures.find((f) => f.ref === at)?.label;
     if (label === undefined || label.trim() === '') continue;
     const escape = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
@@ -217,13 +353,15 @@ const linked = async (said: string, tools: ChatTools): Promise<{ text: string; f
     .replace(/\{\{(?!ref:[a-z][a-z0-9_]*#[1-9][0-9]*\}\})[^}]*\}\}/gu, '')
     /* AND THE PUNCTUATION A NAME OR A BRACE LEFT BEHIND WHEN IT MOVED OR WENT: "two of them:, " and ", and, ". */
     .replace(/([:,;])\s*,/gu, '$1')
+    /* A LINK THE MODEL BRACKETED, "({{ref:obligations#2}}) is late", is drawn as the name it is, without the brackets. */
+    .replace(/\(\s*(\{\{ref:[a-z][a-z0-9_]*#[1-9][0-9]*\}\})\s*\)/gu, '$1')
     .replace(/^([ \t]*-)[ \t]*[:,][ \t]*/gmu, '$1 ')
     .replace(/\band,\s/gu, 'and ')
     .replace(/\(\s*\)/gu, '')
     .replace(/[ \t]{2,}/gu, ' ')
     .replace(/\s+([.,;:!?])/gu, '$1')
     .trim();
-  return { text, figures };
+  return { text, figures: cited };
 };
 
 /* ── calc ────────────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -342,6 +480,94 @@ const promptOf = (a: {
   return lines.join('\n');
 };
 
+/* ── the answer as it streams ────────────────────────────────────────────────────────────────────────────────────── */
+
+/** Where the first whole sentence of `text` ends, its space after it included, or -1 while it is still being written. */
+const sentenceEnd = (text: string): number => {
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    const ends = c === '\n' || (/[.!?]/u.test(c) && i + 1 < text.length && SPACE.test(text[i + 1]!));
+    if (!ends) continue;
+    let end = i + 1;
+    while (end < text.length && SPACE.test(text[end]!)) end++;
+    return end;
+  }
+  return -1;
+};
+
+/**
+ * The answer, put on the screen a sentence at a time as the model writes it, each sentence held until it ends and then
+ * held to the same two rules the whole answer was: its figures checked against what this turn read (`checkFigures`), and
+ * its ids made links (`linked`). NOTHING UNCHECKED GOES OUT: the sentence still being written waits, and a sentence a
+ * figure fails is dropped with it, as it was from the whole answer.
+ *
+ * `feed` takes the answer's words so far, as often as more arrive, and `end` once they are all there. `evidence` is read
+ * when each sentence is checked, so it must be whole before the answering step is asked, which it is: every call of the
+ * turn has run by then.
+ */
+const flowing = (evidence: readonly number[], tools: ChatTools, emit: (event: ChatEvent) => void) => {
+  let taken = 0;
+  let pending = '';
+  /* THE SPACE AFTER THE LAST SENTENCE OUT goes out before the next, so a dropped sentence takes its own with it and an
+     answer never ends on a space. */
+  let gap = '';
+  let out = '';
+  let dropped = 0;
+  const looked: Looked = { to: new Map(), figures: [] };
+  let queue: Promise<void> = Promise.resolve();
+
+  const send = async (piece: string): Promise<void> => {
+    const core = piece.trim();
+    if (core === '') {
+      if (out !== '') gap += piece;
+      return;
+    }
+    const lead = piece.slice(0, piece.length - piece.trimStart().length);
+    const trail = piece.slice(piece.trimEnd().length);
+    const checked = checkFigures(core, evidence);
+    if (checked.dropped > 0) {
+      dropped += checked.dropped;
+      return;
+    }
+    const drawn = await linked(checked.text, tools, looked);
+    if (drawn.text === '') return;
+    const text = `${out === '' ? '' : `${gap}${lead}`}${drawn.text}`;
+    gap = trail;
+    out += text;
+    emit({ type: 'delta', text, ...(drawn.figures.length === 0 ? {} : { figures: drawn.figures }) });
+  };
+  const later = (piece: string): void => {
+    queue = queue.then(() => send(piece)).catch(() => undefined);
+  };
+
+  return {
+    feed(said: string, end: boolean): void {
+      if (said.length > taken) {
+        pending += said.slice(taken);
+        taken = said.length;
+      }
+      for (let at = sentenceEnd(pending); at > 0; at = sentenceEnd(pending)) {
+        later(pending.slice(0, at));
+        pending = pending.slice(at);
+      }
+      if (end && pending !== '') {
+        later(pending);
+        pending = '';
+      }
+    },
+    /** Every sentence fed so far, out. */
+    async done(): Promise<void> {
+      for (let q = queue; ; q = queue) {
+        await q;
+        if (q === queue) return;
+      }
+    },
+    shown: (): string => out,
+    dropped: (): number => dropped,
+    cited: (): ChatFigure[] => looked.figures,
+  };
+};
+
 /* ── the engine ──────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 export type Chat = {
@@ -439,12 +665,15 @@ export const chats = (core: Core): Chat => {
     addTurn(thread.id, 'you', message);
 
     const list = [...tools.list.filter((t) => t.name !== CALC.name), CALC];
+    /* THE LISTS ARE READ WHILE THE PREFETCH RUNS, and awaited before the first model call reads them. */
+    const listing = (async (): Promise<string> => {
+      try {
+        return tools.context ? cut(await tools.context(), LISTS_CHARS) : '';
+      } catch {
+        return '';
+      }
+    })();
     let lists = '';
-    try {
-      lists = tools.context ? cut(await tools.context(), LISTS_CHARS) : '';
-    } catch {
-      lists = '';
-    }
     const named = new Map(list.map((t) => [t.name, t]));
     const run: ChatRun = { askOnly: false, asked: DOING.test(message), said: message, outside: null };
     const done: Done[] = [];
@@ -453,7 +682,6 @@ export const chats = (core: Core): Chat => {
     const figures: number[] = [
       ...numbersIn(message),
       ...before.flatMap((t) => numbersIn(t.text)),
-      ...numbersIn(lists),
       ...numbersIn(dayOf(clock.now())),
       ...numbersIn(dayOf(clock.now() + 86_400_000)),
     ];
@@ -517,12 +745,16 @@ export const chats = (core: Core): Chat => {
       }
     };
 
+    const flow = flowing(figures, tools, emit);
+
     try {
       /* THE READS THE MESSAGE PLAINLY WANTS, BEFORE THE FIRST MODEL CALL, so "how much cash do I have" is one call and not
          two. Reads only, never a tool that writes, and they spend none of the turn's calls: they are the host's guess,
          and the model may still call what it wants. */
       const first = (tools.prefetch?.(message) ?? []).filter((c) => named.has(c.tool) && named.get(c.tool)?.writes !== true).slice(0, 2);
       if (first.length > 0) await runCalls(first.map((c) => ({ name: c.tool, args: { ...c.args } })));
+      lists = await listing;
+      figures.push(...numbersIn(lists));
 
       for (let step = 0; step < STEPS_MOST && answer === null; step++) {
         const last = step === STEPS_MOST - 1 || calls >= CALLS_MOST;
@@ -547,7 +779,19 @@ export const chats = (core: Core): Chat => {
         if (step > 0) holds.push(id);
         /* THE LAST STEP CAN ONLY ANSWER: its schema has no calls, so a model that would have called again says what it has,
            where before it called again, the calls were dropped and the person was told nothing was found. */
-        const ran = await core.run({ id: 'chat', slots: { '%TRANSCRIPT%': text }, inference, model: s.model ?? undefined, ...(last ? { schema: CHAT_ANSWER_SCHEMA } : {}) });
+        /* THE ANSWER STREAMS AS IT IS WRITTEN, once the step says it calls nothing (the last step always answers), a
+           checked sentence at a time (`flow`). A step that calls is read whole, as before. */
+        const ran = await core.run({
+          id: 'chat',
+          slots: { '%TRANSCRIPT%': text },
+          inference,
+          model: s.model ?? undefined,
+          ...(last ? { schema: CHAT_ANSWER_SCHEMA } : {}),
+          onText: (sofar) => {
+            const seen = peekStep(sofar);
+            if (seen.say !== null && (last || seen.calls === 'none')) flow.feed(seen.say, false);
+          },
+        });
         reached ||= ran.served;
         core.account({
           id,
@@ -570,10 +814,13 @@ export const chats = (core: Core): Chat => {
           break;
         }
 
-        const said = typeof ran.out.value['say'] === 'string' ? ran.out.value['say'].trim() : '';
+        const spoken = typeof ran.out.value['say'] === 'string' ? ran.out.value['say'] : '';
+        const said = spoken.trim();
         const wanted = (Array.isArray(ran.out.value['calls']) ? ran.out.value['calls'] : []).filter(isRecord).slice(0, 3);
         if (wanted.length === 0 || last) {
           answer = said;
+          /* AS IT WAS WRITTEN AND NOT TRIMMED, so it lines up with what streamed of it. */
+          flow.feed(spoken, true);
           break;
         }
 
@@ -590,26 +837,28 @@ export const chats = (core: Core): Chat => {
       for (const id of holds) core.release(id);
     }
 
-    let text = '';
-    let cited: ChatFigure[] = [];
+    /* WHAT STREAMED WAS FINISHED FROM THE ANSWER AS IT WAS READ WHOLE, which is the same words, so the last sentence that
+       had no end yet went out then; an answer that did not stream (its calls were said after its words) went out the same
+       way, all at once. Every sentence is out once the flow is done. */
+    await flow.done();
+    let text = flow.shown();
     if (answer !== null && answer !== '') {
-      const checked = checkFigures(answer, figures);
-      const drawn = await linked(checked.text, tools);
-      text = drawn.text;
-      cited = drawn.figures;
-      if (checked.dropped > 0)
-        text =
+      if (flow.dropped() > 0) {
+        const note =
           text === ''
             ? "I found something, but I couldn't check its figures against the record, so I've left them out. Ask me to look again."
-            : `${text} (I left out a figure I couldn't check.)`;
-    } else if (failed === null) {
+            : " (I left out a figure I couldn't check.)";
+        emit({ type: 'delta', text: note });
+        text += note;
+      }
+    } else if (failed === null && text === '') {
       text = actions.length > 0 ? 'Done.' : "I couldn't find that in the record.";
+      emit({ type: 'delta', text });
     }
 
-    /* EACH PIECE WITH THE SPACE IT WAS WRITTEN WITH, so the lines of a short list stay lines on the screen. */
-    if (text !== '') for (const piece of sentences(text)) emit({ type: 'delta', text: piece });
     if (failed !== null) emit({ type: 'error', text: failed });
     addTurn(thread.id, 'slash', text !== '' ? text : (failed ?? ''), actions);
+    const cited = flow.cited();
     emit({ type: 'done', spent: { asks: reached ? 1 : 0, left: left() }, ...(cited.length === 0 ? {} : { figures: cited }) });
   };
 
