@@ -66,7 +66,6 @@
     best: 'Best match',
     jumpTo: 'Jump to',
     lists: 'Lists',
-    listsCount: 'Every entry in each list, finished ones too.',
     recent: 'Changed lately',
     entries: (n: number) => n.toLocaleString('en'),
   } as const;
@@ -305,7 +304,7 @@
 {#snippet meaningBelow()}<p class="reading">{meaningSaid}</p>{/snippet}
 
 <!-- UNDER THE TITLE SENTENCE when there are hits; under the empty state, below, when there are none. -->
-<PageHead icon="search" title={copy.search} count={q ? found.total : undefined} {sentence} below={shown === 'hits' && meaningSaid ? meaningBelow : undefined} />
+<PageHead icon="search" title={copy.search} {sentence} below={shown === 'hits' && meaningSaid ? meaningBelow : undefined} />
 
 <div class="page">
   <!-- THE FIELD ACROSS THE BOARD, first under the sentence: 48 tall on the tile's own fill, as wide as the tiles under
@@ -368,7 +367,6 @@
           {/if}
           {#if lists.length > 0}
             <Tile icon="rows" title={words.lists}>
-              <p class="counts-say">{words.listsCount}</p>
               <ul class="places">
                 {#each lists as l (l.href)}
                   <li>
@@ -588,13 +586,6 @@
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .counts-say {
-    margin: 0 0 var(--sp-2);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
   }
 
   .quiet {

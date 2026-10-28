@@ -20,10 +20,10 @@ export const palette = {
   searchNone: (q: string) => `Nothing matches “${q}”`,
   /* THE NEXT STEP, NOT A WAY OUT: what to change about the words, and the one
      other place a thing that is not in a list may have been. */
-  searchNoneNext: 'Check the spelling or try fewer words. Anything archived or changed still shows in History.',
+  searchNoneNext: 'Try fewer words, or look in History.',
   searchClear: 'Clear the search',
   searchInHistory: 'Open History',
-  searchWhere: 'Type a word to search your projects, people and money.',
+  searchWhere: 'Projects, people, money and more.',
   allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
   showingOf: (shown: number, total: number) => (shown >= total ? `${shown}` : `${shown} of ${total}`),
   /* `Stopped.` IS THE ASSISTANT'S, NOT THE TRANSPORT'S, whatever its position in this block says.
