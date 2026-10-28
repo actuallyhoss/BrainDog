@@ -21,7 +21,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
     metric: 'spent-30d',
     name: 'Spent, 30 days',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, direction is out, on after -30d',
+    where: 'state is cleared, transfer is false, stays is not true, direction is out, on after -30d',
     value: { sum: 'amount' },
     format: MONEY,
     target: {},
@@ -33,7 +33,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
     metric: 'received-30d',
     name: 'Received, 30 days',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, direction is in, on after -30d',
+    where: 'state is cleared, transfer is false, stays is not true, direction is in, on after -30d',
     value: { sum: 'amount' },
     format: MONEY,
     target: { gte: 0 },
@@ -57,7 +57,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
     metric: 'received-7d',
     name: 'Received, 7 days',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, direction is in, settles is empty, on after -7d, on before +1d',
+    where: 'state is cleared, transfer is false, stays is not true, direction is in, settles is empty, on after -7d, on before +1d',
     value: { sum: 'amount' },
     format: MONEY,
     target: { gte: 0 },
@@ -99,7 +99,7 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
  * `compare: none` ON ALL OF THEM: each is one half of a comparison already, and a second one moved by a window would
  * be a third month nobody asked about.
  */
-const LEDGER_OUT = 'state is cleared, transfer is false, direction is out';
+const LEDGER_OUT = 'state is cleared, transfer is false, stays is not true, direction is out';
 
 /* AN ENTRY SPLIT INTO PARTS IS READ AS ITS PARTS by every figure here, since each adds up `amount` and nothing else: each
    part under its own category, and every total the entry's (`parts`, `lists/transactions.ts`). */

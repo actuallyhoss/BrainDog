@@ -4,7 +4,7 @@ import type { SeedPage } from '../../base.ts';
 import { WHERE_IT_WENT } from './parts/where-it-went.ts';
 
 /** What moved, as every figure of the Ledger counts it: cleared and not between a person's own accounts. */
-const MOVED = 'state is cleared, transfer is false';
+const MOVED = 'state is cleared, transfer is false, stays is not true';
 
 /**
  * THE MONTHS A PERSON PICKS, as one strip over the page: this month, last month, three months or a year. Each is a

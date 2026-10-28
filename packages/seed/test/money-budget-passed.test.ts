@@ -91,7 +91,7 @@ test('THE FIGURE IS ONE RUNNING TOTAL OVER THE LEDGER, and it names no currency 
   assert.equal(decl.source, 'register.transactions');
   assert.equal(decl.format, 'money', 'the figure names a currency or is no money figure');
   /* THE SAME MONEY `spent-by-category-month` ADDS UP, cut to the one category a page names. */
-  assert.equal(decl.where, 'state is cleared, transfer is false, direction is out, on at least bom, category is {{it}}');
+  assert.equal(decl.where, 'state is cleared, transfer is false, stays is not true, direction is out, on at least bom, category is {{it}}');
   assert.deepEqual(decl.value, { running: { sum: 'amount', order: 'on', until: { gte: { field: 'budget', of: 'category' } } } });
 });
 

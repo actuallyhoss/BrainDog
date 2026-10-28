@@ -208,6 +208,14 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
      * ledger, and no pair can be found for it.
      */
     { id: 'transfer', label: 'Between your own accounts', type: 'bool', default: false, index: true },
+    /**
+     * FILED UNDER A CATEGORY THAT SAYS THE MONEY STAYS YOURS, SINCE money-core 3.30.0, read through the link and never
+     * stored (`derive: via`). A move whose other leg is not in the Ledger, a card paid off from the bank or cash taken
+     * out has no partner to pair with, and a person files it under a category such as their own transfers. Every figure
+     * of spending and income says `stays is not true` beside `transfer is false`, so such an entry is counted in neither,
+     * and a ticked category takes every entry under it out at once. An entry with no category is counted.
+     */
+    { id: 'stays', label: 'Money stays yours', type: 'bool', derive: { via: { ref: 'category', field: 'transfer' } } },
     /* THE PROMISE THIS PAYMENT DISCHARGED. Reconcile is this field and nothing else. */
     { id: 'settles', label: 'Settles', type: 'ref', to: 'obligations', index: true },
     { id: 'note', type: 'text' },

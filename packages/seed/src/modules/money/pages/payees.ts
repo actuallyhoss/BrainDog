@@ -7,7 +7,7 @@ import { LEDGER_COLUMNS } from './parts/ledger.ts';
  * THE LAST NINETY DAYS OF WHAT MOVED, as the payee figures read them (`figures/payees.ts`): cleared, not between a
  * person's own accounts, and nothing dated ahead.
  */
-const LEDGER_90D = 'state is cleared, transfer is false, on after -90d, on before +1d';
+const LEDGER_90D = 'state is cleared, transfer is false, stays is not true, on after -90d, on before +1d';
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: one bar a payee, the most paid first, how often each was paid and the
@@ -92,7 +92,7 @@ export const MONEY_PAYEES_PAGE: SeedPage = {
       icon: 'receipt',
       span: 12,
       source: 'register.transactions',
-      where: 'state is not void, transfer is false',
+      where: 'state is not void, transfer is false, stays is not true',
       columns: LEDGER_COLUMNS,
       order: [{ field: 'on', dir: 'desc' }],
       limit: 10,

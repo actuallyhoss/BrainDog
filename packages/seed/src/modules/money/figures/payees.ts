@@ -7,7 +7,7 @@ import type { SeedMetric } from '../../base.ts';
  * not thirty, because a shop paid once a month is a payee and thirty days would have it some months and not others.
  * `after` leaves out its own day, as `spent-30d` says, and `before +1d` leaves out an entry dated ahead.
  */
-const LEDGER_90D = 'state is cleared, transfer is false, on after -90d, on before +1d';
+const LEDGER_90D = 'state is cleared, transfer is false, stays is not true, on after -90d, on before +1d';
 
 /**
  * THE PAYEES PAGE'S OWN FIGURES, SINCE money-core 3.29.0.

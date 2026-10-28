@@ -186,8 +186,8 @@ test('a Ledger entry, a repeating line and an instalment made on an account in A
   const said = r.log.filter((l) => /Acme/u.test(l)).join(' ');
   assert.match(said, /NORTHGATE ESTATES is in Acme, the book its account is in\./u);
   assert.doesNotMatch(said, /—|#\d|\brow\b|01[0-9A-Z]{24}/u);
-  /* AND NOTHING ELSE ABOUT THE ENTRY CHANGED. */
-  const { book: _b, ...rest } = r.k.get(made[0]!.id)!.fields;
+  /* AND NOTHING ELSE ABOUT THE ENTRY CHANGED. `stays` is read through its category, which it has none of. */
+  const { book: _b, stays: _s, ...rest } = r.k.get(made[0]!.id)!.fields;
   assert.deepEqual(rest, made[0]!.fields);
   r.sql.close();
 });

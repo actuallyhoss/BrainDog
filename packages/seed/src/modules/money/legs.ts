@@ -139,7 +139,7 @@ const EVERYDAY: Leg = {
   register: 'transactions',
   on: 'on',
   amount: 'amount',
-  where: 'state is cleared, transfer is false',
+  where: 'state is cleared, transfer is false, stays is not true',
   incoming: { field: 'direction', is: 'in' },
   everyday: { months: 3 },
 };

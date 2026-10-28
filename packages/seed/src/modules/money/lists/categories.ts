@@ -119,6 +119,13 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
       labels: { near: 'Near its most', over: 'Over its most' },
     },
     { id: 'warned_month', label: 'Warned for', type: 'text' },
+    /**
+     * MONEY THAT STAYS YOURS, SINCE money-core 3.30.0: a move between your own accounts, a card paid off from the bank,
+     * cash taken out, money put into savings. A person who files such entries under a category of their own says so here
+     * once, and every figure of spending and income leaves out what is filed under it, through the Ledger's `stays`
+     * (`./transactions.ts`). Nothing reads a category by its name, so this is how one is known for what it is.
+     */
+    { id: 'transfer', label: 'Money stays yours', type: 'bool', default: false },
     { id: 'state', label: 'Status', type: 'enum', values: ['live', 'retired'], default: 'live', index: true, required: true },
     { id: 'note', type: 'text' },
   ],

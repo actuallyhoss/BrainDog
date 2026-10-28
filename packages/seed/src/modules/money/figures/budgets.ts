@@ -37,7 +37,7 @@ export const BUDGET_FIGURES: Record<string, SeedMetric> = {
     metric: 'budget-passed-on',
     name: 'The day a category passed its budget',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, direction is out, on at least bom, category is {{it}}',
+    where: 'state is cleared, transfer is false, stays is not true, direction is out, on at least bom, category is {{it}}',
     value: { running: { sum: 'amount', order: 'on', until: { gte: { field: 'budget', of: 'category' } } } },
     format: MONEY,
     target: { gte: 0 },

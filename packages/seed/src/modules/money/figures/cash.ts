@@ -130,7 +130,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'book-spent-month',
     name: 'Paid out of one book this month',
     source: 'register.transactions',
-    where: 'state is cleared, transfer is false, direction is out, on at least bom, book is {{it}}',
+    where: 'state is cleared, transfer is false, stays is not true, direction is out, on at least bom, book is {{it}}',
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },

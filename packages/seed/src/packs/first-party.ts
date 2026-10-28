@@ -812,12 +812,17 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.29.1: fewer words on every Money page. Notes that said what a figure is go, leads are one line with a
  *   figure in it, and an empty list says one line. Words inside declarations already there, nothing added or taken
  *   away, so a patch step.
+ * - money-core 3.30.0: money that stays yours is not spending. A category says so (`transfer` on `register.categories`,
+ *   "Money stays yours"), the Ledger reads it through the entry's category (`stays`, worked out at read), and every
+ *   figure, page and walk of spending and income says `stays is not true` beside `transfer is false`, so a card paid off,
+ *   cash taken out or a move whose other leg is not in the Ledger is counted in neither. Two fields added and nothing
+ *   taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.1.0',
   portfolio: '1.30.0',
   people: '4.0.0',
-  'money-core': '3.29.1',
+  'money-core': '3.30.0',
   estate: '2.5.0',
   work: '1.19.0',
 };

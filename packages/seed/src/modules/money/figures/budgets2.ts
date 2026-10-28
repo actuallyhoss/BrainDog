@@ -8,7 +8,7 @@ import { MONEY } from './shared.ts';
  * counts (`figures/spending.ts` says why each clause is there). The page's bars read `spent-by-category-month` over the
  * same sentence, so a total here and a bar there are one sum.
  */
-const LEDGER_OUT = 'state is cleared, transfer is false, direction is out';
+const LEDGER_OUT = 'state is cleared, transfer is false, stays is not true, direction is out';
 
 /** The categories that hold a budget, as `budgets-set` counts them (`figures/budgets.ts`). */
 const BUDGETED = 'state is live, direction is out, budget is set';

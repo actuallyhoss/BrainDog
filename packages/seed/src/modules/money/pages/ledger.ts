@@ -53,8 +53,8 @@ export const SHOW_FILTER = {
   options: [
     { value: 'unfiled', label: 'Not filed yet', where: 'category is empty, parts is empty, transfer is false' },
     { value: 'moves', label: 'Between your accounts', where: 'transfer is true' },
-    { value: 'in', label: 'Money in', where: 'direction is in, transfer is false' },
-    { value: 'out', label: 'Money out', where: 'direction is out, transfer is false' },
+    { value: 'in', label: 'Money in', where: 'direction is in, transfer is false, stays is not true' },
+    { value: 'out', label: 'Money out', where: 'direction is out, transfer is false, stays is not true' },
   ],
 } as const;
 
