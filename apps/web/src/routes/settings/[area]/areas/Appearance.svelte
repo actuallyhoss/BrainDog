@@ -1,6 +1,9 @@
 <!--
   Settings > Appearance: how BrainDog looks to this person, in one section, and the record's own look under it.
 
+  FIVE SETTINGS (`d8`): theme, density, navigation, the phone bar and words. Text size, colour, contrast, screenshot mode
+  and the record's own look are folded under them, one press away; everything else is said on the page itself.
+
   THE PERSON'S LOOK FOLLOWS THEM (`35`). Scheme, text size, density, contrast and accent are kept by the record as their
   own `look.*` prefs, so every device they open this record on looks the same; the cookie is only the first-paint copy
   (`pref.ts`). EACH RECORD KEEPS ITS OWN: a person in two records has a look in each, and the hint says "this record"
@@ -47,6 +50,7 @@
   import { ownsRecord } from '../../levels.ts';
   import { shot, shotNow } from '$lib/palette/customise-apply.ts';
   import StateRow from './StateRow.svelte';
+  import NavChoices from './NavChoices.svelte';
 
   /* EVERY AREA TAKES THE SAME PROPS. The device's own choices read none of them; the record's look asks whether the
      person is the owner, whose save installs it, or a member, whose save goes to Decide. */
@@ -66,6 +70,8 @@
     light: 'Light',
     dark: 'Dark',
     houseRed: 'House red',
+    more: 'Text size, colour and look',
+    moreSeeing: 'Contrast and screenshots',
   };
 
   /* A THEME REFUSED AT INSTALL, handed over by the add-on screen's Fix and install. Taken once, so a reload of this
@@ -327,6 +333,40 @@
     <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
     <div class="looks">
       <div class="choices">
+        <div class="choice">
+          <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
+          <Segmented full role="group" aria-labelledby="choice-scheme">
+            {#each SCHEMES as [v, label, icon] (v)}
+              <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
+                ><Icon name={icon} size="s" />{label}</button
+              >
+            {/each}
+          </Segmented>
+        </div>
+
+        <div class="choice">
+          <span class="choice-name" id="choice-density">{copy.density}</span>
+          <Segmented full role="group" aria-labelledby="choice-density">
+            {#each DENSITIES as [v, label] (v)}
+              <button
+                type="button"
+                class="segment"
+                aria-pressed={density === v}
+                data-on={density === v ? '' : undefined}
+                onclick={() => set('density', v)}
+                ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
+              >
+            {/each}
+          </Segmented>
+        </div>
+
+        <!-- NAVIGATION, THE PHONE BAR AND WORDS: the other three of the five (`d8`). -->
+        <NavChoices shell={props.shell} />
+
+        <!-- EVERYTHING ELSE, FOLDED: five settings are shown, and the rest is one press away, never gone. -->
+        <details class="more">
+          <summary>{words.more}</summary>
+          <div class="more-body">
         <!-- EVERY LOOK THE RECORD HOLDS, ONE PRESS EACH: House, High contrast, the record's own, one for each add-on. The
              one drawn now carries a tick as well as its fill, so the state is never colour alone. -->
         {#if answered && choices.length > 1}
@@ -349,17 +389,6 @@
         {/if}
 
         <div class="choice">
-          <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
-          <Segmented full role="group" aria-labelledby="choice-scheme">
-            {#each SCHEMES as [v, label, icon] (v)}
-              <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
-                ><Icon name={icon} size="s" />{label}</button
-              >
-            {/each}
-          </Segmented>
-        </div>
-
-        <div class="choice">
           <span class="choice-name" id="choice-text">{copy.textSize}</span>
           <Segmented full role="group" aria-labelledby="choice-text">
             {#each TEXTS as [v, label] (v)}
@@ -369,22 +398,6 @@
                 aria-pressed={text === v}
                 data-on={text === v ? '' : undefined}
                 onclick={() => set('text', v)}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
-              >
-            {/each}
-          </Segmented>
-        </div>
-
-        <div class="choice">
-          <span class="choice-name" id="choice-density">{copy.density}</span>
-          <Segmented full role="group" aria-labelledby="choice-density">
-            {#each DENSITIES as [v, label] (v)}
-              <button
-                type="button"
-                class="segment"
-                aria-pressed={density === v}
-                data-on={density === v ? '' : undefined}
-                onclick={() => set('density', v)}
-                ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
               >
             {/each}
           </Segmented>
@@ -431,6 +444,8 @@
           {#if accentName}<p class="swatch-name">{accentName}</p>{/if}
           {#if accentWrong}<p class="wrong" role="alert">{accentWrong}</p>{/if}
         </div>
+          </div>
+        </details>
       </div>
 
       <!--
@@ -493,9 +508,12 @@
       A SWITCH AND NOT A SEGMENT, because it is one thing that is on or off, and `13 §5.1` wants
       the state said in something other than styling: `aria-checked` carries it.
     -->
+    <details class="more">
+      <summary>{words.moreSeeing}</summary>
     <StateRow icon="eye" title={copy.contrast} line={copy.contrastHint} action={contrastSwitch} />
     <!-- A DISPLAY MODE FOR A SHOULDER, not a redaction: the sentence says both halves, so nobody takes it for a lock. -->
     <StateRow icon="eye" title={copy.shot} line={copy.shotHint} action={shotSwitch} />
+    </details>
   </div>
 </Tile>
 
@@ -503,14 +521,40 @@
   THE RECORD'S LOOK, which is everybody's, under the person's own choices, which are theirs alone (`21 §6`).
   The editor is its own component with its own styles, because this file's style block is the device choices'.
 -->
+<details class="more record-look">
+  <summary>{copy.lookTitle}</summary>
 <Tile icon="eye" class="section" data-surface="tile" title={copy.lookTitle}>
   <div class="section-body">
     <p class="hint">{copy.lookHint}</p>
     <LookEditor {owner} {staged} />
   </div>
 </Tile>
+</details>
 
 <style>
+  /* THE FOLDS: one quiet line each, opened by a press, so the five settings are what the area shows. */
+  .more {
+    margin-block-start: var(--sp-2);
+  }
+
+  .more > summary {
+    cursor: pointer;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    padding-block: var(--sp-2);
+  }
+
+  .more-body {
+    display: grid;
+    gap: var(--sp-5);
+    padding-block-start: var(--sp-3);
+  }
+
+  .record-look {
+    margin-block-start: var(--sp-4);
+  }
+
   /* The hint sits above the control it explains, not beside it: a sentence in a column beside a
      row of swatches is read after the choice has been made. */
   .hint {

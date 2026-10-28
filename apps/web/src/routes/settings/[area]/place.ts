@@ -84,8 +84,8 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     title: 'You',
     icon: 'sliders-horizontal',
     areas: [
-      area('/settings/appearance', 'Appearance', 'sun', 'Theme, text size, density and accent'),
-      area('/settings/navigation', 'Navigation', 'rows', 'What is in the sidebar and the bar'),
+      area('/settings/appearance', 'Appearance', 'sun', 'Theme, density, navigation, phone bar and words'),
+      area('/settings/navigation', 'Pages', 'rows', 'What is in the sidebar and the bar'),
       area('/settings/words', 'Words and money', 'tag', 'What your lists are called, and your currency'),
       area('/settings/notifications', 'Notifications', 'bell', 'When BrainDog interrupts you'),
       area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts, and the keys that are one letter'),
