@@ -50,8 +50,6 @@ export type Said = { ok: true } | { ok: false; fix: string };
 export const commentWords = {
   heading: 'Comments',
   reading: 'Reading the comments.',
-  /** NOTHING, WHERE NOTHING HAS BEEN SAID (today F9): the field under the heading is the whole of an empty thread. */
-  none: 'No comments yet',
   addLabel: 'Add a comment',
   add: 'Add comment',
   reply: 'Reply',

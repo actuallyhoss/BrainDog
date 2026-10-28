@@ -189,9 +189,8 @@
   {:else if heard.from === 'refused'}
     <p class="thread-quiet">{heard.fix}</p>
   {:else}
-    {#if threads.length === 0}
-      <p class="thread-quiet">{words.none}</p>
-    {:else}
+    <!-- AN EMPTY THREAD IS ITS FIELD ALONE: "No comments yet" over "Add a comment" said one thing twice. -->
+    {#if threads.length > 0}
       <ol class="comments">
         {#each threads as t (t.comment.id)}
           {@const c = t.comment}
