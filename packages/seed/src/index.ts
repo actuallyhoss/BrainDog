@@ -645,7 +645,7 @@ export function handledBatch(kernel: Pick<Kernel, 'get'>): { question: string; b
     body: {
       register: 'transactions',
       rows: paid.map((row) => ({ at: `transactions#${row.seq}`, version: row.version, patch: { category: software.id } })),
-      why: 'Ledger Post’s sending plan is already filed under Software in what comes round.',
+      why: 'Its sending plan is already under Software.',
     },
   };
 }
