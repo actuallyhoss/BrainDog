@@ -8,6 +8,7 @@
   UNDER THE LIST, ONE QUIET LINK TO WHAT SLASH SUGGESTED AND WHAT CAME OF IT, the page this was before (`?history`).
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import { since } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
   import { keptThreads, threads as recordThreads, type KeptThread } from '$lib/palette/slash-chat.ts';
@@ -34,6 +35,9 @@
     threads = keptThreads();
     now = Date.now();
     drew('ready');
+    /* ONLY A HOST WITH A MODEL BEHIND SLASH KEEPS CONVERSATIONS (`slash` in the shell): one with none answers the door
+       refused, which the browser writes to the console, and there is nothing it could list. */
+    if (page.data.slash !== true) return;
     void recordThreads(apiBase()).then((kept) => {
       if (!kept) return;
       const mine = keptThreads();
