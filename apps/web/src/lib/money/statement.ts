@@ -38,9 +38,9 @@ export type Read = { lines: Line[]; other: number; unread: number };
 /** Kept here, so the screen owns its words. Plain, sentence case. */
 export const words = {
   title: 'Import a statement',
-  sentence: 'Bring in a bank statement as a CSV. Lines already in the Ledger are skipped.',
+  sentence: 'A CSV from your bank. Lines already in the Ledger are skipped.',
   account: 'Account',
-  noAccounts: 'There is no open account to import into yet.',
+  noAccounts: 'No open account yet.',
   noLedger: 'This record keeps no ledger to import into.',
   file: 'Statement',
   drop: 'Drop a CSV here, or choose one',
@@ -61,8 +61,8 @@ export const words = {
   already: 'Already in the Ledger',
   fresh: (n: number) => (n === 1 ? '1 new line' : `${n.toLocaleString('en')} new lines`),
   skipped: (n: number) => (n === 1 ? '1 already in the Ledger' : `${n.toLocaleString('en')} already in the Ledger`),
-  otherCurrency: (n: number, code: string) => `${n === 1 ? '1 line is' : `${n.toLocaleString('en')} lines are`} not in ${code}, so ${n === 1 ? 'it is' : 'they are'} left out.`,
-  unread: (n: number) => `${n === 1 ? '1 line has' : `${n.toLocaleString('en')} lines have`} no date, amount or description and ${n === 1 ? 'is' : 'are'} left out.`,
+  otherCurrency: (n: number, code: string) => `${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`} not in ${code}, left out.`,
+  unread: (n: number) => `${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`} missing a date, amount or description, left out.`,
   more: (n: number) => `and ${n.toLocaleString('en')} more`,
   add: (n: number) => (n === 1 ? 'Add 1 line' : `Add ${n.toLocaleString('en')} lines`),
   adding: (done: number, of: number) => `Adding ${done.toLocaleString('en')} of ${of.toLocaleString('en')}…`,

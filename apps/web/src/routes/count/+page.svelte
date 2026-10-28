@@ -41,7 +41,6 @@
 
   const words = {
     title: 'Count cash',
-    sentence: 'The box against what is expected.',
     account: 'Account',
     notes: 'Notes and coins',
     totalOnly: 'Total counted',
@@ -60,15 +59,15 @@
     how: 'Record the difference',
     asLines: 'As lines',
     asDiscrepancy: 'As Discrepancy',
-    linesHelp: 'What is left is filed as Discrepancy.',
-    discrepancyHelp: 'One Discrepancy entry in the Ledger.',
+    linesHelp: 'Whatever is left is filed as Discrepancy.',
+    discrepancyHelp: 'Filed as one Discrepancy line.',
     what: 'What it was',
     amount: 'Amount',
     category: 'Category',
     addLine: 'Add a line',
     left: 'Left as Discrepancy',
-    noCash: 'No Cash account to count yet',
-    notSetUp: 'Add Count cash to count the box',
+    noCash: 'No cash account to count',
+    notSetUp: 'Needs the Count cash add-on',
     addOn: 'See add-ons',
     saved: 'Count saved',
     savedBody: 'Filing the difference in the Ledger.',
@@ -179,7 +178,7 @@
 
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
-<PageHead icon="money" title={words.title} sentence={words.sentence} kicker="Money" back={at('/p/money', page.url.pathname)} />
+<PageHead icon="money" title={words.title} kicker="Money" back={at('/p/money', page.url.pathname)} />
 <div class="cc-page">
   {#if !ready}
     <Empty kind="no-data-yet" glyph="money" title={words.notSetUp}>
