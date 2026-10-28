@@ -322,6 +322,10 @@ export const checkFigures = (answer: string, evidence: readonly number[]): { tex
 
 /** `tasks#41`, the one form a link is drawn from. */
 const QUALIFIED = /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u;
+/** What a person may send with their words: a row, or a question in Decide, an agent's run or a vital sign by its id. */
+const SENT = /^(?:[a-z][a-z0-9_]*#[1-9][0-9]*|(?:decide|run|sign):[A-Za-z0-9_.:-]{1,80})$/u;
+/** The name a sent thing's read is kept under in the turn's reads, which no tool of the model's is called. */
+const SENT_READ = 'sent';
 
 /**
  * Every `{{ref:ID}}` made the `register#seq` a link is drawn from, through the host's own lookup, and every other brace
@@ -502,7 +506,7 @@ const promptOf = (a: {
     for (const t of a.before) lines.push(`${t.role === 'you' ? 'They said' : 'You said'}: ${cut(t.text, TURN_CHARS)}${t.actions ?? ''}`);
   }
   lines.push('', `Now they say: ${a.message}`);
-  if (a.sent !== undefined && a.sent.length > 0) lines.push(`They sent you these rows with it, read below: ${a.sent.join(', ')}.`);
+  if (a.sent !== undefined && a.sent.length > 0) lines.push(`They sent you these with it, read below: ${a.sent.join(', ')}.`);
   if (a.done.length > 0) {
     lines.push('', 'What your calls answered this turn:');
     a.done.forEach((d, i) => {
@@ -548,7 +552,7 @@ const deepPromptOf = (a: {
   }
   lines.push('', `Now they say: ${a.message}`);
   if (a.rethink) lines.push('They asked you to think harder about this than the answer they had: look again, more carefully.');
-  if (a.sent.length > 0) lines.push(`They sent you these rows with it: ${a.sent.join(', ')}.`);
+  if (a.sent.length > 0) lines.push(`They sent you these with it, read below: ${a.sent.join(', ')}.`);
   if (a.done.length > 0) {
     lines.push('', 'Already read for this turn:');
     a.done.forEach((d, i) => lines.push(`[${i + 1}] ${d.tool} ${JSON.stringify(d.args)}`, cut(d.text, DEEP_RESULT_CHARS), ''));
@@ -843,6 +847,16 @@ export const chats = (core: Core): Chat => {
     /** A tool call the engine runs, by the name the model gave it. */
     type Asked = { name: string; args: Record<string, unknown> };
     const runOne = async (c: Asked): Promise<ChatRan> => {
+      if (c.name === SENT_READ) {
+        const ref = typeof c.args['ref'] === 'string' ? c.args['ref'] : '';
+        try {
+          if (tools.attached) return await tools.attached(ref);
+          if (QUALIFIED.test(ref) && named.has('open')) return await tools.call('open', { id: ref }, { ...run });
+          return { text: `${ref} could not be read here.` };
+        } catch (e) {
+          return { text: `${ref} could not be read just now: ${e instanceof Error ? e.message : String(e)}.` };
+        }
+      }
       const tool = named.get(c.name);
       if (tool === undefined) return { text: `There is no tool called ${c.name}. The tools are ${list.map((t) => t.name).join(', ')}.` };
       if (tool.name === CALC.name) {
@@ -868,7 +882,7 @@ export const chats = (core: Core): Chat => {
       for (const [i, c] of asked.entries()) {
         const out = outs[i]!;
         const tool = named.get(c.name);
-        if (tool !== undefined) emit({ type: 'step', text: out.step ?? tool.about.split(/[.:,]/u)[0] ?? c.name });
+        if (tool !== undefined || out.step !== undefined) emit({ type: 'step', text: out.step ?? tool?.about.split(/[.:,]/u)[0] ?? c.name });
         /* OUTSIDE TEXT DROPS THE REST OF THE TURN TO ASKING, whatever the model reads next (the record's own rule). */
         if (out.outside) {
           run.outside ??= out.outside;
@@ -901,7 +915,7 @@ export const chats = (core: Core): Chat => {
 
     /* THE ROWS THEY SENT, read through the tools before any model is asked, as the asker, so a row they may not read is
        refused in the tool's own words. Quick reads a few, to stay under its template's cap; deep reads them all. */
-    const sent = [...new Set((input.attach ?? []).filter((r): r is string => typeof r === 'string' && QUALIFIED.test(r)))].slice(0, goDeep || mode === 'auto' ? ATTACH_MOST : 3);
+    const sent = [...new Set((input.attach ?? []).filter((r): r is string => typeof r === 'string' && SENT.test(r)))].slice(0, goDeep || mode === 'auto' ? ATTACH_MOST : 3);
 
     /**
      * A deep turn, on the owner's key: the model is handed the tools themselves and the turn's reads so far, calls what it
@@ -1016,7 +1030,7 @@ export const chats = (core: Core): Chat => {
          and the model may still call what it wants. */
       const first = (tools.prefetch?.(message) ?? []).filter((c) => named.has(c.tool) && named.get(c.tool)?.writes !== true).slice(0, 2);
       if (first.length > 0) await runCalls(first.map((c) => ({ name: c.tool, args: { ...c.args } })));
-      if (sent.length > 0 && named.has('open')) await runCalls(sent.map((ref) => ({ name: 'open', args: { id: ref } })));
+      if (sent.length > 0) await runCalls(sent.map((ref) => ({ name: SENT_READ, args: { ref } })));
       lists = await listing;
       figures.push(...numbersIn(lists));
 

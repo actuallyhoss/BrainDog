@@ -131,9 +131,12 @@ export type SlashChatInput = {
   rethink?: boolean;
 };
 
-/** The most rows one message may send Slash, and the shape each is named in: `tasks#12`. */
+/**
+ * The most things one message may send Slash, and the forms each is named in: a row (`tasks#12`), or a question in Decide,
+ * an agent's run or a vital sign by its id (`decide:<id>`, `run:<id>`, `sign:<id>`).
+ */
 const ATTACH_MOST = 8;
-const ROW_REF = /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u;
+const ROW_REF = /^(?:[a-z][a-z0-9_]*#[1-9][0-9]*|(?:decide|run|sign):[A-Za-z0-9_.:-]{1,80})$/u;
 
 /**
  * The tools a conversation reads and writes through, built by the host for one asker (`@braindog/mcp/slash-tools`). The
@@ -700,7 +703,7 @@ async function conversation<C>(route: 'chat' | 'act', body: Record<string, unkno
     return refusal(422, { code: 'ENUM_VALUE_UNKNOWN', fix: 'mode is quick, deep or auto.', at: 'mode', allowed: ['quick', 'deep', 'auto'] });
   const attach = body['attach'];
   if (attach !== undefined && attach !== null && (!Array.isArray(attach) || attach.length > ATTACH_MOST || !attach.every((r) => typeof r === 'string' && ROW_REF.test(r))))
-    return refusal(422, { code: 'VALUE_MALFORMED', fix: `attach is up to ${ATTACH_MOST} rows by their ids, such as "tasks#12".`, at: 'attach' });
+    return refusal(422, { code: 'VALUE_MALFORMED', fix: `attach is up to ${ATTACH_MOST} things by their ids: a row such as "tasks#12", or decide:, run: or sign: and an id.`, at: 'attach' });
   const page = body['page'];
   const at = typeof page === 'object' && page !== null && !Array.isArray(page) ? (page as Record<string, unknown>) : null;
   if (page !== undefined && page !== null && (at === null || typeof at['path'] !== 'string'))

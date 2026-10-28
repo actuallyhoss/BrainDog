@@ -51,7 +51,15 @@ export type SlashChatTools = {
   context(): Promise<string>;
   /** The reads a question plainly wants, run before the model is first asked (`slashPrefetch`). */
   prefetch(message: string): { tool: string; args: Args }[];
+  /**
+   * One thing a person sent with their words, read as they may read it: a row (`tasks#12`), a question in Decide
+   * (`decide:<id>`), an agent's run (`run:<id>`) or a vital sign (`sign:<id>`). Read only, never a write.
+   */
+  attached(ref: string): Promise<SlashToolRan>;
 };
+
+/** The four forms a sent thing is named in, which the chat door also checks (`packages/host/src/slash-ask.ts`). */
+export const SENT_REF = /^(?:[a-z][a-z0-9_]*#[1-9][0-9]*|(?:decide|run|sign):[A-Za-z0-9_.:-]{1,80})$/u;
 
 /* THE WORDS THAT SAY WHICH READ A QUESTION WANTS. Each is a read the model asked for first on nearly every such question,
    measured on the included model, where a model call costs seconds and a read costs milliseconds. */
@@ -82,6 +90,8 @@ export function slashPrefetch(message: string): { tool: string; args: Args }[] {
 /** The record's methods this file calls beyond what an agent's surface names. Each optional, as a host may not answer it. */
 export type SlashSurface<C> = McpSurface<C> & {
   slashPropose?(args: { asked: string; page?: string }, ctx: C): Answer;
+  /** The record's vital signs now, for a sign a person sends Slash (`signs` in `packages/record/src/methods/signs.ts`). */
+  signs?(args: unknown, ctx: C): Answer;
 };
 
 export type SlashToolDeps = {
@@ -690,5 +700,31 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     return all.map((l) => `${l.name} (${l.id}${l.count === null ? '' : `, ${l.count}`})`).join(', ');
   };
 
-  return { list: TOOLS, call, apply, ref, now, context, prefetch: slashPrefetch };
+  /* A SENT THING, READ BY ITS KIND: a row as `open` reads it, a question through Decide's own read, a run as the row the
+     record keeps for it (`session`), and a sign from the record's signs, with its sentence and facts as the asker may see them. */
+  const attached = async (ref: string): Promise<SlashToolRan> => {
+    const said = ref.trim();
+    if (!SENT_REF.test(said)) return { text: `${clip(said, 40)} is not something Slash can read.` };
+    const kind = /^(decide|run|sign):(.+)$/u.exec(said);
+    if (kind === null) return call('open', { id: said }, { askOnly: false, asked: false, said: '', outside: null });
+    const id = kind[2]!;
+    if (kind[1] === 'decide') return { text: await read('governance', { register: 'suggestion', id }), step: 'Reading the question in Decide' };
+    if (kind[1] === 'run') {
+      const spoken = /^[1-9][0-9]*$/u.test(id) ? `session#${id}` : id;
+      return { text: await read('get', { spoken }), step: 'Reading the run' };
+    }
+    if (!surface.signs) return { text: 'This record does not read its vital signs here.' };
+    const out = await surface.signs({}, ctx);
+    if (!out.ok) return { text: fixOf(out) };
+    const all = isObject(out.value) && Array.isArray(out.value['signs']) ? out.value['signs'].filter(isObject) : [];
+    const one = all.find((g) => g['sign'] === id || g['name'] === id);
+    if (one === undefined) return { text: `No vital sign is called ${clip(id, 40)}.` };
+    const facts = Array.isArray(one['facts']) ? one['facts'].filter((f): f is string => typeof f === 'string') : [];
+    return {
+      text: [`${text(one['name']) || id}: ${text(one['state'])}${typeof one['value'] === 'number' ? `, ${one['value']}` : ''}. ${text(one['said'])}`, ...facts.map((f) => `- ${f}`)].join('\n'),
+      step: `Reading ${clip(text(one['name']) || id, 40)}`,
+    };
+  };
+
+  return { list: TOOLS, call, apply, ref, now, context, prefetch: slashPrefetch, attached };
 }

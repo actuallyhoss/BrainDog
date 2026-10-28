@@ -559,6 +559,12 @@ export type ChatTools = {
    * spending ask for the figures, "what's late" for today. Reads only, and none for a message asking for something done.
    */
   prefetch?(message: string): readonly { tool: string; args: Record<string, unknown> }[];
+  /**
+   * One thing the person sent with their words, read as they may read it: a row (`tasks#12`), a question in Decide
+   * (`decide:<id>`), an agent's run (`run:<id>`) or a vital sign (`sign:<id>`). Absent, a row is read with `open` and the
+   * other three are not read.
+   */
+  attached?(ref: string): Promise<ChatRan>;
 };
 
 /* ── deep: the owner's own Anthropic key, with the model's own tool use ──────────────────────────────────────────── */
