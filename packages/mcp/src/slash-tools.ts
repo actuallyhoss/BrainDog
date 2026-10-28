@@ -159,12 +159,15 @@ const SAID_AS: Readonly<Record<string, string>> = {
 };
 
 /** The words of a figure question, as the figures' names say them. */
-const figureWords = (said: string): string[] =>
-  said
+const figureWords = (said: string): string[] => {
+  const words = said
     .toLowerCase()
     .split(/[^a-z0-9]+/u)
     .filter((w) => w.length > 1 && !ASKING.has(w))
     .map((w) => SAID_AS[w] ?? w);
+  /* "HOW LONG WILL IT LAST" IS THE RUNWAY, and none of its words names one. */
+  return /\bhow long\b/iu.test(said) ? [...words.filter((w) => w !== 'last' && w !== 'long' && w !== 'will'), 'runway', 'lasts'] : words;
+};
 
 /**
  * How well a figure's id and name answer the words: one for each word it holds, one more where the words stand in its
@@ -487,10 +490,12 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       case 'open': {
         const id = text(args['id'] ?? args['spoken']);
         const row = await rowOf(id);
+        const said = await read('get', { spoken: id });
         return {
-          text: await read('get', { spoken: id }),
+          text: said,
           ...(row === null ? {} : { outside: outsideOf([row.register]) }),
-          step: `Opening ${row === null ? clip(id, 40) : titleOf(row.fields) || id}`,
+          /* A FIGURE OPENED IS SAID BY ITS NAME, "Opening Days the money lasts", and not by its id. */
+          step: `Opening ${row === null ? clip(said.split('\n')[0]?.replace(/\s*\([^)]*\).*$/u, '') || id, 40) : titleOf(row.fields) || id}`,
         };
       }
       case 'figures': {
