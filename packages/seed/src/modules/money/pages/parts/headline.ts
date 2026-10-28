@@ -2,11 +2,12 @@
 
 const ONE_BOOK = { metric: 'books-held', lt: 2 };
 /**
- * THE ACCOUNTS THE MONEY IS IN, SINCE money-core 3.27.0: the accounts Cash now cuts into that hold money
- * (`cash-by-account.groups`), the ones the Accounts tile lists. The count of every cash account said seven beside a
- * tile of six, which leaves one at nought out of its legend.
+ * THE ACCOUNTS THE MONEY IS SPREAD OVER, SINCE money-core 3.30.0: the accounts Cash now cuts into that hold money
+ * (`cash-by-account.groups`), the ones the Accounts tile lists. It said how many books were held too, which a person
+ * does not open Money to read, and a model handed that count wrote "2 books are held". Cash now itself is the hero's,
+ * drawn under the line, so the line does not say it again.
  */
-const ACCOUNTS_SAID = '{{cash-by-account.groups}} account(s)';
+const ACCOUNTS_SAID = 'Spread over {{cash-by-account.groups}} account(s).';
 /**
  * NO LINE OF WHERE THE MONEY IS KEPT, SINCE money-core 3.29.1: "Kept in 2 accounts" said a count the Accounts tile draws
  * a row for, in the page's biggest type. The line is only what needs doing: the part that is late and the card to pay.
@@ -39,14 +40,14 @@ export const HEADLINE: Record<string, unknown>[] = [
     body: `${LATE_PART}${CARD_OWES}`,
   },
   {
-    /* WITH TWO BOOKS OR MORE THE LINE SAYS HOW MANY, SINCE money-core 3.17.0, so a person reads that the hero's Cash
-       now holds both before reading it. What each book holds is on the Accounts page. Then the part that is late, as
-       on one book. */
+    /* WITH TWO BOOKS OR MORE THE LINE SAYS HOW MANY ACCOUNTS THE MONEY IS SPREAD OVER, SINCE money-core 3.30.0, so a
+       person reads that the hero's Cash now holds every book. What each book holds is on the Accounts page. Then the
+       part that is late, as on one book. */
     kind: 'note',
     lead: true,
     span: 12,
     when: { metric: 'books-held', gte: 2 },
-    body: `${ACCOUNTS_SAID} in {{books-held}} books. ${LATE_PART}${CARD_OWES}`,
+    body: `${ACCOUNTS_SAID} ${LATE_PART}${CARD_OWES}`,
   },
 ];
 

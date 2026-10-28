@@ -18,7 +18,9 @@ export const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due 
 export const LASTS_SAID = {
   metric: 'lasts-no-income',
   label: 'If nothing comes in',
-  note: 'Until {{lasts-no-income.on}}, when {{lasts-no-income.because}} is due',
+  /* ONE SHORT LINE, SINCE money-core 3.30.0: the day alone. What falls due that day ran it to two lines on a phone, and
+     the Forecast page says it. */
+  note: 'Until {{lasts-no-income.on}}',
 };
 
 /**

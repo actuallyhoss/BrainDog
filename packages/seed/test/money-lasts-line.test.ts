@@ -101,7 +101,8 @@ const LATE = '{{installments-late.first}} is {{bad:late}}: {{installments-late.f
 const ACCOUNTS = '{{cash-by-account.groups}} account(s)';
 const WHAT_THERE_IS = LATE;
 const LASTS = `Lasts the year on what is due. ${LATE}`;
-const BOOKS = `${ACCOUNTS} in {{books-held}} books. ${LATE}`;
+/* SPREAD OVER HOW MANY ACCOUNTS SINCE money-core 3.30.0, and no longer how many books. */
+const BOOKS = `Spread over ${ACCOUNTS}. ${LATE}`;
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
@@ -166,7 +167,7 @@ test('A RECORD WITH NO ACCOUNT IS NOT TOLD ITS MONEY LASTS', async () => {
   assert.deepEqual(bodies(k).filter((b) => /lasts the year/u.test(b ?? '')), [], 'there is no money to last');
 });
 
-test('WITH TWO BOOKS, the line says the money there is and the books it is kept in, whether it lasts or not', async () => {
+test('WITH TWO BOOKS, the line says how many accounts the money is spread over, whether it lasts or not', async () => {
   const k = await record();
   const book = (name: string): string => value<{ id: string }>(k.create('books', { name }, OWNER)).id;
   account(k, 'Company account', gbp(500_000), { book: book('Northwind Ltd') });

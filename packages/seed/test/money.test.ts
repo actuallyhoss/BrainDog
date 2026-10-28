@@ -773,7 +773,6 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   const on = reading(k, 'runs-out-on');
   assert.equal(on, Math.floor(NOW / 86_400_000) + days, 'the day is not the count of days from today');
   assert.equal(runs.values?.['lasts-no-income.on'], new Date(NOW + dry * 86_400_000).toISOString().slice(0, 10), 'the sentence does not say the day the days end on');
-  assert.equal(typeof runs.values?.['lasts-no-income.because'], 'string', 'the sentence does not say what falls due that day');
   assert.equal((METRICS['runs-out-on'] as { format?: string }).format, 'day');
 });
 
@@ -934,7 +933,7 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['card-to-pay', 'card-to-pay-on']);
   /* HOW MUCH, AND HOW FAR IT MOVED, ARE THE HERO'S SINCE money-core 3.29.0, drawn under the line in the figure's own size. */
   const hero = blocks.find((b) => b.kind === 'stat' && b.lead === true)!;
-  assert.deepEqual(Object.keys(hero.values ?? {}).filter((v) => v.startsWith('cash-now.')).sort(), ['cash-now.apart', 'cash-now.moved']);
+  assert.deepEqual(Object.keys(hero.values ?? {}).filter((v) => v.startsWith('cash-now.')).sort(), ['cash-now.moved']);
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
@@ -1307,7 +1306,7 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
     /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines of Heads up carry no heading either. */
     return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean; body?: string }[] }).blocks
       .filter((b) => b.drawn !== false)
-      .map((b) => (b.lead === true && b.body !== undefined ? (b.body.includes('{{books-held}}') ? 'kept in' : undefined) : (b.heading ?? '')));
+      .map((b) => (b.lead === true && b.body !== undefined ? (b.body.includes('{{cash-by-account.groups}}') ? 'kept in' : undefined) : (b.heading ?? '')));
   };
   assert.ok(drawn().includes(undefined));
   made('Home');

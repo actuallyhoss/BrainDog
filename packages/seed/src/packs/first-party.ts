@@ -815,8 +815,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.30.0: money that stays yours is not spending. A category says so (`transfer` on `register.categories`,
  *   "Money stays yours"), the Ledger reads it through the entry's category (`stays`, worked out at read), and every
  *   figure, page and walk of spending and income says `stays is not true` beside `transfer is false`, so a card paid off,
- *   cash taken out or a move whose other leg is not in the Ledger is counted in neither. Two fields added and nothing
- *   taken away, so a minor step.
+ *   cash taken out or a move whose other leg is not in the Ledger is counted in neither. And Money's line says how many
+ *   accounts the money is spread over and no longer how many books, and the hero's notes are one short line each. Two
+ *   fields added and nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.1.0',

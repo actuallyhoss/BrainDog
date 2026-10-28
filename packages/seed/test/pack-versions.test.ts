@@ -2206,9 +2206,10 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '08f1dd085dc715f7',
+    declares: '0ed2f801ac71509b',
     history: [
       'Money 3.30.0: `register.categories` gains `transfer` ("Money stays yours") and `register.transactions` reads it as `stays` through the category; every figure, page and walk of spending and income says `stays is not true`; no id added or taken away -> 08f1dd085dc715f7',
+      'Money 3.30.0, its lines: `page.money` says how many accounts the money is spread over and not how many books, and its hero notes are one short line; no id added or taken away -> 0ed2f801ac71509b',
     ],
   },
   'work@1.17.0': {

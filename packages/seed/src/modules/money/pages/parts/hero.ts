@@ -3,11 +3,11 @@
 import { LASTS_SAID, ON_WHAT_IS_DUE } from './runway.ts';
 
 /**
- * WHAT CASH NOW IS MADE OF, under the number: how far it moved in thirty days, then each currency in its own amount and
- * the day of the rate that added them up. The second sentence names the rate's day and how old it is, with the one
- * place the rates are kept to update; a record kept in one currency has none of it, so there it goes whole.
+ * ONE SHORT LINE UNDER THE NUMBER, SINCE money-core 3.30.0: how far it moved in thirty days, then how old the rate that
+ * added it up is, with the place the rates are kept. Each currency's own amount is on the Accounts page; under the number
+ * it ran to two lines on a phone. A record kept in one currency has no rate, so there the second sentence goes whole.
  */
-const CASH_NOW_SAID = "{{cash-now.moved}} on a month ago. {{cash-now.apart}} at {{cash-now.rate_on}}'s rate, {{cash-now.rate_age}} · [Update](/r/fx)";
+const CASH_NOW_SAID = '{{cash-now.moved}} on a month ago. Rate {{cash-now.rate_age}} · [Update](/r/fx)';
 
 /**
  * ONE NUMBER FIRST, SINCE money-core 3.29.0. Money opened on a sentence and a chart a screen tall, with the answers in a
