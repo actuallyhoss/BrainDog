@@ -87,7 +87,7 @@ test('a list with neither state nor deadline says how many and how new', () => {
   assert.equal(readingOf(people, rows.slice(0, 1), NOW, WHOLE)?.before, '1 person, newest 3d ago.');
 });
 
-test('a list whose state is a kind and never finished says how many it holds, not how many are open', () => {
+test('a list whose state is a kind and never finished says no line, since the head already counts what it holds', () => {
   /* Projects' lane: Building, Earning, Parked and Finished, none declared finished. "30 open." stood over Parked and
      Finished rows on his record (`things-390-light.png`). */
   const things = {
@@ -103,7 +103,7 @@ test('a list whose state is a kind and never finished says how many it holds, no
     ],
   } as unknown as RegisterDecl;
   const rows = [row({ name: 'Kiln', lane: 'building' }), row({ name: 'Portage', lane: 'parked' }), row({ name: 'Tallyard', lane: 'finished' })];
-  assert.equal(readingOf(things, rows, NOW, WHOLE)?.before, '3 projects.');
+  assert.equal(readingOf(things, rows, NOW, WHOLE), null);
 });
 
 test('filtered, it says how many match; paging, it says nothing', () => {

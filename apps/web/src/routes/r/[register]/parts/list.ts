@@ -673,7 +673,8 @@ export function readingOf(
           ? words.toSettle(open.length)
           : words.open(open.length)
         : counted(decl, open.length);
-  if (!dated) return plain(`${lead}.`);
+  /* A LINE THAT IS ONLY THE COUNT IS NOT SAID: the head beside the title already draws it ("Projects 4" over "4 projects."). */
+  if (!dated) return lead === counted(decl, entries.length) ? null : plain(`${lead}.`);
   const late = open.filter((e) => isLate(decl, e, now)).length;
   const coming = open
     .map((e) => ({ e, v: e.fields[dated] }))
