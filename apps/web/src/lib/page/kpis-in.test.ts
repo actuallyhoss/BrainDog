@@ -60,9 +60,9 @@ test('A KEY NUMBER IS HANDED OVER AS THE DRAWER TAKES IT: its fields, its points
   assert.deepEqual(kpisIn({}), []);
 });
 
-test('WHY IT IS ON TODAY IS SAID ONLY FOR A PIN OR A NUMBER OFF TARGET: money first, a big change and stale order the rows and are not printed', () => {
+test('WHY IT IS ON TODAY IS SAID ONLY FOR A NUMBER OFF TARGET: a pin, money first, a big change and stale order the rows and are not printed', () => {
   const why = (rank: string, said: string) => kpiInputOf(answered({ rank, why: said }))!.why;
-  assert.equal(why('pinned', 'Pinned to Today'), 'Pinned to Today');
+  assert.equal(why('pinned', 'Pinned to Today'), undefined);
   assert.equal(why('off-target', 'Off target'), 'Off target');
   assert.equal(why('change', 'Up 34%'), undefined);
   assert.equal(why('stale', 'Not updated for 23 days'), undefined);

@@ -6,7 +6,7 @@
  * THE RECORD'S ANSWER IS READ LOOSELY, as every answer is: a number with no name or no points is left out, and a key this
  * file does not read is dropped, so the drawer is handed only what its type says.
  *
- * WHY IT IS ON TODAY IS SAID ONLY FOR A PIN OR A NUMBER OFF TARGET. "Money first" and "Up 34%" under a figure that already
+ * WHY IT IS ON TODAY IS SAID ONLY FOR A NUMBER OFF TARGET. "Money first" and "Up 34%" under a figure that already
  * says its change read as noise (K1-C), and a stale number says itself in the warn
  * colour under its figure, so the ranking's other reasons order the rows and are not printed.
  *
@@ -21,8 +21,9 @@ import { rowHref, spokenOf } from '../record/row-href.ts';
 /** One key number as the record answered it, as far as this file reads it: who keeps it too, for a stale one's fix. */
 export type KpiAnswered = KpiInput & { spoken?: string; owner?: string };
 
-/** The reasons a Today row says in words; the others only order the rows. */
-const SAID: ReadonlySet<string> = new Set(['pinned', 'off-target']);
+/** The reasons a Today row says in words; the others only order the rows. A pin says nothing: "Pinned to Today", read
+    on Today, told the reader where they already were, and the row's change says more in its place. */
+const SAID: ReadonlySet<string> = new Set(['off-target']);
 
 const KINDS: readonly string[] = ['level', 'flow', 'share', 'progress', 'count'];
 const SOURCES: readonly string[] = ['numbers', 'figure', 'feed', 'agent', 'typed'];
