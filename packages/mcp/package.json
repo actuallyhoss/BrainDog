@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./rpc": "./src/rpc.ts", "./http": "./src/http.ts", "./build": "./src/build.ts" },
+  "exports": { ".": "./src/index.ts", "./rpc": "./src/rpc.ts", "./http": "./src/http.ts", "./build": "./src/build.ts", "./slash-tools": "./src/slash-tools.ts" },
   "dependencies": {
     "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
