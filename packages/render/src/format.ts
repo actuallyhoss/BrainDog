@@ -859,6 +859,17 @@ export function valueWord(value: string, lead = false): string {
   return lead ? word.charAt(0).toUpperCase() + word.slice(1) : word;
 }
 
+/** Short words a bank line holds that are words and not initials: lowered mid-line, as a person writes them. */
+const SMALL_WORDS = new Set(['a', 'an', 'and', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'via']);
+/** Short words that are words, said with a capital: months, days, company endings and the common nouns of a bank line. */
+const SHORT_NAMES = new Set([
+  'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+  'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun', 'ltd', 'co', 'inc', 'plc', 'llc',
+  'tax', 'fee', 'pay', 'end', 'new', 'set', 'day', 'net', 'gas', 'car', 'bus', 'cab', 'bar', 'box', 'top', 'one', 'two', 'all', 'out', 'off', 'our', 'per',
+]);
+/** Longer initialisms a bank line holds, kept in capitals. */
+const LONG_INITIALS = new Set(['HMRC', 'HSBC', 'AMEX', 'IBAN', 'SWIFT', 'DVLA']);
+
 /**
  * BANK TEXT AS A PERSON WRITES IT: "KILN STOREFRONT PAYOUT" is "Kiln Storefront Payout", and "TALLYARD" is
  * "Tallyard". A bank sends its lines in capitals, and capitals down a ledger read as shouting and hide the one word that
@@ -866,15 +877,30 @@ export function valueWord(value: string, lead = false): string {
  *
  * ONLY A STRING WITH NO SMALL LETTER IN IT, AND MORE THAN THREE LETTERS IN ALL: "Rent" and "iPad case" are a person's
  * own and stay as typed, and "VAT" alone is an initialism. Inside a line a word of three letters or fewer is kept as it
- * came ("VAT", "UK", "S"), since it is far more often an initialism than a word; everything else is title-cased, a word
- * at a time, its apostrophes and hyphens kept ("O'NEILL-SMITH" is "O'neill-Smith"). Digits are left alone.
+ * came ("VAT", "UK", "S"), since it is far more often an initialism than a word, unless it is one of the short words a
+ * line is made of: "TO" and "THE" are lowered after the first word ("Transfer to Tax Reserve"), and a month, a day or
+ * "LTD" takes a capital. A word joined by a hyphen is cased with its neighbour ("YEAR-END" is "Year-End",
+ * "O'NEILL-SMITH" is "O'neill-Smith"), and the long initialisms a bank writes ("HMRC") keep their capitals.
  */
 export function readable(text: string): string {
   const letters = text.match(/\p{L}/gu) ?? [];
   if (letters.length <= 3 || /\p{Ll}/u.test(text)) return text;
-  return text.replace(/\p{L}[\p{L}'’]*/gu, (word) => {
-    const bare = word.replace(/['’]/gu, '');
-    return bare.length <= 3 ? word : word.charAt(0) + word.slice(1).toLowerCase();
+  let first = true;
+  return text.replace(/\p{L}[\p{L}'’]*(?:-\p{L}[\p{L}'’]*)*/gu, (compound) => {
+    const lead = first;
+    first = false;
+    const parts = compound.split('-');
+    const joined = parts.length > 1 && parts.some((w) => w.replace(/['’]/gu, '').length > 3);
+    return parts
+      .map((word) => {
+        const bare = word.replace(/['’]/gu, '');
+        const low = word.toLowerCase();
+        if (LONG_INITIALS.has(bare)) return word;
+        if (!lead && parts.length === 1 && SMALL_WORDS.has(low)) return low;
+        if (bare.length <= 3 && !joined && !SHORT_NAMES.has(low)) return word;
+        return word.charAt(0) + word.slice(1).toLowerCase();
+      })
+      .join('-');
   });
 }
 

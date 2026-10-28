@@ -38,10 +38,12 @@ test('A DISPLAY FIGURE IS WHOLE, rounded half away from nought', () => {
 test('BANK CAPITALS READ AS A PERSON WRITES THEM, and nothing else is touched', () => {
   assert.equal(readable('KILN STOREFRONT PAYOUT'), 'Kiln Storefront Payout');
   assert.equal(readable('TALLYARD'), 'Tallyard');
-  assert.equal(readable('HMRC VAT Q3'), 'Hmrc VAT Q3');
+  assert.equal(readable('HMRC VAT Q3'), 'HMRC VAT Q3');
+  assert.equal(readable('TRANSFER TO TAX RESERVE'), 'Transfer to Tax Reserve');
+  assert.equal(readable('PELL & VINE, HALF THE YEAR-END FEE'), 'Pell & Vine, Half the Year-End Fee');
   assert.equal(readable('VAT'), 'VAT');
   assert.equal(readable('S'), 'S');
   assert.equal(readable('Rent, October'), 'Rent, October');
   assert.equal(readable('iPad CASE'), 'iPad CASE');
-  assert.equal(readable("O'NEILL-SMITH LTD"), "O'neill-Smith LTD");
+  assert.equal(readable("O'NEILL-SMITH LTD"), "O'neill-Smith Ltd");
 });
