@@ -51,6 +51,11 @@ export default {
        The site is only ever served at the root of its
        host, so nothing else moves. `test/not-found-depth.test.mjs` holds the built page to it. */
     paths: { relative: false },
+    /* EVERY STYLESHEET IS IN THE PAGE, not linked beside it. Linked, a phone waited on six to eight more round trips
+       before it drew a word, and Lighthouse put the docs under 95 for it; inlined, the first bytes are the finished page,
+       and the docs' block sheets add about 20 KB to a docs page once compressed. No `style-src` is set in `csp`, so an
+       inline style needs no hash. */
+    inlineStyleThreshold: Infinity,
     /* THE SCRIPT POLICY IS HERE AND NOT IN `static/_headers`, because a header cannot name the one
        script that has to run. Every page carries an inline `<script>` that starts SvelteKit, and a
        header of `script-src 'self'` blocked it on 23 September: the console logged the violation and
