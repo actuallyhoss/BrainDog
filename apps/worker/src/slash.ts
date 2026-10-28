@@ -306,49 +306,60 @@ export function includedInference(
   if (ai === undefined || env.SLASH_INCLUDED !== 'yes') return undefined;
   /* SCHEMA BREAKS IN A ROW, over every call this adapter makes: an answer that keeps its schema starts it over. */
   let streak = 0;
+  /* ONE CALL, WHOLE OR STREAMED (`onText`), and every failure after it read the same way. A streamed answer's counts are
+     the stream's own (`onUsage`), so a reply that then breaks its schema is billed what was read. */
+  const once = async (call: Parameters<SlashInference['complete']>[0], onText?: (text: string) => void): Promise<Awaited<ReturnType<SlashInference['complete']>>> => {
+    let last: unknown;
+    let ran = false;
+    let provider = '';
+    let streamed: { in: number; out: number } | undefined;
+    const port = aiInference({
+      AI: { run: async (model, inputs, options) => ((ran = true), (provider = model), (last = await ai.run(model, inputs, options))) },
+      AI_GATEWAY: env.AI_GATEWAY,
+      AI_REST_URL: env.AI_REST_URL,
+      WORKERS_AI_TOKEN: env.WORKERS_AI_TOKEN,
+    });
+    const req = {
+      model: call.model,
+      messages: call.messages,
+      maxTokens: call.maxTokens,
+      schema: call.jsonSchema as JsonSchema,
+      budget: { neurons: await most() },
+    };
+    const out =
+      onText === undefined
+        ? await port.complete(req)
+        : await port.stream(req, onText, (usage) => {
+            streamed = { in: usage.in, out: usage.out };
+          });
+    if (out.ok) {
+      streak = 0;
+      return { text: out.value.text, usage: { in: out.value.usage.in, out: out.value.usage.out }, model: call.model };
+    }
+    const refusal = 'refusal' in out ? out.refusal : undefined;
+    const fix = refusal?.fix ?? 'The included model did not answer.';
+    const raw = refusal?.detail ?? '';
+    /* THE CEILING SAYING NO IS NOT A MODEL THAT FAILED, so the hook hears every refusal but that one. */
+    const budget = refusal?.code === 'SLASH_BUDGET_SPENT';
+    if (!ran) {
+      if (!budget) told(onFail, { model: call.model, provider: '', why: phraseOf(fix), raw, sent: false, whose: 'operator', streak: 0 });
+      /* THE CEILING'S NO CARRIES ITS CODE, so a route's walk stops here: every candidate after it hears the same no. */
+      throw Object.assign(new NotSent(fix, budget ? fix : phraseOf(fix), raw), budget ? { code: 'SLASH_BUDGET_SPENT' } : {});
+    }
+    if (refusal?.code === 'PROPOSAL_SCHEMA') {
+      streak += 1;
+      told(onFail, { model: call.model, provider, why: 'schema', raw: scrubRaw(fix), sent: true, whose: 'operator', streak });
+      const usage = (last as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } } | null)?.usage;
+      throw new SlashAnsweredError(fix, streamed ?? { in: counted(usage?.prompt_tokens), out: counted(usage?.completion_tokens) }, call.model);
+    }
+    streak = 0;
+    told(onFail, { model: call.model, provider, why: phraseOf(fix), raw, sent: true, whose: 'operator', streak: 0 });
+    throw new Reached(fix, call.model, phraseOf(fix), raw);
+  };
   return {
     ...embedOver(env),
-    complete: async (call) => {
-      let last: unknown;
-      let ran = false;
-      let provider = '';
-      const port = aiInference({
-        AI: { run: async (model, inputs, options) => ((ran = true), (provider = model), (last = await ai.run(model, inputs, options))) },
-        AI_GATEWAY: env.AI_GATEWAY,
-        AI_REST_URL: env.AI_REST_URL,
-        WORKERS_AI_TOKEN: env.WORKERS_AI_TOKEN,
-      });
-      const out = await port.complete({
-        model: call.model,
-        messages: call.messages,
-        maxTokens: call.maxTokens,
-        schema: call.jsonSchema as JsonSchema,
-        budget: { neurons: await most() },
-      });
-      if (out.ok) {
-        streak = 0;
-        return { text: out.value.text, usage: { in: out.value.usage.in, out: out.value.usage.out }, model: call.model };
-      }
-      const refusal = 'refusal' in out ? out.refusal : undefined;
-      const fix = refusal?.fix ?? 'The included model did not answer.';
-      const raw = refusal?.detail ?? '';
-      /* THE CEILING SAYING NO IS NOT A MODEL THAT FAILED, so the hook hears every refusal but that one. */
-      const budget = refusal?.code === 'SLASH_BUDGET_SPENT';
-      if (!ran) {
-        if (!budget) told(onFail, { model: call.model, provider: '', why: phraseOf(fix), raw, sent: false, whose: 'operator', streak: 0 });
-        /* THE CEILING'S NO CARRIES ITS CODE, so a route's walk stops here: every candidate after it hears the same no. */
-        throw Object.assign(new NotSent(fix, budget ? fix : phraseOf(fix), raw), budget ? { code: 'SLASH_BUDGET_SPENT' } : {});
-      }
-      if (refusal?.code === 'PROPOSAL_SCHEMA') {
-        streak += 1;
-        told(onFail, { model: call.model, provider, why: 'schema', raw: scrubRaw(fix), sent: true, whose: 'operator', streak });
-        const usage = (last as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } } | null)?.usage;
-        throw new SlashAnsweredError(fix, { in: counted(usage?.prompt_tokens), out: counted(usage?.completion_tokens) }, call.model);
-      }
-      streak = 0;
-      told(onFail, { model: call.model, provider, why: phraseOf(fix), raw, sent: true, whose: 'operator', streak: 0 });
-      throw new Reached(fix, call.model, phraseOf(fix), raw);
-    },
+    complete: (call) => once(call),
+    stream: (call, onText) => once(call, onText),
   };
 }
 

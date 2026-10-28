@@ -306,6 +306,11 @@ export async function runModel(env: AiEnv, model: string, inputs: Record<string,
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(inputs),
     });
+    /* A STREAM ASKED FOR IS HANDED BACK AS THE BODY, as the binding hands back its own, once the status says it is one. */
+    if (inputs['stream'] === true && res.ok && res.body !== null && (res.headers.get('content-type') ?? '').includes('event-stream')) {
+      log(`ai: answered by rest; ${tell()}`);
+      return res.body;
+    }
     const body = (await res.json().catch(() => null)) as { success?: unknown; result?: unknown; errors?: unknown } | null;
     if (!res.ok || body === null || body.success === false || body.result === undefined)
       throw new Error(`rest ${res.status} ${scrubRaw(JSON.stringify(body?.errors ?? ''))}`);
@@ -424,6 +429,88 @@ const readAnswer = (shape: Shape, raw: unknown): Read => {
   return { text: typeof content === 'string' ? content : '', usage, cutOff: typeof why === 'string' ? why === 'length' : null, thought };
 };
 
+/**
+ * Workers AI's event stream read to its end: each piece of the answer handed to `onText` as it lands, and at the end
+ * the same `Read` a whole answer gives.
+ *
+ * THE COUNTS ARE THE STREAM'S LAST WORD. Measured on `glm-5.3-flash` (28 October), every chunk carries a `usage`, the
+ * content chunks a count of their own piece, and the last chunk before `[DONE]` is `{ "response": "", "usage": {...} }`
+ * with the call's whole counts; that chunk is the one read. A stream that ends without it (a provider that sends none, or
+ * a body that broke off) is counted the way a prompt is estimated, `ceil(utf8 bytes / 4)`, over what arrived, the
+ * reasoning included, and never below the largest count a chunk reported.
+ *
+ * A BINDING THAT ANSWERS WHOLE, a test's stub or a model that ignores `stream`, is read as a whole answer and handed on
+ * in one piece.
+ */
+const readStream = async (shape: Shape, raw: unknown, onText: (text: string) => void, promptTokens: number): Promise<Read> => {
+  const reader = (raw as { getReader?: unknown } | null)?.getReader;
+  if (typeof reader !== 'function') {
+    const read = readAnswer(shape, raw);
+    if (read.text !== '') onText(read.text);
+    return read;
+  }
+  const stream = (raw as ReadableStream<Uint8Array>).getReader();
+  const decoder = new TextDecoder();
+  let held = '';
+  let text = '';
+  let reasoning = '';
+  let cutOff: boolean | null = null;
+  let total: Usage | null = null;
+  let thought = 0;
+  let most = { in: 0, out: 0 };
+  let ended = false;
+  const take = (line: string): void => {
+    const data = line.startsWith('data:') ? line.slice(5).trim() : '';
+    if (data === '' || ended) return;
+    if (data === '[DONE]') {
+      ended = true;
+      return;
+    }
+    let chunk: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(data);
+      if (parsed === null || typeof parsed !== 'object') return;
+      chunk = parsed as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    const reported = chunk['usage'];
+    if (reported !== null && typeof reported === 'object') {
+      const tokens = reported as Record<string, unknown>;
+      const counted = { in: count(tokens['prompt_tokens']), out: count(tokens['completion_tokens']) };
+      most = { in: Math.max(most.in, counted.in), out: Math.max(most.out, counted.out) };
+      if (typeof chunk['response'] === 'string' && !Array.isArray(chunk['choices'])) {
+        total = { ...counted, neurons: null };
+        const details = tokens['completion_tokens_details'];
+        thought = count(details !== null && typeof details === 'object' ? (details as Record<string, unknown>)['reasoning_tokens'] : undefined);
+      }
+    }
+    const choices = chunk['choices'];
+    const first = (Array.isArray(choices) ? choices[0] : undefined) as
+      | { delta?: { content?: unknown; reasoning_content?: unknown } | undefined; finish_reason?: unknown }
+      | undefined;
+    const piece = first !== undefined ? first.delta?.content : shape === 'text' ? chunk['response'] : undefined;
+    if (typeof first?.delta?.reasoning_content === 'string') reasoning += first.delta.reasoning_content;
+    if (typeof first?.finish_reason === 'string') cutOff = first.finish_reason === 'length';
+    if (typeof piece === 'string' && piece !== '') {
+      text += piece;
+      onText(piece);
+    }
+  };
+  for (;;) {
+    const { value, done } = await stream.read();
+    if (done) break;
+    held += decoder.decode(value, { stream: true });
+    const lines = held.split('\n');
+    held = lines.pop() ?? '';
+    for (const line of lines) take(line.trim());
+  }
+  held += decoder.decode();
+  if (held.trim() !== '') take(held.trim());
+  const usage: Usage = total ?? { in: Math.max(most.in, promptTokens), out: Math.max(most.out, tokensIn(text + reasoning)), neurons: null };
+  return { text, usage, cutOff, thought };
+};
+
 /** `clamp(round(x × 127), −127, 127)` of `51 §5.11` step 4: one signed byte per dimension, and −128 is never produced. */
 const int8 = (row: number[]): Int8Array => {
   const out = new Int8Array(row.length);
@@ -445,7 +532,16 @@ const int8 = (row: number[]): Int8Array => {
  * calls cross a Durable Object RPC boundary that an exception carries neither a code nor a
  * sentence across.
  */
-export function aiInference(env: AiEnv, deps: AiDeps = {}): Inference {
+/**
+ * The port with one call more: `complete` streamed (`stream: true`), each piece of the answer handed to `onText` as it
+ * lands and the same `Result` at the end, checked the same way. `onUsage` hears the counts the answer was billed at,
+ * also when the answer then fails its checks, so a caller that throws can bill what was read and not an estimate.
+ */
+export type StreamingInference = Inference & {
+  stream(req: CompleteRequest, onText: (text: string) => void, onUsage?: (usage: Usage) => void): Promise<Result<Completion>>;
+};
+
+export function aiInference(env: AiEnv, deps: AiDeps = {}): StreamingInference {
   /** The binding's answer, or one of the three `Missing` reasons, so neither caller re-reads the platform's error. */
   /* `raw` IS THE PLATFORM'S OWN SENTENCE, scrubbed and cut (`scrubRaw`), carried beside the phrase and never instead. */
   const call = async (provider: string, inputs: Record<string, unknown>): Promise<{ answer: unknown } | { why: Missing; raw: string }> => {
@@ -459,67 +555,81 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): Inference {
     }
   };
 
+  /** One completion, whole or streamed: the ceiling before it, the call, and the answer's checks after. */
+  const completion = async (req: CompleteRequest, onText?: (text: string) => void, onUsage?: (usage: Usage) => void): Promise<Result<Completion>> => {
+    /* A NAME THIS TABLE DOES NOT CARRY IS `no adapter on this host` AND NOT `the provider does not
+       serve it`, AND THE DIFFERENCE IS THAT ONE OF THEM WOULD BE UNTRUE. Workers AI does serve
+       `glm-5.3`; what does not exist is a row here that routes to it. The port's vocabulary has
+       no value meaning *this host does not route that model*, and of the three it declares this
+       is the only one that is true of both this case and an unbound binding. A refusal a person
+       reads may be imprecise about which layer said no; it may not state something false about
+       the provider, because the reader's next move is to go and look. */
+    const rate = Object.hasOwn(MODELS, req.model) ? MODELS[req.model] : undefined;
+    if (rate === undefined) return modelMissing<Completion>(req.model, 'no adapter on this host');
+
+    /* THE CEILING IS CHECKED BEFORE THE CALL, WHICH IS THE ONLY PLACE IT IS WORTH ANYTHING. A
+       budget read after the answer arrives is a report; read here it is a refusal that costs
+       nothing. The estimate is deliberately the WORST case: every prompt byte is counted, and
+       the output is counted at `maxTokens` as though the model ran to the ceiling. An estimate
+       that erred low would let exactly the runaway generation this exists to stop through, and
+       the price of erring high is a job that asks for a bigger number in its routing table. */
+    const promptTokens = req.messages.reduce((n, m) => n + tokensIn(m.content), 0);
+    const would = Math.ceil((promptTokens * rate.inPerM + req.maxTokens * rate.outPerM) / 1_000_000);
+    if (would > req.budget.neurons) return budgetSpent<Completion>(would, req.budget.neurons);
+
+    const got = await call(rate.provider, {
+      messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+      max_tokens: req.maxTokens,
+      response_format: formatFor(rate.shape, req.schema),
+      /* THE ROW'S OWN EFFORT, where it reasons (`Effort`): its thinking is spent from `max_tokens` too. */
+      ...(rate.effort === undefined ? {} : { reasoning_effort: rate.effort }),
+      ...(onText === undefined ? {} : { stream: true }),
+    });
+    if ('why' in got) return modelMissing<Completion>(req.model, got.why, got.raw);
+
+    /* A STREAM THAT BREAKS OFF IS A PROVIDER THAT STOPPED ANSWERING, in the port's words; what arrived before it is
+       the caller's to count (`onText`). */
+    let read: Read;
+    try {
+      read = onText === undefined ? readAnswer(rate.shape, got.answer) : await readStream(rate.shape, got.answer, onText, promptTokens);
+    } catch (e) {
+      return modelMissing<Completion>(req.model, 'the provider did not answer', scrubRaw(sayOf(e)));
+    }
+    const { text, usage, cutOff, thought } = read;
+    onUsage?.(usage);
+
+    /* TRUNCATION IS TOLD APART FROM A BAD ANSWER IN THE SENTENCE, AND IT IS CHECKED FIRST. A
+       generation cut off at the ceiling is usually half a JSON document, so it fails the parse as
+       well, and the two send a reader to different places: one raises `maxTokens`, the other
+       rewrites the prompt. Measured while writing the test: with this check below the parse, the
+       same half-written object is reported as JSON that could not be read, which is true and
+       useless. Where the shape reports it, `cutOff` is the platform's own word; where it does
+       not, the completion count against the ceiling is the only signal there is, and an absent
+       `usage` counts as zero and therefore makes no claim either way. AND THE SENTENCE SAYS HOW MUCH
+       OF THE CEILING WAS THINKING where the platform counted it (`Effort`): a reasoning row spends
+       its ceiling on both, and the two send a reader to different places again, the effort or the
+       size of what was asked for. */
+    if (cutOff ?? (usage.out > 0 && usage.out >= req.maxTokens))
+      return schemaFailed<Completion>(
+        req.model,
+        `it stopped at the ${req.maxTokens}-token ceiling${thought > 0 ? `, ${thought} of them its reasoning` : ''}, so what came back is the beginning of a document rather than one`,
+      );
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return schemaFailed<Completion>(req.model, 'it is not JSON at all');
+    }
+    const wrong = unhonoured(parsed, req.schema);
+    if (wrong !== null) return schemaFailed<Completion>(req.model, wrong);
+
+    return ok({ text, model: rate.provider, usage });
+  };
+
   return {
-    complete: async (req: CompleteRequest): Promise<Result<Completion>> => {
-      /* A NAME THIS TABLE DOES NOT CARRY IS `no adapter on this host` AND NOT `the provider does not
-         serve it`, AND THE DIFFERENCE IS THAT ONE OF THEM WOULD BE UNTRUE. Workers AI does serve
-         `glm-5.3`; what does not exist is a row here that routes to it. The port's vocabulary has
-         no value meaning *this host does not route that model*, and of the three it declares this
-         is the only one that is true of both this case and an unbound binding. A refusal a person
-         reads may be imprecise about which layer said no; it may not state something false about
-         the provider, because the reader's next move is to go and look. */
-      const rate = Object.hasOwn(MODELS, req.model) ? MODELS[req.model] : undefined;
-      if (rate === undefined) return modelMissing<Completion>(req.model, 'no adapter on this host');
-
-      /* THE CEILING IS CHECKED BEFORE THE CALL, WHICH IS THE ONLY PLACE IT IS WORTH ANYTHING. A
-         budget read after the answer arrives is a report; read here it is a refusal that costs
-         nothing. The estimate is deliberately the WORST case: every prompt byte is counted, and
-         the output is counted at `maxTokens` as though the model ran to the ceiling. An estimate
-         that erred low would let exactly the runaway generation this exists to stop through, and
-         the price of erring high is a job that asks for a bigger number in its routing table. */
-      const promptTokens = req.messages.reduce((n, m) => n + tokensIn(m.content), 0);
-      const would = Math.ceil((promptTokens * rate.inPerM + req.maxTokens * rate.outPerM) / 1_000_000);
-      if (would > req.budget.neurons) return budgetSpent<Completion>(would, req.budget.neurons);
-
-      const got = await call(rate.provider, {
-        messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
-        max_tokens: req.maxTokens,
-        response_format: formatFor(rate.shape, req.schema),
-        /* THE ROW'S OWN EFFORT, where it reasons (`Effort`): its thinking is spent from `max_tokens` too. */
-        ...(rate.effort === undefined ? {} : { reasoning_effort: rate.effort }),
-      });
-      if ('why' in got) return modelMissing<Completion>(req.model, got.why, got.raw);
-
-      const { text, usage, cutOff, thought } = readAnswer(rate.shape, got.answer);
-
-      /* TRUNCATION IS TOLD APART FROM A BAD ANSWER IN THE SENTENCE, AND IT IS CHECKED FIRST. A
-         generation cut off at the ceiling is usually half a JSON document, so it fails the parse as
-         well, and the two send a reader to different places: one raises `maxTokens`, the other
-         rewrites the prompt. Measured while writing the test: with this check below the parse, the
-         same half-written object is reported as JSON that could not be read, which is true and
-         useless. Where the shape reports it, `cutOff` is the platform's own word; where it does
-         not, the completion count against the ceiling is the only signal there is, and an absent
-         `usage` counts as zero and therefore makes no claim either way. AND THE SENTENCE SAYS HOW MUCH
-         OF THE CEILING WAS THINKING where the platform counted it (`Effort`): a reasoning row spends
-         its ceiling on both, and the two send a reader to different places again, the effort or the
-         size of what was asked for. */
-      if (cutOff ?? (usage.out > 0 && usage.out >= req.maxTokens))
-        return schemaFailed<Completion>(
-          req.model,
-          `it stopped at the ${req.maxTokens}-token ceiling${thought > 0 ? `, ${thought} of them its reasoning` : ''}, so what came back is the beginning of a document rather than one`,
-        );
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        return schemaFailed<Completion>(req.model, 'it is not JSON at all');
-      }
-      const wrong = unhonoured(parsed, req.schema);
-      if (wrong !== null) return schemaFailed<Completion>(req.model, wrong);
-
-      return ok({ text, model: rate.provider, usage });
-    },
+    complete: (req: CompleteRequest): Promise<Result<Completion>> => completion(req),
+    stream: (req, onText, onUsage) => completion(req, onText, onUsage),
 
     embed: async (texts: readonly string[]): Promise<Result<Embeddings>> => {
       /* NOTHING TO EMBED IS NOT A CALL. An empty batch is what a record with no new entries hands
