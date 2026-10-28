@@ -487,6 +487,13 @@
     display: inline-flex;
   }
 
+  /* THE KEY ON "DO IT" is for a keyboard, and not drawn under a thumb. */
+  @media (hover: none) and (pointer: coarse) {
+    .t-key {
+      display: none;
+    }
+  }
+
   .t-go {
     display: flex;
     flex-wrap: wrap;

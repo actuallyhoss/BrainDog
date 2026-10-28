@@ -1493,7 +1493,7 @@
         class="p-input"
         type="text"
         aria-label={threadWords.placeholder}
-        aria-describedby="palette-ask-foot"
+        aria-describedby={waitingCard || asksLeft !== null ? "palette-ask-foot" : undefined}
         placeholder={convo.turns.length > 0 ? threadWords.followUp : threadWords.placeholder}
         autocomplete="off"
       />
@@ -1602,10 +1602,10 @@
       <span class="p-cap">{slashWords.capLine(slashStatus.asks.used, slashStatus.asks.cap, slashStatus.asks.resets)}</span>
       <button type="button" class="p-cap-hide tap" onclick={dismissCapLine}>{slashWords.capDismiss}</button>
     </footer>
-  {:else if inAsk}
+  {:else if inAsk && (waitingCard || asksLeft !== null)}
     <!-- QUIET: what Enter does while a card waits, and the asks left this month once there is a number to say. -->
     <footer class="p-foot p-ask-foot" id="palette-ask-foot">
-      {#if waitingCard}<span>{threadWords.enterDoes}</span>{/if}
+      {#if waitingCard}<span class="p-keys-hint">{threadWords.enterDoes}</span>{/if}
       {#if asksLeft !== null}<span class="p-left">{threadWords.left(asksLeft)}</span>{/if}
     </footer>
   {/if}
@@ -1668,6 +1668,8 @@
   .palette {
     position: fixed;
     inset-block-start: 96px;
+    /* AS TALL AS WHAT IT HOLDS: the UA puts a modal's end edge on the window's, which stretched it to its cap. */
+    inset-block-end: auto;
     inset-inline: 0;
     z-index: var(--z-palette);
     display: flex;
@@ -2022,12 +2024,34 @@
     min-block-size: min(280px, 60dvh);
   }
 
-  .p-ask-foot:empty {
-    display: none;
-  }
-
   .p-left {
     margin-inline-start: auto;
+  }
+
+  /* WHAT ENTER AND ESC DO is said where there are keys to press, and not under a thumb. */
+  @media (hover: none) and (pointer: coarse) {
+    .p-keys-hint {
+      display: none;
+    }
+  }
+
+  /* ON A PHONE, NEW AND FIND ARE THEIR GLYPHS, 44px each, so the field keeps its width; each says its name to a reader. */
+  @media (width < 640px) {
+    .p-mode {
+      justify-content: center;
+      min-inline-size: var(--tap);
+      min-block-size: var(--tap);
+      padding: 0;
+    }
+
+    .p-mode span {
+      display: none;
+    }
+
+    .p-mode :global(svg) {
+      inline-size: var(--icon-m);
+      block-size: var(--icon-m);
+    }
   }
 
   .p-cap {
