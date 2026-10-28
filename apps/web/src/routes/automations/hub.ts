@@ -83,21 +83,21 @@ export const hubWords = {
   /* AN EMPTY TAB SAYS WHAT THE THING IS AND WHAT TO ASK AN AGENT, as the automations list always has.
      The prompts are examples a person reads and replaces, not features the code ships. */
   scheduledNone: 'No scheduled actions yet',
-  scheduledWhy: 'A scheduled action fetches from, calls or watches a web address on a clock, and files what it gets in your record.',
+  scheduledWhy: 'Fetches or watches a web address on a clock.',
   scheduledPrompt: 'read my record, then propose a scheduled action that fetches a figure from api.example.com every hour and files it in my record',
   scheduledAbsent: 'This record does not list its scheduled actions yet',
   scheduledAbsentHow: 'Updating the host brings them. You can still make one here and send it to Needs you.',
   scriptsPrompt: 'read my record, then write a script that runs every morning, reads my open tasks and writes a one-line summary to my notes, and propose it',
-  scriptsMore: 'Logs, versions and what each script may read, write and fetch are on the scripts screen.',
-  scriptsOpen: 'Open the scripts screen',
+  scriptsMore: 'Logs and versions are on',
+  scriptsOpen: 'Scripts',
   runsNone: 'Nothing has run yet',
-  runsWhy: 'Each run of an automation, a schedule or a script shows here, newest first.',
+  runsWhy: 'Runs show here, newest first.',
   /* THE PAGE'S SENTENCE WHILE NOTHING HAS RUN, so the empty screen still says what it holds. */
   runsNoneSaid: (n: number) => (n === 0 ? 'Nothing has run yet.' : `${n.toLocaleString('en')} ${n === 1 ? 'automation' : 'automations'}, none has run yet.`),
   makeOne: 'Make an automation',
   runsPrompt: 'read my record, then propose an automation that runs every morning and tells me what changed yesterday',
   /* THE LIST IS WHAT EACH THING KEEPS TO HAND, and says so, so a quiet list is not read as a quiet record. */
-  runsReach: 'The newest runs each automation and script keeps, and the last run of each scheduled action. Open one to see all of its runs.',
+  runsReach: 'The newest runs of each. Open one for all of its runs.',
   runsSomeMissing: 'Some runs could not be read just now, so a few may be missing below.',
   /* ONE SENTENCE PER WAY A RUN ENDS, the time inside it, so a failed run and a finished one read alike but for the word. */
   ended: {

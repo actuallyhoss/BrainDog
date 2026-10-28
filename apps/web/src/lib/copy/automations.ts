@@ -18,7 +18,7 @@ export const automations = {
      sender is whatever posts, and `webhook-doors.test.ts` fails if a use case comes back into these words. */
   doorsTitle: 'Web addresses that take things in',
   /* NO "TOKEN": what a person needs to know is that the address is private. */
-  doorsHow: 'Each address below takes posts from a phone, a script or another service and files them in a list. Each address is private: whoever has it can post to this list.',
+  doorsHow: 'Each private address files what is posted to it in a list.',
   /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
      token back, and a blank where a value would go reads as "you have none". */
   doorsUnknown: 'This screen cannot show a token the record already has. Only a fingerprint of it is kept, so if you no longer have it, make a new one and the old one stops working.',
@@ -27,7 +27,7 @@ export const automations = {
      change somebody approves. It said "an ingest with channel webhook and verify kind path", which is the file's
      spelling and not the person's; those words stay in the prompt, which is handed to an agent. */
   doorsNone: 'Nothing is posted in yet',
-  doorsNoneWhy: 'Things a phone, a script or another service posts to this record, each written to the list you name. Ask an agent to set one up, and approve the change it proposes in Needs you.',
+  doorsNoneWhy: 'Ask an agent to set one up.',
   doorsPrompt: 'read my record, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
   doorsWrites: (list: string) => `Writes to ${list}.`,
   doorsHeld: 'An address is in use. Making a new one stops the old one working.',
