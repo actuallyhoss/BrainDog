@@ -280,8 +280,9 @@ test('THE PACK NAMES A KEY AND CARRIES NONE, and lays the field it finds an acco
      `^1.0.0` refused this pack beside it (`packages/seed/test/money-core-major.test.ts` plans it on both). 3.0.0 took
      pages and card wordings and kept the accounts and transactions this pack writes, so 1.1.1 widened to it. The floor
      moved in 1.3.0, to 3.1.0, whose `books` the `book` setting files each row in, and in 1.1.0 of this id to 3.10.0, whose
-     ledger declares the `counterparty_text` the script writes. */
-  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.10.0 <4.0.0' });
+     ledger declares the `counterparty_text` the script writes, and in 1.3.0 of this id to 3.31.0, whose accounts declare
+     the `no_feed` the script marks each account it keeps with. */
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.31.0 <4.0.0' });
 
   /* THE PULL IS GONE (1.2.0): one script, one key path, balances then transactions. */
   assert.deepEqual(doc.declarations.map((d) => (typeof d.script === 'string' ? `script ${d.script}` : `other ${String(d.ingest ?? '')}`)), ['script mercury_ledger']);
@@ -437,7 +438,7 @@ test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, on its host, key 
   ]);
   const cards = JSON.parse(readFileSync(new URL('../card-alerts/card-alerts.pack.json', import.meta.url), 'utf8')) as { extends?: unknown };
   assert.equal(cards.extends, undefined, 'another bank door lays the payee field again');
-  assert.deepEqual([doc.version, typeof doc.changes], ['1.2.1', 'string']);
+  assert.deepEqual([doc.version, typeof doc.changes], ['1.3.0', 'string']);
   /* THE CHANGES LINE IS READ BY A PERSON ON THE ADD-ON'S PAGE: plain words, no dash for a comma, no id. */
   assert.equal(/[—–]|mercury_|#\d/.test(String(doc.changes)), false, String(doc.changes));
 });
@@ -557,7 +558,7 @@ const NOTE = 'Not yet matched to an account you typed';
 type Fixture = { id: string; name: string; currentBalance: number };
 /** An account the script already keeps: Mercury's id on it, and its balance as of today, in cents. */
 const keptRow = (a: Fixture, extra: Record<string, Json> = {}): Row =>
-  rowOf('accounts', { name: a.name, kind: 'bank', balance: { amount: Math.round(a.currentBalance * 100), currency: 'USD' }, as_of: TODAY, liquid: true, mercury_account: a.id, ...extra });
+  rowOf('accounts', { name: a.name, kind: 'bank', balance: { amount: Math.round(a.currentBalance * 100), currency: 'USD' }, as_of: TODAY, liquid: true, mercury_account: a.id, no_feed: false, ...extra });
 const opsHeld = (): Row => keptRow(OPS);
 /** An account a person typed in, which no feed keeps. */
 const typedRow = (name: string, amount: number, currency = 'USD', extra: Record<string, Json> = {}): Row =>
@@ -566,7 +567,7 @@ const typedRow = (name: string, amount: number, currency = 'USD', extra: Record<
 const createdAccount = (a: Fixture, liquid: boolean, extra: Record<string, Json> = {}): ScriptWrite => ({
   op: 'create',
   register: 'accounts',
-  fields: { name: a.name, kind: 'bank', balance: { amount: Math.round(a.currentBalance * 100), currency: 'USD' }, as_of: TODAY, liquid, mercury_account: a.id, ...(liquid ? {} : { mercury_note: NOTE }), ...extra },
+  fields: { name: a.name, kind: 'bank', balance: { amount: Math.round(a.currentBalance * 100), currency: 'USD' }, as_of: TODAY, liquid, mercury_account: a.id, no_feed: false, ...(liquid ? {} : { mercury_note: NOTE }), ...extra },
 });
 
 test('A FRESH RECORD: ONE ACCOUNT A MERCURY ACCOUNT, counted as cash, in cents, dated the hour it ran, carrying Mercury’s id', async () => {
@@ -613,8 +614,8 @@ test('FIRST CONTACT TAKES THE ONE ACCOUNT A PERSON TYPED UNDER MERCURY’S NAME 
   const h = mercuryHost({ accounts: [typedOps, typedReserve, pounds, stripes], transactions: [], categories: [], mercury: [ops, reserve], txns: [] });
   const a = await runInQuickJs(ledgerDecl(), h);
   assert.deepEqual(writesOf(a), [
-    { op: 'update', spoken: `accounts#${typedOps.seq}`, patch: { mercury_account: 'acc_ops', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY }, version: 1 },
-    { op: 'update', spoken: `accounts#${typedReserve.seq}`, patch: { mercury_account: 'acc_res', balance: { amount: 25_000_000, currency: 'USD' }, as_of: TODAY }, version: 1 },
+    { op: 'update', spoken: `accounts#${typedOps.seq}`, patch: { mercury_account: 'acc_ops', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, no_feed: false }, version: 1 },
+    { op: 'update', spoken: `accounts#${typedReserve.seq}`, patch: { mercury_account: 'acc_res', balance: { amount: 25_000_000, currency: 'USD' }, as_of: TODAY, no_feed: false }, version: 1 },
   ]);
   assert.match(a.log, /Took over "mercury checking {2}••4417 ": it is "Mercury Checking ••4417" at Mercury/);
   assert.match(a.log, /Took over "RESERVE"/);
@@ -657,7 +658,7 @@ test('ONE TYPED ACCOUNT TWO MERCURY ACCOUNTS BOTH NAME IS TAKEN BY NEITHER: taki
 test('THE CURRENCY IS MERCURY’S FOR THE ACCOUNT, on its balance and on each of its transactions, in that currency’s minor units', async () => {
   /* A EURO ACCOUNT, said in Mercury's lower case; an account that names none is in dollars (the tests above). */
   const euros = account('Mercury EUR', 1_200.5, { id: 'acc_eur', currency: 'eur' }) as Fixture;
-  const held = rowOf('accounts', { name: 'Company euros', kind: 'bank', balance: { amount: 100_000, currency: 'EUR' }, as_of: '2026-09-19', liquid: true, mercury_account: 'acc_eur' });
+  const held = rowOf('accounts', { name: 'Company euros', kind: 'bank', balance: { amount: 100_000, currency: 'EUR' }, as_of: '2026-09-19', liquid: true, mercury_account: 'acc_eur', no_feed: false });
   const more = { acc_eur: [txn('txn_e', -12.3, 'sent', 'Lisbon Cafe', '2026-09-19T08:00:00Z', '2026-09-19T09:00:00Z')] };
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [held], transactions: [], categories: [], mercury: [euros], more }));
   assert.deepEqual(writesOf(a), [
@@ -676,6 +677,14 @@ test('AN ACCOUNT A PERSON SET TO COUNT AS CASH HAS BEEN ANSWERED: the note goes,
   const waiting = keptRow(RESERVE, { liquid: false, mercury_note: NOTE });
   const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [answered, waiting], transactions: [], categories: [], mercury: [OPS, RESERVE], txns: [] }));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${answered.seq}`, patch: { mercury_note: null }, version: 1 }]);
+});
+
+test('AN ACCOUNT KEPT BEFORE 1.3.0 SAYS IT IS FED THE NEXT HOUR, in Money’s own No bank feed, and one a person marked fed is left', async () => {
+  /* MONEY READS `no_feed` BEFORE IT POSTS A REPEATING LINE ITSELF, and never this pack's own field, so a row this pack
+     kept before it said so is marked once, with nothing else of it moved. */
+  const before = rowOf('accounts', { name: OPS.name, kind: 'bank', balance: { amount: Math.round(OPS.currentBalance * 100), currency: 'USD' }, as_of: TODAY, liquid: true, mercury_account: OPS.id });
+  const a = await runInQuickJs(ledgerDecl(), mercuryHost({ accounts: [before, keptRow(RESERVE)], transactions: [], categories: [], mercury: [OPS, RESERVE], txns: [] }));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: `accounts#${before.seq}`, patch: { no_feed: false }, version: 1 }]);
 });
 
 test('THE NOTE IN THE SCRIPT IS THE ONE A PERSON READS, word for word', () => {

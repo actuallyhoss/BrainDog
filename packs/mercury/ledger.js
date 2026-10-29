@@ -120,6 +120,13 @@ export const currencyOf = (account) => {
 /** A name as first contact compares it: spaces trimmed and run together, case folded. */
 export const fold = (name) => (typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').toLowerCase() : '');
 
+/**
+ * AN ACCOUNT THIS PACK KEEPS SAYS SO IN MONEY'S OWN WORDS, SINCE 1.3.0: `no_feed` false, "fed by the bank", which is what
+ * Money reads before it posts a repeating line to an account itself (`post-due` in money-core). Written on every account
+ * the pack writes or takes over, and on one it already held the next hour, so Money never has to know this pack's field.
+ */
+const FED = (row) => (row.fields.no_feed === false ? {} : { no_feed: false });
+
 const unmarked = (row) => FEED_MARKS.every((f) => row.fields[f] === undefined || row.fields[f] === null || row.fields[f] === '');
 /* THE BOOK THIS PACK FILES ITS ROWS IN: the `book` setting, the number of a row of money-core's `books` (books#2), so
    the company's Mercury money sits on the company's book page and not in the household's. Anything but a whole number
@@ -272,7 +279,7 @@ async function keepAccounts(ctx, accounts, inBook, bookFor) {
       const moved = was === null || typeof was !== 'object' || was.amount !== balance.amount || was.currency !== balance.currency || row.fields.as_of !== today;
       /* A PERSON WHO SETS IT TO COUNT AS CASH HAS SAID IT IS NEW, so the note that asked is taken off. */
       const answered = row.fields.mercury_note === NOT_MATCHED && row.fields.liquid === true;
-      const patch = { ...(moved ? { balance, as_of: today } : {}), ...(answered ? { mercury_note: null } : {}), ...bookFor(row) };
+      const patch = { ...(moved ? { balance, as_of: today } : {}), ...(answered ? { mercury_note: null } : {}), ...FED(row), ...bookFor(row) };
       if (Object.keys(patch).length === 0) continue;
       ctx.update(`accounts#${row.seq}`, patch, row.version);
       writes += 1;
@@ -288,7 +295,7 @@ async function keepAccounts(ctx, accounts, inBook, bookFor) {
       const typed = named[0];
       claimed.add(typed.id);
       rowOf.set(a.id, typed.id);
-      ctx.update(`accounts#${typed.seq}`, { mercury_account: a.id, balance, as_of: today, ...bookFor(typed) }, typed.version);
+      ctx.update(`accounts#${typed.seq}`, { mercury_account: a.id, balance, as_of: today, no_feed: false, ...bookFor(typed) }, typed.version);
       writes += 1;
       ctx.log(`Took over "${typed.fields.name}": it is "${a.name}" at Mercury, kept from Mercury every hour from now on, so the money counts once.`);
       continue;
@@ -305,6 +312,7 @@ async function keepAccounts(ctx, accounts, inBook, bookFor) {
       as_of: today,
       liquid: !doubt,
       mercury_account: a.id,
+      no_feed: false,
       ...(doubt ? { mercury_note: NOT_MATCHED } : {}),
       ...inBook,
     });
