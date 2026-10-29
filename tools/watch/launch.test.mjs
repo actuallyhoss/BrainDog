@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import watch, { allowedCommits, hostInput, namesOf, reasonsBeside, shipRuns } from './launch.mjs';
-import { wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
+import { siteConfig, wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
 import { SIGNUP_STOPPED, STOPPING, launchDetail, launchState } from '../../apps/worker/src/launch.ts';
 
 const NOW = Date.parse('2026-10-09T12:00:00Z');
@@ -239,7 +239,10 @@ test('THE NAMES COME FROM apps/worker/wrangler.jsonc: production is app.brain.do
   assert.equal(names.host, 'app.brain.dog');
   assert.ok(names.legacy.includes('brain.dog'), names.legacy.join(', '));
   assert.equal(names.signup, 'invite');
+  assert.equal(names.site, 'app.brain.dog', 'with no site config the app\'s name is asked');
+  assert.equal(namesOf(wranglerConfig(), 'production', '', siteConfig()).site, 'brain.dog');
   assert.equal(namesOf(wranglerConfig(), 'production', 'down.example.test').host, 'down.example.test');
+  assert.equal(namesOf(wranglerConfig(), 'production', 'down.example.test', siteConfig()).site, 'down.example.test');
   assert.throws(() => namesOf({ env: {} }), /no PUBLIC_HOST/);
 });
 

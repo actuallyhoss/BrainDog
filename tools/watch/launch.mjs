@@ -13,7 +13,8 @@
  *   3. `/.well-known/braindog-build` names the commit of the last green `deploy` run on master. For the first hour after
  *      a deploy the commit before it passes too, and so does a deploy still running, whose Worker is live before its
  *      run is green.
- *   4. `/.well-known/security.txt` is 200 and its `Expires` is more than 30 days away. Red until LCH-C12, correctly.
+ *   4. `/.well-known/security.txt` is 200 and its `Expires` is more than 30 days away, asked of the site's name, since
+ *      the file is the site's (`apps/site/static/.well-known`) and the app's own name has none. Red until LCH-C12.
  *   5. Each name of `LEGACY_HOSTS` answers at all: any status under 500.
  *   6. `/healthz`'s `night` ran: its `at` under 26 hours old and `backups_failed` 0 (`apps/worker/src/health.ts`).
  *   7. `/healthz`'s `launch.signup` is what `SIGNUP` switches it to. The Worker says `closed` whenever anything stops a
@@ -39,7 +40,7 @@
  * EXIT CODES: 0 when all seven answer as they should, 1 when any does not.
  */
 
-import { readBuild, wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
+import { readBuild, siteConfig, wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
 
 /** How long one question waits. */
 export const ASK_MS = 10_000;
@@ -74,12 +75,15 @@ const modeOf = (said) => {
  * The names one environment of `apps/worker/wrangler.jsonc` is deployed with: its host, its old names and the sign-up
  * its switch sets. `host` replaces `PUBLIC_HOST` when given, for a forced miss through `workflow_dispatch`.
  */
-export function namesOf(config, name = 'production', host = '') {
+export function namesOf(config, name = 'production', host = '', site = null) {
   const vars = config.env?.[name]?.vars ?? {};
   const own = String(host || vars.PUBLIC_HOST || '').trim().toLowerCase();
   if (!own) throw new Error(`env.${name} has no PUBLIC_HOST in apps/worker/wrangler.jsonc`);
   const legacy = String(vars.LEGACY_HOSTS ?? '').split(/[\s,]+/).map((h) => h.toLowerCase()).filter((h) => h.length > 0);
-  return { host: own, legacy, signup: modeOf(vars.SIGNUP) };
+  /* THE SITE'S NAME, from `apps/site/wrangler.jsonc` when it is handed in, for the file only the site serves. A typed
+     host is asked everything, as a forced miss means. */
+  const siteName = String(site?.env?.[name]?.routes?.[0]?.pattern ?? '').split('/')[0].trim().toLowerCase();
+  return { host: own, site: (!host && siteName) || own, legacy, signup: modeOf(vars.SIGNUP) };
 }
 
 const parse = (text) => {
@@ -186,6 +190,7 @@ const toHttps = (location, host) => {
  */
 export async function questions({ names, github = {}, ask = fetch, now = Date.now(), ms = ASK_MS }) {
   const { host, legacy, signup } = names;
+  const site = names.site ?? host;
   const out = [];
   const say = (n, asks, miss, note = '', more = []) => out.push({ n, asks, miss, note, more });
   const failed = (a) => (a.error ? `did not answer: ${a.error}` : null);
@@ -217,12 +222,12 @@ export async function questions({ names, github = {}, ask = fetch, now = Date.no
     hit ? `${live}, ${hit.as}` : '',
   );
 
-  const sec = await asked(ask, `https://${host}/.well-known/security.txt`, {}, ms);
+  const sec = await asked(ask, `https://${site}/.well-known/security.txt`, {}, ms);
   const expires = sec.status === 200 ? (/^expires:[ \t]*(.+?)\s*$/im.exec(sec.text ?? '')?.[1] ?? null) : null;
   const left = expires === null ? NaN : Date.parse(expires) - now;
   say(
     4,
-    `https://${host}/.well-known/security.txt expires more than 30 days away`,
+    `https://${site}/.well-known/security.txt expires more than 30 days away`,
     failed(sec) ??
       (sec.status !== 200 ? `answered ${sec.status}`
       : expires === null ? 'has no Expires line'
@@ -312,7 +317,7 @@ if (import.meta.main) {
       token: process.env.GITHUB_TOKEN,
       runId: process.env.GITHUB_RUN_ID,
     };
-    process.exitCode = await watch({ names: namesOf(wranglerConfig(), 'production', host), github });
+    process.exitCode = await watch({ names: namesOf(wranglerConfig(), 'production', host, siteConfig()), github });
   } catch (err) {
     console.error(`  watch: ${err instanceof Error ? err.message : String(err)}`);
     process.exitCode = 1;

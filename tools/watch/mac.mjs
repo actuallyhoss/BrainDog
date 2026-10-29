@@ -25,7 +25,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import watch, { hostInput, namesOf, shipRuns } from './launch.mjs';
-import { wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
+import { siteConfig, wranglerConfig } from '../../apps/worker/scripts/provision-check.mjs';
 
 export const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 export const LABEL = 'dog.brain.watch';
@@ -109,7 +109,7 @@ async function run(hostSaid) {
   let code;
   try {
     const host = hostInput(hostSaid);
-    code = await watch({ names: namesOf(wranglerConfig(), 'production', host), github: { deploys: { runs: shipRuns(files, locked) }, lastWatch: before?.at ?? null }, log: (l) => lines.push(l), now });
+    code = await watch({ names: namesOf(wranglerConfig(), 'production', host, siteConfig()), github: { deploys: { runs: shipRuns(files, locked) }, lastWatch: before?.at ?? null }, log: (l) => lines.push(l), now });
   } catch (err) {
     lines.push(`  watch: ${err instanceof Error ? err.message : String(err)}`);
     code = 1;
