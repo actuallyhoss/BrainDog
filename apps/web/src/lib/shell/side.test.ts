@@ -14,6 +14,7 @@ import {
   factsKept,
   holdsProjects,
   leadFirst,
+  moneyLead,
   homesOf,
   lanesOf,
   litOf,
@@ -287,4 +288,10 @@ test("a place's kept rows stand first and the rest fold under its More without t
   assert.equal(got.lead, 2);
   assert.deepEqual(got.kids.map((k) => k.label), ['Accounts', 'Ledger', 'Snapshots', 'Categories']);
   assert.equal(got.kids[2]?.count, undefined, 'a list under More carries no count');
+});
+
+test("MONEY'S OPEN PAGES ARE ITS FIRST SIX IN THEIR DECLARED ORDER, less its own, and name no page", () => {
+  const views = ['/p/home', '/p/a', '/p/b', '/p/c', '/p/d', '/p/e', '/p/f', '/p/g'].map((href) => ({ href }));
+  assert.deepEqual(moneyLead(views, '/p/home'), ['/p/a', '/p/b', '/p/c', '/p/d', '/p/e', '/p/f']);
+  assert.deepEqual(moneyLead(undefined, '/p/home'), []);
 });

@@ -72,7 +72,7 @@
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
-  import { FACTS_KEY, IN_MORE, MONEY_LEAD, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
+  import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
@@ -452,7 +452,7 @@
       counted: holdsTasks ? { work: TASKS } : {},
       /* MONEY KEEPS ITS PAGES OPEN AND ITS LISTS FOLDED (Q35 of the 29 Oct audit): the places he goes stand under it,
          and Snapshots, Books, Exchange rates, Categories and the rest wait under its More. */
-      leads: placed.at.money ? { [placed.at.money]: MONEY_LEAD } : {},
+      leads: placed.at.money ? { [placed.at.money]: moneyLead(rail.views[placed.at.money], [...rail.places, ...rail.rest].find((i) => i.key === placed.at.money)?.href) } : {},
     }),
   );
   /* A TAB IS LIT ON ITS PLACE'S OWN LISTS TOO, as the sidebar's place unfolds there: Money's tab on its ledger. */

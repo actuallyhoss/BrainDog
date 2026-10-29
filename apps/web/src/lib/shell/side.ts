@@ -471,5 +471,17 @@ export function leadFirst(kids: readonly SideLink[], hrefs: readonly string[]): 
   return { kids: [...open, ...rest], lead: open.length };
 }
 
-/** Money's pages that stand open under it in the sidebar, in this order; its lists and add-on pages fold under More. */
-export const MONEY_LEAD: readonly string[] = ['/p/money-accounts', '/p/money-ledger', '/p/money-budgets', '/p/money-coming', '/p/money-forecast', '/p/money-reports'];
+/** How many of Money's own pages stand open under it in the sidebar; its lists and the rest of its pages fold under More. */
+export const MONEY_LEAD_MOST = 6;
+
+/**
+ * THE PAGES THAT STAND OPEN UNDER MONEY: the first of the place's own pages, in the order their declarations give them
+ * (`nav.order`), less the place's own page, so no page is named here. Money's own come first (Accounts, Ledger, Budgets,
+ * Coming up, Forecast, Reports) because they declare the lowest orders; an add-on's page declares a later one.
+ */
+export function moneyLead(views: readonly { href: string }[] | undefined, own: string | undefined): string[] {
+  return (views ?? [])
+    .filter((v) => v.href !== own)
+    .slice(0, MONEY_LEAD_MOST)
+    .map((v) => v.href);
+}
