@@ -804,8 +804,10 @@
       <a class="block-source tap" href={inApp(openHref(block) ?? `/r/${block.register}`)} aria-label={whereOf(block) ? copy.openThese(source) : copy.openList(source)}>
         {source}
         {#if whereOf(block)}
+          <!-- NO HIDDEN CLAUSE (live check of 30 October, 21): it was out of sight and out of the reader's hearing, so it
+               reached nobody, and it held record words ("Filter seq is 3", "account is accounts#3"). The glyph says
+               the list is narrowed, and the link's name says where it goes. -->
           <Icon name="filter" size="s" />
-          <span class="block-where" aria-hidden="true"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
         {/if}
       </a>
     {/if}
@@ -1227,22 +1229,6 @@
     white-space: nowrap;
   }
 
-  /* THE CLAUSE IS FOR A SCREEN READER AND THE TOOLTIP. The glyph says the list is narrowed; the words are kept out of
-     sight rather than printed as a debug line under the heading. */
-  .block-where {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  /* The word, quieter than the clause it introduces: it is a label and the clause is the fact. */
-  .block-where-lead {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
 
   /* The same weight and colour as the list grid's own cap line, because it is the same sentence about the same thing
      seen from the page rather than from the list. Left-aligned rather than centred: it sits under content of every
@@ -1332,13 +1318,6 @@
     font-size: var(--fs-meta);
   }
 
-  /* THE QUERY A BLOCK WAS DRAWN FROM IS PROVENANCE, and on a phone it competes with the block's own heading. It is a
-     desktop affordance, as the source link in the page's head is. */
-  @media (width < 900px) {
-    .block-where {
-      display: none;
-    }
-  }
 
   /* THE DESK'S OWN TILE IS ITS OWN TILE: the slot draws no fill round it, and the tile fills the slot's height. */
   /* A ROW OF A PROJECT'S SHAPE IS ITS PARTS' OWN TILES: the slot draws no fill round them, and a row with nothing to
