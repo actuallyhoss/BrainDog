@@ -364,44 +364,19 @@ export const HELD = {
     words: { cairo: 'the `tz` line at 379 gives `Africa/Cairo` as its example, the same one the kernel\'s refusal gives.' },
   },
   /* HELD ON 30 OCTOBER, at his word to deploy ("yes yes yes go go go"): what round 1030's code spelled of one use case.
-     Each goes with the unit its `until` names: SHL-A22 moves the widget templates into each pack's `widgets`
-     declaration, and SHL-A23 puts money-core's words behind pack declarations. */
-  'packages/kernel/src/worth-grams.ts': {
-    why: 'net worth in grams of gold, worked out in the kernel from the gold rates list, in a file of its own so the hold names nothing else (4 hits).',
-    until: 'SHL-A23',
-    words: { gold: '`worth_gold` and `gold_rates` in the nightly snapshot: a figure the holdings add-on should declare, read off its declaration.' },
-  },
+     The same day SHL-A22 moved the widget templates into each pack's `widgets` and SHL-A23 put money-core's gold,
+     Mercury, Stripe and pay words behind declarations, which took four of the six out; these two stay, each saying why. */
   'packages/render/src/widgets.ts': {
-    why: 'the widget catalogue offers a gold price widget and scales its rate sample to the home currency (10 hits).',
+    why: 'the widget catalogue says an example rate in the record\'s own currency, from a table of thirty (1 hit).',
     until: 'SHL-A22',
     words: {
-      gold: 'the `gold-price` template over `register.gold_rates`, which goes into the holdings pack\'s `widgets`.',
-      egp: 'one row of `SAMPLE_DOLLARS`, the example rate a record in that currency is shown.',
+      egp: 'one row of `SAMPLE_DOLLARS`, the example rate a record in that currency is shown. Every currency is a row, and taking the one out would change what an EGP record sees; it goes when the table moves to EXEMPT or into the rates the record keeps.',
     },
-  },
-  'packages/seed/src/modules/money/figures/accounts.ts': {
-    why: 'the currencies a Stripe balance is checked below zero in (1 hit).',
-    until: 'SHL-A23',
-    words: { egp: '`STRIPE_CURRENCIES`, which the Stripe add-on should declare with its balance.' },
   },
   'packages/seed/src/modules/money/lists/snapshots.ts': {
     why: 'the nightly snapshot keeps net worth in grams of gold (2 hits).',
     until: 'SHL-A23',
-    words: { gold: 'the `worth_gold` field, which the holdings add-on should add to the list it extends.' },
-  },
-  'packages/seed/src/modules/money/scripts/post-due.js': {
-    why: 'a repeating line is not posted to an account a bank feed keeps, told by the feed\'s own field (1 hit).',
-    until: 'SHL-A23',
-    words: { mercury: '`mercury_account`, the Mercury add-on\'s field, which a feed should declare as the mark of a fed account.' },
-  },
-  'apps/web/src/lib/money/category-look.ts': {
-    why: 'a category with no glyph of its own takes one by the words in its name (3 hits).',
-    until: 'SHL-A23',
-    words: {
-      salary: 'a word in the name that draws the briefcase glyph.',
-      payroll: 'a word in the name that draws the briefcase glyph.',
-      gold: 'a word in the name that draws the bank glyph, which money-core should declare as a hint beside its categories.',
-    },
+    words: { gold: 'the `worth_gold` field. The kernel reads it off what Holdings\' gold rates declare (`restates`) since 30 October and names no gold; the field itself moves to Holdings only with a major money-core step and a move of the nights already kept, which waits on his word.' },
   },
 };
 
