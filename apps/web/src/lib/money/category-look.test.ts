@@ -17,3 +17,11 @@ test('an account is drawn by its type, else by its name', () => {
   assert.equal(accountLook('Cash (EGP)', null).glyph, 'wallet');
   assert.equal(accountLook('HSBC (USD)', 'bank').glyph, 'landmark');
 });
+
+test('MONEY THAT COMES IN, under a name no word here knows, is drawn as earnings; its own glyph and the words still win', () => {
+  assert.equal(glyphByName('Monthly pay slip', true), 'briefcase');
+  assert.equal(glyphByName('Monthly pay slip'), 'tag');
+  assert.equal(glyphByName('Rent', true), 'house');
+  assert.equal(categoryLook('Monthly pay slip', { income: true }).glyph, 'briefcase');
+  assert.equal(categoryLook('Monthly pay slip', { icon: 'gift', income: true }).glyph, 'gift');
+});

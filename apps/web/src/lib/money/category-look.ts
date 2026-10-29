@@ -6,6 +6,7 @@
  * existed), so a category named for a common kind of spending takes a sensible glyph by its name, and its colour is the
  * steady slot its name hashes to (`wordSlot`), the one the ledger already gives it. A name nothing here knows keeps the
  * tag glyph. Nothing is written back: this is how it is drawn, never what it holds.
+
  *
  * AN ACCOUNT IS DRAWN BY ITS TYPE (bank, cash, card) where the record says it, else by its name.
  */
@@ -31,9 +32,9 @@ const BY_NAME: readonly (readonly [RegExp, string])[] = [
   [/music|concert/iu, 'music'],
   [/school|educat|course|tuition|study|studies|learn/iu, 'graduation-cap'],
   [/gym|sport|fitness/iu, 'dumbbell'],
-  [/salary|wage|payroll|income|client|freelance|work|business|office/iu, 'briefcase'],
+  [/wage|income|client|freelance|work|business|office/iu, 'briefcase'],
   [/saving/iu, 'piggy-bank'],
-  [/invest|stock|fund|gold|certificate/iu, 'landmark'],
+  [/invest|stock|fund|certificate/iu, 'landmark'],
   [/card|credit|loan|debt|instal/iu, 'credit-card'],
   [/charity|donat|zakat|sadaqa/iu, 'hand-coins'],
   [/transfer|move/iu, 'repeat'],
@@ -43,17 +44,21 @@ const BY_NAME: readonly (readonly [RegExp, string])[] = [
   [/fee|tax|bank/iu, 'banknote'],
 ];
 
-/** The glyph a category's name suggests, or the tag glyph. */
-export function glyphByName(name: string): string {
+/**
+ * The glyph a category's name suggests, or the tag glyph. MONEY THAT COMES IN, where the category says so by its own way
+ * (`ledger.ts`'s `way`), and that no word here names, is drawn as earnings with the briefcase: what a person is paid is
+ * theirs to call it, and the app spells no kind of pay of its own.
+ */
+export function glyphByName(name: string, income = false): string {
   for (const [re, g] of BY_NAME) if (re.test(name)) return g;
-  return 'tag';
+  return income ? 'briefcase' : 'tag';
 }
 
 const SLOTS = new Set(['pink', 'violet', 'blue', 'teal', 'yellow', 'lime', 'sky', 'slate']);
 
 /** A category's chip: its own glyph and colour where it holds them, else the ones its name suggests. */
-export function categoryLook(name: string, held?: { icon?: string | null; colour?: string | null } | null): Look {
-  const icon = held?.icon && /^[a-z]+(?:-[a-z]+)*$/u.test(held.icon) ? held.icon : glyphByName(name);
+export function categoryLook(name: string, held?: { icon?: string | null; colour?: string | null; income?: boolean } | null): Look {
+  const icon = held?.icon && /^[a-z]+(?:-[a-z]+)*$/u.test(held.icon) ? held.icon : glyphByName(name, held?.income === true);
   const colour = held?.colour && SLOTS.has(held.colour) ? held.colour : wordSlot(name);
   return { glyph: icon, slot: colour };
 }
@@ -68,26 +73,3 @@ export function accountLook(name: string, kind?: string | null): Look {
   if (/stripe|paypal|wise|payout|available/u.test(n)) return { glyph: 'banknote', slot: 'sky' };
   return { glyph: 'landmark', slot: 'blue' };
 }
-
-/**
- * THE ADD-ONS WHOSE PAGES ARE MONEY'S, so they wear its look whatever version of them a record holds: an older install
- * of Investments and gold put no section on its page, and drew in the plain look under no place.
- */
-export const MONEY_PACKS: ReadonlySet<string> = new Set([
-  'money-core',
-  'holdings',
-  'goals',
-  'debts',
-  'subscriptions',
-  'splits',
-  'tax-set-aside',
-  'receipts',
-  'savings-circle',
-  'count-cash',
-  'certificates',
-  'property',
-  'insurance',
-  'trips',
-  'zakat',
-  'money-watch',
-]);

@@ -95,7 +95,7 @@
   import { pageOfLedger } from '$lib/money/ledger.ts';
   import { quick } from '$lib/money/quick.svelte.ts';
   import SetupGate from '$lib/money/SetupGate.svelte';
-  import { MONEY_PACKS } from '$lib/money/category-look.ts';
+  import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
   import { masonry } from '$lib/money/masonry.ts';
   import { headsSection, SETUP_KEY, type SetupFacts } from '$lib/money/setup.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
@@ -481,7 +481,7 @@
   /* A MONEY PAGE wears Money's look: the section's pages, and the pages about one account, bill or plan its add-on brings. */
   const moneyPage = $derived(
     !!live &&
-      (MONEY_PACKS.has(String((live.page.page as { pack?: unknown }).pack ?? '')) || live.page.page.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(live.page.page.page ?? '')),
+      (live.page.page.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(live.page.page.page ?? '') || moneyLooks.moneyPack(String((live.page.page as { pack?: unknown }).pack ?? ''))),
   );
   const headlined = $derived(!!live && (about !== null || fromPack || judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true)));
 

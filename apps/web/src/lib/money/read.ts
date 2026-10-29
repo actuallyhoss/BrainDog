@@ -169,7 +169,7 @@ export async function writeLines(base: string, l: Ledger, lines: readonly Line[]
 }
 
 /** What Money's chips are drawn from: each category's own glyph and colour, and each account's type, by name. */
-export type Looks = { categories: { name: string; icon: string | null; colour: string | null }[]; accounts: { name: string; kind: string | null }[] };
+export type Looks = { categories: { name: string; icon: string | null; colour: string | null; income: boolean }[]; accounts: { name: string; kind: string | null }[] };
 
 /** The categories and accounts of the record's ledger, by name, for the chips; nothing where it keeps no ledger. */
 export async function readLooks(base: string, lists: readonly Listed[]): Promise<Looks> {
@@ -178,7 +178,8 @@ export async function readLooks(base: string, lists: readonly Listed[]): Promise
   const client = createClient({ base });
   const [accountRows, categoryRows] = await Promise.all([list(client, l.account.list, 200), l.category ? list(client, l.category.list, 300) : Promise.resolve([])]);
   const c = l.category;
-  const categories = c ? categoriesOf(categoryRows, c).map((o) => ({ name: o.name, icon: o.icon ?? null, colour: o.colour ?? null })) : [];
+  /* MONEY THAT COMES IN IS SAID BY THE CATEGORY'S OWN WAY, which draws an unnamed kind of pay as earnings (`glyphByName`). */
+  const categories = c ? categoriesOf(categoryRows, c).map((o) => ({ name: o.name, icon: o.icon ?? null, colour: o.colour ?? null, income: c.way !== null && o.way === c.way.in })) : [];
   const accounts = accountRows.map((r) => ({ name: text(r.fields[l.account.title]) || UNNAMED, kind: l.account.kind ? idOf(r.fields[l.account.kind]) : null }));
   return { categories, accounts };
 }

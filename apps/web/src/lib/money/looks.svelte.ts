@@ -9,6 +9,8 @@ import { page } from '$app/state';
 import { apiBase } from '../at.ts';
 import { wordSlot } from 'braindog-render';
 
+import { createClient } from '@braindog/client';
+
 import { accountLook, categoryLook, type Look } from './category-look.ts';
 import type { Looks } from './read.ts';
 
@@ -50,6 +52,34 @@ class Held {
         if (this.#asked === base) this.#looks = l;
       })
       .catch(() => undefined);
+  }
+
+  /*
+   * THE ADD-ONS WHOSE PAGES ARE MONEY'S, read off the pages the record declares and never listed here: an add-on any of
+   * whose pages is placed in Money (`nav.section`), so its other pages, the one about a single holding or bill that sits
+   * in no place, wear Money's look too. Asked once a record, on the first page of an add-on that says no section.
+   */
+  #packs = $state<ReadonlySet<string> | null>(null);
+  #packsAsked: string | null = null;
+
+  /** Whether `pack` is one whose pages are Money's; false until the record has said, which draws the plain look. */
+  moneyPack(pack: string): boolean {
+    if (pack === '') return false;
+    const base = typeof location === 'undefined' ? null : apiBase();
+    if (base !== null && this.#packsAsked !== base) {
+      this.#packsAsked = base;
+      void createClient({ base })
+        .pages()
+        .then((got) => {
+          if (this.#packsAsked !== base || !got.ok) return;
+          const placed = (got.value as { pack?: unknown; nav?: { section?: unknown } | null }[]).flatMap((p) =>
+            typeof p.pack === 'string' && typeof p.nav?.section === 'string' && p.nav.section.toLowerCase() === 'money' ? [p.pack] : [],
+          );
+          this.#packs = new Set(placed);
+        })
+        .catch(() => undefined);
+    }
+    return this.#packs?.has(pack) ?? false;
   }
 
   /** A category's chip by its name, its own glyph and colour where it holds them. */
