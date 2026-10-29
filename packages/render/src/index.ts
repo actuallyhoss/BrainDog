@@ -34,6 +34,7 @@ export {
   ringDash,
   ringOf,
   trendOf,
+  trendTrimmed,
   trendAhead,
   TREND_TODAY,
   type AgentMark,

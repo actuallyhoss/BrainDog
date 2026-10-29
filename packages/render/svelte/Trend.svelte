@@ -5,23 +5,33 @@
   today marked at its start, its lowest point marked, and its two ends dated under it.
 -->
 <script lang="ts">
-  import { inline, text, trendAhead, trendOf, TREND, TREND_TODAY, type RenderOptions } from '../src/index.ts';
+  import { inline, text, trendAhead, trendOf, trendTrimmed, TREND, TREND_TODAY, type RenderOptions } from '../src/index.ts';
 
   let { cls, label, value, opts = {}, dated = false }: { cls: string; label: string; value: string; opts?: RenderOptions; dated?: boolean } = $props();
 
   const ahead = $derived(trendAhead(text(inline(value, opts))));
   const run = $derived(ahead ? trendOf(ahead.run) : null);
   const named = $derived(ahead && run ? `${text(inline(label, opts)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${run.said.join(', ')}` : '');
-  const t = $derived(ahead ? null : trendOf(text(inline(value, opts))));
+  /* A RUN BEHIND THAT IS DATED IS DRAWN FROM ITS FIRST READING TO ITS LAST (`trendTrimmed`), so its line spans the frame. */
+  const span = $derived(ahead || !dated ? null : trendTrimmed(text(inline(value, opts))));
+  const t = $derived(ahead ? null : trendOf(span ? span.value : text(inline(value, opts))));
   const name = $derived(t ? `${text(inline(label, opts)) || TREND}: ${t.said.join(', ')}` : '');
   /* A RUN BEHIND, ONE READING A DAY TO TODAY, SAYS ITS TWO ENDS UNDER IT where the host asks (`dated`): the day its
      first reading was taken and today, as the walk ahead says its own. */
   const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-  const from = $derived.by(() => {
+  /* THE DAYS OF ITS FIRST AND LAST READINGS, NOT OF THE RUN'S ENDS (live check of 30 October, 16): a run whose first
+     weeks and last nights hold nothing drew its line from a third of the way in to well short of "Today", under "7 Aug"
+     and "Today". The line is the run's, so the days under it are the ones its readings were taken. */
+  const ends = $derived.by((): { from: string; to: string } | null => {
     if (!dated || !t || t.said.length < 2) return null;
     const now = typeof opts.now === 'number' ? opts.now : Date.now();
-    return DAY.format(now - (t.said.length - 1) * 86_400_000);
+    const n = span?.length ?? t.said.length;
+    const lead = span?.lead ?? 0;
+    const tail = span?.tail ?? 0;
+    const dayOf = (back: number): string => DAY.format(now - back * 86_400_000);
+    return { from: dayOf(n - 1 - lead), to: tail === 0 ? TREND_TODAY : dayOf(tail) };
   });
+  const from = $derived(ends?.from ?? null);
 </script>
 
 {#if ahead && run}<span class="{cls}-ahead"
@@ -40,4 +50,4 @@
       d={t.end}
       vector-effect="non-scaling-stroke"
     ></path></svg
-  >{#if from}<span class="trend-days {cls}-days" aria-hidden="true"><span>{from}</span><span>{TREND_TODAY}</span></span>{/if}{/if}
+  >{#if from}<span class="trend-days {cls}-days" aria-hidden="true"><span>{from}</span><span>{ends?.to ?? TREND_TODAY}</span></span>{/if}{/if}
