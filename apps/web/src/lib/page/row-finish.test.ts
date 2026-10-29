@@ -22,6 +22,6 @@ test("A PLAN'S PARTS ARE THE LIST THAT POINTS AT IT, keeps money and is finished
 
 test('A LIST THAT KEEPS MONEY, OR ONE NOTHING FINISHES BY ITS WORDS, has no parts', () => {
   for (const d of all.filter((d) => d.fields.some((f) => f.type === 'money'))) assert.equal(partsOf(d, all), null, d.id);
-  const renamed = all.map((d) => ({ ...d, done: d.done?.includes('paid') && !d.fields.some((f) => f.type === 'money') ? ['settled'] : d.done }));
+  const renamed = all.map((d): RegisterDecl => (d.done?.includes('paid') && !d.fields.some((f) => f.type === 'money') ? { ...d, done: ['settled'] } : d));
   for (const d of renamed) assert.equal(partsOf(d, renamed), null, d.id);
 });
