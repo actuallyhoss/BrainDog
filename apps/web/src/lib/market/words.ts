@@ -53,7 +53,7 @@ export const words = {
     updateTo: (version: string): string => `Update to ${version}`,
   },
   all: 'All',
-  categoriesLabel: 'Categories',
+  categoriesLabel: 'Kinds of add-on',
   categories: {
     'made-by-braindog': 'Made by BrainDog',
     'ways-of-working': 'Starters',
