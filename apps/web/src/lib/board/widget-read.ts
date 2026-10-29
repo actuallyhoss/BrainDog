@@ -10,7 +10,7 @@
  * PLAIN TYPESCRIPT, so a test can load it in Node.
  */
 
-import { WIDGETS, dayShort, moneyWhole, widgetById, widgetMatches, type GalleryAnswer, type GalleryWidget, type ReadFigure, type ReadRow, type WidgetOffer, type WidgetSize } from 'braindog-render';
+import { WIDGETS, dayShort, moneyWhole, widgetMatches, type GalleryAnswer, type GalleryWidget, type ReadFigure, type ReadRow, type WidgetOffer, type WidgetSize } from 'braindog-render';
 
 /** The sheet's own words (a unit's new words live in a module it owns, never in `copy.ts`). */
 export const sheetWords = {
@@ -149,11 +149,19 @@ export function blockAt(w: Pick<GalleryWidget, 'block'>, size: WidgetSize): Reco
   return block;
 }
 
-/** Whether a gallery item matches the sheet's search: its name, its line, its group, its own words, its add-on. */
-export function itemMatches(w: Pick<GalleryWidget, 'id' | 'title' | 'says' | 'group' | 'addon'>, q: string): boolean {
-  const t = widgetById(w.id);
-  if (t !== undefined) return widgetMatches(t, q);
-  const words = q.toLowerCase().split(/\s+/u).filter((x) => x !== '');
-  const hay = `${w.title} ${w.says} ${w.group} ${w.addon?.name ?? ''}`.toLowerCase();
-  return words.every((x) => hay.includes(x));
+/**
+ * Whether a gallery item matches the sheet's search: its name, its line, its group, its own words, its add-on. The
+ * words come with the item (`GalleryWidget.words`), since the catalogue is the record's and not a copy in the web.
+ */
+export function itemMatches(w: Pick<GalleryWidget, 'title' | 'says' | 'group' | 'for' | 'addon' | 'words'>, q: string): boolean {
+  return widgetMatches({ title: w.title, says: w.says, group: w.group, for: w.for, words: [...(w.words ?? []), ...(w.addon ? [w.addon.name] : [])] }, q);
+}
+
+/**
+ * The template a gallery item was made from, as the record handed it: its block with the blanks unfilled, the blanks,
+ * and the fields its preview reads. `null` for one the record sent without it (an older record), which is then added
+ * as drawn and cannot be filled again for another choice.
+ */
+export function templateOf(w: Pick<GalleryWidget, 'template' | 'size'>): (NonNullable<GalleryWidget['template']> & { size: WidgetSize }) | null {
+  return w.template === undefined ? null : { ...w.template, size: w.size };
 }

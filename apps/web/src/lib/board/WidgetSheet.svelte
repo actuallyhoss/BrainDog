@@ -28,7 +28,6 @@
     distill,
     widgetBlock,
     chosenWith,
-    widgetById,
     type GalleryAnswer,
     type GalleryWidget,
     type WidgetOffer,
@@ -48,7 +47,7 @@
   import { drawnWidgetDraft } from '$lib/page/draw.ts';
   import { kept as keptBlock } from 'braindog-render';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { blockAt, catalogueOnly, itemMatches, readGallery, sheetWords } from './widget-read.ts';
+  import { blockAt, catalogueOnly, itemMatches, readGallery, sheetWords, templateOf } from './widget-read.ts';
   import { widgetHeld } from './widget-held.svelte.ts';
   import { WIDGETS_PARAM, sheetAsked } from './offer.svelte.ts';
   import { page } from '$app/state';
@@ -250,9 +249,9 @@
 
   /** The block the open widget adds: its blanks as picked, its rows capped to the size. */
   function blockOf(w: GalleryWidget, at: WidgetSize, values: Record<string, string>): Record<string, unknown> {
-    const t = widgetById(w.id);
+    const t = templateOf(w);
     const same = Object.keys(values).every((k) => values[k] === w.filled[k]);
-    return t !== undefined && !same ? widgetBlock(t, at, values) : blockAt(w, at);
+    return t !== null && !same ? widgetBlock(t, at, values) : blockAt(w, at);
   }
 
   async function add(w: GalleryWidget, at: WidgetSize, offer: WidgetOffer | null, values: Record<string, string> = w.filled) {
@@ -272,19 +271,19 @@
     if (picked === null) return;
     chosen = chosenWith(picked.widget, chosen, id, value);
     chosenReading = null;
-    const t = widgetById(picked.widget.id);
-    if (t === undefined) return;
+    const t = templateOf(picked.widget);
+    if (t === null) return;
     try {
       const { createClient } = await import('@braindog/client');
       const block = widgetBlock(t, t.size, chosen);
-      const out = await createClient({ base: apiBase() }).call<{ blocks?: unknown[] }>('previewPage', { body: { page: 'widget', title: t.title, blocks: [block] } });
+      const out = await createClient({ base: apiBase() }).call<{ blocks?: unknown[] }>('previewPage', { body: { page: 'widget', title: picked.widget.title, blocks: [block] } });
       if (out.ok && Array.isArray(out.value.blocks)) chosenReading = distill(t, out.value.blocks[0]);
     } catch {
       /* The preview stays the one the gallery read; the widget is still added for the choice. */
     }
   }
 
-  const forSaid = (f: GalleryWidget['for']): string => (f === 'personal' ? sheetWords.forPersonal : f === 'business' ? sheetWords.forBusiness : sheetWords.forBoth);
+  const forSaid = (f: GalleryWidget['for']): string => (f === 'personal' ? sheetWords.forPersonal : f === 'both' ? sheetWords.forBoth : sheetWords.forBusiness);
 </script>
 
 <Sheet bind:open title={picked ? picked.widget.title.replace(/\{\{[a-z_]+\}\}/gu, chosen.project ?? '') : sheetWords.title} wide caret={false}>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { fitted, phoneWidgets, widgetsOf } from './items.ts';
+import { fitted, phoneWidgets, widgetsOf } from './board-widgets.ts';
 
 test('the head is not a widget, a size the kind cannot take is the nearest it can, and the phone keeps its own order', () => {
   const w = widgetsOf([

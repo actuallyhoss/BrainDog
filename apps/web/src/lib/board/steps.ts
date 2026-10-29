@@ -6,7 +6,7 @@
 
 import type { WidgetSize } from 'braindog-render';
 
-import type { Phone } from './items.ts';
+import type { Phone } from './board-widgets.ts';
 
 /** A board's arrangement in the editor: the laptop's order and sizes, and the phone's own, once it has one. */
 export type Arranged = {

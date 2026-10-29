@@ -6,10 +6,11 @@
   opens it in the widget sheet on Today, drawn on his own data, to add or not. Nothing is added from here.
 
   ASKED ONLY WHEN AN ANSWER IS ON SCREEN, at most every five minutes (`offersNow`), and drawn only when an offer matches
-  the question's words (`askedWidget`, the record's own rule), so most answers carry nothing here.
+  the question's words, by the patterns its widget declares and the offer carries (`asks`), so most answers carry nothing
+  here. The patterns are the record's: the web keeps no copy of which widget answers which words (SHL-A22).
 -->
 <script lang="ts">
-  import { askedWidget, type WidgetOffer } from 'braindog-render';
+  import type { WidgetOffer } from 'braindog-render';
   import { apiBase, at as inApp } from '$lib/at.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { askedSaid, offersNow, sheetHref } from './offer.svelte.ts';
@@ -18,13 +19,23 @@
 
   let offer = $state<WidgetOffer | null>(null);
 
+  /** Whether an offer's widget answers this question, by the patterns it carries. */
+  const answers = (o: WidgetOffer, text: string): boolean =>
+    (o.asks ?? []).some((m) => {
+      try {
+        return new RegExp(m, 'iu').test(text);
+      } catch {
+        return false;
+      }
+    });
+
   $effect(() => {
-    const widget = askedWidget(asked);
+    const text = asked;
     offer = null;
-    if (widget === null) return;
+    if (text.trim() === '') return;
     let current = true;
     void offersNow(apiBase()).then((all) => {
-      if (current) offer = all.find((o) => o.widget === widget && o.signal === 'S1') ?? null;
+      if (current) offer = all.find((o) => o.signal === 'S1' && answers(o, text)) ?? null;
     });
     return () => {
       current = false;

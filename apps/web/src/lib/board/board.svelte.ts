@@ -20,7 +20,7 @@ import { SIZE_WORDS, WIDGET_SIZES, sizesOf, type WidgetSize } from 'braindog-ren
 
 import { still } from '../ui/motion.ts';
 import { areaOf, cellsOf, dropIndex, filled, moved, pack, type Laid, type Packed } from './pack.ts';
-import { phoneWidgets, type Phone, type Widget } from './items.ts';
+import { phoneWidgets, type Phone, type Widget } from './board-widgets.ts';
 import { stepsBetween, type Arranged, type Step } from './steps.ts';
 
 /** How long a press is held before the board starts editing (§5.1). */

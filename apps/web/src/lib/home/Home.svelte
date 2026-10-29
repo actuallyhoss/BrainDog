@@ -125,7 +125,7 @@
   import EditCover from '$lib/board/EditCover.svelte';
   import DraftMark from '$lib/board/DraftMark.svelte';
   import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
-  import { fitted, widgetsOf, type Phone } from '$lib/board/items.ts';
+  import { fitted, widgetsOf, type Phone } from '$lib/board/board-widgets.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
