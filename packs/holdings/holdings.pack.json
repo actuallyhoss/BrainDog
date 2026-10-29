@@ -309,7 +309,7 @@
       ],
       "restates": {
         "night": "worth_gold",
-        "price": "per_gram",
+        "unit": "per_gram",
         "day": "on",
         "match": {
           "karat": "24k",
