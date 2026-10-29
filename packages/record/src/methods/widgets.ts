@@ -15,6 +15,14 @@
  * last cell shows with `cell`. `board` is the board's widgets as drawn (key, source, empty), for what is already there and
  * what has drawn nothing for three weeks. Today asks it inside its own read (`today.ts`), so the cell costs no request.
  *
+ * THE CATALOGUE IS EVERYBODY'S DECLARATIONS, NOT THE CORE'S LIST (SHL-A22, 30 October). The core offers the three widgets
+ * over what it keeps itself (`braindog-render` `WIDGETS`); every other comes from where it is declared: this build's own
+ * modules and starters (`@braindog/seed` `SEED_WIDGETS`, read from the build so a record installed before they declared
+ * any has them), the manifests of the add-ons the record holds, and, for an add-on it does not hold yet or holds at a
+ * version from before its widgets, the newest file the host's catalogue publishes (`catalogueShelf`), which is where
+ * "Comes with" its name comes from. A blank's choices are read the way its widget declares them (`from`), drawn by
+ * `previewPage` like the widget, so a reader is offered only rows they may see.
+ *
  * TO A PERSON WHO READS EVERY LIST, AND WITH THE PEN ON. A suggestion rests on use read across the record, and a reader
  * held to some lists is offered nothing, as the pen offers them nothing (`boot`'s `pen`). `pen.suggest` off is none.
  */
@@ -22,8 +30,7 @@
 import type { Result } from '@braindog/ports';
 import { fillConfig, type Json } from '@braindog/kernel';
 import {
-  STARTER_BOARDS,
-  WIDGET_ADDONS,
+  WIDGETS,
   WIDGET_GROUPS,
   distill,
   widgetBlock,
@@ -46,6 +53,9 @@ import {
   type Shipper,
 } from 'braindog-render';
 import { previewerOf, type SlashDeclined, type SlashDrafted, type SlashPreviewer } from '../slash.ts';
+import { packIdOf } from '@braindog/declare';
+import { SEED_WIDGETS } from '@braindog/seed';
+import type { CatalogueShelf } from '../arrange.ts';
 
 import { widgetOffers, type WidgetHeld, type WidgetSignal } from '../design-agent.ts';
 import { needsMet, widgetSignals, type BoardRead, type SignalRead } from '../widget-signals.ts';
@@ -58,8 +68,9 @@ export const GALLERY_BATCH = 12;
 export const GALLERY_Q_MOST = 100;
 /** The most of the board `widgetSuggest` is handed. */
 export const BOARD_MOST = 24;
-/** The most projects or currencies offered for a blank. */
+/** The most projects or currencies offered for a blank, and the most rows read to find them. */
 const CHOICES_MOST = 8;
+const CHOICES_READ = 200;
 
 /** The preference the widget brakes are kept in (`index.ts` `PREF_KEYS`). */
 export const WIDGETS_HELD_PREF = 'widgets.held';
@@ -108,7 +119,7 @@ export function boardOf(v: unknown): BoardRead[] {
  * is not offered them again. The list alone said People to get back to was on Today because Today shows
  * people, and it is not (the validator's audit of 30 October, 11).
  */
-export function onBoardOf(board: readonly (BoardRead & { where?: string; metric?: string })[], values: (s: WidgetSignal) => Record<string, string>, byId: (id: string) => WidgetTemplate | undefined = widgetById) {
+export function onBoardOf(board: readonly (BoardRead & { where?: string; metric?: string })[], values: (s: WidgetSignal) => Record<string, string>, byId: (id: string) => WidgetTemplate | undefined = (id) => widgetById(id)) {
   return (s: WidgetSignal): boolean => {
     const t = byId(s.widget);
     if (t === undefined) return true;
@@ -182,6 +193,65 @@ function firstBlock(d: SlashDrafted): Bag | null {
   return null;
 }
 
+/** One source of widgets: who ships them, and the widgets as declared. */
+type Shipping = { by: Shipper; widgets: ShippedWidget[] };
+
+/** This build's own modules' and starters' widgets, each under the pack id a record holds it by. */
+const SEEDED: readonly Shipping[] = SEED_WIDGETS.map((s) => ({
+  by: { id: s.pack ?? packIdOf(s.usecase ?? ''), title: s.title },
+  widgets: s.widgets as ShippedWidget[],
+}));
+
+/** A manifest's settings filled into its widgets, each at what was chosen or else at its default. */
+function filledWidgets(m: { widgets?: unknown; config?: unknown; config_values?: unknown }): ShippedWidget[] {
+  if (!Array.isArray(m.widgets)) return [];
+  const chosen = isBag(m.config_values) ? m.config_values : {};
+  const values = Object.fromEntries(
+    Object.entries(isBag(m.config) ? m.config : {}).flatMap(([k, d]) => {
+      const v = Object.hasOwn(chosen, k) ? chosen[k] : isBag(d) ? d.default : undefined;
+      return v === undefined ? [] : [[k, v as Json]];
+    }),
+  );
+  return m.widgets.filter(isBag).map((w) => (Object.keys(values).length > 0 ? (fillConfig(w as Json, values) as Bag) : w));
+}
+
+/**
+ * THE CATALOGUE'S FILES ARE READ ONCE A VERSION, AND KEPT: a published version never changes (`from-packs.mjs`), so its
+ * widgets are the same every time the sheet opens. Kept for each shelf a host hands in.
+ */
+const shelfWidgets = new WeakMap<CatalogueShelf, Map<string, Promise<ShippedWidget[]>>>();
+function publishedWidgets(shelf: CatalogueShelf, id: string, version: string): Promise<ShippedWidget[]> {
+  let kept = shelfWidgets.get(shelf);
+  if (kept === undefined) shelfWidgets.set(shelf, (kept = new Map()));
+  const key = `${id}@${version}`;
+  let got = kept.get(key);
+  if (got === undefined) {
+    got = shelf
+      .fetch(id)
+      .then((out) => (out !== null && out.ok ? filledWidgets(out.value.doc) : []))
+      .catch(() => []);
+    kept.set(key, got);
+  }
+  return got;
+}
+
+/** A list's fields as a widget rule reads them: each field's id, and the list a link points at. */
+type Shape = { id: string; fields: readonly { id: string; type?: string; to?: string }[] };
+const has = (l: Shape, id: string): boolean => l.fields.some((f) => f.id === id);
+const linkOf = (l: Shape | undefined, id: string): string | null => l?.fields.find((f) => f.id === id && typeof f.to === 'string')?.to ?? null;
+
+/**
+ * THE LEDGER AND THE TO-DO LIST, FOUND BY WHAT THEIR ROWS HOLD AND NOT BY NAME (SHL-A22): the two lists `composeWidget`'s
+ * rules read. A ledger's rows have a day `on`, an `amount`, a `direction` and a `category` or a `party`; a to-do list's
+ * have `what`, `by` and a link `thing` to the projects. The first readable list of each shape, or `undefined`.
+ */
+export function ledgerOf(lists: readonly Shape[]): Shape | undefined {
+  return lists.find((l) => has(l, 'on') && has(l, 'amount') && has(l, 'direction') && (has(l, 'category') || has(l, 'party')));
+}
+export function todoOf(lists: readonly Shape[]): Shape | undefined {
+  return lists.find((l) => has(l, 'what') && has(l, 'by') && linkOf(l, 'thing') !== null);
+}
+
 export function methods(deps: RecordDeps) {
   const { kernel, sql, scoped, readable, no, clock } = deps;
 
@@ -193,36 +263,41 @@ export function methods(deps: RecordDeps) {
   };
 
   /**
-   * THE CATALOGUE WITH THE WIDGETS EVERY ADD-ON IT HOLDS SHIPS (§6.5), read off the manifests the record keeps, each time
-   * it is asked: an add-on switched off ships nothing, and one installed a moment ago is in the sheet at once.
+   * THE CATALOGUE, EACH TIME IT IS ASKED (§6.5): the core's, this build's own modules' and starters', the widgets every
+   * add-on the record holds ships, read off the manifests it keeps (an add-on switched off ships nothing, and one installed
+   * a moment ago is in the sheet at once), and those the host's catalogue says an add-on it does not hold would bring.
    */
-  const shipped = (): { by: Shipper; widgets: ShippedWidget[] }[] =>
-    sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL ORDER BY id').flatMap((p) => {
+  const catalogue = async (): Promise<{ all: WidgetTemplate[]; byId: (id: string) => WidgetTemplate | undefined; addonName: (id: string) => string }> => {
+    const own = new Set(SEEDED.map((s) => s.by.id));
+    const held = sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL ORDER BY id').flatMap((p) => {
+      if (own.has(p.id)) return [];
       try {
         const m = JSON.parse(p.manifest) as { title?: unknown; widgets?: unknown; config?: unknown; config_values?: unknown };
-        if (!Array.isArray(m.widgets) || m.widgets.length === 0) return [];
-        const title = typeof m.title === 'string' && m.title.trim() !== '' ? m.title : (WIDGET_ADDONS[p.id] ?? p.id);
-        /* ITS SETTINGS FILLED IN, as its declarations were at install: a shared widget's "Which category?" is the one
-           whoever installed it picked, or the example it starts from. */
-        const chosen = isBag(m.config_values) ? m.config_values : {};
-        const values = Object.fromEntries(
-          Object.entries(isBag(m.config) ? m.config : {}).flatMap(([k, d]) => {
-            const v = Object.hasOwn(chosen, k) ? chosen[k] : isBag(d) ? d.default : undefined;
-            return v === undefined ? [] : [[k, v as Json]];
-          }),
-        );
-        const widgets = m.widgets.filter(isBag).map((w) => (Object.keys(values).length > 0 ? (fillConfig(w as Json, values) as Bag) : w));
-        return [{ by: { id: p.id, title }, widgets }];
+        const title = typeof m.title === 'string' && m.title.trim() !== '' ? m.title : p.id;
+        return [{ by: { id: p.id, title }, widgets: filledWidgets(m) }];
       } catch {
         return [];
       }
     });
-  const catalogue = (): { all: WidgetTemplate[]; byId: (id: string) => WidgetTemplate | undefined; addonName: (id: string) => string } => {
-    const packs = shipped();
+    const heldById = new Map(held.map((h) => [h.by.id, h] as const));
+    const published: Shipping[] = [];
+    const shelf = deps.catalogueShelf;
+    if (shelf !== undefined) {
+      const listed = await shelf.listed().catch(() => []);
+      for (const e of listed) {
+        if (e.kind !== 'pack' || (e.widgets?.length ?? 0) === 0 || own.has(e.id)) continue;
+        const h = heldById.get(e.id);
+        /* HELD AND SHIPPING ITS OWN: the record's copy is the one its settings were chosen for. */
+        if (h !== undefined && h.widgets.length > 0) continue;
+        const widgets = await publishedWidgets(shelf, e.id, e.version);
+        if (widgets.length > 0) published.push({ by: { id: e.id, title: h?.by.title ?? e.title }, widgets });
+      }
+    }
+    const packs = [...SEEDED, ...[...held.filter((h) => h.widgets.length > 0), ...published].sort((a, b) => (a.by.id < b.by.id ? -1 : a.by.id > b.by.id ? 1 : 0))];
     const all = withShipped(packs);
     const map = new Map(all.map((t) => [t.id, t] as const));
-    const names = new Map(packs.map((p) => [p.by.id, p.by.title] as const));
-    return { all, byId: (id) => map.get(id), addonName: (id) => WIDGET_ADDONS[id] ?? names.get(id) ?? id };
+    const names = new Map([...packs, ...held].map((p) => [p.by.id, p.by.title] as const));
+    return { all, byId: (id) => map.get(id), addonName: (id) => names.get(id) ?? id };
   };
 
   /** The caller's person, whose preferences and questions these are, or `null` for a share or a host. */
@@ -238,56 +313,86 @@ export function methods(deps: RecordDeps) {
   };
 
   /**
-   * The names a blank can be filled with: the projects, newest moved first, the currencies with a rate kept, and the
-   * trips not over yet, soonest first, each with its last day beside it (`trip_until`, in the same order).
+   * THE NAMES A BLANK CAN BE FILLED WITH, read as each blank declares them (`from`): the rows of its list its filter lets
+   * through, in its order, drawn by `previewPage` so a reader is offered only the rows they see, each named by its field,
+   * once, at most eight. A blank that brings its last day (`until`, a trip's end) and its first (`starts`) carries them
+   * beside its names, in the same order (`<blank>_until`, `<blank>_starts`). A name with a quote in it is left out: a
+   * widget finds its row by name, written in quotes. The currency most asked after, the dollar, goes first where kept.
    */
-  const choicesOf = (ctx: CallContext, lists: ReadonlySet<string>): Record<string, string[]> => {
+  const choicesOf = async (ctx: CallContext, lists: ReadonlySet<string>, templates: readonly WidgetTemplate[]): Promise<Record<string, string[]>> => {
     const out: Record<string, string[]> = {};
-    if (lists.has('trips')) {
-      const today = new Date(clock.now()).toISOString().slice(0, 10);
-      const trips = seen(ctx, 'trips', sql
-        .all<{ id: string; n: string | null; f: string | null; t: string | null }>(
-          "SELECT id, json_extract(fields, '$.name') AS n, json_extract(fields, '$.from') AS f, json_extract(fields, '$.to') AS t FROM entry WHERE register = 'trips' AND deleted_at IS NULL AND substr(coalesce(json_extract(fields, '$.to'), json_extract(fields, '$.from')), 1, 10) >= ? ORDER BY json_extract(fields, '$.from') LIMIT ?",
-          today,
-          CHOICES_MOST,
-        ))
-        /* A NAME WITH A QUOTE IN IT IS LEFT OUT: the widget finds its trip by name, written in quotes. */
-        .flatMap((r) => (typeof r.n === 'string' && r.n.trim() !== '' && !r.n.includes('"') && typeof (r.t ?? r.f) === 'string' ? [{ name: r.n, until: String(r.t ?? r.f).slice(0, 10) }] : []));
-      out.trip = trips.map((t) => t.name);
-      out.trip_until = trips.map((t) => t.until);
-    }
-    if (lists.has('things'))
-      out.project = seen(ctx, 'things', sql
-        .all<{ id: string; n: string | null }>(
-          "SELECT id, json_extract(fields, '$.name') AS n FROM entry WHERE register = 'things' AND deleted_at IS NULL AND coalesce(json_extract(fields, '$.lane'), '') NOT IN ('retired', 'parked') ORDER BY updated_at DESC LIMIT ?",
-          CHOICES_MOST,
-        ))
-        .flatMap((r) => (typeof r.n === 'string' && r.n.trim() !== '' ? [r.n] : []));
-    if (lists.has('fx'))
-      out.currency = [
-        ...new Set(
-          seen(ctx, 'fx', sql.all<{ id: string; c: string | null }>("SELECT id, json_extract(fields, '$.currency') AS c FROM entry WHERE register = 'fx' AND deleted_at IS NULL ORDER BY c"))
-            .flatMap((r) => (typeof r.c === 'string' && r.c !== '' ? [r.c] : [])),
-        ),
-      ].slice(0, CHOICES_MOST);
-    /* THE DOLLAR FIRST WHERE IT IS KEPT: "what a dollar is worth" is the rate most asked. */
-    if (out.currency?.includes('USD')) out.currency = ['USD', ...out.currency.filter((c) => c !== 'USD')];
+    const asked = new Map<string, NonNullable<WidgetTemplate['blanks']>[number]>();
+    for (const t of templates)
+      for (const b of t.blanks ?? []) {
+        const list = b.from?.source.startsWith('register.') ? b.from.source.slice('register.'.length) : null;
+        if (b.from !== undefined && list !== null && lists.has(list) && !asked.has(b.id)) asked.set(b.id, b);
+      }
+    if (asked.size === 0 || deps.previewAs === undefined) return out;
+    const blanks = [...asked.values()];
+    const blocks = blanks.map((b) => {
+      const f = b.from!;
+      return {
+        kind: 'table',
+        source: f.source,
+        ...(f.where !== undefined ? { where: f.where } : {}),
+        ...(f.order !== undefined ? { order: f.order } : {}),
+        columns: [f.field, ...(f.until ? [f.until] : []), ...(f.starts ? [f.starts] : [])].map((field) => ({ field })),
+        limit: CHOICES_READ,
+      };
+    });
+    const drawn = await drawAll(blocks, ctx);
+    blanks.forEach((b, i) => {
+      const f = b.from!;
+      const d = drawn[i];
+      const rows = isBag(d) && Array.isArray(d.rows) ? (d.rows as unknown[]) : [];
+      const names: string[] = [];
+      const until: string[] = [];
+      const starts: string[] = [];
+      for (const r of rows) {
+        const fields = isBag(r) && isBag(r.fields) ? r.fields : null;
+        const name = fields?.[f.field];
+        if (typeof name !== 'string' || name.trim() === '' || name.includes('"') || names.includes(name)) continue;
+        const day = (field: string | undefined): string => (field !== undefined && typeof fields?.[field] === 'string' ? String(fields[field]).slice(0, 10) : '');
+        if (f.until !== undefined && day(f.until) === '' && day(f.starts) === '') continue;
+        names.push(name);
+        until.push(day(f.until) || day(f.starts));
+        starts.push(day(f.starts));
+        if (names.length >= CHOICES_MOST) break;
+      }
+      /* THE DOLLAR FIRST WHERE IT IS KEPT: "what a dollar is worth" is the rate most asked. */
+      if (b.id === 'currency' && names.includes('USD')) names.splice(0, names.length, 'USD', ...names.filter((c) => c !== 'USD'));
+      out[b.id] = names;
+      if (f.until !== undefined) out[`${b.id}_until`] = until;
+      if (f.starts !== undefined) out[`${b.id}_starts`] = starts;
+    });
     return out;
   };
 
-  /** What a sentence may name, for the rules: projects and currencies as the blanks have them, categories and payees. */
-  const choicesFor = (ctx: CallContext, lists: ReadonlySet<string>): Omit<ComposeChoices, 'lists' | 'figures'> => {
-    const names = (register: string, where = ''): string[] =>
-      lists.has(register)
+  /**
+   * What a sentence may name, for the rules: the projects, the categories and the payees, each the list a link of the
+   * to-do list or the ledger points at (`ledgerOf`, `todoOf`), and the currencies as the blanks have them.
+   */
+  const choicesFor = (ctx: CallContext, lists: ReadonlySet<string>, choices: Record<string, string[]>): Omit<ComposeChoices, 'lists' | 'figures'> => {
+    const shapes = [...kernel.registers().values()].filter((r) => lists.has(r.id)) as unknown as Shape[];
+    const ledger = ledgerOf(shapes);
+    const todo = todoOf(shapes);
+    const names = (register: string | null): string[] =>
+      register !== null && lists.has(register)
         ? [
             ...new Set(
-              seen(ctx, register, sql.all<{ id: string; n: string | null }>(`SELECT id, json_extract(fields, '$.name') AS n FROM entry WHERE register = ? AND deleted_at IS NULL ${where}`, register))
+              seen(ctx, register, sql.all<{ id: string; n: string | null }>(`SELECT id, json_extract(fields, '$.name') AS n FROM entry WHERE register = ? AND deleted_at IS NULL`, register))
                 .flatMap((r) => (typeof r.n === 'string' && r.n.trim() !== '' ? [r.n] : [])),
             ),
           ].slice(0, 200)
         : [];
-    const c = choicesOf(ctx, lists);
-    return { projects: names('things'), currencies: c.currency ?? [], categories: names('categories'), payees: names('organisations') };
+    return {
+      projects: names(linkOf(todo, 'thing')),
+      currencies: choices.currency ?? [],
+      categories: names(linkOf(ledger, 'category')),
+      payees: names(linkOf(ledger, 'party')),
+      ...(ledger !== undefined ? { ledger: ledger.id } : {}),
+      ...(todo !== undefined ? { todo: todo.id } : {}),
+    };
   };
 
   /** A template's blanks filled with the first of each one's choices. */
@@ -327,11 +432,14 @@ export function methods(deps: RecordDeps) {
     return out;
   };
 
-  /** What fills a widget the record cannot draw yet, said plainly. */
-  const needSaid = (t: WidgetTemplate, addons: ReadonlySet<string>, addonName: (id: string) => string = (id) => WIDGET_ADDONS[id] ?? id): string => {
+  /**
+   * What fills a widget the record cannot draw yet, said plainly: its own sentence where it declares one (an add-on every
+   * record starts with fills in by being used), else the add-on that brings it, else keeping what it shows.
+   */
+  const needSaid = (t: WidgetTemplate, addons: ReadonlySet<string>, addonName: (id: string) => string = (id) => id): string => {
+    if (t.fills !== undefined) return t.fills;
     const addon = t.needs.addon;
-    if (addon !== undefined && !addons.has(addon) && addon !== 'money-core') return `Comes with ${addonName(addon)}.`;
-    if (addon === 'money-core') return 'Fills in once you add an account.';
+    if (addon !== undefined && !addons.has(addon)) return `Comes with ${addonName(addon)}.`;
     return 'Fills in once you start keeping what it shows.';
   };
 
@@ -342,19 +450,24 @@ export function methods(deps: RecordDeps) {
     const prefs = kernel.prefsOf(person) as Bag;
     if (prefs['pen.suggest'] === false) return [];
     const { lists, figures, addons } = holds(ctx);
-    const choices = choicesOf(ctx, lists);
-    const cat = catalogue();
-    /* HOW MANY BILLS FALL DUE THIS WEEK, as Coming up counts them: one row asked, and the count it matched. */
-    let billsSoon: number | null = null;
-    if (deps.previewAs !== undefined && figures.has('cash-now')) {
+    const cat = await catalogue();
+    const choices = await choicesOf(ctx, lists, cat.all);
+    /* HOW MANY ROWS FALL DUE AS EACH WIDGET THAT DECLARES `due` COUNTS THEM ("bills this week"): one row asked of each, and
+       the count it matched, all in one read. */
+    const dues = new Map<string, number>();
+    const counting = cat.all.filter((t) => t.due !== undefined && typeof t.block.source === 'string' && needsMet(t, { lists, figures }));
+    if (deps.previewAs !== undefined && counting.length > 0) {
       const out = await deps.previewAs(
-        { body: { page: 'widget-signals', title: 'Signals', blocks: [{ kind: 'table', source: 'deadlines', where: 'day after -1d, day before +8d, direction is out', columns: [{ field: 'title' }], limit: 1 }] } },
+        { body: { page: 'widget-signals', title: 'Signals', blocks: counting.map((t) => ({ kind: 'table', source: t.block.source, where: t.due!.where, columns: [{ field: 'title' }], limit: 1 })) } },
         ctx,
       );
-      const block = out.ok && isBag(out.value) && Array.isArray(out.value.blocks) ? out.value.blocks[0] : null;
-      billsSoon = isBag(block) && typeof block.matched === 'number' ? block.matched : null;
+      const blocks = out.ok && isBag(out.value) && Array.isArray(out.value.blocks) ? (out.value.blocks as unknown[]) : [];
+      counting.forEach((t, i) => {
+        const b = blocks[i];
+        if (isBag(b) && typeof b.matched === 'number') dues.set(t.id, b.matched);
+      });
     }
-    const read: SignalRead = { sql, nowMs: clock.now(), person, lists, figures, addons, billsSoon, board, templates: cat.all, addonName: cat.addonName };
+    const read: SignalRead = { sql, nowMs: clock.now(), person, lists, figures, addons, dues, board, templates: cat.all, addonName: cat.addonName };
     const pages = new Map((deps.pagesNow?.() ?? kernel.pages()).map((p) => [String((p as { page?: unknown }).page ?? ''), String((p as { title?: unknown }).title ?? '')] as const));
     const signals = widgetSignals(read, pages, choices.project ?? []);
     const today = new Date(clock.now()).toISOString().slice(0, 10);
@@ -381,6 +494,7 @@ export function methods(deps: RecordDeps) {
           signal: r.signal,
           score: Math.round(r.score * 100) / 100,
           ...(r.asked !== undefined ? { asked: r.asked } : {}),
+          ...(r.signal === 'S1' && (t.asked ?? []).length > 0 ? { asks: t.asked!.map((a) => a.match) } : {}),
         },
       ];
     });
@@ -413,8 +527,8 @@ export function methods(deps: RecordDeps) {
       const group = said.group as WidgetGroup | undefined;
       const q = typeof said.q === 'string' ? said.q : '';
       const { lists, figures, addons } = holds(ctx);
-      const choices = choicesOf(ctx, lists);
-      const cat = catalogue();
+      const cat = await catalogue();
+      const choices = await choicesOf(ctx, lists, cat.all);
       const addonOnly = typeof said.addon === 'string' ? said.addon : undefined;
       const shown = cat.all.filter((t) => (group === undefined || t.group === group) && (addonOnly === undefined || t.needs.addon === addonOnly) && widgetMatches(t, q));
       const ready = shown.filter((t) => needsMet(t, { lists, figures }) && (t.blanks ?? []).every((b) => (choices[b.id]?.length ?? 0) > 0));
@@ -429,7 +543,8 @@ export function methods(deps: RecordDeps) {
         const isReady = readings.has(t.id);
         const block = widgetBlock(t, t.size, filled.get(t.id)!);
         const reading = readings.get(t.id) ?? null;
-        const addon = t.needs.addon !== undefined && t.needs.addon !== 'money-core' ? { id: t.needs.addon, name: cat.addonName(t.needs.addon) } : null;
+        /* A WIDGET THAT FILLS IN BY BEING USED IS NOBODY'S TO ADD (`fills`): no add-on is named for it. */
+        const addon = t.needs.addon !== undefined && t.fills === undefined ? { id: t.needs.addon, name: cat.addonName(t.needs.addon) } : null;
         return {
           id: t.id,
           title: t.title,
@@ -454,6 +569,8 @@ export function methods(deps: RecordDeps) {
           need: isReady && reading !== null ? null : needSaid(t, addons, cat.addonName),
           reading,
           example: t.example,
+          ...(t.words !== undefined ? { words: [...t.words] } : {}),
+          template: { block: { ...t.block }, ...(t.blanks !== undefined ? { blanks: [...t.blanks] } : {}), ...(t.rows !== undefined ? { rows: t.rows } : {}) },
         };
       });
       const suggested = addonOnly !== undefined ? [] : await offersFor(ctx, boardOf(said.board), false).catch(() => []);
@@ -497,8 +614,10 @@ export function methods(deps: RecordDeps) {
 
       /* THE RULES, unless this changes a widget, the rules' answer was turned down, or it is to be drawn. */
       if (a.from === undefined && !drawing) {
-        const choices: ComposeChoices = { ...choicesFor(ctx, lists), lists, figures };
-        const made = composeWidget(said, choices);
+        const cat = await catalogue();
+        const blanks = await choicesOf(ctx, lists, cat.all);
+        const choices: ComposeChoices = { ...choicesFor(ctx, lists, blanks), lists, figures };
+        const made = composeWidget(said, choices, cat.all);
         if (made !== null && !turned.has(JSON.stringify(stripDraft(made.block)))) {
           const { drawn, fix } = await draw(made.block);
           if (fix === null)
@@ -507,9 +626,9 @@ export function methods(deps: RecordDeps) {
       }
 
       /* A CATALOGUE WIDGET IT NAMES THAT AN ADD-ON BRINGS, on a record without the add-on: said, not guessed at. */
-      const cat = catalogue();
-      const named = a.from === undefined ? cat.byId(askedWidget(said) ?? '') : undefined;
-      if (named !== undefined && !needsMet(named, { lists, figures }) && named.needs.addon !== undefined && named.needs.addon !== 'money-core')
+      const cat = await catalogue();
+      const named = a.from === undefined ? cat.byId(askedWidget(said, cat.all) ?? '') : undefined;
+      if (named !== undefined && !needsMet(named, { lists, figures }) && named.needs.addon !== undefined && named.fills === undefined)
         return no('PACK_REQUIRED', `${named.title} comes with ${cat.addonName(named.needs.addon)}. Add it from Add-ons, then ask again.`, { at: 'said' });
 
       /* THE MODEL, an owner's in a browser, as Slash's drafting is. */
@@ -554,7 +673,7 @@ export function methods(deps: RecordDeps) {
       });
     },
 
-    async widgetSuggest(args: { board?: unknown; cell?: unknown }, ctx: CallContext): Promise<Result<{ offers: WidgetOffer[]; starter: typeof STARTER_BOARDS }>> {
+    async widgetSuggest(args: { board?: unknown; cell?: unknown }, ctx: CallContext): Promise<Result<{ offers: WidgetOffer[] }>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const said = (args ?? {}) as Bag;
@@ -562,7 +681,7 @@ export function methods(deps: RecordDeps) {
       if (said.cell !== undefined && typeof said.cell !== 'boolean') return no('VALUE_MALFORMED', 'cell is true for the one offer Today shows at its end.', { at: 'cell' });
       if (said.board !== undefined && !Array.isArray(said.board)) return no('VALUE_MALFORMED', "board is the board's widgets, each with its key, source and whether it drew nothing.", { at: 'board' });
       const offers = await offersFor(ctx, boardOf(said.board), said.cell === true);
-      return { ok: true, value: { offers: said.cell === true ? offers.slice(0, 1) : offers, starter: STARTER_BOARDS } };
+      return { ok: true, value: { offers: said.cell === true ? offers.slice(0, 1) : offers } };
     },
   };
 }

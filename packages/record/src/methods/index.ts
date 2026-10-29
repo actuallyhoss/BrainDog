@@ -194,6 +194,11 @@ export type RecordDeps = {
   doorBuild?: import('./door.ts').DoorBuild | (() => import('./door.ts').DoorBuild);
   /** The host's catalogue, by id and title, which packsRemoved names a removed add-on by. Absent, it is said by its id. */
   catalogue?: readonly { id: string; title: string }[] | undefined;
+  /**
+   * The host's whole catalogue (`catalogue-offers.ts` `shelfFromCatalogue`): the widget sheet reads the widgets an add-on
+   * the record does not hold yet would bring from its newest published file, for "Comes with". Absent, it offers none.
+   */
+  catalogueShelf?: import('../arrange.ts').CatalogueShelf | undefined;
   /** The operator's cut-off (`TOKENS_VALID_FROM`, `53 §5.11`), so doorHealth counts no key or runner it ended. */
   validFrom?: (() => string | undefined) | undefined;
   /** The record's own checks on a new entry that `create` makes (`mergeShaped`, `keyHeld`, `huedOf` in `index.ts`), which `capture` asks of each entry. Absent, `capture` refuses only a merge. */

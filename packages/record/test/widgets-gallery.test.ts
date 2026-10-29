@@ -9,11 +9,20 @@ import { createRecordApi, type CallContext } from '../src/index.ts';
 import { widgetOffers, widgetsPaused, type WidgetSignal } from '../src/design-agent.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, installSeed } from '../../seed/src/index.ts';
+import { existsSync, readFileSync } from 'node:fs';
+import { shelfFromCatalogue } from '../src/catalogue-offers.ts';
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 
+/** The catalogue the web app ships, as a host hands it in: where an add-on not held yet says what it would bring. */
+const CATALOGUE = new URL('../../../apps/web/static/catalogue/', import.meta.url);
+const shelf = shelfFromCatalogue((path) => {
+  const at = new URL(path, CATALOGUE);
+  return existsSync(at) ? readFileSync(at, 'utf8') : null;
+});
+
 async function seeded() {
-  const api = (await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) })) as unknown as Record<string, (a: unknown, c: CallContext) => Promise<{ ok: boolean; value: never }>> & { kernel: never };
+  const api = (await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW), catalogueShelf: shelf })) as unknown as Record<string, (a: unknown, c: CallContext) => Promise<{ ok: boolean; value: never }>> & { kernel: never };
   assert.ok((await installSeed(api.kernel)).ok);
   return api;
 }
@@ -78,12 +87,47 @@ test('a widget reading what Today already reads is on the board: the same list a
 });
 
 test('one widget per thing: no two titles alike, the folded ones gone, and the sample rate in the record’s own money', async () => {
-  const { WIDGETS, exampleMoney } = await import('braindog-render');
-  const titles = WIDGETS.map((w) => w.title);
+  const { exampleMoney } = await import('braindog-render');
+  const api = await seeded();
+  const out = await api.widgetGallery!({}, owner);
+  const titles = (out.value as { widgets: { title: string }[] }).widgets.map((w) => w.title);
   assert.equal(new Set(titles).size, titles.length);
-  assert.ok(WIDGETS.length <= 27, `${WIDGETS.length} widgets`);
+  assert.ok(titles.length <= 30, `${titles.length} widgets`);
   for (const gone of ['Bills coming up', 'Cash today', 'Runway', 'Days in a row', 'Next trip']) assert.ok(!titles.includes(gone), gone);
   assert.ok(titles.includes('Cash ahead') && titles.includes('Coming up'));
   assert.equal(exampleMoney('¤fx', 'GBP'), '£1 = $1.27');
   assert.match(exampleMoney('¤fx', 'EGP'), /^\$1 = /u);
+});
+
+test('THE CORE OFFERS ONLY WHAT IT KEEPS ITSELF, and every other widget comes from where it is declared (SHL-A22)', async () => {
+  const { WIDGETS } = await import('braindog-render');
+  assert.deepEqual(WIDGETS.map((w) => w.id), ['needs-you', 'since-last', 'agents-working']);
+  const api = await seeded();
+  const out = await api.widgetGallery!({}, owner);
+  const widgets = (out.value as { widgets: { id: string; addon: { id: string; name: string } | null; need: string | null; ready: boolean }[] }).widgets;
+  const by = (id: string) => widgets.find((w) => w.id === id)!;
+  /* MONEY'S, FROM THE BUILD: nobody's to add, so no add-on is named. */
+  assert.equal(by('cash-today').addon, null);
+  /* AN ADD-ON NOT HELD, FROM THE CATALOGUE: "Comes with" its catalogue name. */
+  for (const [id, name] of [['savings-goal', 'Goals'], ['trip-countdown', 'Trips'], ['subscriptions', 'Subscriptions'], ['tax-aside', 'Tax set aside'], ['weather-today', 'Weather'], ['calendar-next', 'Calendar']] as const) {
+    assert.equal(by(id).ready, false, id);
+    assert.equal(by(id).need, `Comes with ${name}.`, id);
+  }
+  /* AND WITH NO CATALOGUE HANDED IN, an add-on not held brings nothing to the sheet, and the build's own are all there. */
+  const bare = (await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) })) as unknown as Record<string, (a: unknown, c: CallContext) => Promise<{ ok: boolean; value: never }>> & { kernel: never };
+  assert.ok((await installSeed(bare.kernel)).ok);
+  const ids = ((await bare.widgetGallery!({}, owner)).value as { widgets: { id: string }[] }).widgets.map((w) => w.id);
+  assert.ok(ids.includes('cash-today') && ids.includes('people-back') && ids.includes('next-up'));
+  assert.ok(!ids.includes('gold-price'));
+});
+
+test('a question is matched to the widget whose declaration answers it, narrow words first', async () => {
+  const { askedWidget, withShipped } = await import('braindog-render');
+  const { SEED_WIDGETS } = await import('../../seed/src/index.ts');
+  const all = withShipped(SEED_WIDGETS.map((s) => ({ by: { id: s.pack ?? s.usecase!, title: s.title }, widgets: s.widgets })));
+  assert.equal(askedWidget('how long will my cash last', all), 'cash-today');
+  assert.equal(askedWidget('what is my net worth', all), 'net-worth');
+  assert.equal(askedWidget('how much did I spend', all), 'spending');
+  assert.equal(askedWidget('what are the agents working on', all), 'agents-working');
+  assert.equal(askedWidget('the moon', all), null);
 });

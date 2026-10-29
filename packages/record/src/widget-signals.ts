@@ -17,10 +17,16 @@
  * through a shared link are not counted where they are written, so not here either.
  *
  * WHAT IS WEIGHED, KEPT AND BRAKED IS `design-agent.ts`'s (`widgetOffers`). Here is only the reading.
+ *
+ * WHAT EACH WIDGET IS NOTICED FOR IS ITS OWN DECLARATION'S (SHL-A22, 30 October): the question it answers (`asked`), the
+ * pages whose lead it shows (`leads`), a row new in its list (`fresh`), a day close by (`near`) and bills piling up
+ * (`due`). Before, this file held a table of page slugs and widget ids and asked two add-ons' lists by name, so the core
+ * knew Goals and Trips. The one-project widget is the one whose blank is a project, and the key numbers' the one drawn
+ * as the kernel's `kpis` block.
  */
 
 import type { Sql } from '@braindog/ports';
-import { ASKED, WIDGETS, WIDGET_ADDONS, widgetById, type WidgetTemplate } from 'braindog-render';
+import { WIDGETS, askedOf, type WidgetTemplate } from 'braindog-render';
 
 import { WIDGET_YOUNG_DAYS, type WidgetSignal } from './design-agent.ts';
 
@@ -39,11 +45,11 @@ export type SignalRead = {
   figures: ReadonlySet<string>;
   /** The add-ons the record has installed, by id. */
   addons: ReadonlySet<string>;
-  /** How many bills fall due in the next seven days, as `deadlines` counts them; `null` when not read. */
-  billsSoon: number | null;
+  /** For each widget that declares `due`, how many of its rows fall due as it says, by widget id; absent where not read. */
+  dues?: ReadonlyMap<string, number>;
   /** The board's widgets as drawn now: each one's key, what it reads, and whether it drew nothing. */
   board: readonly BoardRead[];
-  /** The catalogue with the widgets installed add-ons ship (`withShipped`), and each add-on's name. Absent, the catalogue's own. */
+  /** The catalogue with the widgets the add-ons ship (`withShipped`), and each add-on's name. Absent, the core's own. */
   templates?: readonly WidgetTemplate[];
   addonName?: (id: string) => string;
 };
@@ -55,6 +61,14 @@ export type BoardRead = { key: string; heading?: string; source?: string; where?
 export function needsMet(t: WidgetTemplate, read: Pick<SignalRead, 'lists' | 'figures'>): boolean {
   return (t.needs.lists ?? []).every((l) => read.lists.has(l)) && (t.needs.figures ?? []).every((f) => read.figures.has(f));
 }
+
+/** The widget of one project: the first whose blank is a project. */
+const ofProject = (templates: readonly WidgetTemplate[]): WidgetTemplate | undefined => templates.find((t) => (t.blanks ?? []).some((b) => b.id === 'project'));
+const byId = (read: SignalRead, id: string): WidgetTemplate | undefined => (read.templates ?? WIDGETS).find((t) => t.id === id);
+/** The list a widget's block reads, by id, or `null` for one over something the record keeps for itself. */
+const listOf = (t: WidgetTemplate): string | null => (typeof t.block.source === 'string' && t.block.source.startsWith('register.') ? t.block.source.slice('register.'.length) : null);
+/** A row's field as SQLite reads it out of the row's fields. Fields are checked as plain words where they are declared. */
+const at = (field: string): string => `$.${field.replace(/[^a-z0-9_]/gu, '')}`;
 
 /* ── S1: a question asked again ─────────────────────────────────────────────────────────────────────────────────── */
 
@@ -83,23 +97,33 @@ function askedAgain(read: SignalRead, projects: readonly string[]): WidgetSignal
     /* A RECORD SLASH NEVER SPOKE ON HAS NO THREADS YET: nothing asked. */
     return [];
   }
+  const templates = read.templates ?? WIDGETS;
+  const asks = askedOf(templates);
+  /* A QUESTION NAMING A PROJECT IS ABOUT THAT PROJECT unless it asks after something else: words that only ask what the
+     one-project widget already shows ("Kiln tasks") do not take it elsewhere. */
+  const pulse = ofProject(templates);
+  const within = new Set(pulse?.needs.lists ?? []);
+  const shows = (id: string): boolean => {
+    const t = templates.find((x) => x.id === id);
+    return t !== undefined && (t.needs.lists ?? []).length > 0 && (t.needs.lists ?? []).every((l) => within.has(l));
+  };
   const by = new Map<string, { widget: string; blank?: { id: string; value: string }; days: Set<string>; newest: string; text: string; about: string }>();
   for (const r of rows) {
     const text = String(r.text);
-    const project = projects.find((p) => p.length > 2 && new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\b`, 'iu').test(text));
-    const hit = project !== undefined && !ASKED.some((a) => a.widget !== 'next-up' && a.re.test(text)) ? { widget: 'project-pulse', about: project } : ASKED.find((a) => a.re.test(text));
+    const project = pulse === undefined ? undefined : projects.find((p) => p.length > 2 && new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\b`, 'iu').test(text));
+    const hit = project !== undefined && !asks.some((a) => !shows(a.widget) && a.re.test(text)) ? { widget: pulse!.id, about: project } : asks.find((a) => a.re.test(text));
     if (hit === undefined) continue;
-    const key = project !== undefined && hit.widget === 'project-pulse' ? `project-pulse:${project}` : hit.widget;
+    const onProject = project !== undefined && hit.widget === pulse?.id;
+    const key = onProject ? `${hit.widget}:${project}` : hit.widget;
     const day = String(r.ts).slice(0, 10);
     const was = by.get(key);
-    if (was === undefined)
-      by.set(key, { widget: hit.widget, ...(hit.widget === 'project-pulse' ? { blank: { id: 'project', value: project! } } : {}), days: new Set([day]), newest: day, text, about: hit.about });
+    if (was === undefined) by.set(key, { widget: hit.widget, ...(onProject ? { blank: { id: 'project', value: project! } } : {}), days: new Set([day]), newest: day, text, about: hit.about });
     else was.days.add(day);
   }
   const out: WidgetSignal[] = [];
   for (const g of by.values()) {
     if (g.days.size < ASKED_ON_DAYS) continue;
-    const t = widgetById(g.widget);
+    const t = byId(read, g.widget);
     if (t === undefined || !needsMet(t, read)) continue;
     out.push({ signal: 'S1', widget: g.widget, ...(g.blank ? { blank: g.blank } : {}), why: `You asked “${quoted(g.text)}” on ${g.days.size} days this month.`, seen: g.newest, draws: true, asked: g.days.size });
   }
@@ -108,26 +132,12 @@ function askedAgain(read: SignalRead, projects: readonly string[]): WidgetSignal
 
 /* ── S2 and S5: places opened often ─────────────────────────────────────────────────────────────────────────────── */
 
-/** The pages whose lead a widget shows, by slug. */
-export const PAGE_WIDGETS: Readonly<Record<string, string>> = {
-  money: 'cash-today',
-  budgets: 'budget-left',
-  spending: 'spending',
-  goals: 'savings-goal',
-  people: 'people-back',
-  work: 'next-up',
-  'work-board': 'next-up',
-  holdings: 'net-worth',
-  trips: 'trip-countdown',
-  subscriptions: 'subscriptions',
-  splits: 'splits',
-  'tax-set-aside': 'tax-aside',
-  receipts: 'receipts',
-  'savings-circles': 'savings-circle',
-  portfolio: 'projects',
-  'all-numbers': 'numbers',
-  agents: 'agents-working',
-};
+/** The pages whose lead a widget shows, by slug, as each widget declares them (`leads`): the first to claim a page has it. */
+export function pageWidgets(templates: readonly WidgetTemplate[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const t of templates) for (const slug of t.leads ?? []) if (!out.has(slug)) out.set(slug, t.id);
+  return out;
+}
 
 /** S2: opened this many times on this many days in fourteen. */
 export const OPENS = { times: 5, days: 3, within: 14 } as const;
@@ -155,20 +165,22 @@ function openedOften(read: SignalRead, pages: ReadonlyMap<string, string>, proje
   const week = dayOf(read.nowMs - DAILY.within * DAY_MS);
   const out: WidgetSignal[] = [];
   const bySlug = new Map(projects.map((p) => [slugOf(p), p] as const));
+  const templates = read.templates ?? WIDGETS;
+  const leads = pageWidgets(templates);
+  const pulse = ofProject(templates);
   for (const r of rows) {
     const subject = String(r.subject).replace(/^page\./u, '');
     /* S5: A PROJECT OPENED EVERY DAY, read over the last seven days alone. */
     const project = bySlug.get(subject);
     if (project !== undefined) {
       const daily = read.sql.one<{ d: number }>(`SELECT count(DISTINCT day) AS d FROM ${o.from} WHERE kind = 'page.render' AND subject = ? AND day >= ?${andWho(o)}`, r.subject, week, ...o.who)?.d ?? 0;
-      const t = widgetById('project-pulse');
-      if (daily >= DAILY.days && t !== undefined && needsMet(t, read))
-        out.push({ signal: 'S5', widget: 'project-pulse', blank: { id: 'project', value: project }, why: `You open ${project} every day.`, seen: String(r.last), draws: true });
+      if (daily >= DAILY.days && pulse !== undefined && needsMet(pulse, read))
+        out.push({ signal: 'S5', widget: pulse.id, blank: { id: 'project', value: project }, why: `You open ${project} every day.`, seen: String(r.last), draws: true });
       continue;
     }
-    const widget = PAGE_WIDGETS[subject];
+    const widget = leads.get(subject);
     if (widget === undefined || Number(r.n) < OPENS.times || Number(r.days) < OPENS.days) continue;
-    const t = widgetById(widget);
+    const t = byId(read, widget);
     if (t === undefined || !needsMet(t, read)) continue;
     const title = pages.get(subject) ?? t.title;
     out.push({ signal: 'S2', widget, why: `You opened ${title} on ${Number(r.days)} days in the last two weeks.`, seen: String(r.last), draws: true });
@@ -193,27 +205,28 @@ function somethingNew(read: SignalRead): WidgetSignal[] {
     /* THE ADD-ON'S FIRST WIDGET THE RECORD CAN FILL NOW, the catalogue's or one the add-on ships itself: offering one it
        cannot draw would be an empty frame. */
     const t = (read.templates ?? WIDGETS).find((w) => w.needs.addon === id && needsMet(w, read));
-    const name = WIDGET_ADDONS[id] ?? read.addonName?.(id);
+    const name = read.addonName?.(id);
     if (name === undefined) continue;
     if (t === undefined) continue;
     out.push({ signal: 'S3', widget: t.id, why: `You added ${name}. ${t.title} can sit on Today.`, seen: String(e.ts).slice(0, 10), draws: true });
   }
-  if (read.lists.has('money_goals')) {
-    const goal = read.sql.one<{ name: string | null; at: string }>(
-      "SELECT json_extract(fields, '$.name') AS name, created_at AS at FROM entry WHERE register = 'money_goals' AND deleted_at IS NULL AND created_at >= ? ORDER BY created_at DESC LIMIT 1",
+  /* A ROW NEW IN A LIST A WIDGET SAYS IT NOTICES (`fresh`): a savings goal just set, said in the widget's own words. */
+  for (const t of read.templates ?? WIDGETS) {
+    const list = t.fresh === undefined ? null : listOf(t);
+    if (list === null || !read.lists.has(list) || !needsMet(t, read)) continue;
+    const row = read.sql.one<{ name: string | null; at: string }>(
+      "SELECT json_extract(fields, '$.name') AS name, created_at AS at FROM entry WHERE register = ? AND deleted_at IS NULL AND created_at >= ? ORDER BY created_at DESC LIMIT 1",
+      list,
       since,
     );
-    if (goal !== undefined)
-      out.push({ signal: 'S3', widget: 'savings-goal', why: goal.name ? `You started saving for ${goal.name}.` : 'You set a new savings goal.', seen: String(goal.at).slice(0, 10), draws: true });
+    if (row !== undefined)
+      out.push({ signal: 'S3', widget: t.id, why: row.name ? t.fresh!.says.replace(/\{\{name\}\}/gu, row.name) : t.fresh!.unnamed, seen: String(row.at).slice(0, 10), draws: true });
   }
   return out;
 }
 
 /* ── S4: time ──────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-/** S4: this many bills inside seven days, a trip inside this many days. */
-export const BILLS_SOON = 3;
-export const TRIP_WITHIN = 14;
 
 const SAY_COUNT = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const counted = (n: number): string => SAY_COUNT[n] ?? n.toLocaleString('en');
@@ -221,18 +234,29 @@ const counted = (n: number): string => SAY_COUNT[n] ?? n.toLocaleString('en');
 function comingUp(read: SignalRead): WidgetSignal[] {
   const today = dayOf(read.nowMs);
   const out: WidgetSignal[] = [];
-  const bills = widgetById('coming-up');
-  if (read.billsSoon !== null && read.billsSoon >= BILLS_SOON && bills !== undefined && needsMet(bills, read))
-    out.push({ signal: 'S4', widget: 'coming-up', why: `${counted(read.billsSoon)} bills fall due this week.`, seen: today, draws: true });
-  if (read.lists.has('trips')) {
-    const trip = read.sql.one<{ name: string | null; from: string }>(
-      "SELECT json_extract(fields, '$.name') AS name, json_extract(fields, '$.from') AS \"from\" FROM entry WHERE register = 'trips' AND deleted_at IS NULL AND json_extract(fields, '$.from') >= ? AND json_extract(fields, '$.from') <= ? ORDER BY json_extract(fields, '$.from') LIMIT 1",
+  for (const t of read.templates ?? WIDGETS) {
+    /* BILLS PILING UP: as many rows as the widget says make a reason, counted as it says (`due`). */
+    const due = read.dues?.get(t.id);
+    if (t.due !== undefined && due !== undefined && due >= t.due.least && needsMet(t, read))
+      out.push({ signal: 'S4', widget: t.id, why: t.due.says.replace(/\{\{count\}\}/gu, counted(due)), seen: today, draws: true });
+    /* A DAY CLOSE BY: the soonest row of its list starting inside the days it says (`near`), a trip inside a fortnight. */
+    const list = t.near === undefined ? null : listOf(t);
+    if (list === null || !read.lists.has(list)) continue;
+    const near = t.near!;
+    const row = read.sql.one<{ name: string | null; from: string }>(
+      `SELECT json_extract(fields, ?) AS name, json_extract(fields, ?) AS "from" FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, ?) >= ? AND json_extract(fields, ?) <= ? ORDER BY json_extract(fields, ?) LIMIT 1`,
+      at(near.name ?? 'name'),
+      at(near.day),
+      list,
+      at(near.day),
       today,
-      dayOf(read.nowMs + TRIP_WITHIN * DAY_MS),
+      at(near.day),
+      dayOf(read.nowMs + near.within * DAY_MS),
+      at(near.day),
     );
-    if (trip !== undefined) {
-      const days = Math.max(0, Math.round((Date.parse(`${trip.from}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / DAY_MS));
-      out.push({ signal: 'S4', widget: 'trip-countdown', why: `${trip.name ?? 'Your trip'} is ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`}.`, seen: today, draws: true });
+    if (row !== undefined) {
+      const days = Math.max(0, Math.round((Date.parse(`${row.from}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / DAY_MS));
+      out.push({ signal: 'S4', widget: t.id, why: `${row.name ?? near.unnamed} is ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`}.`, seen: today, draws: true });
     }
   }
   return out;
@@ -245,9 +269,10 @@ function pinned(read: SignalRead): WidgetSignal[] {
   const pin = read.sql.one<{ name: string | null; at: string }>(
     "SELECT json_extract(fields, '$.name') AS name, updated_at AS at FROM entry WHERE register = 'kpis' AND deleted_at IS NULL AND json_extract(fields, '$.today') = 'pinned' ORDER BY updated_at DESC LIMIT 1",
   );
-  const t = widgetById('numbers');
+  /* THE WIDGET DRAWN AS THE KERNEL'S KEY NUMBERS, whichever add-on brings it. */
+  const t = (read.templates ?? WIDGETS).find((w) => w.block.kind === 'kpis');
   if (pin === undefined || t === undefined || !needsMet(t, read)) return [];
-  return [{ signal: 'S5', widget: 'numbers', why: pin.name ? `You pinned ${pin.name}.` : 'You pinned a key number.', seen: String(pin.at).slice(0, 10), draws: true }];
+  return [{ signal: 'S5', widget: t.id, why: pin.name ? `You pinned ${pin.name}.` : 'You pinned a key number.', seen: String(pin.at).slice(0, 10), draws: true }];
 }
 
 /* ── S6: a widget that draws nothing ───────────────────────────────────────────────────────────────────────────── */

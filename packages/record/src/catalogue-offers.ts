@@ -96,14 +96,10 @@ const indexOf = async (read: CatalogueReader): Promise<CatalogueIndex | null> =>
 const entryNamed = (index: CatalogueIndex, id: string): IndexEntry | undefined =>
   index.entries.find((e) => installedIdOf(e) === id) ?? index.entries.find((e) => e.kind === 'usecase' && e.id === id);
 
-const shelfEntry = (e: IndexEntry, version: string, modules: readonly string[]): ShelfEntry => ({
-  id: installedIdOf(e),
-  kind: e.kind,
-  title: e.title,
-  summary: e.summary,
-  version,
-  modules,
-});
+const shelfEntry = (e: IndexEntry, version: string, modules: readonly string[]): ShelfEntry => {
+  const widgets = e.versions.find((v) => v.version === version)?.reach?.widgets ?? [];
+  return { id: installedIdOf(e), kind: e.kind, title: e.title, summary: e.summary, version, modules, ...(widgets.length > 0 ? { widgets } : {}) };
+};
 
 /**
  * THE HOST'S WHOLE CATALOGUE, AS THE ARRANGER READS IT (`ArrangeDeps.shelf`). The arranger found an add-on only in the

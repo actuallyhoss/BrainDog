@@ -273,7 +273,16 @@ export async function planAgain(d: { kernel: Kernel; installed: () => Installed;
 }
 
 /** One current entry of the host's whole catalogue: `id` is the pack id a record holds it under, `modules` what goes in first. */
-export type ShelfEntry = { id: string; kind: 'pack' | 'usecase'; title: string; summary: string; version: string; modules: readonly string[] };
+export type ShelfEntry = {
+  id: string;
+  kind: 'pack' | 'usecase';
+  title: string;
+  summary: string;
+  version: string;
+  modules: readonly string[];
+  /** The widgets its newest version ships for the sheet, by title, as the index lists them; absent when it ships none. */
+  widgets?: readonly string[];
+};
 
 /** A shelf entry with its document, fetched and held to its checksum and signature. */
 export type ShelfFetched = ShelfEntry & { doc: Record<string, unknown> };
