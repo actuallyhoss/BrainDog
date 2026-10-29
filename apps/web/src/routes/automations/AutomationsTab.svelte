@@ -160,7 +160,7 @@
 
   /* BRAINDOG'S OWN UPKEEP IS LEFT OUT UNTIL ASKED FOR (`isUpkeep`), so the list is the rules that do his work. */
   let upkeepShown = $state(false);
-  const upkeep = $derived(rows.filter(isUpkeep).length);
+  const upkeep = $derived(rows.filter((r) => isUpkeep(r)).length);
   const listedRows = $derived(upkeepShown ? rows : rows.filter((r) => !isUpkeep(r)));
   const on = $derived(listedRows.filter((r) => placed.get(r.id) ?? r.enabled).map(rowOf));
   const off = $derived(listedRows.filter((r) => !(placed.get(r.id) ?? r.enabled)).map(rowOf));

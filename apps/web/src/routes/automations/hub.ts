@@ -19,6 +19,7 @@ import { since } from 'braindog-render';
 
 import { VERB_LABELS, words as flowWords } from '../../lib/flow/flow.ts';
 import { lastSaid, lasted } from '../../lib/flow/source.ts';
+import { REGISTERS } from '../../lib/record/held.ts';
 import { humanize, ruleNameSaid } from '../../lib/record/names.ts';
 
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
@@ -262,10 +263,21 @@ function counted(on: readonly AutomationRow[]): number | null {
 /**
  * BRAINDOG'S OWN UPKEEP, NOT HIS (Q30 of 29 October): the rules that look after the machines a record is copied to,
  * which nobody set up and nobody needs to switch. Left out of the list by default, and one press shows them.
+ *
+ * TOLD BY WHAT THE ADD-ON DECLARES, never by its name: an add-on one of whose lists plays the agents' `carry` role
+ * (`AGENT_ROLES` in the kernel's `roles.ts`, what each machine carries to the next) keeps the machines, and every rule
+ * it brings or that runs over one of its lists is that upkeep. A list this tab has no declaration for is his.
  */
-const OWN_PACKS = new Set(['setup-sync']);
-export const isUpkeep = (r: Pick<AutomationRow, 'pack' | 'register'>): boolean =>
-  (r.pack !== null && r.pack !== undefined && OWN_PACKS.has(r.pack)) || (r.register !== null && /^sync_/u.test(r.register));
+export function upkeepPacks(decls: Iterable<{ pack?: string | undefined }>): Set<string> {
+  const out = new Set<string>();
+  for (const d of decls) if ((d as { role?: unknown }).role === 'carry' && typeof d.pack === 'string') out.add(d.pack);
+  return out;
+}
+export const isUpkeep = (r: Pick<AutomationRow, 'pack' | 'register'>, decls: Readonly<Record<string, { pack?: string | undefined }>> = REGISTERS): boolean => {
+  const own = upkeepPacks(Object.values(decls));
+  const listPack = r.register !== null && r.register !== undefined ? decls[r.register]?.pack : undefined;
+  return (r.pack !== null && r.pack !== undefined && own.has(r.pack)) || (listPack !== undefined && own.has(listPack));
+};
 
 /** Past this many rules on one list, the sentence names them apart: a record that files by payee grows one a payee. */
 export const ONE_LIST_MANY = 10;
