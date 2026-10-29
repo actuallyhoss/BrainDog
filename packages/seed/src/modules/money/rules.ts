@@ -14,6 +14,7 @@ import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { BUDGET_WATCH_SCRIPT } from './scripts/budget-watch.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { FILE_BACK_SCRIPT } from './scripts/file-back.js';
+import { FILE_PAID_RULE, FILE_PAID_SCRIPT } from './scripts/file-paid.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
 import { OFFER_BUDGETS_SCRIPT } from './scripts/offer-budgets.js';
@@ -354,6 +355,9 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   /* A DELETED PAYMENT REOPENS WHAT IT PAID (unsettle-92): `payment-unsettles` recounts the bill without it. */
   UNSETTLE_RULE,
   UNSETTLE_SCRIPT,
+  /* A PAID BILL IS SPENDING (file-paid, 30 October): its payment filed under Transfers is filed under the bill's category. */
+  FILE_PAID_RULE,
+  FILE_PAID_SCRIPT,
   ...MOVE_LINE,
   ...CARD_OWED,
   /**

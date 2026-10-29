@@ -27,6 +27,7 @@
  */
 
 import { fileable, filingFits, filingWinner, unfiled } from './file-back.js';
+import { BILL_KINDS as KINDS } from './file-paid.js';
 
 /**
  * The words of the question for one payee, its category and how many more would be filed: `{ cause, question, about,
@@ -95,6 +96,16 @@ export default async function run(ctx) {
     return null;
   }
   const under = typeof category.fields.name === 'string' && category.fields.name !== '' ? category.fields.name : 'its category';
+  /* AN ENTRY THE BILL IT PAYS FILED WAS NOT FILED BY HAND (`file_paid`, `settle_matched_line`): it settles a bill whose
+     kind is this category's name, or a repeating line under this category counted a payment on its day. */
+  const bare = (t) => (typeof t === 'string' ? t.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '') : '');
+  const bill = typeof f.settles === 'string' && f.settles !== '' ? await ctx.record.get(f.settles) : null;
+  const kind = bill && typeof bill.fields.category === 'string' ? bill.fields.category : '';
+  const byBill = kind !== '' && [bare(kind), bare(KINDS[kind])].includes(bare(category.fields.name));
+  if (byBill || (typeof f.on === 'string' && (await ctx.record.list('recurring', { all: [{ field: 'category', is: category.id }, { field: 'last_paid', is: f.on }] })).length > 0)) {
+    ctx.log(`The entry for ${whom} was filed by what it pays, so nothing was asked.`);
+    return null;
+  }
 
   /* A RULE THAT IS ON AND NAMES THIS TEXT WHOLE, FOR THIS WAY, IS ALREADY THE ANSWER, or one Yes would tie with. */
   const rivals = [];
@@ -161,7 +172,7 @@ export const LEARN_CATEGORY_SCRIPT = {
   runs: { rule: true },
   egress: [],
   keys: [],
-  reads: ['transactions', 'categories', 'filing_rules'],
+  reads: ['transactions', 'categories', 'filing_rules', 'obligations', 'recurring'],
   writes: ['filing_rules'],
   limits: { cpu_ms: 1000, wall_ms: 30000 },
   source: `${filingFits.toString()}
@@ -169,5 +180,6 @@ ${filingWinner.toString()}
 ${fileable.toString()}
 ${unfiled.toString()}
 ${learnAsk.toString()}
+const KINDS = ${JSON.stringify(KINDS)};
 export default ${run.toString()}`,
 };

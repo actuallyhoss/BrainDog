@@ -6,6 +6,7 @@
 import { CASH_LEGS } from './legs.ts';
 import matchRun, { matchPayment } from './scripts/match-payment.js';
 import { settle } from './scripts/settle.js';
+import { BILL_KINDS, categoriesFor, fileUnder } from './scripts/file-paid.js';
 
 /** WHAT THE WALK READS OF A REPEATING LINE TO STEP IT, Cash ahead's own leg (`CASH_LEGS`), written into the script as
  * data since a sandbox imports nothing: the day `ctx.cycle` answers is the day the forecast walks. */
@@ -29,6 +30,9 @@ const LINE_LEG = (({ on, every, ends, days, weekend }) => ({ on, every, ends, da
  * FOR THE SAME MONEY IS MARKED PAID ON THE DAY OF THE ANSWER (`paidBill`): he said the money went, and a bill left open
  * for it read late on Today the morning after.
  * `settle` IS BOUND BY NAME: the Worker's bundle renamed it (`settle3`), and the body below, text, called `settle`.
+ *
+ * A LINE PAID IS SPENDING, SINCE money-core 3.32.2 (file-paid): the payment it counted, filed under a category whose money
+ * stays yours or under none, is filed under the line's own category in the same write (`scripts/file-paid.js`).
  */
 export const SETTLE_LINE_SCRIPT = {
   script: 'settle_matched_line',
@@ -37,10 +41,13 @@ export const SETTLE_LINE_SCRIPT = {
   runs: { rule: true },
   egress: [],
   keys: [],
-  reads: ['obligations', 'installments', 'recurring', 'transactions'],
+  reads: ['categories', 'obligations', 'installments', 'recurring', 'transactions'],
   writes: ['obligations', 'recurring', 'transactions'],
   source: `${matchPayment.toString()}
 const settle = ${settle.toString()};
+const fileUnder = ${fileUnder.toString()};
+const categoriesFor = ${categoriesFor.toString()};
+const KINDS = ${JSON.stringify(BILL_KINDS)};
 const find = ${matchRun.toString()};
 const LEG = ${JSON.stringify(LINE_LEG)};
 export default async function run(ctx) {
@@ -100,6 +107,12 @@ export default async function run(ctx) {
   if (!paymentRow || !lineRow || !Number.isSafeInteger(paymentRow.seq)) return null;
   const payment = shaped('transactions#' + paymentRow.seq, paymentRow);
   const out = settle(shaped(at, lineRow), payment, { next: await dayAfter(lineRow.fields), quiet: true });
+  /* COUNTED ON THE LINE, THE PAYMENT IS WHAT THE LINE IS FOR: filed under its category where it was money that stays yours. */
+  if (out.writes) {
+    const categories = await categoriesFor(ctx, payment.fields);
+    const filed = categories ? fileUnder(payment, shaped(at, lineRow), categories, KINDS) : null;
+    if (filed && filed.writes) out.writes.push(...filed.writes), (out.said += ' ' + filed.said);
+  }
   /* SAID ON THE PAYMENT, WHERE IT HOLDS NO NOTE OF ITS OWN: a person's words are never written over. */
   if (out.left && !(typeof payment.fields.note === 'string' && payment.fields.note.trim() !== '')) ctx.update(payment.spoken, { note: out.left }, payment.version);
   return write(out, at);
