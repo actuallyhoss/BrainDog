@@ -44,7 +44,7 @@ export const MONEY_RULES_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'filed-by-rule-30d', gte: 1 },
-      body: '{{rules-filing-30d}} rule(s) filed {{filed-by-rule-30d}} entries in 30 days.',
+      body: '{{rules-filing-30d}} rule(s) filed {{filed-by-rule-30d}} line(s) in 30 days.',
     },
     {
       /* RULES THAT FILED BEFORE AND NOTHING LATELY: said in words, and never "0 rules filed 0". */
