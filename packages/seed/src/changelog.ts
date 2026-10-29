@@ -200,6 +200,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.32.2',
+      notes: 'A payment that pays a bill and was filed under a category whose money stays yours, such as Transfers, is filed under the bill\'s category and counts as spending: the Northwind premium paid by bank transfer goes under Insurance. A category you file by hand is left as it is.',
+    },
+    {
       version: '3.32.1',
       notes: 'Net worth takes away what a plan still has to pay only where what it buys is counted, so two flats paid in parts no longer read as millions owed with nothing owned, and Over time says so under its line. The filing rules count the lines they filed, one or several. An account says what to type in its balance box.',
     },

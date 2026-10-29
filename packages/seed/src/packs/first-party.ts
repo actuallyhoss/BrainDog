@@ -870,12 +870,17 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   counts what it buys (`property-left`) and the Debts add-on's balances, never two flats' sixty parts with neither flat
  *   counted, and Over time says so under its line; the filing rules' line counts lines, one or several; an account's
  *   balance box says what to type. A figure's parts and words, nothing added or taken away, so a patch step.
+ * - money-core 3.32.2 (file-paid, his word of 30 October): a payment that pays a bill or a repeating line and is filed
+ *   under a category whose money stays yours is filed under the bill's category, so it counts as spending
+ *   (`rule.payment-files-paid`, `script.file_paid`, and `script.settle_matched_line` for a line), and a category the bill
+ *   filed offers no filing rule (`script.learn_category`). A rule and its script added, nothing taken away, and every
+ *   record on 3.32.1 gains them as it updates, so a patch step as he asked.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.0',
   portfolio: '1.30.1',
   people: '4.2.1',
-  'money-core': '3.32.1',
+  'money-core': '3.32.2',
   estate: '2.6.0',
   work: '1.20.0',
 };
