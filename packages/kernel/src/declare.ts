@@ -73,6 +73,7 @@ import type { FlowDecl } from './rules.ts';
 import { alsoFault, linkFault } from './rule-link.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
 import { clockOf, isMoneyFormat, isRatioOf, isSumOf, kindOf, pastFault, sumOfFault, TREND_AHEAD_MOST, windowMs, type EvalContext, type MetricDecl, type SumOf } from './metrics.ts';
+import { restatesFault } from './restates.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
@@ -4541,6 +4542,7 @@ const REGISTER_KEYS = [
   'same',
   'role',
   'fade',
+  'restates',
 ] as const;
 
 /**
@@ -6090,6 +6092,14 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       return bad('DECLARATION_INVALID', `${id}'s fade is { field, after }, its field one of this list's day fields${days.length > 0 ? ` (${days.join(', ')})` : ', and it has none'}.`, 'fade.field', days);
     if (typeof f.after !== 'string' || !/^[1-9][0-9]{0,4}d$/u.test(f.after))
       return bad('DECLARATION_INVALID', `${id}'s fade after is a number of days, such as 90d. ${JSON.stringify(f.after)} is not.`, 'fade.after');
+  }
+
+  /* `restates:` NAMES A MONEY FIELD AND A DAY FIELD OF THIS LIST, and what the night's net worth is restated in by them
+     (`restatesOf` in `restates.ts`). The night's field it fills is the night list's to declare, so it is not checked
+     here: a list of prices installed before the night declares the field fills nothing until it does. */
+  if (decl.body.restates !== undefined) {
+    const fault = restatesFault(id, fields as unknown as FieldLike[], decl.body.restates);
+    if (fault) return fault;
   }
 
   /* `hand:` NAMES FIELDS OF THIS LIST OF THE TYPES A HAND WRITES, or pressing "Hand to" would set a person into a text

@@ -596,7 +596,7 @@ import { GROUP_CAP } from './buckets.ts';
 import { convertMinor, RATE_STALE_DAYS, rateFor, ratesFrom } from './fx.ts';
 import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark, markFrozen } from './marks.ts';
 import { laidOf } from './pack-laid.ts';
-import { worthInGrams } from './worth-grams.ts';
+import { restatedWorth } from './restates.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measureLines, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureLatest, MeasureLines, MeasureSeries, RawReading } from './measures.ts';
@@ -9584,7 +9584,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /**
    * NET WORTH ON THE NIGHT, SINCE money-core 3.31.0: what is held beyond cash, what is owed over time, and net worth, in
-   * the night's one currency, then net worth again in dollars and in grams of gold.
+   * the night's one currency, then net worth again in dollars and in whatever units a list of prices declares.
    *
    * ALL OR NOTHING, AND NEVER THE NIGHT ITSELF. A record on an older money-core declares none of these fields, and a row
    * that names a field its list does not hold is refused whole, so they are written only where `snapshots` declares
@@ -9592,9 +9592,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * the bills are still a night worth keeping, and a net worth that adds two currencies is not one.
    *
    * THE STABLE UNITS ARE RESTATEMENTS, each left out on its own when the record holds nothing to restate by. Dollars at
-   * the rate the record holds for the night (the same `rateFor` every figure converts with); grams at what a gram of
-   * 24k gold sells for in Holdings' Gold rates, the newest rate in use, converted the same way when it is kept in
-   * another currency.
+   * the rate the record holds for the night (the same `rateFor` every figure converts with); and by every price a list
+   * declares with `restates:` (`restates.ts`), the newest price in use, converted the same way when it is kept in
+   * another currency, into the night field that list names.
    */
   function worthOfNight(ctx: EvalContext, currency: string, night: string): Record<string, Json> {
     const declared = new Set((registers.get(NIGHT_REGISTER)?.fields ?? []).map((f) => f.id));
@@ -9626,7 +9626,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const usd = into(read.worth!, currency, 'USD');
       if (usd !== null) said.worth_usd = { amount: usd, currency: 'USD' };
     }
-    Object.assign(said, worthInGrams(sql, declared, (id) => registers.has(id), read.worth!, currency, into));
+    const nightFields = new Map((registers.get(NIGHT_REGISTER)?.fields ?? []).filter((f) => f.retired !== true).map((f) => [f.id, f.type] as const));
+    Object.assign(said, restatedWorth(sql, [...registers.values()].map((d) => ({ id: d.id, body: d })), nightFields, read.worth!, currency, into));
     return said;
   }
 
