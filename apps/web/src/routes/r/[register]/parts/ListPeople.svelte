@@ -21,7 +21,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
-  import { foldPeople, folds, lastDayOf, letterPeople, meetsOf, orgFieldOf, roleFieldOf, seenWords, type Member } from '../people.ts';
+  import { foldPeople, folds, lastDayOf, letterPeople, meetsOf, orgFieldOf, roleFieldOf, seenWords, type Member } from '../folk.ts';
   import { daySaid, localDay } from '../[seq]/said.ts';
 
   let {

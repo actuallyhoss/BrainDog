@@ -12,7 +12,7 @@ import type { BlockResult } from './api.ts';
 import { toSegments } from './blocks.ts';
 import { REGISTERS } from './held.ts';
 import { survivorsOf } from './names.ts';
-import { foldedTo, groupCards, type GroupKey } from './people.ts';
+import { foldedTo, groupCards, type GroupKey } from './folk.ts';
 import { refMapOf } from './remote.ts';
 import type { Entry, Fields, RegisterDecl } from './schema.ts';
 

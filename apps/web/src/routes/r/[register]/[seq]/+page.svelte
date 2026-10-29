@@ -127,7 +127,7 @@
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { reachWords } from '../reach.ts';
   import { OWN_TYPES } from '$lib/ui/own.ts';
-  import { knownOf, lastDayOf, meetsOf, orgNameSaid, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../people.ts';
+  import { knownOf, lastDayOf, meetsOf, orgNameSaid, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../folk.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));

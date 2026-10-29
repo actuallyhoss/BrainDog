@@ -1,11 +1,11 @@
 /**
- * `people.ts` `seenOf`: where a person was seen, said in words, with no id and no address left in them.
+ * `folk.ts` `seenOf`: where a person was seen, said in words, with no id and no address left in them.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { keySaid, seenOf } from './people.ts';
+import { keySaid, seenOf } from './folk.ts';
 
 test('A BANK TEXT OR AN IMPORT names no address: the address and the bracket it sat in are taken out', () => {
   const seen = seenOf(['2026-09-02 · paid by jo@kiln.example', '2026-09-03 · imported from contacts (jo.bell+work@kiln.example)', 'met at Kiln <jo@kiln.example>']);

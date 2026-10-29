@@ -15,7 +15,7 @@ import { seqWidth } from '../../../../lib/record/api.ts';
 import { wayField } from '../../../../lib/record/money-way.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
 import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } from '../../../../lib/record/schema.ts';
-import { orgFieldOf, orgRoleOf } from '../people.ts';
+import { orgFieldOf, orgRoleOf } from '../folk.ts';
 import { presenceOf } from '@braindog/kernel';
 
 /**

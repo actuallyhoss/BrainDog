@@ -1,5 +1,5 @@
 <!--
-  A list of organisations, grouped by kind (`people.ts` `foldOrgs`), with how many people are with each.
+  A list of organisations, grouped by kind (`folk.ts` `foldOrgs`), with how many people are with each.
 
   SINCE 29 OCTOBER ("i dont understand why is there organizations under people (4) and organizations page, showing (17)").
   This list is the one place organisations are, and its count is the one the sidebar and People say. So nothing is
@@ -18,7 +18,7 @@
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
   import Face from '$lib/ui/Face.svelte';
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
-  import { foldOrgs, orgFieldOf, orgNameSaid, orgRoleOf, orgsCounted, meetsOf, seenWords, type OrgGroup } from '../people.ts';
+  import { foldOrgs, orgFieldOf, orgNameSaid, orgRoleOf, orgsCounted, meetsOf, seenWords, type OrgGroup } from '../folk.ts';
   import { daySaid } from '../[seq]/said.ts';
 
   let {

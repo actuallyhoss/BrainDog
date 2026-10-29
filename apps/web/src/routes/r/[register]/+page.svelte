@@ -104,7 +104,7 @@
   import ListCards from './parts/ListCards.svelte';
   import ListPeople from './parts/ListPeople.svelte';
   import ListOrgs from './parts/ListOrgs.svelte';
-  import { meetsOf, mergedAway, orgRoleOf } from './people.ts';
+  import { meetsOf, mergedAway, orgRoleOf } from './folk.ts';
   import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
   import { amountField, signedSaid, wayField, wayOf } from '$lib/record/money-way.ts';
   import ListBoard from './parts/ListBoard.svelte';

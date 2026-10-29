@@ -14,7 +14,7 @@
  *
  * A THIRD READS IT NOW: a page's `cards` block that answers `group:` and `fold:` draws its rows in the same groups
  * (`groupCards`), so People on a page reads as the list does. It lives beside the record's other readers for that
- * reason; `routes/r/[register]/people.ts` hands it on to the two screens that read it first.
+ * reason; `routes/r/[register]/folk.ts` hands it on to the two screens that read it first.
  *
  * OUT OF THE COMPONENTS so `node --test` can run it, which is why its imports are relative and type-only.
  */

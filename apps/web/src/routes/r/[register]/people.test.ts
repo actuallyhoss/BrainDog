@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Entry, Fields, RegisterDecl } from '../../../lib/record/schema.ts';
-import { bandOf, folds, foldPeople, keySaid, knownOf, lastDayOf, meetsOf, orgFieldOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, timesSaid, whoParts, whoSaid } from './people.ts';
+import { bandOf, folds, foldPeople, keySaid, knownOf, lastDayOf, meetsOf, orgFieldOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, timesSaid, whoParts, whoSaid } from './folk.ts';
 
 const TODAY = '2026-10-06';
 

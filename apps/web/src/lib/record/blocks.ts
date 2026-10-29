@@ -72,7 +72,7 @@ const clockOf = (block: BlockResult): number => {
 import { copy } from '../copy.ts';
 import { recordToday } from './zone.ts';
 import type { Entry } from './schema.ts';
-import { groupCards, meetsOf, mergedAway, seenWords, type CardRun, type GroupKey } from './people.ts';
+import { groupCards, meetsOf, mergedAway, seenWords, type CardRun, type GroupKey } from './folk.ts';
 
 /** The words a run of cards is counted in, for a part that draws them. */
 export { seenWords };
@@ -1340,7 +1340,7 @@ function writtenLine(block: BlockResult, kinds?: Readonly<Record<string, KindSpe
 }
 
 /**
- * A CARD BLOCK THAT SAYS `group:`, DRAWN IN ITS GROUPS (`people.ts` `groupCards`): People on a page reads as the list of
+ * A CARD BLOCK THAT SAYS `group:`, DRAWN IN ITS GROUPS (`folk.ts` `groupCards`): People on a page reads as the list of
  * people does, each organisation one quiet heading where its most recent person stands, with that person under it and
  * the rest folded behind a line that opens the organisation's page, where they all are. Cards in no group stay where
  * the record put them, a run of them one grid. `null` for every other block, which is drawn as it always was.

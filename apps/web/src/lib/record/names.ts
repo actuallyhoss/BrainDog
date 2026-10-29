@@ -17,7 +17,7 @@ import { RULE_NAMES, SCRIPT_NAMES } from '@braindog/seed/usecases/names';
 
 import { copy } from '../copy/frame.ts';
 import { REGISTERS } from './held.ts';
-import { mergedFieldOf } from './people.ts';
+import { mergedFieldOf } from './folk.ts';
 
 /**
  * What kind of actor signed a write, which is what `Face` draws: a person and you as a monogram, an automation or a rule

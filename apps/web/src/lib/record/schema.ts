@@ -333,7 +333,7 @@ export type PageBlock = {
   /**
    * A `cards` block's: the field its cards are grouped by, a link to one row, such as the organisation a person is with.
    * A group is headed by that row's name and stands where its first card stood; the record answers the name of each
-   * card's group as `groups`, one a row (`people.ts` `groupCards`).
+   * card's group as `groups`, one a row (`folk.ts` `groupCards`).
    */
   group?: string;
   /** The glyph beside a `section`'s heading. */
