@@ -1,0 +1,288 @@
+{
+  "format": 1,
+  "made_at": "2026-10-29T22:25:23.092Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "{{splits-to-me}} comes back to you and {{splits-to-them}} goes back from you, across {{splits-people-open}} people.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "splits-to-me": 0,
+            "splits-to-them": 0,
+            "splits-people-open": 0
+          },
+          "read_as": {
+            "splits-to-me": "figure",
+            "splits-to-them": "figure",
+            "splits-people-open": "figure"
+          }
+        },
+        {
+          "body": "Add a shared cost below, or write a name in Shared with on a Ledger line.",
+          "heading": "Nothing shared yet",
+          "icon": "split",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "splits-held"
+          },
+          "key": "k08g9971",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Comes back to you",
+              "metric": "splits-to-me"
+            },
+            {
+              "label": "Goes back from you",
+              "metric": "splits-to-them"
+            },
+            {
+              "label": "Open splits",
+              "metric": "splits-open"
+            },
+            {
+              "label": "Shared this month",
+              "metric": "splits-shared-month"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "split",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-held"
+          },
+          "key": "k0jacd2u",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Name",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "stands",
+              "label": "Stands at",
+              "width": "14ch"
+            },
+            {
+              "field": "way",
+              "label": "Which way",
+              "width": "minmax(16ch,20ch)"
+            },
+            {
+              "align": "end",
+              "field": "open",
+              "label": "Open",
+              "width": "8ch"
+            },
+            {
+              "field": "since",
+              "label": "Since",
+              "width": "13ch"
+            }
+          ],
+          "empty": "Everyone is square.",
+          "heading": "Each person",
+          "icon": "users",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "since"
+            }
+          ],
+          "source": "register.split_people",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-people-open"
+          },
+          "where": "way is to_me or to_them",
+          "key": "k1fld6l8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a shared cost",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "splits",
+          "span": 12,
+          "key": "k12cxcw9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "with",
+              "label": "With",
+              "width": "minmax(10ch,16ch)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "part",
+              "label": "To settle",
+              "width": "13ch"
+            },
+            {
+              "field": "way",
+              "label": "Which way",
+              "width": "minmax(14ch,18ch)"
+            }
+          ],
+          "empty": "Nothing open.",
+          "heading": "Open",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.splits",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-open"
+          },
+          "where": "state is open",
+          "key": "k0i7vhd9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "fold": true,
+          "heading": "Settled",
+          "icon": "archive",
+          "kind": "section",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-held"
+          },
+          "key": "k14j0vi5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "with",
+              "label": "With",
+              "width": "minmax(10ch,16ch)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            }
+          ],
+          "empty": "Nothing settled yet.",
+          "heading": "Settled splits",
+          "icon": "archive",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.splits",
+          "span": 12,
+          "where": "state is settled",
+          "key": "k1a8b4ef",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "split",
+      "nav": {
+        "order": 65,
+        "section": "Money"
+      },
+      "pack": "splits",
+      "page": "splits",
+      "requires": [
+        "register.splits",
+        "register.split_people"
+      ],
+      "title": "Splits",
+      "read_at": "2026-10-29T22:25:23.092Z",
+      "zone": "UTC",
+      "look": {
+        "look": "splits",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

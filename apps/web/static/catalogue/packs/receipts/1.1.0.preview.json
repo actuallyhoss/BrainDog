@@ -1,0 +1,322 @@
+{
+  "format": 1,
+  "made_at": "2026-10-29T22:25:23.092Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "{{receipts-missing}} lines from this month and last want a receipt, and {{receipts-waiting}} receipts wait for their line.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "receipts-missing": 0,
+            "receipts-waiting": 0
+          },
+          "read_as": {
+            "receipts-missing": "figure",
+            "receipts-waiting": "figure"
+          }
+        },
+        {
+          "cells": [
+            {
+              "label": "Lines wanting one",
+              "metric": "receipts-missing"
+            },
+            {
+              "label": "Waiting for a line",
+              "metric": "receipts-waiting"
+            },
+            {
+              "label": "Kept this month",
+              "metric": "receipts-kept-month"
+            }
+          ],
+          "heading": "Receipts",
+          "icon": "receipt-text",
+          "kind": "stat",
+          "span": 12,
+          "key": "k1pew11m",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Lines wanting one",
+              "metric": "receipts-missing",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Waiting for a line",
+              "metric": "receipts-waiting",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Kept this month",
+              "metric": "receipts-kept-month",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "heading": "Add a receipt",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "receipts",
+          "span": 12,
+          "key": "k1urnfy7",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "heading": "Which line is it?",
+          "icon": "ask",
+          "kind": "queue",
+          "limit": 3,
+          "source": "governance.open",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "questions-open-in:receipts"
+          },
+          "where": "list is receipts",
+          "key": "k1odxf3l",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "category",
+              "label": "Category",
+              "width": "minmax(12ch,16ch)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            }
+          ],
+          "empty": "Every line has its receipt.",
+          "heading": "Lines wanting a receipt",
+          "icon": "circle-alert",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.transactions",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "receipts-missing"
+          },
+          "where": "receipt_wanted is true, receipt is empty, state is cleared, on at least bom-1m",
+          "key": "k1pvsldr",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "shop",
+              "label": "Shop",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            },
+            {
+              "field": "picture",
+              "label": "Picture",
+              "width": "minmax(12ch,18ch)"
+            }
+          ],
+          "empty": "Nothing waiting.",
+          "heading": "Waiting for their line",
+          "icon": "receipt-text",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.receipts",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "receipts-waiting"
+          },
+          "where": "state is waiting",
+          "key": "k1o1lvxb",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            },
+            {
+              "field": "receipt",
+              "label": "Receipt",
+              "width": "minmax(12ch,18ch)"
+            }
+          ],
+          "empty": "No receipts this month yet.",
+          "heading": "Kept this month",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.transactions",
+          "span": 12,
+          "where": "receipt is set, on at least bom",
+          "key": "k0g2vooj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Switch on Keep receipts on a category, such as work costs or anything with a warranty, and its lines say when they still want one.",
+          "heading": "Which categories keep receipts",
+          "icon": "tag",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "receipts-categories"
+          },
+          "key": "k006bfgs",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "receipt-text",
+      "nav": {
+        "order": 75,
+        "section": "Money"
+      },
+      "pack": "receipts",
+      "page": "receipts",
+      "requires": [
+        "register.receipts",
+        "register.transactions"
+      ],
+      "title": "Receipts",
+      "read_at": "2026-10-29T22:25:23.092Z",
+      "zone": "UTC",
+      "look": {
+        "look": "receipts",
+        "basis": "r1rdrohu",
+        "by": "rule",
+        "hide": [
+          "k0g2vooj"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

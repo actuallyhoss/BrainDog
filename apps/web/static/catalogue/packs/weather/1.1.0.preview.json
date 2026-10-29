@@ -1,0 +1,141 @@
+{
+  "format": 1,
+  "made_at": "2026-10-29T22:25:23.092Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No weather yet. Set your town under Place on this add-on's settings, and the forecast arrives within three hours.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "weather-days"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "what"
+            },
+            {
+              "as": "figure",
+              "field": "high",
+              "label": "High"
+            },
+            {
+              "as": "fact",
+              "field": "low",
+              "label": "Low"
+            },
+            {
+              "as": "fact",
+              "field": "rain",
+              "label": "Chance of rain %"
+            },
+            {
+              "as": "fact",
+              "field": "place",
+              "label": "Where"
+            }
+          ],
+          "empty": "Today's forecast has not arrived yet.",
+          "kind": "cards",
+          "lead": true,
+          "limit": 1,
+          "source": "register.weather",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "weather-days"
+          },
+          "where": "day is today",
+          "key": "k149ujf7",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            },
+            {
+              "field": "what",
+              "label": "Sky",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "high",
+              "label": "High",
+              "width": "8ch"
+            },
+            {
+              "field": "low",
+              "label": "Low",
+              "width": "8ch"
+            },
+            {
+              "field": "rain",
+              "label": "Rain %",
+              "width": "8ch"
+            }
+          ],
+          "empty": "Nothing past today yet.",
+          "heading": "The next days",
+          "icon": "calendar-days",
+          "kind": "table",
+          "limit": 6,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "day"
+            }
+          ],
+          "source": "register.weather",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "weather-days"
+          },
+          "where": "day after today",
+          "key": "k1b771y1",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "sun",
+      "nav": {
+        "order": 10,
+        "section": "Life"
+      },
+      "pack": "weather",
+      "page": "weather",
+      "requires": [
+        "register.weather"
+      ],
+      "title": "Weather",
+      "read_at": "2026-10-29T22:25:23.092Z",
+      "zone": "UTC",
+      "look": {
+        "look": "weather",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}
