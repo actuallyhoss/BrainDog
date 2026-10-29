@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Gold is valued from the first gold rate anybody sets, of any karat, and gold with no price paid is still valued by its grams. Set today's gold rate sits with the gold rates, not beside what you hold.",
+  "changes": "Brings its Gold price widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -39,6 +39,80 @@
       "note": "Shops sell gold above the world price. Put what your jeweller adds, such as 2, and every karat's rate goes up by that much."
     }
   },
+  "widgets": [
+    {
+      "id": "gold-price",
+      "title": "Gold price",
+      "says": "Today’s gold rate for a gram, each karat.",
+      "group": "money",
+      "for": "personal",
+      "icon": "vault",
+      "block": {
+        "kind": "table",
+        "heading": "Gold price",
+        "icon": "vault",
+        "source": "register.gold_rates",
+        "where": "live is true",
+        "columns": [
+          {
+            "field": "karat",
+            "label": "Karat"
+          },
+          {
+            "field": "per_gram",
+            "label": "A gram",
+            "align": "end"
+          }
+        ],
+        "order": [
+          {
+            "field": "karat",
+            "dir": "asc"
+          }
+        ],
+        "limit": 3,
+        "empty": "No gold rate yet."
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall"
+      ],
+      "size": "small",
+      "needs": {
+        "lists": [
+          "gold_rates"
+        ]
+      },
+      "rows": {
+        "title": "karat",
+        "amount": "per_gram"
+      },
+      "example": {
+        "rows": [
+          {
+            "title": "24k",
+            "meta": "¤110 a gram"
+          },
+          {
+            "title": "21k",
+            "meta": "¤96 a gram"
+          }
+        ]
+      },
+      "words": [
+        "gold",
+        "karat",
+        "grams"
+      ],
+      "asked": [
+        {
+          "match": "\\bgold\\b",
+          "about": "gold"
+        }
+      ]
+    }
+  ],
   "declarations": [
     {
       "register": "holdings",

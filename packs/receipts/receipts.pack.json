@@ -1,10 +1,10 @@
 {
   "pack": "receipts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icon": "receipt-text",
   "title": "Receipts",
   "summary": "Keep a receipt on each Ledger line. Send one in on its own and it finds its line by amount and day, or asks which one. Mark the categories you keep receipts for, such as work costs or anything with a warranty, and see which lines from this month and last still want one.",
-  "changes": "First version: a receipt on each Ledger line, receipts matched to their line by amount and day (and looked for again each night), categories that keep receipts, and the lines still missing one.",
+  "changes": "Brings its Receipts widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -39,6 +39,58 @@
       ]
     }
   },
+  "widgets": [
+    {
+      "id": "receipts",
+      "title": "Receipts",
+      "says": "Payments still missing a receipt, and receipts waiting to be matched.",
+      "group": "money",
+      "for": "business",
+      "icon": "receipt",
+      "block": {
+        "kind": "stat",
+        "heading": "Receipts",
+        "icon": "receipt",
+        "cells": [
+          {
+            "metric": "receipts-missing",
+            "label": "Missing a receipt"
+          },
+          {
+            "metric": "receipts-waiting",
+            "label": "To match"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "receipts-missing"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "Missing a receipt",
+            "said": "3"
+          }
+        ]
+      },
+      "words": [
+        "expenses",
+        "paperwork"
+      ],
+      "leads": [
+        "receipts"
+      ]
+    }
+  ],
   "declarations": [
     {
       "register": "receipts",

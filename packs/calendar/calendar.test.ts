@@ -65,7 +65,7 @@ test('THE PACK CARRIES calendar.js, CALLS ONLY GOOGLE AND OUTLOOK, AND KEEPS THE
   assert.deepEqual(PACK.widgets.map((w) => w.id), ['calendar-next', 'calendar-today']);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(PACK.version, '1.1.0');
+  assert.equal(PACK.version, '1.2.0');
   assert.deepEqual((SCRIPT as unknown as { keys: string[] }).keys, ['{{config:address}}'], 'the link is a key, named by the setting');
 });
 

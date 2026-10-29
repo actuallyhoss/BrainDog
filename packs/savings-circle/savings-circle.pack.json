@@ -1,10 +1,10 @@
 {
   "pack": "savings-circle",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icon": "piggy-bank",
   "title": "Savings circle",
   "summary": "A savings circle (a gam'eya, a tontine, a committee): everyone puts the same part in each month and one person takes the pot each month. Say the people, the part, your turn and the first month, and the months and your payout are written as a plan's parts, so Cash ahead and Coming up count them.",
-  "changes": "First version: a circle on a plan, its monthly parts and your payout written for you, and a page of every circle with what goes in each month and the payouts to come.",
+  "changes": "Brings its Savings circle widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -59,6 +59,60 @@
       ]
     }
   },
+  "widgets": [
+    {
+      "id": "savings-circle",
+      "title": "Savings circle",
+      "says": "What you pay into your circles a month, and the payouts to come.",
+      "group": "money",
+      "for": "personal",
+      "icon": "coins",
+      "block": {
+        "kind": "stat",
+        "heading": "Savings circle",
+        "icon": "coins",
+        "cells": [
+          {
+            "metric": "circles-month",
+            "label": "A month"
+          },
+          {
+            "metric": "circles-payouts",
+            "label": "Payouts to come"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "circles-month"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "A month",
+            "said": "¤250"
+          }
+        ]
+      },
+      "words": [
+        "gameya",
+        "jameya",
+        "circle",
+        "rosca"
+      ],
+      "leads": [
+        "savings-circles"
+      ]
+    }
+  ],
   "declarations": [
     {
       "rule": "circle_make",

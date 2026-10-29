@@ -1,10 +1,10 @@
 {
   "pack": "subscriptions",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icon": "refresh",
   "title": "Subscriptions",
   "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
-  "changes": "First version: mark a Repeating line as a subscription, with a trial end, a cancel-by day, how to cancel and how much you use it; a page with the month and year cost, renewals, trials and price rises.",
+  "changes": "Brings its Subscriptions widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -80,6 +80,74 @@
       ]
     }
   },
+  "widgets": [
+    {
+      "id": "subscriptions",
+      "title": "Subscriptions",
+      "says": "What your subscriptions cost a month, and what renews in 30 days.",
+      "group": "money",
+      "for": "both",
+      "icon": "repeat",
+      "block": {
+        "kind": "stat",
+        "heading": "Subscriptions",
+        "icon": "repeat",
+        "cells": [
+          {
+            "metric": "subs-month",
+            "label": "A month"
+          },
+          {
+            "metric": "subs-renew-30d",
+            "label": "Renew in 30 days"
+          },
+          {
+            "metric": "subs-unused",
+            "label": "Unused"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "subs-month"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "A month",
+            "said": "¤110"
+          },
+          {
+            "label": "Renew in 30 days",
+            "said": "4"
+          }
+        ]
+      },
+      "words": [
+        "subs",
+        "renewals",
+        "netflix",
+        "spotify"
+      ],
+      "asked": [
+        {
+          "match": "\\bsubscriptions?\\b",
+          "about": "your subscriptions"
+        }
+      ],
+      "leads": [
+        "subscriptions"
+      ]
+    }
+  ],
   "declarations": [
     {
       "rule": "subscriptions_price",

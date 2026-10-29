@@ -1,10 +1,10 @@
 {
   "pack": "goals",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "icon": "star",
   "title": "Goals",
   "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
-  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+  "changes": "Brings its Savings goals widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -14,6 +14,91 @@
       "money-core": ">=2.0.0"
     }
   },
+  "widgets": [
+    {
+      "id": "savings-goal",
+      "title": "Savings goals",
+      "says": "How far each thing you are saving for has come.",
+      "group": "money",
+      "for": "personal",
+      "icon": "piggy-bank",
+      "block": {
+        "kind": "progress",
+        "heading": "Savings goals",
+        "icon": "piggy-bank",
+        "source": "register.money_goals",
+        "where": "state is not paused",
+        "columns": [
+          {
+            "field": "name"
+          },
+          {
+            "field": "target"
+          },
+          {
+            "field": "by"
+          }
+        ],
+        "spent": "goals-have-by-name",
+        "order": [
+          {
+            "field": "seq",
+            "dir": "asc"
+          }
+        ],
+        "limit": 6,
+        "empty": "No goal yet. Add what you are saving for."
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large",
+        "full"
+      ],
+      "size": "small",
+      "needs": {
+        "lists": [
+          "money_goals"
+        ]
+      },
+      "rows": {
+        "title": "name",
+        "amount": "target",
+        "day": "by"
+      },
+      "example": {
+        "rows": [
+          {
+            "title": "Car",
+            "meta": "62% of ¤25,000"
+          },
+          {
+            "title": "Summer trip",
+            "meta": "30% of ¤4,000"
+          }
+        ]
+      },
+      "words": [
+        "save",
+        "saving",
+        "goal"
+      ],
+      "asked": [
+        {
+          "match": "\\b(savings?|saving for|goal)\\b",
+          "about": "your savings"
+        }
+      ],
+      "leads": [
+        "goals"
+      ],
+      "fresh": {
+        "says": "You started saving for {{name}}.",
+        "unnamed": "You set a new savings goal."
+      }
+    }
+  ],
   "declarations": [
     {
       "register": "money_goals",

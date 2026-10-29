@@ -1,10 +1,10 @@
 {
   "pack": "weather",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icon": "sun",
   "title": "Weather",
   "summary": "The weather where you are, today and the next six days, from Open-Meteo: free, with no key and no account. Set your town on this page and it is kept in step every three hours.",
-  "changes": "First version: today and the next six days for one place, in Celsius or Fahrenheit, with a Weather page and two widgets.",
+  "changes": "Its Weather widget says what it shows in the sheet, with its own icon and example, as BrainDog’s copy of it did.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -68,7 +68,8 @@
           }
         ],
         "limit": 1,
-        "empty": "Set your town on the Weather page."
+        "empty": "Set your town on the Weather page.",
+        "icon": "cloud"
       },
       "blanks": [],
       "sizes": [
@@ -79,17 +80,22 @@
       "needs": [
         "register.weather"
       ],
-      "example": [
-        {
-          "what": "Partly cloudy",
-          "day": "2026-10-29",
-          "place": "Cairo, Egypt",
-          "high": 27.9,
-          "low": 17.7,
-          "rain": 0,
-          "code": 2,
-          "unit": "°C"
-        }
+      "example": {
+        "figures": [
+          {
+            "label": "Partly cloudy · low 14°",
+            "said": "22°"
+          }
+        ]
+      },
+      "says": "Today’s weather where you are: the sky, the high and the low, and the chance of rain.",
+      "icon": "cloud",
+      "words": [
+        "weather",
+        "rain",
+        "temperature",
+        "forecast",
+        "sun"
       ]
     },
     {
@@ -131,7 +137,8 @@
           }
         ],
         "limit": 7,
-        "empty": "Set your town on the Weather page."
+        "empty": "Set your town on the Weather page.",
+        "icon": "cloud"
       },
       "blanks": [],
       "sizes": [
@@ -165,7 +172,8 @@
           "low": 15.7,
           "rain": 10
         }
-      ]
+      ],
+      "icon": "cloud"
     }
   ],
   "declarations": [

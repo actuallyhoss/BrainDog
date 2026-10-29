@@ -1,10 +1,10 @@
 {
   "pack": "calendar",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icon": "calendar",
   "title": "Calendar",
   "summary": "Your calendar's next events, read every hour from its secret ICS link in Google Calendar or Outlook, into a list you, your widgets and your agents can read. The link stays in your keys. Nothing is written back to the calendar.",
-  "changes": "The calendar's secret link now stays in your keys: the setting names the key, and the link is never in a setting or seen by the add-on's script.",
+  "changes": "Its Next meetings widget says what it shows in the sheet, with its own icon and example, as BrainDog’s copy of it did.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -56,7 +56,8 @@
           }
         ],
         "limit": 6,
-        "empty": "Nothing coming up."
+        "empty": "Nothing coming up.",
+        "icon": "calendar-days"
       },
       "blanks": [],
       "sizes": [
@@ -68,24 +69,31 @@
       "needs": [
         "register.events"
       ],
-      "example": [
-        {
-          "what": "Call with the accountant",
-          "day": "2026-10-30",
-          "time": "10:00",
-          "until": "10:30"
-        },
-        {
-          "what": "Studio walk-through",
-          "day": "2026-10-30",
-          "time": "14:00",
-          "until": "15:00"
-        },
-        {
-          "what": "Dinner",
-          "day": "2026-10-31",
-          "time": "20:00"
-        }
+      "example": {
+        "rows": [
+          {
+            "title": "Call with the accountant",
+            "meta": "Tomorrow · 10:00"
+          },
+          {
+            "title": "Studio walk-through",
+            "meta": "Tomorrow · 14:00"
+          }
+        ]
+      },
+      "says": "What is in your calendar next, soonest first.",
+      "icon": "calendar-days",
+      "rows": {
+        "title": "what",
+        "day": "day",
+        "meta": "time"
+      },
+      "words": [
+        "calendar",
+        "meetings",
+        "events",
+        "schedule",
+        "appointments"
       ]
     },
     {
@@ -119,7 +127,8 @@
           }
         ],
         "limit": 4,
-        "empty": "Nothing today."
+        "empty": "Nothing today.",
+        "icon": "calendar-days"
       },
       "blanks": [],
       "sizes": [
@@ -138,7 +147,8 @@
           "time": "10:00",
           "place": "Phone"
         }
-      ]
+      ],
+      "icon": "calendar-days"
     }
   ],
   "declarations": [

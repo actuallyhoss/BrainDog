@@ -1,10 +1,10 @@
 {
   "pack": "trips",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "icon": "plane",
   "title": "Trips",
   "summary": "Name a trip with its dates and file the Ledger's lines into it, and each trip says what it cost in total, by category and in each currency.",
-  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+  "changes": "Brings its Trip countdown widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -26,6 +26,108 @@
       ]
     }
   },
+  "widgets": [
+    {
+      "id": "trip-countdown",
+      "title": "Trip countdown",
+      "says": "The days until your next trip, or the one you pick. It leaves the board on its own once you are back.",
+      "group": "life",
+      "for": "personal",
+      "icon": "plane",
+      "block": {
+        "kind": "drawn",
+        "heading": "{{trip}}",
+        "icon": "plane",
+        "source": "register.trips",
+        "where": "name is \"{{trip}}\"",
+        "columns": [
+          {
+            "field": "name"
+          },
+          {
+            "field": "from"
+          },
+          {
+            "field": "to"
+          }
+        ],
+        "order": [
+          {
+            "field": "from",
+            "dir": "asc"
+          }
+        ],
+        "limit": 1,
+        "until": "{{trip_until}}",
+        "code": "<div class=\"trip\" id=\"trip\"></div>\n<style>\n  .trip { display: grid; gap: 4px; }\n  .trip button { all: unset; cursor: pointer; display: grid; gap: 4px; }\n  .trip .n { font-size: 40px; line-height: 1.05; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }\n  .trip .what { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n  .trip .when { color: var(--ink-3); font-size: 13px; }\n  .trip .road { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }\n  .trip .road i { display: block; width: 8px; height: 8px; border-radius: 4px; background: var(--rule); }\n  .trip .road i.on { background: var(--red); }\n  .trip.small .n { font-size: 32px; }\n  .trip.small .when, .trip.small .road, .trip.wide .road, .trip.full .road { display: none; }\n  .trip .none { color: var(--ink-3); }\n</style>\n<script>\n  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\n  function day(s) {\n    var m = /^(\\d{4})-(\\d{2})-(\\d{2})/.exec(String(s == null ? '' : s));\n    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;\n  }\n  function said(t) { var d = new Date(t); return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]; }\n  function today() { var n = new Date(); return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()); }\n  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }\n  braindog.on(function (data, theme, size) {\n    var box = document.getElementById('trip');\n    box.className = 'trip ' + (size || 'wide');\n    box.textContent = '';\n    var now = today();\n    var rows = data.rows.filter(function (r) {\n      var end = day(r.fields.to) || day(r.fields.from);\n      return end !== null && end >= now;\n    });\n    if (rows.length === 0) { box.append(el('p', 'none', 'No trip coming up.')); return; }\n    var r = rows[0];\n    var from = day(r.fields.from) || now;\n    var to = day(r.fields.to) || from;\n    var name = r.fields.name == null || r.fields.name === '' ? 'Your trip' : String(r.fields.name);\n    var left = Math.round((from - now) / 864e5);\n    var b = el('button');\n    b.onclick = function () { braindog.open(r.ref); };\n    if (left > 0) {\n      b.append(el('div', 'n', left === 1 ? '1 day' : left + ' days'), el('div', 'what', 'until ' + name));\n    } else {\n      var k = Math.round((now - from) / 864e5) + 1;\n      var all = Math.round((to - from) / 864e5) + 1;\n      b.append(el('div', 'n', all > 1 ? 'Day ' + k + ' of ' + all : 'Today'), el('div', 'what', name));\n    }\n    b.append(el('div', 'when', to !== from ? said(from) + ' to ' + said(to) : said(from)));\n    if (left > 0 && left <= 60) {\n      var road = el('div', 'road');\n      for (var i = 0; i < Math.min(left, 42); i++) road.append(el('i', i === 0 ? 'on' : null));\n      b.append(road);\n    }\n    box.append(b);\n  });\n</script>"
+      },
+      "blanks": [
+        {
+          "id": "trip",
+          "asks": "Which trip?",
+          "from": {
+            "source": "register.trips",
+            "field": "name",
+            "where": "to after yesterday",
+            "order": [
+              {
+                "field": "from",
+                "dir": "asc"
+              }
+            ],
+            "until": "to",
+            "starts": "from"
+          }
+        }
+      ],
+      "sizes": [
+        "small",
+        "wide",
+        "tall"
+      ],
+      "size": "small",
+      "needs": {
+        "lists": [
+          "trips"
+        ]
+      },
+      "rows": {
+        "title": "name",
+        "day": "from"
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "until Lisbon",
+            "said": "16 days"
+          }
+        ]
+      },
+      "words": [
+        "travel",
+        "holiday",
+        "countdown",
+        "flight",
+        "days until",
+        "next trip",
+        "trip"
+      ],
+      "asked": [
+        {
+          "match": "\\b(trip|travel|flight|holiday)\\b",
+          "about": "your trip"
+        }
+      ],
+      "leads": [
+        "trips"
+      ],
+      "near": {
+        "day": "from",
+        "within": 14,
+        "unnamed": "Your trip"
+      }
+    }
+  ],
   "declarations": [
     {
       "register": "trips",

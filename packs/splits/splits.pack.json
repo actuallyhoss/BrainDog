@@ -1,10 +1,10 @@
 {
   "pack": "splits",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icon": "split",
   "title": "Splits",
   "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their rows close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
-  "changes": "First version: shared costs and settle-ups, where each person stands in each currency, square marked by itself, and a Shared with field on the Ledger that writes the split.",
+  "changes": "Brings its Splits widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -33,6 +33,59 @@
       ]
     }
   },
+  "widgets": [
+    {
+      "id": "splits",
+      "title": "Splits",
+      "says": "What comes back to you from shared costs, and what goes back from you.",
+      "group": "money",
+      "for": "personal",
+      "icon": "split",
+      "block": {
+        "kind": "stat",
+        "heading": "Splits",
+        "icon": "split",
+        "cells": [
+          {
+            "metric": "splits-to-me",
+            "label": "Comes back to you"
+          },
+          {
+            "metric": "splits-to-them",
+            "label": "Goes back from you"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "splits-to-me"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "Comes back to you",
+            "said": "¤180"
+          }
+        ]
+      },
+      "words": [
+        "shared",
+        "friends",
+        "split"
+      ],
+      "leads": [
+        "splits"
+      ]
+    }
+  ],
   "declarations": [
     {
       "register": "splits",

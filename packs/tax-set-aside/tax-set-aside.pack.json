@@ -1,10 +1,10 @@
 {
   "pack": "tax-set-aside",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "icon": "piggy-bank",
   "title": "Tax set aside",
   "summary": "For freelancers and a small business: give a category of money in a tax rate, and every payment in it says what to put aside. See this year's set aside, what you paid the tax office, what your tax account holds against it, and the tax bills still to pay.",
-  "changes": "Set aside each month draws its bars again; it was refused before.",
+  "changes": "Brings its Tax set aside widget for Today, which was BrainDog’s own until now.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -64,6 +64,59 @@
       ]
     }
   },
+  "widgets": [
+    {
+      "id": "tax-aside",
+      "title": "Tax set aside",
+      "says": "What you have put by for tax this year, and what is due.",
+      "group": "money",
+      "for": "business",
+      "icon": "percent",
+      "block": {
+        "kind": "stat",
+        "heading": "Tax set aside",
+        "icon": "percent",
+        "cells": [
+          {
+            "metric": "tax-aside-year",
+            "label": "Set aside this year"
+          },
+          {
+            "metric": "tax-due",
+            "label": "Due"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "tax-aside-year"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "Set aside this year",
+            "said": "¤7,900"
+          }
+        ]
+      },
+      "words": [
+        "tax",
+        "vat",
+        "self assessment"
+      ],
+      "leads": [
+        "tax-set-aside"
+      ]
+    }
+  ],
   "declarations": [
     {
       "rule": "tax_line",
