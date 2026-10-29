@@ -99,7 +99,10 @@ export const byId = (id: string): Convo | undefined => convos.list.find((c) => c
 
 const answer = (): Answer => ({ role: 'them', text: '', steps: [], streaming: true, error: null, actions: [] });
 
-function made(c: Omit<Convo, 'key' | 'at' | 'turns' | 'receipts' | 'fix' | 'progress' | 'state' | 'thread' | 'target'> & { first: string; target?: string | null }): Convo {
+/** What a conversation starts with, whatever it was sent with: `made` writes these, never its caller. */
+type Fresh = Pick<Convo, 'key' | 'at' | 'turns' | 'fix' | 'progress' | 'state' | 'thread' | 'target'> & { receipts: Kept[] };
+
+function made(c: Omit<Convo, keyof Fresh> & { first: string; target?: string | null }): Convo {
   const { first, ...rest } = c;
   const convo: Convo = {
     ...rest,
