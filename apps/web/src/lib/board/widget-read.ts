@@ -129,7 +129,8 @@ export function rowLine(r: ReadRow, home: string | null): string {
     parts.push(left >= 0 ? `${said(left)} left of ${said(r.of)}` : `${said(-left)} over ${said(r.of)}`);
   } else if (r.amount) parts.push(moneyWhole(r.amount.amount, r.amount.currency, home ?? r.amount.currency)?.text ?? '');
   if (r.day) parts.push(dayShort(r.day));
-  if (r.meta) parts.push(r.meta);
+  /* A BARE NUMBER IS SAID TO TWO PLACES AT MOST, GROUPED (live check of 30 October, 19): a rate read "51.744321". */
+  if (r.meta) parts.push(/^-?\d+(\.\d+)?$/u.test(r.meta) ? Number(r.meta).toLocaleString('en', { maximumFractionDigits: 2 }) : r.meta);
   return parts.filter((p) => p !== '').join(' · ');
 }
 

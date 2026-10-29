@@ -1086,5 +1086,8 @@ export function exampleMoney(text: string, home: string | null): string {
 export function plainName(text: string | undefined): string | undefined {
   if (text === undefined) return undefined;
   if (!/[A-Z]{3}/u.test(text) || /[a-z]/u.test(text)) return text;
+  /* THREE LETTERS OR FEWER ARE INITIALS, as `readable` keeps them: the exchange rate's "USD" read "Usd" (live check of
+     30 October, 19). */
+  if ((text.match(/\p{L}/gu) ?? []).length <= 3) return text;
   return text.toLowerCase().replace(/(^|[\s/&(-])(\p{L})/gu, (_a, pre: string, ch: string) => pre + ch.toUpperCase());
 }
