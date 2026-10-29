@@ -9,8 +9,8 @@
  * is on its card the day it is declared.
  *
  * AGENTS' WORDS ARE KEPT HERE, because its manifest is written in `packs/agents.ts` as a plain `PackManifest` and the
- * other five carry theirs in `packs/first-party.ts` `SIGNALS`. Both reach the first run through `firstPartyModules()`
- * alone.
+ * other five carry theirs beside their declarations (`signalsOf` in `packs/first-party.ts`). Both reach the first run
+ * through `firstPartyModules()` alone.
  *
  * COMPUTED ONCE AND ON FIRST ASK, because `packs/first-party.ts` re-exports through `index.ts` and reads it back: a
  * value computed when this file loads would run before the declarations it reads exist, and splitting the starter

@@ -1917,3 +1917,15 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
   });
   return { ...page, requires: (page.requires as string[]).filter((r) => !gone(r)), blocks: holding };
 }
+
+/**
+ * THE WORDS A PERSON USES FOR WHAT THIS PACK KEEPS, which the first run listens for in the sentence it is told
+ * (`apps/web/src/lib/shape.ts`), carried in its manifest as `signals` (`firstPartyManifest`). Kept with the pack's own
+ * declarations, as an add-on's are in its file: they are its words, and a word one of them shares with an add-on's id
+ * ("subscriptions") is the pack's to say and not the code's that reads it. Lower-case words and short phrases, each
+ * inflection written out, because the reader matches whole words and never stems.
+ */
+export const PORTFOLIO_SIGNALS: readonly string[] = [
+  'project', 'projects', 'side project', 'side projects', 'side-project', 'side-projects', 'product', 'products', 'app', 'apps',
+  'studio', 'shop', 'store', 'brand', 'brands', 'game', 'games', 'agency', 'foundry', 'website', 'websites',
+];

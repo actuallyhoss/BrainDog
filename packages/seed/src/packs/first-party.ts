@@ -24,7 +24,11 @@
 import { wholeDocument } from '../index.ts';
 import { ADDON_LEG_LISTS } from '../modules/held-legs.ts';
 import { MONEY_HOME_SETTING, targetConfigOf } from '../modules/money.ts';
-import { estateTargetConfig } from '../modules/estate.ts';
+import { ESTATE_SIGNALS, estateTargetConfig } from '../modules/estate.ts';
+import { MONEY_SIGNALS } from '../modules/money/signals.ts';
+import { PEOPLE_SIGNALS } from '../modules/people.ts';
+import { PORTFOLIO_SIGNALS } from '../modules/portfolio.ts';
+import { WORK_SIGNALS } from '../modules/work.ts';
 import type { PackManifest } from './agents.ts';
 
 export type FirstPartyId = 'core' | 'portfolio' | 'people' | 'money-core' | 'estate' | 'work';
@@ -60,36 +64,14 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 
 /**
  * THE WORDS A PERSON USES FOR WHAT EACH PACK KEEPS, which the first run listens for in the sentence it is told
- * (`apps/web/src/lib/shape.ts`). They are the manifest's, the way a use case's `signals` are its own, so
- * the first run reads a first-party pack exactly as it reads anything else in the catalogue, and a pack from the Kennel
- * that says what it is for can be offered on the same terms.
- *
- * Lower-case words and short phrases, each inflection written out, because the reader matches whole words and never
- * stems: "invoicing" is a signal of its own. A word may belong to two packs: "freelance" says there is money and there
- * are clients. "track" is in none, since "I track a few side projects" is a verb about projects and not a Work list.
+ * (`apps/web/src/lib/shape.ts`). They are the manifest's, the way a use case's `signals` are its own, so each pack keeps
+ * its own beside its declarations (`ESTATE_SIGNALS` in `modules/estate.ts` and the rest), and this reads them, when
+ * asked and not when this file loads, for the reason in its header.
+ * A word may belong to two packs: "freelance" says there is money and there are clients. "track" is in none, since
+ * "I track a few side projects" is a verb about projects and not a Work list.
  */
-const SIGNALS: Record<FirstPartyId, readonly string[]> = {
-  core: [],
-  portfolio: [
-    'project', 'projects', 'side project', 'side projects', 'side-project', 'side-projects', 'product', 'products', 'app', 'apps',
-    'studio', 'shop', 'store', 'brand', 'brands', 'game', 'games', 'agency', 'foundry', 'website', 'websites',
-  ],
-  people: [
-    'freelance', 'freelances', 'freelanced', 'freelancing', 'freelancer', 'freelancers', 'team', 'staff', 'employee', 'employees',
-    'contractor', 'contractors', 'client', 'clients', 'customer', 'customers', 'collaborator', 'collaborators', 'partner', 'partners',
-    'accountant', 'accountants', 'people', 'colleague', 'colleagues', 'cofounder', 'cofounders', 'co-founder', 'co-founders',
-  ],
-  'money-core': [
-    'freelance', 'freelances', 'freelanced', 'freelancing', 'freelancer', 'invoice', 'invoices', 'invoiced', 'invoicing', 'bill',
-    'bills', 'billed', 'billing', 'retainer', 'retainers', 'owe', 'owes', 'owed', 'owing', 'payment', 'payments', 'paid', 'vat',
-    'tax', 'taxes', 'money', 'cash', 'fee', 'fees', 'charge', 'charges', 'charged', 'charging',
-  ],
-  estate: [
-    'domain', 'domains', 'hosting', 'server', 'servers', 'subscription', 'subscriptions', 'saas', 'licence', 'licences', 'license',
-    'licenses', 'certificate', 'renewal', 'renewals',
-  ],
-  work: ['task', 'tasks', 'todo', 'todos', 'to-do', 'to-dos', 'deadline', 'deadlines', 'sprint', 'sprints', 'backlog', 'roadmap', 'milestone', 'milestones'],
-};
+const signalsOf = (id: FirstPartyId): readonly string[] =>
+  ({ core: [], portfolio: PORTFOLIO_SIGNALS, people: PEOPLE_SIGNALS, 'money-core': MONEY_SIGNALS, estate: ESTATE_SIGNALS, work: WORK_SIGNALS })[id];
 
 /**
  * EACH PACK'S OWN VERSION. A record is offered an update when the version here is later than the one it installed, so a
@@ -985,7 +967,7 @@ function split(): Split {
 /**
  * One first-party pack's manifest: its id, its version, the registers it needs already there, and the ones it
  * only links to (`LINKS`), which it points at when the record holds them and leaves out when it does not, and the
- * words the first run hears it in (`SIGNALS`).
+ * words the first run hears it in (`signalsOf`).
  */
 export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides: readonly string[]; links: readonly string[]; signals: readonly string[] } {
   const { packs, owner } = split();
@@ -1002,7 +984,7 @@ export function firstPartyManifest(id: FirstPartyId): PackManifest & { provides:
     for (const r of leansOn(d)) if (!own.has(r)) any.add(`register.${r}`);
   }
   const links = [...any].filter((r) => !needs.has(r)).sort();
-  return { id, version: FIRST_PARTY_VERSIONS[id], requires: [...needs].sort(), provides: mine.map(idOf).sort(), links, signals: SIGNALS[id] };
+  return { id, version: FIRST_PARTY_VERSIONS[id], requires: [...needs].sort(), provides: mine.map(idOf).sort(), links, signals: signalsOf(id) };
 }
 
 /** The pages that live in `core` and no longer in People, handed over by People from 4.0.0 under the ids they always had. */
