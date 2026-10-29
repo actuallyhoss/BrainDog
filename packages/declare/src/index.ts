@@ -241,7 +241,7 @@ export type PageAddition = { page: string; block: Record<string, Json>; after?: 
 export { ADD_COLUMNS_MOST, columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 import type { PackWidget } from './pack-widgets.ts';
 import { readPackWidgets } from './pack-widgets.ts';
-export { PACK_WIDGET_GROUPS, PACK_WIDGET_SIZES, PACK_WIDGETS_MOST, readPackWidgets, type PackWidget } from './pack-widgets.ts';
+export { PACK_WIDGET_FOR, PACK_WIDGET_GROUPS, PACK_WIDGET_SIZES, PACK_WIDGETS_MOST, readPackWidgets, type PackWidget, type PackWidgetBlank } from './pack-widgets.ts';
 
 /* WHO HOLDS A LIST'S ROWS is `hand.ts`'s, so a page that reads it does not carry the planner. */
 export { handOf, type Hand } from './hand.ts';
