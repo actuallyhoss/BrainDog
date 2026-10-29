@@ -19,7 +19,6 @@
   import { put } from '$lib/clipboard.ts';
   import { copy } from '$lib/copy.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
   import { inviteLink } from '$lib/record/settings-write.ts';
   import { SHARED_EVENT } from '$lib/sharing/sharing.ts';
   import { asksConfirm, sheetApi, type Here, type SheetApi } from '$lib/sharing/sheet-api.ts';
@@ -30,7 +29,7 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { accountShareApi, accountShares, type Holder, type Rung, type Who } from './account-share.ts';
+  import { accountShareApi, accountShares, shareListsOf, type Holder, type Rung, type ShareLists, type Who } from './account-share.ts';
 
   /*
    * `part="sheet"` IS THE SHEET WITHOUT A BUTTON, opened each time `ask` goes up (audit of 30 October, 19): the account
@@ -43,14 +42,25 @@
   let api: SheetApi | null = null;
   let mine: ReturnType<typeof accountShareApi> | null = null;
   const sheet = () => (api ??= sheetApi(apiBase()));
-  const money = () => (mine ??= accountShareApi(apiBase()));
+  /* THE LISTS THE SHARE REACHES INTO, read off the declarations the tab asks beside `boot` (`shareListsOf`), never by
+     name. A record that keeps no ledger shares nothing from here. */
+  let reach: Promise<ShareLists | null> | null = null;
+  const listsHere = () =>
+    (reach ??= import('./read.ts').then((m) => m.declarations(apiBase(), (page.data as { lists?: { id: string; kernel?: true }[] }).lists ?? [])).then(shareListsOf));
+  const money = async () => {
+    if (mine) return mine;
+    const lists = await listsHere();
+    return lists ? (mine = accountShareApi(apiBase(), lists)) : null;
+  };
 
   /* ── the line: who holds it ── */
   let holders = $state<Holder[]>([]);
   let account = $state<{ id: string; book: string | null } | null>(null);
   async function readHolders() {
-    account ??= await money().account(seq);
-    holders = account ? await money().holders(account.id) : [];
+    const m = await money();
+    if (!m) return;
+    account ??= await m.account(seq);
+    holders = account ? await m.holders(account.id) : [];
   }
   /* THE READ IS UNTRACKED: `readHolders` reads and writes `account` before its first await, and a tracked read of it
      here ran the effect again on its own write, for ever, and hung every account page. Only `part` and `seq` rerun it. */
@@ -68,7 +78,12 @@
   let stopping = $state<string | null>(null);
   async function stop(h: Holder) {
     stopping = h.ids[0] ?? null;
-    const out = await money().stop(h.ids);
+    const m = await money();
+    if (!m) {
+      stopping = null;
+      return;
+    }
+    const out = await m.stop(h.ids);
     stopping = null;
     if (!out.ok) {
       toasts.push(out.fix, { intent: 'warn' });
@@ -120,14 +135,15 @@
     if (!chosen || busy) return;
     busy = true;
     problem = null;
-    const at = await money().account(seq);
-    if (!at) {
+    const m = await money();
+    const lists = await listsHere();
+    const at = m ? await m.account(seq) : null;
+    if (!m || !lists || !at) {
       busy = false;
       problem = copy.accountShareMissing;
       return;
     }
-    const payees = await money().payees(at.id);
-    const lists = new Set(Object.keys(REGISTERS));
+    const payees = await m.payees(at.id);
     const shares = accountShares({ who: chosen.who, account: at.id, can, book: at.book, payees, lists });
     const out = await sheet().send(shares, null);
     if (!out.ok) {

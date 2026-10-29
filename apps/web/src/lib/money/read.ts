@@ -28,7 +28,7 @@ const rowsOf = (v: unknown): RecordRow[] => ((v as { rows?: unknown } | null)?.r
 type Listed = { id: string; kernel?: true };
 
 /** Every non-kernel list's declaration this tab holds, asked once (they arrive with `boot`, so asking costs nothing). */
-async function declarations(base: string, lists: readonly Listed[]) {
+export async function declarations(base: string, lists: readonly Listed[]) {
   const client = createClient({ base });
   const ids = lists.filter((l) => l.kernel !== true).map((l) => l.id);
   const asked = new Map<string, Promise<void>>();
