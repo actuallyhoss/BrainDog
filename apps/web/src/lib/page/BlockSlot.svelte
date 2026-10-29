@@ -722,6 +722,11 @@
   const LANE_ORDER = ['earning', 'building', 'parked'];
   const lanes = $derived.by(() => {
     if (!projectCards || block.group) return [];
+    /* ONLY OVER EVERY PROJECT (live check of 30 October, 6): a tile drawing 4 of 18 counted its lanes over the 4, "In play
+       4 · Earning 1 · Building 3" beside "Projects 18". Where the block holds fewer than it counts, it draws no lane bar,
+       and its "N more" says the rest. */
+    const total = (block as { counted?: number }).counted ?? block.total;
+    if (typeof total === 'number' && total > projectCards.length) return [];
     const list = block.register ? REGISTERS[block.register] : undefined;
     const state = list?.state ? list.fields.find((x) => x.id === list.state) : undefined;
     const counts = new Map<string, number>();
