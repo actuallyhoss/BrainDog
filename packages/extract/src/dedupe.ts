@@ -108,7 +108,21 @@ export function isDuplicate(a: Fields, b: Fields, dedupe: Dedupe): boolean {
 
   const { on, day, prefix } = dedupe.near;
   if (on.length === 0) return false;
-  if (!on.every((field) => sameField(a, b, field))) return false;
+  /* A FIELD ONE SIDE NEVER HELD DOES NOT TELL THEM APART, IN THE NEAR FORM ONLY (live check of 30 October, 11). A bank
+     add-on that learned to read a reference wrote the same four alerts again beside the rows it had written before it
+     could, since the old rows held no reference and "the same reference" failed on every one. Absent on one side is
+     unknown, not different; held by both, it must agree, and at least one field must be held by both and agree. */
+  const held = (x: Fields, f: string): boolean => Object.hasOwn(x, f) && x[f] !== undefined && x[f] !== null;
+  let agreed = 0;
+  for (const field of on) {
+    if (!held(a, field) || !held(b, field)) {
+      if (held(a, field) || held(b, field)) continue;
+      return false;
+    }
+    if (!sameField(a, b, field)) return false;
+    agreed++;
+  }
+  if (agreed === 0) return false;
 
   const l = utcDay(a[day]);
   const r = utcDay(b[day]);

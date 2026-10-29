@@ -140,3 +140,13 @@ test('no prefix declared is allowed, and then the on fields and the day decide',
   const noPrefix = { near: { on: ['account', 'amount'], day: 'date' } };
   assert.equal(isDuplicate(a, { ...a, date: '2026-08-30', merchant: 'SOMETHING ELSE' }, noPrefix), true);
 });
+
+test('near: a field one side never held is unknown, not different, so an older row without a reference is the same', () => {
+  /* The live check of 30 October: four HSBC alerts written again beside the rows written before the add-on read a reference. */
+  const key = { near: { on: ['amount', 'account', 'ref'], day: 'on', prefix: { field: 'what', chars: 12 } } };
+  const old: Fields = { amount: 3462000, account: 'a', on: '2026-10-17', what: 'WOPLEK OFFICE FURNITURE' };
+  const again: Fields = { ...old, ref: '40175f9b' };
+  assert.equal(isDuplicate(again, old, key), true);
+  assert.equal(isDuplicate(again, { ...old, ref: 'ffff0000' }, key), false, 'held by both, it must agree');
+  assert.equal(isDuplicate({ ref: 'x', on: '2026-10-17', what: 'W' }, { on: '2026-10-17', what: 'W' }, key), false, 'nothing held by both is no match');
+});

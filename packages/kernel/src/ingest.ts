@@ -608,6 +608,14 @@ export function existingRow(
          below, which compares canonically. Binding it as `null` here would be the wrong-answer
          version of the same thing. */
       if (v !== null && typeof v === 'object') { inJs = true; continue; }
+      /* IN THE NEAR FORM A ROW THAT NEVER HELD THE FIELD IS STILL A CANDIDATE (live check of 30 October, 11): written
+         before its add-on read that field, it is asked of `duplicate`, which reads absent on one side as unknown. */
+      if (near !== undefined && (v === undefined || v === null) && type !== 'money' && type !== 'quantity') continue;
+      if (near !== undefined && type !== 'money' && type !== 'quantity') {
+        terms.push(`(${sql} = ? OR ${sql} IS NULL)`);
+        bound.push(typeof v === 'number' ? v : String(v));
+        continue;
+      }
       terms.push(`${sql} = ?`);
       bound.push(v === undefined || v === null ? null : typeof v === 'number' ? v : String(v));
     }
