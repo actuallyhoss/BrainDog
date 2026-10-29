@@ -860,6 +860,10 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
     if (folded.has(e)) return [];
     /* WHAT AN ACCEPTED ARRANGEMENT DID, kept on its decision (`keepApplied`), is the decision's own line and not news. */
     if (e.kind === 'note' && e.target_kind === 'decision') return [];
+    /* AN AUTOMATION THAT RAN IS NOT NEWS; WHAT IT CHANGED IS (live check of 30 October, 12): his bell read "Look again for
+       what a recent payment paid ran · 59 times" and "Ask whether a category of moves is money that stays yours ran",
+       automations' own names for runs that changed nothing. Whatever a run wrote is its own line beside this one. */
+    if (/^rule\.[a-z0-9][a-z0-9_-]* ran\.?$/u.test(e.note ?? '')) return [];
     /* A RUN'S OWN ROW MOVING IS THE RUN KEEPING ITS PLACE, NOT NEWS (recheck of 30 October, N6): his bell read
        "attached: compact · 9 times" and "Made 4 changes in Session at once" for an agent picking a run back up. Where a run
        stands (its state) is still said; the Agents page holds the rest. */
