@@ -85,7 +85,7 @@
   });
 
   /** On a board the frame is the size's; elsewhere the component says its height. */
-  const stands = $derived(size ? (measured ? drawnFrameHeight(size, measured.row, measured.gap) : drawnFrameHeight(size)) : height);
+  const tall = $derived(size ? (measured ? drawnFrameHeight(size, measured.row, measured.gap) : drawnFrameHeight(size)) : height);
 
   const refs = $derived(new Set(data.rows.map((r) => r.ref)));
 
@@ -134,8 +134,8 @@
       if ('height' in asked) height = asked.height;
       else if ('open' in asked) onopen?.(asked.open);
       else if (picture && alive) {
-        keepPicture(pictureKey(code, size, themeNow().mode), asked.picture, stands);
-        kept = { picture: asked.picture, height: stands };
+        keepPicture(pictureKey(code, size, themeNow().mode), asked.picture, tall);
+        kept = { picture: asked.picture, height: tall };
       }
     };
     addEventListener('message', listen);
@@ -235,7 +235,7 @@
   });
 </script>
 
-<div class="drawn" bind:this={box} style:block-size="{stands}px">
+<div class="drawn" bind:this={box} style:block-size="{tall}px">
   {#if near && (alive || kept)}
     {#key `${code}|${alive}`}
       <iframe bind:this={frame} class="drawn-frame" src={SRC} sandbox="allow-scripts" {title} loading="lazy" referrerpolicy="no-referrer"></iframe>
