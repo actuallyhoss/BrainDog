@@ -179,64 +179,12 @@ export const HELD = {
   /* HELD ON 16 OCTOBER. What this gate, core-names and colour-grep found that day was held rather than renamed
      ("Hold them, deploy tonight"). Each says what its id is, so the change that renames it knows. */
   'apps/web/src/lib/home/imported-rules.ts': {
-    ids: ['categories', 'filing_rules'],
-    why: "Money's filing rules and the categories a rule files under, which Home's offer to make imported automations filing rules writes into by their list ids.",
+    ids: ['filing_rules'],
+    why: "Money's filing rules, which Home's offer to make imported automations filing rules writes into by the list's id. The categories a rule files under are read off the rule's own link since 30 October (SHL-A24).",
   },
   'apps/web/src/lib/signup.ts': {
     ids: ['things'],
     why: "`things`, what a question back from the reading door may be about (`SetupAbout` in `@braindog/slash`), which is not the list.",
-  },
-  /* HELD ON 30 OCTOBER, at his word to deploy ("yes yes yes go go go"): what round 1030's new web code names. Money's
-     screens, the bell and the Keychain row read a list by its id where the record could say which list plays the part
-     (SHL-A24), the sheet's sample reads Money's ledger (SHL-A22), and two are a word the web uses for something else
-     that a new add-on's plain id now spells (SHL-A23). */
-  'apps/web/src/lib/board/SheetWidgets.svelte': {
-    ids: ['transactions'],
-    why: "the sheet's widgets for a list read Money's ledger by `register.transactions`; SHL-A22 moves them into the pack's `widgets`.",
-  },
-  'apps/web/src/lib/money/BookScope.svelte': {
-    ids: ['books'],
-    why: "the book picker reads Money's books and links into the list by its id; SHL-A24 reads it by its role.",
-  },
-  'apps/web/src/lib/money/BudgetSet.svelte': {
-    ids: ['categories'],
-    why: "Set a budget lists Money's categories by the list's id; SHL-A24 reads it by its role.",
-  },
-  'apps/web/src/lib/money/account-share.ts': {
-    ids: ['accounts', 'books', 'categories', 'organisations', 'transactions'],
-    why: "sharing one account names the lists the share reaches into; SHL-A24 reads each by its role.",
-  },
-  'apps/web/src/lib/money/category-look.ts': {
-    ids: ['certificates', 'count-cash', 'debts', 'goals', 'holdings', 'insurance', 'money-core', 'money-watch', 'property', 'receipts', 'savings-circle', 'splits', 'subscriptions', 'tax-set-aside', 'trips', 'zakat'],
-    why: "`MONEY_PACKS`, the add-ons whose pages wear Money's look though an older install of them says no section; SHL-A24 reads the place off the page or the pack's own declaration.",
-  },
-  'apps/web/src/lib/page/PageView.svelte': {
-    ids: ['accounts', 'books'],
-    why: "Money's pages open their quick add and setup on the accounts and books lists by id; SHL-A24 reads them by their role.",
-  },
-  'apps/web/src/lib/page/row-finish.ts': {
-    ids: ['installments', 'plans'],
-    why: "a plan with nothing left to pay is told by asking its installments list by id; SHL-A24 reads the link off the field.",
-  },
-  'apps/web/src/lib/record/people.ts': {
-    ids: ['organisations'],
-    why: "People's one line counts organisations and shops from the organisations list by id; SHL-A24 reads it by its role.",
-  },
-  'apps/web/src/lib/send/convos.svelte.ts': {
-    ids: ['receipts'],
-    why: "`receipts`, a conversation's own field in a type, which the Receipts add-on's id now spells; SHL-A23 says which of the two the gate reads.",
-  },
-  'apps/web/src/lib/shell/alerts.ts': {
-    ids: ['organisations', 'people', 'tasks', 'things', 'work'],
-    why: "the bell picks a line's glyph by the list its link opens; SHL-A24 reads the list's own place or glyph.",
-  },
-  'apps/web/src/routes/+layout.svelte': {
-    ids: ['credentials'],
-    why: "the sidebar leaves the keys list out because the Keychain row stands for it (Q28 of 29 October); SHL-A24 reads that off the list.",
-  },
-  'apps/web/src/routes/automations/hub.ts': {
-    ids: ['setup-sync'],
-    why: "upkeep the record runs for itself is told by its add-on's id and kept out of the list by default; SHL-A23 has the add-on declare it.",
   },
 };
 
