@@ -4,7 +4,7 @@
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Brings its Gold price widget for Today, which was BrainDog’s own until now.",
+  "changes": "Brings its Gold price widget for Today, which was BrainDog’s own until now, and its gold rates say they restate the night’s net worth in grams of 24k gold, which BrainDog worked out by their names until now.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
