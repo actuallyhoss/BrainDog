@@ -34,9 +34,8 @@ import { undoChange } from '../record/undo-write.ts';
  */
 const DESCRIPTION = 'what';
 
-/** The list a rule goes into, and the list its category points at. */
+/** The list a rule goes into. The list its category points at is read off the rule's own `category` link (`listOf`). */
 export const FILING_RULES = 'filing_rules';
-const CATEGORIES = 'categories';
 
 /** The most entries one capture keeps (`CAPTURE_MOST` in `packages/record/src/methods/capture.ts`). */
 export const CAPTURE_MOST = 8;
@@ -80,7 +79,14 @@ export type Pressed = { ok: true; value: Accepted } | { ok: false; fix: string }
 
 /** A raw id as the record mints one, and a spoken one (`categories#4`): a category the record resolves as it is. */
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/iu;
-const SPOKEN = new RegExp(`^${CATEGORIES}#\\d+$`, 'u');
+const spoken = (list: string): RegExp => new RegExp(`^${list.replace(/[^a-z0-9_-]/giu, '')}#\\d+$`, 'u');
+
+/** The list a declaration's `category` link points at, or `null`: the categories, as the filing rule says them. */
+export function categoryListOf(decl: unknown): string | null {
+  const fields = plainObj(decl) && Array.isArray(decl.fields) ? decl.fields.filter(plainObj) : [];
+  const link = fields.find((f) => f.id === 'category' && f.type === 'ref' && typeof f.to === 'string');
+  return link ? (link.to as string) : null;
+}
 
 const plainObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -130,7 +136,7 @@ function testOf(when: unknown): { match: string; match_by: 'contains' | 'starts'
 }
 
 /** The category the one action sets, as written: a set on `category`, or a link to a category by a name typed out. */
-function categoryOf(then: unknown): string | null {
+function categoryOf(then: unknown, list: string): string | null {
   if (!Array.isArray(then) || then.length !== 1 || !plainObj(then[0])) return null;
   const act = then[0];
   if (plainObj(act.set) && act.set.field === 'category') return text(act.set.to) || null;
@@ -138,7 +144,7 @@ function categoryOf(then: unknown): string | null {
     const to = act.link.to;
     const value = text(to.value);
     /* A NAME TYPED OUT, never a template: `{{what}}` is the category's own Matches, which is Money's rule, not his. */
-    if (to.register !== CATEGORIES || to.by !== 'name' || to.where !== undefined || to.take !== undefined) return null;
+    if (to.register !== list || to.by !== 'name' || to.where !== undefined || to.take !== undefined) return null;
     return value === '' || value.includes('{{') ? null : value;
   }
   return null;
@@ -160,9 +166,9 @@ function onLedger(body: Record<string, unknown>, ledger: string): boolean {
  * `whole` (the categories are every one the record holds), a row id none of them has is `null` too: a category since
  * deleted would have the record refuse the whole press, every time it was pressed.
  */
-function resolved(said: string, categories: readonly CategoryRow[], whole: boolean): string | null {
+function resolved(said: string, categories: readonly CategoryRow[], whole: boolean, list: string): string | null {
   if (ULID.test(said)) return !whole || categories.some((c) => c.id === said) ? said : null;
-  if (SPOKEN.test(said)) return said;
+  if (spoken(list).test(said)) return said;
   const named = categories.filter((c) => fold(c.name) === fold(said));
   return named.length === 1 ? named[0]!.id : null;
 }
@@ -185,10 +191,13 @@ export function importedOf(
     ledgers = [],
     held = [],
     whole = false,
-  }: { categories?: readonly CategoryRow[]; ledgers?: readonly string[]; held?: readonly HeldRule[]; whole?: boolean } = {},
+    list = '',
+  }: { categories?: readonly CategoryRow[]; ledgers?: readonly string[]; held?: readonly HeldRule[]; whole?: boolean; list?: string } = {},
 ): ImportedFound {
   const picked: ImportedRule[] = [];
   const torn = new Set<string>();
+  /* NO CATEGORY LIST KNOWN, NOTHING PICKED: a rule is a text and the category it files under. */
+  if (list === '') return { rules: [] };
   for (const row of rows) {
     if (!plainObj(row) || row.enabled !== true || !plainObj(row.body)) continue;
     if (text(row.pack) !== '' || text(row.project) !== '' || row.body.project !== undefined) continue;
@@ -196,8 +205,8 @@ export function importedOf(
     const ledger = text(row.register);
     if (rule === '' || !ledgers.includes(ledger) || !onLedger(row.body, ledger)) continue;
     const test = testOf(row.body.when);
-    const said = categoryOf(row.body.then);
-    const category = said === null ? null : resolved(said, categories, whole);
+    const said = categoryOf(row.body.then, list);
+    const category = said === null ? null : resolved(said, categories, whole, list);
     if (test === null || category === null) continue;
     const key = fold(test.match);
     const same = picked.find((r) => fold(r.match) === key);
@@ -251,7 +260,7 @@ export function refusalSaid(answer: unknown, fallback: string, labels: Readonly<
 export type Port = {
   automations: () => Promise<unknown>;
   automation: (rule: string) => Promise<unknown>;
-  categories: () => Promise<unknown>;
+  categories: (list: string) => Promise<unknown>;
   /** The filing rules the record holds, as `list` answers a page of them. */
   filingRules: () => Promise<unknown>;
   /** One list's declaration, as `schema(register)` answers it. */
@@ -268,7 +277,7 @@ export function portAt(base: string, io?: Fetch): Port {
   return {
     automations: () => client.automations(),
     automation: (rule) => client.automation(rule),
-    categories: () => client.list({ register: CATEGORIES, limit: 500 }),
+    categories: (list) => client.list({ register: list, limit: 500 }),
     filingRules: () => client.list({ register: FILING_RULES, limit: 500 }),
     /* THROUGH THE BROWSER'S OWN FETCH, where one is passed only to abort a leave: the tab's kept schemas are kept by the
        fetch they went through, so a fetch made per visit asked every list's schema again on every visit. */
@@ -321,8 +330,11 @@ export async function readImported(port: Port): Promise<ImportedFound | null> {
       .map((a) => text(a.rule))
       .filter((r) => r !== '');
     if (rules.length === 0) return null;
+    /* THE CATEGORIES ARE WHERE A FILING RULE'S `category` POINTS, read off its declaration and never named. */
+    const list = categoryListOf(valueOf(await port.schema(FILING_RULES).catch(() => undefined)));
+    if (list === null) return null;
     const bodies = await bodiesOf(port, rules);
-    const page = valueOf(await port.categories());
+    const page = valueOf(await port.categories(list));
     const rows = plainObj(page) && Array.isArray(page.rows) ? page.rows : [];
     const categories = rows.flatMap((c): CategoryRow[] =>
       plainObj(c) && typeof c.id === 'string' && plainObj(c.fields) && text(c.fields.name) !== '' ? [{ id: c.id, name: text(c.fields.name) }] : [],
@@ -337,7 +349,7 @@ export async function readImported(port: Port): Promise<ImportedFound | null> {
         : [],
     );
     const whole = plainObj(page) && page.cursor === null;
-    const found = importedOf(bodies, { categories, ledgers, held, whole });
+    const found = importedOf(bodies, { categories, ledgers, held, whole, list });
     return found.rules.length > 0 ? found : null;
   } catch {
     return null;

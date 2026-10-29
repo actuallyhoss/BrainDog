@@ -39,7 +39,7 @@ const STARTS = auto('tea-corner', {
 const SAID = auto('bakery', { register: LEDGER, when: 'what contains bakery', then: setCat(GROCERIES) });
 
 test('PICKED: on, on a Ledger write, one test of the description, one set of the category', () => {
-  const found = importedOf([HOLDS, STARTS, SAID], { categories: CATS, ledgers: [LEDGER] });
+  const found = importedOf([HOLDS, STARTS, SAID], { categories: CATS, ledgers: [LEDGER], list: 'categories' });
   assert.deepEqual(
     found.rules.map((r) => [r.rule, r.match, r.match_by, r.category]),
     [
@@ -75,19 +75,19 @@ test('NOT PICKED: off, another list, another field, two tests, more than one thi
     auto('j', { on: { every: '1d' }, register: LEDGER, when: { field: 'what', contains: 'X' }, then: setCat('Groceries') }),
     auto('k', { register: LEDGER, when: { field: 'what', contains: 'X' }, then: setCat('') }),
   ];
-  assert.deepEqual(importedOf(not, { categories: CATS, ledgers: [LEDGER] }).rules, []);
+  assert.deepEqual(importedOf(not, { categories: CATS, ledgers: [LEDGER], list: 'categories' }).rules, []);
   /* A SPOKEN ID IS KEPT AS IT IS, and the record resolves it. */
   const spoken = auto('s', { register: LEDGER, when: { field: 'what', starts: 'KIOSK' }, then: setCat('categories#4') });
-  assert.equal(importedOf([spoken], { ledgers: [LEDGER] }).rules[0]?.category, 'categories#4');
+  assert.equal(importedOf([spoken], { ledgers: [LEDGER], list: 'categories' }).rules[0]?.category, 'categories#4');
 });
 
 test('THE SAME TEXT TWICE: one rule and both switched off, or neither where two categories disagree', () => {
   const twin = auto('green-grocer-2', { register: LEDGER, when: 'what holds green  grocer', then: setCat('groceries') });
-  const one = importedOf([HOLDS, twin], { categories: CATS, ledgers: [LEDGER] });
+  const one = importedOf([HOLDS, twin], { categories: CATS, ledgers: [LEDGER], list: 'categories' });
   assert.equal(one.rules.length, 1);
   assert.deepEqual(one.rules[0]?.also, ['green-grocer-2']);
   const torn = auto('green-grocer-3', { register: LEDGER, when: { field: 'what', contains: 'Green Grocer' }, then: setCat('Outings') });
-  assert.deepEqual(importedOf([HOLDS, torn, SAID], { categories: CATS, ledgers: [LEDGER] }).rules.map((r) => r.rule), ['bakery']);
+  assert.deepEqual(importedOf([HOLDS, torn, SAID], { categories: CATS, ledgers: [LEDGER], list: 'categories' }).rules.map((r) => r.rule), ['bakery']);
 });
 
 /** A record in memory: its automations, its categories, and every call the offer made. */
@@ -191,10 +191,10 @@ test('NOT PICKED EITHER: an add-on\'s own, one for a project, two quoted texts, 
     auto('q', { register: LEDGER, when: 'what contains "PIER" or "DOCK"', then: setCat('Groceries') }),
     auto('r', { register: LEDGER, when: { field: 'what', contains: 'X' }, then: setCat('01J9Z3K4M5N6P7Q8R9S0T1V2W8') }),
   ];
-  assert.deepEqual(importedOf(not, { categories: CATS, ledgers: [LEDGER], whole: true }).rules, []);
+  assert.deepEqual(importedOf(not, { categories: CATS, ledgers: [LEDGER], whole: true, list: 'categories' }).rules, []);
   /* A QUOTE THAT HOLDS ITS OWN MARK IS ONE TEXT, as the record reads it. */
   const one = auto('t', { register: LEDGER, when: "what contains 'Joe's cafe'", then: setCat('Outings') });
-  assert.equal(importedOf([one], { categories: CATS, ledgers: [LEDGER] }).rules[0]?.match, "Joe's cafe");
+  assert.equal(importedOf([one], { categories: CATS, ledgers: [LEDGER], list: 'categories' }).rules[0]?.match, "Joe's cafe");
 });
 
 test('A FILING RULE ALREADY THERE: never written twice, the automation only switched off, or left on where it disagrees', async () => {
