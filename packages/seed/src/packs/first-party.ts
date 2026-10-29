@@ -880,12 +880,16 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   sign each amount by which way it goes. Words, a `when` and a `where`, so no step of its own.
  * - work 1.20.0 (also, the recheck of 30 October): Yours and Agents count what Open counts too (`counts:` on a filter of
  *   its own choices, which the kernel now reads). A key on a filter, so no step of its own.
+ * - money-core 3.32.1 (the live check of 30 October): net worth takes away what is left on a plan only where Property
+ *   counts what it buys (`property-left`) and the Debts add-on's balances, never two flats' sixty parts with neither flat
+ *   counted, and Over time says so under its line; the filing rules' line counts lines, one or several; an account's
+ *   balance box says what to type. A figure's parts and words, nothing added or taken away, so a patch step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.0',
   portfolio: '1.30.1',
   people: '4.2.1',
-  'money-core': '3.32.0',
+  'money-core': '3.32.1',
   estate: '2.6.0',
   work: '1.20.0',
 };

@@ -200,6 +200,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.32.1',
+      notes: 'Net worth takes away what a plan still has to pay only where what it buys is counted, so two flats paid in parts no longer read as millions owed with nothing owned, and Over time says so under its line. The filing rules count the lines they filed, one or several. An account says what to type in its balance box.',
+    },
+    {
       version: '3.32.0',
       notes: 'Reports says how much of what comes in repeating bills and instalments take against the money that actually came in over the last three months, and only once there are three months to read. Budgets opens on its bars, all budgets together first, and every budget says what is left or how far over. An account page lists what moved as the Ledger does, and Coming up counts the same next two weeks on Money, Today and its own page, where what is late is listed first. Money\'s Accounts lists every open account, the card too. Budgets says whether each budget is for a week, a month or a year, and you set the most to spend and its period at the foot of the page. A line still waiting to clear counts in no spending figure until it clears: the Ledger lists it apart, and Budgets says how much is waiting. Accounts counts the accounts it lists, says how many balances are out of date, and a card says which digits it ends in. Over time draws Cash\'s line until net worth has a week of nights kept, then net worth\'s. Snapshots heads its list with the newest night, not thirty nights added up, and calls cash and bills together Cash after bills. Money\'s month of budgets says what every budget comes to as a month. An account\'s page opens on its name and what it holds. Payees no longer says nobody was paid over payments that name nobody, and Last paid lists only money out. Bills and invoices show their amounts signed.',
     },
