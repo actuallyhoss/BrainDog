@@ -1241,6 +1241,8 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
     const carriesUnit = (v: unknown): boolean => {
       const q = QUALIFIER[decl.type];
       if (!q) return true;
+      /* BELOW OR ABOVE ZERO IS A SIGN, THE SAME IN EVERY CURRENCY (`signOnly`), so it needs none. */
+      if (signOnly(op, decl.type, v)) return true;
       const half = typeof v === 'object' && v !== null ? (v as Record<string, unknown>)[q.key] : undefined;
       if (half !== undefined && half !== null && half !== '') return true;
       /* TWO CALLS AND NOT A TERNARY INSIDE ONE, so `refusals.mjs` can see both codes: it reads an
@@ -1453,7 +1455,7 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
            same-day instant sorts after the ten characters of its own day, so `after today` kept the
            rows `before today` had already excluded, and the pair was not exclusive. */
         const cmp = `${asDay(decl.type, bound) ? `substr(${path}, 1, 10)` : path} ${sign} ${put(bound)}`;
-        const money = qualifier(field, decl.type, value, put);
+        const money = signOnly(op, decl.type, value) ? '' : qualifier(field, decl.type, value, put);
         /* A ROW WITH NO VALUE IS NOT BEFORE ANYTHING. `IS NOT NULL` is explicit rather than relying
            on SQLite's null comparison, because the same predicate is answered by `evaluate` in
            JavaScript, where `undefined < x` is false and `undefined > x` is also false — two
@@ -1805,7 +1807,7 @@ export function evaluate(
         const a = comparable(raw, value);
         const b = comparable(value, value);
         if (a === null || b === null) return false;
-        if (!sameQualifier(type, raw, value)) return false;
+        if (!signOnly(op, type, value) && !sameQualifier(type, raw, value)) return false;
         if (op === 'gt' || op === 'after') return a > b;
         if (op === 'gte') return a >= b;
         if (op === 'lt' || op === 'before') return a < b;
@@ -1853,6 +1855,19 @@ const fold = (s: string): string => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
  * A currency for money, a unit for a quantity. Every comparison of a compound value has to ask this,
  * and the ones that did not were comparing 24,000 GBP with 24,000 EUR and calling them equal.
  */
+/**
+ * AN AMOUNT COMPARED WITH ZERO, ORDERED, WITH NO CURRENCY: `balance lt { amount: 0 }`. Nought is nought in every currency,
+ * so whether an amount is below or above it is a sign and not a comparison of two currencies' numbers, which is the
+ * mistake a missing currency is refused for. Any other amount, and `is`, `between` and `in`, still need one. A
+ * comparison that does carry a currency is held to it as before.
+ */
+function signOnly(op: string, type: string, value: unknown): boolean {
+  if (type !== 'money' || (op !== 'gt' && op !== 'gte' && op !== 'lt' && op !== 'lte')) return false;
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return v.amount === 0 && (v.currency === undefined || v.currency === null || v.currency === '');
+}
+
 function sameQualifier(type: string, a: unknown, b: unknown): boolean {
   const q = QUALIFIER[type];
   if (!q) return true;

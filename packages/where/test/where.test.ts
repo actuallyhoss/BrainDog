@@ -1421,3 +1421,19 @@ test('AND THE REFUSAL READS AS A SENTENCE WITH THREE KEYS IN THE OBJECT, not as 
      reads it rather than out of the sentence. */
   assert.deepEqual(c.bad[0]!.allowed, ['all', 'any', 'none']);
 });
+
+test('AN AMOUNT ABOVE OR BELOW ZERO IS A SIGN, asked in no currency and the same in every one; any other amount still needs its currency', () => {
+  /* EVERY AMOUNT IN THE ROWS IS ABOVE ZERO, IN POUNDS AND IN EUROS, and the row with none is in no answer. */
+  for (const [where, want] of [
+    [{ field: 'amount', gt: { amount: 0 } }, ['a', 'b', 'c', 'e']],
+    [{ field: 'amount', gte: { amount: 0 } }, ['a', 'b', 'c', 'e']],
+    [{ field: 'amount', lt: { amount: 0 } }, []],
+    [{ field: 'amount', lte: { amount: 0 } }, []],
+  ] as const) {
+    assert.deepEqual(bySql(where as unknown as Predicate), want, JSON.stringify(where));
+    assert.deepEqual(byJs(where as unknown as Predicate), want, JSON.stringify(where));
+  }
+  assert.ok(evaluate({ field: 'amount', lt: { amount: 0 } } as unknown as Predicate, { amount: { amount: -961, currency: 'USD' } }, SCHEMA));
+  for (const where of [{ field: 'amount', lt: { amount: 100 } }, { field: 'amount', is: { amount: 0 } }, { field: 'amount', between: [{ amount: 0 }, { amount: 0 }] }])
+    assert.equal(compile(where as unknown as Predicate, SCHEMA).bad[0]?.code, 'MONEY_LITERAL_NEEDS_CURRENCY', JSON.stringify(where));
+});
