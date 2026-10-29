@@ -1982,6 +1982,14 @@ function meetOne(
     const clean = filled.text.trim();
     if (clean !== '' && !/^[a-z]+:\s*$/u.test(clean)) keys.push(clean);
   }
+  /* A NAME WITH NO LETTER IN IT NAMES NOBODY (live check of 30 October, 10): a bank's "0140" and "8307" are the digits of
+     an account, and meeting them made two organisations Payees then offered as names. The name is left out, and with it
+     a key made of the same digits. */
+  if (named.name !== undefined && !/\p{L}/u.test(named.name)) {
+    const digits = named.name;
+    delete named.name;
+    for (let i = keys.length - 1; i >= 0; i--) if (keys[i]!.slice(keys[i]!.indexOf(':') + 1).trim() === digits) keys.splice(i, 1);
+  }
   const organisation = named.kind === 'organisation';
   if (named.name === undefined && named.email === undefined && named.handle === undefined && keys.length === 0 && !(organisation && named.domain !== undefined))
     return { ok: true, person: null, said: 'Nobody: the name, email, handle and keys it names were all empty.' };
