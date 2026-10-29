@@ -54,3 +54,12 @@ test('A NOTE THAT OPENS ON ITS VERB READS ON FROM THE NAME, and one that opens o
   assert.equal(noteSaid('Imported from Kiln Notes.'), 'imported this from Kiln Notes');
   assert.equal(noteSaid('Halden sent this.'), 'Halden sent this.');
 });
+
+test("A ROW A MEET MADE SAYS WHERE IT CAME FROM: a bank text, or a mail's sender, the person or the organisation", async () => {
+  const { lineWhole } = await import('./timeline.ts');
+  assert.equal(lineWhole('rule:meet-payees', 'created'), 'Filed from a bank text');
+  assert.equal(lineWhole('rule:meet-senders', 'created'), 'Added from a mail');
+  assert.equal(lineWhole('rule:meet-sender-firms', 'created'), 'Added from a mail');
+  assert.equal(lineWhole('rule:meet-senderless', 'created'), null);
+  assert.equal(lineWhole('rule:meet-senders', 'changed'), null);
+});

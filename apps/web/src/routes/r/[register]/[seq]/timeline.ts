@@ -64,7 +64,8 @@ export function lineWhole(by: string, note: string): string | null {
   if (note.trim() !== 'created') return null;
   const rule = /^rule[.:](.+)$/u.exec(by.trim())?.[1];
   if (rule === 'meet-payees') return 'Filed from a bank text';
-  if (rule === 'meet-senders' || rule === 'meet-sender-organisations') return 'Added from a mail';
+  /* A MEET OF A MAIL'S SENDER, the person or the organisation, as the rule's own id says it (`meet-sender…`). */
+  if (rule !== undefined && /^meet-senders?(?:-|$)/u.test(rule)) return 'Added from a mail';
   return null;
 }
 
