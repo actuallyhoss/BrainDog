@@ -197,7 +197,9 @@ export const PEOPLE: Entry[] = entriesOf('people');
 export const OBLIGATIONS: Entry[] = entriesOf('obligations');
 export const SERVICES: Entry[] = entriesOf('services');
 export const TASKS: Entry[] = entriesOf('tasks');
-const CATEGORIES: Entry[] = entriesOf('categories');
+/* THE CATEGORIES ARE THE LIST THE LEDGER FILES A LINE UNDER, read off the ledger's own link as the app reads it
+   (`money/ledger.ts`), so the sample names no list the ledger does not point at. */
+const CATEGORIES: Entry[] = entriesOf(String((SEED_REGISTERS.transactions?.fields ?? []).find((f) => f.id === 'category')?.to ?? ''));
 
 /**
  * MONEY'S LEDGER WAS IN THE SEED AND NOT IN THIS INDEX, which is the whole of the bug.
