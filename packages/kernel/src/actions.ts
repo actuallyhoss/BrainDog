@@ -1443,6 +1443,12 @@ export async function runActions(
     else if (outcome === 'dropped') out.dropped++;
     else out.refused++;
   }
+  /* A FULL LEASE MAY HAVE LEFT MORE BEHIND IT, so the host goes again now (recheck of 30 October, live 1). A sweep that
+     queued sixty scripts at once ran five an alarm, and nothing woke the record for the rest: a script's job is no row
+     of the schedule and no queue delivers it, so the fifty-five waited for the next hour's alarm, five at a time, and
+     his newest payment, last in the line, waited most of a day to be matched. Only when something here ran, so a pass
+     whose jobs were all held at the allowance does not spin. */
+  if (leased.length >= n && out.ran > 0) out.more = true;
   return out;
 }
 
