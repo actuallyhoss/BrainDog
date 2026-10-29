@@ -26,7 +26,7 @@ const FIELDS = [
   { id: 'on', type: 'day' },
   { id: 'live', type: 'bool' },
 ];
-const SAID = { night: 'worth_units', price: 'per_unit', day: 'on', match: { grade: 'pure', live: true } };
+const SAID = { night: 'worth_units', unit: 'per_unit', day: 'on', match: { grade: 'pure', live: true } };
 const NIGHT = new Map([['worth_units', 'decimal']]);
 const same = (amount: number, from: string, to: string): number | null => (from === to ? amount : null);
 
@@ -54,8 +54,8 @@ test('NOTHING IS WRITTEN where the night does not declare the field, no price re
 
 test('A DECLARED RESTATES NAMES THIS LIST\'S MONEY AND DAY FIELDS, and what it matches on', () => {
   assert.equal(restatesFault('register.prices', FIELDS, SAID), null);
-  assert.equal(restatesFault('register.prices', FIELDS, { night: 'worth_units', price: 'per_unit', day: 'on' }), null);
-  assert.equal(restatesFault('register.prices', FIELDS, { ...SAID, price: 'grade' })?.at, 'restates.price');
+  assert.equal(restatesFault('register.prices', FIELDS, { night: 'worth_units', unit: 'per_unit', day: 'on' }), null);
+  assert.equal(restatesFault('register.prices', FIELDS, { ...SAID, unit: 'grade' })?.at, 'restates.unit');
   assert.equal(restatesFault('register.prices', FIELDS, { ...SAID, day: 'per_unit' })?.at, 'restates.day');
   assert.equal(restatesFault('register.prices', FIELDS, { ...SAID, night: 'Worth Units' })?.at, 'restates.night');
   assert.equal(restatesFault('register.prices', FIELDS, { ...SAID, match: { karat: 'pure' } })?.at, 'restates.match.karat');
