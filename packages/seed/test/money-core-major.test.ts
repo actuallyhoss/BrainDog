@@ -139,12 +139,14 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
   assert.equal(bankHsbcEgFile().version, '1.7.3');
   /* AND MERCURY 1.2.0 (batch 42): its accounts met by name on first contact, a minor step of its own, with no
      floor of money-core moved. */
-  assert.equal(mercuryFile().version, '1.2.1');
-  for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
+  /* AND MERCURY 1.3.0 (SHL-A23): it marks each account it keeps with money-core's `no_feed`, which 3.31.0 declares, so
+     its floor moves there. */
+  assert.equal(mercuryFile().version, '1.3.0');
+  for (const [name, doc, held] of [['bank-hsbc-eg', bankHsbcEgFile(), ['3.10.0', '3.31.0']], ['mercury', mercuryFile(), ['3.31.0']]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(
-      ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0', '3.10.0', '4.0.0'].filter((v) => satisfies(v, range)),
-      ['3.10.0'],
+      ['1.7.0', '1.8.0', '2.0.0', '2.9.0', '3.0.0', '3.9.0', '3.10.0', '3.31.0', '4.0.0'].filter((v) => satisfies(v, range)),
+      [...held],
       name,
     );
   }
