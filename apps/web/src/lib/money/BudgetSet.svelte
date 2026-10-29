@@ -15,8 +15,11 @@
   import { updateRow } from '$lib/record/page-write.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import type { Ledger } from './ledger.ts';
 
-  let { onsaved }: { onsaved?: (() => void) | undefined } = $props();
+  /* THE CATEGORIES ARE THE LIST THE LEDGER FILES A LINE UNDER (`ledger.ts`), handed by the page, never named here: its
+     title, the state a category is put away by and the way it spends are the list's own fields. */
+  let { category, onsaved }: { category: NonNullable<Ledger['category']>; onsaved?: (() => void) | undefined } = $props();
 
   type Period = 'week' | 'month' | 'year';
   type Line = { seq: number; version: number; name: string; minor: number | null; currency: string | null; period: Period; typed: string };
@@ -42,9 +45,16 @@
   const isPeriod = (v: unknown): v is Period => v === 'week' || v === 'month' || v === 'year';
   const shown = (minor: number | null): string => (minor === null ? '' : String(Math.round(minor) / 100).replace(/\.0+$/u, ''));
 
+  /** The categories one spends in that are not put away, as the list's own fields say it. */
+  const spending = (): string =>
+    [category.state && category.done.length > 0 ? `${category.state} is not ${category.done.join(' or ')}` : '', category.way ? `${category.way.field} is ${category.way.out}` : '']
+      .filter((c) => c !== '')
+      .join(', ');
+
   async function read() {
+    const where = spending();
     const out = await createClient({ base: apiBase() })
-      .list({ register: 'categories', where: { toJSON: () => 'state is live, direction is out' } as never, limit: 200, order: [{ field: 'name', dir: 'asc' }] as never })
+      .list({ register: category.list, ...(where !== '' ? { where: { toJSON: () => where } as never } : {}), limit: 200, order: [{ field: category.title, dir: 'asc' }] as never })
       .catch(() => null);
     if (!out?.ok) {
       lines = [];
@@ -54,14 +64,15 @@
     const home = homeCurrency();
     lines = (out.value.rows as { seq?: unknown; version?: unknown; fields?: Record<string, unknown> }[]).flatMap((r) => {
       const f = r.fields ?? {};
-      if (typeof r.seq !== 'number' || typeof f.name !== 'string') return [];
+      const name = f[category.title];
+      if (typeof r.seq !== 'number' || typeof name !== 'string') return [];
       const b = f.budget as { amount?: unknown; currency?: unknown } | null | undefined;
       const minor = b && typeof b.amount === 'number' ? b.amount : null;
       return [
         {
           seq: r.seq,
           version: typeof r.version === 'number' ? r.version : 0,
-          name: f.name,
+          name,
           minor,
           currency: b && typeof b.currency === 'string' ? b.currency : home,
           period: isPeriod(f.budget_period) ? f.budget_period : 'month',
@@ -77,7 +88,7 @@
 
   async function save(l: Line, patch: Record<string, unknown>, said: string) {
     busy = l.seq;
-    const out = await updateRow(apiBase(), { register: 'categories', seq: l.seq, version: l.version }, patch, l.name);
+    const out = await updateRow(apiBase(), { register: category.list, seq: l.seq, version: l.version }, patch, l.name);
     busy = null;
     if (out.from !== 'written') {
       toasts.push(out.fix, { intent: 'warn' });

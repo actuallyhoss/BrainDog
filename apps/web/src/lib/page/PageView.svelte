@@ -1083,7 +1083,7 @@
     />
     </div>
     <!-- BUDGETS SETS ITS BUDGETS, a week's, a month's or a year's, at its foot (`BudgetSet.svelte`), placed as the offer is. -->
-    {#if slug === 'money-budgets' && !shapeWaits && !arranging && writes}<div class="page-offer" data-after="blocks">{#await import('$lib/money/BudgetSet.svelte') then { default: BudgetSet }}<BudgetSet onsaved={() => void reread()} />{/await}</div>{/if}
+    {#if slug === 'money-budgets' && !shapeWaits && !arranging && writes && ledgerHere?.category}<div class="page-offer" data-after="blocks">{#await import('$lib/money/BudgetSet.svelte') then { default: BudgetSet }}<BudgetSet category={ledgerHere.category} onsaved={() => void reread()} />{/await}</div>{/if}
     <!-- THE OFFER COMES AFTER EVERY BLOCK OF THE PAGE, never before the first. -->
     {#if offer && !shapeWaits}<div class="page-offer" data-after="blocks">{@render offer()}</div>{/if}
     {#if hosting}<BatchBar {picked} />{/if}
