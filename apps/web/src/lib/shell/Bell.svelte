@@ -27,10 +27,18 @@
   import { apiBase, at } from '../at.ts';
   import { agoOf, bellDays, bellLines, kindOf, unreadBy, type BellLine, type Day } from './alerts.ts';
   import Icon from '../ui/Icon.svelte';
+  import { isGlyph, type IconName } from '../ui/icons.ts';
+  import { REGISTERS } from '../record/held.ts';
   import Sheet from '../ui/Sheet.svelte';
   import { settled } from '../ui/panel.ts';
   import { frame } from './frame.svelte.ts';
   import type SentTrayView from '../send/SentTray.svelte';
+
+  /** A list's own glyph, as its declaration gives it, for a line that opens it (`kindOf`). */
+  const glyphOf = (list: string): IconName | undefined => {
+    const icon = REGISTERS[list]?.icon;
+    return icon && isGlyph(icon) ? icon : undefined;
+  };
 
   let { phone = false }: { phone?: boolean } = $props();
   const uid = $props.id();
@@ -256,7 +264,7 @@
             <li>
               <a class="bell-row" data-bell-item data-unread={isNew ? '' : undefined} href={at(l.href)}>
                 <span class="bell-new" aria-hidden="true"></span>
-                <span class="bell-kind" aria-hidden="true"><Icon name={kindOf(l.href, l.tone)} size="s" /></span>
+                <span class="bell-kind" aria-hidden="true"><Icon name={kindOf(l.href, l.tone, glyphOf)} size="s" /></span>
                 <span class="bell-said" dir="auto">{#if isNew}<span class="sr-only">{words.unread}</span>{/if}{l.text}{#if l.n > 1}<span class="bell-times">{` · ${words.times(l.n)}`}</span>{/if}</span>
                 <time class="bell-ago num" datetime={l.at}>{agoOf(l.at, now)}</time>
               </a>

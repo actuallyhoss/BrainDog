@@ -49,3 +49,13 @@ test('only a handoff line is a handoff', () => {
   assert.equal(handoffAlert({ id: '1', kind: 'state', to: 'active' }), null);
   assert.equal(handoffAlert({ id: '1', kind: 'state', to: 'handoff', note: 'Pick up the tests' })?.goto, '/p/agents');
 });
+
+test("A LINE INTO A LIST WEARS THAT LIST'S OWN GLYPH, and a question, a run, an alarm and a list nobody declared their own", async () => {
+  const { kindOf } = await import('./alerts.ts');
+  const glyph = (list: string) => (list === 'purses' ? 'wallet' : undefined);
+  assert.equal(kindOf('/r/purses/3', undefined, glyph), 'wallet');
+  assert.equal(kindOf('/r/unknown/3', undefined, glyph), 'activity');
+  assert.equal(kindOf('/decide', undefined, glyph), 'decide');
+  assert.equal(kindOf('/jobs/2', undefined, glyph), 'session');
+  assert.equal(kindOf('/r/purses/3', 'bad', glyph), 'alert');
+});

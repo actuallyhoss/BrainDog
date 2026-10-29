@@ -117,22 +117,20 @@ export function agoOf(at: string, now: number = Date.now()): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() === new Date(now).getFullYear() ? '' : ` ${d.getFullYear()}`}`;
 }
 
-/** The glyph a line wears, by what it is about: a question, money, work, a project, a person, an agent, or the log. */
-export type BellKind = 'decide' | 'money' | 'task' | 'projects' | 'people' | 'session' | 'alert' | 'activity';
+/** The glyph a line wears, by what it is about: a question, an agent's run, an alarm, or the list its link opens. */
+export type BellKind = 'decide' | 'session' | 'alert' | 'activity';
 
-const MONEYISH = /^(?:ledger|entries|transactions|bills|invoices|obligations|accounts|payees|recurring|installments|plans|budgets|categories|snapshots|books|rates)$/u;
-
-export function kindOf(href: string, tone?: Tone): BellKind {
+/**
+ * A LINE INTO A LIST WEARS THAT LIST'S OWN GLYPH, as its declaration gives it (`icon`) and the rail draws it, so the bell
+ * names no list: `glyph` answers a list's declared glyph, or nothing for a list this tab has no declaration for, which
+ * wears the log's. A question, an agent's run and an alarm are where the link goes, not a list.
+ */
+export function kindOf<G extends string = never>(href: string, tone?: Tone, glyph: (list: string) => G | undefined = () => undefined): BellKind | G {
   if (tone === 'bad') return 'alert';
   if (href.startsWith('/decide')) return 'decide';
   if (href.startsWith('/p/agents') || href.startsWith('/jobs')) return 'session';
   const list = /^\/r\/([^/?#]+)/u.exec(href)?.[1] ?? '';
-  if (MONEYISH.test(list)) return 'money';
-  if (list === 'tasks' || list === 'work') return 'task';
-  if (list === 'things') return 'projects';
-  if (list === 'people' || list === 'orgs' || list === 'organisations') return 'people';
-  if (list === 'sessions' || list === 'runs') return 'session';
-  return 'activity';
+  return (list !== '' ? glyph(decodeURIComponent(list)) : undefined) ?? 'activity';
 }
 
 /** The first hearing only seeds what is already there, so opening the app never rings for old questions. */
