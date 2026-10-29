@@ -1052,10 +1052,13 @@ function sampleRate(home: string | null): string {
   return dollars >= 0.5 ? `${write(1, home)} = ${write(dollars, 'USD')}` : `${write(1, 'USD')} = ${write(1 / dollars, home)}`;
 }
 
-/** A sample figure rounded as a person would say it: three figures from a thousand up, two under. */
+/**
+ * A sample figure rounded as a person would say it, and plainly a round one: two figures at most (live check of 30
+ * October, 4), so "EGP 1,210,000" and "EGP 383,000" read as his own numbers where "EGP 1,200,000" and "EGP 380,000" do not.
+ */
 const sampleRound = (n: number): number => {
   if (n < 10) return Math.max(1, Math.round(n));
-  const keep = n >= 1000 ? 3 : 2;
+  const keep = 2;
   const step = 10 ** (Math.floor(Math.log10(n)) + 1 - keep);
   return Math.round(n / step) * step;
 };
