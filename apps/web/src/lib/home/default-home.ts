@@ -483,7 +483,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
      each of six rows read as a ledger, and how late it is says more than the day it was due (`homeDrawn`). */
   const lateMoney: PageBlock = {
     kind: 'spec',
-    ...widget('late-money'),
+    ...widget('overdue-money'),
     heading: voice.overdue,
     icon: 'clock',
     source: 'deadlines',

@@ -61,7 +61,7 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   assert.deepEqual(raw.filter((b) => b.area !== undefined), []);
   /* EVERY WIDGET OF THE BOARD IS KEYED (the widgets plan of 29 October, §4.1), and the late band's four reads with it. */
   assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [
-    ['needs-you', 5], ['late', undefined], ['late-money', undefined], ['to-check', undefined], ['urgent', undefined],
+    ['needs-you', 5], ['late', undefined], ['overdue-money', undefined], ['to-check', undefined], ['urgent', undefined],
     ['cash', 3], ['numbers', 12], ['coming-up', 3], ['work-due', undefined], ['arrivals', undefined],
   ]);
 });
