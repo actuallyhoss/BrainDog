@@ -267,7 +267,7 @@
       if (finish?.key !== key) finish = null;
       if (!of) return;
       void import('./row-finish.ts')
-        .then((m) => m.finishFor(apiBase(), of.register, of.seq))
+        .then((m) => m.finishFor(apiBase(), of.register, of.seq, (route.data as { lists?: { id: string; kernel?: true }[] }).lists ?? []))
         .then((f) => {
           if (f && spoken === key) finish = { key, said: f.said };
         })
@@ -549,6 +549,10 @@
      THE LEDGER IS FOUND FROM THE DECLARATIONS (`quick.ledger`), never named. A page that draws the ledger or its accounts
      offers Import a statement in its ⋯ menu, and an account's own page opens it on that account. */
   const ledgerHere = $derived(mode === 'page' && live && quick.base === apiBase() ? quick.ledger : null);
+  /** The ledger's book list (`ledger.ts` `book`), which Money's home and each book's page draw Which book over. */
+  const bookHere = $derived(ledgerHere?.book ?? null);
+  /** Whether this page is one row of the ledger's accounts, which an owner may share as a household view. */
+  const accountPage = $derived(ledgerHere !== null && about?.register === ledgerHere.account.list);
   const importHref = $derived.by(() => {
     if (!ledgerHere || !live || !shell?.me || !may(shell, 'append', ledgerHere.list)) return null;
     const about = live.page.page.identity;
@@ -907,7 +911,7 @@
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
-  {#if about?.register === 'accounts' && sharable && !arranging}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="line" seq={about.seq} name={about.title} />{/await}{/if}
+  {#if accountPage && about && sharable && !arranging}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="line" seq={about.seq} name={about.title} />{/await}{/if}
 
   <!-- THE PAGE'S OWN BUTTONS, drawn once: at the end of the name's row, or on the lead tile's first row. -->
   {#snippet pageButtons()}
@@ -931,7 +935,7 @@
         <!-- SHARE WITH PEOPLE IS SHARE'S FIRST CHOICE, for an owner or an Admin, so the head stays two. -->
         <!-- ONE SHARE ON AN ACCOUNT (audit of 30 October, 19): its first choice is sharing the account, the sheet
              `AccountShare.svelte` draws, where Share and "Share this account" stood side by side. -->
-        {@const account = about?.register === 'accounts' && sharable ? about : null}
+        {@const account = accountPage && sharable ? about : null}
         <ShareMenu {slug} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />
         {#if sharing && sharable && !account}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
         {#if account}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="sheet" ask={accountAsk} seq={account.seq} name={account.title} />{/await}{/if}
@@ -981,9 +985,9 @@
   <!-- WHICH BOOK, under the name of Money's home and of each book's page: Everything, then Personal and each business,
        where the record keeps two or more. -->
   {#snippet bookScope()}
-    {#if moneyPage && !showSource && (live.page.page.page === 'money' || about?.register === 'books')}
+    {#if moneyPage && !showSource && bookHere && (live.page.page.page === 'money' || about?.register === bookHere.list)}
       {#await import('$lib/money/BookScope.svelte') then { default: BookScope }}
-        <BookScope base={apiBase()} on={about?.register === 'books' ? about.seq : null} />
+        <BookScope base={apiBase()} book={bookHere} on={about?.register === bookHere.list ? about.seq : null} />
       {/await}
     {/if}
   {/snippet}
@@ -1033,7 +1037,7 @@
   {#if strip && !led}
     <div class="page-filters">{@render narrow()}</div>
   {/if}
-  {#if !tiled && moneyPage && about?.register === 'books'}<div class="page-filters">{@render bookScope()}</div>{/if}
+  {#if !tiled && moneyPage && bookHere && about?.register === bookHere.list}<div class="page-filters">{@render bookScope()}</div>{/if}
 
 
   {#if showSource}

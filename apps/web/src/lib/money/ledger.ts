@@ -60,6 +60,11 @@ export type Ledger = {
   mark: string | null;
   /** The field one line's parts are kept in, each a category and its share of the amount (`parts_of`), when there is one. */
   parts?: string | null;
+  /**
+   * THE BOOK: a list the account links to that the ledger's lines link to as well (Personal, and each business), with the
+   * account's field that names it, when there is one.
+   */
+  book?: ({ field: string } & SideList) | null;
 };
 
 /** A value that sends money out, and one that brings it in, by their own words (`money-way.ts` reads them the same). */
@@ -143,6 +148,10 @@ export function ledgerFrom(decl: RegisterDecl, byId: ReadonlyMap<string, Registe
     .map((x) => ({ ...x, read: categoryOf(x.target, ways) }))
     .filter((x) => x.read.way !== null)
     .sort((a, b) => Number(b.f.index === true) - Number(a.f.index === true))[0];
+  const lineLinks = new Set(refs.map((f) => f.to));
+  const bookF = accountDecl.fields.find(
+    (f) => live(f) && f.type === 'ref' && typeof f.to === 'string' && f.to !== accountDecl.id && f.to !== decl.id && f.to !== categoryF?.target.id && lineLinks.has(f.to) && byId.has(f.to),
+  );
   const note = decl.fields.find((f) => live(f) && f.type === 'text' && f.id !== decl.title && f.search !== true && f.required !== true);
   const mark = fieldOf(decl, pairs?.mark);
   const split = splitAtOf(decl);
@@ -159,6 +168,7 @@ export function ledgerFrom(decl: RegisterDecl, byId: ReadonlyMap<string, Registe
     note: note?.id ?? null,
     mark: mark?.type === 'bool' ? mark.id : null,
     ...(split?.of === amount.id ? { parts: split.field } : {}),
+    book: bookF ? { field: bookF.id, ...sideOf(byId.get(bookF.to!)!) } : null,
   };
 }
 

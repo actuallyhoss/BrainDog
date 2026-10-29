@@ -6,15 +6,17 @@
   LINKS, NOT A FILTER: each book already has its own page (`money-book`, one per row of `books`), and Money's home is
   everything. So the row is a `nav` of addresses, and the back button walks it as a person would expect.
 
-  It reads the books once, by name, through the record's ordinary `list`; a refusal or a slow read draws nothing.
+  It reads the books once through the record's ordinary `list`; a refusal or a slow read draws nothing. WHICH LIST THE
+  BOOKS ARE IS THE LEDGER'S TO SAY (`ledger.ts` `book`), handed by the page, never named here.
 -->
 <script lang="ts">
   import { createClient } from '@braindog/client';
 
   import { at } from '../at.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
+  import type { SideList } from './ledger.ts';
 
-  let { base, on }: { base: string; on: number | null } = $props();
+  let { base, book, on }: { base: string; book: SideList; on: number | null } = $props();
 
   type Book = { seq: number; name: string };
   let books = $state<Book[]>([]);
@@ -23,13 +25,16 @@
     const client = createClient({ base });
     let gone = false;
     void client
-      .list({ register: 'books', limit: 12, order: [{ field: 'name', dir: 'asc' }] })
+      .list({ register: book.list, limit: 12, order: [{ field: book.title, dir: 'asc' }] })
       .then((got) => {
         if (gone || !got.ok) return;
         const rows = ((got.value as { rows?: unknown } | null)?.rows ?? []) as { seq?: unknown; fields?: Record<string, unknown> }[];
         books = rows
           .filter((r) => typeof r.seq === 'number')
-          .map((r) => ({ seq: r.seq as number, name: typeof r.fields?.name === 'string' && r.fields.name.trim() ? r.fields.name.trim() : `Book ${r.seq}` }));
+          .map((r) => {
+            const name = r.fields?.[book.title];
+            return { seq: r.seq as number, name: typeof name === 'string' && name.trim() ? name.trim() : `Book ${r.seq}` };
+          });
       })
       .catch(() => undefined);
     return () => {
@@ -43,7 +48,7 @@
     <Segmented tag="nav" aria-label="Which book" full>
       <a class="segment" href={at('/p/money')} data-on={on === null ? '' : undefined} aria-current={on === null ? 'page' : undefined}>Everything</a>
       {#each books as b (b.seq)}
-        <a class="segment" href={at(`/r/books/${b.seq}`)} data-on={on === b.seq ? '' : undefined} aria-current={on === b.seq ? 'page' : undefined}>{b.name}</a>
+        <a class="segment" href={at(`/r/${book.list}/${b.seq}`)} data-on={on === b.seq ? '' : undefined} aria-current={on === b.seq ? 'page' : undefined}>{b.name}</a>
       {/each}
     </Segmented>
   </div>

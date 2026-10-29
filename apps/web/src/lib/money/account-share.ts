@@ -50,21 +50,17 @@ export function shareListsOf(decls: readonly RegisterDecl[]): ShareLists | null 
   if (!ledger) return null;
   const byId = new Map(decls.map((d) => [d.id, d]));
   const own = byId.get(ledger.list);
-  const account = byId.get(ledger.account.list);
-  if (!own || !account) return null;
+  if (!own || !byId.has(ledger.account.list)) return null;
   const refs = (d: RegisterDecl) => d.fields.filter((f) => live(f) && f.type === 'ref' && typeof f.to === 'string' && f.to !== d.id);
   const cat = ledger.category ? byId.get(ledger.category.list) : undefined;
-  const taken = new Set([ledger.list, ledger.account.list, ledger.category?.list]);
-  /* THE BOOK: a list the account links to that its lines link to as well. */
-  const lineLinks = new Set(refs(own).map((f) => f.to));
-  const bookF = refs(account).find((f) => !taken.has(f.to) && lineLinks.has(f.to));
+  const taken = new Set([ledger.list, ledger.account.list, ledger.category?.list, ledger.book?.list]);
   const payeeF = refs(own).find((f) => !taken.has(f.to) && byId.get(f.to!)?.org !== undefined);
   return {
     account: ledger.account.list,
     ledger: ledger.list,
     on: ledger.account.field,
     categories: cat ? { list: cat.id, hide: cat.fields.filter((f) => live(f) && f.type === 'money').map((f) => f.id) } : null,
-    book: bookF ? { list: bookF.to!, field: bookF.id } : null,
+    book: ledger.book ? { list: ledger.book.list, field: ledger.book.field } : null,
     payees: payeeF ? { list: payeeF.to!, field: payeeF.id } : null,
   };
 }
