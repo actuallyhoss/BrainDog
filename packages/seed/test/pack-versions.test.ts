@@ -2400,7 +2400,7 @@ const DECLARED: Record<string, Version> = {
       '`script.post_due` reads only `no_feed` on an account, which a feed now sets on every account it keeps, where it read Mercury\'s and Stripe\'s own fields; no id added or taken away -> 623dd507e74ef839',
       '`metric.stripe-below-zero-count` asks a balance below zero in any currency, where it listed seven; no id added or taken away -> ff3bf8c8c1a23e75',
       "Money 3.32.1, the live check of 30 October: `metric.net-worth` takes away `metric.property-left` and `metric.debts-left` where it took away `metric.owed-over-time`, Over time on `page.money` says why under its line, `page.money-rules` counts lines filed, and `page.money-account`'s balance box says what to type; no id added or taken away -> 1e6d0d90bb453254",
-      'Both 3.32.1 patches of 30 October together: the feed and Stripe reads with `metric.property-left` in net worth; no id taken away -> 21c7791ef5ca6739',
+      'Both 3.32.1 patches of 30 October together: `script.post_due` reads `no_feed` and `metric.net-worth` takes away what is left on counted plans; no id taken away -> 21c7791ef5ca6739',
     ],
   },
   'work@1.17.0': {

@@ -112,7 +112,10 @@
        redirect is a single dashboard Redirect Rule. */
     "production": {
       "routes": [{ "pattern": "brain.dog", "custom_domain": true }],
-      "services": [{ "binding": "APP", "service": "braindog-production" }]
+      "services": [{ "binding": "APP", "service": "braindog-production" }],
+      /* NO SCHEDULE: the uptime check moved to `apps/watchdog`, but a deploy keeps a cron it is not told to drop, so the
+         old every-minute trigger kept firing into a Worker with no `scheduled()` and failed once a minute. */
+      "triggers": { "crons": [] }
     },
 
     /* EACH ENVIRONMENT HANDS ITS APP'S DOORS TO ITS OWN APP. A service binding in place of
@@ -145,6 +148,7 @@
        serve production's record on alpha's name, and the same test fails on it. */
     "alpha": {
       "routes": [{ "pattern": "alpha.brain.dog", "custom_domain": true }],
+      "triggers": { "crons": [] },
       "assets": {
         "directory": "build-alpha",
         "not_found_handling": "404-page",
