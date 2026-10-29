@@ -11,9 +11,9 @@ import { MONEY } from './shared.ts';
  * Insurance, Debts), so the parts that read them are `optional`: a record without the add-on adds nothing for it, and
  * one that takes it later adds it from that night on (`SumOf` in `packages/kernel/src/metrics.ts`).
  *
- * A PROPERTY IS ADDED AT WHAT IT IS WORTH, AND ITS PARTS STILL TO PAY ARE TAKEN AWAY WITH EVERY OTHER INSTALMENT. Equity is
- * worth less what is left on the plan, so adding equity and taking away every instalment left would take the flat's
- * parts away twice.
+ * A PROPERTY IS ADDED AT WHAT IT IS WORTH, AND ITS PARTS STILL TO PAY ARE TAKEN AWAY WITH IT. Equity is worth less what
+ * is left on the plan, so adding equity and taking away the parts left would take the flat's parts away twice. A plan
+ * whose purchase is counted nowhere is taken away nowhere either (`net-worth` says why).
  */
 export const WORTH_FIGURES: Record<string, SeedMetric> = {
   /* WHAT IS HELD BEYOND THE BANK, AT WHAT IT IS WORTH NOW. Each part is an add-on's own figure, read as its page reads it. */
@@ -66,7 +66,13 @@ export const WORTH_FIGURES: Record<string, SeedMetric> = {
         { metric: 'owed-to-you' },
         { metric: 'held-beyond-cash' },
         { metric: 'owed-by-you', minus: true },
-        { metric: 'owed-over-time', minus: true },
+        /* WHAT IS LEFT ON A PLAN IS TAKEN AWAY ONLY WHERE WHAT IT BUYS IS COUNTED (live check of 30 October, 3): his net
+           worth read −EGP 38.7M, two flats' sixty parts still to pay taken away and neither flat counted, since he keeps
+           no Property add-on. So the parts left are taken away as Property counts them, on plans with a value
+           (`property-left`, beside `property-value` in `held-beyond-cash`), and with the Debts add-on's balances; a plan
+           whose purchase is counted nowhere is neither added nor taken away. Still to pay over time says it whole. */
+        { metric: 'property-left', optional: true, minus: true },
+        { metric: 'debts-left', optional: true, minus: true },
       ],
     },
     format: MONEY,

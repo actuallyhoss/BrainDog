@@ -10,7 +10,9 @@
 /** What is a row of a widget: a late line, a question, a run, a list's line, a card, a feed's line. */
 const ROWS = '.ln, .qa, .run, li, tr, .cards-item, .feed-row, [data-row]';
 /** What is a widget's foot, which always shows. */
-const FOOT = '.late-more, .block-more, .block-slice, .queue-more, .p-more, [data-needs-foot], .signs-line, .t-more, .more, .r-more, [data-draft-mark]';
+/* AND A TILE'S OWN DOOR AT ITS FOOT (`.l-foot`, `.tile-link`): Arrivals' "Activity" was no foot, so its "3 more" was drawn
+   on top of it (live check of 30 October, 7). */
+const FOOT = '.late-more, .block-more, .block-slice, .queue-more, .p-more, [data-needs-foot], .signs-line, .t-more, .more, .r-more, [data-draft-mark], .l-foot, .tile-link';
 /** A foot that is the widget's own "N more" or "All …" link, which already says there is more. */
 const SAYS_MORE = /\b(?:more|all)\b/iu;
 /**
@@ -90,8 +92,12 @@ export function fitBoard(board: HTMLElement): void {
       for (const f of quiet) marks.push([f.el, 1]);
     }
     const { says, cutAt } = p;
-    rows.forEach((row, i) => marks.push([row, rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1 ? 1 : 0]));
-    const left = says ? past(cutAt) : 0;
+    /* ONE ROW AT LEAST, WHEN THERE ARE ROWS (live check of 30 October, 7): Arrivals drew its title, "3 more" and nothing,
+       its first line taller than the room under the title. The first row stays and the frame clips what runs past it. */
+    const first = rects.findIndex((r) => r.height > 0);
+    const keepFirst = first >= 0 && !p.shown;
+    rows.forEach((row, i) => marks.push([row, !(keepFirst && i === first) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1 ? 1 : 0]));
+    const left = says ? past(cutAt) - (keepFirst ? 1 : 0) : 0;
     if (left > 0 && kept.length > 0) {
       delete frame.dataset.more;
       before.push([kept[0]!.el, `${left} more`]);

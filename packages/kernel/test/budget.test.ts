@@ -170,3 +170,12 @@ test('NO BUDGET IS NO CEILING, which is the self-host: nothing is reserved and n
   assert.deepEqual(seen.released, []);
   assert.equal(out.more, false);
 });
+
+test('A FULL LEASE SAYS THERE MAY BE MORE, so a backlog of queued scripts is not left for the next hour', async () => {
+  /* Five leased of five asked: the queue may hold more behind them, and the host goes again now. The recheck of 30
+     October found sixty scripts a sweep queued running five an hour, the newest payment last. */
+  const full = counted((j) => paged(j.id, 1), ['a', 'b', 'c', 'd', 'e'].map(job));
+  assert.equal((await pass(full.steps)).more, true);
+  const short = counted((j) => paged(j.id, 1), ['a', 'b'].map(job));
+  assert.equal((await pass(short.steps)).more, false);
+});

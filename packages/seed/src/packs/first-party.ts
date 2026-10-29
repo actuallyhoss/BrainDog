@@ -866,6 +866,10 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   says no on the accounts it keeps (Mercury 1.3.0, Stripe 1.5.0), so Money reads no feed's own field. A Stripe
  *   balance below zero is read in any currency, below zero being a sign, where seven currencies were listed. A script's
  *   words and a filter, so a patch step.
+ * - money-core 3.32.1 (also, the live check of 30 October): net worth takes away what is left on a plan only where Property
+ *   counts what it buys (`property-left`) and the Debts add-on's balances, never two flats' sixty parts with neither flat
+ *   counted, and Over time says so under its line; the filing rules' line counts lines, one or several; an account's
+ *   balance box says what to type. A figure's parts and words, nothing added or taken away, so a patch step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.0',

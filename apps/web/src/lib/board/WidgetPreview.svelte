@@ -83,7 +83,9 @@
   <header class="wp-head">
     <span class="wp-icon" aria-hidden="true"><Icon name={icon} size="s" /></span>
     <span class="wp-title">{title}</span>
-    {#if example && size !== 'small' && size !== 'tall'}<span class="wp-tag">{sheetWords.example}</span>{/if}
+    <!-- AT EVERY SIZE (live check of 30 October, 4): the sheet draws most add-ons Small, where the word was left out, so
+         "Car 62% of EGP 1,200,000" read as his own savings. -->
+    {#if example}<span class="wp-tag">{sheetWords.example}</span>{/if}
   </header>
 
   {#if waiting && reading === null}

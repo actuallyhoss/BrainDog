@@ -1,5 +1,5 @@
 /**
- * MONEY-CORE 3.30.0, PEOPLE 4.0.0 AND PORTFOLIO 1.30.0 AS c78754bdd (master before round 1030) DECLARED THEM, as the parts this build changed or
+ * MONEY-CORE 3.30.0 (taken back from 3.32.1, the live check's patch, whose one page outside the round is `page.money-rules`), PEOPLE 4.0.0 AND PORTFOLIO 1.30.0 AS c78754bdd (master before round 1030) DECLARED THEM, as the parts this build changed or
  * added, so every rebuild of an older version starts from what a record held before the round (`before1030`).
  *
  * GENERATED, NOT HAND-WRITTEN, as `founder-shipped.ts` is: at that commit, `firstPartyDocument(id, { seeds: [] })` for each
@@ -16,7 +16,7 @@ type Before = { version: string; now: string; added: readonly string[]; was: Rea
 const BEFORE_1030: Readonly<Record<string, Before>> = {
  "money-core": {
   "version": "3.30.0",
-  "now": "3.32.0",
+  "now": "3.32.1",
   "added": [
    "metric.balance-by-account#0",
    "metric.accounts-open#0",
@@ -52,6 +52,164 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
    "script.category_stays#0"
   ],
   "was": {
+   "page.money-rules#0": {
+    "page": "money-rules",
+    "title": "Filing rules",
+    "nav": {
+     "section": "Money",
+     "order": 40
+    },
+    "icon": "tag",
+    "requires": [
+     "register.filing_rules",
+     "register.transactions"
+    ],
+    "pack": "money-core",
+    "blocks": [
+     {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+       "metric": "rule-filed",
+       "lt": 1
+      },
+      "body": "No rule has filed anything yet."
+     },
+     {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+       "metric": "filed-by-rule-30d",
+       "gte": 1
+      },
+      "body": "{{rules-filing-30d}} rule(s) filed {{filed-by-rule-30d}} entries in 30 days."
+     },
+     {
+      "kind": "note",
+      "lead": true,
+      "span": 12,
+      "when": {
+       "all": [
+        {
+         "metric": "rule-filed",
+         "gte": 1
+        },
+        {
+         "metric": "filed-by-rule-30d",
+         "lt": 1
+        }
+       ]
+      },
+      "body": "Nothing filed in 30 days. {{rule-filed}} before that."
+     },
+     {
+      "kind": "note",
+      "span": 12,
+      "when": {
+       "metric": "txn-uncategorised",
+       "gt": 0
+      },
+      "body": "{{txn-uncategorised}} entries with no category. [File them](/automations/txn-categorise?again=1)"
+     },
+     {
+      "kind": "table",
+      "heading": "Rules",
+      "icon": "tag",
+      "span": 12,
+      "source": "register.filing_rules",
+      "columns": [
+       {
+        "field": "match",
+        "label": "Matches",
+        "width": "minmax(14ch,1fr)"
+       },
+       {
+        "field": "match_by",
+        "label": "How it matches",
+        "width": "16ch"
+       },
+       {
+        "field": "category",
+        "label": "Category",
+        "width": "minmax(10ch,18ch)"
+       },
+       {
+        "field": "state",
+        "label": "Status",
+        "width": "8ch"
+       }
+      ],
+      "order": [
+       {
+        "field": "rank",
+        "dir": "asc"
+       },
+       {
+        "field": "match",
+        "dir": "asc"
+       }
+      ],
+      "limit": 120,
+      "empty": "No filing rules yet."
+     },
+     {
+      "kind": "bar",
+      "heading": "Entries each rule filed",
+      "icon": "chart-bar",
+      "span": 12,
+      "source": "metric.rule-filed",
+      "when": {
+       "metric": "rules-filing",
+       "gte": 2
+      },
+      "empty": "No rule has filed anything yet."
+     },
+     {
+      "kind": "table",
+      "heading": "Filed lately",
+      "icon": "history",
+      "span": 12,
+      "source": "register.transactions",
+      "where": "filed_by is set",
+      "columns": [
+       {
+        "field": "filed_by",
+        "label": "Rule",
+        "width": "minmax(12ch,18ch)"
+       },
+       {
+        "field": "what",
+        "label": "Description",
+        "width": "minmax(14ch,1fr)"
+       },
+       {
+        "field": "category",
+        "label": "Category",
+        "width": "minmax(10ch,18ch)"
+       },
+       {
+        "field": "on",
+        "label": "Date",
+        "width": "13ch",
+        "align": "end"
+       }
+      ],
+      "order": [
+       {
+        "field": "created_at",
+        "dir": "desc"
+       }
+      ],
+      "limit": 6,
+      "when": {
+       "metric": "rule-filed",
+       "gte": 1
+      }
+     }
+    ]
+   },
    "register.accounts#0": {
     "register": "accounts",
     "name": "Accounts",

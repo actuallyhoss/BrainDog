@@ -2395,10 +2395,12 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'ff3bf8c8c1a23e75',
+    declares: '21c7791ef5ca6739',
     history: [
       '`script.post_due` reads only `no_feed` on an account, which a feed now sets on every account it keeps, where it read Mercury\'s and Stripe\'s own fields; no id added or taken away -> 623dd507e74ef839',
       '`metric.stripe-below-zero-count` asks a balance below zero in any currency, where it listed seven; no id added or taken away -> ff3bf8c8c1a23e75',
+      "Money 3.32.1, the live check of 30 October: `metric.net-worth` takes away `metric.property-left` and `metric.debts-left` where it took away `metric.owed-over-time`, Over time on `page.money` says why under its line, `page.money-rules` counts lines filed, and `page.money-account`'s balance box says what to type; no id added or taken away -> 1e6d0d90bb453254",
+      'Both 3.32.1 patches of 30 October together: the feed and Stripe reads with `metric.property-left` in net worth; no id taken away -> 21c7791ef5ca6739',
     ],
   },
   'work@1.17.0': {

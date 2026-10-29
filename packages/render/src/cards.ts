@@ -156,6 +156,21 @@ export function runTokens(value: string): string[] {
   return run.split(',').map((t) => t.trim());
 }
 
+/**
+ * A RUN WITHOUT ITS EMPTY ENDS, and how many readings each end lost: a run one reading a day to today whose first weeks
+ * and last nights hold nothing drew its line from a third of the way in to well short of "Today" (live check of 30
+ * October, 16). Trimmed, the line spans the frame and its days are those of its first and last readings.
+ */
+export function trendTrimmed(value: string): { value: string; lead: number; tail: number; length: number } {
+  const tokens = runTokens(value);
+  const known = (t: string): boolean => t !== '' && Number.isFinite(Number(t.replace(/−/gu, '-').replace(/,(?=\d{3}(?!\d))/gu, '')));
+  const first = tokens.findIndex(known);
+  if (first < 0) return { value, lead: 0, tail: 0, length: tokens.length };
+  let last = tokens.length - 1;
+  while (last > first && !known(tokens[last]!)) last--;
+  return { value: tokens.slice(first, last + 1).join(', '), lead: first, tail: tokens.length - 1 - last, length: tokens.length };
+}
+
 /** What a gap in a run is called in the line's accessible name. */
 const NO_VALUE = 'no value';
 

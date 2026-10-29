@@ -1625,7 +1625,10 @@ export function blockOf(
     const own = typeof modelSaid === 'string' ? modelSaid.trim() : '';
     /* AND IT ENDS AS A SENTENCE DOES (`stopped`, P13): "Portage and Kiln need a push, Marlow & Co is on track" ran out
        with no full stop under Projects' name, while the header's own line ended with one. */
-    if (own !== '') return { ...shell, body: stopped(own), modelLine: true };
+    /* AND SAID AS EVERY OTHER SENTENCE IS (live check of 30 October, 15 and 17): the model wrote "cash lasts to
+       2027-01-13" and "EGP 560,563.82, down −11%", so its line takes the days in words, the money in whole units and a
+       direction said once. */
+    if (own !== '') return { ...shell, body: stopped(datesIn(wholeMoneyIn(own), now).replace(/\b(down|up) [−+-](?=\d)/gu, '$1 ')), modelLine: true };
     const lead = leadOf(body, namedResolverOf(values, unnamedOf(b)));
     return lead.trim() === '' ? { ...shell, body: '', drawn: false } : { ...shell, body: stopped(lead) };
   }

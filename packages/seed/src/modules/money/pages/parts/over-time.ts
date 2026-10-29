@@ -33,7 +33,7 @@ export const OVER_TIME: Record<string, unknown>[] = [
     heading: 'Over time',
     icon: 'chart-line',
     span: 12,
-    cells: [{ metric: 'net-worth', label: 'Net worth, the last 12 weeks', trend: '12w' }],
+    cells: [{ metric: 'net-worth', label: 'Net worth, the last 12 weeks', trend: '12w', note: 'A plan still to pay counts once what it buys is counted' }],
     when: { all: [{ metric: 'cash-accounts', gt: 0 }, { metric: 'net-worth-nights', gte: A_WEEK_OF_NIGHTS }] },
   },
 ];

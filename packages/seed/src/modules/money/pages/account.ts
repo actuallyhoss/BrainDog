@@ -110,7 +110,9 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
         /* WHAT IT HOLDS TODAY WRITES A BALANCE CHECK FOR THIS ACCOUNT, never the account itself (`parts/ages.ts`). The
            account is preset by its spoken id, as a book's capture presets its book. */
         kind: 'capture',
-        heading: 'What it holds today',
+        /* SAID AS WHAT TO TYPE (live check of 30 October, 14): the heading is the box's own words, and "What it holds
+           today" in a grey box read as a bar stuck loading. */
+        heading: 'Type what the bank says it holds today',
         icon: 'check',
         span: 12,
         register: 'balances',
