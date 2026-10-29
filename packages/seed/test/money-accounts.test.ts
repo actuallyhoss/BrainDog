@@ -153,3 +153,16 @@ test('an account typed before it had a status holds none, and is counted as open
   assert.deepEqual([cash(k, 'cash-accounts').value, cash(k, 'cash-now').value], [2, 240_000], 'an account with no status dropped out of Cash now');
   assert.equal(cash(k, 'cash-cross-check').value, 0);
 });
+
+test('A STRIPE BALANCE BELOW ZERO IS COUNTED IN WHATEVER CURRENCY IT IS KEPT, and one at nought or above, or closed, is not', async () => {
+  const { ACCOUNT_FIGURES } = await import('../src/modules/money/figures/accounts.ts');
+  const k = await moneyCore();
+  const count = (): number | null => read(k, ACCOUNT_FIGURES, 'stripe-below-zero-count').value;
+  assert.equal(count(), 0);
+  make(k, 'accounts', { name: 'Stripe available USD', kind: 'bank', balance: money(-961, 'USD'), as_of: day(0), liquid: true });
+  make(k, 'accounts', { name: 'Stripe available JPY', kind: 'bank', balance: money(-500, 'JPY'), as_of: day(0), liquid: true });
+  make(k, 'accounts', { name: 'Stripe available GBP', kind: 'bank', balance: money(0), as_of: day(0), liquid: true });
+  const closed = make(k, 'accounts', { name: 'Stripe available EUR', kind: 'bank', balance: money(-100, 'EUR'), as_of: day(0), liquid: true });
+  close(k, closed);
+  assert.equal(count(), 2, 'dollars and yen below zero, and nothing else');
+});

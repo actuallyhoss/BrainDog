@@ -2395,9 +2395,10 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '623dd507e74ef839',
+    declares: 'ff3bf8c8c1a23e75',
     history: [
       '`script.post_due` reads only `no_feed` on an account, which a feed now sets on every account it keeps, where it read Mercury\'s and Stripe\'s own fields; no id added or taken away -> 623dd507e74ef839',
+      '`metric.stripe-below-zero-count` asks a balance below zero in any currency, where it listed seven; no id added or taken away -> ff3bf8c8c1a23e75',
     ],
   },
   'work@1.17.0': {

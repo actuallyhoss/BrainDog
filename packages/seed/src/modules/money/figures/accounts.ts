@@ -17,14 +17,16 @@ const LINES_ONLY = { rolled: { balance: ROLLED.rolled.balance, as_of: ROLLED.rol
 /** The months an account's page draws its money in and out over, the walk's six and the month it is in. */
 const MONTHS = 'on after -7m';
 
-/** The currencies a Stripe balance is read below zero in: a money comparison names its currency. */
-const STRIPE_CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'AED', 'EGP'] as const;
+/**
+ * A STRIPE BALANCE BELOW ZERO, IN WHATEVER CURRENCY IT IS KEPT: below zero is a sign, which a money comparison asks with
+ * no currency (`signOnly` in `@braindog/where`), so no list of the currencies Stripe pays out in is kept here.
+ */
 const STRIPE_BELOW_ZERO = {
   all: [
     { field: 'name', contains: 'stripe' },
     { field: 'liquid', is: true },
     { field: 'state', not: 'closed' },
-    { any: STRIPE_CURRENCIES.map((currency) => ({ field: 'balance', lt: { amount: 0, currency } })) },
+    { field: 'balance', lt: { amount: 0 } },
   ],
 };
 
@@ -125,7 +127,7 @@ export const ACCOUNT_FIGURES: Record<string, SeedMetric> = {
    * payments in to cover them, and takes the difference from the bank if it stays there. The Accounts page says so in
    * one line, so "Stripe available −$9.61" is not a number left to guess at. The amount stays on the account's own
    * card, in its own currency, and is not converted into the line. An account counted as cash whose name says
-   * Stripe, read in the currencies Stripe pays out in most: a money comparison names its currency, so each is a clause.
+   * Stripe, below zero in any currency.
    */
   'stripe-below-zero-count': {
     metric: 'stripe-below-zero-count',
