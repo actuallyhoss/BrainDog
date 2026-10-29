@@ -770,7 +770,17 @@ export const looksLikeToken = (piece: string) =>
  */
 export const holdsTokenShape = (word: string): boolean => {
   const onDisk = /^(?:[\\/]|~[\\/]|[A-Za-z]:[\\/])/.test(word.replace(/^["']/, '')) && !/[=?&]/.test(word);
-  return word.split(/[\\/=:?&"',;\s]+/).some((piece) => piece !== '' && (onDisk ? /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) || piece.length >= 32 : looksLikeToken(piece)));
+  return word.split(/[\\/=:?&"',;\s]+/).some((piece) => piece !== '' && !namesAPlace(piece) && (onDisk ? /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) || piece.length >= 32 : looksLikeToken(piece)));
+};
+/*
+ * A PACKAGE AT A VERSION AND A HOST NAME ARE NOT KEYS, though both mix letters and digits past sixteen characters:
+ * `chrome-devtools-mcp@0.20.3` and `aws-mcp.us-east-1.api.aws` were measured flagged as keys in MCP entries that hold
+ * none. Each part is still asked on its own, so a token dressed as a name or a label is caught.
+ */
+const namesAPlace = (piece: string): boolean => {
+  const pkg = /^(@?[a-z0-9][a-z0-9._-]*)@(?:\d+(?:\.\d+)*(?:[-+][0-9a-z.-]+)?|latest|next)$/.exec(piece);
+  if (pkg) return !looksLikeToken(pkg[1] ?? '');
+  return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(piece) && piece.split('.').every((label) => !looksLikeToken(label));
 };
 /* Each path segment on its own, so a folder is still named while a token between two slashes is not. */
 const hidePieces = (text: string) => text.split(/([\\/])/).map((piece) => (piece === '/' || piece === '\\' || !looksLikeToken(piece) ? piece : HIDDEN)).join('');
