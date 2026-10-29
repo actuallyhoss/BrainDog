@@ -261,6 +261,15 @@ const NAMED_LISTS = { 'packages/kernel/src/govern.ts': ['BODY_KINDS'] };
 const KIND_MODULES = { 'packages/kernel/src/kinds/index.ts': 'BLOCK_KIND_MODULES' };
 
 /**
+ * THE FIGURES THE KERNEL ANSWERS FOR ITSELF. `built-in-figures.ts` answers a figure by id when no declaration holds that
+ * id (`questions-open-in`, `feeds-behind`, `project-worked`), and an add-on reads one the way it reads any figure, under
+ * `metric` (`questions-open-in:receipts`). Read there, the id is the kernel's and not the add-on's: the add-on names the
+ * kernel, so each key of the table is a kernel word. Its values are calls with braces in them, so the keys are read a line
+ * at a time to the line that closes the table, not to the first brace.
+ */
+const BUILT_IN = { 'packages/kernel/src/built-in-figures.ts': 'BUILT_IN_FIGURES' };
+
+/**
  * THE WORDS THE KERNEL DECLARES FOR ITSELF, folded, read off its own source under one root. From a grammar file,
  * every one-word string in a list or a set a module-level constant in capitals is given (`const BLOCK_KINDS = [`,
  * `export const FIELD_TYPES = [`, `new Set([`), nested lists and spreads included, to the bracket that closes it. From
@@ -286,6 +295,14 @@ export function kernelWords(root) {
       const m = new RegExp(`^(?:export )?const ${name}\\b[^=\\n]*=\\s*\\[([^\\]]*)\\]`, 'm').exec(text);
       for (const q of (m?.[1] ?? '').matchAll(/'([A-Za-z][A-Za-z0-9_-]*)'/g)) words.add(fold(q[1]));
     }
+  }
+  for (const [path, name] of Object.entries(BUILT_IN)) {
+    const text = textOf(path);
+    const from = new RegExp(`^(?:export )?const ${name}\\b[^=\\n]*=\\s*\\{\\s*$`, 'm').exec(text);
+    if (from === null) continue;
+    const rest = text.slice(from.index + from[0].length);
+    const body = rest.slice(0, Math.max(0, rest.search(/^\};/m)));
+    for (const q of body.matchAll(/^\s*'([a-z][a-z0-9-]*)':/gm)) words.add(fold(q[1]));
   }
   for (const [path, name] of Object.entries(KIND_MODULES)) {
     const m = new RegExp(`^(?:export )?const ${name}\\b[^=\\n]*=\\s*\\{([^}]*)\\}`, 'm').exec(textOf(path));

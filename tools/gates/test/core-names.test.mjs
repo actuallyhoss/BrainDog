@@ -300,6 +300,9 @@ test('a word the kernel declares is not a place, and after register. it still is
   for (const word of ['lines', 'roadmap', 'progress', 'steps', 'source', 'parts']) assert.ok(own.has(word), word);
   /* AND THE KINDS THAT READ THEMSELVES, keys of `BLOCK_KIND_MODULES` that `BLOCK_KINDS` spreads in. */
   for (const word of ['calendar', 'gallery', 'embed', 'form']) assert.ok(own.has(word), word);
+  /* AND WHAT A FIGURE COUNTS OVER (`METRIC_SOURCE_KINDS`, the kernel's own log among them), and the figures the kernel
+     answers for itself (`BUILT_IN_FIGURES`), which an add-on reads and never declares. */
+  for (const word of ['events', 'series', 'questionsopenin', 'feedsbehind', 'projectworked']) assert.ok(own.has(word), word);
   /* AND NOTHING AN ADD-ON ALONE DECLARES: a list the kernel's grammar never says stays a name. */
   for (const word of ['tasks', 'orders', 'transactions', 'making']) assert.ok(!own.has(word), word);
   assert.deepEqual(kernelWords(join(gates, 'negative', 'core-names-string')), new Set(), 'a tree with no kernel grammar declares no word');
