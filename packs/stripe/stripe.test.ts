@@ -203,10 +203,11 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
      counts. */
   assert.deepEqual(RAW.limits, { fetches: 3 });
   /* money-core 3.1.0 AND NOT EARLIER: 3.0.0's walk brings a payout in on the day it lands (`accounts.arrives`), and
-     3.1.0 has the `books` the `book` setting (1.2.0) files each row in. */
+     3.1.0 has the `books` the `book` setting (1.2.0) files each row in. 3.31.0 SINCE 1.5.0, whose accounts declare the
+     `no_feed` the script marks each row it keeps with. */
   const doc = JSON.parse(TEXT) as { version: string; requires: { packs: Record<string, string> }; config: Record<string, unknown> };
-  assert.equal(doc.version, '1.4.1');
-  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.1.0 <4.0.0' });
+  assert.equal(doc.version, '1.5.0');
+  assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.31.0 <4.0.0' });
   assert.deepEqual(Object.keys(doc.config), ['grant', 'book']);
   assert.deepEqual([DEFAULTS.grant, DEFAULTS.book], ['stripe', 0]);
   /* THE FIELD THE PACK FINDS ITS ROWS BY, laid on Accounts, with words a person reads for each kind. */
@@ -215,7 +216,7 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
   assert.deepEqual([kind?.type, kind?.values, kind?.labels], ['enum', ['available', 'pending', 'in_transit'], { available: 'Available', pending: 'Pending', in_transit: 'In transit' }]);
   /* A CHANGES LINE A PERSON READS: plain words, no dash, no id. */
   const changes = (doc as unknown as { changes: string }).changes;
-  assert.match(changes, /counts once/);
+  assert.match(changes, /fed by the bank/);
   assert.equal(/\u2014|books#|\brows?\b/.test(changes), false, changes);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
@@ -320,6 +321,7 @@ const created = (name: string, amount: number, currency: string, liquid: boolean
     liquid,
     ...(arrives === undefined ? {} : { arrives }),
     stripe_kind: kindOf(name),
+    no_feed: false,
     ...(book === undefined ? {} : { book }),
   },
 });
@@ -374,7 +376,7 @@ const typed = (name: string, amount: number, currency: string, as_of = '2026-09-
 
 /** A row this pack wrote on an earlier hour, marked with the `stripe_kind` its name says. */
 const held = (name: string, amount: number, currency: string, as_of = '2026-09-24', extra: Record<string, Json> = {}): Row =>
-  typed(name, amount, currency, as_of, { stripe_kind: kindOf(name), ...extra });
+  typed(name, amount, currency, as_of, { stripe_kind: kindOf(name), no_feed: false, ...extra });
 
 test('THE NEXT HOUR UPDATES IN PLACE: a payout that landed goes to zero, an unmoved row is left alone, and a person’s own Stripe account is not touched', async () => {
   const usd = held('Stripe available USD', 1_842_050, 'USD', TODAY);
@@ -414,13 +416,13 @@ test('A STRIPE BALANCE TYPED IN BY HAND BEFORE THE PACK IS TAKEN OVER ON THE FIR
     {
       op: 'update',
       spoken: `accounts#${dollars.seq}`,
-      patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true },
+      patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true, no_feed: false },
       version: 3,
     },
     {
       op: 'update',
       spoken: `accounts#${euros.seq}`,
-      patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 31_000, currency: 'EUR' }, as_of: TODAY, liquid: true },
+      patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 31_000, currency: 'EUR' }, as_of: TODAY, liquid: true, no_feed: false },
       version: 3,
     },
     /* AND NO AVAILABLE ROW IS WRITTEN BESIDE THEM. "Stripe reserve" is in no write. */
@@ -514,9 +516,9 @@ test('THE ROWS THIS PACK WROTE BEFORE 1.4.0 ARE MARKED ON THE FIRST RUN, by the 
   const payouts = { data: ON_ITS_WAY.data.filter((p) => p.currency === 'usd') };
   const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [{ amount: 250_000, currency: 'usd' }] }, payouts }, [usd, pending, transit]));
   assert.deepEqual(writesOf(a), [
-    { op: 'update', spoken: `accounts#${usd.seq}`, patch: { balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, stripe_kind: 'available' }, version: 3 },
-    { op: 'update', spoken: `accounts#${transit.seq}`, patch: { balance: { amount: 200_000, currency: 'USD' }, as_of: TODAY, arrives: '2026-09-26', stripe_kind: 'in_transit' }, version: 3 },
-    { op: 'update', spoken: `accounts#${pending.seq}`, patch: { balance: { amount: 250_000, currency: 'USD' }, as_of: TODAY, stripe_kind: 'pending' }, version: 3 },
+    { op: 'update', spoken: `accounts#${usd.seq}`, patch: { balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, stripe_kind: 'available', no_feed: false }, version: 3 },
+    { op: 'update', spoken: `accounts#${transit.seq}`, patch: { balance: { amount: 200_000, currency: 'USD' }, as_of: TODAY, arrives: '2026-09-26', stripe_kind: 'in_transit', no_feed: false }, version: 3 },
+    { op: 'update', spoken: `accounts#${pending.seq}`, patch: { balance: { amount: 250_000, currency: 'USD' }, as_of: TODAY, stripe_kind: 'pending', no_feed: false }, version: 3 },
   ]);
 });
 
@@ -529,7 +531,7 @@ test('HIS CASE: "Stripe available" in dollars, filed in a book, is taken over an
   const his = typed('Stripe available', 1_800_000, 'USD', '2026-09-18', { book: '01K5BOOK000000000000000002' });
   const a = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [{ amount: 250_000, currency: 'usd' }] }, payouts: { data: [ON_ITS_WAY.data[0]] } }, [his]));
   assert.deepEqual(writesOf(a), [
-    { op: 'update', spoken: `accounts#${his.seq}`, patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true }, version: 3 },
+    { op: 'update', spoken: `accounts#${his.seq}`, patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true, no_feed: false }, version: 3 },
     created('Stripe payout in transit USD', 120_000, 'USD', false, '2026-09-28'),
     created('Stripe pending USD', 250_000, 'USD', false),
   ]);
@@ -556,7 +558,7 @@ test('TWO ACCOUNTS THAT COULD BE THE STRIPE BALANCE: nothing is written, and the
   const kept = { ...two, fields: { ...two.fields, name: 'Savings (not Stripe)' } };
   const b = await runInQuickJs(declOf(), stripeHost({ balance: { available: [{ amount: 1_842_050, currency: 'usd' }], pending: [] }, payouts: { data: [] } }, [one, kept]));
   assert.deepEqual(writesOf(b), [
-    { op: 'update', spoken: `accounts#${one.seq}`, patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true }, version: 3 },
+    { op: 'update', spoken: `accounts#${one.seq}`, patch: { stripe_kind: 'available', kind: 'bank', balance: { amount: 1_842_050, currency: 'USD' }, as_of: TODAY, liquid: true, no_feed: false }, version: 3 },
   ]);
 });
 

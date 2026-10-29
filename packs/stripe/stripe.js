@@ -123,6 +123,13 @@ async function ask(ctx, key, path) {
 /** Stripe's `arrival_date`, Unix seconds at midnight UTC, as the day it names. */
 const dayOf = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10);
 
+/**
+ * AN ACCOUNT THIS PACK KEEPS SAYS SO IN MONEY'S OWN WORDS, SINCE 1.5.0: `no_feed` false, "fed by the bank", which is what
+ * Money reads before it posts a repeating line to an account itself (`post-due` in money-core). Written on every row the
+ * pack writes or takes over, and on one it already kept the next hour, so Money never has to know `stripe_kind`.
+ */
+const FED = (row) => (row.fields.no_feed === false ? {} : { no_feed: false });
+
 /** Where a row of the pack's lives: its kind and its currency. */
 const at = (kind, currency) => `${kind} ${currency}`;
 
@@ -253,7 +260,7 @@ export default async function run(ctx) {
   const taken = new Set();
   for (const [where, row] of adopt.sort((a, b) => a[1].seq - b[1].seq)) {
     const want = now.get(where);
-    ctx.update(`accounts#${row.seq}`, { stripe_kind: 'available', kind: 'bank', balance: { amount: want.amount, currency: want.currency }, as_of: today, liquid: true, ...fileOf(row) }, row.version);
+    ctx.update(`accounts#${row.seq}`, { stripe_kind: 'available', kind: 'bank', balance: { amount: want.amount, currency: want.currency }, as_of: today, liquid: true, no_feed: false, ...fileOf(row) }, row.version);
     taken.add(where);
     ctx.log(`Took over "${row.fields.name}": it holds the Stripe balance in ${want.currency} from now on, kept from Stripe every hour, so the money counts once.`);
   }
@@ -271,6 +278,7 @@ export default async function run(ctx) {
         liquid: want.liquid,
         ...(want.arrives === null ? {} : { arrives: want.arrives }),
         stripe_kind: want.kind,
+        no_feed: false,
         ...inBook,
       });
       continue;
@@ -284,8 +292,9 @@ export default async function run(ctx) {
     const relabel = want !== undefined && row.fields.liquid !== want.liquid;
     const mark = marked.includes(where) ? { stripe_kind: KIND_OF_WORDS[BEFORE.exec(String(row.fields.name))[1]] } : {};
     const file = fileOf(row);
-    const same = row.fields.balance.amount === balanceNow.amount && row.fields.as_of === today && (!transit || (row.fields.arrives ?? null) === arrives) && !relabel && Object.keys({ ...mark, ...file }).length === 0;
+    const fed = FED(row);
+    const same = row.fields.balance.amount === balanceNow.amount && row.fields.as_of === today && (!transit || (row.fields.arrives ?? null) === arrives) && !relabel && Object.keys({ ...mark, ...file, ...fed }).length === 0;
     if (same) continue;
-    ctx.update(`accounts#${row.seq}`, { balance: balanceNow, as_of: today, ...(transit ? { arrives } : {}), ...(relabel ? { liquid: want.liquid } : {}), ...mark, ...file }, row.version);
+    ctx.update(`accounts#${row.seq}`, { balance: balanceNow, as_of: today, ...(transit ? { arrives } : {}), ...(relabel ? { liquid: want.liquid } : {}), ...mark, ...file, ...fed }, row.version);
   }
 }
