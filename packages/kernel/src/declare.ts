@@ -97,6 +97,14 @@ const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
    over the page as it is read (`compose.ts`). The CHECK that holds the database to this list takes it in the migration
    after 23. */
 export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script', 'job', 'look'] as const;
+
+/**
+ * WHAT A FIGURE COUNTS OVER, BEFORE THE DOT: a list's rows (`register.<id>`), a series' points (`series.<id>`) or the
+ * kernel's own log of what was written to a list (`events.<id>`). These are the kernel's words, so a reader that says
+ * `events` names the log and nobody's list.
+ */
+export const METRIC_SOURCE_KINDS = ['register', 'series', 'events'] as const;
+const METRIC_SOURCE = new RegExp(`^(?:${METRIC_SOURCE_KINDS.join('|')})\\.[a-z][a-z0-9_-]*$`, 'u');
 export type DeclKind = (typeof KINDS)[number];
 
 export type Declaration = {
@@ -438,11 +446,11 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
      register name is the commonest mistake and the evaluator reads it as none of them. */
   if (
     typeof body.source !== 'string' ||
-    (body.source !== WALK_SOURCE && body.source !== 'record.door' && !/^(?:register|series|events)\.[a-z][a-z0-9_-]*$/u.test(body.source))
+    (body.source !== WALK_SOURCE && body.source !== 'record.door' && !METRIC_SOURCE.test(body.source))
   )
     return bad(
       'DECLARATION_INVALID',
-      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id>, series.<id>, events.<id>, ${WALK_SOURCE} or record.door.`,
+      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is ${METRIC_SOURCE_KINDS.map((k) => `${k}.<id>`).join(', ')}, ${WALK_SOURCE} or record.door.`,
       'source',
     );
 
