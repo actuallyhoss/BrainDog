@@ -2960,8 +2960,33 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "85aa8c49f3ad08cf421ef2cee468f55132e2fd7109feb0df9e00c3ac9cf85d20",
+          "bytes": 29850,
+          "published_at": "2026-10-29T22:14:12.402Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          },
+          "notes": "Each Mercury account says it is fed by the bank in Money's own No bank feed, so Money never posts a repeating line to it itself."
+        },
         {
           "version": "1.2.1",
           "checksum": "28361d8186a69a787047f24566f7c9b10c2a9a0848e76dfbc823d0d78aba09d6",
@@ -5830,8 +5855,33 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.4.1",
+      "latest": "1.5.0",
       "versions": [
+        {
+          "version": "1.5.0",
+          "checksum": "24410870db1e084455035ce4ded879fd82a99b53e571be9ef9dcf27903944749",
+          "bytes": 20473,
+          "published_at": "2026-10-29T22:14:12.402Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.stripe.com",
+                "line": "CALLS OUT api.stripe.com · every 1h · key \"stripe\" to the host its keychain entry opens",
+                "key": "stripe"
+              }
+            ]
+          },
+          "notes": "Each Stripe account says it is fed by the bank in Money's own No bank feed, so Money never posts a repeating line to it itself."
+        },
         {
           "version": "1.4.1",
           "checksum": "9136f86d0d59464000f7242ad9d403fd34e6f7879abf197ee49fa930032e2379",
