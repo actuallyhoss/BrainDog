@@ -729,7 +729,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
       /* NO "Known by" NOTE OVER `keys`. A key is `kind:value`, a handle the record joins on and never shown to a person
          (`packages/kernel/src/identity-keys.ts`), and a note fills a list as its values joined by commas, so the page
          read "email:jo@okonkwo.example,github:jokonkwo". The app's own page for a person says each one in words
-         ("Email", "GitHub", `knownOf` in `apps/web/src/routes/r/[register]/people.ts`). */
+         ("Email", "GitHub", `knownOf` in `apps/web/src/lib/record/folk.ts`). */
       {
         /* WHERE THEY WERE SEEN, SINCE People 3.0.0, AND IT WAS "Met": the evidence, one dated line a sighting with where
            it was, "2026-08-27 · commit 8b1e4d0 in portage" or "2026-08-28 · mail from halden.example". The cards leave
