@@ -9,12 +9,11 @@ export function postable(account) {
   const f = account.fields;
   const name = typeof f.name === 'string' && f.name.trim() !== '' ? f.name.trim() : 'its account';
   const filled = (v) => v !== undefined && v !== null && v !== '';
-  /* THE FIELDS AN ACCOUNT A FEED KEEPS CARRIES: Mercury's and Stripe's own ids. */
-  const fed = ['mercury_account', 'stripe_kind'].some((k) => filled(f[k]));
   if (f.state === 'closed') return { ok: false, why: `${name} is closed` };
-  if (fed) return { ok: false, why: `a bank feed keeps ${name}, so the bank writes it` };
   if (f.no_feed === true) return { ok: true };
-  if (f.no_feed === false) return { ok: false, why: `${name} is marked as fed by the bank` };
+  /* AN ACCOUNT A FEED KEEPS SAYS SO HERE, in "No bank feed" set to no: every feed marks the accounts it writes, so this
+     never has to know a feed's own fields (Mercury 1.3.0, Stripe 1.5.0). */
+  if (f.no_feed === false) return { ok: false, why: `a bank feed keeps ${name}, so the bank writes it` };
   if (filled(f.last4)) return { ok: false, why: `bank messages may write ${name}; mark it "No bank feed" to post to it` };
   return { ok: true };
 }

@@ -880,12 +880,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   sign each amount by which way it goes. Words, a `when` and a `where`, so no step of its own.
  * - work 1.20.0 (also, the recheck of 30 October): Yours and Agents count what Open counts too (`counts:` on a filter of
  *   its own choices, which the kernel now reads). A key on a filter, so no step of its own.
+ * - money-core 3.32.1 (SHL-A23): a repeating line is posted to an account unless "No bank feed" says no, and every feed
+ *   says no on the accounts it keeps (Mercury 1.3.0, Stripe 1.5.0), so Money reads no feed's own field. A script's
+ *   words, so a patch step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.2.0',
   portfolio: '1.30.1',
   people: '4.2.1',
-  'money-core': '3.32.0',
+  'money-core': '3.32.1',
   estate: '2.6.0',
   work: '1.20.0',
 };

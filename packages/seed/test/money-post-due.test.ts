@@ -16,7 +16,9 @@ test('A LINE IS POSTED ONLY WHERE NO BANK FEED WRITES', () => {
   assert.deepEqual(postable(account({})), { ok: true }, 'an account that says nothing and carries no feed mark');
   assert.equal(postable(account({ no_feed: false })).ok, false);
   assert.equal(postable(account({ last4: '4471' })).ok, false, 'bank messages may write it');
-  assert.equal(postable(account({ no_feed: true, mercury_account: 'm_1' })).ok, false, 'a feed keeps it whatever it says');
+  /* A FEED SAYS SO IN "No bank feed" ITSELF (Mercury 1.3.0, Stripe 1.5.0), and its own field is no mark here. */
+  assert.equal(postable(account({ no_feed: false, mercury_account: 'm_1' })).ok, false, 'a feed marks what it keeps');
+  assert.equal(postable(account({ no_feed: true, mercury_account: 'm_1' })).ok, true, "a feed's own field is not read");
   assert.equal(postable(account({ no_feed: true, state: 'closed' })).ok, false);
   assert.equal(postable(null).ok, false);
 });
