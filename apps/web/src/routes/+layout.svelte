@@ -72,6 +72,7 @@
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
+  import { KEYS_REGISTER } from '$lib/record/keychain.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
@@ -311,7 +312,7 @@
   const sideLists = $derived<SideList[]>(
     /* ONE ENTRY FOR THE KEYS (Q28 of 29 October): the Keychain below is where keys are, so the list of them is not a
        second row ("Keys 176" over "Keychain"). The list still opens from the Keychain. */
-    orderLists(data.index.registers.filter((r) => r.id !== 'credentials'), navPrefs.order).map((r) => ({
+    orderLists(data.index.registers.filter((r) => r.id !== KEYS_REGISTER), navPrefs.order).map((r) => ({
       id: r.id,
       name: r.name,
       icon: r.icon,
