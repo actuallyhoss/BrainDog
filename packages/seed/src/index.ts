@@ -35,6 +35,26 @@ export { PROJECTS_SAID, SAMPLE_KPIS, SAMPLE_READINGS, SAMPLE_ROWS, THINGS } from
 export { KPI_BACKFILL_SCRIPT } from './modules/portfolio/kpi-backfill.js';
 export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
+import { MONEY_WIDGETS } from './modules/money/widgets.ts';
+import { PEOPLE_WIDGETS } from './modules/people.ts';
+import { WORK_WIDGETS } from './modules/work.ts';
+import { PORTFOLIO_WIDGETS } from './modules/portfolio.ts';
+import { PERSONAL_WIDGETS } from './usecases/personal.ts';
+
+/**
+ * THE WIDGETS THIS BUILD'S OWN MODULES AND STARTERS BRING TO TODAY (SHL-A22), each declared beside its lists: the
+ * catalogue the record joins to the core's few at read time (`widgetGallery`), read from the build and not from a
+ * record's kept manifest, so a record installed before a module declared its widgets has them all the same. Each says
+ * whose it is, `pack` for a module and `usecase` for a starter, and the name a person knows it by. In the order the
+ * sheet has always drawn them: Money, Work, People, Projects, then the starter's.
+ */
+export const SEED_WIDGETS: readonly { pack?: string; usecase?: string; title: string; widgets: readonly Record<string, unknown>[] }[] = [
+  MONEY_WIDGETS,
+  WORK_WIDGETS,
+  PEOPLE_WIDGETS,
+  PORTFOLIO_WIDGETS,
+  PERSONAL_WIDGETS,
+];
 
 import { BASE_PAGES, NOW, day, hours, type Fields, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
 import {

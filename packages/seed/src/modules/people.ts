@@ -883,3 +883,41 @@ export const PEOPLE_SIGNALS: readonly string[] = [
   'contractor', 'contractors', 'client', 'clients', 'customer', 'customers', 'collaborator', 'collaborators', 'partner', 'partners',
   'accountant', 'accountants', 'people', 'colleague', 'colleagues', 'cofounder', 'cofounders', 'co-founder', 'co-founders',
 ];
+
+/**
+ * THE WIDGET PEOPLE BRINGS TO TODAY (SHL-A22, 30 October), in the shape an add-on's manifest `widgets` takes, joined to
+ * the core's at read time. It was the core's own catalogue's until today, which named this module's list by id.
+ */
+export const PEOPLE_WIDGETS = {
+  pack: 'people',
+  title: 'People',
+  widgets: [
+    {
+      id: 'people-back',
+      title: 'People to get back to',
+      says: 'People you have not been in touch with for three months.',
+      group: 'people',
+      for: 'both',
+      icon: 'users',
+      block: {
+        kind: 'cards',
+        heading: 'People to get back to',
+        icon: 'users',
+        source: 'register.people',
+        where: 'merged_into is empty, self is not true, in_touch before -90d',
+        columns: [{ field: 'name', as: 'who' }, { field: 'in_touch', as: 'fact', label: 'Last in touch' }],
+        order: [{ field: 'in_touch', dir: 'asc' }],
+        limit: 6,
+        empty: 'You are in touch with everyone.',
+      },
+      sizes: ['wide', 'tall', 'large', 'full'],
+      size: 'tall',
+      needs: { lists: ['people'] },
+      rows: { title: 'name', day: 'in_touch' },
+      example: { rows: [{ title: 'Priya Shah', meta: 'Last in touch 2 Jul' }, { title: 'Omar Fathy', meta: 'Last in touch 14 Jun' }] },
+      words: ['contacts', 'friends', 'clients', 'catch up', 'in touch'],
+      asked: [{ match: "\\b(get back to|in touch|haven'?t (talked|spoken|heard))\\b", about: 'who to get back to' }],
+      leads: ['people'],
+    },
+  ],
+};

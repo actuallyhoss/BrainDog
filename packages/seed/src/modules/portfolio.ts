@@ -1929,3 +1929,57 @@ export const PORTFOLIO_SIGNALS: readonly string[] = [
   'project', 'projects', 'side project', 'side projects', 'side-project', 'side-projects', 'product', 'products', 'app', 'apps',
   'studio', 'shop', 'store', 'brand', 'brands', 'game', 'games', 'agency', 'foundry', 'website', 'websites',
 ];
+
+/**
+ * THE WIDGETS PROJECTS BRINGS TO TODAY (SHL-A22, 30 October), in the shape an add-on's manifest `widgets` takes, joined
+ * to the core's at read time. They were the core's own catalogue's until today, which named this module's lists by id.
+ */
+export const PORTFOLIO_WIDGETS = {
+  pack: 'portfolio',
+  title: 'Projects',
+  widgets: [
+    {
+      id: 'projects',
+      alike: ['projects'],
+      title: 'Projects in play',
+      says: 'Each project you are working on, with when it was last worked on.',
+      group: 'projects',
+      for: 'business',
+      icon: 'grid',
+      block: {
+        kind: 'cards',
+        heading: 'Projects',
+        icon: 'grid',
+        source: 'register.things',
+        /* IN PLAY, AS THE SIDEBAR COUNTS THEM: a parked or retired project is not one (audit of 30 October, 12). */
+        where: 'lane is not parked or retired',
+        columns: [{ field: 'name', as: 'title' }, { metric: 'project-worked:{{name}}', as: 'when', label: 'Worked on' }],
+        limit: 8,
+      },
+      sizes: ['wide', 'large', 'full'],
+      size: 'full',
+      needs: { lists: ['things'] },
+      rows: { title: 'name', meta: 'next' },
+      example: { rows: [{ title: 'Kiln', meta: 'Worked on today' }, { title: 'Marlow & Co', meta: 'Worked on 2 days ago' }, { title: 'Portage' }] },
+      words: ['projects', 'portfolio', 'clients'],
+      leads: ['portfolio'],
+    },
+    {
+      id: 'numbers',
+      alike: ['numbers'],
+      title: 'Key numbers',
+      says: 'The few numbers that lead, your pinned ones first, each with its line.',
+      group: 'numbers',
+      for: 'business',
+      icon: 'gauge',
+      block: { kind: 'kpis', heading: 'Key numbers', icon: 'gauge', source: 'kpis', for: 'today', empty: 'No key numbers yet.' },
+      sizes: ['small', 'wide', 'tall', 'large', 'full'],
+      size: 'wide',
+      needs: { lists: ['kpis'] },
+      example: { figures: [{ label: 'Subscribers', said: '486' }, { label: 'Hours billed', said: '32' }] },
+      words: ['kpi', 'kpis', 'metrics', 'revenue'],
+      asked: [{ match: '\\b(kpis?|key numbers|metrics)\\b', about: 'your key numbers' }],
+      leads: ['all-numbers'],
+    },
+  ],
+};

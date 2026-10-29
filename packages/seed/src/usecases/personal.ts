@@ -885,3 +885,43 @@ export function payDayRow(said: string, today: string | null): PayDay | null {
   if (due) fields.next_due = due;
   return { register: 'recurring', fields, missing: [...(sum ? [] : ['amount']), ...(due ? [] : ['next_due'])] };
 }
+
+/**
+ * THE WIDGET THE PERSONAL STARTER BRINGS TO TODAY (SHL-A22, 30 October): habits over its own goals and their log, in the
+ * shape an add-on's manifest `widgets` takes, joined to the core's at read time. It was the core's own catalogue's until
+ * today, which named these lists by id. It fills in by being used, so it never says "Comes with".
+ */
+export const PERSONAL_WIDGETS = {
+  usecase: 'personal',
+  title: 'Personal',
+  widgets: [
+    {
+      id: 'habits',
+      title: 'Habits this week',
+      says: 'Each habit, against what you set out to do this week.',
+      group: 'life',
+      for: 'personal',
+      icon: 'repeat',
+      block: {
+        kind: 'progress',
+        heading: 'Habits this week',
+        icon: 'repeat',
+        source: 'register.goals',
+        where: 'state is active, kind is habit',
+        columns: [{ field: 'what' }, { field: 'target' }, { field: 'unit' }],
+        toward: 'logged-this-week-by-goal',
+        order: [{ field: 'seq', dir: 'asc' }],
+        limit: 6,
+        empty: 'No habits yet. Add one, like running three times a week.',
+      },
+      sizes: ['small', 'wide', 'tall', 'large', 'full'],
+      size: 'small',
+      needs: { lists: ['goals', 'goal_log'] },
+      rows: { title: 'what', meta: 'unit' },
+      example: { rows: [{ title: 'Run', meta: '2 of 3 times' }, { title: 'Read', meta: '4 of 7 days' }] },
+      words: ['habit', 'routine', 'run', 'read'],
+      asked: [{ match: '\\b(habits?|streak)\\b', about: 'your habits' }],
+      fills: 'Fills in once you start keeping what it shows.',
+    },
+  ],
+};

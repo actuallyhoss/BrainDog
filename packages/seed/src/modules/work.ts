@@ -1271,3 +1271,67 @@ export const WORK_PAGES: Record<string, SeedPage> = {
  * inflection written out, because the reader matches whole words and never stems.
  */
 export const WORK_SIGNALS: readonly string[] = ['task', 'tasks', 'todo', 'todos', 'to-do', 'to-dos', 'deadline', 'deadlines', 'sprint', 'sprints', 'backlog', 'roadmap', 'milestone', 'milestones'];
+
+/**
+ * THE WIDGETS WORK BRINGS TO TODAY (SHL-A22, 30 October), in the shape an add-on's manifest `widgets` takes, joined to
+ * the core's at read time. They were the core's own catalogue's until today, which named this module's lists by id.
+ * Project pulse's blank is a project, its choices the projects in play, the one moved last first.
+ */
+export const WORK_WIDGETS = {
+  pack: 'work',
+  title: 'Work',
+  widgets: [
+    {
+      id: 'next-up',
+      alike: ['work-due'],
+      title: 'Next up',
+      says: 'Tasks due in the next seven days, soonest first. Tick one where it is.',
+      group: 'work',
+      for: 'both',
+      icon: 'check',
+      block: {
+        kind: 'todo',
+        heading: 'Next up',
+        icon: 'check',
+        source: 'register.tasks',
+        where: 'state is not done or dropped, by before +8d',
+        columns: [{ field: 'what' }, { field: 'by' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        empty: 'Nothing due this week.',
+      },
+      sizes: ['small', 'wide', 'tall', 'large', 'full'],
+      size: 'tall',
+      needs: { lists: ['tasks'] },
+      rows: { title: 'what', day: 'by' },
+      example: { rows: [{ title: 'Send the specimen proofs', meta: 'Today' }, { title: 'Book the accountant', meta: '31 Oct' }] },
+      words: ['tasks', 'todo', 'to do', 'due'],
+      asked: [{ match: "\\b(tasks?|to ?do|what('s| is) (due|next)|due this week)\\b", about: 'what is due' }],
+      leads: ['work', 'work-board'],
+    },
+    {
+      id: 'project-pulse',
+      title: 'Project pulse',
+      says: 'One project: its open work, what is due soon and when it was last worked on.',
+      group: 'projects',
+      for: 'business',
+      icon: 'briefcase',
+      block: {
+        kind: 'stat',
+        heading: '{{project}}',
+        icon: 'briefcase',
+        cells: [
+          { metric: 'project-open:{{project}}', label: 'Open' },
+          { metric: 'project-due-soon:{{project}}', label: 'Due soon' },
+          { metric: 'project-done-7d:{{project}}', label: 'Done this week' },
+        ],
+      },
+      blanks: [{ id: 'project', asks: 'Which project?', from: { source: 'register.things', field: 'name', where: 'lane is not parked or retired', order: [{ field: 'updated_at', dir: 'desc' }] } }],
+      sizes: ['small', 'wide', 'tall', 'large'],
+      size: 'wide',
+      needs: { lists: ['things', 'tasks'], figures: ['project-open'] },
+      example: { figures: [{ label: 'Open', said: '12' }, { label: 'Due soon', said: '3' }] },
+      words: ['project', 'pulse', 'status'],
+    },
+  ],
+};
