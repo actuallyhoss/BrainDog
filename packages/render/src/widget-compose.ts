@@ -1,6 +1,6 @@
 /**
  * MAKING A WIDGET BY SAYING IT, BY RULES FIRST (widgets plan §5.7, batch W4): "my Talabat spending this month", "how many
- * Lanternfish tasks are late", "gold price". The words are matched to the record's own things (its projects, categories,
+ * Lanternfish tasks are late", "exchange rate". The words are matched to the record's own things (its projects, categories,
  * payees and currencies, handed in) and to the catalogue, and the answer is a block the record then draws to check it.
  * A line the rules cannot read is `null`, and only then is the model asked (`widgetCompose` in the record).
  *
@@ -8,7 +8,7 @@
  * as any block is; no rule invents a figure. PURE, so a test holds it in Node.
  */
 
-import { askedWidget, widgetBlock, widgetById, widgetMatches, WIDGETS, type WidgetSize } from './widgets.ts';
+import { askedWidget, widgetBlock, widgetById, widgetMatches, WIDGETS, type WidgetSize, type WidgetTemplate } from './widgets.ts';
 
 /** The record's own things a sentence may name, each by the name a person uses. */
 export type ComposeChoices = {
@@ -18,6 +18,14 @@ export type ComposeChoices = {
   currencies?: readonly string[];
   /** The lists the record keeps, by id: a rule over a list it does not keep is not offered. */
   lists: ReadonlySet<string>;
+  /**
+   * THE LISTS THE TWO RULES READ, BY WHAT THEY HOLD AND NOT BY NAME (SHL-A22): the ledger, a list whose rows have a day
+   * `on`, an `amount`, a `direction` and a `category` or a `party`; and the to-do list, whose rows have `what`, `by`, a
+   * state and a `thing`. The record finds each off its lists' fields (`ledgerOf` in its widgets method). Absent, the
+   * rule is not offered.
+   */
+  ledger?: string;
+  todo?: string;
   figures?: ReadonlySet<string>;
 };
 
@@ -69,7 +77,7 @@ const titled = (said: string): string => {
  * THE RULES, in order: money in one category or to one payee, a project's tasks, a catalogue widget its words name (with
  * its blank filled where the sentence names a project or a currency), and the catalogue widget whose words match best.
  */
-export function composeWidget(said: string, c: ComposeChoices): Composed | null {
+export function composeWidget(said: string, c: ComposeChoices, templates: readonly WidgetTemplate[] = WIDGETS): Composed | null {
   const text = plain(said);
   if (text === '') return null;
   const title = titled(said);
@@ -79,7 +87,8 @@ export function composeWidget(said: string, c: ComposeChoices): Composed | null 
   const payee = category === null ? named(text, c.payees) : null;
   const out = SPENT.test(text);
   const into = !out && EARNED.test(text);
-  if (c.lists.has('transactions') && (category !== null || payee !== null) && (out || into || category !== null || BY_WEEK.test(text))) {
+  const ledger = c.ledger !== undefined && c.lists.has(c.ledger) ? c.ledger : null;
+  if (ledger !== null && (category !== null || payee !== null) && (out || into || category !== null || BY_WEEK.test(text))) {
     /* SUMMED BY WEEK, when the sentence asks for it: a bar a week of the totals, never the single payments (the
        validator's audit of 30 October, 13), from Money's own weekly figure for one category or one payee. A record
        whose Money is older than those figures gets the payments, newest first, as before. */
@@ -110,7 +119,7 @@ export function composeWidget(said: string, c: ComposeChoices): Composed | null 
         kind: 'table',
         heading: title,
         icon: out ? 'trending-down' : into ? 'trending-up' : 'wallet',
-        source: 'register.transactions',
+        source: `register.${ledger}`,
         where,
         columns: [{ field: 'on' }, { field: 'what' }, { field: 'amount' }],
         order: [{ field: 'on', dir: 'desc' }],
@@ -125,7 +134,8 @@ export function composeWidget(said: string, c: ComposeChoices): Composed | null 
 
   /* A PROJECT'S TASKS: late, due soon, or open. */
   const project = named(text, c.projects);
-  if (project !== null && c.lists.has('tasks') && (TASKS.test(text) || LATE.test(text))) {
+  const todo = c.todo !== undefined && c.lists.has(c.todo) ? c.todo : null;
+  if (project !== null && todo !== null && (TASKS.test(text) || LATE.test(text))) {
     const late = LATE.test(text);
     const due = !late && DUE.test(text);
     const where = ['state is not done or dropped', `thing is ${project}`, ...(late ? ['by before today'] : due ? ['by before +8d'] : [])].join(', ');
@@ -134,7 +144,7 @@ export function composeWidget(said: string, c: ComposeChoices): Composed | null 
         kind: 'todo',
         heading: title,
         icon: late ? 'clock' : 'check',
-        source: 'register.tasks',
+        source: `register.${todo}`,
         where,
         columns: [{ field: 'what' }, { field: 'by' }],
         order: [{ field: 'by', dir: 'asc' }],
@@ -152,14 +162,17 @@ export function composeWidget(said: string, c: ComposeChoices): Composed | null 
   if (project !== null) values.project = project;
   const currency = named(text, c.currencies);
   if (currency !== null) values.currency = currency;
-  const asked = project !== null && !askedWidget(text) ? 'project-pulse' : askedWidget(text);
+  /* A PROJECT NAMED, AND NO OTHER WIDGET ASKED FOR, IS THE WIDGET OF ONE PROJECT: the first whose blank is a project. */
+  const byWords = askedWidget(text, templates);
+  const ofProject = templates.find((t) => (t.blanks ?? []).some((b) => b.id === 'project'))?.id ?? null;
+  const asked = project !== null && byWords === null ? ofProject : byWords;
   const fits = (id: string): boolean => {
-    const t = widgetById(id);
+    const t = widgetById(id, templates);
     return t !== undefined && (t.needs.lists ?? []).every((l) => c.lists.has(l)) && (t.needs.figures ?? []).every((f) => c.figures === undefined || c.figures.has(f));
   };
-  const best = asked !== null && fits(asked) ? asked : (WIDGETS.find((t) => fits(t.id) && widgetMatches(t, text))?.id ?? null);
+  const best = asked !== null && fits(asked) ? asked : (templates.find((t) => fits(t.id) && widgetMatches(t, text))?.id ?? null);
   if (best === null) return null;
-  const t = widgetById(best)!;
+  const t = widgetById(best, templates)!;
   if ((t.blanks ?? []).some((b) => values[b.id] === undefined)) return null;
   const block = widgetBlock(t, t.size, values);
   return { block: { ...block, heading: t.blanks?.length ? title : t.title }, size: t.size, widget: t.id, title: t.blanks?.length ? title : t.title };

@@ -1,24 +1,30 @@
 /**
- * THE WIDGET CATALOGUE (widgets plan §3.7, §7.2): every widget the sheet offers, as a block with blanks, the sizes it
- * draws at, the one it starts at, what it needs and an example to draw before the record holds anything.
+ * THE WIDGET CATALOGUE (widgets plan §3.7, §7.2): what a widget is, the few widgets the core itself offers, and the
+ * reading every widget is drawn and offered by.
  *
- * A WIDGET IS A BLOCK ON A BOARD, NOT A NEW TYPE. Each entry's `block` is a page block in the grammar every page is
+ * A WIDGET IS A BLOCK ON A BOARD, NOT A NEW TYPE. Each template's `block` is a page block in the grammar every page is
  * written in (docs/06), drawn by the same renderer and read through the same `previewPage`, so the gallery, Today and a
  * page say one number for one figure. What a board adds, a `size` and a `key`, is the board's to write (`widgetBlock`).
  *
- * PERSONAL AND BUSINESS ARE BOTH FIRST-CLASS. Each entry says who it is for, and the two starter boards
- * (`STARTER_BOARDS`) open on six widgets each: a person's money and life, or a business's queue, money and work.
+ * PERSONAL AND BUSINESS ARE BOTH FIRST-CLASS. Each template says who it is for (`WIDGET_FOR`), and the sheet never hides
+ * one from the other.
  *
- * ADD-ONS SHIP TEMPLATES, NEVER PLACEMENTS (§6.5). An entry over an add-on's lists names it in `needs.addon`, so the
- * sheet shows it in that add-on's group and, on a record without it, offers the add-on in its place. Nothing here
- * places a widget anywhere: a press does.
+ * THE CORE OFFERS ONLY WHAT IT KEEPS ITSELF (SHL-A22, 30 October): the questions waiting on you, what changed while you
+ * were away, and the agents at work. Every other widget is an add-on's, declared in its manifest's `widgets` beside its
+ * lists (`packs/<id>/<id>.pack.json`, and Money's, People's, Work's and Projects' own in the seed), and joined to these
+ * at read time (`widget-packs.ts` `withShipped`). Before, this file held twenty-one of them by their lists' and
+ * add-ons' ids, and the core knew Money, Goals, Trips and nine more by name. What the core used to know about each one
+ * (the question it answers, the page whose lead it shows, the day it counts down to) is declared beside it now.
+ *
+ * ADD-ONS SHIP TEMPLATES, NEVER PLACEMENTS (§6.5). A template from an add-on names it in `needs.addon`, so the sheet
+ * shows it in that add-on's group and, on a record without it, offers the add-on in its place. Nothing here places a
+ * widget anywhere: a press does.
  *
  * PURE AND ISOMORPHIC: the record reads it to answer `widgetGallery`, the web to draw the sheet, the design book to
  * print it. `distill` turns a block as `previewPage` answers it into the few figures or rows a preview draws, so the
  * gallery's answer is small (a reading, never a page).
  */
 
-import { TRIP_COUNTDOWN } from './trip-countdown.ts';
 import { kpiView, type KpiInput } from './kpis.ts';
 import { moneySet, moneyWhole } from './money.ts';
 import { exponentOf } from './format.ts';
@@ -40,13 +46,20 @@ export const GROUP_NAMES: Readonly<Record<WidgetGroup, string>> = {
 };
 
 /** Who a widget is for. Both is both, and the sheet never hides one from the other. */
-export type WidgetFor = 'personal' | 'business' | 'both';
+export const WIDGET_FOR = ['personal', 'business', 'both'] as const;
+export type WidgetFor = (typeof WIDGET_FOR)[number];
 
 /**
- * A blank a widget asks of the record, filled from the record's own things: a project by its name, a currency by its
- * code. The record picks the first that draws something (`widgetGallery`), and the inspector (W4) offers the rest.
+ * A blank a widget asks of the record, filled from the record's own things: the rows of the list `from` names, each by
+ * its field (a project by its name, a currency by its code). The record picks the first that draws something
+ * (`widgetGallery`), and the inspector (W4) offers the rest. `until` brings each choice's last day with it, and
+ * `starts` its first.
  */
-export type WidgetBlank = { id: 'project' | 'currency' | 'trip'; asks: string };
+export type WidgetBlank = {
+  id: string;
+  asks: string;
+  from?: { source: string; field: string; where?: string; order?: readonly { field: string; dir: 'asc' | 'desc' }[]; until?: string; starts?: string };
+};
 
 /**
  * What a widget needs before it draws anything: lists the record keeps, figures it declares, an add-on that brings both.
@@ -59,8 +72,8 @@ export type RowsRead = { title: string; day?: string; amount?: string; meta?: st
 
 /**
  * An example for the gallery: figures or rows a widget shows before the record holds any. Never stored. Money in it is
- * written `¤1,240`, and said in the record's own currency when drawn (`exampleMoney`): an add-on's sample in EGP on a
- * GBP record read as somebody else's money (the validator's audit of 30 October, 12).
+ * written `¤1,240`, and said in the record's own currency when drawn (`exampleMoney`): an add-on's sample in another
+ * currency on a GBP record read as somebody else's money (the validator's audit of 30 October, 12).
  */
 export type WidgetExample = { figures?: readonly { label: string; said: string }[]; rows?: readonly { title: string; meta?: string }[] };
 
@@ -88,335 +101,30 @@ export type WidgetTemplate = {
    * and the suggestions count it as on Today. Read beside the exact match on list, filter and figure.
    */
   alike?: readonly string[];
+  /** The questions it answers (signal S1): a pattern for the words, and what they are about, for the reason line. */
+  asked?: readonly { match: string; about: string }[];
+  /** The pages whose lead it shows, by slug (signal S2). */
+  leads?: readonly string[];
+  /**
+   * What is said while the record does not hold what it reads, in place of "Comes with" its add-on: an add-on every record
+   * starts with fills in by being used, not by being added ("Fills in once you add an account").
+   */
+  fills?: string;
+  /** What it says of a row new in its list in the last fortnight (signal S3), with `{{name}}`, and of one with no name. */
+  fresh?: { says: string; unnamed: string };
+  /** A row starting within `within` days on its `day` field (signal S4): the blank's choice it counts down to. */
+  near?: { day: string; within: number; unnamed: string; name?: string };
+  /** At least `least` rows of its source that `where` lets through (signal S4), said with `{{count}}`. */
+  due?: { where: string; least: number; says: string };
 };
 
-/** The add-ons a template can name, by catalogue id, with the name the sheet says. */
-export const WIDGET_ADDONS: Readonly<Record<string, string>> = {
-  'money-core': 'Money',
-  goals: 'Goals',
-  holdings: 'Investments',
-  'rates-open-er-api-com': 'Daily exchange rates',
-  trips: 'Trips',
-  weather: 'Weather',
-  calendar: 'Calendar',
-  subscriptions: 'Subscriptions',
-  splits: 'Splits',
-  'tax-set-aside': 'Tax set aside',
-  receipts: 'Receipts',
-  'savings-circle': 'Savings circle',
-  people: 'People',
-  portfolio: 'Projects',
-  work: 'Work',
-};
-
-const ALL: readonly WidgetSize[] = WIDGET_SIZES;
-const LISTS: readonly WidgetSize[] = ['small', 'wide', 'tall', 'large', 'full'];
-const FIGURE: readonly WidgetSize[] = ['small', 'wide', 'tall', 'large'];
-const OPEN_TASK = 'state is not done or dropped';
-
-const stat = (heading: string, icon: string, cells: readonly Record<string, unknown>[], extra: Record<string, unknown> = {}) => ({ kind: 'stat', heading, icon, cells, ...extra });
+const OPEN_WORK = 'Nothing is waiting on you.';
 
 /**
- * THE CATALOGUE. Money first, since it is what both a person and a business open Today for; then work, people,
- * projects, agents, numbers and the rest of a life. Each block is the one its page or Today already draws where there is
- * one, so the widget and the page agree (risk 4).
+ * THE CORE'S OWN WIDGETS: each over what the record keeps for itself, the questions waiting (`governance.open`), what
+ * changed (`activity`) and the sessions of its agents (`sessions.working`), so a record with no add-on at all has them.
  */
 export const WIDGETS: readonly WidgetTemplate[] = [
-  /* ── money ── */
-  /* CASH AHEAD, ONE WIDGET FOR THE CASH (the validator's audit of 30 October, 33): what was Cash today and Runway, said as
-     Today's own Cash ahead says it, the cash now with the day it lasts to, and what comes in and goes out in 30 days. The
-     id stays `cash-today`, so what a person turned down or kept of it still counts. */
-  {
-    id: 'cash-today',
-    alike: ['cash'],
-    title: 'Cash ahead',
-    says: 'The cash you have now, how long it lasts, and what comes in and goes out in the next 30 days.',
-    group: 'money',
-    for: 'both',
-    icon: 'wallet',
-    block: stat('Cash ahead', 'wallet', [
-      { metric: 'cash-now', label: 'Cash now', trend: '12w', ahead: 'cash-now', note: 'Lasts to {{runs-out-on}}' },
-      { metric: 'arriving-30d', label: 'Coming in, 30 days' },
-      { metric: 'leaving-30d', label: 'Going out, 30 days' },
-    ]),
-    sizes: ALL,
-    size: 'wide',
-    needs: { figures: ['cash-now'], addon: 'money-core' },
-    example: { figures: [{ label: 'Cash now', said: '¤42,000' }, { label: 'Coming in, 30 days', said: '¤14,500' }] },
-    words: ['bank', 'balance', 'money', 'accounts', 'cash today', 'runway', 'burn', 'lasts', 'run out'],
-  },
-  {
-    id: 'spending',
-    title: 'Spending',
-    says: 'What went out in the last 30 days, beside last month.',
-    group: 'money',
-    for: 'personal',
-    icon: 'trending-down',
-    block: stat('Spending', 'trending-down', [
-      { metric: 'spent-30d', label: 'Spent, 30 days' },
-      { metric: 'spent-last-month', label: 'Last month' },
-    ]),
-    sizes: FIGURE,
-    size: 'wide',
-    needs: { figures: ['spent-30d'], addon: 'money-core' },
-    example: { figures: [{ label: 'Spent, 30 days', said: '¤2,700' }, { label: 'Last month', said: '¤3,000' }] },
-    words: ['spent', 'expenses', 'outgoings'],
-  },
-  {
-    id: 'budget-left',
-    title: 'Budget left',
-    says: 'Each category you set a budget on, against what it spent this month.',
-    group: 'money',
-    for: 'personal',
-    icon: 'target',
-    block: {
-      kind: 'progress',
-      heading: 'Budget left',
-      icon: 'target',
-      source: 'register.categories',
-      where: 'state is live, direction is out, budget is set',
-      columns: [{ field: 'name' }, { field: 'budget' }],
-      spent: 'spent-by-category-month',
-      order: [{ field: 'seq', dir: 'asc' }],
-      limit: 8,
-      empty: 'No budget yet. Give a category the most you mean to spend in a month.',
-    },
-    sizes: ['wide', 'tall', 'large', 'full'],
-    size: 'large',
-    needs: { lists: ['categories'], figures: ['spent-by-category-month'], addon: 'money-core' },
-    rows: { title: 'name', amount: 'budget' },
-    example: { rows: [{ title: 'Food', meta: '¤230 left of ¤500' }, { title: 'Transport', meta: '¤50 left of ¤150' }, { title: 'Going out', meta: '¤120 left of ¤190' }] },
-    words: ['budgets', 'categories', 'limit'],
-  },
-  /* COMING UP, ONE WIDGET FOR WHAT FALLS DUE WITH MONEY ON IT (audit of 30 October, 33): Bills coming up folded in, and
-     read as Today's Coming up reads it (`default-home.ts`, `amount is set` over the next 14 days), so the two are one. */
-  {
-    id: 'coming-up',
-    alike: ['coming-up'],
-    title: 'Coming up',
-    says: 'Bills and other money due in the next two weeks, soonest first.',
-    group: 'money',
-    for: 'both',
-    icon: 'calendar',
-    block: {
-      kind: 'timeline',
-      heading: 'Coming up',
-      icon: 'calendar',
-      source: 'deadlines',
-      where: 'amount is set, day after -1d',
-      horizon: 14,
-      columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
-      limit: 8,
-      empty: 'Nothing falls due in the next two weeks.',
-    },
-    sizes: LISTS,
-    size: 'tall',
-    needs: { addon: 'money-core', figures: ['cash-now'] },
-    rows: { title: 'title', day: 'day', amount: 'amount' },
-    example: { rows: [{ title: 'Rent', meta: '1 Nov' }, { title: 'Phone', meta: '3 Nov' }, { title: 'Paycheck', meta: '5 Nov' }] },
-    words: ['bills', 'bills coming up', 'due', 'payments', 'upcoming', 'pay', 'deadlines'],
-  },
-  {
-    id: 'late',
-    title: 'Late payments',
-    says: 'What fell due and was not paid, oldest first.',
-    group: 'money',
-    for: 'both',
-    icon: 'clock',
-    block: {
-      kind: 'timeline',
-      heading: 'Late',
-      icon: 'clock',
-      source: 'deadlines',
-      where: 'day before today',
-      columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
-      limit: 8,
-      empty: 'Nothing is late.',
-    },
-    sizes: LISTS,
-    size: 'wide',
-    needs: { addon: 'money-core', figures: ['cash-now'] },
-    rows: { title: 'title', day: 'day', amount: 'amount' },
-    example: { rows: [{ title: 'Studio rent', meta: '12 Oct' }, { title: 'Invoice 2026-031', meta: '20 Oct' }] },
-    words: ['overdue', 'unpaid'],
-  },
-  {
-    id: 'owed-to-you',
-    title: 'Owed to you',
-    says: 'What people and clients still owe you.',
-    group: 'money',
-    for: 'business',
-    icon: 'hand-coins',
-    block: stat('Owed to you', 'hand-coins', [{ metric: 'owed-to-you', label: 'Owed to you' }, { metric: 'owed-by-you', label: 'You owe' }]),
-    sizes: FIGURE,
-    size: 'small',
-    needs: { figures: ['owed-to-you'], addon: 'money-core' },
-    example: { figures: [{ label: 'Owed to you', said: '¤36,000' }] },
-    words: ['invoices', 'receivables', 'clients'],
-  },
-  {
-    id: 'net-worth',
-    title: 'Net worth',
-    says: 'Your cash and what you hold, less what you owe.',
-    group: 'money',
-    for: 'personal',
-    icon: 'scale',
-    block: stat('Net worth', 'scale', [{ metric: 'net-worth', label: 'Net worth' }, { metric: 'cash-now', label: 'Cash' }, { metric: 'held-beyond-cash', label: 'Held' }]),
-    sizes: FIGURE,
-    size: 'small',
-    needs: { figures: ['net-worth'], addon: 'money-core' },
-    example: { figures: [{ label: 'Net worth', said: '¤240,000' }] },
-    words: ['wealth', 'assets', 'total'],
-  },
-  {
-    id: 'savings-goal',
-    title: 'Savings goals',
-    says: 'How far each thing you are saving for has come.',
-    group: 'money',
-    for: 'personal',
-    icon: 'piggy-bank',
-    block: {
-      kind: 'progress',
-      heading: 'Savings goals',
-      icon: 'piggy-bank',
-      source: 'register.money_goals',
-      where: 'state is not paused',
-      columns: [{ field: 'name' }, { field: 'target' }, { field: 'by' }],
-      spent: 'goals-have-by-name',
-      order: [{ field: 'seq', dir: 'asc' }],
-      limit: 6,
-      empty: 'No goal yet. Add what you are saving for.',
-    },
-    sizes: LISTS,
-    size: 'small',
-    needs: { lists: ['money_goals'], addon: 'goals' },
-    rows: { title: 'name', amount: 'target', day: 'by' },
-    example: { rows: [{ title: 'Car', meta: '62% of ¤25,000' }, { title: 'Summer trip', meta: '30% of ¤4,000' }] },
-    words: ['save', 'saving', 'goal'],
-  },
-  {
-    id: 'subscriptions',
-    title: 'Subscriptions',
-    says: 'What your subscriptions cost a month, and what renews in 30 days.',
-    group: 'money',
-    for: 'both',
-    icon: 'repeat',
-    block: stat('Subscriptions', 'repeat', [{ metric: 'subs-month', label: 'A month' }, { metric: 'subs-renew-30d', label: 'Renew in 30 days' }, { metric: 'subs-unused', label: 'Unused' }]),
-    sizes: FIGURE,
-    size: 'small',
-    needs: { figures: ['subs-month'], addon: 'subscriptions' },
-    example: { figures: [{ label: 'A month', said: '¤110' }, { label: 'Renew in 30 days', said: '4' }] },
-    words: ['subs', 'renewals', 'netflix', 'spotify'],
-  },
-  {
-    id: 'splits',
-    title: 'Splits',
-    says: 'Who owes you for shared costs, and who you owe.',
-    group: 'money',
-    for: 'personal',
-    icon: 'split',
-    block: stat('Splits', 'split', [{ metric: 'splits-to-me', label: 'Friends owe you' }, { metric: 'splits-to-them', label: 'You owe friends' }]),
-    sizes: FIGURE,
-    size: 'small',
-    needs: { figures: ['splits-to-me'], addon: 'splits' },
-    example: { figures: [{ label: 'Friends owe you', said: '¤180' }] },
-    words: ['shared', 'friends', 'iou'],
-  },
-  {
-    id: 'tax-aside',
-    title: 'Tax set aside',
-    says: 'What you have put by for tax this year, and what is due.',
-    group: 'money',
-    for: 'business',
-    icon: 'percent',
-    block: stat('Tax set aside', 'percent', [{ metric: 'tax-aside-year', label: 'Set aside this year' }, { metric: 'tax-due', label: 'Due' }]),
-    sizes: FIGURE,
-    size: 'small',
-    needs: { figures: ['tax-aside-year'], addon: 'tax-set-aside' },
-    example: { figures: [{ label: 'Set aside this year', said: '¤7,900' }] },
-    words: ['tax', 'vat', 'self assessment'],
-  },
-  {
-    id: 'receipts',
-    title: 'Receipts',
-    says: 'Payments still missing a receipt, and receipts waiting to be matched.',
-    group: 'money',
-    for: 'business',
-    icon: 'receipt',
-    block: stat('Receipts', 'receipt', [{ metric: 'receipts-missing', label: 'Missing a receipt' }, { metric: 'receipts-waiting', label: 'To match' }]),
-    sizes: FIGURE,
-    size: 'small',
-    needs: { figures: ['receipts-missing'], addon: 'receipts' },
-    example: { figures: [{ label: 'Missing a receipt', said: '3' }] },
-    words: ['expenses', 'paperwork'],
-  },
-  {
-    id: 'savings-circle',
-    title: 'Savings circle',
-    says: 'What you pay into your circles a month, and the payouts to come.',
-    group: 'money',
-    for: 'personal',
-    icon: 'coins',
-    block: stat('Savings circle', 'coins', [{ metric: 'circles-month', label: 'A month' }, { metric: 'circles-payouts', label: 'Payouts to come' }]),
-    sizes: FIGURE,
-    size: 'small',
-    needs: { figures: ['circles-month'], addon: 'savings-circle' },
-    example: { figures: [{ label: 'A month', said: '¤250' }] },
-    words: ['gameya', 'jameya', 'circle', 'rosca'],
-  },
-  {
-    id: 'gold-price',
-    title: 'Gold price',
-    says: 'Today’s gold rate for a gram, each karat.',
-    group: 'money',
-    for: 'personal',
-    icon: 'vault',
-    block: {
-      kind: 'table',
-      heading: 'Gold price',
-      icon: 'vault',
-      source: 'register.gold_rates',
-      where: 'live is true',
-      columns: [{ field: 'karat', label: 'Karat' }, { field: 'per_gram', label: 'A gram', align: 'end' }],
-      order: [{ field: 'karat', dir: 'asc' }],
-      limit: 3,
-      empty: 'No gold rate yet.',
-    },
-    sizes: ['small', 'wide', 'tall'],
-    size: 'small',
-    needs: { lists: ['gold_rates'], addon: 'holdings' },
-    rows: { title: 'karat', amount: 'per_gram' },
-    example: { rows: [{ title: '24k', meta: '¤110 a gram' }, { title: '21k', meta: '¤96 a gram' }] },
-    words: ['gold', 'karat', 'grams'],
-  },
-  {
-    id: 'exchange-rate',
-    title: 'Exchange rate',
-    says: 'What a dollar is worth in your money today.',
-    group: 'money',
-    for: 'personal',
-    icon: 'globe',
-    block: {
-      kind: 'table',
-      heading: 'Exchange rate',
-      icon: 'globe',
-      source: 'register.fx',
-      where: 'currency is {{currency}}',
-      columns: [{ field: 'currency' }, { field: 'rate', align: 'end' }, { field: 'as_of' }],
-      order: [{ field: 'as_of', dir: 'desc' }],
-      limit: 1,
-      empty: 'No rate yet.',
-    },
-    blanks: [{ id: 'currency', asks: 'Which currency?' }],
-    sizes: ['small', 'wide'],
-    size: 'small',
-    needs: { lists: ['fx'], addon: 'rates-open-er-api-com' },
-    rows: { title: 'currency', meta: 'rate', day: 'as_of' },
-    example: { figures: [{ label: 'Against the US dollar', said: '¤fx' }] },
-    words: ['rate', 'dollar', 'usd', 'fx', 'currency'],
-  },
-
-  /* ── work ── */
   {
     id: 'needs-you',
     alike: ['needs-you'],
@@ -425,39 +133,13 @@ export const WIDGETS: readonly WidgetTemplate[] = [
     group: 'work',
     for: 'both',
     icon: 'inbox',
-    block: { kind: 'queue', heading: 'Needs you', icon: 'inbox', source: 'governance.open', limit: 8, empty: 'Nothing is waiting on you.', tiles: true },
+    block: { kind: 'queue', heading: 'Needs you', icon: 'inbox', source: 'governance.open', limit: 8, empty: OPEN_WORK, tiles: true },
     sizes: ['wide', 'tall', 'large', 'full'],
     size: 'wide',
     needs: {},
     rows: { title: 'question' },
     example: { rows: [{ title: 'Does Tallow get retired, or parked for another year?' }] },
     words: ['questions', 'decide', 'inbox', 'approve'],
-  },
-  {
-    id: 'next-up',
-    alike: ['work-due'],
-    title: 'Next up',
-    says: 'Tasks due in the next seven days, soonest first. Tick one where it is.',
-    group: 'work',
-    for: 'both',
-    icon: 'check',
-    block: {
-      kind: 'todo',
-      heading: 'Next up',
-      icon: 'check',
-      source: 'register.tasks',
-      where: `${OPEN_TASK}, by before +8d`,
-      columns: [{ field: 'what' }, { field: 'by' }],
-      order: [{ field: 'by', dir: 'asc' }],
-      limit: 8,
-      empty: 'Nothing due this week.',
-    },
-    sizes: LISTS,
-    size: 'tall',
-    needs: { lists: ['tasks'], addon: 'work' },
-    rows: { title: 'what', day: 'by' },
-    example: { rows: [{ title: 'Send the specimen proofs', meta: 'Today' }, { title: 'Book the accountant', meta: '31 Oct' }] },
-    words: ['tasks', 'todo', 'to do', 'due'],
   },
   {
     id: 'since-last',
@@ -475,81 +157,6 @@ export const WIDGETS: readonly WidgetTemplate[] = [
     example: { rows: [{ title: 'Kiln', meta: 'Claude edited it' }, { title: 'Filed 2 payments under Software' }] },
     words: ['activity', 'changes', 'feed', 'news'],
   },
-
-  /* ── people ── */
-  {
-    id: 'people-back',
-    title: 'People to get back to',
-    says: 'People you have not been in touch with for three months.',
-    group: 'people',
-    for: 'both',
-    icon: 'users',
-    block: {
-      kind: 'cards',
-      heading: 'People to get back to',
-      icon: 'users',
-      source: 'register.people',
-      where: 'merged_into is empty, self is not true, in_touch before -90d',
-      columns: [{ field: 'name', as: 'who' }, { field: 'in_touch', as: 'fact', label: 'Last in touch' }],
-      order: [{ field: 'in_touch', dir: 'asc' }],
-      limit: 6,
-      empty: 'You are in touch with everyone.',
-    },
-    sizes: ['wide', 'tall', 'large', 'full'],
-    size: 'tall',
-    needs: { lists: ['people'], addon: 'people' },
-    rows: { title: 'name', day: 'in_touch' },
-    example: { rows: [{ title: 'Priya Shah', meta: 'Last in touch 2 Jul' }, { title: 'Omar Fathy', meta: 'Last in touch 14 Jun' }] },
-    words: ['contacts', 'friends', 'clients', 'catch up', 'in touch'],
-  },
-
-  /* ── projects ── */
-  {
-    id: 'projects',
-    alike: ['projects'],
-    title: 'Projects in play',
-    says: 'Each project you are working on, with when it was last worked on.',
-    group: 'projects',
-    for: 'business',
-    icon: 'grid',
-    block: {
-      kind: 'cards',
-      heading: 'Projects',
-      icon: 'grid',
-      source: 'register.things',
-      /* IN PLAY, AS THE SIDEBAR COUNTS THEM: a parked or retired project is not one (audit of 30 October, 12). */
-      where: 'lane is not parked or retired',
-      columns: [{ field: 'name', as: 'title' }, { metric: 'project-worked:{{name}}', as: 'when', label: 'Worked on' }],
-      limit: 8,
-    },
-    sizes: ['wide', 'large', 'full'],
-    size: 'full',
-    needs: { lists: ['things'], addon: 'portfolio' },
-    rows: { title: 'name', meta: 'next' },
-    example: { rows: [{ title: 'Kiln', meta: 'Worked on today' }, { title: 'Marlow & Co', meta: 'Worked on 2 days ago' }, { title: 'Portage' }] },
-    words: ['projects', 'portfolio', 'clients'],
-  },
-  {
-    id: 'project-pulse',
-    title: 'Project pulse',
-    says: 'One project: its open work, what is due soon and when it was last worked on.',
-    group: 'projects',
-    for: 'business',
-    icon: 'briefcase',
-    block: stat('{{project}}', 'briefcase', [
-      { metric: 'project-open:{{project}}', label: 'Open' },
-      { metric: 'project-due-soon:{{project}}', label: 'Due soon' },
-      { metric: 'project-done-7d:{{project}}', label: 'Done this week' },
-    ]),
-    blanks: [{ id: 'project', asks: 'Which project?' }],
-    sizes: FIGURE,
-    size: 'wide',
-    needs: { lists: ['things', 'tasks'], figures: ['project-open'], addon: 'work' },
-    example: { figures: [{ label: 'Open', said: '12' }, { label: 'Due soon', said: '3' }] },
-    words: ['project', 'pulse', 'status'],
-  },
-
-  /* ── agents ── */
   {
     id: 'agents-working',
     alike: ['working'],
@@ -572,169 +179,16 @@ export const WIDGETS: readonly WidgetTemplate[] = [
     rows: { title: 'doing', meta: 'agent' },
     example: { rows: [{ title: 'Variable axis QA, instances 3 of 9', meta: 'Claude' }, { title: 'Drafting the specimen page copy', meta: 'Codex' }] },
     words: ['claude', 'codex', 'cursor', 'runs', 'sessions', 'working'],
-  },
-
-  /* ── numbers ── */
-  {
-    id: 'numbers',
-    alike: ['numbers'],
-    title: 'Key numbers',
-    says: 'The few numbers that lead, your pinned ones first, each with its line.',
-    group: 'numbers',
-    for: 'business',
-    icon: 'gauge',
-    block: { kind: 'kpis', heading: 'Key numbers', icon: 'gauge', source: 'kpis', for: 'today', empty: 'No key numbers yet.' },
-    sizes: ['small', 'wide', 'tall', 'large', 'full'],
-    size: 'wide',
-    needs: { lists: ['kpis'], addon: 'portfolio' },
-    example: { figures: [{ label: 'Subscribers', said: '486' }, { label: 'Hours billed', said: '32' }] },
-    words: ['kpi', 'kpis', 'metrics', 'revenue'],
-  },
-
-  /* ── life ── */
-  {
-    id: 'habits',
-    title: 'Habits this week',
-    says: 'Each habit, against what you set out to do this week.',
-    group: 'life',
-    for: 'personal',
-    icon: 'repeat',
-    block: {
-      kind: 'progress',
-      heading: 'Habits this week',
-      icon: 'repeat',
-      source: 'register.goals',
-      where: 'state is active, kind is habit',
-      columns: [{ field: 'what' }, { field: 'target' }, { field: 'unit' }],
-      toward: 'logged-this-week-by-goal',
-      order: [{ field: 'seq', dir: 'asc' }],
-      limit: 6,
-      empty: 'No habits yet. Add one, like running three times a week.',
-    },
-    sizes: LISTS,
-    size: 'small',
-    needs: { lists: ['goals', 'goal_log'] },
-    rows: { title: 'what', meta: 'unit' },
-    example: { rows: [{ title: 'Run', meta: '2 of 3 times' }, { title: 'Read', meta: '4 of 7 days' }] },
-    words: ['habit', 'routine', 'run', 'read'],
-  },
-  /* THE WEATHER AND THE CALENDAR, AS THEIR ADD-ONS SHIP THEM (the validator's recheck of 30 October, 27): the same blocks
-     and ids as `packs/weather` and `packs/calendar` declare, so the sheet shows them as "Comes with Weather" on a record
-     without the add-on, and an installed add-on's own copy is folded into this one (`withShipped`). */
-  {
-    id: 'weather-today',
-    title: 'Weather',
-    says: 'Today’s weather where you are: the sky, the high and the low, and the chance of rain.',
-    group: 'life',
-    for: 'personal',
-    icon: 'cloud',
-    block: {
-      kind: 'cards',
-      heading: 'Weather',
-      icon: 'cloud',
-      source: 'register.weather',
-      where: 'day is today',
-      columns: [
-        { field: 'what', as: 'title' },
-        { field: 'high', label: 'High', as: 'figure' },
-        { field: 'low', label: 'Low', as: 'fact' },
-        { field: 'rain', label: 'Chance of rain %', as: 'fact' },
-        { field: 'place', label: 'Where', as: 'fact' },
-      ],
-      limit: 1,
-      empty: 'Set your town on the Weather page.',
-    },
-    sizes: ['small', 'wide'],
-    size: 'small',
-    needs: { lists: ['weather'], addon: 'weather' },
-    example: { figures: [{ label: 'Partly cloudy · low 14°', said: '22°' }] },
-    words: ['weather', 'rain', 'temperature', 'forecast', 'sun'],
-  },
-  {
-    id: 'calendar-next',
-    title: 'Next meetings',
-    says: 'What is in your calendar next, soonest first.',
-    group: 'life',
-    for: 'both',
-    icon: 'calendar-days',
-    block: {
-      kind: 'table',
-      heading: 'Next meetings',
-      icon: 'calendar-days',
-      source: 'register.events',
-      where: 'gone is not true, day after yesterday',
-      columns: [{ field: 'day', label: 'Day' }, { field: 'time', label: 'At' }, { field: 'what', label: 'What' }],
-      order: [{ field: 'day', dir: 'asc' }, { field: 'time', dir: 'asc' }],
-      limit: 6,
-      empty: 'Nothing coming up.',
-    },
-    sizes: ['wide', 'tall', 'large'],
-    size: 'tall',
-    needs: { lists: ['events'], addon: 'calendar' },
-    rows: { title: 'what', day: 'day', meta: 'time' },
-    example: { rows: [{ title: 'Call with the accountant', meta: 'Tomorrow · 10:00' }, { title: 'Studio walk-through', meta: 'Tomorrow · 14:00' }] },
-    words: ['calendar', 'meetings', 'events', 'schedule', 'appointments'],
-  },
-  /* ONE TRIP, COUNTED DOWN, AND GONE AFTER IT (Call 18): `until` is the trip's last day, filled with the trip as
-     `{{trip_until}}`, so the board stops drawing it once he is back. Drawn, since no kind counts days to one row. */
-  {
-    id: 'trip-countdown',
-    title: 'Trip countdown',
-    says: 'The days until your next trip, or the one you pick. It leaves the board on its own once you are back.',
-    group: 'life',
-    for: 'personal',
-    icon: 'plane',
-    block: {
-      kind: 'drawn',
-      heading: '{{trip}}',
-      icon: 'plane',
-      source: 'register.trips',
-      where: 'name is "{{trip}}"',
-      columns: [{ field: 'name' }, { field: 'from' }, { field: 'to' }],
-      order: [{ field: 'from', dir: 'asc' }],
-      limit: 1,
-      until: '{{trip_until}}',
-      code: TRIP_COUNTDOWN,
-    },
-    blanks: [{ id: 'trip', asks: 'Which trip?' }],
-    sizes: ['small', 'wide', 'tall'],
-    size: 'small',
-    needs: { lists: ['trips'], addon: 'trips' },
-    rows: { title: 'name', day: 'from' },
-    example: { figures: [{ label: 'until Lisbon', said: '16 days' }] },
-    words: ['travel', 'holiday', 'countdown', 'flight', 'days until', 'next trip', 'trip'],
+    asked: [{ match: "\\b(agents?|claude|codex|cursor) (are |is )?(working|doing|on)\\b", about: 'what the agents are doing' }],
+    leads: ['agents'],
   },
 ];
 
-/** A template by its id, or `undefined`. */
-export const widgetById = (id: string): WidgetTemplate | undefined => WIDGETS.find((w) => w.id === id);
+/** A template by its id among `from`, the core's own unless the record's whole catalogue is handed in. */
+export const widgetById = (id: string, from: readonly WidgetTemplate[] = WIDGETS): WidgetTemplate | undefined => from.find((w) => w.id === id);
 
 /** Whether a template draws at a size. */
 export const widgetFits = (t: Pick<WidgetTemplate, 'sizes'>, size: WidgetSize): boolean => t.sizes.includes(size);
-
-
-/**
- * THE TWO STARTER BOARDS (§3.7, Call 17): six widgets each, small enough to read on one phone screen and a laptop's
- * first glance (risk 2, "nine phone screens of tiles"). Everyone can add any other.
- */
-export const STARTER_BOARDS: Readonly<Record<'personal' | 'business', readonly { id: string; size: WidgetSize }[]>> = {
-  personal: [
-    { id: 'cash-today', size: 'wide' },
-    { id: 'spending', size: 'wide' },
-    { id: 'coming-up', size: 'tall' },
-    { id: 'savings-goal', size: 'small' },
-    { id: 'habits', size: 'small' },
-    { id: 'people-back', size: 'tall' },
-  ],
-  business: [
-    { id: 'needs-you', size: 'wide' },
-    { id: 'late', size: 'wide' },
-    { id: 'agents-working', size: 'wide' },
-    { id: 'cash-today', size: 'wide' },
-    { id: 'numbers', size: 'wide' },
-    { id: 'projects', size: 'full' },
-  ],
-};
 
 /** Every `{{blank}}` in a block filled from `values`; a blank with no value is left as it is written. Deep, and pure. */
 export function fillBlanks<T>(block: T, values: Readonly<Record<string, string>>): T {
@@ -757,7 +211,7 @@ const OWN_BLANKS = (t: Pick<WidgetTemplate, 'blanks'>): string[] => (t.blanks ??
  * A template as a block a board can hold: its blanks filled, its rows capped to what the size shows, and nothing a
  * board writes for itself (the size and the key are the board's). The board's `onadd({ block, size })` takes this.
  */
-export function widgetBlock(t: WidgetTemplate, size: WidgetSize = t.size, values: Readonly<Record<string, string>> = {}): Record<string, unknown> {
+export function widgetBlock(t: Pick<WidgetTemplate, 'block' | 'blanks' | 'size'>, size: WidgetSize = t.size, values: Readonly<Record<string, string>> = {}): Record<string, unknown> {
   const own = Object.fromEntries(Object.entries(values).filter(([k]) => OWN_BLANKS(t).includes(k)));
   const block = fillBlanks({ ...t.block }, own) as Record<string, unknown>;
   /* AN `until` NOTHING FILLED IS LEFT OUT: the widget then stays until it is taken away, rather than being refused. */
@@ -779,11 +233,14 @@ export function chosenWith(w: Pick<GalleryWidget, 'untils'>, chosen: Readonly<Re
   return next;
 }
 
-/** Whether a template matches what was typed in the sheet's search: its name, its line, its group or its own words. */
-export function widgetMatches(t: WidgetTemplate, q: string): boolean {
+/**
+ * Whether a template matches what was typed in the sheet's search: its name, its line, its group or its own words. An
+ * add-on's widget carries its add-on's name among its words (`packTemplate`), so a search for the add-on finds its widgets.
+ */
+export function widgetMatches(t: Pick<WidgetTemplate, 'title' | 'says' | 'group' | 'for' | 'words'>, q: string): boolean {
   const words = q.toLowerCase().split(/\s+/u).filter((w) => w !== '');
   if (words.length === 0) return true;
-  const hay = [t.title, t.says, GROUP_NAMES[t.group], t.for, ...(t.words ?? []), t.needs.addon ? (WIDGET_ADDONS[t.needs.addon] ?? '') : ''].join(' ').toLowerCase();
+  const hay = [t.title, t.says, GROUP_NAMES[t.group], t.for, ...(t.words ?? [])].join(' ').toLowerCase();
   return words.every((w) => hay.includes(w));
 }
 
@@ -972,6 +429,14 @@ export type GalleryWidget = {
   need: string | null;
   reading: WidgetReading | null;
   example: WidgetExample;
+  /** Its words, for the sheet's search, the add-on's name among them. */
+  words?: string[];
+  /**
+   * The template as declared, its blanks unfilled: what the sheet fills again when another choice is picked
+   * (`widgetBlock`), and the fields its preview reads (`distill`). The catalogue is the record's, so the web reads the
+   * template here rather than from a copy of its own.
+   */
+  template?: { block: Record<string, unknown>; blanks?: WidgetBlank[]; rows?: RowsRead };
   /** True when Today already has a widget reading the same thing: the sheet says so, and suggests it nowhere. */
   onBoard?: boolean;
   /** The heading Today shows it under, where that is not the widget's own name ("Work this week" for Next up). */
@@ -994,6 +459,8 @@ export type WidgetOffer = {
   remove?: string;
   /** On S1, how many times the question was asked: the palette says "you've asked this 3 times". */
   asked?: number;
+  /** On S1, the patterns of the questions it answers, as its template declares them, so a screen can tell its question. */
+  asks?: string[];
   /** The widget drawn small on the record's own data, so the cell shows the real thing; absent where it was not read. */
   reading?: WidgetReading;
 };
@@ -1004,32 +471,33 @@ export type GalleryAnswer = { widgets: GalleryWidget[]; suggested: WidgetOffer[]
 
 /**
  * WHICH WIDGET ANSWERS A QUESTION (signal S1, widgets plan §6.1): the words a question to Slash is matched to a widget by,
- * the first that matches winning, so the narrower come first. The record counts the days each was asked on; the palette
- * reads the same words to say "you've asked this 3 times" under an answer. Rules, never a model.
+ * as each template declares them (`asked`), the first that matches winning. The record counts the days each was asked
+ * on; the palette reads the same words to say "you've asked this 3 times" under an answer. Rules, never a model.
+ *
+ * EACH WIDGET SAYS ITS OWN (SHL-A22): this was one list of eighteen in the core, keyed by the widgets' ids, so the core
+ * knew which add-on each word was about. Narrower patterns are listed first in a template, and the
+ * templates are asked in the catalogue's order.
  */
-export const ASKED: readonly { widget: string; re: RegExp; about: string }[] = [
-  { widget: 'net-worth', re: /\bnet ?worth\b/iu, about: 'your net worth' },
-  { widget: 'budget-left', re: /\bbudgets?\b/iu, about: 'your budgets' },
-  { widget: 'cash-today', re: /\b(runway|run out|how long (will|does|would) (the |my |our )?(cash|money) last)\b/iu, about: 'how long the cash lasts' },
-  { widget: 'owed-to-you', re: /\b(owe[sd]? (me|us)|owed to (me|us)|unpaid invoices?|outstanding)\b/iu, about: 'what is owed to you' },
-  { widget: 'late', re: /\b(late|overdue)\b/iu, about: 'what is late' },
-  { widget: 'coming-up', re: /\b(bills?|what (do i|have i got to) pay)\b/iu, about: 'bills coming up' },
-  { widget: 'spending', re: /\b(spen[dt]|spending|expenses?|went on)\b/iu, about: 'what you spent' },
-  { widget: 'cash-today', re: /\b(cash|balance|in the bank|how much (money )?(do|have) (i|we) (have|got))\b/iu, about: 'your cash' },
-  { widget: 'subscriptions', re: /\bsubscriptions?\b/iu, about: 'your subscriptions' },
-  { widget: 'gold-price', re: /\bgold\b/iu, about: 'gold' },
-  { widget: 'exchange-rate', re: /\b(exchange rate|dollar rate|usd|the rate)\b/iu, about: 'the exchange rate' },
-  { widget: 'savings-goal', re: /\b(savings?|saving for|goal)\b/iu, about: 'your savings' },
-  { widget: 'trip-countdown', re: /\b(trip|travel|flight|holiday)\b/iu, about: 'your trip' },
-  { widget: 'habits', re: /\b(habits?|streak)\b/iu, about: 'your habits' },
-  { widget: 'people-back', re: /\b(get back to|in touch|haven'?t (talked|spoken|heard))\b/iu, about: 'who to get back to' },
-  { widget: 'agents-working', re: /\b(agents?|claude|codex|cursor) (are |is )?(working|doing|on)\b/iu, about: 'what the agents are doing' },
-  { widget: 'numbers', re: /\b(kpis?|key numbers|metrics)\b/iu, about: 'your key numbers' },
-  { widget: 'next-up', re: /\b(tasks?|to ?do|what('s| is) (due|next)|due this week)\b/iu, about: 'what is due' },
-];
+export function askedOf(templates: readonly WidgetTemplate[]): { widget: string; re: RegExp; about: string }[] {
+  /* EVERY TEMPLATE'S FIRST PATTERN BEFORE ANY TEMPLATE'S SECOND: a widget's broader words are its later ones ("cash" after
+     "how long the cash lasts"), and they must not win over another widget's narrow first ones ("what I spent in cash"). */
+  const most = Math.max(0, ...templates.map((t) => t.asked?.length ?? 0));
+  const out: { widget: string; re: RegExp; about: string }[] = [];
+  for (let i = 0; i < most; i++)
+    for (const t of templates) {
+      const a = t.asked?.[i];
+      if (a === undefined) continue;
+      try {
+        out.push({ widget: t.id, re: new RegExp(a.match, 'iu'), about: a.about });
+      } catch {
+        /* A pattern that does not compile answers nothing; the manifest check refuses one at install. */
+      }
+    }
+  return out;
+}
 
-/** The widget a question asks about, by its words, or `null`. */
-export const askedWidget = (text: string): string | null => ASKED.find((a) => a.re.test(text))?.widget ?? null;
+/** The widget among `templates` a question asks about, by its words, or `null`. */
+export const askedWidget = (text: string, templates: readonly WidgetTemplate[] = WIDGETS): string | null => askedOf(templates).find((a) => a.re.test(text))?.widget ?? null;
 
 /**
  * ABOUT WHAT A UNIT OF EACH CURRENCY IS WORTH IN US DOLLARS, for the exchange rate's example only: the gallery says the
@@ -1062,7 +530,7 @@ const sampleRound = (n: number): number => {
 
 /**
  * An example's money said in the record's currency. Each `¤1,240` is written in US dollars and said as about that much
- * of the record's own money (`SAMPLE_DOLLARS`), so a gram of gold is about £87 on a GBP record and about EGP 5,300 on
+ * of the record's own money (`SAMPLE_DOLLARS`), so ¤110 is about £87 on a GBP record and about 5,300 pounds on
  * an EGP one, never an EGP figure with a £ in front of it (the validator's recheck of 30 October, 12). A currency the
  * table does not know says the dollars as dollars. `¤fx` is the record's money against the dollar (`sampleRate`). Pure.
  */

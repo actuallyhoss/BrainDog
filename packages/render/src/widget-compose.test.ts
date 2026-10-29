@@ -8,14 +8,16 @@ const choices = {
   categories: ['Software', 'Travel'],
   payees: ['Fenwick Cloud'],
   currencies: ['GBP'],
-  lists: new Set(['transactions', 'tasks', 'things']),
+  lists: new Set(['ledger_lines', 'todos', 'things']),
+  ledger: 'ledger_lines',
+  todo: 'todos',
 };
 
 test('money in one category over a window is a list of the ledger, newest first', () => {
   const made = composeWidget('my Software spending this month', choices);
   assert.ok(made);
   assert.equal(made.block.kind, 'table');
-  assert.equal(made.block.source, 'register.transactions');
+  assert.equal(made.block.source, 'register.ledger_lines');
   assert.match(String(made.block.where), /direction is out/u);
   assert.match(String(made.block.where), /category is Software/u);
   assert.match(String(made.block.where), /on at least bom/u);
@@ -39,6 +41,9 @@ test("a project's late tasks are a list to tick", () => {
 test('a line the rules cannot read is null, so only then is the model asked', () => {
   assert.equal(composeWidget('the moon phase over my garden', { lists: new Set() }), null);
   assert.equal(composeWidget('   ', choices), null);
+  /* A record with no list shaped as a ledger is offered no ledger rule. */
+  const { ledger: _l, ...noLedger } = choices;
+  assert.equal(composeWidget('my Software spending this month', noLedger), null);
 });
 
 test('windows are said as a person says them', () => {

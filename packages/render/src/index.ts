@@ -362,7 +362,7 @@ export {
 export { DRAWN_ROWS_MOST, drawnData, type DrawnData, type DrawnRow, type DrawnValue } from './drawn-data.ts';
 /* A visual a thing carries, drawn in the same frame: its page with its pictures inline, whole width. */
 export { pictureData, swapPictures, visualDocument } from './visual.ts';
-/* The widget catalogue (widgets plan §7.2): every widget the sheet offers, its sizes, the starter boards, and a block's
+/* The widget catalogue (widgets plan §7.2): the core's own widgets, their sizes, and a block's
    reading distilled to what a preview draws. */
 export * from './widgets.ts';
 /* The widgets installed add-ons ship, joined to the catalogue at read time (widgets plan §6.5). */
@@ -371,4 +371,3 @@ export * from './widget-packs.ts';
 export * from './widget-compose.ts';
 /* Drawn widgets (W7): frames per size, how many run at once, the model's ask, and whether a widget is still shown (`until`). */
 export { DRAWN_ALIVE_MOST, WIDGET_GAP_PX, WIDGET_ROW_PX, drawWidgetAsk, drawnFrameHeight, drawnSizes, drawnSizesFault, stillShown, untilOf } from './drawn-widget.ts';
-export { TRIP_COUNTDOWN } from './trip-countdown.ts';

@@ -4,14 +4,14 @@
  * of the add-ons it holds and each widget becomes a template as the catalogue's are, under its add-on, so the sheet, the
  * suggestions and Make your own treat it as one of their own.
  *
- * TWO SPELLINGS ARE READ, as the manifest check reads them: `needs` as ids (`["register.weather"]`) or as `{ lists,
+ * TWO SPELLINGS ARE READ, as the manifest check reads them: `needs` as ids (`["register.<list>"]`) or as `{ lists,
  * figures }`, and `example` as the rows it would show or as `{ figures, rows }`. A one-row card's example is said as
  * figures, by its columns' labels, which is how the sheet draws a one-row card.
  *
  * PURE, so a test holds it in Node.
  */
 
-import { WIDGET_GROUPS, WIDGET_SIZES, WIDGETS, type RowsRead, type WidgetExample, type WidgetGroup, type WidgetSize, type WidgetTemplate } from './widgets.ts';
+import { WIDGET_FOR, WIDGET_GROUPS, WIDGET_SIZES, WIDGETS, type RowsRead, type WidgetBlank, type WidgetExample, type WidgetFor, type WidgetGroup, type WidgetSize, type WidgetTemplate } from './widgets.ts';
 
 /** A widget as an add-on's manifest keeps it. Loose, because the record reads manifests a stranger wrote. */
 export type ShippedWidget = Readonly<Record<string, unknown>>;
@@ -84,8 +84,17 @@ export function exampleOf(raw: unknown, block: Readonly<Record<string, unknown>>
   };
 }
 
-/** One shipped widget as a catalogue template under its add-on, or `null` when it does not read as one. */
-export function packTemplate(w: ShippedWidget, by: Shipper): WidgetTemplate | null {
+/** The declared keys a shipped widget may carry for the record's signals, read as written and checked by shape. */
+const isRows = (v: unknown): v is RowsRead => isBag(v) && typeof v.title === 'string' && Object.values(v).every((x) => typeof x === 'string');
+const isBlank = (v: unknown): v is WidgetBlank => isBag(v) && typeof v.id === 'string' && typeof v.asks === 'string' && (v.from === undefined || (isBag(v.from) && typeof v.from.source === 'string' && typeof v.from.field === 'string'));
+
+/**
+ * One shipped widget as a catalogue template under its add-on, or `null` when it does not read as one. `taken` is the ids
+ * already in the catalogue: A WIDGET KEEPS THE ID ITS ADD-ON GAVE IT unless another already holds it, and then it is
+ * `<add-on>.<id>`, so two add-ons that both ship a `today` are two widgets and what a person kept or turned down of a
+ * widget that moved out of the core into its add-on (SHL-A22) still counts under the id it always had.
+ */
+export function packTemplate(w: ShippedWidget, by: Shipper, taken: ReadonlySet<string> = new Set()): WidgetTemplate | null {
   const id = text(w.id);
   const title = text(w.title);
   if (id === undefined || title === undefined || !isBag(w.block) || typeof w.block.kind !== 'string') return null;
@@ -101,36 +110,48 @@ export function packTemplate(w: ShippedWidget, by: Shipper): WidgetTemplate | nu
     : isBag(w.needs)
       ? { lists: strings(w.needs.lists), figures: strings(w.needs.figures) }
       : { lists: [] as string[], figures: [] as string[] };
-  const rows = rowsReadFor(w.block);
+  const rows = isRows(w.rows) ? w.rows : rowsReadFor(w.block);
+  const blanks = Array.isArray(w.blanks) ? w.blanks.filter(isBlank) : [];
+  const asked = Array.isArray(w.asked) ? w.asked.flatMap((a) => (isBag(a) && typeof a.match === 'string' && typeof a.about === 'string' ? [{ match: a.match, about: a.about }] : [])) : [];
   return {
-    /* THE ID IS THE ADD-ON'S AND THE WIDGET'S, so two add-ons that both ship a `today` are two widgets. */
-    id: id === by.id || id.startsWith(`${by.id}-`) || id.startsWith(`${by.id}.`) ? id : `${by.id}.${id}`,
+    id: taken.has(id) ? `${by.id}.${id}` : id,
     title,
     says: text(w.says) ?? `From ${by.title}.`,
     group,
-    for: w.for === 'personal' || w.for === 'business' ? w.for : 'both',
+    for: (WIDGET_FOR as readonly unknown[]).includes(w.for) ? (w.for as WidgetFor) : 'both',
     icon: text(w.icon) ?? text(w.block.icon) ?? 'grid',
     block: { heading: title, ...w.block },
-    ...(Array.isArray(w.blanks) && w.blanks.length > 0 ? { blanks: w.blanks as WidgetTemplate['blanks'] & object } : {}),
+    ...(blanks.length > 0 ? { blanks } : {}),
     sizes,
     size,
     needs: { ...(needs.lists.length > 0 ? { lists: needs.lists } : {}), ...(needs.figures.length > 0 ? { figures: needs.figures } : {}), addon: by.id },
-    ...(rows && w.block.kind !== 'cards' ? { rows } : {}),
+    /* A ONE-ROW CARD IS DRAWN AS FIGURES, so it reads no rows, unless its add-on said which fields it reads. */
+    ...(rows && (w.block.kind !== 'cards' || isRows(w.rows)) ? { rows } : {}),
     example: exampleOf(w.example, w.block),
     words: [...strings(w.words), by.title.toLowerCase()],
+    ...(strings(w.alike).length > 0 ? { alike: strings(w.alike) } : {}),
+    ...(asked.length > 0 ? { asked } : {}),
+    ...(strings(w.leads).length > 0 ? { leads: strings(w.leads) } : {}),
+    ...(text(w.fills) !== undefined ? { fills: text(w.fills)! } : {}),
+    ...(isBag(w.fresh) && text(w.fresh.says) && text(w.fresh.unnamed) ? { fresh: { says: text(w.fresh.says)!, unnamed: text(w.fresh.unnamed)! } } : {}),
+    ...(isBag(w.near) && typeof w.near.day === 'string' && typeof w.near.within === 'number' && text(w.near.unnamed)
+      ? { near: { day: w.near.day, within: w.near.within, unnamed: text(w.near.unnamed)!, ...(typeof w.near.name === 'string' ? { name: w.near.name } : {}) } }
+      : {}),
+    ...(isBag(w.due) && typeof w.due.where === 'string' && typeof w.due.least === 'number' && text(w.due.says) ? { due: { where: w.due.where, least: w.due.least, says: text(w.due.says)! } } : {}),
   };
 }
 
 /**
- * The catalogue with every installed add-on's widgets after its own, in add-on order. A shipped widget whose id the
- * catalogue already has is left out: the catalogue's is the one BrainDog checked.
+ * The catalogue with every add-on's widgets after its own, in the order the add-ons are handed in. A shipped widget
+ * whose id is already taken is kept under its add-on's id (`packTemplate`); the same widget handed in twice, from the
+ * record's manifest and from the catalogue's, is the caller's to hand once.
  */
 export function withShipped(packs: readonly { by: Shipper; widgets: readonly ShippedWidget[] }[], base: readonly WidgetTemplate[] = WIDGETS): WidgetTemplate[] {
   const out = [...base];
   const seen = new Set(out.map((t) => t.id));
   for (const p of packs)
     for (const w of p.widgets) {
-      const t = packTemplate(w, p.by);
+      const t = packTemplate(w, p.by, seen);
       if (t !== null && !seen.has(t.id)) {
         seen.add(t.id);
         out.push(t);
