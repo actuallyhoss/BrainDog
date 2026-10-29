@@ -633,7 +633,10 @@ export const seenWords = {
   fromTexts: 'Shops from card texts',
   /* THE LIST'S ONE LINE, the same words People says over it: "4 organisations you work with, 13 shops from card texts." */
   orgsSaid: (known: number, shops: number): string =>
-    [known > 0 ? `${known} ${known === 1 ? 'organisation' : 'organisations'} you work with` : '', shops > 0 ? `${shops} ${shops === 1 ? 'shop' : 'shops'} from card texts` : '']
+    [
+      known > 0 ? `${known} ${known === 1 ? 'organisation you work with' : 'organisations you work with'}` : '',
+      shops > 0 ? `${shops} ${shops === 1 ? 'shop from card texts' : 'shops from card texts'}` : '',
+    ]
       .filter(Boolean)
       .join(', ') + '.',
   /* AN ORGANISATION A BANK TEXT FILED, said on its page as a sentence and not as "Seen in · Bank text". */
